@@ -1,0 +1,805 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+}
+
+#container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #ffffff;
+  border: none;
+  pointer-events: none; /* コンテナ自体はクリックを受け付けない */
+}
+
+#mindmap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-color: #ffffff;
+  cursor: grab;
+  pointer-events: auto; /* SVGのみクリック可能 */
+}
+
+#mindmap:active {
+  cursor: grabbing;
+}
+
+text {
+  user-select: none;
+  cursor: pointer;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+rect {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* 折りたたみノードのスタイル */
+.collapsed rect {
+  stroke-dasharray: 5,3;
+  animation: collapsedPulse 2s infinite;
+}
+
+/* 折りたたみノードのパルスアニメーション */
+@keyframes collapsedPulse {
+  0% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.6;
+  }
+  100% {
+    stroke-opacity: 1;
+  }
+}
+
+/* インジケーターのホバー効果 */
+circle:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+g {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+g:hover {
+  cursor: pointer;
+}
+
+g.dragging {
+  cursor: grabbing !important;
+  opacity: 0.8;
+}
+
+g.selected {
+  cursor: pointer;
+}
+
+/* スライドメニュー */
+.slide-menu {
+  position: fixed !important;
+  top: 0 !important;
+  left: -300px !important;
+  width: 300px !important;
+  height: 100vh !important;
+  background: #ffffff !important;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1) !important;
+  z-index: 1000 !important;
+  transition: left 0.3s ease !important;
+  display: block !important;
+}
+
+.slide-menu.open {
+  left: 0 !important;
+}
+
+.menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #2c3e50;
+  color: white;
+}
+
+.menu-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.menu-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-close:hover {
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+}
+
+.menu-content {
+  padding: 20px !important;
+  pointer-events: auto !important;
+}
+
+.layout-btn {
+  width: 100% !important;
+  padding: 15px 20px !important;
+  margin-bottom: 10px !important;
+  border: 2px solid #e0e0e0 !important;
+  background: white !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+  pointer-events: auto !important;
+  z-index: 1002 !important;
+  position: relative !important;
+}
+
+.layout-btn:hover {
+  border-color: #3498db !important;
+  background: #f8f9fa !important;
+}
+
+.layout-btn.active {
+  border-color: #3498db !important;
+  background: #e3f2fd !important;
+  color: #1976d2 !important;
+  font-weight: 600 !important;
+}
+
+.layout-icon {
+  margin-right: 12px !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  pointer-events: none !important;
+}
+
+/* メニュートグルボタン */
+.menu-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 50px;
+  height: 50px;
+  background: #2c3e50;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 9999; /* 最高レベルに設定 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+  pointer-events: auto; /* ポインターイベントを明示的に有効化 */
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3); /* 視認性向上 */
+}
+
+.menu-toggle:hover {
+  background: #34495e;
+  transform: scale(1.1);
+}
+
+.hamburger {
+  width: 20px;
+  height: 2px;
+  background: white;
+  border-radius: 1px;
+  transition: all 0.3s ease;
+}
+
+.menu-toggle.menu-open .hamburger:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.menu-toggle.menu-open .hamburger:nth-child(2) {
+  opacity: 0;
+}
+
+.menu-toggle.menu-open .hamburger:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* マインドマップ管理UI */
+.mindmap-manager {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 1001; /* メニューより高く */
+  pointer-events: auto;
+}
+
+.new-folder-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.new-folder-btn:hover {
+  background: #1976d2;
+  transform: translateY(-1px);
+}
+
+.folder-icon {
+  font-size: 16px;
+}
+
+.new-mindmap-btn {
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.new-mindmap-btn:hover {
+  background: #229954;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.plus-icon {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.mindmap-selector {
+  position: relative;
+}
+
+.selector-btn {
+  background: white;
+  border: 2px solid #bdc3c7;
+  border-radius: 8px;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.selector-btn:hover {
+  border-color: #3498db;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.selector-btn.open {
+  border-color: #3498db;
+  background: #f8f9fa;
+}
+
+.dropdown-arrow {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.selector-btn.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.mindmap-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin-top: 5px;
+  background: white;
+  border: 2px solid #bdc3c7;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+  z-index: 1001;
+}
+
+.mindmap-list.show {
+  display: block;
+}
+
+/* 階層表示スタイル */
+.mindmap-hierarchy {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin-top: 5px;
+  background: white;
+  border: 2px solid #bdc3c7;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 400px;
+  overflow-y: auto;
+  display: none;
+  z-index: 1001;
+  padding: 5px;
+}
+
+.mindmap-hierarchy.show {
+  display: block;
+}
+
+/* 階層アイテム */
+.hierarchy-item {
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.hierarchy-item:hover {
+  background: #f8f9fa;
+}
+
+.hierarchy-item.folder {
+  font-weight: 500;
+  color: #495057;
+}
+
+.hierarchy-item.mindmap {
+  color: #333;
+}
+
+.hierarchy-item.mindmap.in-folder {
+  margin-left: 20px; /* フォルダの子アイテム用インデント */
+}
+
+.hierarchy-item.active {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.hierarchy-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.hierarchy-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hierarchy-actions {
+  display: none;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hierarchy-item:hover .hierarchy-actions {
+  display: flex;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #dee2e6;
+  opacity: 1;
+}
+
+/* 名前編集モード */
+.name-edit-input {
+  flex: 1;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: white;
+  outline: none;
+}
+
+/* ドラッグ&ドロップ */
+.hierarchy-item.drag-over {
+  background: #e3f2fd;
+  border: 2px dashed #1976d2;
+}
+
+.hierarchy-item.dragging {
+  opacity: 0.5;
+}
+
+.mindmap-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid #ecf0f1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.mindmap-item:hover {
+  background: #f8f9fa;
+}
+
+.mindmap-item:last-child {
+  border-bottom: none;
+}
+
+.mindmap-item.active {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.mindmap-name {
+  flex: 1;
+  text-align: left;
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+.mindmap-item:hover .delete-btn {
+  opacity: 1;
+}
+
+/* 階層表示のスタイル */
+.mindmap-hierarchy {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.hierarchy-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #eee;
+  position: relative;
+}
+
+.hierarchy-item:hover {
+  background-color: #f8f9fa;
+}
+
+.hierarchy-item:last-child {
+  border-bottom: none;
+}
+
+.hierarchy-item.active {
+  background-color: #e3f2fd;
+  font-weight: bold;
+}
+
+.folder-item {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.mindmap-item {
+  color: #34495e;
+}
+
+.folder-toggle {
+  margin-right: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  color: #666;
+}
+
+.folder-toggle.expanded {
+  transform: rotate(90deg);
+}
+
+.folder-icon, .mindmap-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.item-name {
+  flex: 1;
+  text-align: left;
+  font-size: 14px;
+}
+
+.rename-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  margin-left: auto;
+}
+
+.rename-btn:hover {
+  background-color: #e0e0e0;
+  opacity: 1;
+}
+
+.hierarchy-item:hover .rename-btn {
+  opacity: 0.8;
+}
+
+/* フォルダボタンのスタイル */
+.new-folder-btn {
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+}
+
+.new-folder-btn:hover {
+  background: #2ecc71;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+}
+
+.folder-icon {
+  font-size: 16px;
+}
+
+/* マインドマップ一覧ボタン */
+.mindmap-list-toggle {
+  background: #9b59b6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.mindmap-list-toggle:hover {
+  background: #8e44ad;
+  transform: translateY(-1px);
+}
+
+.list-icon {
+  font-size: 16px;
+}
+
+/* 右スライドメニュー（マインドマップ一覧） */
+.mindmap-sidebar {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 400px;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+  z-index: 1000;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.mindmap-sidebar.open {
+  right: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #34495e;
+  color: white;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.sidebar-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.mindmap-hierarchy-container {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* ドラッグ&ドロップスタイル */
+.hierarchy-item {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8f9fa;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.hierarchy-item:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+}
+
+.hierarchy-item.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+  z-index: 1001;
+}
+
+.hierarchy-item.drop-target {
+  border-color: #28a745;
+  background: #d4edda;
+}
+
+.folder-item {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.folder-item.drop-target {
+  border-color: #28a745;
+  background: #d4edda;
+}
+
+.mindmap-item {
+  background: #d1ecf1;
+  border-left: 4px solid #17a2b8;
+  cursor: grab;
+}
+
+.mindmap-item:active {
+  cursor: grabbing;
+}
+
+.item-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.item-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.item-button:hover {
+  background: #0056b3;
+}
+
+.delete-button {
+  background: #dc3545;
+}
+
+.delete-button:hover {
+  background: #c82333;
+}

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mindmap Prototype</title>
+  <link rel="stylesheet" href="viewer_style.css" />
+  <style>
+    /* キーボードフォーカス用スタイル */
+    .focusable {
+      outline: none;
+    }
+    
+    .focusable:focus {
+      outline: 2px solid #17a2b8;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(23, 162, 184, 0.2);
+    }
+    
+    .layout-btn.focusable:focus {
+      outline: 2px solid #17a2b8;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(23, 162, 184, 0.3);
+    }
+    
+    .sidebar-close.focusable:focus,
+    .menu-close.focusable:focus {
+      outline: 2px solid #17a2b8;
+      outline-offset: 2px;
+      background: rgba(23, 162, 184, 0.1);
+    }
+    
+    /* mindmap内のnode用フォーカススタイル */
+    .node-focused {
+      stroke: #17a2b8 !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 8px rgba(23, 162, 184, 0.6));
+    }
+  </style>
+</head>
+<body>
+  <button id="back-to-list" class="focusable" tabindex="1" style="position:fixed;top:24px;right:32px;z-index:3000;padding:10px 18px;font-size:15px;background:#17a2b8;color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">戻る</button>
+  <div id="container">
+    <svg id="mindmap" width="100%" height="100%" viewBox="0 0 1600 900" tabindex="2" class="focusable"></svg>
+    
+    <!-- メニュートグルボタン -->
+    <button id="menu-toggle" class="menu-toggle focusable" tabindex="3">
+      <div class="hamburger"></div>
+      <div class="hamburger"></div>
+      <div class="hamburger"></div>
+    </button>
+    
+    
+    <!-- 右スライドメニュー（マインドマップ一覧） -->
+    <div id="mindmap-sidebar" class="mindmap-sidebar">
+      <div class="sidebar-header">
+        <h3>マインドマップ一覧</h3>
+        <button id="sidebar-close" class="sidebar-close focusable" tabindex="10">×</button>
+      </div>
+      <div id="mindmap-hierarchy" class="mindmap-hierarchy-container">
+        <!-- 動的に生成 -->
+      </div>
+    </div>
+    
+    <!-- スライドメニュー -->
+    <div id="slide-menu" class="slide-menu">
+      <div class="menu-header">
+        <h3>レイアウト</h3>
+        <button id="menu-close" class="menu-close focusable" tabindex="20">×</button>
+      </div>
+      <div class="menu-content">
+        <button id="radial-layout" class="layout-btn focusable active" tabindex="21">
+          <span class="layout-icon">●</span>
+          Radial（放射状）
+        </button>
+        <button id="leftright-layout" class="layout-btn focusable" tabindex="22">
+          <span class="layout-icon">↔</span>
+          Left-Right（左右分岐）
+        </button>
+        <button id="tree-layout" class="layout-btn focusable" tabindex="23">
+          <span class="layout-icon">┖</span>
+          Tree（片側ツリー）
+        </button>
+      </div>
+    </div>
+  </div>
+  <script src="viewer.js"></script>
+  <script>
+    document.getElementById('back-to-list').addEventListener('click', function(e) {
+      e.preventDefault();
+      // URLパラメータからreturnFolderを取得
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnFolder = urlParams.get('returnFolder');
+      
+      // returnFolderがあれば、それをパラメータとしてlist.htmlに渡す
+      const listUrl = returnFolder ? `list.html?folder=${returnFolder}` : 'list.html';
+      
+      // 履歴がlist.htmlから来ていれば戻る、そうでなければlist.htmlへ
+      if (document.referrer && document.referrer.includes('list.html')) {
+        window.history.back();
+      } else {
+        window.location.href = listUrl;
+      }
+    });
+    
+    // キーボードイベントハンドラを追加
+    document.addEventListener('DOMContentLoaded', function() {
+      setupKeyboardHandlers();
+    });
+    
+    function setupKeyboardHandlers() {
+      // グローバルキーボードイベント
+      document.addEventListener('keydown', function(e) {
+        // Escapeキーでメニューを閉じる
+        if (e.key === 'Escape') {
+          const slideMenu = document.getElementById('slide-menu');
+          const sidebar = document.getElementById('mindmap-sidebar');
+          if (slideMenu.classList.contains('active')) {
+            slideMenu.classList.remove('active');
+          }
+          if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+          }
+        }
+        
+        // Tabキーのデフォルト動作を保持しつつ、メニュー内でのフォーカス管理
+        if (e.key === 'Tab') {
+          handleTabNavigation(e);
+        }
+        
+        // マインドマップエリアでの矢印キーナビゲーション
+        if (e.target.id === 'mindmap' && (e.key.startsWith('Arrow') || e.key === 'Enter' || e.key === ' ')) {
+          handleMindMapKeyboard(e);
+        }
+      });
+      
+      // ボタンのEnter/Spaceキーイベント
+      document.querySelectorAll('button.focusable').forEach(button => {
+        button.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            button.click();
+          }
+        });
+      });
+    }
+    
+    function handleTabNavigation(e) {
+      const slideMenu = document.getElementById('slide-menu');
+      const sidebar = document.getElementById('mindmap-sidebar');
+      
+      // メニューが開いている場合、メニュー内でのフォーカスループを実現
+      if (slideMenu.classList.contains('active')) {
+        const menuFocusables = slideMenu.querySelectorAll('.focusable');
+        const currentIndex = Array.from(menuFocusables).indexOf(e.target);
+        
+        if (e.shiftKey) { // Shift+Tabで逆方向
+          if (currentIndex === 0) {
+            e.preventDefault();
+            menuFocusables[menuFocusables.length - 1].focus();
+          }
+        } else { // Tabで順方向
+          if (currentIndex === menuFocusables.length - 1) {
+            e.preventDefault();
+            menuFocusables[0].focus();
+          }
+        }
+      }
+      
+      if (sidebar.classList.contains('active')) {
+        const sidebarFocusables = sidebar.querySelectorAll('.focusable');
+        const currentIndex = Array.from(sidebarFocusables).indexOf(e.target);
+        
+        if (e.shiftKey) {
+          if (currentIndex === 0) {
+            e.preventDefault();
+            sidebarFocusables[sidebarFocusables.length - 1].focus();
+          }
+        } else {
+          if (currentIndex === sidebarFocusables.length - 1) {
+            e.preventDefault();
+            sidebarFocusables[0].focus();
+          }
+        }
+      }
+    }
+    
+    // マインドマップエリアでのキーボードナビゲーション（機能は基本的なフォーカス移動のみ）
+    function handleMindMapKeyboard(e) {
+      e.preventDefault();
+      
+      switch(e.key) {
+        case 'Enter':
+        case ' ':
+          // フォーカスされたノードの編集モードに入る（viewer.jsの機能に依存）
+          console.log('マインドマップでEnter/Spaceキーが押されました');
+          break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+        case 'ArrowLeft':
+        case 'ArrowRight':
+          // ノード間のフォーカス移動（viewer.jsの機能に依存）
+          console.log('マインドマップで矢印キーが押されました:', e.key);
+          break;
+      }
+    }
+  </script>
+</body>
+</html>

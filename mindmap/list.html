@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインドマップ管理</title>
+    <style>
+                .main-flex {
+                    display: flex;
+                    gap: 24px;
+                }
+                .folder-tree {
+                    width: 260px;
+                    min-width: 180px;
+                    background: #fff;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    padding: 16px 8px 16px 16px;
+                    margin-bottom: 24px;
+                    max-height: 70vh;
+                    overflow-y: auto;
+                }
+                .folder-list {
+                    list-style: none;
+                    padding-left: 0;
+                }
+                .folder-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 4px;
+                    padding: 2px 0 2px 8px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+                .folder-item.selected {
+                    background: #e3f2fd;
+                    font-weight: bold;
+                }
+                .folder-actions {
+                    margin-left: auto;
+                    display: flex;
+                    gap: 2px;
+                }
+                .folder-btn {
+                    background: none;
+                    border: none;
+                    color: #6c757d;
+                    cursor: pointer;
+                    font-size: 15px;
+                    border-radius: 4px;
+                    padding: 2px 4px;
+                }
+                .folder-btn:hover {
+                    background: #f1f3f4;
+                }
+                @media (max-width: 900px) {
+                    .main-flex {
+                        flex-direction: column;
+                    }
+                    .folder-tree {
+                        width: 100%;
+                        max-width: 100vw;
+                        margin-bottom: 12px;
+                    }
+                }
+                @media (max-width: 600px) {
+                    .container {
+                        padding: 6px;
+                    }
+                    .main-flex {
+                        gap: 8px;
+                    }
+                    .folder-tree {
+                        padding: 8px 2px 8px 8px;
+                        font-size: 15px;
+                    }
+                }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .header-menu {
+            position: relative;
+        }
+
+        .menu-toggle-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .menu-toggle-btn:hover {
+            background: #138496;
+        }
+
+        .header-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 150px;
+            display: none;
+            margin-top: 4px;
+        }
+
+        .header-menu-dropdown.show {
+            display: block;
+        }
+
+        .header-menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 14px;
+            color: #333;
+            transition: background 0.2s;
+        }
+
+        .header-menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .header-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #138496;
+        }
+
+        .mindmap-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .mindmap-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.2s;
+        }
+
+        .mindmap-item:hover {
+            background: #f8f9fa;
+        }
+
+        .mindmap-item:last-child {
+            border-bottom: none;
+        }
+
+        /* キーボードフォーカス用スタイル */
+        .focusable {
+            outline: none;
+        }
+
+        .focusable:focus {
+            outline: 2px solid #17a2b8;
+            outline-offset: 2px;
+        }
+
+        .folder-item.focusable:focus {
+            background: #e3f2fd;
+            outline: 2px solid #17a2b8;
+        }
+
+        .mindmap-item.focusable:focus {
+            background: #f0f8ff;
+            outline: 2px solid #17a2b8;
+        }
+
+        .mindmap-info {
+            flex: 1;
+        }
+
+        .mindmap-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #2c3e50;
+            text-decoration: none;
+            margin-bottom: 4px;
+            display: block;
+            cursor: pointer;
+        }
+
+        .mindmap-name:hover {
+            color: #17a2b8;
+            text-decoration: underline;
+        }
+
+        .mindmap-meta {
+            font-size: 13px;
+            color: #6c757d;
+        }
+
+        .mindmap-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .menu-btn:hover {
+            background: #f8f9fa;
+            color: #495057;
+        }
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 160px;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .context-menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .context-menu-item.danger {
+            color: #dc3545;
+        }
+
+        .context-menu-item.danger:hover {
+            background: #fee;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90vw;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #2c3e50;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        @media (max-width: 600px) {
+            .mindmap-item {
+                padding: 12px 16px;
+            }
+
+            .mindmap-name {
+                font-size: 15px;
+            }
+
+            .mindmap-meta {
+                font-size: 12px;
+            }
+
+            .menu-btn {
+                font-size: 16px;
+                padding: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+            <!-- フォルダ用コンテキストメニュー -->
+            <div id="folder-context-menu" class="context-menu">
+                <div class="context-menu-item" onclick="editFolderFromMenu()">✏️ 名前変更</div>
+                <div class="context-menu-item" onclick="moveFolderFromMenu()">📂 フォルダ移動</div>
+                <div class="context-menu-item danger" onclick="deleteFolderFromMenu()">🗑️ 削除</div>
+            </div>
+        
+        <!-- フォルダ移動モーダル -->
+        <div id="move-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">フォルダへ移動</div>
+                <div class="form-group">
+                    <label for="move-folder-select">移動先フォルダ:</label>
+                    <select id="move-folder-select" class="form-control"></select>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('move-modal')">キャンセル</button>
+                    <button class="btn">移動</button>
+                </div>
+            </div>
+        </div>
+    <div class="container">
+        <div class="header">
+            <h1>マインドマップ</h1>
+            <div class="toolbar">
+                <button class="btn" onclick="createNewMindMap()">
+                    新規作成
+                </button>
+                <div class="header-menu">
+                    <button class="menu-toggle-btn" onclick="toggleHeaderMenu(event)">
+                        メニュー ▼
+                    </button>
+                    <div class="header-menu-dropdown" id="header-menu">
+                        <div class="header-menu-item" onclick="importMindMap(); hideHeaderMenu();">📁 インポート</div>
+                        <div class="header-menu-item" onclick="exportAllMindMaps(); hideHeaderMenu();">📄 エクスポート</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-flex">
+            <div class="folder-tree">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-weight:600;">フォルダ</span>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:13px;" onclick="showCreateFolderModal()">＋</button>
+                </div>
+                <ul id="folder-list" class="folder-list"></ul>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div id="mindmap-container" class="mindmap-container">
+                    <!-- 動的に生成されます -->
+                </div>
+            </div>
+        </div>
+        <!-- フォルダ作成モーダル -->
+        <div id="folder-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header" id="folder-modal-title">新しいフォルダ</div>
+                <div class="form-group">
+                    <label for="folder-name">フォルダ名:</label>
+                    <input type="text" id="folder-name" class="form-control" placeholder="フォルダ名を入力">
+                </div>
+                <div class="form-group">
+                    <label for="folder-parent">親フォルダ:</label>
+                    <select id="folder-parent" class="form-control"></select>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('folder-modal')">キャンセル</button>
+                    <button class="btn" id="folder-modal-confirm-btn" onclick="confirmCreateFolder()">作成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 個別メニュー -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item" onclick="exportMindMap(currentContextMindMapId)">📄 個別エクスポート</div>
+        <div class="context-menu-item" onclick="editName(currentContextMindMapId)">✏️ 名前変更</div>
+        <div class="context-menu-item" onclick="showMoveModal(currentContextMindMapId)">📂 フォルダ移動</div>
+        <div class="context-menu-item danger" onclick="deleteMindMap(currentContextMindMapId)">🗑️ 削除</div>
+    </div>
+
+    <!-- 新規作成モーダル -->
+    <div id="create-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">新しいマインドマップ</div>
+            <div class="form-group">
+                <label for="new-name">名前:</label>
+                <input type="text" id="new-name" class="form-control" placeholder="マインドマップの名前を入力">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('create-modal')">キャンセル</button>
+                <button class="btn" onclick="confirmCreateMindMap()">作成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 名前編集モーダル -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">名前を変更</div>
+            <div class="form-group">
+                <label for="edit-name">新しい名前:</label>
+                <input type="text" id="edit-name" class="form-control">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('edit-modal')">キャンセル</button>
+                <button class="btn" onclick="confirmEditName()">変更</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- インポート用ファイル入力 -->
+    <input type="file" id="import-file" style="display: none;" accept=".json">
+
+    <script>
+                    // フォルダ移動（コンテキストメニューから）
+                    function moveFolderFromMenu() {
+                        console.log('moveFolderFromMenu開始, _contextFolderId:', window._contextFolderId);
+                        if (window._contextFolderId) {
+                            const folderId = window._contextFolderId; // IDを事前に保存
+                            hideFolderContextMenu();
+                            showMoveFolderModal(folderId); // 保存したIDを使用
+                        } else {
+                            console.log('エラー: _contextFolderIdが設定されていません');
+                        }
+                    }
+
+                    // フォルダ移動モーダル（フォルダ用）
+                    function showMoveFolderModal(folderId) {
+                        console.log('showMoveFolderModal開始:', folderId);
+                        console.log('現在のfoldersデータ:', folders);
+                        // 移動先選択モーダルを流用
+                        const select = document.getElementById('move-folder-select');
+                        select.innerHTML = '';
+                        // 子孫判定用
+                        function isDescendant(targetId, parentId) {
+                            const parent = folders.find(f => f.id === parentId);
+                            if (!parent || !parent.children) return false;
+                            for (const childId of parent.children) {
+                                if (childId === targetId) return true;
+                                if (isDescendant(targetId, childId)) return true;
+                            }
+                            return false;
+                        }
+                        function addOption(folder, depth = 0) {
+                            console.log(`addOption: ${folder.name} (id: ${folder.id}), depth: ${depth}`);
+                            // 自分自身と子孫は除外
+                            if (folder.id === folderId) {
+                                console.log(`  除外: 自分自身 ${folder.name}`);
+                                return;
+                            }
+                            if (isDescendant(folder.id, folderId)) {
+                                console.log(`  除外: 子孫 ${folder.name}`);
+                                return;
+                            }
+                            const opt = document.createElement('option');
+                            opt.value = folder.id;
+                            opt.textContent = '　'.repeat(depth) + folder.name;
+                            select.appendChild(opt);
+                            console.log(`  追加: ${opt.textContent}`);
+                            (folder.children||[]).forEach(childId => {
+                                const child = folders.find(f => f.id === childId);
+                                if (child) addOption(child, depth+1);
+                            });
+                        }
+                        const rootFolder = folders.find(f => f.id === 'root');
+                        console.log('rootFolder:', rootFolder);
+                        if (rootFolder) addOption(rootFolder, 0);
+                        console.log('最終的なselect options数:', select.options.length);
+                        // 現在の親を初期選択
+                        const folder = folders.find(f => f.id === folderId);
+                        if (folder) select.value = folder.parentId || 'root';
+                        // モーダルタイトル変更
+                        document.querySelector('#move-modal .modal-header').textContent = 'フォルダの移動';
+                        // 移動確定ボタンの挙動をフォルダ用に差し替え
+                        const confirmBtn = document.querySelector('#move-modal .modal-actions .btn:not(.btn-secondary)');
+                        // onclickを直接関数代入し、イベントリスナーの重複を防ぐ
+                        confirmBtn.onclick = function() {
+                            console.log('フォルダ移動確定ボタンクリック:', folderId);
+                            const newParentId = select.value;
+                            console.log('移動先:', newParentId);
+                            moveFolder(folderId, newParentId);
+                            closeModal('move-modal');
+                            confirmBtn.onclick = null;
+                        };
+                        showModal('move-modal');
+                    }
+
+                    function moveFolder(folderId, newParentId) {
+                        console.log('moveFolder開始:', { folderId, newParentId });
+                        const folder = folders.find(f => f.id === folderId);
+                        if (!folder) {
+                            console.log('エラー: フォルダが見つかりません:', folderId);
+                            return;
+                        }
+                        console.log('移動対象フォルダ:', folder);
+                        // 旧親から除外
+                        const oldParent = folders.find(f => f.id === folder.parentId);
+                        if (oldParent) oldParent.children = oldParent.children.filter(cid => cid !== folder.id);
+                        // 新親に追加
+                        const newParent = folders.find(f => f.id === newParentId);
+                        if (newParent) {
+                            if (!Array.isArray(newParent.children)) newParent.children = [];
+                            if (!newParent.children.includes(folder.id)) newParent.children.push(folder.id);
+                        }
+                        folder.parentId = newParentId;
+                        console.log('moveFolder: folders before save', JSON.stringify(folders));
+                        saveFolders();
+                        console.log('moveFolder: folders after save', JSON.stringify(folders));
+                        // 移動後に選択フォルダを移動先に変更し、UIを再描画
+                        selectedFolderId = newParentId;
+                        renderFolderTree();
+                        renderMindMapList();
+                    }
+                    // フォルダ用コンテキストメニュー表示
+                    function showFolderContextMenu(event, folderId) {
+                        console.log('showFolderContextMenu開始:', folderId);
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const menu = document.getElementById('folder-context-menu');
+                        menu.style.display = 'block';
+                        menu.style.left = event.pageX + 'px';
+                        menu.style.top = event.pageY + 'px';
+                        // 画面端に近い場合の調整
+                        const rect = menu.getBoundingClientRect();
+                        if (rect.right > window.innerWidth) {
+                            menu.style.left = (event.pageX - rect.width) + 'px';
+                        }
+                        if (rect.bottom > window.innerHeight) {
+                            menu.style.top = (event.pageY - rect.height) + 'px';
+                        }
+                        // 編集・削除用に選択フォルダIDを保存
+                        window._contextFolderId = folderId;
+                        console.log('_contextFolderIdを設定:', window._contextFolderId);
+                    }
+
+                    // フォルダ用コンテキストメニュー非表示
+                    function hideFolderContextMenu() {
+                        const menu = document.getElementById('folder-context-menu');
+                        menu.style.display = 'none';
+                        window._contextFolderId = null;
+                    }
+
+                    // 名前変更（コンテキストメニューから）
+                    function editFolderFromMenu() {
+                        if (window._contextFolderId) {
+                            const folderId = window._contextFolderId; // IDを事前に保存
+                            hideFolderContextMenu();
+                            showEditFolderModal(folderId); // 保存したIDを使用
+                        }
+                    }
+
+                    // 削除（コンテキストメニューから）
+                    function deleteFolderFromMenu() {
+                        if (window._contextFolderId) {
+                            const folderId = window._contextFolderId; // IDを事前に保存
+                            hideFolderContextMenu();
+                            deleteFolder(folderId); // 保存したIDを使用
+                        }
+                    }
+
+                    window.showFolderContextMenu = showFolderContextMenu;
+                    window.hideFolderContextMenu = hideFolderContextMenu;
+                    // フォルダ移動モーダル表示
+                    let movingMindMapId = null;
+                    function showMoveModal(mindMapId) {
+                        movingMindMapId = mindMapId;
+                        renderMoveFolderOptions();
+                        // モーダルタイトル変更
+                        document.querySelector('#move-modal .modal-header').textContent = 'フォルダへ移動';
+                        // 移動確定ボタンの挙動をmindmap用に差し替え
+                        const confirmBtn = document.querySelector('#move-modal .modal-actions .btn:not(.btn-secondary)');
+                        confirmBtn.onclick = null;
+                        confirmBtn.onclick = confirmMoveMindMap;
+                        showModal('move-modal');
+                    }
+                    function renderMoveFolderOptions() {
+                        const select = document.getElementById('move-folder-select');
+                        select.innerHTML = '';
+                        function addOption(folder, depth = 0) {
+                            const opt = document.createElement('option');
+                            opt.value = folder.id;
+                            opt.textContent = '　'.repeat(depth) + folder.name;
+                            select.appendChild(opt);
+                            (folder.children||[]).forEach(childId => {
+                                const child = folders.find(f => f.id === childId);
+                                if (child) addOption(child, depth+1);
+                            });
+                        }
+                        const rootFolder = folders.find(f => f.id === 'root');
+                        if (rootFolder) addOption(rootFolder, 0);
+                        // 現在のフォルダを初期選択
+                        const mindMap = mindMaps.find(m => m.id === movingMindMapId);
+                        if (mindMap) select.value = mindMap.folder || 'root';
+                    }
+                    function confirmMoveMindMap() {
+                        const folderId = document.getElementById('move-folder-select').value;
+                        const mindMap = mindMaps.find(m => m.id === movingMindMapId);
+                        if (mindMap && folderId) {
+                            mindMap.folder = folderId;
+                            mindMap.updatedAt = Date.now();
+                            saveMindMaps();
+                            renderMindMapList();
+                            closeModal('move-modal');
+                        }
+                        movingMindMapId = null;
+                        hideContextMenu();
+                    }
+            // フォルダデータ
+            let folders = [];
+            let selectedFolderId = 'root';
+            let editingFolderId = null;
+        // グローバル変数
+        let mindMaps = [];
+        let editingMindMapId = null;
+        let currentContextMindMapId = null;
+
+        // ローカルストレージからマインドマップ・フォルダデータを読み込み
+        function loadMindMaps() {
+            try {
+                const stored = localStorage.getItem('mindMaps');
+                const storedFolders = localStorage.getItem('folders');
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    mindMaps = data.mindMaps || [];
+                } else {
+                    mindMaps = [];
+                }
+                if (storedFolders) {
+                    folders = JSON.parse(storedFolders);
+                } else {
+                    folders = [{ id: 'root', name: '全体', parentId: null, children: [] }];
+                }
+                
+                // URLパラメータからフォルダIDを取得
+                const urlParams = new URLSearchParams(window.location.search);
+                const returnFolderId = urlParams.get('folder') || urlParams.get('returnFolder');
+                if (returnFolderId && folders.find(f => f.id === returnFolderId)) {
+                    selectedFolderId = returnFolderId;
+                    // URLパラメータをクリア（ブラウザ履歴を汚さないため）
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }
+                
+                renderFolderTree();
+                renderMindMapList();
+            } catch (error) {
+                console.error('データ読み込みエラー:', error);
+                mindMaps = [];
+                folders = [{ id: 'root', name: '全体', parentId: null, children: [] }];
+                renderFolderTree();
+                renderMindMapList();
+            }
+        }
+
+        // マインドマップリストを描画（選択中フォルダのみ）
+        function renderMindMapList() {
+            const container = document.getElementById('mindmap-container');
+            const filtered = mindMaps.filter(m => (m.folder || 'root') === selectedFolderId);
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>マインドマップがありません</h3>
+                        <p>「新規作成」ボタンから最初のマインドマップを作成しましょう</p>
+                    </div>
+                `;
+                return;
+            }
+            let tabIndex = 100; // マインドマップ用のtabindex開始値
+            container.innerHTML = filtered.map(mindMap => `
+                <div class="mindmap-item focusable" data-id="${mindMap.id}" tabindex="${tabIndex++}" 
+                     onclick="if (!event.target.closest('button')) openMindMap('${mindMap.id}')"
+                     onkeydown="handleMindMapKeydown(event, '${mindMap.id}')">
+                    <div class="mindmap-info">
+                        <span class="mindmap-name">${escapeHtml(mindMap.name)}</span>
+                        <div class="mindmap-meta">
+                            ${formatDate(mindMap.updatedAt)} · ${countNodes(mindMap.rootNode)} ノード
+                        </div>
+                    </div>
+                    <div class="mindmap-actions">
+                        <button class="menu-btn" onclick="showContextMenu(event, '${mindMap.id}')" title="メニュー">⋮</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // フォルダツリー描画
+        function renderFolderTree() {
+            const list = document.getElementById('folder-list');
+            list.innerHTML = '';
+            let tabIndex = 1; // フォルダ用のtabindex開始値
+            function renderNode(folder, depth = 0) {
+                const li = document.createElement('li');
+                li.className = 'folder-item focusable' + (selectedFolderId === folder.id ? ' selected' : '');
+                li.style.paddingLeft = (depth * 18) + 'px';
+                li.tabIndex = tabIndex++;
+                li.setAttribute('data-folder-id', folder.id);
+                // 左: フォルダ名, 右: メニュー
+                const left = document.createElement('span');
+                left.textContent = folder.name;
+                li.appendChild(left);
+                // 行全体クリックで選択
+                li.onclick = (e) => {
+                    // メニュークリック時は無視
+                    if (e.target.closest('button')) return;
+                    selectedFolderId = folder.id;
+                    renderFolderTree();
+                    renderMindMapList();
+                };
+                // キーボードイベント追加
+                li.addEventListener('keydown', (e) => {
+                    handleFolderKeydown(e, folder.id);
+                });
+                if (folder.id !== 'root') {
+                    const right = document.createElement('span');
+                    right.style.display = 'flex';
+                    right.style.alignItems = 'center';
+                    const menuBtn = document.createElement('button');
+                    menuBtn.className = 'folder-menu-btn menu-btn';
+                    menuBtn.title = 'メニュー';
+                    menuBtn.innerHTML = '⋮';
+                    menuBtn.onclick = (e) => { 
+                        console.log('フォルダメニューボタンクリック:', folder.id);
+                        e.stopPropagation(); 
+                        window.showFolderContextMenu(e, folder.id); 
+                    };
+                    right.appendChild(menuBtn);
+                    li.appendChild(right);
+                }
+                list.appendChild(li);
+                (folder.children||[]).forEach(childId => {
+                    const child = folders.find(f => f.id === childId);
+                    if (child) renderNode(child, depth+1);
+                });
+            }
+            const rootFolder = folders.find(f => f.id === 'root');
+            if (rootFolder) renderNode(rootFolder, 0);
+        // ←ここで関数終了（不要な閉じカッコ削除）
+
+
+        }
+        // フォルダ作成・編集モーダル
+        window.showCreateFolderModal = showCreateFolderModal;
+        function showCreateFolderModal() {
+            editingFolderId = null;
+            document.getElementById('folder-modal-title').textContent = '新しいフォルダ';
+            document.getElementById('folder-name').value = '';
+            renderFolderParentOptions();
+            showModal('folder-modal');
+            setTimeout(() => document.getElementById('folder-name').focus(), 100);
+            document.getElementById('folder-modal-confirm-btn').onclick = confirmCreateFolder;
+        }
+        function showEditFolderModal(folderId) {
+            editingFolderId = folderId;
+            const folder = folders.find(f => f.id === folderId);
+            document.getElementById('folder-modal-title').textContent = 'フォルダ編集';
+            document.getElementById('folder-name').value = folder.name;
+            renderFolderParentOptions(folderId);
+            showModal('folder-modal');
+            setTimeout(() => document.getElementById('folder-name').focus(), 100);
+            document.getElementById('folder-modal-confirm-btn').onclick = confirmEditFolder;
+        }
+        function renderFolderParentOptions(excludeId) {
+            const select = document.getElementById('folder-parent');
+            select.innerHTML = '';
+            function addOption(folder, depth = 0) {
+                if (folder.id === excludeId) return;
+                const opt = document.createElement('option');
+                opt.value = folder.id;
+                opt.textContent = '　'.repeat(depth) + folder.name;
+                select.appendChild(opt);
+                (folder.children||[]).forEach(childId => {
+                    const child = folders.find(f => f.id === childId);
+                    if (child) addOption(child, depth+1);
+                });
+            }
+            const rootFolder = folders.find(f => f.id === 'root');
+            if (rootFolder) addOption(rootFolder, 0);
+            select.value = selectedFolderId;
+        }
+        function confirmCreateFolder() {
+            const name = document.getElementById('folder-name').value.trim();
+            const parentId = document.getElementById('folder-parent').value;
+            if (!name) { alert('フォルダ名を入力してください'); return; }
+            const id = generateUUID();
+            // 新しいフォルダを作成
+            folders.push({ id, name, parentId, children: [] });
+            // 親フォルダのchildrenに追加
+            if (parentId) {
+                const parent = folders.find(f => f.id === parentId);
+                if (parent && !parent.children.includes(id)) parent.children.push(id);
+            }
+            saveFolders();
+            closeModal('folder-modal');
+            renderFolderTree();
+        }
+        function confirmEditFolder() {
+            const name = document.getElementById('folder-name').value.trim();
+            const parentId = document.getElementById('folder-parent').value;
+            if (!name) { alert('フォルダ名を入力してください'); return; }
+            const folder = folders.find(f => f.id === editingFolderId);
+            if (!folder) return;
+            // 親変更
+            if (folder.parentId !== parentId) {
+                // 旧親から除外
+                const oldParent = folders.find(f => f.id === folder.parentId);
+                if (oldParent) oldParent.children = oldParent.children.filter(cid => cid !== folder.id);
+                // 新親に追加
+                const newParent = folders.find(f => f.id === parentId);
+                if (newParent && !newParent.children.includes(folder.id)) newParent.children.push(folder.id);
+                folder.parentId = parentId;
+            }
+            folder.name = name;
+            saveFolders();
+            closeModal('folder-modal');
+            renderFolderTree();
+        }
+        function deleteFolder(folderId) {
+            if (folderId === 'root') return;
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder) return;
+            if (!confirm(`フォルダ「${folder.name}」を削除しますか？\n配下のマインドマップも全て削除されます。`)) return;
+            // 子孫も再帰削除
+            function removeFolderAndChildren(id) {
+                const f = folders.find(ff => ff.id === id);
+                if (!f) return;
+                (f.children||[]).forEach(cid => removeFolderAndChildren(cid));
+                // 配下マインドマップも削除
+                mindMaps = mindMaps.filter(m => (m.folder||'root') !== id);
+                // 親から除外
+                const parent = folders.find(ff => ff.id === f.parentId);
+                if (parent) parent.children = parent.children.filter(cid => cid !== id);
+                // 自身削除
+                folders = folders.filter(ff => ff.id !== id);
+            }
+            removeFolderAndChildren(folderId);
+            saveFolders();
+            renderFolderTree();
+            renderMindMapList();
+        }
+        function saveFolders() {
+            console.log('saveFolders開始 - 保存前folders:', folders);
+            localStorage.setItem('folders', JSON.stringify(folders));
+            const saved = JSON.parse(localStorage.getItem('folders'));
+            console.log('saveFolders完了 - 保存後確認:', saved);
+            saveMindMaps();
+        }
+
+        // 統計情報を更新（UI簡素化のため無効化）
+        function updateStats() {
+            // 統計表示を削除したため、何もしない
+            return;
+        }
+
+        // ノード数をカウント（再帰）
+        function countNodes(node) {
+            if (!node) return 0;
+            let count = 1;
+            if (node.children && node.children.length > 0) {
+                count += node.children.reduce((sum, child) => sum + countNodes(child), 0);
+            }
+            return count;
+        }
+
+        // 個別メニュー表示
+        function showContextMenu(event, mindMapId) {
+            event.preventDefault();
+            event.stopPropagation(); // イベントのバブリングを停止
+            currentContextMindMapId = mindMapId;
+            const contextMenu = document.getElementById('context-menu');
+            
+            // メニューを表示
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = event.pageX + 'px';
+            contextMenu.style.top = event.pageY + 'px';
+            
+            // 画面端に近い場合の調整
+            const rect = contextMenu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                contextMenu.style.left = (event.pageX - rect.width) + 'px';
+            }
+            if (rect.bottom > window.innerHeight) {
+                contextMenu.style.top = (event.pageY - rect.height) + 'px';
+            }
+        }
+
+        // 個別メニューを閉じる
+        function hideContextMenu() {
+            document.getElementById('context-menu').style.display = 'none';
+            currentContextMindMapId = null;
+        }
+
+        // headerメニューを表示/非表示
+        function toggleHeaderMenu(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('header-menu');
+            menu.classList.toggle('show');
+        }
+
+        // headerメニューを閉じる
+        function hideHeaderMenu() {
+            document.getElementById('header-menu').classList.remove('show');
+        }
+
+        // マインドマップを開く（別タブ）
+        // マインドマップを開く（同一ウィンドウ遷移）
+        function openMindMap(id) {
+            const mindMap = mindMaps.find(m => m.id === id);
+            const folderId = mindMap ? (mindMap.folder || 'root') : 'root';
+            const url = `viewer.html?id=${id}&returnFolder=${folderId}`;
+            window.open(url, '_self');
+        }
+
+        // 新規マインドマップ作成
+        window.createNewMindMap = createNewMindMap;
+        window.toggleHeaderMenu = toggleHeaderMenu;
+        function createNewMindMap() {
+            document.getElementById('new-name').value = '';
+            showModal('create-modal');
+            setTimeout(() => document.getElementById('new-name').focus(), 100);
+        }
+
+        // 新規作成確定
+        function confirmCreateMindMap() {
+            const name = document.getElementById('new-name').value.trim();
+            if (!name) {
+                alert('名前を入力してください');
+                return;
+            }
+            const newMindMap = {
+                id: generateUUID(),
+                name: name,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                folder: selectedFolderId,
+                rootNode: {
+                    id: generateUUID(),
+                    text: name,
+                    children: []
+                }
+            };
+            mindMaps.push(newMindMap);
+            saveMindMaps();
+            closeModal('create-modal');
+            renderMindMapList();
+            // 新規作成後すぐに開く
+            openMindMap(newMindMap.id);
+        }
+
+        // 名前編集
+        function editName(id) {
+            const mindMap = mindMaps.find(m => m.id === id);
+            if (!mindMap) return;
+            
+            editingMindMapId = id;
+            document.getElementById('edit-name').value = mindMap.name;
+            showModal('edit-modal');
+            setTimeout(() => document.getElementById('edit-name').focus(), 100);
+            hideContextMenu();
+        }
+
+        // 名前編集確定
+        function confirmEditName() {
+            const newName = document.getElementById('edit-name').value.trim();
+            if (!newName) {
+                alert('名前を入力してください');
+                return;
+            }
+
+            const mindMap = mindMaps.find(m => m.id === editingMindMapId);
+            if (mindMap) {
+                mindMap.name = newName;
+                mindMap.updatedAt = Date.now();
+                // ルートノードの名前も更新
+                if (mindMap.rootNode) {
+                    mindMap.rootNode.text = newName;
+                }
+                saveMindMaps();
+                renderMindMapList();
+            }
+
+            closeModal('edit-modal');
+            editingMindMapId = null;
+        }
+
+        // マインドマップ削除
+        function deleteMindMap(id) {
+            const mindMap = mindMaps.find(m => m.id === id);
+            if (mindMap && confirm(`マインドマップ「${mindMap.name}」を削除しますか？\n\nこの操作は取り消すことができません。`)) {
+                mindMaps = mindMaps.filter(m => m.id !== id);
+                saveMindMaps();
+                renderMindMapList();
+            }
+            hideContextMenu();
+        }
+
+        // エクスポート（単体）
+        function exportMindMap(id) {
+            const mindMap = mindMaps.find(m => m.id === id);
+            if (!mindMap) return;
+
+            const dataStr = JSON.stringify(mindMap, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${mindMap.name}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            hideContextMenu();
+        }
+
+        // エクスポート（全て）
+        function exportAllMindMaps() {
+            if (mindMaps.length === 0) {
+                alert('エクスポートするマインドマップがありません');
+                return;
+            }
+
+            const exportData = {
+                mindMaps: mindMaps,
+                folders: folders,
+                exportDate: new Date().toISOString(),
+                version: '2.0'
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `mindmaps_full_export_${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // インポート
+        function importMindMap() {
+            console.log('importMindMap関数が呼ばれました');
+            document.getElementById('import-file').click();
+        }
+
+        // ファイルインポート処理
+        function handleFileImport(event) {
+            console.log('handleFileImport開始');
+            const file = event.target.files[0];
+            console.log('選択されたファイル:', file);
+            if (!file) {
+                console.log('ファイルが選択されていません');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('ファイル読み込み完了');
+                try {
+                    const data = JSON.parse(e.target.result);
+                    console.log('インポートファイルの解析結果:', data);
+                    
+                    if (data.mindMaps && Array.isArray(data.mindMaps)) {
+                        // 複数マインドマップ形式（フォルダ情報有無問わず）
+                        console.log('複数マインドマップ形式として処理');
+                        handleMultipleMindMapsImport(data);
+                    } else if (data.id && data.name && data.rootNode) {
+                        // 単体マインドマップ形式
+                        console.log('単体マインドマップ形式として処理');
+                        handleSingleMindMapImport(data);
+                    } else {
+                        throw new Error('不正なファイル形式です。マインドマップデータが見つかりません。');
+                    }
+                } catch (error) {
+                    console.error('インポートエラー:', error);
+                    alert('ファイルの読み込みに失敗しました: ' + error.message);
+                }
+                
+                // ファイル入力をクリア
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // 複数マインドマップのインポート処理
+        function handleMultipleMindMapsImport(data) {
+            console.log('handleMultipleMindMapsImport開始:', data);
+            const importCount = data.mindMaps.length;
+            
+            // フォルダ情報の確認（バージョン1.0では存在しない場合がある）
+            const hasfolders = data.folders && Array.isArray(data.folders) && data.folders.length > 0;
+            console.log('hasfolders判定:', hasfolders);
+            console.log('data.folders:', data.folders);
+            
+            // フォルダ情報が存在しない場合、全てrootフォルダに配置
+            if (!hasfolders) {
+                console.log('フォルダ情報が存在しないため、全てrootフォルダに配置します');
+                data.mindMaps.forEach(mindMap => {
+                    if (!mindMap.folder) {
+                        mindMap.folder = 'root';
+                    }
+                });
+            }
+            
+            const folderText = hasfolders ? `、${data.folders.length}個のフォルダ` : '';
+            const message = `${importCount}個のマインドマップ${folderText}を発見しました。\n\nどのように処理しますか？`;
+            
+            const choice = confirm(message + '\n\nOK: 現在のデータを置き換える\nキャンセル: 新規追加する');
+            console.log('ユーザー選択:', choice ? '置換' : '新規追加');
+            
+            if (choice) {
+                // データ置換
+                mindMaps = data.mindMaps.map(mindMap => {
+                    mindMap.updatedAt = Date.now();
+                    return mindMap;
+                });
+                if (hasfolders) {
+                    folders = data.folders;
+                    selectedFolderId = 'root';
+                }
+                saveFolders();
+                saveMindMaps();
+                renderFolderTree();
+                renderMindMapList();
+                alert(`${data.mindMaps.length}個のマインドマップ${folderText}でデータを置き換えました`);
+            } else {
+                // 新規追加
+                console.log('新規追加処理開始');
+                let addedCount = 0;
+                let addedFolderCount = 0;
+                
+                // フォルダの新規追加（同名チェックと新規作成）
+                if (hasfolders) {
+                    console.log('フォルダインポート開始:', data.folders);
+                    console.log('既存フォルダ:', folders);
+                    
+                    // フォルダを階層順（親から子の順）で処理するため、ソート
+                    const sortedFolders = [...data.folders].sort((a, b) => {
+                        // rootフォルダを最初に
+                        if (a.id === 'root') return -1;
+                        if (b.id === 'root') return 1;
+                        
+                        // 親フォルダを子フォルダより先に処理
+                        const aDepth = getDepth(a.id, data.folders);
+                        const bDepth = getDepth(b.id, data.folders);
+                        return aDepth - bDepth;
+                    });
+                    
+                    console.log('ソート後フォルダ:', sortedFolders);
+                    
+                    sortedFolders.forEach(importedFolder => {
+                        console.log('処理中フォルダ:', importedFolder);
+                        if (importedFolder.id === 'root') return; // rootフォルダはスキップ
+                        
+                        // 同名フォルダの確認
+                        const existingFolderByName = folders.find(existing => 
+                            existing.name === importedFolder.name && 
+                            existing.parentId === importedFolder.parentId
+                        );
+                        
+                        console.log('同名フォルダチェック結果:', existingFolderByName);
+                        
+                        if (!existingFolderByName) {
+                            // IDの重複チェックも行い、必要なら新しいIDを生成
+                            const existingFolderById = folders.find(existing => existing.id === importedFolder.id);
+                            const originalId = importedFolder.id;
+                            if (existingFolderById) {
+                                importedFolder.id = generateUUID();
+                                console.log('ID重複のため新しいIDを生成:', originalId, '->', importedFolder.id);
+                            }
+                            
+                            // children配列を初期化
+                            if (!importedFolder.children) {
+                                importedFolder.children = [];
+                            }
+                            
+                            // 親フォルダのchildren配列に追加
+                            const parentFolder = folders.find(f => f.id === importedFolder.parentId);
+                            console.log('親フォルダ検索結果:', parentFolder);
+                            if (parentFolder) {
+                                if (!parentFolder.children) {
+                                    parentFolder.children = [];
+                                }
+                                if (!parentFolder.children.includes(importedFolder.id)) {
+                                    parentFolder.children.push(importedFolder.id);
+                                    console.log('親フォルダに子を追加:', parentFolder.id, '->', importedFolder.id);
+                                }
+                            }
+                            
+                            // IDが変更された場合、関連するマインドマップとフォルダのIDも更新
+                            if (originalId !== importedFolder.id) {
+                                data.mindMaps.forEach(mindMap => {
+                                    if (mindMap.folder === originalId) {
+                                        mindMap.folder = importedFolder.id;
+                                    }
+                                });
+                                // 子フォルダのparentIdも更新
+                                sortedFolders.forEach(childFolder => {
+                                    if (childFolder.parentId === originalId) {
+                                        childFolder.parentId = importedFolder.id;
+                                    }
+                                });
+                            }
+                            
+                            folders.push(importedFolder);
+                            console.log('フォルダを追加:', importedFolder);
+                            addedFolderCount++;
+                        } else {
+                            // 同名フォルダが存在する場合、インポートするマインドマップのフォルダIDを既存フォルダのIDに変更
+                            const originalId = importedFolder.id;
+                            data.mindMaps.forEach(mindMap => {
+                                if (mindMap.folder === originalId) {
+                                    mindMap.folder = existingFolderByName.id;
+                                }
+                            });
+                            // 子フォルダのparentIdも既存フォルダのIDに変更
+                            sortedFolders.forEach(childFolder => {
+                                if (childFolder.parentId === originalId) {
+                                    childFolder.parentId = existingFolderByName.id;
+                                }
+                            });
+                        }
+                    });
+                    
+                    console.log('フォルダインポート完了:', folders);
+                    console.log('追加されたフォルダ数:', addedFolderCount);
+                }
+                
+                // マインドマップの新規追加
+                data.mindMaps.forEach(importedMindMap => {
+                    // 重複チェック
+                    if (!mindMaps.find(existing => existing.id === importedMindMap.id)) {
+                        importedMindMap.updatedAt = Date.now();
+                        mindMaps.push(importedMindMap);
+                        addedCount++;
+                    }
+                });
+                
+                if (addedCount > 0 || addedFolderCount > 0) {
+                    saveFolders();
+                    saveMindMaps();
+                    renderFolderTree();
+                    renderMindMapList();
+                    const folderAddText = addedFolderCount > 0 ? `、${addedFolderCount}個のフォルダ` : '';
+                    alert(`${addedCount}個のマインドマップ${folderAddText}を新規追加しました`);
+                } else {
+                    alert('新規追加するデータはありませんでした（重複のため）');
+                }
+            }
+        }
+
+        // 単体マインドマップのインポート処理
+        function handleSingleMindMapImport(data) {
+            // IDの重複チェック
+            const existingIndex = mindMaps.findIndex(m => m.id === data.id);
+            
+            if (existingIndex >= 0) {
+                const choice = confirm(`同じIDのマインドマップ「${mindMaps[existingIndex].name}」が既に存在します。\n\nOK: 上書きする\nキャンセル: 新規IDで追加する`);
+                
+                if (choice) {
+                    // 上書き（現在選択されているフォルダに配属）
+                    mindMaps[existingIndex] = { ...data, updatedAt: Date.now(), folder: selectedFolderId };
+                    saveMindMaps();
+                    renderMindMapList();
+                    alert(`マインドマップ「${data.name}」を上書きしました`);
+                } else {
+                    // 新規IDで追加（現在選択されているフォルダに配属）
+                    const newMindMap = { ...data, id: generateUUID(), updatedAt: Date.now(), folder: selectedFolderId };
+                    mindMaps.push(newMindMap);
+                    saveMindMaps();
+                    renderMindMapList();
+                    alert(`マインドマップ「${newMindMap.name}」を新規追加しました`);
+                }
+            } else {
+                // 新規追加（現在選択されているフォルダに配属）
+                const importedMindMap = { ...data, updatedAt: Date.now(), folder: selectedFolderId };
+                mindMaps.push(importedMindMap);
+                saveMindMaps();
+                renderMindMapList();
+                alert(`マインドマップ「${importedMindMap.name}」を新規追加しました`);
+            }
+        }
+
+        // ローカルストレージに保存
+        function saveMindMaps() {
+            try {
+                const data = {
+                    mindMaps: mindMaps,
+                    lastUpdated: Date.now()
+                };
+                localStorage.setItem('mindMaps', JSON.stringify(data));
+            } catch (error) {
+                console.error('保存エラー:', error);
+                alert('データの保存に失敗しました');
+            }
+        }
+
+        // UUID生成
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // フォルダの階層深度を取得
+        function getDepth(folderId, folderList = folders) {
+            if (folderId === 'root' || !folderId) return 0;
+            
+            const folder = folderList.find(f => f.id === folderId);
+            if (!folder) return 0;
+            
+            return 1 + getDepth(folder.parentId, folderList);
+        }
+
+        // モーダル表示
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        // モーダル非表示
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+        }
+
+        // 日付フォーマット
+        function formatDate(timestamp) {
+            return new Date(timestamp).toLocaleString('ja-JP');
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            console.log('setupEventListeners開始');
+            // ファイルインポート
+            const importFileElement = document.getElementById('import-file');
+            console.log('import-file要素:', importFileElement);
+            if (importFileElement) {
+                importFileElement.addEventListener('change', handleFileImport);
+                console.log('import-fileのchangeイベントリスナーを設定しました');
+            } else {
+                console.error('import-file要素が見つかりません');
+            }
+            
+            document.getElementById('folder-name').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const confirmBtn = document.getElementById('folder-modal-confirm-btn');
+                    if (confirmBtn.onclick) confirmBtn.onclick();
+                }
+            });
+
+            // キーボードナビゲーション用イベントハンドラ
+            // フォルダ用キーボードハンドラ
+            window.handleFolderKeydown = function(e, folderId) {
+                switch(e.key) {
+                    case 'Enter':
+                    case ' ': // スペースキー
+                        e.preventDefault();
+                        selectedFolderId = folderId;
+                        renderFolderTree();
+                        renderMindMapList();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        focusPreviousFolder(e.target);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        focusNextFolder(e.target);
+                        break;
+                    case 'Tab':
+                        // デフォルトのTab動作を維持
+                        break;
+                    case 'ContextMenu':
+                    case 'F10':
+                        if (e.shiftKey) { // Shift+F10 for context menu
+                            e.preventDefault();
+                            if (folderId !== 'root') {
+                                const rect = e.target.getBoundingClientRect();
+                                const fakeEvent = {
+                                    preventDefault: () => {},
+                                    stopPropagation: () => {},
+                                    pageX: rect.left + rect.width / 2,
+                                    pageY: rect.top + rect.height / 2
+                                };
+                                window.showFolderContextMenu(fakeEvent, folderId);
+                            }
+                        }
+                        break;
+                }
+            };
+
+            // マインドマップ用キーボードハンドラ
+            window.handleMindMapKeydown = function(e, mindMapId) {
+                switch(e.key) {
+                    case 'Enter':
+                    case ' ': // スペースキー
+                        e.preventDefault();
+                        openMindMap(mindMapId);
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        focusPreviousMindMap(e.target);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        focusNextMindMap(e.target);
+                        break;
+                    case 'Tab':
+                        // デフォルトのTab動作を維持
+                        break;
+                    case 'ContextMenu':
+                    case 'F10':
+                        if (e.shiftKey) { // Shift+F10 for context menu
+                            e.preventDefault();
+                            const rect = e.target.getBoundingClientRect();
+                            const fakeEvent = {
+                                preventDefault: () => {},
+                                stopPropagation: () => {},
+                                pageX: rect.left + rect.width / 2,
+                                pageY: rect.top + rect.height / 2
+                            };
+                            showContextMenu(fakeEvent, mindMapId);
+                        }
+                        break;
+                }
+            };
+
+            // フォーカス移動用ヘルパー関数
+            function focusPreviousFolder(current) {
+                const folders = document.querySelectorAll('.folder-item.focusable');
+                const currentIndex = Array.from(folders).indexOf(current);
+                if (currentIndex > 0) {
+                    folders[currentIndex - 1].focus();
+                }
+            }
+
+            function focusNextFolder(current) {
+                const folders = document.querySelectorAll('.folder-item.focusable');
+                const currentIndex = Array.from(folders).indexOf(current);
+                if (currentIndex < folders.length - 1) {
+                    folders[currentIndex + 1].focus();
+                }
+            }
+
+            function focusPreviousMindMap(current) {
+                const mindMaps = document.querySelectorAll('.mindmap-item.focusable');
+                const currentIndex = Array.from(mindMaps).indexOf(current);
+                if (currentIndex > 0) {
+                    mindMaps[currentIndex - 1].focus();
+                }
+            }
+
+            function focusNextMindMap(current) {
+                const mindMaps = document.querySelectorAll('.mindmap-item.focusable');
+                const currentIndex = Array.from(mindMaps).indexOf(current);
+                if (currentIndex < mindMaps.length - 1) {
+                    mindMaps[currentIndex + 1].focus();
+                }
+            }
+
+            // Escapeキーでモーダルを閉じる
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    // 表示中のモーダルを探して閉じる
+                    const modals = document.querySelectorAll('.modal');
+                    modals.forEach(modal => {
+                        if (modal.style.display === 'flex' || modal.classList.contains('show')) {
+                            modal.classList.remove('show');
+                            modal.style.display = 'none';
+                        }
+                    });
+                    // コンテキストメニューも閉じる
+                    hideContextMenu();
+                    window.hideFolderContextMenu();
+                    hideHeaderMenu();
+                }
+            });
+
+            // Enterキーでモーダル確定
+            document.getElementById('new-name').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') confirmCreateMindMap();
+            });
+            
+            document.getElementById('edit-name').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') confirmEditName();
+            });
+
+            // モーダル外クリックで閉じる
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('modal')) {
+                    e.target.style.display = 'none';
+                }
+                // コンテキストメニューも閉じる
+                if (!e.target.closest('#context-menu')) {
+                    hideContextMenu();
+                }
+                // フォルダ用コンテキストメニューも閉じる
+                if (!e.target.closest('#folder-context-menu')) {
+                    window.hideFolderContextMenu();
+                }
+                // headerメニューも閉じる
+                if (!e.target.closest('.header-menu')) {
+                    hideHeaderMenu();
+                }
+            });
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMindMaps();
+            setupEventListeners();
+            // setIntervalによるloadMindMaps()の定期呼び出しを一時的に無効化
+            // 移動直後の状態を維持できるか確認する
+        });
+
+// グローバルエクスポート
+window.showFolderContextMenu = showFolderContextMenu;
+window.hideFolderContextMenu = hideFolderContextMenu;
+    </script>
+</body>
+</html>
