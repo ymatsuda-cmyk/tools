@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+          xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+          xsi:type="TaskPaneApp">
+
+  <!-- ============ Basic Settings ============ -->
+  <Id>bee0e0c0-8568-48d7-94c4-1d5206c2a6e9</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Contoso</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+
+  <DisplayName DefaultValue="WBS Kanban" />
+  <Description DefaultValue="WBSシートをカンバン表示し、変更をWBSに反映します。" />
+
+  <IconUrl DefaultValue="https://your-org.github.io/your-repo/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://your-org.github.io/your-repo/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://your-org.github.io/your-repo/" />
+
+  <!-- Dialog/TaskPane/Command で開く可能性のあるドメイン（GitHub Pages） -->
+  <AppDomains>
+    <AppDomain>https://your-org.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+
+  <!-- Excelのシート読み書きが必要なのでReadWriteDocument -->
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <!-- 後方互換用：最低限 SourceLocation が必要（表示しなくてもOK） -->
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://your-org.github.io/your-repo/blank.html" />
+  </DefaultSettings>
+
+  <!-- ============ Add-in Commands (Ribbon) ============ -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+                    xsi:type="VersionOverridesV1_0">
+
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+
+          <!-- ExecuteFunction を実行する JS が置かれている FunctionFile -->
+          <FunctionFile resid="Commands.Url" />
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <CustomTab id="WbsKanbanTab">
+              <Label resid="Tab.Label" />
+
+              <Group id="WbsKanbanGroup">
+                <Label resid="Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16" />
+                  <bt:Image size="32" resid="Icon.32" />
+                  <bt:Image size="80" resid="Icon.80" />
+                </Icon>
+
+                <!-- リボンボタン：クリックでopenKanban（ExecuteFunction）を呼ぶ -->
+                <Control xsi:type="Button" id="OpenKanbanButton">
+                  <Label resid="Btn.OpenKanban.Label" />
+                  <Supertip>
+                    <Title resid="Btn.OpenKanban.Title" />
+                    <Description resid="Btn.OpenKanban.Desc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openKanban</FunctionName>
+                  </Action>
+                </Control>
+
+              </Group>
+            </CustomTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://your-org.github.io/your-repo/assets/icon-16.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://your-org.github.io/your-repo/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://your-org.github.io/your-repo/assets/icon-80.png" />
+      </bt:Images>
+
+      <bt:Urls>
+        <!-- FunctionFile（commands.html）: openKanban を associate する -->
+        <bt:Url id="Commands.Url" DefaultValue="https://your-org.github.io/your-repo/commands.html" />
+      </bt:Urls>
+
+      <bt:ShortStrings>
+        <bt:String id="Tab.Label" DefaultValue="WBS Kanban" />
+        <bt:String id="Group.Label" DefaultValue="操作" />
+        <bt:String id="Btn.OpenKanban.Label" DefaultValue="カンバンを開く" />
+        <bt:String id="Btn.OpenKanban.Title" DefaultValue="WBSカンバン" />
+      </bt:ShortStrings>
+
+      <bt:LongStrings>
+        <bt:String id="Btn.OpenKanban.Desc" DefaultValue="wbsシートの内容を読み込み、Dialogでカンバン表示します。変更はwbsシートへ反映されます。" />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+
+</OfficeApp>

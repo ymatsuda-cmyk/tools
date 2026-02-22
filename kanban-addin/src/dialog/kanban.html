@@ -1,0 +1,83 @@
+<!-- src/dialog/kanban.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>自動化スケジュール カンバン</title>
+  https://appsforoffice.microsoft.com/lib/1/hosted/office.js</script>
+  ./kanban.js</script>
+  <style>
+    /* 簡易レイアウト例（必要に応じて調整） */
+    body { font-family: sans-serif; margin: 0; }
+    #board { display: flex; height: 100vh; }
+    .column {
+      flex: 1;
+      padding: 8px;
+      border-right: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    .column:last-child { border-right: none; }
+    .column-header { font-weight: bold; margin-bottom: 8px; }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 4px 6px;
+      margin-bottom: 6px;
+      cursor: grab;
+    }
+    .tag { font-size: 10px; padding: 1px 4px; border-radius: 3px; background: #eee; margin-right: 2px; }
+    /* 編集ダイアログ（モーダル） */
+    #edit-dialog-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.2);
+      display: none; align-items: center; justify-content: center;
+    }
+    #edit-dialog {
+      background: #fff; padding: 12px; border-radius: 4px;
+      min-width: 320px; max-width: 480px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .form-row { margin-bottom: 8px; }
+    .form-row label { display:block; font-size: 12px; margin-bottom: 2px; }
+    .form-row input, .form-row textarea, .form-row select {
+      width: 100%; box-sizing: border-box;
+    }
+    .dialog-buttons { text-align: right; margin-top: 8px; }
+    .dialog-buttons button { margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <div id="board"></div>
+
+  <!-- 編集ダイアログ -->
+  <div id="edit-dialog-backdrop">
+    <div id="edit-dialog">
+      <div class="form-row">
+        <label>タスク名</label>
+        <div id="edit-title"></div>
+      </div>
+      <div class="form-row">
+        <label for="edit-assignee">担当者</label>
+        <select id="edit-assignee"></select>
+      </div>
+      <div class="form-row">
+        <label for="edit-planned-start">予定開始日 (m/d)</label>
+        <input id="edit-planned-start" type="text" />
+      </div>
+      <div class="form-row">
+        <label for="edit-planned-end">予定終了日 (m/d)</label>
+        <input id="edit-planned-end" type="text" />
+      </div>
+      <div class="form-row">
+        <label for="edit-note">備考（最大1024文字）</label>
+        <textarea id="edit-note" rows="4" maxlength="1024"></textarea>
+      </div>
+      <div class="dialog-buttons">
+        <button id="edit-cancel">キャンセル</button>
+        <button id="edit-ok">保存</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
