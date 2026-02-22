@@ -1,38 +1,41 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
-          xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
-          xsi:type="TaskPaneApp">
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
 
   <!-- ============ Basic Settings ============ -->
-  <Id>bee0e0c0-8568-48d7-94c4-1d5206c2a6e9</Id>
+  <!-- ★ここは自分で生成した GUID に置き換えてください -->
+  <Id>460d2c5c-e4cd-4d96-82f4-703849c080a0</Id>
+
   <Version>1.0.0.0</Version>
-  <ProviderName>Contoso</ProviderName>
+  <ProviderName>ymatsuda</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
   <DisplayName DefaultValue="WBS Kanban" />
   <Description DefaultValue="WBSシートをカンバン表示し、変更をWBSに反映します。" />
 
-  <IconUrl DefaultValue="https://your-org.github.io/your-repo/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://your-org.github.io/your-repo/assets/icon-64.png" />
-  <SupportUrl DefaultValue="https://your-org.github.io/your-repo/" />
+  <!-- アイコン画像は任意。GitHub Pages 上のパスに合わせて配置してください -->
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/" />
 
   <!-- Dialog/TaskPane/Command で開く可能性のあるドメイン（GitHub Pages） -->
   <AppDomains>
-    <AppDomain>https://your-org.github.io</AppDomain>
+    <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
   </AppDomains>
 
   <Hosts>
     <Host Name="Workbook" />
   </Hosts>
 
-  <!-- Excelのシート読み書きが必要なのでReadWriteDocument -->
+  <!-- Excel のシート読み書きが必要なので ReadWriteDocument -->
   <Permissions>ReadWriteDocument</Permissions>
 
   <!-- 後方互換用：最低限 SourceLocation が必要（表示しなくてもOK） -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://your-org.github.io/your-repo/blank.html" />
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/blank.html" />
   </DefaultSettings>
 
   <!-- ============ Add-in Commands (Ribbon) ============ -->
@@ -58,7 +61,7 @@
                   <bt:Image size="80" resid="Icon.80" />
                 </Icon>
 
-                <!-- リボンボタン：クリックでopenKanban（ExecuteFunction）を呼ぶ -->
+                <!-- リボンボタン：クリックで openKanban（ExecuteFunction）を呼ぶ -->
                 <Control xsi:type="Button" id="OpenKanbanButton">
                   <Label resid="Btn.OpenKanban.Label" />
                   <Supertip>
@@ -85,14 +88,14 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://your-org.github.io/your-repo/assets/icon-16.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://your-org.github.io/your-repo/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://your-org.github.io/your-repo/assets/icon-80.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-16.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-80.png" />
       </bt:Images>
 
       <bt:Urls>
         <!-- FunctionFile（commands.html）: openKanban を associate する -->
-        <bt:Url id="Commands.Url" DefaultValue="https://your-org.github.io/your-repo/commands.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/commands.html" />
       </bt:Urls>
 
       <bt:ShortStrings>
@@ -103,7 +106,8 @@
       </bt:ShortStrings>
 
       <bt:LongStrings>
-        <bt:String id="Btn.OpenKanban.Desc" DefaultValue="wbsシートの内容を読み込み、Dialogでカンバン表示します。変更はwbsシートへ反映されます。" />
+        <bt:String id="Btn.OpenKanban.Desc"
+                   DefaultValue="WBSシートの内容を読み込み、Dialogでカンバン表示します。変更はWBSシートへ反映されます。" />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
