@@ -116,10 +116,19 @@ async function openKanban(event) {
       }
 
       header = wbsTable.getHeaderRowRange();
-      body   = wbsTable.getDataBodyRange();
+      
+      // データボディの取得（存在しない場合はnull）
+      try {
+        body = wbsTable.getDataBodyRange();
+      } catch (error) {
+        console.log("No data rows in table, only headers exist");
+        body = null;
+      }
 
       header.load("values");
-      body.load("values");
+      if (body) {
+        body.load("values");
+      }
       
       // テーブルの値を確実にロードするため、ここで一度同期
       try {
@@ -198,11 +207,20 @@ async function openKanban(event) {
       console.log("Headers found:", headers);
 
       // ボディデータの確認
-      if (!body || !body.values || !Array.isArray(body.values)) {
-        console.warn("Table body is empty or invalid, creating empty task list");
+      if (!body || !body.values || !Array.isArray(body.values) || body.values.length === 0) {
+        console.warn("Table has no data rows (headers only), creating empty task list");
+        
+        // 担当者候補だけは取得して返す
+        let assignees = [];
+        if (assigneeBody && assigneeBody.values) {
+          assignees = assigneeBody.values
+            .map(row => String(row[0]).trim())
+            .filter(name => !!name);
+        }
+        
         return {
           tasks: [],
-          assignees: []
+          assignees: assignees
         };
       }
       
@@ -382,8 +400,15 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
       
       const table = tables.items[0]; // 最初のテーブルを使用
       console.log("Using table for update:", table.name);
+      
       const header = table.getHeaderRowRange();
-      const body   = table.getDataBodyRange();
+      let body;
+      try {
+        body = table.getDataBodyRange();
+      } catch (error) {
+        console.log("No data rows in table for update");
+        return; // データ行がない場合は更新不可
+      }
 
       header.load("values");
       body.load("values");
@@ -473,8 +498,15 @@ async function updateTaskDetails(msg) {
     
     const table = tables.items[0]; // 最初のテーブルを使用
     console.log("Using table for update:", table.name);
+    
     const header = table.getHeaderRowRange();
-    const body   = table.getDataBodyRange();
+    let body;
+    try {
+      body = table.getDataBodyRange();
+    } catch (error) {
+      console.log("No data rows in table for update");
+      return; // データ行がない場合は更新不可
+    }
 
     header.load("values");
     body.load("values");
