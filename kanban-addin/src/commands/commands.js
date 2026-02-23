@@ -124,40 +124,51 @@ async function openKanban(event) {
       }
       
       if (codeSheet) {
-        const codesTables = codeSheet.tables;
-        codesTables.load("items/name");
-        await context.sync();
-        
-        console.log("Available tables in Codes sheet:", codesTables.items.map(t => t.name));
-        
         try {
-          assigneeTable = codeSheet.tables.getItem("tblAssignee");
-          assigneeBody  = assigneeTable.getDataBodyRange();
-          assigneeBody.load("values");
-        } catch (error) {
-          console.log("tblAssignee table not found in Codes sheet");
-          if (codesTables.items.length > 0) {
-            console.log("Using first available table in Codes sheet:", codesTables.items[0].name);
-            assigneeTable = codesTables.items[0];
-            assigneeBody = assigneeTable.getDataBodyRange();
+          const codesTables = codeSheet.tables;
+          codesTables.load("items/name");
+          await context.sync();
+          
+          console.log("Available tables in Codes sheet:", codesTables.items.map(t => t.name));
+          
+          try {
+            assigneeTable = codeSheet.tables.getItem("tblAssignee");
+            assigneeBody  = assigneeTable.getDataBodyRange();
             assigneeBody.load("values");
-          } else {
-            console.log("No tables found in Codes sheet, attempting to create one.");
-            const usedRange = codeSheet.getUsedRange();
-            usedRange.load("address");
-            await context.sync();
-            if (usedRange.address) {
-              console.log("Used range in Codes sheet is:", usedRange.address);
-              assigneeTable = codeSheet.tables.add(usedRange, true /*hasHeaders*/);
-              assigneeTable.name = "tblAssignee_auto";
+          } catch (error) {
+            console.log("tblAssignee table not found in Codes sheet");
+            if (codesTables.items.length > 0) {
+              console.log("Using first available table in Codes sheet:", codesTables.items[0].name);
+              assigneeTable = codesTables.items[0];
               assigneeBody = assigneeTable.getDataBodyRange();
               assigneeBody.load("values");
-              console.log("New table 'tblAssignee_auto' created in Codes sheet.");
             } else {
-               console.log("Codes sheet is empty, will use empty assignee list");
-               assigneeBody = null;
+              console.log("No tables found in Codes sheet, attempting to create one.");
+              try {
+                const usedRange = codeSheet.getUsedRange();
+                usedRange.load("address");
+                await context.sync();
+                if (usedRange.address) {
+                  console.log("Used range in Codes sheet is:", usedRange.address);
+                  assigneeTable = codeSheet.tables.add(usedRange, true /*hasHeaders*/);
+                  assigneeTable.name = "tblAssignee_auto";
+                  assigneeBody = assigneeTable.getDataBodyRange();
+                  assigneeBody.load("values");
+                  console.log("New table 'tblAssignee_auto' created in Codes sheet.");
+                } else {
+                   console.log("Codes sheet is empty, will use empty assignee list");
+                   assigneeBody = null;
+                }
+              } catch (usedRangeError) {
+                console.log("Failed to get used range in Codes sheet:", usedRangeError.message);
+                assigneeBody = null;
+              }
             }
           }
+        } catch (tablesError) {
+          console.log("Failed to access tables in Codes sheet:", tablesError.message);
+          console.log("Will use empty assignee list");
+          assigneeBody = null;
         }
       }
 
