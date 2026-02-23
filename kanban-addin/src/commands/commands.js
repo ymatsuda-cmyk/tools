@@ -47,6 +47,14 @@ async function openKanban(event) {
     const payload = await Excel.run(async (context) => {
       console.log("Inside Excel.run");
       
+      // まず現在のワークブックの構造を確認
+      const workbook = context.workbook;
+      const worksheets = workbook.worksheets;
+      worksheets.load("items/name");
+      await context.sync();
+      
+      console.log("Available worksheets:", worksheets.items.map(ws => ws.name));
+      
       // === 1) WBS テーブルからタスク情報取得 ===
       let wbsSheet, wbsTable, header, body;
       
@@ -54,14 +62,48 @@ async function openKanban(event) {
         console.log("Getting WBS sheet");
         wbsSheet = context.workbook.worksheets.getItem("WBS");
       } catch (error) {
-        throw new Error("WBSシートが見つかりません: " + error.message);
+        // WBSシートが見つからない場合、現在のアクティブシートを使用するか確認
+        console.warn("WBS sheet not found, checking current active sheet");
+        const activeSheet = context.workbook.worksheets.getActiveWorksheet();
+        activeSheet.load("name");
+        await context.sync();
+        
+        const sheetName = activeSheet.name;
+        console.log("Current active sheet:", sheetName);
+        
+        // ユーザーに確認を求める
+        const useCurrentSheet = confirm(`WBSシートが見つかりません。現在のシート「${sheetName}」を使用しますか？`);
+        if (useCurrentSheet) {
+          wbsSheet = activeSheet;
+        } else {
+          throw new Error(`WBSシートが見つかりません。利用可能なシート: ${worksheets.items.map(ws => ws.name).join(', ')}`);
+        }
       }
+      
+      // テーブルの確認
+      const tables = wbsSheet.tables;
+      tables.load("items/name");
+      await context.sync();
+      
+      console.log("Available tables in sheet:", tables.items.map(t => t.name));
       
       try {
         console.log("Getting WBS table");
         wbsTable = wbsSheet.tables.getItem("tblWBS");
       } catch (error) {
-        throw new Error("tblWBSテーブルが見つかりません: " + error.message);
+        // tblWBSテーブルが見つからない場合
+        if (tables.items.length > 0) {
+          const tableName = tables.items[0].name;
+          console.log("tblWBS not found, using first available table:", tableName);
+          const useFirstTable = confirm(`tblWBSテーブルが見つかりません。「${tableName}」テーブルを使用しますか？`);
+          if (useFirstTable) {
+            wbsTable = tables.items[0];
+          } else {
+            throw new Error(`tblWBSテーブルが見つかりません。利用可能なテーブル: ${tables.items.map(t => t.name).join(', ')}`);
+          }
+        } else {
+          throw new Error("このシートにはテーブルが存在しません。データをテーブル形式に変換してください。");
+        }
       }
 
       header = wbsTable.getHeaderRowRange();
@@ -77,19 +119,32 @@ async function openKanban(event) {
         console.log("Getting Codes sheet");
         codeSheet = context.workbook.worksheets.getItem("Codes");
       } catch (error) {
-        console.log("Codesシートが見つかりません、空の担当者リストを使用します");
-        // Codesシートが無くても続行
+        console.log("Codes sheet not found, will use empty assignee list");
         codeSheet = null;
       }
       
       if (codeSheet) {
+        const codesTables = codeSheet.tables;
+        codesTables.load("items/name");
+        await context.sync();
+        
+        console.log("Available tables in Codes sheet:", codesTables.items.map(t => t.name));
+        
         try {
           assigneeTable = codeSheet.tables.getItem("tblAssignee");
           assigneeBody  = assigneeTable.getDataBodyRange();
           assigneeBody.load("values");
         } catch (error) {
-          console.log("tblAssigneeテーブルが見つかりません、空の担当者リストを使用します");
-          assigneeBody = null;
+          console.log("tblAssignee table not found in Codes sheet");
+          if (codesTables.items.length > 0) {
+            console.log("Using first available table in Codes sheet:", codesTables.items[0].name);
+            assigneeTable = codesTables.items[0];
+            assigneeBody = assigneeTable.getDataBodyRange();
+            assigneeBody.load("values");
+          } else {
+            console.log("No tables found in Codes sheet, will use empty assignee list");
+            assigneeBody = null;
+          }
         }
       }
 
@@ -100,30 +155,43 @@ async function openKanban(event) {
       const headers = header.values[0].map(h => String(h).trim());
       console.log("Headers found:", headers);
       
-      const col = (name) => {
-        const index = headers.indexOf(name);
-        if (index === -1) {
-          console.warn(`Column '${name}' not found in headers`);
+      // より柔軟な列名検索関数
+      const findCol = (possibleNames) => {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          if (index !== -1) {
+            console.log(`Found column '${headers[index]}' for pattern '${name}'`);
+            return index;
+          }
         }
-        return index;
+        console.warn(`No column found for patterns: ${possibleNames.join(', ')}`);
+        return -1;
       };
 
-      const idCol           = col("ID");
-      const titleCol        = col("task");
-      const assigneeCol     = col("担当者");
-      const plannedStartCol = col("予定開始日");
-      const plannedEndCol   = col("予定終了日");
-      const actualStartCol  = col("実績開始日");
-      const actualEndCol    = col("実績終了日");
-      const noteCol         = col("備考");
-      const tagLargeCol     = col("大分類");
-      const tagSmallCol     = col("小分類");
+      // 複数のパターンで列を検索
+      const idCol           = findCol(["ID", "番号", "No", "識別子"]);
+      const titleCol        = findCol(["task", "タスク", "作業", "項目", "件名", "内容"]);
+      const assigneeCol     = findCol(["担当者", "assignee", "assigned", "担当"]);
+      const plannedStartCol = findCol(["予定開始日", "planned start", "start date", "開始予定"]);
+      const plannedEndCol   = findCol(["予定終了日", "planned end", "end date", "終了予定"]);
+      const actualStartCol  = findCol(["実績開始日", "actual start", "開始実績", "実際開始"]);
+      const actualEndCol    = findCol(["実績終了日", "actual end", "終了実績", "実際終了"]);
+      const noteCol         = findCol(["備考", "note", "notes", "コメント", "メモ"]);
+      const tagLargeCol     = findCol(["大分類", "category", "大カテゴリー", "分類"]);
+      const tagSmallCol     = findCol(["小分類", "subcategory", "小カテゴリー", "詳細分類"]);
+
+      console.log("Column mapping:", {
+        id: idCol, title: titleCol, assignee: assigneeCol,
+        plannedStart: plannedStartCol, plannedEnd: plannedEndCol,
+        actualStart: actualStartCol, actualEnd: actualEndCol,
+        note: noteCol, tagLarge: tagLargeCol, tagSmall: tagSmallCol
+      });
 
       console.log("Processing tasks data");
       // タスク一覧の生成
       const tasks = body.values.map((r, index) => {
-        const actualStart = r[actualStartCol];
-        const actualEnd   = r[actualEndCol];
+        const actualStart = actualStartCol >= 0 ? r[actualStartCol] : null;
+        const actualEnd   = actualEndCol >= 0 ? r[actualEndCol] : null;
 
         let status;
         if (!actualStart && !actualEnd) {
@@ -132,20 +200,22 @@ async function openKanban(event) {
           status = "Doing";
         } else if (actualEnd) {
           status = "Done";
+        } else {
+          status = "Todo"; // デフォルト
         }
 
         return {
-          id:          r[idCol],
-          title:       r[titleCol],
-          assignee:    r[assigneeCol],
-          plannedStart:r[plannedStartCol],
-          plannedEnd:  r[plannedEndCol],
+          id:          idCol >= 0 ? r[idCol] : `task-${index + 1}`,
+          title:       titleCol >= 0 ? r[titleCol] : `Task ${index + 1}`,
+          assignee:    assigneeCol >= 0 ? r[assigneeCol] : "",
+          plannedStart: plannedStartCol >= 0 ? r[plannedStartCol] : "",
+          plannedEnd:  plannedEndCol >= 0 ? r[plannedEndCol] : "",
           actualStart,
           actualEnd,
           status,
-          note:        r[noteCol],
-          tagLarge:    r[tagLargeCol],
-          tagSmall:    r[tagSmallCol],
+          note:        noteCol >= 0 ? r[noteCol] : "",
+          tagLarge:    tagLargeCol >= 0 ? r[tagLargeCol] : "",
+          tagSmall:    tagSmallCol >= 0 ? r[tagSmallCol] : "",
         };
       });
 
