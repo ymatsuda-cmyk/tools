@@ -83,40 +83,35 @@ async function openKanban(event) {
       
       console.log("Available tables in sheet:", tables.items.map(t => t.name));
       
-      try {
-        console.log("Getting WBS table");
-        wbsTable = wbsSheet.tables.getItem("tblWBS");
-      } catch (error) {
-        console.log("tblWBS table not found, error:", error.message);
-        // tblWBSテーブルが見つからない場合、最初のテーブルを自動使用
-        if (tables.items.length > 0) {
-          const tableName = tables.items[0].name;
-          console.log(`tblWBS not found, using first available table: ${tableName}`);
-          wbsTable = tables.items[0];
-        } else {
-          // テーブルが存在しない場合、使用されている範囲から新しいテーブルを作成
-          console.log("No tables found in sheet. Attempting to create a new table from used range.");
-          try {
-            const usedRange = wbsSheet.getUsedRange();
-            usedRange.load("address");
-            await context.sync();
-            
-            if (!usedRange || !usedRange.address) {
-              throw new Error("WBSシートにデータが存在しません。少なくともヘッダー行を含むデータを入力してください。");
-            }
-            
-            console.log("Used range is:", usedRange.address);
-            // ヘッダーがあることを前提としてテーブルを作成
-            wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
-            wbsTable.name = "tblWBS_auto";
-            console.log("New table 'tblWBS_auto' created.");
-            
-            // テーブル作成直後に同期して確実に利用可能にする
-            await context.sync();
-          } catch (rangeError) {
-            console.error("Failed to create table from used range:", rangeError.message);
-            throw new Error("WBSシートからテーブルを作成できませんでした。シートにヘッダー行を含むデータが正しく入力されているか確認してください。");
+      // テーブルの取得または作成
+      console.log("Getting or creating table");
+      if (tables.items.length > 0) {
+        // 最初のテーブルを使用
+        wbsTable = tables.items[0];
+        console.log("Using existing table:", wbsTable.name);
+      } else {
+        // テーブルが存在しない場合、使用されている範囲から新しいテーブルを作成
+        console.log("No tables found in sheet. Creating a new table from used range.");
+        try {
+          const usedRange = wbsSheet.getUsedRange();
+          usedRange.load("address");
+          await context.sync();
+          
+          if (!usedRange || !usedRange.address) {
+            throw new Error("シートにデータが存在しません。少なくともヘッダー行を含むデータを入力してください。");
           }
+          
+          console.log("Used range is:", usedRange.address);
+          // ヘッダーがあることを前提としてテーブルを作成
+          wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
+          wbsTable.name = "AutoTable_" + Date.now(); // ユニークなテーブル名
+          console.log("New table created:", wbsTable.name);
+          
+          // テーブル作成直後に同期して確実に利用可能にする
+          await context.sync();
+        } catch (rangeError) {
+          console.error("Failed to create table from used range:", rangeError.message);
+          throw new Error("シートからテーブルを作成できませんでした。シートにヘッダー行を含むデータが正しく入力されているか確認してください。");
         }
       }
 
@@ -153,18 +148,13 @@ async function openKanban(event) {
           
           console.log("Available tables in Codes sheet:", codesTables.items.map(t => t.name));
           
-          try {
-            assigneeTable = codeSheet.tables.getItem("tblAssignee");
-            assigneeBody  = assigneeTable.getDataBodyRange();
+          if (codesTables.items.length > 0) {
+            // 最初のテーブルを使用
+            assigneeTable = codesTables.items[0];
+            assigneeBody = assigneeTable.getDataBodyRange();
             assigneeBody.load("values");
-          } catch (error) {
-            console.log("tblAssignee table not found in Codes sheet");
-            if (codesTables.items.length > 0) {
-              console.log("Using first available table in Codes sheet:", codesTables.items[0].name);
-              assigneeTable = codesTables.items[0];
-              assigneeBody = assigneeTable.getDataBodyRange();
-              assigneeBody.load("values");
-            } else {
+            console.log("Using table in Codes sheet:", assigneeTable.name);
+          } else {
               console.log("No tables found in Codes sheet, attempting to create one.");
               try {
                 const usedRange = codeSheet.getUsedRange();
@@ -173,10 +163,10 @@ async function openKanban(event) {
                 if (usedRange.address) {
                   console.log("Used range in Codes sheet is:", usedRange.address);
                   assigneeTable = codeSheet.tables.add(usedRange, true /*hasHeaders*/);
-                  assigneeTable.name = "tblAssignee_auto";
+                  assigneeTable.name = "AssigneeTable_" + Date.now();
                   assigneeBody = assigneeTable.getDataBodyRange();
                   assigneeBody.load("values");
-                  console.log("New table 'tblAssignee_auto' created in Codes sheet.");
+                  console.log("New table created in Codes sheet:", assigneeTable.name);
                 } else {
                    console.log("Codes sheet is empty, will use empty assignee list");
                    assigneeBody = null;
@@ -203,7 +193,7 @@ async function openKanban(event) {
         headers = header.values[0].map(h => String(h).trim());
       } else {
         console.error("Header row is missing or invalid. header.values:", header && header.values);
-        throw new Error("WBSテーブルのヘッダー行が取得できません。ExcelのWBSシートとテーブル構造を確認してください。");
+        throw new Error("テーブルのヘッダー行が取得できません。Excelシートとテーブル構造を確認してください。");
       }
       console.log("Headers found:", headers);
 
@@ -329,7 +319,7 @@ async function openKanban(event) {
     );
   } catch (error) {
     console.error("Error in openKanban:", error);
-    console.error("エラーが発生しました: " + error.message + "\n\nExcelのWBSシートとtblWBSテーブルが存在するか確認してください。");
+    console.error("エラーが発生しました: " + error.message + "\n\nExcelシートにヘッダー行を含むデータが正しく入力されているか確認してください。");
   } finally {
     console.log("Completing event");
     // ExecuteFunction の必須
@@ -381,21 +371,17 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
         sheet = context.workbook.worksheets.getActiveWorksheet();
       }
       
-      // テーブルを柔軟に検索
+      // テーブルを取得（最初のテーブルを使用）
       const tables = sheet.tables;
       tables.load("items/name");
       await context.sync();
       
-      let table;
-      try {
-        table = sheet.tables.getItem("tblWBS");
-      } catch (error) {
-        if (tables.items.length > 0) {
-          table = tables.items[0]; // 最初のテーブルを使用
-        } else {
-          throw new Error("更新対象のテーブルが見つかりません");
-        }
+      if (tables.items.length === 0) {
+        throw new Error("更新対象のテーブルが見つかりません");
       }
+      
+      const table = tables.items[0]; // 最初のテーブルを使用
+      console.log("Using table for update:", table.name);
       const header = table.getHeaderRowRange();
       const body   = table.getDataBodyRange();
 
@@ -476,21 +462,17 @@ async function updateTaskDetails(msg) {
       sheet = context.workbook.worksheets.getActiveWorksheet();
     }
     
-    // テーブルを柔軟に検索
+    // テーブルを取得（最初のテーブルを使用）
     const tables = sheet.tables;
     tables.load("items/name");
     await context.sync();
     
-    let table;
-    try {
-      table = sheet.tables.getItem("tblWBS");
-    } catch (error) {
-      if (tables.items.length > 0) {
-        table = tables.items[0]; // 最初のテーブルを使用
-      } else {
-        throw new Error("更新対象のテーブルが見つかりません");
-      }
+    if (tables.items.length === 0) {
+      throw new Error("更新対象のテーブルが見つかりません");
     }
+    
+    const table = tables.items[0]; // 最初のテーブルを使用
+    console.log("Using table for update:", table.name);
     const header = table.getHeaderRowRange();
     const body   = table.getDataBodyRange();
 
