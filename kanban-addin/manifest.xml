@@ -11,14 +11,11 @@
 
   <Version>1.0.0.0</Version>
   <ProviderName>ymatsuda</ProviderName>
-  <DefaultLocale>ja-JP</DefaultLocale>
+  <DefaultLocale>en-US</DefaultLocale>
 
   <DisplayName DefaultValue="WBS Kanban" />
   <Description DefaultValue="WBSシートをカンバン表示し、変更をWBSに反映します。" />
 
-  <!-- アイコン画像は任意。GitHub Pages 上のパスに合わせて配置してください -->
-  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-64.png" />
   <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/" />
 
   <!-- Dialog/TaskPane/Command で開く可能性のあるドメイン（GitHub Pages） -->
@@ -55,26 +52,14 @@
 
               <Group id="WbsKanbanGroup">
                 <Label resid="Group.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.16" />
-                  <bt:Image size="32" resid="Icon.32" />
-                  <bt:Image size="80" resid="Icon.80" />
-                </Icon>
 
-                <!-- リボンボタン：クリックで openKanban（ExecuteFunction）を呼ぶ -->
-                <Control xsi:type="Button" id="OpenKanbanButton">
-                  <Label resid="Btn.OpenKanban.Label" />
-                  <Supertip>
-                    <Title resid="Btn.OpenKanban.Title" />
-                    <Description resid="Btn.OpenKanban.Desc" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.16" />
-                    <bt:Image size="32" resid="Icon.32" />
-                    <bt:Image size="80" resid="Icon.80" />
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>openKanban</FunctionName>
+                  <!-- リボンボタン：クリックで openKanban（ExecuteFunction）を呼ぶ -->
+                  <Control xsi:type="Button" id="OpenKanbanButton">
+                    <Label resid="Btn.OpenKanban.Label" />
+                    <Supertip>
+                      <Title resid="Btn.OpenKanban.Title" />
+                      <Description resid="Btn.OpenKanban.Desc" />
+                    </Supertip>
                   </Action>
                 </Control>
 
@@ -87,12 +72,6 @@
     </Hosts>
 
     <Resources>
-      <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-16.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/assets/icon-80.png" />
-      </bt:Images>
-
       <bt:Urls>
         <!-- FunctionFile（commands.html）: openKanban を associate する -->
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/commands.html" />

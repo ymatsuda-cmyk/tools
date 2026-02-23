@@ -3,25 +3,44 @@
 let dialog;
 
 // Office.js が読み込まれたかチェック
-Office.onReady(() => {
+Office.onReady((info) => {
   console.log("Office.js loaded successfully");
+  console.log("Office host:", info.host);
+  console.log("Office platform:", info.platform);
+  
   // ExecuteFunction の関連付け
   if (Office.actions && Office.actions.associate) {
-    Office.actions.associate("openKanban", openKanban);
-    console.log("openKanban function registered successfully");
+    try {
+      Office.actions.associate("openKanban", openKanban);
+      console.log("openKanban function registered successfully");
+    } catch (error) {
+      console.error("Failed to register openKanban function:", error);
+    }
   } else {
     console.error("Office.actions.associate is not available");
+    console.log("Available Office APIs:", Object.keys(Office));
   }
 });
 
 // リボンボタンから呼ばれる ExecuteFunction
 async function openKanban(event) {
-  console.log("openKanban function called");
+  console.log("=== openKanban function called ===");
+  console.log("Event object:", event);
+  
+  // 基本的なOffice.js APIの可用性チェック
+  console.log("Office object available:", typeof Office !== 'undefined');
+  console.log("Office.context available:", !!(Office && Office.context));
+  console.log("Excel object available:", typeof Excel !== 'undefined');
+  console.log("Excel.run available:", !!(Excel && Excel.run));
   
   try {
     // Office.js が利用可能かチェック
     if (!Office || !Office.context) {
       throw new Error("Office.js が利用できません");
+    }
+    
+    if (!Excel || !Excel.run) {
+      throw new Error("Excel.js APIが利用できません");
     }
 
     console.log("Starting Excel.run");
