@@ -79,7 +79,7 @@ async function openKanban(event) {
     });
 
     // === 3) Dialog を開く ===
-    const url = `https://your-org.github.io/kanban-addin/src/dialog/kanban.html#data=${encodeURIComponent(JSON.stringify(payload))}`;
+    const url = `https://ymatsuda-cmyk.github.io/tools/kanban-addin/src/dialog/kanban.html#data=${encodeURIComponent(JSON.stringify(payload))}`;
 
     Office.context.ui.displayDialogAsync(
       url,
