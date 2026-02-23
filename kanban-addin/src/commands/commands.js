@@ -372,8 +372,30 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
   
   try {
     await Excel.run(async (context) => {
-      const sheet  = context.workbook.worksheets.getItem("WBS");
-      const table  = sheet.tables.getItem("tblWBS");
+      // WBSシートを柔軟に検索
+      let sheet;
+      try {
+        sheet = context.workbook.worksheets.getItem("WBS");
+      } catch (error) {
+        // WBSシートが見つからない場合、アクティブシートを使用
+        sheet = context.workbook.worksheets.getActiveWorksheet();
+      }
+      
+      // テーブルを柔軟に検索
+      const tables = sheet.tables;
+      tables.load("items/name");
+      await context.sync();
+      
+      let table;
+      try {
+        table = sheet.tables.getItem("tblWBS");
+      } catch (error) {
+        if (tables.items.length > 0) {
+          table = tables.items[0]; // 最初のテーブルを使用
+        } else {
+          throw new Error("更新対象のテーブルが見つかりません");
+        }
+      }
       const header = table.getHeaderRowRange();
       const body   = table.getDataBodyRange();
 
@@ -382,11 +404,19 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
       await context.sync();
 
       const headers = header.values[0].map(h => String(h).trim());
-      const col = (name) => headers.indexOf(name);
+      
+      // より柔軟な列名検索関数
+      const findCol = (possibleNames) => {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          if (index !== -1) return index;
+        }
+        return -1;
+      };
 
-      const idCol          = col("ID");
-      const actualStartCol = col("実績開始日");
-      const actualEndCol   = col("実績終了日");
+      const idCol          = findCol(["ID", "番号", "No", "識別子"]);
+      const actualStartCol = findCol(["実績開始日", "actual start", "開始実績", "実際開始"]);
+      const actualEndCol   = findCol(["実績終了日", "actual end", "終了実績", "実際終了"]);
 
       const values   = body.values;
       const rowIndex = values.findIndex(r => String(r[idCol]) === String(id));
@@ -437,8 +467,30 @@ async function updateTaskDetails(msg) {
   try {
     // msg: { id, assignee, plannedStart, plannedEnd, note }
     await Excel.run(async (context) => {
-    const sheet  = context.workbook.worksheets.getItem("WBS");
-    const table  = sheet.tables.getItem("tblWBS");
+    // WBSシートを柔軟に検索
+    let sheet;
+    try {
+      sheet = context.workbook.worksheets.getItem("WBS");
+    } catch (error) {
+      // WBSシートが見つからない場合、アクティブシートを使用
+      sheet = context.workbook.worksheets.getActiveWorksheet();
+    }
+    
+    // テーブルを柔軟に検索
+    const tables = sheet.tables;
+    tables.load("items/name");
+    await context.sync();
+    
+    let table;
+    try {
+      table = sheet.tables.getItem("tblWBS");
+    } catch (error) {
+      if (tables.items.length > 0) {
+        table = tables.items[0]; // 最初のテーブルを使用
+      } else {
+        throw new Error("更新対象のテーブルが見つかりません");
+      }
+    }
     const header = table.getHeaderRowRange();
     const body   = table.getDataBodyRange();
 
@@ -447,13 +499,21 @@ async function updateTaskDetails(msg) {
     await context.sync();
 
     const headers = header.values[0].map(h => String(h).trim());
-    const col = (name) => headers.indexOf(name);
+    
+    // より柔軟な列名検索関数
+    const findCol = (possibleNames) => {
+      for (const name of possibleNames) {
+        const index = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+        if (index !== -1) return index;
+      }
+      return -1;
+    };
 
-    const idCol           = col("ID");
-    const assigneeCol     = col("担当者");
-    const plannedStartCol = col("予定開始日");
-    const plannedEndCol   = col("予定終了日");
-    const noteCol         = col("備考");
+    const idCol           = findCol(["ID", "番号", "No", "識別子"]);
+    const assigneeCol     = findCol(["担当者", "assignee", "assigned", "担当"]);
+    const plannedStartCol = findCol(["予定開始日", "planned start", "start date", "開始予定"]);
+    const plannedEndCol   = findCol(["予定終了日", "planned end", "end date", "終了予定"]);
+    const noteCol         = findCol(["備考", "note", "notes", "コメント", "メモ"]);
 
     const values   = body.values;
     const rowIndex = values.findIndex(r => String(r[idCol]) === String(msg.id));
