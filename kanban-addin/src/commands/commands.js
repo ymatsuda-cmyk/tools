@@ -182,7 +182,13 @@ async function openKanban(event) {
       await context.sync();
       
       console.log("Processing header data");
-      const headers = header.values[0].map(h => String(h).trim());
+      let headers = [];
+      if (header && header.values && Array.isArray(header.values) && header.values.length > 0 && Array.isArray(header.values[0])) {
+        headers = header.values[0].map(h => String(h).trim());
+      } else {
+        console.error("Header row is missing or invalid. header.values:", header && header.values);
+        throw new Error("WBSテーブルのヘッダー行が取得できません。ExcelのWBSシートとテーブル構造を確認してください。");
+      }
       console.log("Headers found:", headers);
       
       // より柔軟な列名検索関数
