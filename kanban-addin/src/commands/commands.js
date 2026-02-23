@@ -103,6 +103,9 @@ async function openKanban(event) {
           wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
           wbsTable.name = "tblWBS_auto";
           console.log("New table 'tblWBS_auto' created.");
+          
+          // テーブル作成直後に同期して確実に利用可能にする
+          await context.sync();
         }
       }
 
@@ -111,6 +114,9 @@ async function openKanban(event) {
 
       header.load("values");
       body.load("values");
+      
+      // テーブルの値を確実にロードするため、ここで一度同期
+      await context.sync();
 
       // === 2) コードシートから担当者候補を取得 ===
       let codeSheet, assigneeTable, assigneeBody;
