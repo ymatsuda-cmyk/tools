@@ -87,6 +87,7 @@ async function openKanban(event) {
         console.log("Getting WBS table");
         wbsTable = wbsSheet.tables.getItem("tblWBS");
       } catch (error) {
+        console.log("tblWBS table not found, error:", error.message);
         // tblWBSテーブルが見つからない場合、最初のテーブルを自動使用
         if (tables.items.length > 0) {
           const tableName = tables.items[0].name;
@@ -95,17 +96,27 @@ async function openKanban(event) {
         } else {
           // テーブルが存在しない場合、使用されている範囲から新しいテーブルを作成
           console.log("No tables found in sheet. Attempting to create a new table from used range.");
-          const usedRange = wbsSheet.getUsedRange();
-          usedRange.load("address");
-          await context.sync();
-          console.log("Used range is:", usedRange.address);
-          // ヘッダーがあることを前提としてテーブルを作成
-          wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
-          wbsTable.name = "tblWBS_auto";
-          console.log("New table 'tblWBS_auto' created.");
-          
-          // テーブル作成直後に同期して確実に利用可能にする
-          await context.sync();
+          try {
+            const usedRange = wbsSheet.getUsedRange();
+            usedRange.load("address");
+            await context.sync();
+            
+            if (!usedRange || !usedRange.address) {
+              throw new Error("WBSシートにデータが存在しません。少なくともヘッダー行を含むデータを入力してください。");
+            }
+            
+            console.log("Used range is:", usedRange.address);
+            // ヘッダーがあることを前提としてテーブルを作成
+            wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
+            wbsTable.name = "tblWBS_auto";
+            console.log("New table 'tblWBS_auto' created.");
+            
+            // テーブル作成直後に同期して確実に利用可能にする
+            await context.sync();
+          } catch (rangeError) {
+            console.error("Failed to create table from used range:", rangeError.message);
+            throw new Error("WBSシートからテーブルを作成できませんでした。シートにヘッダー行を含むデータが正しく入力されているか確認してください。");
+          }
         }
       }
 
@@ -116,7 +127,12 @@ async function openKanban(event) {
       body.load("values");
       
       // テーブルの値を確実にロードするため、ここで一度同期
-      await context.sync();
+      try {
+        await context.sync();
+      } catch (syncError) {
+        console.error("Failed to sync table data:", syncError.message);
+        throw new Error("テーブルデータの読み込みに失敗しました。テーブル構造を確認してください。");
+      }
 
       // === 2) コードシートから担当者候補を取得 ===
       let codeSheet, assigneeTable, assigneeBody;
@@ -190,6 +206,15 @@ async function openKanban(event) {
         throw new Error("WBSテーブルのヘッダー行が取得できません。ExcelのWBSシートとテーブル構造を確認してください。");
       }
       console.log("Headers found:", headers);
+
+      // ボディデータの確認
+      if (!body || !body.values || !Array.isArray(body.values)) {
+        console.warn("Table body is empty or invalid, creating empty task list");
+        return {
+          tasks: [],
+          assignees: []
+        };
+      }
       
       // より柔軟な列名検索関数
       const findCol = (possibleNames) => {
