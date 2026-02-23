@@ -5,90 +5,108 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
 
-  <!-- ============ Basic Settings ============ -->
-  <!-- Replace with your own generated GUID -->
+  <!-- Basic Settings -->
   <Id>460d2c5c-e4cd-4d96-82f4-703849c080a0</Id>
-
   <Version>1.0.0.0</Version>
   <ProviderName>ymatsuda</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-
+  
   <DisplayName DefaultValue="WBS Kanban" />
   <Description DefaultValue="Display WBS sheet as Kanban board and sync changes back to WBS." />
-
+  
+  <!-- Default icon for backward compatibility -->
+  <IconUrl DefaultValue="https://via.placeholder.com/32x32.png" />
+  <HighResolutionIconUrl DefaultValue="https://via.placeholder.com/64x64.png" />
+  
   <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/" />
-
-  <!-- Domains that can be opened in Dialog/TaskPane/Command (GitHub Pages) -->
+  
   <AppDomains>
     <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
   </AppDomains>
-
+  
   <Hosts>
     <Host Name="Workbook" />
   </Hosts>
-
-  <!-- ReadWriteDocument required for Excel sheet read/write -->
+  
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="ExcelApi" MinVersion="1.7" />
+    </Sets>
+  </Requirements>
+  
   <Permissions>ReadWriteDocument</Permissions>
-
-  <!-- Backward compatibility: minimum SourceLocation required -->
+  
   <DefaultSettings>
     <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/blank.html" />
   </DefaultSettings>
 
-  <!-- ============ Add-in Commands (Ribbon) ============ -->
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
                     xsi:type="VersionOverridesV1_0">
-
+    
+    <Requirements>
+      <Sets DefaultMinVersion="1.1">
+        <Set Name="ExcelApi" MinVersion="1.7" />
+      </Sets>
+    </Requirements>
+    
     <Hosts>
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
-
-          <!-- FunctionFile where JS for ExecuteFunction is located -->
           <FunctionFile resid="Commands.Url" />
-
+          
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <CustomTab id="WbsKanbanTab">
-              <Label resid="Tab.Label" />
-
+              <Label resid="WbsKanban.Tab.Label" />
+              
               <Group id="WbsKanbanGroup">
-                <Label resid="Group.Label" />
-
-                <!-- Ribbon button: calls openKanban (ExecuteFunction) on click -->
+                <Label resid="WbsKanban.Group1.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                
                 <Control xsi:type="Button" id="OpenKanbanButton">
-                  <Label resid="Btn.OpenKanban.Label" />
+                  <Label resid="WbsKanban.OpenKanban.Label" />
                   <Supertip>
-                    <Title resid="Btn.OpenKanban.Title" />
-                    <Description resid="Btn.OpenKanban.Desc" />
+                    <Title resid="WbsKanban.OpenKanban.Label" />
+                    <Description resid="WbsKanban.OpenKanban.Tooltip" />
                   </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
                   <Action xsi:type="ExecuteFunction">
                     <FunctionName>openKanban</FunctionName>
                   </Action>
                 </Control>
-
               </Group>
             </CustomTab>
           </ExtensionPoint>
-
         </DesktopFormFactor>
       </Host>
     </Hosts>
-
+    
     <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://via.placeholder.com/16x16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://via.placeholder.com/32x32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://via.placeholder.com/80x80.png" />
+      </bt:Images>
+      
       <bt:Urls>
-        <!-- FunctionFile (commands.html): associates openKanban -->
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/commands.html" />
       </bt:Urls>
-
+      
       <bt:ShortStrings>
-        <bt:String id="Tab.Label" DefaultValue="WBS Kanban" />
-        <bt:String id="Group.Label" DefaultValue="Operations" />
-        <bt:String id="Btn.OpenKanban.Label" DefaultValue="Open Kanban" />
-        <bt:String id="Btn.OpenKanban.Title" DefaultValue="WBS Kanban" />
+        <bt:String id="WbsKanban.Tab.Label" DefaultValue="WBS Kanban" />
+        <bt:String id="WbsKanban.Group1.Label" DefaultValue="Operations" />
+        <bt:String id="WbsKanban.OpenKanban.Label" DefaultValue="Open Kanban" />
       </bt:ShortStrings>
-
+      
       <bt:LongStrings>
-        <bt:String id="Btn.OpenKanban.Desc"
-                   DefaultValue="Load WBS sheet content and display as Kanban board in dialog. Changes are synced back to WBS sheet." />
+        <bt:String id="WbsKanban.OpenKanban.Tooltip" DefaultValue="Load WBS sheet content and display as Kanban board in dialog. Changes are synced back to WBS sheet." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
