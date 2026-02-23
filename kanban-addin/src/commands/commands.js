@@ -236,7 +236,12 @@ async function openKanban(event) {
 
     Office.context.ui.displayDialogAsync(
       url,
-      { height: 90, width: 90 },
+      { 
+        height: 80, 
+        width: 80, 
+        requireHTTPS: true,
+        displayInIframe: false 
+      },
       (asyncResult) => {
         console.log("Dialog async result:", asyncResult);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {

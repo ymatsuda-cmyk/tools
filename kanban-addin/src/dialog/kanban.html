@@ -1,11 +1,33 @@
-<!-- src/dialog/kanban.html -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>自動化スケジュール カンバン</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WBS Kanban Board</title>
+  
+  <!-- Office.js Library -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="https://ymatsuda-cmyk.github.io/tools/kanban-addin/src/dialog/kanban.js"></script>
+  
+  <!-- Kanban JavaScript -->
+  <script type="text/javascript">
+    // Ensure Office.js is loaded before loading kanban script
+    Office.onReady(function() {
+      console.log("Office.js loaded in kanban.html");
+      
+      // Load the kanban script after Office.js is ready
+      var script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = 'https://ymatsuda-cmyk.github.io/tools/kanban-addin/src/dialog/kanban.js';
+      script.onload = function() {
+        console.log("kanban.js loaded successfully");
+      };
+      script.onerror = function() {
+        console.error("Failed to load kanban.js");
+      };
+      document.head.appendChild(script);
+    });
+  </script>
   <style>
     /* 簡易レイアウト例（必要に応じて調整） */
     body { font-family: sans-serif; margin: 0; }
