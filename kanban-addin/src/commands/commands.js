@@ -2,30 +2,92 @@
 
 let dialog;
 
+// Office.js が読み込まれたかチェック
+Office.onReady(() => {
+  console.log("Office.js loaded successfully");
+  // ExecuteFunction の関連付け
+  if (Office.actions && Office.actions.associate) {
+    Office.actions.associate("openKanban", openKanban);
+    console.log("openKanban function registered successfully");
+  } else {
+    console.error("Office.actions.associate is not available");
+  }
+});
+
 // リボンボタンから呼ばれる ExecuteFunction
 async function openKanban(event) {
+  console.log("openKanban function called");
+  
   try {
-    const payload = await Excel.run(async (context) => {
-      // === 1) WBS テーブルからタスク情報取得 ===
-      const wbsSheet = context.workbook.worksheets.getItem("WBS");
-      const wbsTable = wbsSheet.tables.getItem("tblWBS");
+    // Office.js が利用可能かチェック
+    if (!Office || !Office.context) {
+      throw new Error("Office.js が利用できません");
+    }
 
-      const header = wbsTable.getHeaderRowRange();
-      const body   = wbsTable.getDataBodyRange();
+    console.log("Starting Excel.run");
+    const payload = await Excel.run(async (context) => {
+      console.log("Inside Excel.run");
+      
+      // === 1) WBS テーブルからタスク情報取得 ===
+      let wbsSheet, wbsTable, header, body;
+      
+      try {
+        console.log("Getting WBS sheet");
+        wbsSheet = context.workbook.worksheets.getItem("WBS");
+      } catch (error) {
+        throw new Error("WBSシートが見つかりません: " + error.message);
+      }
+      
+      try {
+        console.log("Getting WBS table");
+        wbsTable = wbsSheet.tables.getItem("tblWBS");
+      } catch (error) {
+        throw new Error("tblWBSテーブルが見つかりません: " + error.message);
+      }
+
+      header = wbsTable.getHeaderRowRange();
+      body   = wbsTable.getDataBodyRange();
 
       header.load("values");
       body.load("values");
 
       // === 2) コードシートから担当者候補を取得 ===
-      const codeSheet = context.workbook.worksheets.getItem("Codes");
-      const assigneeTable = codeSheet.tables.getItem("tblAssignee");
-      const assigneeBody  = assigneeTable.getDataBodyRange();
-      assigneeBody.load("values");
+      let codeSheet, assigneeTable, assigneeBody;
+      
+      try {
+        console.log("Getting Codes sheet");
+        codeSheet = context.workbook.worksheets.getItem("Codes");
+      } catch (error) {
+        console.log("Codesシートが見つかりません、空の担当者リストを使用します");
+        // Codesシートが無くても続行
+        codeSheet = null;
+      }
+      
+      if (codeSheet) {
+        try {
+          assigneeTable = codeSheet.tables.getItem("tblAssignee");
+          assigneeBody  = assigneeTable.getDataBodyRange();
+          assigneeBody.load("values");
+        } catch (error) {
+          console.log("tblAssigneeテーブルが見つかりません、空の担当者リストを使用します");
+          assigneeBody = null;
+        }
+      }
 
+      console.log("Syncing context");
       await context.sync();
-
+      
+      console.log("Processing header data");
       const headers = header.values[0].map(h => String(h).trim());
-      const col = (name) => headers.indexOf(name);
+      console.log("Headers found:", headers);
+      
+      const col = (name) => {
+        const index = headers.indexOf(name);
+        if (index === -1) {
+          console.warn(`Column '${name}' not found in headers`);
+        }
+        return index;
+      };
 
       const idCol           = col("ID");
       const titleCol        = col("task");
@@ -38,8 +100,9 @@ async function openKanban(event) {
       const tagLargeCol     = col("大分類");
       const tagSmallCol     = col("小分類");
 
+      console.log("Processing tasks data");
       // タスク一覧の生成
-      const tasks = body.values.map((r) => {
+      const tasks = body.values.map((r, index) => {
         const actualStart = r[actualStartCol];
         const actualEnd   = r[actualEndCol];
 
@@ -67,10 +130,16 @@ async function openKanban(event) {
         };
       });
 
+      console.log(`Found ${tasks.length} tasks`);
+
       // 担当者候補（Codes シート） ※1列目に名前が入っている前提
-      const assignees = assigneeBody.values
-        .map(row => String(row[0]).trim())
-        .filter(name => !!name);
+      let assignees = [];
+      if (assigneeBody && assigneeBody.values) {
+        assignees = assigneeBody.values
+          .map(row => String(row[0]).trim())
+          .filter(name => !!name);
+      }
+      console.log(`Found ${assignees.length} assignees`);
 
       return {
         tasks,
@@ -78,14 +147,24 @@ async function openKanban(event) {
       };
     });
 
+    console.log("Excel.run completed successfully");
+    console.log("Payload:", payload);
+
     // === 3) Dialog を開く ===
     const url = `https://ymatsuda-cmyk.github.io/tools/kanban-addin/src/dialog/kanban.html#data=${encodeURIComponent(JSON.stringify(payload))}`;
+    console.log("Opening dialog with URL:", url);
 
     Office.context.ui.displayDialogAsync(
       url,
       { height: 90, width: 90 },
       (asyncResult) => {
-        if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) return;
+        console.log("Dialog async result:", asyncResult);
+        if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
+          console.error("Failed to open dialog:", asyncResult.error);
+          alert("ダイアログを開けませんでした: " + (asyncResult.error ? asyncResult.error.message : "不明なエラー"));
+          return;
+        }
+        console.log("Dialog opened successfully");
         dialog = asyncResult.value;
         dialog.addEventHandler(
           Office.EventType.DialogMessageReceived,
@@ -93,7 +172,11 @@ async function openKanban(event) {
         );
       }
     );
+  } catch (error) {
+    console.error("Error in openKanban:", error);
+    alert("エラーが発生しました: " + error.message + "\n\nExcelのWBSシートとtblWBSテーブルが存在するか確認してください。");
   } finally {
+    console.log("Completing event");
     // ExecuteFunction の必須
     event.completed();
   }
@@ -101,47 +184,64 @@ async function openKanban(event) {
 
 // Dialog からのメッセージを受ける
 async function onDialogMessage(arg) {
-  const msg = JSON.parse(arg.message);
+  console.log("Received message from dialog:", arg.message);
+  
+  try {
+    const msg = JSON.parse(arg.message);
+    console.log("Parsed message:", msg);
 
-  switch (msg.type) {
-    case "move":
-      // ステータス変更 → 実績開始日／実績終了日 更新
-      await updateActualDatesByStatus(msg.id, msg.status, msg.forceOverwrite);
-      break;
-    case "edit":
-      // 予定開始日／予定終了日／担当者／備考 の更新
-      await updateTaskDetails(msg);
-      break;
-    default:
-      break;
+    switch (msg.type) {
+      case "move":
+        console.log("Processing move message");
+        // ステータス変更 → 実績開始日／実績終了日 更新
+        await updateActualDatesByStatus(msg.id, msg.status, msg.forceOverwrite);
+        break;
+      case "edit":
+        console.log("Processing edit message");
+        // 予定開始日／予定終了日／担当者／備考 の更新
+        await updateTaskDetails(msg);
+        break;
+      default:
+        console.log("Unknown message type:", msg.type);
+        break;
+    }
+  } catch (error) {
+    console.error("Error processing dialog message:", error);
+    alert("ダイアログからのメッセージ処理でエラーが発生しました: " + error.message);
   }
 }
 
 // status に応じて 実績開始日／実績終了日 を更新
 async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
-  await Excel.run(async (context) => {
-    const sheet  = context.workbook.worksheets.getItem("WBS");
-    const table  = sheet.tables.getItem("tblWBS");
-    const header = table.getHeaderRowRange();
-    const body   = table.getDataBodyRange();
+  console.log(`Updating actual dates for task ${id} to status ${newStatus}`);
+  
+  try {
+    await Excel.run(async (context) => {
+      const sheet  = context.workbook.worksheets.getItem("WBS");
+      const table  = sheet.tables.getItem("tblWBS");
+      const header = table.getHeaderRowRange();
+      const body   = table.getDataBodyRange();
 
-    header.load("values");
-    body.load("values");
-    await context.sync();
+      header.load("values");
+      body.load("values");
+      await context.sync();
 
-    const headers = header.values[0].map(h => String(h).trim());
-    const col = (name) => headers.indexOf(name);
+      const headers = header.values[0].map(h => String(h).trim());
+      const col = (name) => headers.indexOf(name);
 
-    const idCol          = col("ID");
-    const actualStartCol = col("実績開始日");
-    const actualEndCol   = col("実績終了日");
+      const idCol          = col("ID");
+      const actualStartCol = col("実績開始日");
+      const actualEndCol   = col("実績終了日");
 
-    const values   = body.values;
-    const rowIndex = values.findIndex(r => String(r[idCol]) === String(id));
-    if (rowIndex < 0) return;
+      const values   = body.values;
+      const rowIndex = values.findIndex(r => String(r[idCol]) === String(id));
+      if (rowIndex < 0) {
+        console.error(`Task with ID ${id} not found`);
+        return;
+      }
 
-    const rowRange = body.getRow(rowIndex);
-    const today = new Date();
+      const rowRange = body.getRow(rowIndex);
+      const today = new Date();
 
     const currentStart = values[rowIndex][actualStartCol];
     const currentEnd   = values[rowIndex][actualEndCol];
@@ -167,13 +267,21 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
     }
 
     await context.sync();
+    console.log("Actual dates updated successfully");
   });
+  } catch (error) {
+    console.error("Error updating actual dates:", error);
+    alert("実績日時の更新でエラーが発生しました: " + error.message);
+  }
 }
 
 // 予定開始日／予定終了日／担当者／備考 の更新
 async function updateTaskDetails(msg) {
-  // msg: { id, assignee, plannedStart, plannedEnd, note }
-  await Excel.run(async (context) => {
+  console.log("Updating task details:", msg);
+  
+  try {
+    // msg: { id, assignee, plannedStart, plannedEnd, note }
+    await Excel.run(async (context) => {
     const sheet  = context.workbook.worksheets.getItem("WBS");
     const table  = sheet.tables.getItem("tblWBS");
     const header = table.getHeaderRowRange();
@@ -194,7 +302,10 @@ async function updateTaskDetails(msg) {
 
     const values   = body.values;
     const rowIndex = values.findIndex(r => String(r[idCol]) === String(msg.id));
-    if (rowIndex < 0) return;
+    if (rowIndex < 0) {
+      console.error(`Task with ID ${msg.id} not found for update`);
+      return;
+    }
 
     const rowRange = body.getRow(rowIndex);
 
@@ -204,8 +315,10 @@ async function updateTaskDetails(msg) {
     rowRange.getCell(0, noteCol).values         = [[msg.note || ""]];
 
     await context.sync();
+    console.log("Task details updated successfully");
   });
+  } catch (error) {
+    console.error("Error updating task details:", error);
+    alert("タスク詳細の更新でエラーが発生しました: " + error.message);
+  }
 }
-
-// ExecuteFunction の関連付け
-Office.actions.associate("openKanban", openKanban);
