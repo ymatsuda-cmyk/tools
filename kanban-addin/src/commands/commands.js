@@ -71,13 +71,9 @@ async function openKanban(event) {
         const sheetName = activeSheet.name;
         console.log("Current active sheet:", sheetName);
         
-        // ユーザーに確認を求める
-        const useCurrentSheet = confirm(`WBSシートが見つかりません。現在のシート「${sheetName}」を使用しますか？`);
-        if (useCurrentSheet) {
-          wbsSheet = activeSheet;
-        } else {
-          throw new Error(`WBSシートが見つかりません。利用可能なシート: ${worksheets.items.map(ws => ws.name).join(', ')}`);
-        }
+        // ユーザーに確認を求める（Office Add-in対応）
+        console.log(`WBS sheet not found, using current active sheet: ${sheetName}`);
+        wbsSheet = activeSheet;
       }
       
       // テーブルの確認
@@ -91,16 +87,11 @@ async function openKanban(event) {
         console.log("Getting WBS table");
         wbsTable = wbsSheet.tables.getItem("tblWBS");
       } catch (error) {
-        // tblWBSテーブルが見つからない場合
+        // tblWBSテーブルが見つからない場合、最初のテーブルを自動使用
         if (tables.items.length > 0) {
           const tableName = tables.items[0].name;
-          console.log("tblWBS not found, using first available table:", tableName);
-          const useFirstTable = confirm(`tblWBSテーブルが見つかりません。「${tableName}」テーブルを使用しますか？`);
-          if (useFirstTable) {
-            wbsTable = tables.items[0];
-          } else {
-            throw new Error(`tblWBSテーブルが見つかりません。利用可能なテーブル: ${tables.items.map(t => t.name).join(', ')}`);
-          }
+          console.log(`tblWBS not found, using first available table: ${tableName}`);
+          wbsTable = tables.items[0];
         } else {
           throw new Error("このシートにはテーブルが存在しません。データをテーブル形式に変換してください。");
         }
@@ -250,7 +241,7 @@ async function openKanban(event) {
         console.log("Dialog async result:", asyncResult);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
           console.error("Failed to open dialog:", asyncResult.error);
-          alert("ダイアログを開けませんでした: " + (asyncResult.error ? asyncResult.error.message : "不明なエラー"));
+          console.error("ダイアログを開けませんでした: " + (asyncResult.error ? asyncResult.error.message : "不明なエラー"));
           return;
         }
         console.log("Dialog opened successfully");
@@ -263,7 +254,7 @@ async function openKanban(event) {
     );
   } catch (error) {
     console.error("Error in openKanban:", error);
-    alert("エラーが発生しました: " + error.message + "\n\nExcelのWBSシートとtblWBSテーブルが存在するか確認してください。");
+    console.error("エラーが発生しました: " + error.message + "\n\nExcelのWBSシートとtblWBSテーブルが存在するか確認してください。");
   } finally {
     console.log("Completing event");
     // ExecuteFunction の必須
@@ -296,7 +287,7 @@ async function onDialogMessage(arg) {
     }
   } catch (error) {
     console.error("Error processing dialog message:", error);
-    alert("ダイアログからのメッセージ処理でエラーが発生しました: " + error.message);
+    console.error("ダイアログからのメッセージ処理でエラーが発生しました: " + error.message);
   }
 }
 
@@ -360,7 +351,7 @@ async function updateActualDatesByStatus(id, newStatus, forceOverwrite) {
   });
   } catch (error) {
     console.error("Error updating actual dates:", error);
-    alert("実績日時の更新でエラーが発生しました: " + error.message);
+    console.error("実績日時の更新でエラーが発生しました: " + error.message);
   }
 }
 
@@ -408,6 +399,6 @@ async function updateTaskDetails(msg) {
   });
   } catch (error) {
     console.error("Error updating task details:", error);
-    alert("タスク詳細の更新でエラーが発生しました: " + error.message);
+    console.error("タスク詳細の更新でエラーが発生しました: " + error.message);
   }
 }
