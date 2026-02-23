@@ -93,7 +93,16 @@ async function openKanban(event) {
           console.log(`tblWBS not found, using first available table: ${tableName}`);
           wbsTable = tables.items[0];
         } else {
-          throw new Error("このシートにはテーブルが存在しません。データをテーブル形式に変換してください。");
+          // テーブルが存在しない場合、使用されている範囲から新しいテーブルを作成
+          console.log("No tables found in sheet. Attempting to create a new table from used range.");
+          const usedRange = wbsSheet.getUsedRange();
+          usedRange.load("address");
+          await context.sync();
+          console.log("Used range is:", usedRange.address);
+          // ヘッダーがあることを前提としてテーブルを作成
+          wbsTable = wbsSheet.tables.add(usedRange, true /*hasHeaders*/);
+          wbsTable.name = "tblWBS_auto";
+          console.log("New table 'tblWBS_auto' created.");
         }
       }
 
