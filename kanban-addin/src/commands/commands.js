@@ -142,8 +142,21 @@ async function openKanban(event) {
             assigneeBody = assigneeTable.getDataBodyRange();
             assigneeBody.load("values");
           } else {
-            console.log("No tables found in Codes sheet, will use empty assignee list");
-            assigneeBody = null;
+            console.log("No tables found in Codes sheet, attempting to create one.");
+            const usedRange = codeSheet.getUsedRange();
+            usedRange.load("address");
+            await context.sync();
+            if (usedRange.address) {
+              console.log("Used range in Codes sheet is:", usedRange.address);
+              assigneeTable = codeSheet.tables.add(usedRange, true /*hasHeaders*/);
+              assigneeTable.name = "tblAssignee_auto";
+              assigneeBody = assigneeTable.getDataBodyRange();
+              assigneeBody.load("values");
+              console.log("New table 'tblAssignee_auto' created in Codes sheet.");
+            } else {
+               console.log("Codes sheet is empty, will use empty assignee list");
+               assigneeBody = null;
+            }
           }
         }
       }
