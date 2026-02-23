@@ -6,7 +6,7 @@
            xsi:type="TaskPaneApp">
 
   <!-- ============ Basic Settings ============ -->
-  <!-- ★ここは自分で生成した GUID に置き換えてください -->
+  <!-- Replace with your own generated GUID -->
   <Id>460d2c5c-e4cd-4d96-82f4-703849c080a0</Id>
 
   <Version>1.0.0.0</Version>
@@ -14,11 +14,11 @@
   <DefaultLocale>en-US</DefaultLocale>
 
   <DisplayName DefaultValue="WBS Kanban" />
-  <Description DefaultValue="WBSシートをカンバン表示し、変更をWBSに反映します。" />
+  <Description DefaultValue="Display WBS sheet as Kanban board and sync changes back to WBS." />
 
   <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/" />
 
-  <!-- Dialog/TaskPane/Command で開く可能性のあるドメイン（GitHub Pages） -->
+  <!-- Domains that can be opened in Dialog/TaskPane/Command (GitHub Pages) -->
   <AppDomains>
     <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
   </AppDomains>
@@ -27,10 +27,10 @@
     <Host Name="Workbook" />
   </Hosts>
 
-  <!-- Excel のシート読み書きが必要なので ReadWriteDocument -->
+  <!-- ReadWriteDocument required for Excel sheet read/write -->
   <Permissions>ReadWriteDocument</Permissions>
 
-  <!-- 後方互換用：最低限 SourceLocation が必要（表示しなくてもOK） -->
+  <!-- Backward compatibility: minimum SourceLocation required -->
   <DefaultSettings>
     <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/blank.html" />
   </DefaultSettings>
@@ -43,7 +43,7 @@
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
 
-          <!-- ExecuteFunction を実行する JS が置かれている FunctionFile -->
+          <!-- FunctionFile where JS for ExecuteFunction is located -->
           <FunctionFile resid="Commands.Url" />
 
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
@@ -53,13 +53,15 @@
               <Group id="WbsKanbanGroup">
                 <Label resid="Group.Label" />
 
-                  <!-- リボンボタン：クリックで openKanban（ExecuteFunction）を呼ぶ -->
-                  <Control xsi:type="Button" id="OpenKanbanButton">
-                    <Label resid="Btn.OpenKanban.Label" />
-                    <Supertip>
-                      <Title resid="Btn.OpenKanban.Title" />
-                      <Description resid="Btn.OpenKanban.Desc" />
-                    </Supertip>
+                <!-- Ribbon button: calls openKanban (ExecuteFunction) on click -->
+                <Control xsi:type="Button" id="OpenKanbanButton">
+                  <Label resid="Btn.OpenKanban.Label" />
+                  <Supertip>
+                    <Title resid="Btn.OpenKanban.Title" />
+                    <Description resid="Btn.OpenKanban.Desc" />
+                  </Supertip>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openKanban</FunctionName>
                   </Action>
                 </Control>
 
@@ -73,20 +75,20 @@
 
     <Resources>
       <bt:Urls>
-        <!-- FunctionFile（commands.html）: openKanban を associate する -->
+        <!-- FunctionFile (commands.html): associates openKanban -->
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin/commands.html" />
       </bt:Urls>
 
       <bt:ShortStrings>
         <bt:String id="Tab.Label" DefaultValue="WBS Kanban" />
-        <bt:String id="Group.Label" DefaultValue="操作" />
-        <bt:String id="Btn.OpenKanban.Label" DefaultValue="カンバンを開く" />
-        <bt:String id="Btn.OpenKanban.Title" DefaultValue="WBSカンバン" />
+        <bt:String id="Group.Label" DefaultValue="Operations" />
+        <bt:String id="Btn.OpenKanban.Label" DefaultValue="Open Kanban" />
+        <bt:String id="Btn.OpenKanban.Title" DefaultValue="WBS Kanban" />
       </bt:ShortStrings>
 
       <bt:LongStrings>
         <bt:String id="Btn.OpenKanban.Desc"
-                   DefaultValue="WBSシートの内容を読み込み、Dialogでカンバン表示します。変更はWBSシートへ反映されます。" />
+                   DefaultValue="Load WBS sheet content and display as Kanban board in dialog. Changes are synced back to WBS sheet." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
