@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
-           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
-           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
-           xsi:type="TaskPaneApp">
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
 
   <Id>11111111-2222-3333-4444-555555555555</Id>
   <Version>1.0.0.0</Version>
@@ -16,24 +17,37 @@
     <Host Name="Workbook"/>
   </Hosts>
 
+  <!-- ★ TaskPaneApp では必須 -->
+  <DefaultSettings>
+    <SourceLocation
+      DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin2/commands.html"/>
+  </DefaultSettings>
+
   <Permissions>ReadWriteDocument</Permissions>
 
   <VersionOverrides xsi:type="ov:VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="ov:Workbook">
-        <ExtensionPoint xsi:type="ov:PrimaryCommandSurface">
-          <OfficeTab id="TabHome">
-            <Group id="KanbanGroup">
-              <Label resid="KanbanGroupLabel"/>
-              <Control xsi:type="Button" id="KanbanButton">
-                <Label resid="KanbanButtonLabel"/>
-                <Action xsi:type="ExecuteFunction">
-                  <FunctionName>openKanbanDialog</FunctionName>
-                </Action>
-              </Control>
-            </Group>
-          </OfficeTab>
-        </ExtensionPoint>
+        <AllFormFactors>
+
+          <!-- ExecuteFunction 用 -->
+          <FunctionFile resid="Commands.Url"/>
+
+          <ExtensionPoint xsi:type="ov:PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="KanbanGroup">
+                <Label resid="KanbanGroupLabel"/>
+                <Control xsi:type="Button" id="KanbanButton">
+                  <Label resid="KanbanButtonLabel"/>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openKanbanDialog</FunctionName>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </AllFormFactors>
       </Host>
     </Hosts>
 
@@ -42,6 +56,15 @@
         <bt:String id="KanbanGroupLabel" DefaultValue="管理"/>
         <bt:String id="KanbanButtonLabel" DefaultValue="カンバン"/>
       </bt:ShortStrings>
+
+      <bt:Urls>
+        <bt:Url id="Commands.Url"
+          DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin2/commands.html"/>
+        <bt:Url id="Dialog.Url"
+          DefaultValue="https://ymatsuda-cmyk.github.io/tools/kanban-addin2/dialog.html"/>
+      </bt:Urls>
     </Resources>
+
   </VersionOverrides>
 </OfficeApp>
+``
