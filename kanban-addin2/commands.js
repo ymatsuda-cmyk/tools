@@ -1,6 +1,6 @@
 function openKanbanDialog() {
   Office.context.ui.displayDialogAsync(
-    "https://localhost/dialog.html",
+    "https://ymatsuda-cmyk.github.io/tools/kanban-addin2/dialog.html",
     {
       width: 80,
       height: 80,
