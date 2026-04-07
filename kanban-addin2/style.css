@@ -1,0 +1,42 @@
+#kanban {
+  display: flex;
+  height: 100vh;
+  gap: 12px;
+  padding: 10px;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.lane {
+  flex: 1;
+  background: #f4f5f7;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lane-header {
+  padding: 8px;
+  font-weight: bold;
+  border-bottom: 1px solid #ccc;
+}
+
+.lane-body {
+  flex: 1;
+  padding: 8px;
+}
+
+.lane.drag-over {
+  background: #dbefff;
+}
+
+.card {
+  background: #fff;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  cursor: grab;
+}
+
+.card.dragging {
+  opacity: 0.5;
+}
