@@ -1,9 +1,23 @@
 status: "todo" | "doing" | "done"
 let tasks = [];
+let currentTask = null;
+let idRowMap = {};
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeModal();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("modal").addEventListener("click", e => {
+    if (e.target.id === "modal") closeModal();
+  });
+});
+
 
 Office.onReady(() => {
   init();
 });
+
 
 function isOfficeAvailable() {
   return typeof Office !== "undefined";
@@ -50,6 +64,11 @@ async function loadTasks() {
         // 🔥 空タスク除外
         if (!task_name) return null;
 
+        const rowNumber = i + 11;
+        // 🔥 ここでマップ作る
+        const safeId = id || `row-${rowNumber}`;
+        idRowMap[safeId] = rowNumber;
+
         // 🔥 ステータス判定（超重要）
         let status = "todo";
         if (actualEnd) {
@@ -58,9 +77,12 @@ async function loadTasks() {
           status = "doing";
         }
 
+        if (!id) {
+          console.warn("ID missing at row:", i + 11);
+        }
         return {
-          id: id || i + 1,
-          row: i + 11, // ← Excel行番号（N11開始）
+          id: safeId,
+          row: rowNumber, // ← Excel行番号（N11開始）
 
           task_name,
           name,
@@ -96,6 +118,8 @@ function render() {
     const card = document.createElement("div");
     card.className = "card";
     card.textContent = task.task_name;
+
+    card.addEventListener("click", () => openModal(task));
 
     const meta = document.createElement("div");
     meta.className = "meta";
@@ -154,4 +178,57 @@ function mapStatus(value) {
     case 3: return "done";
     default: return "todo";
   }
+}
+
+function openModal(task) {
+  currentTask = task;
+
+  document.getElementById("modal-title").textContent = task.task_name;
+  document.getElementById("modal-note").value = task.note || "";
+
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+
+async function saveNote() {
+  const newNote = document.getElementById("modal-note").value;
+  const row = idRowMap[currentTask.id];
+
+  if (!row) {
+    alert("行が見つかりません");
+    return;
+  }
+
+  currentTask.note = newNote;
+
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+
+    const cell = sheet.getRange(`O${row}`);
+    cell.values = [[newNote]];
+
+    await context.sync();
+  });
+
+  closeModal();
+}
+
+async function findRowById(context, sheet, targetId) {
+  const range = sheet.getRange("Y11:Y1000");
+  range.load("values");
+
+  await context.sync();
+
+  const values = range.values;
+
+  for (let i = 0; i < values.length; i++) {
+    if (values[i][0] == targetId) {
+      return i + 11; // ← 行番号
+    }
+  }
+
+  throw new Error("ID not found: " + targetId);
 }
