@@ -1,3 +1,4 @@
+status: "todo" | "doing" | "done"
 let tasks = [];
 
 Office.onReady(() => {
@@ -36,7 +37,7 @@ async function loadTasks() {
       id: i + 1,
       row: i + 2,
       name: row[2],
-      status: row[3] || "todo",
+      status: mapStatus(row[3]),  // StatusはExcel上では数値（1,2,3）で管理している想定
       order: i
     }));
   });
@@ -71,4 +72,13 @@ function formatDate(date) {
   if (!date) return "";
   const d = new Date(date);
   return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function mapStatus(value) {
+  switch (value) {
+    case 1: return "todo";
+    case 2: return "doing";
+    case 3: return "done";
+    default: return "todo";
+  }
 }
