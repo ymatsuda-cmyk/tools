@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kanban Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>カンバン（デモ）</h2>
+
+<div class="toolbar">
+  <button onclick="undo()">Undo</button>
+  <button onclick="redo()">Redo</button>
+</div>
+
+<div id="board">
+  <div class="lane" id="todo">
+    <h3>未着手</h3>
+    <div class="card-list"></div>
+  </div>
+  <div class="lane" id="doing">
+    <h3>対応中</h3>
+    <div class="card-list"></div>
+  </div>
+  <div class="lane" id="done">
+    <h3>完了</h3>
+    <div class="card-list"></div>
+  </div>
+</div>
+
+<script src="kanban.js"></script>
+</body>
+</html>
