@@ -1,32 +1,45 @@
 async function loadTasks() {
   return Excel.run(async (context) => {
+
     const sheet = context.workbook.worksheets.getItem("wbs");
-    const range = sheet.getRange("P2:Z200");
+
+    // 🔥 必要列だけ取る（高速＆安全）
+    const range = sheet.getRange("P2:Z1000");
     range.load("values");
+
     await context.sync();
-    return range.values.map((r, i) => {
+
+    const tasks = [];
+
+    range.values.forEach((row, i) => {
+
+      const plannedStart = row[0]; // P
+      const plannedEnd   = row[1]; // Q
+      const actualStart  = row[2]; // R
+      const actualEnd    = row[3]; // S
+      const order        = row[4]; // T
+      const name         = row[10]; // Z
+
+      // 空行スキップ
+      if (!name) return;
+
+      // 🔥 状態判定（列は作らない）
       let status = "todo";
-      if (r[3]) status = "done";
-      else if (r[2]) status = "doing";
-      return {
+      if (actualEnd) status = "done";
+      else if (actualStart) status = "doing";
+
+      tasks.push({
         id: i,
         row: i + 2,
-        name: r[10],
-        order: r[4] || 0,
-        status
-      };
-    });
-  });
-}
+        name,
+        status,
+        order: order || 0,
+        plannedStart,
+        plannedEnd
+      });
 
-async function saveOrder(laneId) {
-  const cards = document.querySelectorAll(`#${laneId} .card`);
-  await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getItem("wbs");
-    cards.forEach((card, index) => {
-      const row = card.dataset.row;
-      sheet.getRange(`T${row}`).values = [[index + 1]];
     });
-    await context.sync();
+
+    return tasks;
   });
 }

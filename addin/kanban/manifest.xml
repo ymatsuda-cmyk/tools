@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xsi:type="TaskPaneApp">
 
   <Id>6b7e3c52-8c2b-4d6f-9c9e-123456789abc</Id>
@@ -10,14 +9,7 @@
   <DefaultLocale>ja-JP</DefaultLocale>
 
   <DisplayName DefaultValue="Excel Kanban"/>
-  <Description DefaultValue="Kanban Board Add-in"/>
-
-  <!-- 🔥 これが無いとWeb版で落ちる -->
-  <Requirements>
-    <Sets DefaultMinVersion="1.1">
-      <Set Name="ExcelApi" MinVersion="1.3"/>
-    </Sets>
-  </Requirements>
+  <Description DefaultValue="Kanban Board"/>
 
   <Hosts>
     <Host Name="Workbook"/>
@@ -28,78 +20,4 @@
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
-
-  <AppDomains>
-    <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
-  </AppDomains>
-
-  <!-- 🔥 namespaceも重要 -->
-  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:type="VersionOverridesV1_1">
-
-    <Hosts>
-      <Host xsi:type="Workbook">
-        <DesktopFormFactor>
-
-          <FunctionFile resid="Commands.Url"/>
-
-          <ExtensionPoint xsi:type="PrimaryCommandSurface">
-            <OfficeTab id="TabHome">
-
-              <Group id="KanbanGroup">
-                <Label resid="GroupLabel"/>
-
-                <Control xsi:type="Button" id="OpenKanban">
-                  <Label resid="ButtonLabel"/>
-
-                  <Supertip>
-                    <Title resid="ButtonLabel"/>
-                    <Description resid="ButtonDesc"/>
-                  </Supertip>
-
-                  <Icon>
-                    <bt:Image size="16" resid="Icon16"/>
-                    <bt:Image size="32" resid="Icon32"/>
-                    <bt:Image size="80" resid="Icon80"/>
-                  </Icon>
-
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>openKanban</FunctionName>
-                  </Action>
-                </Control>
-
-              </Group>
-            </OfficeTab>
-          </ExtensionPoint>
-
-        </DesktopFormFactor>
-      </Host>
-    </Hosts>
-
-    <Resources>
-
-      <bt:Images>
-        <bt:Image id="Icon16" DefaultValue="https://via.placeholder.com/16"/>
-        <bt:Image id="Icon32" DefaultValue="https://via.placeholder.com/32"/>
-        <bt:Image id="Icon80" DefaultValue="https://via.placeholder.com/80"/>
-      </bt:Images>
-
-      <bt:Urls>
-        <bt:Url id="Commands.Url"
-          DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/commands.html"/>
-      </bt:Urls>
-
-      <bt:ShortStrings>
-        <bt:String id="GroupLabel" DefaultValue="Kanban"/>
-        <bt:String id="ButtonLabel" DefaultValue="カンバン"/>
-      </bt:ShortStrings>
-
-      <bt:LongStrings>
-        <bt:String id="ButtonDesc" DefaultValue="カンバンを開く"/>
-      </bt:LongStrings>
-
-    </Resources>
-
-  </VersionOverrides>
 </OfficeApp>
