@@ -28,18 +28,62 @@ async function init() {
 async function loadTasks() {
   return await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getActiveWorksheet();
-    const range = sheet.getRange("A2:D100");
+    const range = sheet.getRange("N11:Z1000");
 
     range.load("values");
     await context.sync();
 
-    return range.values.map((row, i) => ({
-      id: i + 1,
-      row: i + 2,
-      name: row[2],
-      status: mapStatus(row[3]),  // StatusはExcel上では数値（1,2,3）で管理している想定
-      order: i
-    }));
+    const rows = range.values;
+
+    const tasks = rows
+      .map((row, i) => {
+        const name = row[0];          // N 担当者
+        const note = row[1];          // O 備考
+        const plannedStart = row[2];  // P 予定開始日
+        const plannedEnd = row[3];    // Q 予定終了日
+        const actualStart = row[4];   // R 実際開始日
+        const actualEnd = row[5];     // S 実際終了日
+        const priority = row[6];      // T 優先度
+        const id = row[11];           // Y ID ←主キー
+        const task_name = row[12];    // Z タスク名
+
+        // 🔥 空タスク除外
+        if (!task_name) return null;
+
+        // 🔥 ステータス判定（超重要）
+        let status = "todo";
+        if (actualEnd) {
+          status = "done";
+        } else if (actualStart) {
+          status = "doing";
+        }
+
+        return {
+          id: id || i + 1,
+          row: i + 11, // ← Excel行番号（N11開始）
+
+          task_name,
+          name,
+          note,
+
+          plannedStart,
+          plannedEnd,
+          actualStart,
+          actualEnd,
+
+          priority,
+
+          status,
+          order: i
+        };
+      })
+      .filter(Boolean); // null除外
+
+    // 🔥 デバッグ
+    console.log("🔥 tasks:", tasks);
+    window.tasks = tasks;
+
+    return tasks;
   });
 }
 
