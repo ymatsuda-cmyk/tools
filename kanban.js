@@ -5,6 +5,28 @@ Office.onReady(async () => {
   render();
 });
 
+function isOfficeAvailable() {
+  return typeof Office !== "undefined";
+}
+
+async function init() {
+  if (isOfficeAvailable()) {
+    await Office.onReady();
+    tasks = await loadTasks();
+  } else {
+    console.warn("⚠ Officeなし → モックデータで起動");
+
+    // 🔥 モック
+    tasks = [
+      { id:1, row:2, name:"タスクA", status:"todo", order:1 },
+      { id:2, row:3, name:"タスクB", status:"doing", order:2 },
+      { id:3, row:4, name:"タスクC", status:"done", order:3 }
+    ];
+  }
+
+  render();
+}
+
 function render() {
 
   document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
@@ -40,4 +62,7 @@ function formatDate(date) {
   return `${d.getMonth()+1}/${d.getDate()}`;
 }
 
+
+
+init();
 
