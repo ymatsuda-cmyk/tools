@@ -27,6 +27,23 @@ async function init() {
   render();
 }
 
+async function loadTasks() {
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange("A2:D100");
+
+    range.load("values");
+    await context.sync();
+
+    const tasks = range.values.map(row => ({
+      title: row[2],
+      status: row[3] || "todo"
+    }));
+
+    renderKanban(tasks);
+  });
+}
+
 function render() {
 
   document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
