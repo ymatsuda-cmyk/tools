@@ -21,7 +21,7 @@ async function init() {
       { id:3, row:4, name:"タスクC", status:"done", order:3 }
     ];
   }
-
+  console.log("🔥 tasks:", tasks);
   render();
 }
 
