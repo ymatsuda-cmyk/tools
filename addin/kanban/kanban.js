@@ -95,10 +95,10 @@ function render() {
   tasks.forEach(task => {
     const card = document.createElement("div");
     card.className = "card";
-    card.textContent = task.name;
+    card.textContent = task.task_name;
 
-    card.dataset.row = task.row;
-    card.dataset.id = task.id;
+    card.dataset.name = task.name;
+    card.dataset.plannedEnd = task.plannedEnd;
 
     const meta = document.createElement("div");
     meta.className = "meta";
