@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="TaskPaneApp">
+  <Id>00000000-0000-0000-0000-000000000001</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Kanban</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+  <Hosts><Host Name="Workbook"/></Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <AppDomains>
+    <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
+  </AppDomains>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+                    xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="KanbanGroup">
+                <Label resid="GroupLabel"/>
+                <Control xsi:type="Button" id="OpenKanban">
+                  <Label resid="ButtonLabel"/>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openKanban</FunctionName>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Urls>
+        <bt:Url id="Commands.Url"
+          DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/commands.js"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GroupLabel" DefaultValue="Kanban"/>
+        <bt:String id="ButtonLabel" DefaultValue="カンバン"/>
+      </bt:ShortStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

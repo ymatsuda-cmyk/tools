@@ -1,38 +1,4 @@
-body {
-  font-family: sans-serif;
-  background: #f6f7f9;
-  padding: 16px;
-}
-
-#board {
-  display: flex;
-  gap: 16px;
-}
-
-.lane {
-  flex: 1;
-  background: #ebecf0;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.card-list {
-  min-height: 200px;
-}
-
-.card {
-  background: white;
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 8px;
-  cursor: grab;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-}
-
-.card.dragging {
-  opacity: 0.5;
-}
-
-.toolbar {
-  margin-bottom: 10px;
-}
+body{font-family:sans-serif;background:#f6f7f9;padding:16px;}
+#board{display:flex;gap:16px;}
+.lane{flex:1;background:#ebecf0;border-radius:8px;padding:10px;}
+.card{background:white;padding:8px;margin:6px 0;border-radius:6px;cursor:grab;}
