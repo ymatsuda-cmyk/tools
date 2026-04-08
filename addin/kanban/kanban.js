@@ -97,12 +97,13 @@ function render() {
     card.className = "card";
     card.textContent = task.task_name;
 
-    card.dataset.name = task.name;
-    card.dataset.plannedEnd = task.plannedEnd;
-
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.textContent = formatDate(task.plannedEnd);
+
+    meta.textContent = formatRange(
+      task.plannedStart,
+      task.plannedEnd
+    );
 
     card.appendChild(meta);
 
@@ -116,6 +117,34 @@ function formatDate(date) {
   if (!date) return "";
   const d = new Date(date);
   return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function formatRange(start, end) {
+  if (!start && !end) return "";
+
+  const toDate = (v) => {
+    if (!v) return null;
+
+    // Excelシリアル対応
+    if (typeof v === "number") {
+      return new Date((v - 25569) * 86400 * 1000);
+    }
+
+    return new Date(v);
+  };
+
+  const format = (d) => {
+    if (!d) return "";
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  const s = toDate(start);
+  const e = toDate(end);
+
+  if (s && e) return `${format(s)}～${format(e)}`;
+  if (s) return `${format(s)}～`;
+  if (e) return `～${format(e)}`;
+  return "";
 }
 
 function mapStatus(value) {
