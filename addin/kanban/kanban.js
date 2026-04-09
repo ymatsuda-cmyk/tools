@@ -1,95 +1,58 @@
 let tasks = [];
 let currentTask = null;
 let idRowMap = {};
+let clickTimer = null;
 
 // フィルタ状態
-let selectedUsers = new Set();
-let selectedPeriod = "all";
+let activeUser = null;
+let activePeriod = "all";
+let activeCategory = null;
+let includeOverdue = false;
 
-// =========================
+// =====================
 // 初期化
-// =========================
+// =====================
 Office.onReady(() => init());
 
 async function init() {
-  loadFilterState();
   tasks = await loadTasks();
-
-  initUserFilter();
-  initPeriodFilter();
+  restoreFilters();
   render();
+  initFilterUI();
+  initCategoryFilter();
+  updateActiveUI();
 }
 
-// =========================
-// localStorage
-// =========================
-function saveFilterState() {
-  localStorage.setItem("kanban_users", JSON.stringify([...selectedUsers]));
-  localStorage.setItem("kanban_period", selectedPeriod);
-}
-
-function loadFilterState() {
-  const users = JSON.parse(localStorage.getItem("kanban_users") || "[]");
-  selectedUsers = new Set(users);
-  selectedPeriod = localStorage.getItem("kanban_period") || "all";
-}
-
-// =========================
-// Reload
-// =========================
-async function reloadTasks() {
-  tasks = await loadTasks();
-  initUserFilter();
-  initPeriodFilter();
-  render();
-}
-
-// =========================
-// 日付
-// =========================
-function toDate(v) {
-  if (!v) return null;
-  if (typeof v === "number") {
-    return new Date((v - 25569) * 86400 * 1000);
-  }
-  const d = new Date(v);
-  return isNaN(d) ? null : d;
-}
-
-function toExcelDateString(date) {
-  return `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()}`;
-}
-
-// =========================
-// データ取得
-// =========================
+// =====================
+// Excelデータ取得
+// =====================
 async function loadTasks() {
   return await Excel.run(async (context) => {
 
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
-    const range = sheet.getRange("N11:Z1000");
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const range = sheet.getRange("A11:Z1000");
 
     range.load("values");
     await context.sync();
 
-    idRowMap = {};
-
     return range.values.map((row, i) => {
 
-      const name = row[0];
-      const note = row[1];
-      const plannedStart = row[2];
-      const plannedEnd = row[3];
-      const actualStart = row[4];
-      const actualEnd = row[5];
-      const id = row[11];
-      const task_name = row[12];
+      const category = row[0];   // A
+      const name = row[13];      // N
+      const note = row[14];      // O
+      const plannedStart = row[15]; // P
+      const plannedEnd = row[16];   // Q
+      const actualStart = row[17];  // R
+      const actualEnd = row[18];    // S
+      const priority = row[19];     // T
+      const id = row[24];           // Y
+      const task_name = row[25];    // Z
 
       if (!task_name) return null;
 
-      const rowNum = i + 11;
-      const safeId = id || `row-${rowNum}`;
-      idRowMap[safeId] = rowNum;
+      const rowNumber = i + 11;
+      const safeId = id || `row-${rowNumber}`;
+      idRowMap[safeId] = rowNumber;
 
       let status = "todo";
       if (actualEnd) status = "done";
@@ -97,14 +60,19 @@ async function loadTasks() {
 
       return {
         id: safeId,
-        row: rowNum,
+        row: rowNumber,
+
+        category,
         task_name,
         name,
         note,
+
         plannedStart,
         plannedEnd,
         actualStart,
         actualEnd,
+
+        priority,
         status
       };
 
@@ -112,220 +80,249 @@ async function loadTasks() {
   });
 }
 
-// =========================
-// フィルタUI
-// =========================
-function initUserFilter() {
-
-  const container = document.getElementById("user-filter");
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
-
-  users.forEach(user => {
-
-    const label = document.createElement("span");
-    label.textContent = user;
-    label.className = "filter-label";
-
-    if (selectedUsers.has(user)) {
-      label.classList.add("active");
-    }
-
-    label.onclick = () => {
-      if (selectedUsers.has(user)) {
-        selectedUsers.delete(user);
-      } else {
-        selectedUsers.add(user);
-      }
-      saveFilterState();
-      initUserFilter();
-      render();
-    };
-
-    container.appendChild(label);
-  });
-}
-
-function initPeriodFilter() {
-
-  const container = document.getElementById("period-filter");
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const periods = [
-    { key: "all", label: "全期間" },
-    { key: "thisWeek", label: "今週中" },
-    { key: "nextWeek", label: "来週中" },
-    { key: "thisMonth", label: "今月中" }
-  ];
-
-  periods.forEach(p => {
-
-    const label = document.createElement("span");
-    label.textContent = p.label;
-    label.className = "filter-label";
-
-    if (selectedPeriod === p.key) {
-      label.classList.add("active-period");
-    }
-
-    label.onclick = () => {
-      selectedPeriod = p.key;
-      saveFilterState();
-      initPeriodFilter();
-      render();
-    };
-
-    container.appendChild(label);
-  });
-}
-
-// =========================
-// 期間判定
-// =========================
-function isInPeriod(task) {
-
-  if (selectedPeriod === "all") return true;
-
-  const end = toDate(task.plannedEnd);
-  if (!end) return false;
-
-  const now = new Date();
-
-  const endOfWeek = new Date(now);
-  endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
-
-  const endOfNextWeek = new Date(endOfWeek);
-  endOfNextWeek.setDate(endOfWeek.getDate() + 7);
-
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const isOverdue = end < now;
-
-  if (selectedPeriod === "thisWeek") {
-    return end <= endOfWeek || isOverdue;
-  }
-
-  if (selectedPeriod === "nextWeek") {
-    return end <= endOfNextWeek || isOverdue;
-  }
-
-  if (selectedPeriod === "thisMonth") {
-    return end <= endOfMonth || isOverdue;
-  }
-
-  return true;
-}
-
-// =========================
+// =====================
 // 描画
-// =========================
+// =====================
 function render() {
 
   document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
 
-  // 🔥 期限ソート（期限切れ最優先）
-  const now = new Date();
+  tasks.sort((a, b) => new Date(a.plannedEnd) - new Date(b.plannedEnd));
 
-  const sortedTasks = [...tasks].sort((a, b) => {
-    const da = toDate(a.plannedEnd);
-    const db = toDate(b.plannedEnd);
+  tasks.forEach(task => {
 
-    if (!da) return 1;
-    if (!db) return -1;
-
-    const aOver = da < now;
-    const bOver = db < now;
-
-    if (aOver && !bOver) return -1;
-    if (!aOver && bOver) return 1;
-
-    return da - db;
-  });
-
-  sortedTasks.forEach(task => {
-
-    // 担当者フィルタ
-    if (selectedUsers.size > 0 && !selectedUsers.has(task.name)) return;
-
-    // 期間フィルタ
-    if (!isInPeriod(task)) return;
+    if (!isVisible(task)) return;
 
     const card = document.createElement("div");
     card.className = "card";
+    card.dataset.id = task.id;
     card.textContent = task.task_name;
     card.draggable = true;
-    card.dataset.id = task.id;
 
-    // モーダル
-    card.addEventListener("click", () => openModal(task));
+    // クリック → Excelジャンプ
+    card.addEventListener("click", () => {
+      clickTimer = setTimeout(() => focusRow(task.id), 200);
+    });
 
-    // 日付表示
+    // ダブルクリック → モーダル
+    card.addEventListener("dblclick", () => {
+      clearTimeout(clickTimer);
+      openModal(task);
+    });
+
+    card.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("id", task.id);
+    });
+
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
     card.appendChild(meta);
 
-    // 期限色
-    const end = toDate(task.plannedEnd);
-    if (end) {
-      const diff = (end - now) / (1000 * 60 * 60 * 24);
+    applyDeadlineColor(card, task.plannedEnd);
 
-      if (diff < 0) card.classList.add("overdue");
-      else if (diff <= 7) card.classList.add("thisweek");
-      else if (diff <= 14) card.classList.add("nextweek");
-    }
-
-    // ドラッグ
-    card.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/plain", task.id);
-    });
-
-    document
-      .querySelector(`#${task.status} .card-list`)
-      ?.appendChild(card);
+    document.querySelector(`#${task.status} .card-list`)?.appendChild(card);
   });
 }
 
-// =========================
-// ドラッグ
-// =========================
-function allowDrop(e) {
-  e.preventDefault();
+// =====================
+// フィルタ判定
+// =====================
+function isVisible(task) {
+
+  if (activeUser && task.name !== activeUser) return false;
+  if (activeCategory && task.category !== activeCategory) return false;
+
+  const end = new Date(task.plannedEnd);
+  const now = new Date();
+  const diff = (end - now) / 86400000;
+
+  const isOverdue = diff < 0;
+
+  if (activePeriod !== "all") {
+
+    if (includeOverdue && isOverdue) return true;
+
+    if (activePeriod === "week" && diff > 7) return false;
+    if (activePeriod === "nextweek" && diff > 14) return false;
+
+    if (activePeriod === "month") {
+      if (end.getMonth() !== now.getMonth()) return false;
+    }
+  }
+
+  return true;
 }
 
-async function onDrop(e) {
-  e.preventDefault();
+// =====================
+// 担当者フィルタ
+// =====================
+function initFilterUI() {
 
-  const id = e.dataTransfer.getData("text/plain");
-  const lane = e.currentTarget.closest(".lane").id;
+  const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
+  const container = document.getElementById("user-filters");
 
-  const task = tasks.find(t => t.id == id);
-  if (!task) return;
+  container.innerHTML = "";
 
-  task.status = lane;
+  users.forEach(u => {
 
-  await updateExcel(task);
+    const btn = document.createElement("button");
+    btn.textContent = u;
 
-  tasks = await loadTasks();
+    btn.onclick = () => {
+      activeUser = (activeUser === u) ? null : u;
+      updateActiveUI();
+      saveFilters();
+      render();
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+// =====================
+// 大分類フィルタ
+// =====================
+function initCategoryFilter() {
+
+  const categories = [...new Set(tasks.map(t => t.category).filter(Boolean))];
+  const container = document.getElementById("category-filters");
+
+  container.innerHTML = "";
+
+  categories.forEach(c => {
+
+    const btn = document.createElement("button");
+    btn.textContent = c;
+
+    btn.onclick = () => {
+      activeCategory = (activeCategory === c) ? null : c;
+      updateActiveUI();
+      saveFilters();
+      render();
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+// =====================
+// 期間フィルタ
+// =====================
+function setPeriod(p) {
+  activePeriod = (activePeriod === p) ? "all" : p;
+  updateActiveUI();
+  saveFilters();
   render();
 }
 
-// =========================
-// Excel更新
-// =========================
-async function updateExcel(task) {
+function toggleOverdue(cb) {
+  includeOverdue = cb.checked;
+  saveFilters();
+  render();
+}
 
-  const row = idRowMap[task.id];
-  if (!row) return;
+// =====================
+// UI状態反映
+// =====================
+function updateActiveUI() {
+
+  document.querySelectorAll("#user-filters button").forEach(btn => {
+    btn.classList.toggle("active", btn.textContent === activeUser);
+  });
+
+  document.querySelectorAll("#category-filters button").forEach(btn => {
+    btn.classList.toggle("active", btn.textContent === activeCategory);
+  });
+
+  document.querySelectorAll("[data-period]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.period === activePeriod);
+  });
+}
+
+// =====================
+// localStorage
+// =====================
+function saveFilters() {
+  localStorage.setItem("kanbanFilter", JSON.stringify({
+    user: activeUser,
+    period: activePeriod,
+    category: activeCategory,
+    includeOverdue
+  }));
+}
+
+function restoreFilters() {
+  const data = JSON.parse(localStorage.getItem("kanbanFilter") || "{}");
+
+  activeUser = data.user || null;
+  activePeriod = data.period || "all";
+  activeCategory = data.category || null;
+  includeOverdue = data.includeOverdue || false;
+}
+
+// =====================
+// Excelジャンプ
+// =====================
+async function focusRow(id) {
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const row = await getRowById(context, sheet, id);
+    sheet.getRange(`N${row}:Z${row}`).select();
+    await context.sync();
+  });
+}
+
+// =====================
+// ID検索
+// =====================
+async function getRowById(context, sheet, id) {
+
+  if (idRowMap[id]) return idRowMap[id];
+
+  const range = sheet.getRange("Y11:Y1000");
+  range.load("values");
+  await context.sync();
+
+  for (let i = 0; i < range.values.length; i++) {
+    if (range.values[i][0] == id) {
+      const row = i + 11;
+      idRowMap[id] = row;
+      return row;
+    }
+  }
+
+  throw new Error("ID not found");
+}
+
+// =====================
+// D&D
+// =====================
+function allowDrop(e) { e.preventDefault(); }
+
+async function onDrop(e) {
+
+  e.preventDefault();
+
+  const id = e.dataTransfer.getData("id");
+  const task = tasks.find(t => t.id == id);
+  if (!task) return;
+
+  task.status = e.currentTarget.id;
+
+  await updateExcelStatus(task);
+  render();
+}
+
+// =====================
+// Excel更新
+// =====================
+async function updateExcelStatus(task) {
 
   await Excel.run(async (context) => {
 
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const row = await getRowById(context, sheet, task.id);
 
     const r = sheet.getRange(`R${row}`);
     const s = sheet.getRange(`S${row}`);
@@ -344,12 +341,10 @@ async function updateExcel(task) {
       r.values = [[""]];
       s.values = [[""]];
     }
-
     if (task.status === "doing") {
       r.values = [[er || today]];
       s.values = [[""]];
     }
-
     if (task.status === "done") {
       r.values = [[er || today]];
       s.values = [[es || today]];
@@ -359,9 +354,9 @@ async function updateExcel(task) {
   });
 }
 
-// =========================
+// =====================
 // モーダル
-// =========================
+// =====================
 function openModal(task) {
   currentTask = task;
 
@@ -378,31 +373,55 @@ function closeModal() {
 async function saveNote() {
 
   const note = document.getElementById("modal-note").value;
-  const row = idRowMap[currentTask.id];
-
-  if (!row) return;
 
   await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
+
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const row = await getRowById(context, sheet, currentTask.id);
+
     sheet.getRange(`O${row}`).values = [[note]];
+
     await context.sync();
   });
 
   closeModal();
 }
 
-// =========================
-// 日付表示
-// =========================
-function formatRange(s, e) {
+// =====================
+// 日付
+// =====================
+function applyDeadlineColor(card, endDate) {
 
-  const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
+  if (!endDate) return;
 
-  const sd = toDate(s);
-  const ed = toDate(e);
+  const end = new Date(endDate);
+  const now = new Date();
+  const diff = (end - now) / 86400000;
 
-  if (sd && ed) return `${f(sd)}～${f(ed)}`;
-  if (sd) return `${f(sd)}～`;
-  if (ed) return `～${f(ed)}`;
+  if (diff < 0) card.classList.add("overdue");
+  else if (diff <= 7) card.classList.add("thisweek");
+  else if (diff <= 14) card.classList.add("nextweek");
+}
+
+function toExcelDateString(d) {
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function formatRange(start, end) {
+
+  const toDate = v => {
+    if (!v) return null;
+    if (typeof v === "number") return new Date((v - 25569) * 86400 * 1000);
+    return new Date(v);
+  };
+
+  const s = toDate(start);
+  const e = toDate(end);
+
+  const f = d => `${d.getMonth()+1}/${d.getDate()}`;
+
+  if (s && e) return `${f(s)}～${f(e)}`;
+  if (s) return `${f(s)}～`;
+  if (e) return `～${f(e)}`;
   return "";
 }

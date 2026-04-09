@@ -13,38 +13,38 @@
       margin: 10px;
     }
 
-    /* ヘッダー */
-    .header {
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    /* ===== ツールバー ===== */
+    .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    /* フィルタ */
-    .filter-area {
+    .filters {
       margin: 10px 0;
     }
 
-    .filter-label {
-      display: inline-block;
-      padding: 4px 10px;
-      margin: 3px;
-      border: 1px solid #ccc;
-      border-radius: 12px;
+    .filters div {
+      margin-bottom: 5px;
+    }
+
+    button {
+      margin: 2px;
+      padding: 5px 10px;
       cursor: pointer;
     }
 
-    .filter-label.active {
+    /* 選択中 */
+    .active {
       background: #0078d4;
       color: white;
     }
 
-    .filter-label.active-period {
-      background: orange;
-      color: white;
-    }
-
-    /* ボード */
+    /* ===== カンバン ===== */
     #board {
       display: flex;
       gap: 10px;
@@ -54,21 +54,20 @@
       flex: 1;
       background: #f4f4f4;
       padding: 10px;
-      border-radius: 8px;
+      border-radius: 5px;
+    }
+
+    .card-list {
+      min-height: 200px;
     }
 
     .card {
       background: white;
       padding: 8px;
-      margin: 6px 0;
-      border-radius: 6px;
-      cursor: grab;
-      border: 2px solid transparent;
-    }
-
-    .meta {
-      font-size: 12px;
-      color: gray;
+      margin: 5px 0;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
     /* 期限色 */
@@ -84,14 +83,20 @@
       border-color: green;
     }
 
-    /* モーダル */
+    .meta {
+      font-size: 12px;
+      color: gray;
+    }
+
+    /* ===== モーダル ===== */
     .modal {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.4);
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+
       display: flex;
       justify-content: center;
       align-items: center;
@@ -107,63 +112,77 @@
       width: 300px;
       border-radius: 8px;
     }
-
-    textarea {
-      width: 100%;
-    }
-
-    .modal-actions {
-      margin-top: 10px;
-      text-align: right;
-    }
   </style>
 </head>
 
 <body>
 
-<!-- ヘッダー -->
-<div class="header">
+<div class="topbar">
   <h2>カンバン</h2>
-  <button onclick="reloadTasks()">Reload</button>
+  <button onclick="init()">🔄 Reload</button>
 </div>
 
-<!-- 担当者フィルタ -->
-<div class="filter-area">
-  <div id="user-filter"></div>
+<!-- ===== フィルタ ===== -->
+<div class="filters">
+
+  <div>
+    <b>担当者：</b>
+    <div id="user-filters"></div>
+  </div>
+
+  <div>
+    <b>大分類：</b>
+    <div id="category-filters"></div>
+  </div>
+
+  <div>
+    <b>期間：</b>
+    <button onclick="setPeriod('all')">全期間</button>
+    <button onclick="setPeriod('week')">今週</button>
+    <button onclick="setPeriod('nextweek')">来週</button>
+    <button onclick="setPeriod('month')">今月</button>
+  </div>
+
 </div>
 
-<!-- 期間フィルタ -->
-<div class="filter-area">
-  <div id="period-filter"></div>
-</div>
-
-<!-- ボード -->
+<!-- ===== カンバン ===== -->
 <div id="board">
-  <div class="lane" id="todo" ondragover="allowDrop(event)" ondrop="onDrop(event)">
+
+  <div class="lane"
+       id="todo"
+       ondrop="onDrop(event)"
+       ondragover="allowDrop(event)">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="doing" ondragover="allowDrop(event)" ondrop="onDrop(event)">
+  <div class="lane"
+       id="doing"
+       ondrop="onDrop(event)"
+       ondragover="allowDrop(event)">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="done" ondragover="allowDrop(event)" ondrop="onDrop(event)">
+  <div class="lane"
+       id="done"
+       ondrop="onDrop(event)"
+       ondragover="allowDrop(event)">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
+
 </div>
 
-<!-- モーダル -->
+<!-- ===== モーダル ===== -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
 
     <h3 id="modal-title"></h3>
 
-    <textarea id="modal-note" rows="6"></textarea>
+    <textarea id="modal-note" rows="6" style="width:100%;"></textarea>
 
-    <div class="modal-actions">
+    <div style="margin-top:10px;">
       <button onclick="saveNote()">保存</button>
       <button onclick="closeModal()">閉じる</button>
     </div>
