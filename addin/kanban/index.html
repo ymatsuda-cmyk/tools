@@ -3,52 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <title>Kanban Demo</title>
+
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script>
-  Office.onReady(() => {
-    console.log("Office ready");
-  });
-  </script>
-  <script src="kanban.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <script src="kanban.js" defer></script>
+
+  <style>
+    body { font-family: sans-serif; }
+
+    #board {
+      display: flex;
+      gap: 16px;
+    }
+
+    .lane {
+      width: 30%;
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .card-list {
+      min-height: 200px;
+    }
+
+    .card {
+      background: white;
+      padding: 10px;
+      margin: 6px 0;
+      border-radius: 6px;
+      cursor: grab;
+      border: 2px solid transparent;
+    }
+
+    .card.overdue { border-color: red; }
+    .card.thisweek { border-color: orange; }
+    .card.nextweek { border-color: green; }
+
+    .meta {
+      font-size: 12px;
+      color: gray;
+    }
+
+    .modal {
+      position: fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background: rgba(0,0,0,0.4);
+    }
+
+    .hidden { display:none; }
+
+    .modal-content {
+      background:white;
+      width:300px;
+      margin:100px auto;
+      padding:20px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>カンバン（20260409_rev1）</h2>
+<h2>カンバン</h2>
+
 <select id="filter-user" onchange="applyFilter()">
   <option value="">全員</option>
 </select>
 
-<div class="toolbar">
-  <button onclick="undo()">Undo</button>
-  <button onclick="redo()">Redo</button>
-</div>
-
 <div id="board">
+
   <div class="lane" id="todo">
     <h3>未着手</h3>
-    <div class="card-list"></div>
+    <div class="card-list"
+         ondragover="allowDrop(event)"
+         ondrop="onDrop(event)">
+    </div>
   </div>
+
   <div class="lane" id="doing">
     <h3>対応中</h3>
-    <div class="card-list"></div>
+    <div class="card-list"
+         ondragover="allowDrop(event)"
+         ondrop="onDrop(event)">
+    </div>
   </div>
+
   <div class="lane" id="done">
     <h3>完了</h3>
-    <div class="card-list"></div>
+    <div class="card-list"
+         ondragover="allowDrop(event)"
+         ondrop="onDrop(event)">
+    </div>
   </div>
+
 </div>
 
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <h3 id="modal-title"></h3>
-
-    <textarea id="modal-note" rows="6"></textarea>
-
-    <div class="modal-actions">
-      <button onclick="saveNote()">保存</button>
-      <button onclick="closeModal()">閉じる</button>
-    </div>
+    <textarea id="modal-note"></textarea>
+    <br>
+    <button onclick="saveNote()">保存</button>
+    <button onclick="closeModal()">閉じる</button>
   </div>
 </div>
 

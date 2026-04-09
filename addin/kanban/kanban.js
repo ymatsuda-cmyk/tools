@@ -1,54 +1,34 @@
-// ===== kanban.js FINAL =====
-
 let tasks = [];
 let currentTask = null;
 let idRowMap = {};
 
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeModal();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("modal")?.addEventListener("click", e => {
-    if (e.target.id === "modal") closeModal();
-  });
-});
-
-Office.onReady(() => {
-  init();
-});
-
-function isOfficeAvailable() {
-  return typeof Office !== "undefined";
-}
+// =========================
+// 初期化
+// =========================
+Office.onReady(() => init());
 
 async function init() {
-  if (isOfficeAvailable()) {
-    tasks = await loadTasks();
-  } else {
-    tasks = [
-      { id:1, row:2, task_name:"タスクA", status:"todo", order:1 },
-      { id:2, row:3, task_name:"タスクB", status:"doing", order:2 },
-      { id:3, row:4, task_name:"タスクC", status:"done", order:3 }
-    ];
-  }
-
+  tasks = await loadTasks();
   render();
   initFilter();
 }
 
+// =========================
+// データ取得
+// =========================
 async function loadTasks() {
   return await Excel.run(async (context) => {
+
     const sheet = context.workbook.worksheets.getActiveWorksheet();
     const range = sheet.getRange("N11:Z1000");
 
     range.load("values");
     await context.sync();
 
-    const rows = range.values;
     idRowMap = {};
 
-    const tasks = rows.map((row, i) => {
+    return range.values.map((row, i) => {
+
       const name = row[0];
       const note = row[1];
       const plannedStart = row[2];
@@ -60,9 +40,9 @@ async function loadTasks() {
 
       if (!task_name) return null;
 
-      const rowNumber = i + 11;
-      const safeId = id || `row-${rowNumber}`;
-      idRowMap[safeId] = rowNumber;
+      const rowNum = i + 11;
+      const safeId = id || `row-${rowNum}`;
+      idRowMap[safeId] = rowNum;
 
       let status = "todo";
       if (actualEnd) status = "done";
@@ -70,7 +50,7 @@ async function loadTasks() {
 
       return {
         id: safeId,
-        row: rowNumber,
+        row: rowNum,
         task_name,
         name,
         note,
@@ -81,71 +61,129 @@ async function loadTasks() {
         status,
         order: i
       };
-    }).filter(Boolean);
 
-    return tasks;
+    }).filter(Boolean);
   });
 }
 
+// =========================
+// 描画
+// =========================
 function render() {
-  document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
 
-  const filterUser = document.getElementById("filter-user")?.value;
+  document.querySelectorAll(".card-list")
+    .forEach(el => el.innerHTML = "");
 
-  tasks.sort((a, b) => a.order - b.order);
+  const user = document.getElementById("filter-user").value;
 
   tasks.forEach(task => {
-    if (filterUser && task.name !== filterUser) return;
+
+    if (user && task.name !== user) return;
 
     const card = document.createElement("div");
-    card.dataset.id = task.id;
     card.className = "card";
     card.textContent = task.task_name;
     card.draggable = true;
+    card.dataset.id = task.id;
 
-    card.addEventListener("dragstart", e => onDragStart(e, task.id));
+    card.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("text/plain", task.id);
+    });
+
     card.addEventListener("click", () => openModal(task));
 
+    // 日付表示
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
+    card.appendChild(meta);
 
-    // 期限ハイライト
+    // 期限色
     if (task.plannedEnd) {
       const now = new Date();
       const end = new Date(task.plannedEnd);
-      const diff = (end - now) / (1000 * 60 * 60 * 24);
+      const diff = (end - now) / (1000*60*60*24);
 
       if (diff < 0) card.classList.add("overdue");
       else if (diff <= 7) card.classList.add("thisweek");
       else if (diff <= 14) card.classList.add("nextweek");
     }
 
-    card.appendChild(meta);
-
-    const column = document.querySelector(`#${task.status} .card-list`);
-    if (column) column.appendChild(card);
+    document
+      .querySelector(`#${task.status} .card-list`)
+      ?.appendChild(card);
   });
 }
 
-function formatRange(start, end) {
-  const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
-
-  const toDate = v => {
-    if (!v) return null;
-    if (typeof v === "number") return new Date((v - 25569) * 86400 * 1000);
-    return new Date(v);
-  };
-
-  const s = toDate(start);
-  const e = toDate(end);
-
-  if (s && e) return `${f(s)}～${f(e)}`;
-  if (s) return `${f(s)}～`;
-  if (e) return `～${f(e)}`;
-  return "";
+// =========================
+// ドラッグ
+// =========================
+function allowDrop(e) {
+  e.preventDefault();
 }
 
+async function onDrop(e) {
+  e.preventDefault();
+
+  const id = e.dataTransfer.getData("text/plain");
+  const lane = e.currentTarget.closest(".lane").id;
+
+  const task = tasks.find(t => t.id == id);
+  if (!task) return;
+
+  task.status = lane;
+
+  await updateExcel(task);
+
+  tasks = await loadTasks();
+  render();
+}
+
+// =========================
+// Excel更新
+// =========================
+async function updateExcel(task) {
+
+  const row = idRowMap[task.id];
+
+  await Excel.run(async (context) => {
+
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+
+    const r = sheet.getRange(`R${row}`);
+    const s = sheet.getRange(`S${row}`);
+
+    r.load("values");
+    s.load("values");
+
+    await context.sync();
+
+    const er = r.values[0][0];
+    const es = s.values[0][0];
+    const today = new Date();
+
+    if (task.status === "todo") {
+      r.values = [[""]];
+      s.values = [[""]];
+    }
+
+    if (task.status === "doing") {
+      r.values = [[er || today]];
+      s.values = [[""]];
+    }
+
+    if (task.status === "done") {
+      r.values = [[er || today]];
+      s.values = [[es || today]];
+    }
+
+    await context.sync();
+  });
+}
+
+// =========================
+// モーダル
+// =========================
 function openModal(task) {
   currentTask = task;
   document.getElementById("modal-title").textContent = task.task_name;
@@ -158,96 +196,61 @@ function closeModal() {
 }
 
 async function saveNote() {
-  const newNote = document.getElementById("modal-note").value;
+
+  const note = document.getElementById("modal-note").value;
   const row = idRowMap[currentTask.id];
-  if (!row) return;
 
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getActiveWorksheet();
-    sheet.getRange(`O${row}`).values = [[newNote]];
+    sheet.getRange(`O${row}`).values = [[note]];
     await context.sync();
   });
 
   closeModal();
 }
 
-function allowDrop(e) {
-  e.preventDefault();
-}
-
-function onDragStart(e, taskId) {
-  e.dataTransfer.setData("text/plain", taskId);
-}
-
-async function onDrop(e) {
-  e.preventDefault();
-
-  const taskId = e.dataTransfer.getData("text/plain");
-  const newStatus = e.currentTarget.id;
-
-  const task = tasks.find(t => t.id == taskId);
-  if (!task) return;
-
-  task.status = newStatus;
-
-  await updateExcelStatus(task);
-
-  tasks = await loadTasks();
-  render();
-}
-
-async function updateExcelStatus(task) {
-  const row = idRowMap[task.id];
-  if (!row) return;
-
-  await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
-
-    const rCell = sheet.getRange(`R${row}`);
-    const sCell = sheet.getRange(`S${row}`);
-
-    rCell.load("values");
-    sCell.load("values");
-    await context.sync();
-
-    const existingR = rCell.values[0][0];
-    const existingS = sCell.values[0][0];
-    const today = new Date();
-
-    if (task.status === "todo") {
-      rCell.values = [[""]];
-      sCell.values = [[""]];
-    }
-
-    if (task.status === "doing") {
-      rCell.values = [[existingR || today]];
-      sCell.values = [[""]];
-    }
-
-    if (task.status === "done") {
-      rCell.values = [[existingR || today]];
-      sCell.values = [[existingS || today]];
-    }
-
-    await context.sync();
-  });
-}
-
+// =========================
+// フィルタ
+// =========================
 function initFilter() {
+
   const select = document.getElementById("filter-user");
-  if (!select) return;
 
   const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
+
   select.innerHTML = '<option value="">全員</option>';
 
   users.forEach(u => {
-    const opt = document.createElement("option");
-    opt.value = u;
-    opt.textContent = u;
-    select.appendChild(opt);
+    const o = document.createElement("option");
+    o.value = u;
+    o.textContent = u;
+    select.appendChild(o);
   });
 }
 
 function applyFilter() {
   render();
+}
+
+// =========================
+// 日付表示
+// =========================
+function formatRange(s, e) {
+
+  const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
+
+  const toDate = v => {
+    if (!v) return null;
+    if (typeof v === "number")
+      return new Date((v - 25569) * 86400 * 1000);
+    return new Date(v);
+  };
+
+  const sd = toDate(s);
+  const ed = toDate(e);
+
+  if (sd && ed) return `${f(sd)}～${f(ed)}`;
+  if (sd) return `${f(sd)}～`;
+  if (ed) return `～${f(ed)}`;
+  return "";
 }
