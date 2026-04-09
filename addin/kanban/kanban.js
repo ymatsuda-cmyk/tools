@@ -78,7 +78,7 @@ async function loadTasks() {
 
       const name = row[0];
       const note = row[1];
-      const plannedStart = row[2]; // ←復活
+      const plannedStart = row[2];
       const plannedEnd = row[3];
       const actualStart = row[4];
       const actualEnd = row[5];
@@ -228,7 +228,26 @@ function render() {
 
   document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
 
-  tasks.forEach(task => {
+  // 🔥 期限ソート（期限切れ最優先）
+  const now = new Date();
+
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const da = toDate(a.plannedEnd);
+    const db = toDate(b.plannedEnd);
+
+    if (!da) return 1;
+    if (!db) return -1;
+
+    const aOver = da < now;
+    const bOver = db < now;
+
+    if (aOver && !bOver) return -1;
+    if (!aOver && bOver) return 1;
+
+    return da - db;
+  });
+
+  sortedTasks.forEach(task => {
 
     // 担当者フィルタ
     if (selectedUsers.size > 0 && !selectedUsers.has(task.name)) return;
@@ -242,19 +261,18 @@ function render() {
     card.draggable = true;
     card.dataset.id = task.id;
 
-    // 🔥 クリックで備考表示（復活）
+    // モーダル
     card.addEventListener("click", () => openModal(task));
 
-    // 🔥 日付表示
+    // 日付表示
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
     card.appendChild(meta);
 
-    // 🔥 期限色（復活）
+    // 期限色
     const end = toDate(task.plannedEnd);
     if (end) {
-      const now = new Date();
       const diff = (end - now) / (1000 * 60 * 60 * 24);
 
       if (diff < 0) card.classList.add("overdue");
