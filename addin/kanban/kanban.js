@@ -1,12 +1,14 @@
+// =====================
+// 状態
+// =====================
 let tasks = [];
-let currentTask = null;
 let idRowMap = {};
+let currentTask = null;
 let clickTimer = null;
 
-// フィルタ状態
 let activeUser = null;
-let activePeriod = "all";
 let activeCategory = null;
+let activePeriod = "all";
 let includeOverdue = false;
 
 // =====================
@@ -24,7 +26,7 @@ async function init() {
 }
 
 // =====================
-// Excelデータ取得
+// Excel取得
 // =====================
 async function loadTasks() {
   return await Excel.run(async (context) => {
@@ -40,11 +42,10 @@ async function loadTasks() {
       const category = row[0];
       const name = row[13];
       const note = row[14];
-      const plannedStart = row[15];
-      const plannedEnd = row[16];
-      const actualStart = row[17];
-      const actualEnd = row[18];
-      const priority = row[19];
+      const start = row[15];
+      const end = row[16];
+      const r = row[17];
+      const s = row[18];
       const id = row[24];
       const task_name = row[25];
 
@@ -55,8 +56,8 @@ async function loadTasks() {
       idRowMap[safeId] = rowNumber;
 
       let status = "todo";
-      if (actualEnd) status = "done";
-      else if (actualStart) status = "doing";
+      if (s) status = "done";
+      else if (r) status = "doing";
 
       return {
         id: safeId,
@@ -65,11 +66,10 @@ async function loadTasks() {
         task_name,
         name,
         note,
-        plannedStart,
-        plannedEnd,
-        actualStart,
-        actualEnd,
-        priority,
+        plannedStart: start,
+        plannedEnd: end,
+        actualStart: r,
+        actualEnd: s,
         status
       };
 
@@ -82,7 +82,7 @@ async function loadTasks() {
 // =====================
 function render() {
 
-  document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
+  document.querySelectorAll(".card-list").forEach(e => e.innerHTML = "");
 
   tasks.sort((a, b) => new Date(a.plannedEnd) - new Date(b.plannedEnd));
 
@@ -92,22 +92,21 @@ function render() {
 
     const card = document.createElement("div");
     card.className = "card";
-    card.dataset.id = task.id;
     card.textContent = task.task_name;
     card.draggable = true;
 
-    card.addEventListener("click", () => {
+    card.onclick = () => {
       clickTimer = setTimeout(() => focusRow(task.id), 200);
-    });
+    };
 
-    card.addEventListener("dblclick", () => {
+    card.ondblclick = () => {
       clearTimeout(clickTimer);
       openModal(task);
-    });
+    };
 
-    card.addEventListener("dragstart", e => {
+    card.ondragstart = e => {
       e.dataTransfer.setData("id", task.id);
-    });
+    };
 
     const meta = document.createElement("div");
     meta.className = "meta";
@@ -149,7 +148,167 @@ function isVisible(task) {
 }
 
 // =====================
-// 🎯 ここが修正ポイント（月曜開始）
+// フィルタUI
+// =====================
+function initFilterUI() {
+
+  const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
+  const el = document.getElementById("user-filters");
+
+  el.innerHTML = "";
+
+  users.forEach(u => {
+    const b = document.createElement("button");
+    b.textContent = u;
+
+    b.onclick = () => {
+      activeUser = (activeUser === u) ? null : u;
+      updateActiveUI();
+      saveFilters();
+      render();
+    };
+
+    el.appendChild(b);
+  });
+}
+
+function initCategoryFilter() {
+
+  const cats = [...new Set(tasks.map(t => t.category).filter(Boolean))];
+  const el = document.getElementById("category-filters");
+
+  el.innerHTML = "";
+
+  cats.forEach(c => {
+    const b = document.createElement("button");
+    b.textContent = c;
+
+    b.onclick = () => {
+      activeCategory = (activeCategory === c) ? null : c;
+      updateActiveUI();
+      saveFilters();
+      render();
+    };
+
+    el.appendChild(b);
+  });
+}
+
+// =====================
+// 期間
+// =====================
+function setPeriod(p) {
+  activePeriod = (activePeriod === p) ? "all" : p;
+  updateActiveUI();
+  saveFilters();
+  render();
+}
+
+function toggleOverdue(cb) {
+  includeOverdue = cb.checked;
+  saveFilters();
+  render();
+}
+
+// =====================
+// UI更新
+// =====================
+function updateActiveUI() {
+
+  document.querySelectorAll("#user-filters button").forEach(b => {
+    b.classList.toggle("active", b.textContent === activeUser);
+  });
+
+  document.querySelectorAll("#category-filters button").forEach(b => {
+    b.classList.toggle("active", b.textContent === activeCategory);
+  });
+
+  document.querySelectorAll("[data-period]").forEach(b => {
+    b.classList.toggle("active", b.dataset.period === activePeriod);
+  });
+}
+
+// =====================
+// localStorage
+// =====================
+function saveFilters() {
+  localStorage.setItem("kanbanFilter", JSON.stringify({
+    user: activeUser,
+    category: activeCategory,
+    period: activePeriod,
+    includeOverdue
+  }));
+}
+
+function restoreFilters() {
+  const d = JSON.parse(localStorage.getItem("kanbanFilter") || "{}");
+  activeUser = d.user || null;
+  activeCategory = d.category || null;
+  activePeriod = d.period || "all";
+  includeOverdue = d.includeOverdue || false;
+}
+
+// =====================
+// D&D
+// =====================
+function allowDrop(e) { e.preventDefault(); }
+
+async function onDrop(e) {
+
+  e.preventDefault();
+
+  const id = e.dataTransfer.getData("id");
+  const task = tasks.find(t => t.id == id);
+  if (!task) return;
+
+  task.status = e.currentTarget.id;
+
+  await updateExcelStatus(task);
+  render();
+}
+
+// =====================
+// Excel更新（省略なし）
+// =====================
+async function updateExcelStatus(task) {
+
+  await Excel.run(async (context) => {
+
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const row = await getRowById(context, sheet, task.id);
+
+    const r = sheet.getRange(`R${row}`);
+    const s = sheet.getRange(`S${row}`);
+
+    r.load("values");
+    s.load("values");
+
+    await context.sync();
+
+    const er = r.values[0][0];
+    const es = s.values[0][0];
+
+    const today = toExcelDateString(new Date());
+
+    if (task.status === "todo") {
+      r.values = [[""]];
+      s.values = [[""]];
+    }
+    if (task.status === "doing") {
+      r.values = [[er || today]];
+      s.values = [[""]];
+    }
+    if (task.status === "done") {
+      r.values = [[er || today]];
+      s.values = [[es || today]];
+    }
+
+    await context.sync();
+  });
+}
+
+// =====================
+// その他
 // =====================
 function applyDeadlineColor(card, endDate) {
 
@@ -161,56 +320,38 @@ function applyDeadlineColor(card, endDate) {
   today.setHours(0,0,0,0);
   end.setHours(0,0,0,0);
 
-  // 期限切れ
   if (end < today) {
     card.classList.add("overdue");
     return;
   }
 
-  // 月曜開始の週計算
-  const day = today.getDay() || 7; // 日曜=7扱い
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - day + 1);
+  const day = today.getDay() || 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - day + 1);
 
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  const endW = new Date(start);
+  endW.setDate(start.getDate() + 6);
 
-  const startOfNextWeek = new Date(startOfWeek);
-  startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+  const nextS = new Date(start);
+  nextS.setDate(start.getDate() + 7);
 
-  const endOfNextWeek = new Date(startOfWeek);
-  endOfNextWeek.setDate(startOfWeek.getDate() + 13);
+  const nextE = new Date(start);
+  nextE.setDate(start.getDate() + 13);
 
-  if (end >= startOfWeek && end <= endOfWeek) {
-    card.classList.add("thisweek");
-  }
-  else if (end >= startOfNextWeek && end <= endOfNextWeek) {
-    card.classList.add("nextweek");
-  }
+  if (end >= start && end <= endW) card.classList.add("thisweek");
+  else if (end >= nextS && end <= nextE) card.classList.add("nextweek");
 }
 
-// =====================
-// その他（省略なし）
-// =====================
 function toExcelDateString(d) {
   return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
 }
 
-function formatRange(start, end) {
-
-  const toDate = v => {
-    if (!v) return null;
-    if (typeof v === "number") return new Date((v - 25569) * 86400 * 1000);
-    return new Date(v);
-  };
-
-  const s = toDate(start);
-  const e = toDate(end);
-
+function formatRange(s, e) {
   const f = d => `${d.getMonth()+1}/${d.getDate()}`;
-
-  if (s && e) return `${f(s)}～${f(e)}`;
-  if (s) return `${f(s)}～`;
-  if (e) return `～${f(e)}`;
+  const sd = s ? new Date(s) : null;
+  const ed = e ? new Date(e) : null;
+  if (sd && ed) return `${f(sd)}～${f(ed)}`;
+  if (sd) return `${f(sd)}～`;
+  if (ed) return `～${f(ed)}`;
   return "";
 }
