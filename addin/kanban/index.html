@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Kanban</title>
+  <title>Kanban Board</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="kanban.js"></script>
@@ -17,34 +17,31 @@
       margin-bottom: 10px;
     }
 
-    /* ===== ツールバー ===== */
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    /* =====================
+       フィルタエリア
+    ===================== */
+    .filter-area {
+      margin-bottom: 10px;
     }
 
-    .filters {
-      margin: 10px 0;
-    }
-
-    .filters div {
+    .filter-area div {
       margin-bottom: 5px;
     }
 
     button {
       margin: 2px;
-      padding: 5px 10px;
+      padding: 4px 8px;
       cursor: pointer;
     }
 
-    /* 選択中 */
-    .active {
-      background: #0078d4;
+    button.active {
+      background-color: #0078d4;
       color: white;
     }
 
-    /* ===== カンバン ===== */
+    /* =====================
+       ボード
+    ===================== */
     #board {
       display: flex;
       gap: 10px;
@@ -52,51 +49,55 @@
 
     .lane {
       flex: 1;
-      background: #f4f4f4;
+      background: #f3f3f3;
       padding: 10px;
-      border-radius: 5px;
+      border-radius: 6px;
     }
 
     .card-list {
-      min-height: 200px;
+      min-height: 300px;
     }
 
+    /* =====================
+       カード
+    ===================== */
     .card {
       background: white;
-      padding: 8px;
-      margin: 5px 0;
+      padding: 6px;
+      margin-bottom: 6px;
       border: 2px solid #ccc;
-      border-radius: 5px;
+      border-radius: 6px;
       cursor: pointer;
     }
 
-    /* 期限色 */
-    .overdue {
-      border-color: red;
+    .card.overdue {
+      border: 2px solid red;
     }
 
-    .thisweek {
-      border-color: orange;
+    .card.thisweek {
+      border: 2px solid gold;
     }
 
-    .nextweek {
-      border-color: green;
+    .card.nextweek {
+      border: 2px solid green;
     }
 
     .meta {
       font-size: 12px;
       color: gray;
+      margin-top: 4px;
     }
 
-    /* ===== モーダル ===== */
+    /* =====================
+       モーダル
+    ===================== */
     .modal {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       background: rgba(0,0,0,0.5);
-
       display: flex;
       justify-content: center;
       align-items: center;
@@ -112,77 +113,98 @@
       width: 300px;
       border-radius: 8px;
     }
+
+    textarea {
+      width: 100%;
+    }
+
+    .modal-actions {
+      margin-top: 10px;
+      text-align: right;
+    }
+
+    /* =====================
+       右上ボタン
+    ===================== */
+    .top-bar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+
   </style>
 </head>
 
 <body>
 
-<div class="topbar">
-  <h2>カンバン</h2>
-  <button onclick="init()">🔄 Reload</button>
+<h2>カンバン Rev.20260409</h2>
+
+<!-- 右上 -->
+<div class="top-bar">
+  <button onclick="init()">Reload</button>
 </div>
 
-<!-- ===== フィルタ ===== -->
-<div class="filters">
+<!-- フィルタ -->
+<div class="filter-area">
 
+  <!-- 担当者 -->
   <div>
     <b>担当者：</b>
-    <div id="user-filters"></div>
+    <span id="user-filters"></span>
   </div>
 
+  <!-- 大分類 -->
   <div>
-    <b>大分類：</b>
-    <div id="category-filters"></div>
+    <b>分類：</b>
+    <span id="category-filters"></span>
   </div>
 
+  <!-- 期間 -->
   <div>
     <b>期間：</b>
-    <button onclick="setPeriod('all')">全期間</button>
-    <button onclick="setPeriod('week')">今週</button>
-    <button onclick="setPeriod('nextweek')">来週</button>
-    <button onclick="setPeriod('month')">今月</button>
+
+    <button data-period="all" onclick="setPeriod('all')">全期間</button>
+    <button data-period="week" onclick="setPeriod('week')">今週</button>
+    <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
+    <button data-period="month" onclick="setPeriod('month')">今月</button>
+
+    <label style="margin-left:10px;">
+      <input type="checkbox" onchange="toggleOverdue(this)">
+      遅延含む（期間外）
+    </label>
   </div>
 
 </div>
 
-<!-- ===== カンバン ===== -->
+<!-- ボード -->
 <div id="board">
 
-  <div class="lane"
-       id="todo"
-       ondrop="onDrop(event)"
-       ondragover="allowDrop(event)">
+  <div class="lane" id="todo" ondrop="onDrop(event)" ondragover="allowDrop(event)">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane"
-       id="doing"
-       ondrop="onDrop(event)"
-       ondragover="allowDrop(event)">
+  <div class="lane" id="doing" ondrop="onDrop(event)" ondragover="allowDrop(event)">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane"
-       id="done"
-       ondrop="onDrop(event)"
-       ondragover="allowDrop(event)">
+  <div class="lane" id="done" ondrop="onDrop(event)" ondragover="allowDrop(event)">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
 
 </div>
 
-<!-- ===== モーダル ===== -->
+<!-- モーダル -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
 
     <h3 id="modal-title"></h3>
 
-    <textarea id="modal-note" rows="6" style="width:100%;"></textarea>
+    <textarea id="modal-note" rows="6"></textarea>
 
-    <div style="margin-top:10px;">
+    <div class="modal-actions">
       <button onclick="saveNote()">保存</button>
       <button onclick="closeModal()">閉じる</button>
     </div>
