@@ -42,10 +42,13 @@ async function loadTasks() {
       const category = row[0];
       const name = row[13];
       const note = row[14];
-      const start = row[15];
-      const end = row[16];
-      const r = row[17];
-      const s = row[18];
+
+      // ★ 指定どおり
+      const start = row[15]; // P
+      const end   = row[16]; // Q
+      const r     = row[17]; // R
+      const s     = row[18]; // S
+
       const id = row[24];
       const task_name = row[25];
 
@@ -84,7 +87,11 @@ function render() {
 
   document.querySelectorAll(".card-list").forEach(e => e.innerHTML = "");
 
-  tasks.sort((a, b) => new Date(a.plannedEnd) - new Date(b.plannedEnd));
+  tasks.sort((a, b) => {
+    const da = toDate(a.plannedEnd) || new Date(9999,0,1);
+    const db = toDate(b.plannedEnd) || new Date(9999,0,1);
+    return da - db;
+  });
 
   tasks.forEach(task => {
 
@@ -95,24 +102,29 @@ function render() {
     card.textContent = task.task_name;
     card.draggable = true;
 
+    // クリック → Excelジャンプ
     card.onclick = () => {
       clickTimer = setTimeout(() => focusRow(task.id), 200);
     };
 
+    // ダブルクリック → モーダル
     card.ondblclick = () => {
       clearTimeout(clickTimer);
       openModal(task);
     };
 
+    // D&D
     card.ondragstart = e => {
       e.dataTransfer.setData("id", task.id);
     };
 
+    // 日付表示
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
     card.appendChild(meta);
 
+    // 色
     applyDeadlineColor(card, task.plannedEnd);
 
     document.querySelector(`#${task.status} .card-list`)?.appendChild(card);
@@ -127,7 +139,9 @@ function isVisible(task) {
   if (activeUser && task.name !== activeUser) return false;
   if (activeCategory && task.category !== activeCategory) return false;
 
-  const end = new Date(task.plannedEnd);
+  const end = toDate(task.plannedEnd);
+  if (!end) return true;
+
   const now = new Date();
   const diff = (end - now) / 86400000;
   const isOverdue = diff < 0;
@@ -268,7 +282,7 @@ async function onDrop(e) {
 }
 
 // =====================
-// Excel更新（省略なし）
+// Excel更新
 // =====================
 async function updateExcelStatus(task) {
 
@@ -308,15 +322,78 @@ async function updateExcelStatus(task) {
 }
 
 // =====================
-// その他
+// Excelジャンプ
+// =====================
+async function focusRow(id) {
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem("wbs");
+    const row = await getRowById(context, sheet, id);
+    sheet.getRange(`N${row}:Z${row}`).select();
+    await context.sync();
+  });
+}
+
+// =====================
+// ID検索
+// =====================
+async function getRowById(context, sheet, id) {
+
+  if (idRowMap[id]) return idRowMap[id];
+
+  const range = sheet.getRange("Y11:Y1000");
+  range.load("values");
+  await context.sync();
+
+  for (let i = 0; i < range.values.length; i++) {
+    if (range.values[i][0] == id) {
+      const row = i + 11;
+      idRowMap[id] = row;
+      return row;
+    }
+  }
+
+  throw new Error("ID not found");
+}
+
+// =====================
+// 🎯 日付変換（重要）
+// =====================
+function toDate(value) {
+
+  if (!value) return null;
+
+  if (typeof value === "number") {
+    return new Date((value - 25569) * 86400 * 1000);
+  }
+
+  return new Date(value);
+}
+
+// =====================
+// 表示用
+// =====================
+function formatRange(start, end) {
+
+  const s = toDate(start);
+  const e = toDate(end);
+
+  const f = d => `${d.getMonth()+1}/${d.getDate()}`;
+
+  if (s && e) return `${f(s)}～${f(e)}`;
+  if (s) return `${f(s)}～`;
+  if (e) return `～${f(e)}`;
+  return "";
+}
+
+// =====================
+// 色判定（月曜開始）
 // =====================
 function applyDeadlineColor(card, endDate) {
 
-  if (!endDate) return;
+  const end = toDate(endDate);
+  if (!end) return;
 
-  const end = new Date(endDate);
   const today = new Date();
-
   today.setHours(0,0,0,0);
   end.setHours(0,0,0,0);
 
@@ -342,16 +419,7 @@ function applyDeadlineColor(card, endDate) {
   else if (end >= nextS && end <= nextE) card.classList.add("nextweek");
 }
 
+// =====================
 function toExcelDateString(d) {
   return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-}
-
-function formatRange(s, e) {
-  const f = d => `${d.getMonth()+1}/${d.getDate()}`;
-  const sd = s ? new Date(s) : null;
-  const ed = e ? new Date(e) : null;
-  if (sd && ed) return `${f(sd)}～${f(ed)}`;
-  if (sd) return `${f(sd)}～`;
-  if (ed) return `～${f(ed)}`;
-  return "";
 }
