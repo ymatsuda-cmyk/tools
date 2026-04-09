@@ -5,15 +5,53 @@
   <title>Kanban</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="kanban.js" defer></script>
+  <script src="kanban.js"></script>
 
   <style>
-    body { font-family: sans-serif; }
+    body {
+      font-family: sans-serif;
+      margin: 10px;
+    }
 
-    #board { display: flex; gap: 16px; }
+    /* ヘッダー */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* フィルタ */
+    .filter-area {
+      margin: 10px 0;
+    }
+
+    .filter-label {
+      display: inline-block;
+      padding: 4px 10px;
+      margin: 3px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .filter-label.active {
+      background: #0078d4;
+      color: white;
+    }
+
+    .filter-label.active-period {
+      background: orange;
+      color: white;
+    }
+
+    /* ボード */
+    #board {
+      display: flex;
+      gap: 10px;
+    }
 
     .lane {
-      width: 30%;
+      flex: 1;
       background: #f4f4f4;
       padding: 10px;
       border-radius: 8px;
@@ -21,66 +59,116 @@
 
     .card {
       background: white;
-      padding: 10px;
+      padding: 8px;
       margin: 6px 0;
       border-radius: 6px;
       cursor: grab;
       border: 2px solid transparent;
     }
 
-    .card.overdue { border: 2px solid red; }
-    .card.thisweek { border: 2px solid orange; }
-    .card.nextweek { border: 2px solid green; }
-
-    .meta { font-size: 12px; color: gray; }
-
-    .filter-label {
-      margin-right: 8px;
-      padding: 4px 8px;
-      border: 1px solid #ccc;
-      cursor: pointer;
-      display: inline-block;
+    .meta {
+      font-size: 12px;
+      color: gray;
     }
 
-    .active { background: #cce5ff; }
-    .active-period { background: #ffd966; }
+    /* 期限色 */
+    .overdue {
+      border-color: red;
+    }
 
+    .thisweek {
+      border-color: orange;
+    }
+
+    .nextweek {
+      border-color: green;
+    }
+
+    /* モーダル */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      width: 300px;
+      border-radius: 8px;
+    }
+
+    textarea {
+      width: 100%;
+    }
+
+    .modal-actions {
+      margin-top: 10px;
+      text-align: right;
+    }
   </style>
 </head>
 
 <body>
 
-<div style="display:flex; justify-content:space-between;">
-  <h2>カンバン rev.20260409</h2>
-  <button onclick="reloadTasks()">🔄 Reload</button>
+<!-- ヘッダー -->
+<div class="header">
+  <h2>カンバン</h2>
+  <button onclick="reloadTasks()">Reload</button>
 </div>
 
-<!-- 担当者 -->
-<div id="user-filter"></div>
+<!-- 担当者フィルタ -->
+<div class="filter-area">
+  <div id="user-filter"></div>
+</div>
 
-<!-- 期間 -->
-<div id="period-filter"></div>
+<!-- 期間フィルタ -->
+<div class="filter-area">
+  <div id="period-filter"></div>
+</div>
 
+<!-- ボード -->
 <div id="board">
-  <div class="lane" id="todo">
+  <div class="lane" id="todo" ondragover="allowDrop(event)" ondrop="onDrop(event)">
     <h3>未着手</h3>
-    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
+    <div class="card-list"></div>
   </div>
-  <div class="lane" id="doing">
+
+  <div class="lane" id="doing" ondragover="allowDrop(event)" ondrop="onDrop(event)">
     <h3>対応中</h3>
-    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
+    <div class="card-list"></div>
   </div>
-  <div class="lane" id="done">
+
+  <div class="lane" id="done" ondragover="allowDrop(event)" ondrop="onDrop(event)">
     <h3>完了</h3>
-    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
+    <div class="card-list"></div>
   </div>
 </div>
 
-<div id="modal" class="hidden">
-  <h3 id="modal-title"></h3>
-  <textarea id="modal-note"></textarea>
-  <button onclick="saveNote()">保存</button>
-  <button onclick="closeModal()">閉じる</button>
+<!-- モーダル -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+
+    <h3 id="modal-title"></h3>
+
+    <textarea id="modal-note" rows="6"></textarea>
+
+    <div class="modal-actions">
+      <button onclick="saveNote()">保存</button>
+      <button onclick="closeModal()">閉じる</button>
+    </div>
+
+  </div>
 </div>
 
 </body>

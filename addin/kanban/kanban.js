@@ -12,7 +12,7 @@ let selectedPeriod = "all";
 Office.onReady(() => init());
 
 async function init() {
-  loadFilterState(); // ←復元
+  loadFilterState();
   tasks = await loadTasks();
 
   initUserFilter();
@@ -31,7 +31,6 @@ function saveFilterState() {
 function loadFilterState() {
   const users = JSON.parse(localStorage.getItem("kanban_users") || "[]");
   selectedUsers = new Set(users);
-
   selectedPeriod = localStorage.getItem("kanban_period") || "all";
 }
 
@@ -79,6 +78,7 @@ async function loadTasks() {
 
       const name = row[0];
       const note = row[1];
+      const plannedStart = row[2]; // ←復活
       const plannedEnd = row[3];
       const actualStart = row[4];
       const actualEnd = row[5];
@@ -101,6 +101,7 @@ async function loadTasks() {
         task_name,
         name,
         note,
+        plannedStart,
         plannedEnd,
         actualStart,
         actualEnd,
@@ -117,6 +118,8 @@ async function loadTasks() {
 function initUserFilter() {
 
   const container = document.getElementById("user-filter");
+  if (!container) return;
+
   container.innerHTML = "";
 
   const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
@@ -149,6 +152,8 @@ function initUserFilter() {
 function initPeriodFilter() {
 
   const container = document.getElementById("period-filter");
+  if (!container) return;
+
   container.innerHTML = "";
 
   const periods = [
@@ -180,7 +185,7 @@ function initPeriodFilter() {
 }
 
 // =========================
-// フィルタ判定
+// 期間判定
 // =========================
 function isInPeriod(task) {
 
@@ -225,14 +230,39 @@ function render() {
 
   tasks.forEach(task => {
 
+    // 担当者フィルタ
     if (selectedUsers.size > 0 && !selectedUsers.has(task.name)) return;
+
+    // 期間フィルタ
     if (!isInPeriod(task)) return;
 
     const card = document.createElement("div");
     card.className = "card";
     card.textContent = task.task_name;
     card.draggable = true;
+    card.dataset.id = task.id;
 
+    // 🔥 クリックで備考表示（復活）
+    card.addEventListener("click", () => openModal(task));
+
+    // 🔥 日付表示
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
+    card.appendChild(meta);
+
+    // 🔥 期限色（復活）
+    const end = toDate(task.plannedEnd);
+    if (end) {
+      const now = new Date();
+      const diff = (end - now) / (1000 * 60 * 60 * 24);
+
+      if (diff < 0) card.classList.add("overdue");
+      else if (diff <= 7) card.classList.add("thisweek");
+      else if (diff <= 14) card.classList.add("nextweek");
+    }
+
+    // ドラッグ
     card.addEventListener("dragstart", e => {
       e.dataTransfer.setData("text/plain", task.id);
     });
@@ -260,6 +290,7 @@ async function onDrop(e) {
   if (!task) return;
 
   task.status = lane;
+
   await updateExcel(task);
 
   tasks = await loadTasks();
@@ -272,6 +303,7 @@ async function onDrop(e) {
 async function updateExcel(task) {
 
   const row = idRowMap[task.id];
+  if (!row) return;
 
   await Excel.run(async (context) => {
 
@@ -307,4 +339,52 @@ async function updateExcel(task) {
 
     await context.sync();
   });
+}
+
+// =========================
+// モーダル
+// =========================
+function openModal(task) {
+  currentTask = task;
+
+  document.getElementById("modal-title").textContent = task.task_name;
+  document.getElementById("modal-note").value = task.note || "";
+
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+
+async function saveNote() {
+
+  const note = document.getElementById("modal-note").value;
+  const row = idRowMap[currentTask.id];
+
+  if (!row) return;
+
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    sheet.getRange(`O${row}`).values = [[note]];
+    await context.sync();
+  });
+
+  closeModal();
+}
+
+// =========================
+// 日付表示
+// =========================
+function formatRange(s, e) {
+
+  const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
+
+  const sd = toDate(s);
+  const ed = toDate(e);
+
+  if (sd && ed) return `${f(sd)}～${f(ed)}`;
+  if (sd) return `${f(sd)}～`;
+  if (ed) return `～${f(ed)}`;
+  return "";
 }
