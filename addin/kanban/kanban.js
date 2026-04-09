@@ -36,10 +36,10 @@ async function loadTasks() {
       const name = row[13];
       const note = row[14];
 
-      const start = row[15]; // P
-      const end   = row[16]; // Q
-      const r     = row[17]; // R
-      const s     = row[18]; // S
+      const start = row[15];
+      const end   = row[16];
+      const r     = row[17];
+      const s     = row[18];
 
       const id = row[24];
       const task_name = row[25];
@@ -94,7 +94,7 @@ function render() {
     card.textContent = task.task_name;
     card.draggable = true;
 
-    // ★ クリックでモーダル
+    // モーダル
     card.onclick = () => openModal(task);
 
     // D&D
@@ -114,9 +114,12 @@ function render() {
 }
 
 // =====================
-// フィルタ（期間重なり）
+// フィルタ
 // =====================
 function isVisible(task) {
+
+  if ((task.name && task.name.includes("#")) ||
+      (task.category && task.category.includes("#"))) return false;
 
   if (activeUser && task.name !== activeUser) return false;
   if (activeCategory && task.category !== activeCategory) return false;
@@ -130,48 +133,42 @@ function isVisible(task) {
   today.setHours(0,0,0,0);
 
   const day = today.getDay() || 7;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - day + 1);
+  const thisWeekStart = new Date(today);
+  thisWeekStart.setDate(today.getDate() - day + 1);
 
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+  const thisWeekEnd = new Date(thisWeekStart);
+  thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
 
-  const nextStart = new Date(weekStart);
-  nextStart.setDate(weekStart.getDate() + 7);
+  const nextWeekStart = new Date(thisWeekStart);
+  nextWeekStart.setDate(thisWeekStart.getDate() + 7);
 
-  const nextEnd = new Date(weekStart);
-  nextEnd.setDate(weekStart.getDate() + 13);
-
-  let fs, fe;
-
-  if (activePeriod === "week") {
-    fs = weekStart; fe = weekEnd;
-  }
-  else if (activePeriod === "nextweek") {
-    fs = nextStart; fe = nextEnd;
-  }
-  else if (activePeriod === "month") {
-    fs = new Date(today.getFullYear(), today.getMonth(), 1);
-    fe = new Date(today.getFullYear(), today.getMonth()+1, 0);
-  }
+  const nextWeekEnd = new Date(thisWeekStart);
+  nextWeekEnd.setDate(thisWeekStart.getDate() + 13);
 
   const ts = start || end;
   const te = end || start;
 
-  return ts <= fe && te >= fs;
+  if (!ts || !te) return true;
+
+  if (activePeriod === "past") return te < thisWeekStart;
+  if (activePeriod === "week") return ts <= thisWeekEnd && te >= thisWeekStart;
+  if (activePeriod === "nextweek") return ts <= nextWeekEnd && te >= nextWeekStart;
+  if (activePeriod === "future") return ts > nextWeekEnd;
+
+  return true;
 }
 
 // =====================
-// フィルタUI
+// UI
 // =====================
 function initFilterUI() {
-
   const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
   const el = document.getElementById("user-filters");
-
   el.innerHTML = "";
 
   users.forEach(u => {
+    if (u.includes("#")) return;
+
     const b = document.createElement("button");
     b.textContent = u;
 
@@ -187,13 +184,13 @@ function initFilterUI() {
 }
 
 function initCategoryFilter() {
-
   const cats = [...new Set(tasks.map(t => t.category).filter(Boolean))];
   const el = document.getElementById("category-filters");
-
   el.innerHTML = "";
 
   cats.forEach(c => {
+    if (c.includes("#")) return;
+
     const b = document.createElement("button");
     b.textContent = c;
 
@@ -208,7 +205,6 @@ function initCategoryFilter() {
   });
 }
 
-// =====================
 function setPeriod(p) {
   activePeriod = (activePeriod === p) ? "all" : p;
   updateActiveUI();
@@ -216,23 +212,18 @@ function setPeriod(p) {
   render();
 }
 
-// =====================
 function updateActiveUI() {
-
-  document.querySelectorAll("#user-filters button").forEach(b => {
-    b.classList.toggle("active", b.textContent === activeUser);
-  });
-
-  document.querySelectorAll("#category-filters button").forEach(b => {
-    b.classList.toggle("active", b.textContent === activeCategory);
-  });
-
-  document.querySelectorAll("[data-period]").forEach(b => {
-    b.classList.toggle("active", b.dataset.period === activePeriod);
-  });
+  document.querySelectorAll("#user-filters button").forEach(b =>
+    b.classList.toggle("active", b.textContent === activeUser)
+  );
+  document.querySelectorAll("#category-filters button").forEach(b =>
+    b.classList.toggle("active", b.textContent === activeCategory)
+  );
+  document.querySelectorAll("[data-period]").forEach(b =>
+    b.classList.toggle("active", b.dataset.period === activePeriod)
+  );
 }
 
-// =====================
 function saveFilters() {
   localStorage.setItem("kanbanFilter", JSON.stringify({
     user: activeUser,
@@ -249,7 +240,7 @@ function restoreFilters() {
 }
 
 // =====================
-// 色（要件反映）
+// 色
 // =====================
 function applyDeadlineColor(card, task) {
 
@@ -283,7 +274,37 @@ function applyDeadlineColor(card, task) {
 }
 
 // =====================
-// 日付
+// D&D（重要：window公開）
+// =====================
+window.allowDrop = function(e) {
+  e.preventDefault();
+};
+
+window.drop = function(e, status) {
+  e.preventDefault();
+
+  const id = e.dataTransfer.getData("id");
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+
+  task.status = status;
+  render();
+};
+
+// =====================
+// モーダル
+// =====================
+function openModal(task) {
+  currentTask = task;
+  document.getElementById("modal-title").textContent = task.task_name;
+  document.getElementById("modal-note").value = task.note || "";
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+
 // =====================
 function toDate(v) {
   if (!v) return null;
@@ -299,21 +320,4 @@ function formatRange(s, e) {
   if (sd) return `${f(sd)}～`;
   if (ed) return `～${f(ed)}`;
   return "";
-}
-
-// =====================
-// モーダル
-// =====================
-function openModal(task) {
-
-  currentTask = task;
-
-  document.getElementById("modal-title").textContent = task.task_name;
-  document.getElementById("modal-note").value = task.note || "";
-
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-function closeModal() {
-  document.getElementById("modal").classList.add("hidden");
 }

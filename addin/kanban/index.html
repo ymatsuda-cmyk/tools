@@ -11,7 +11,7 @@
 
 <body>
 
-<h2>カンバン Rev.20260409</h2>
+<h2>カンバン</h2>
 
 <div style="position:absolute; top:10px; right:10px;">
   <button onclick="init()">Reload</button>
@@ -36,17 +36,23 @@
 
 <div id="board">
 
-  <div class="lane" id="todo" ondragover="allowDrop(event)" ondrop="drop(event,'todo')">
+  <div class="lane" id="todo"
+       ondragover="allowDrop(event)"
+       ondrop="drop(event,'todo')">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="doing" ondragover="allowDrop(event)" ondrop="drop(event,'doing')">
+  <div class="lane" id="doing"
+       ondragover="allowDrop(event)"
+       ondrop="drop(event,'doing')">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="done" ondragover="allowDrop(event)" ondrop="drop(event,'done')">
+  <div class="lane" id="done"
+       ondragover="allowDrop(event)"
+       ondrop="drop(event,'done')">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
