@@ -2,209 +2,89 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Kanban Board</title>
+  <title>Kanban Demo</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <script>
+    Office.onReady(() => {
+      console.log("Office ready");
+    });
+  </script>
+
   <script src="kanban.js"></script>
-
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 10px;
-    }
-
-    h2 {
-      margin-bottom: 10px;
-    }
-
-    /* =====================
-       フィルタエリア
-    ===================== */
-    .filter-area {
-      margin-bottom: 10px;
-    }
-
-    .filter-area div {
-      margin-bottom: 5px;
-    }
-
-    button {
-      margin: 2px;
-      padding: 4px 8px;
-      cursor: pointer;
-    }
-
-    button.active {
-      background-color: #0078d4;
-      color: white;
-    }
-
-    /* =====================
-       ボード
-    ===================== */
-    #board {
-      display: flex;
-      gap: 10px;
-    }
-
-    .lane {
-      flex: 1;
-      background: #f3f3f3;
-      padding: 10px;
-      border-radius: 6px;
-    }
-
-    .card-list {
-      min-height: 300px;
-    }
-
-    /* =====================
-       カード
-    ===================== */
-    .card {
-      background: white;
-      padding: 6px;
-      margin-bottom: 6px;
-      border: 2px solid #ccc;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    .card.overdue {
-      border: 2px solid red;
-    }
-
-    .card.thisweek {
-      border: 2px solid gold;
-    }
-
-    .card.nextweek {
-      border: 2px solid green;
-    }
-
-    .meta {
-      font-size: 12px;
-      color: gray;
-      margin-top: 4px;
-    }
-
-    /* =====================
-       モーダル
-    ===================== */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .modal-content {
-      background: white;
-      padding: 20px;
-      width: 300px;
-      border-radius: 8px;
-    }
-
-    textarea {
-      width: 100%;
-    }
-
-    .modal-actions {
-      margin-top: 10px;
-      text-align: right;
-    }
-
-    /* =====================
-       右上ボタン
-    ===================== */
-    .top-bar {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-    }
-
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
 <h2>カンバン Rev.20260409</h2>
 
-<!-- 右上 -->
-<div class="top-bar">
+<!-- ===================== -->
+<!-- 🔄 リロード -->
+<!-- ===================== -->
+<div style="position:absolute; top:10px; right:10px;">
   <button onclick="init()">Reload</button>
 </div>
 
-<!-- フィルタ -->
-<div class="filter-area">
+<!-- ===================== -->
+<!-- 👤 担当者 -->
+<!-- ===================== -->
+<h4>担当者</h4>
+<div id="user-filters"></div>
 
-  <!-- 担当者 -->
-  <div>
-    <b>担当者：</b>
-    <span id="user-filters"></span>
-  </div>
+<!-- ===================== -->
+<!-- 📂 分類 -->
+<!-- ===================== -->
+<h4>分類</h4>
+<div id="category-filters"></div>
 
-  <!-- 大分類 -->
-  <div>
-    <b>分類：</b>
-    <span id="category-filters"></span>
-  </div>
-
-  <!-- 期間 -->
-  <div>
-    <b>期間：</b>
-
-    <button data-period="all" onclick="setPeriod('all')">全期間</button>
-    <button data-period="week" onclick="setPeriod('week')">今週</button>
-    <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
-    <button data-period="month" onclick="setPeriod('month')">今月</button>
-
-    <label style="margin-left:10px;">
-      <input type="checkbox" onchange="toggleOverdue(this)">
-      遅延含む（期間外）
-    </label>
-  </div>
-
+<!-- ===================== -->
+<!-- 📅 期間 -->
+<!-- ===================== -->
+<h4>期間</h4>
+<div id="period-filters">
+  <button data-period="all" onclick="setPeriod('all')">全期間</button>
+  <button data-period="week" onclick="setPeriod('week')">今週</button>
+  <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
+  <button data-period="month" onclick="setPeriod('month')">今月</button>
 </div>
 
-<!-- ボード -->
+<hr>
+
+<!-- ===================== -->
+<!-- 🧩 カンバン -->
+<!-- ===================== -->
 <div id="board">
 
-  <div class="lane" id="todo" ondrop="onDrop(event)" ondragover="allowDrop(event)">
+  <div class="lane" id="todo">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="doing" ondrop="onDrop(event)" ondragover="allowDrop(event)">
+  <div class="lane" id="doing">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="done" ondrop="onDrop(event)" ondragover="allowDrop(event)">
+  <div class="lane" id="done">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
 
 </div>
 
-<!-- モーダル -->
+<!-- ===================== -->
+<!-- 📝 モーダル -->
+<!-- ===================== -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
 
     <h3 id="modal-title"></h3>
 
-    <textarea id="modal-note" rows="6"></textarea>
+    <textarea id="modal-note" rows="6" style="width:100%;"></textarea>
 
-    <div class="modal-actions">
+    <div style="margin-top:10px;">
       <button onclick="saveNote()">保存</button>
       <button onclick="closeModal()">閉じる</button>
     </div>
