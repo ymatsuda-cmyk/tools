@@ -26,3 +26,15 @@ body{font-family:sans-serif;background:#f6f7f9;padding:16px;}
   width: 300px;
   border-radius: 8px;
 }
+
+.card.overdue {
+  border: 2px solid red;
+}
+
+.card.thisweek {
+  border: 2px solid orange;
+}
+
+.card.nextweek {
+  border: 2px solid green;
+}
