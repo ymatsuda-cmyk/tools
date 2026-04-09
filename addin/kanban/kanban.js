@@ -2,39 +2,63 @@ let tasks = [];
 let currentTask = null;
 let idRowMap = {};
 
+// フィルタ状態
+let selectedUsers = new Set();
+let selectedPeriod = "all";
+
 // =========================
 // 初期化
 // =========================
 Office.onReady(() => init());
 
 async function init() {
+  loadFilterState(); // ←復元
   tasks = await loadTasks();
+
+  initUserFilter();
+  initPeriodFilter();
   render();
-  initFilter();
 }
 
 // =========================
-// 日付ユーティリティ
+// localStorage
 // =========================
+function saveFilterState() {
+  localStorage.setItem("kanban_users", JSON.stringify([...selectedUsers]));
+  localStorage.setItem("kanban_period", selectedPeriod);
+}
 
-// Excel → JS Date変換
+function loadFilterState() {
+  const users = JSON.parse(localStorage.getItem("kanban_users") || "[]");
+  selectedUsers = new Set(users);
+
+  selectedPeriod = localStorage.getItem("kanban_period") || "all";
+}
+
+// =========================
+// Reload
+// =========================
+async function reloadTasks() {
+  tasks = await loadTasks();
+  initUserFilter();
+  initPeriodFilter();
+  render();
+}
+
+// =========================
+// 日付
+// =========================
 function toDate(v) {
   if (!v) return null;
-
   if (typeof v === "number") {
     return new Date((v - 25569) * 86400 * 1000);
   }
-
   const d = new Date(v);
   return isNaN(d) ? null : d;
 }
 
-// Excel書き込み用フォーマット
 function toExcelDateString(date) {
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  return `${y}/${m}/${d}`;
+  return `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()}`;
 }
 
 // =========================
@@ -55,7 +79,6 @@ async function loadTasks() {
 
       const name = row[0];
       const note = row[1];
-      const plannedStart = row[2];
       const plannedEnd = row[3];
       const actualStart = row[4];
       const actualEnd = row[5];
@@ -78,12 +101,10 @@ async function loadTasks() {
         task_name,
         name,
         note,
-        plannedStart,
         plannedEnd,
         actualStart,
         actualEnd,
-        status,
-        order: i
+        status
       };
 
     }).filter(Boolean);
@@ -91,54 +112,130 @@ async function loadTasks() {
 }
 
 // =========================
+// フィルタUI
+// =========================
+function initUserFilter() {
+
+  const container = document.getElementById("user-filter");
+  container.innerHTML = "";
+
+  const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
+
+  users.forEach(user => {
+
+    const label = document.createElement("span");
+    label.textContent = user;
+    label.className = "filter-label";
+
+    if (selectedUsers.has(user)) {
+      label.classList.add("active");
+    }
+
+    label.onclick = () => {
+      if (selectedUsers.has(user)) {
+        selectedUsers.delete(user);
+      } else {
+        selectedUsers.add(user);
+      }
+      saveFilterState();
+      initUserFilter();
+      render();
+    };
+
+    container.appendChild(label);
+  });
+}
+
+function initPeriodFilter() {
+
+  const container = document.getElementById("period-filter");
+  container.innerHTML = "";
+
+  const periods = [
+    { key: "all", label: "全期間" },
+    { key: "thisWeek", label: "今週中" },
+    { key: "nextWeek", label: "来週中" },
+    { key: "thisMonth", label: "今月中" }
+  ];
+
+  periods.forEach(p => {
+
+    const label = document.createElement("span");
+    label.textContent = p.label;
+    label.className = "filter-label";
+
+    if (selectedPeriod === p.key) {
+      label.classList.add("active-period");
+    }
+
+    label.onclick = () => {
+      selectedPeriod = p.key;
+      saveFilterState();
+      initPeriodFilter();
+      render();
+    };
+
+    container.appendChild(label);
+  });
+}
+
+// =========================
+// フィルタ判定
+// =========================
+function isInPeriod(task) {
+
+  if (selectedPeriod === "all") return true;
+
+  const end = toDate(task.plannedEnd);
+  if (!end) return false;
+
+  const now = new Date();
+
+  const endOfWeek = new Date(now);
+  endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
+
+  const endOfNextWeek = new Date(endOfWeek);
+  endOfNextWeek.setDate(endOfWeek.getDate() + 7);
+
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const isOverdue = end < now;
+
+  if (selectedPeriod === "thisWeek") {
+    return end <= endOfWeek || isOverdue;
+  }
+
+  if (selectedPeriod === "nextWeek") {
+    return end <= endOfNextWeek || isOverdue;
+  }
+
+  if (selectedPeriod === "thisMonth") {
+    return end <= endOfMonth || isOverdue;
+  }
+
+  return true;
+}
+
+// =========================
 // 描画
 // =========================
 function render() {
 
-  document.querySelectorAll(".card-list")
-    .forEach(el => el.innerHTML = "");
-
-  const user = document.getElementById("filter-user")?.value;
+  document.querySelectorAll(".card-list").forEach(el => el.innerHTML = "");
 
   tasks.forEach(task => {
 
-    if (user && task.name !== user) return;
+    if (selectedUsers.size > 0 && !selectedUsers.has(task.name)) return;
+    if (!isInPeriod(task)) return;
 
     const card = document.createElement("div");
     card.className = "card";
     card.textContent = task.task_name;
     card.draggable = true;
-    card.dataset.id = task.id;
 
-    // ドラッグ開始
     card.addEventListener("dragstart", e => {
       e.dataTransfer.setData("text/plain", task.id);
     });
-
-    // クリック → モーダル
-    card.addEventListener("click", () => openModal(task));
-
-    // 日付表示
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
-    card.appendChild(meta);
-
-    // 🔥 期限ハイライト（修正済み）
-    const end = toDate(task.plannedEnd);
-
-    if (end) {
-      const now = new Date();
-      const diff = (end - now) / (1000 * 60 * 60 * 24);
-
-      if (diff < 0) {
-        card.classList.add("overdue");   // 赤
-      } else if (diff <= 7) {
-        card.classList.add("thisweek");  // 黄
-      } else if (diff <= 14) {
-        card.classList.add("nextweek");  // 緑
-      }
-    }
 
     document
       .querySelector(`#${task.status} .card-list`)
@@ -147,7 +244,7 @@ function render() {
 }
 
 // =========================
-// ドラッグ&ドロップ
+// ドラッグ
 // =========================
 function allowDrop(e) {
   e.preventDefault();
@@ -163,7 +260,6 @@ async function onDrop(e) {
   if (!task) return;
 
   task.status = lane;
-
   await updateExcel(task);
 
   tasks = await loadTasks();
@@ -176,7 +272,6 @@ async function onDrop(e) {
 async function updateExcel(task) {
 
   const row = idRowMap[task.id];
-  if (!row) return;
 
   await Excel.run(async (context) => {
 
@@ -190,8 +285,8 @@ async function updateExcel(task) {
 
     await context.sync();
 
-    const existingR = r.values[0][0];
-    const existingS = s.values[0][0];
+    const er = r.values[0][0];
+    const es = s.values[0][0];
 
     const today = toExcelDateString(new Date());
 
@@ -201,87 +296,15 @@ async function updateExcel(task) {
     }
 
     if (task.status === "doing") {
-      r.values = [[existingR || today]];
+      r.values = [[er || today]];
       s.values = [[""]];
     }
 
     if (task.status === "done") {
-      r.values = [[existingR || today]];
-      s.values = [[existingS || today]];
+      r.values = [[er || today]];
+      s.values = [[es || today]];
     }
 
     await context.sync();
   });
-}
-
-// =========================
-// モーダル
-// =========================
-function openModal(task) {
-  currentTask = task;
-
-  document.getElementById("modal-title").textContent = task.task_name;
-  document.getElementById("modal-note").value = task.note || "";
-
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-function closeModal() {
-  document.getElementById("modal").classList.add("hidden");
-}
-
-async function saveNote() {
-
-  const note = document.getElementById("modal-note").value;
-  const row = idRowMap[currentTask.id];
-
-  if (!row) return;
-
-  await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
-    sheet.getRange(`O${row}`).values = [[note]];
-    await context.sync();
-  });
-
-  closeModal();
-}
-
-// =========================
-// フィルタ
-// =========================
-function initFilter() {
-
-  const select = document.getElementById("filter-user");
-  if (!select) return;
-
-  const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
-
-  select.innerHTML = '<option value="">全員</option>';
-
-  users.forEach(u => {
-    const opt = document.createElement("option");
-    opt.value = u;
-    opt.textContent = u;
-    select.appendChild(opt);
-  });
-}
-
-function applyFilter() {
-  render();
-}
-
-// =========================
-// 日付表示
-// =========================
-function formatRange(s, e) {
-
-  const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
-
-  const sd = toDate(s);
-  const ed = toDate(e);
-
-  if (sd && ed) return `${f(sd)}～${f(ed)}`;
-  if (sd) return `${f(sd)}～`;
-  if (ed) return `～${f(ed)}`;
-  return "";
 }

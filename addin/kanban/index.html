@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Kanban Demo</title>
+  <title>Kanban</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="kanban.js" defer></script>
@@ -10,20 +10,13 @@
   <style>
     body { font-family: sans-serif; }
 
-    #board {
-      display: flex;
-      gap: 16px;
-    }
+    #board { display: flex; gap: 16px; }
 
     .lane {
       width: 30%;
       background: #f4f4f4;
       padding: 10px;
       border-radius: 8px;
-    }
-
-    .card-list {
-      min-height: 200px;
     }
 
     .card {
@@ -35,77 +28,59 @@
       border: 2px solid transparent;
     }
 
-    .card.overdue { border-color: red; }
-    .card.thisweek { border-color: orange; }
-    .card.nextweek { border-color: green; }
+    .card.overdue { border: 2px solid red; }
+    .card.thisweek { border: 2px solid orange; }
+    .card.nextweek { border: 2px solid green; }
 
-    .meta {
-      font-size: 12px;
-      color: gray;
+    .meta { font-size: 12px; color: gray; }
+
+    .filter-label {
+      margin-right: 8px;
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      display: inline-block;
     }
 
-    .modal {
-      position: fixed;
-      top:0; left:0;
-      width:100%; height:100%;
-      background: rgba(0,0,0,0.4);
-    }
+    .active { background: #cce5ff; }
+    .active-period { background: #ffd966; }
 
-    .hidden { display:none; }
-
-    .modal-content {
-      background:white;
-      width:300px;
-      margin:100px auto;
-      padding:20px;
-    }
   </style>
 </head>
 
 <body>
 
-<h2>カンバン rev2</h2>
-
-<select id="filter-user" onchange="applyFilter()">
-  <option value="">全員</option>
-</select>
-
-<div id="board">
-
-  <div class="lane" id="todo">
-    <h3>未着手</h3>
-    <div class="card-list"
-         ondragover="allowDrop(event)"
-         ondrop="onDrop(event)">
-    </div>
-  </div>
-
-  <div class="lane" id="doing">
-    <h3>対応中</h3>
-    <div class="card-list"
-         ondragover="allowDrop(event)"
-         ondrop="onDrop(event)">
-    </div>
-  </div>
-
-  <div class="lane" id="done">
-    <h3>完了</h3>
-    <div class="card-list"
-         ondragover="allowDrop(event)"
-         ondrop="onDrop(event)">
-    </div>
-  </div>
-
+<div style="display:flex; justify-content:space-between;">
+  <h2>カンバン rev.20260409</h2>
+  <button onclick="reloadTasks()">🔄 Reload</button>
 </div>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-content">
-    <h3 id="modal-title"></h3>
-    <textarea id="modal-note"></textarea>
-    <br>
-    <button onclick="saveNote()">保存</button>
-    <button onclick="closeModal()">閉じる</button>
+<!-- 担当者 -->
+<div id="user-filter"></div>
+
+<!-- 期間 -->
+<div id="period-filter"></div>
+
+<div id="board">
+  <div class="lane" id="todo">
+    <h3>未着手</h3>
+    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
   </div>
+  <div class="lane" id="doing">
+    <h3>対応中</h3>
+    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
+  </div>
+  <div class="lane" id="done">
+    <h3>完了</h3>
+    <div class="card-list" ondragover="allowDrop(event)" ondrop="onDrop(event)"></div>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <h3 id="modal-title"></h3>
+  <textarea id="modal-note"></textarea>
+  <button onclick="saveNote()">保存</button>
+  <button onclick="closeModal()">閉じる</button>
 </div>
 
 </body>
