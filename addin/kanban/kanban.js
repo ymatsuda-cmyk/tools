@@ -14,6 +14,30 @@ async function init() {
 }
 
 // =========================
+// 日付ユーティリティ
+// =========================
+
+// Excel → JS Date変換
+function toDate(v) {
+  if (!v) return null;
+
+  if (typeof v === "number") {
+    return new Date((v - 25569) * 86400 * 1000);
+  }
+
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+}
+
+// Excel書き込み用フォーマット
+function toExcelDateString(date) {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}/${m}/${d}`;
+}
+
+// =========================
 // データ取得
 // =========================
 async function loadTasks() {
@@ -74,7 +98,7 @@ function render() {
   document.querySelectorAll(".card-list")
     .forEach(el => el.innerHTML = "");
 
-  const user = document.getElementById("filter-user").value;
+  const user = document.getElementById("filter-user")?.value;
 
   tasks.forEach(task => {
 
@@ -86,10 +110,12 @@ function render() {
     card.draggable = true;
     card.dataset.id = task.id;
 
+    // ドラッグ開始
     card.addEventListener("dragstart", e => {
       e.dataTransfer.setData("text/plain", task.id);
     });
 
+    // クリック → モーダル
     card.addEventListener("click", () => openModal(task));
 
     // 日付表示
@@ -98,15 +124,20 @@ function render() {
     meta.textContent = formatRange(task.plannedStart, task.plannedEnd);
     card.appendChild(meta);
 
-    // 期限色
-    if (task.plannedEnd) {
-      const now = new Date();
-      const end = new Date(task.plannedEnd);
-      const diff = (end - now) / (1000*60*60*24);
+    // 🔥 期限ハイライト（修正済み）
+    const end = toDate(task.plannedEnd);
 
-      if (diff < 0) card.classList.add("overdue");
-      else if (diff <= 7) card.classList.add("thisweek");
-      else if (diff <= 14) card.classList.add("nextweek");
+    if (end) {
+      const now = new Date();
+      const diff = (end - now) / (1000 * 60 * 60 * 24);
+
+      if (diff < 0) {
+        card.classList.add("overdue");   // 赤
+      } else if (diff <= 7) {
+        card.classList.add("thisweek");  // 黄
+      } else if (diff <= 14) {
+        card.classList.add("nextweek");  // 緑
+      }
     }
 
     document
@@ -116,7 +147,7 @@ function render() {
 }
 
 // =========================
-// ドラッグ
+// ドラッグ&ドロップ
 // =========================
 function allowDrop(e) {
   e.preventDefault();
@@ -145,6 +176,7 @@ async function onDrop(e) {
 async function updateExcel(task) {
 
   const row = idRowMap[task.id];
+  if (!row) return;
 
   await Excel.run(async (context) => {
 
@@ -158,9 +190,10 @@ async function updateExcel(task) {
 
     await context.sync();
 
-    const er = r.values[0][0];
-    const es = s.values[0][0];
-    const today = new Date();
+    const existingR = r.values[0][0];
+    const existingS = s.values[0][0];
+
+    const today = toExcelDateString(new Date());
 
     if (task.status === "todo") {
       r.values = [[""]];
@@ -168,13 +201,13 @@ async function updateExcel(task) {
     }
 
     if (task.status === "doing") {
-      r.values = [[er || today]];
+      r.values = [[existingR || today]];
       s.values = [[""]];
     }
 
     if (task.status === "done") {
-      r.values = [[er || today]];
-      s.values = [[es || today]];
+      r.values = [[existingR || today]];
+      s.values = [[existingS || today]];
     }
 
     await context.sync();
@@ -186,8 +219,10 @@ async function updateExcel(task) {
 // =========================
 function openModal(task) {
   currentTask = task;
+
   document.getElementById("modal-title").textContent = task.task_name;
   document.getElementById("modal-note").value = task.note || "";
+
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -199,6 +234,8 @@ async function saveNote() {
 
   const note = document.getElementById("modal-note").value;
   const row = idRowMap[currentTask.id];
+
+  if (!row) return;
 
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getActiveWorksheet();
@@ -215,16 +252,17 @@ async function saveNote() {
 function initFilter() {
 
   const select = document.getElementById("filter-user");
+  if (!select) return;
 
   const users = [...new Set(tasks.map(t => t.name).filter(Boolean))];
 
   select.innerHTML = '<option value="">全員</option>';
 
   users.forEach(u => {
-    const o = document.createElement("option");
-    o.value = u;
-    o.textContent = u;
-    select.appendChild(o);
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u;
+    select.appendChild(opt);
   });
 }
 
@@ -238,13 +276,6 @@ function applyFilter() {
 function formatRange(s, e) {
 
   const f = d => d ? `${d.getMonth()+1}/${d.getDate()}` : "";
-
-  const toDate = v => {
-    if (!v) return null;
-    if (typeof v === "number")
-      return new Date((v - 25569) * 86400 * 1000);
-    return new Date(v);
-  };
 
   const sd = toDate(s);
   const ed = toDate(e);
