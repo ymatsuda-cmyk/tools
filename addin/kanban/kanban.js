@@ -11,9 +11,38 @@ let selectedUser = null;
 let selectedCategory = null;
 let selectedPeriod = "all";
 
-Office.onReady(() => init());
+Office.onReady(() => {
+  // アドインコンテナの幅を強制設定
+  try {
+    document.documentElement.style.minWidth = "800px";
+    document.body.style.minWidth = "800px";
+    
+    // 親ウィンドウへのサイズヒント（可能な場合）
+    if (window.parent && window.parent.postMessage) {
+      window.parent.postMessage({
+        type: 'resize',
+        width: 800
+      }, '*');
+    }
+  } catch (e) {
+    console.log("Size setting error:", e);
+  }
+  
+  init();
+});
 
 async function init() {
+  // DOMレベルでの最小幅強制設定
+  document.documentElement.style.minWidth = "800px";
+  document.body.style.minWidth = "800px";
+  
+  // ボードコンテナの幅も確実に設定
+  const boardEl = document.getElementById("board");
+  if (boardEl) {
+    boardEl.style.minWidth = "750px";
+    boardEl.style.width = "100%";
+  }
+
   await loadExcelData();
   renderFilters();
   renderBoard();

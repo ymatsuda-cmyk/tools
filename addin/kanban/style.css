@@ -1,6 +1,8 @@
 body {
   font-family: sans-serif;
   margin: 10px;
+  min-width: 750px;
+  width: 100%;
 }
 
 /* ===== 上部バー ===== */
