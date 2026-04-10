@@ -34,7 +34,7 @@ function restoreSavedSize() {
       // 最小サイズの制限
       const minWidth = 400;
       const minHeight = 300;
-      const width = Math.max(size.width || 800, minWidth);
+      const width = Math.max(size.width || 400, minWidth);
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
@@ -71,7 +71,7 @@ function restoreSavedSize() {
 }
 
 function setDefaultSize() {
-  const defaultWidth = 800;
+  const defaultWidth = 400;
   const defaultHeight = 600;
   
   document.documentElement.style.minWidth = defaultWidth + "px";
@@ -197,25 +197,25 @@ async function init() {
   // 保存されたサイズまたはデフォルトサイズを適用
   try {
     const savedSize = localStorage.getItem('kanban-taskpane-size');
-    let minWidth = 800;
+    let minWidth = 400;
     
     if (savedSize) {
       const size = JSON.parse(savedSize);
-      minWidth = Math.max(size.width || 800, 400);
+      minWidth = Math.max(size.width || 400, 400);
     }
     
     document.documentElement.style.minWidth = minWidth + "px";
     document.body.style.minWidth = minWidth + "px";
   } catch (e) {
     // エラー時はデフォルトサイズ
-    document.documentElement.style.minWidth = "800px";
-    document.body.style.minWidth = "800px";
+    document.documentElement.style.minWidth = "400px";
+    document.body.style.minWidth = "400px";
   }
   
   // ボードコンテナの幅も確実に設定
   const boardEl = document.getElementById("board");
   if (boardEl) {
-    boardEl.style.minWidth = "750px";
+    boardEl.style.minWidth = "350px";
     boardEl.style.width = "100%";
   }
 
