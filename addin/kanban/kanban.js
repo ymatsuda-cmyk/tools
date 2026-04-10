@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_4017a55";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -78,13 +78,20 @@ function renderFilters() {
 }
 
 function renderUserFilter() {
-  const users = [...new Set(allTasks.map(t => t.user).filter(v => v && v !== "#"))];
+  const users = [...new Set(
+    allTasks
+      .filter(t => t.rowIndex >= 11)
+      .map(t => t.user)
+      .filter(v => v && v !== "#")
+  )];
+
   const el = document.getElementById("user-filters");
   el.innerHTML = "";
 
   users.forEach(u => {
     const b = document.createElement("button");
     b.textContent = u;
+
     if (selectedUser === u) b.classList.add("active");
 
     b.onclick = () => {
@@ -98,13 +105,20 @@ function renderUserFilter() {
 }
 
 function renderCategoryFilter() {
-  const cats = [...new Set(allTasks.map(t => t.category).filter(v => v && v !== "#"))];
+  const cats = [...new Set(
+    allTasks
+      .filter(t => t.rowIndex >= 11)
+      .map(t => t.category)
+      .filter(v => v && v !== "#")
+  )];
+
   const el = document.getElementById("category-filters");
   el.innerHTML = "";
 
   cats.forEach(c => {
     const b = document.createElement("button");
     b.textContent = c;
+
     if (selectedCategory === c) b.classList.add("active");
 
     b.onclick = () => {
@@ -288,7 +302,8 @@ function addDays(d,n){
 async function updateStatus(task, lane) {
   let actualStart = task.actualStart;
   let actualEnd = task.actualEnd;
-
+  console.log("Before:", actualStart);
+  
   if (lane === "todo") {
     actualStart = null;
     actualEnd = null;
