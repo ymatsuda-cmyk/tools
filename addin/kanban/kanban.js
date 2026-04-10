@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_fix_final";
+const APP_VERSION = "rev_20260410_80d5a6d";
 
 let allTasks = [];
 let currentDraggedId = null;
