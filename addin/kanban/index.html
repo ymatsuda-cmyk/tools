@@ -5,7 +5,7 @@
   <title>Kanban</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="kanban.js"></script>
+  <script src="./kanban.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -13,7 +13,8 @@
 
 <h2>カンバン</h2>
 
-<div style="position:absolute; top:10px; right:10px;">
+<div style="position:absolute; top:10px; right:10px; display:flex; gap:10px; align-items:center;">
+  <span id="version" style="font-size:12px; color:#666;"></span>
   <button onclick="init()">Reload</button>
 </div>
 

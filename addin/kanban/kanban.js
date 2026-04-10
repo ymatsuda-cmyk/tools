@@ -1,3 +1,8 @@
+// =====================
+// バージョン
+// =====================
+const APP_VERSION = "rev.20260409_001";
+
 let tasks = [];
 let idRowMap = {};
 let currentTask = null;
@@ -16,6 +21,15 @@ async function init() {
   initFilterUI();
   initCategoryFilter();
   updateActiveUI();
+  setVersion(); // ★追加
+}
+
+// =====================
+// バージョン表示
+// =====================
+function setVersion() {
+  const el = document.getElementById("version");
+  if (el) el.textContent = APP_VERSION;
 }
 
 // =====================
@@ -94,10 +108,8 @@ function render() {
     card.textContent = task.task_name;
     card.draggable = true;
 
-    // シングルクリック＝モーダル
     card.onclick = () => openModal(task);
 
-    // D&D
     card.ondragstart = e => {
       e.dataTransfer.setData("id", task.id);
     };
@@ -274,7 +286,7 @@ function applyDeadlineColor(card, task) {
 }
 
 // =====================
-// D&D（Excel更新付き）
+// D&D（Excel連携）
 // =====================
 window.allowDrop = function(e) {
   e.preventDefault();
@@ -290,7 +302,6 @@ window.drop = async function(e, status) {
   task.status = status;
 
   const row = idRowMap[task.id];
-
   const today = new Date();
   const formatted = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}`;
 
@@ -298,15 +309,25 @@ window.drop = async function(e, status) {
 
     const sheet = context.workbook.worksheets.getItem("wbs");
 
+    const startCell = sheet.getRange(`R${row}`);
+    const endCell   = sheet.getRange(`S${row}`);
+
+    startCell.load("values");
+    await context.sync();
+
+    const startVal = startCell.values[0][0];
+
     if (status === "doing") {
-      sheet.getRange(`R${row}`).values = [[formatted]];
-      sheet.getRange(`S${row}`).clear();
+      startCell.values = [[formatted]];
+      endCell.values = [[""]];
     }
     else if (status === "done") {
-      sheet.getRange(`S${row}`).values = [[formatted]];
+      if (!startVal) startCell.values = [[formatted]];
+      endCell.values = [[formatted]];
     }
     else {
-      sheet.getRange(`R${row}:S${row}`).clear();
+      startCell.values = [[""]];
+      endCell.values = [[""]];
     }
 
     await context.sync();
@@ -329,7 +350,7 @@ function closeModal() {
   document.getElementById("modal").classList.add("hidden");
 }
 
-// 備考保存
+// 備考保存（行高さ維持）
 async function saveNote() {
 
   const note = document.getElementById("modal-note").value;
@@ -338,7 +359,21 @@ async function saveNote() {
   await Excel.run(async (context) => {
 
     const sheet = context.workbook.worksheets.getItem("wbs");
-    sheet.getRange(`O${row}`).values = [[note]];
+
+    const rowRange = sheet.getRange(`A${row}:Z${row}`);
+    rowRange.load("rowHeight");
+
+    const noteCell = sheet.getRange(`O${row}`);
+
+    await context.sync();
+
+    const height = rowRange.rowHeight;
+
+    noteCell.values = [[note]];
+
+    await context.sync();
+
+    rowRange.rowHeight = height;
 
     await context.sync();
   });
