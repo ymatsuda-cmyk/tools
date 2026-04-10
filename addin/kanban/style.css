@@ -1,77 +1,115 @@
 body {
   font-family: sans-serif;
+  margin: 10px;
 }
 
-#board {
+/* ===== 上部バー ===== */
+.top-bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
-.lane {
-  flex: 1;
-  background: #f3f3f3;
-  padding: 10px;
-  border-radius: 6px;
+#version-label {
+  font-size: 10px;
+  color: #666;
 }
 
-.card {
-  background: white;
-  padding: 6px;
-  margin-bottom: 6px;
-  border: 2px solid #ccc;
-  border-radius: 6px;
+/* ===== フィルタボタン ===== */
+button {
+  margin: 2px;
+  padding: 4px 8px;
   cursor: pointer;
 }
 
-/* 状態色 */
-.card.overdue {
-  border: 2px solid red;
+button.active {
+  background: #0078d4;
+  color: #fff;
+  border: 1px solid #0078d4;
 }
 
-.card.thisweek {
-  border: 2px solid green;
+/* ===== ボード ===== */
+#board {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
 }
 
-.card.done {
-  border: 2px solid #555;
-  background: #eee;
+/* ===== レーン ===== */
+.lane {
+  flex: 1;
+  background: #f4f4f4;
+  padding: 10px;
+  border-radius: 6px;
+  min-height: 300px;
 }
 
+.lane h3 {
+  margin-top: 0;
+  text-align: center;
+}
+
+/* ===== カード ===== */
+.card {
+  background: #fff;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+/* ===== ドラッグ中 ===== */
 .card.dragging {
   opacity: 0.5;
   transform: scale(1.05);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.25);
 }
 
-.meta {
-  font-size: 12px;
-  color: gray;
+/* ===== 1行目（日時＋担当） ===== */
+.card-row1 {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 2px;
 }
 
-/* フィルタ */
-button.active {
-  background: #0078d4;
-  color: white;
+/* ===== 2行目（タイトル） ===== */
+.card div:last-child {
+  font-size: 13px;
+  word-break: break-word;
 }
 
-/* モーダル */
+/* ===== モーダル ===== */
 .modal {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.hidden {
+.modal.hidden {
   display: none;
 }
 
 .modal-content {
-  background: white;
-  padding: 20px;
-  margin: 100px auto;
+  background: #fff;
+  padding: 15px;
+  border-radius: 6px;
   width: 300px;
 }
 
+.modal textarea {
+  width: 100%;
+  margin-top: 10px;
+}
