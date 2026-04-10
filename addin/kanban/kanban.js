@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_b8f4337";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -217,21 +217,22 @@ function applyColor(el, t) {
     return;
   }
 
+  const start = excelDateToJS(t.start);
   const end = excelDateToJS(t.end);
-  if (!end) return;
+
+  if (!start || !end) return;
 
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const monday = getMonday(new Date());
-  const sunday = addDays(monday, 6);
-
+  // ★ 遅延
   if (end < today) {
     el.style.border = "2px solid red";
     return;
   }
 
-  if (end >= monday && end <= sunday) {
+  // ★ 期間内（←ここが今回のポイント）
+  if (start <= today && end >= today) {
     el.style.border = "2px solid green";
     return;
   }
@@ -339,11 +340,18 @@ async function saveNote() {
 
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
+    const row = currentTask.rowIndex;
 
-    const cell = sheet.getRange(`O${currentTask.rowIndex}`);
+    const cell = sheet.getRange(`O${row}`);
 
-    // 幅が変わらないよう values のみ更新
     cell.values = [[note]];
+
+    // ★これ追加
+    cell.format.wrapText = false;
+
+    // ★行高さ固定（例：20）
+    const entireRow = sheet.getRange(`${row}:${row}`);
+    entireRow.format.rowHeight = 20;
 
     await ctx.sync();
   });
@@ -362,8 +370,10 @@ function isMatch(t) {
   if (selectedUser && t.user !== selectedUser) return false;
   if (selectedCategory && t.category !== selectedCategory) return false;
 
+  const start = excelDateToJS(t.start);
   const end = excelDateToJS(t.end);
-  if (!end) return false;
+
+  if (!start || !end) return false;
 
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -374,17 +384,22 @@ function isMatch(t) {
   const nextSunday = addDays(monday, 13);
 
   switch (selectedPeriod) {
+
     case "past":
       return end < today;
 
     case "week":
-      return end >= monday && end <= sunday;
+      return (
+        (start <= sunday && end >= monday) // ★期間が重なってるか
+      );
 
     case "nextweek":
-      return end >= nextMonday && end <= nextSunday;
+      return (
+        (start <= nextSunday && end >= nextMonday)
+      );
 
     case "future":
-      return end > nextSunday;
+      return start > nextSunday;
 
     default:
       return true;
