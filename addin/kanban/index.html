@@ -14,9 +14,7 @@
 
     function renderVersion() {
       if (!SHOW_VERSION) return;
-
-      const el = document.getElementById("version-label");
-      el.textContent =
+      document.getElementById("version-label").textContent =
         `view(${VIEW_VERSION}) js(${window.APP_VERSION || "unknown"})`;
     }
   </script>
@@ -26,8 +24,8 @@
 
 <h2>カンバン</h2>
 
-<div style="position:absolute; top:10px; right:10px; display:flex; gap:10px;">
-  <span id="version-label" style="font-size:10px; color:#666;"></span>
+<div class="top-bar">
+  <span id="version-label"></span>
   <button onclick="init()">Reload</button>
 </div>
 
@@ -38,47 +36,38 @@
 <div id="category-filters"></div>
 
 <h4>期間</h4>
-<div>
-  <button onclick="setPeriod('all')">全期間</button>
-  <button onclick="setPeriod('past')">以前</button>
-  <button onclick="setPeriod('week')">今週</button>
-  <button onclick="setPeriod('nextweek')">来週</button>
-  <button onclick="setPeriod('future')">以降</button>
+<div id="period-filters">
+  <button data-period="all" onclick="setPeriod('all')">全期間</button>
+  <button data-period="past" onclick="setPeriod('past')">以前</button>
+  <button data-period="week" onclick="setPeriod('week')">今週</button>
+  <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
+  <button data-period="future" onclick="setPeriod('future')">以降</button>
 </div>
 
 <hr>
 
 <div id="board">
-
-  <div class="lane" id="todo"
-       ondragover="allowDrop(event)"
-       ondrop="drop(event,'todo')">
+  <div class="lane" id="todo" ondragover="allowDrop(event)" ondrop="drop(event,'todo')">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="doing"
-       ondragover="allowDrop(event)"
-       ondrop="drop(event,'doing')">
+  <div class="lane" id="doing" ondragover="allowDrop(event)" ondrop="drop(event,'doing')">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="done"
-       ondragover="allowDrop(event)"
-       ondrop="drop(event,'done')">
+  <div class="lane" id="done" ondragover="allowDrop(event)" ondrop="drop(event,'done')">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
-
 </div>
 
 <!-- モーダル -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <h3 id="modal-title"></h3>
-    <textarea id="modal-note" rows="6"></textarea>
-    <br>
+    <textarea id="modal-note"></textarea>
     <button onclick="saveNote()">保存</button>
     <button onclick="closeModal()">閉じる</button>
   </div>
