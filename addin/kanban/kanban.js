@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 const APP_VERSION = "rev_20260410_63329d9";
+=======
+const APP_VERSION = "rev_20260410_9caa816";
+>>>>>>> 3871df677f704e80fccb884eae3df652a10b9686
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
