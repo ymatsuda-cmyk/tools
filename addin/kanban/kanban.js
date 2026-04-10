@@ -1,5 +1,5 @@
 // ===== JSバージョン（自動更新）=====
-const APP_VERSION = "rev_20260410_xxxxxx";
+const APP_VERSION = "rev_20260410_f12a250";
 
 let allTasks = [];
 let currentDraggedId = null;
