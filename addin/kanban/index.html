@@ -15,7 +15,15 @@
     function renderVersion() {
       if (!SHOW_VERSION) return;
       document.getElementById("version-label").textContent =
-        `view(${VIEW_VERSION}) js(${window.APP_VERSION || ""})`;
+        `view(${VIEW_VERSION}) js(${window.APP_VERSION || "loading..."})`;  
+    }
+
+    // Office.onReady後にバージョンを再表示
+    function updateVersionDisplay() {
+      if (SHOW_VERSION && window.APP_VERSION) {
+        document.getElementById("version-label").textContent =
+          `view(${VIEW_VERSION}) js(${window.APP_VERSION})`;
+      }
     }
   </script>
 </head>
@@ -26,7 +34,7 @@
 
 <div class="top-bar">
   <span id="version-label"></span>
-  <button onclick="init()">Reload</button>
+  <button onclick="init(); updateVersionDisplay();">Reload</button>
 </div>
 
 <h4>担当者</h4>

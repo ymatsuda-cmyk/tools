@@ -15,6 +15,11 @@ async function init() {
   renderFilters();
   renderBoard();
   renderPeriodFilter();
+  
+  // バージョン表示を更新
+  if (typeof updateVersionDisplay === 'function') {
+    updateVersionDisplay();
+  }
 }
 
 // ===== Excel日付変換 =====
