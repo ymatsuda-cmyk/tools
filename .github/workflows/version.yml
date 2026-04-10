@@ -16,17 +16,21 @@ jobs:
         run: |
           DATE=$(date +%Y%m%d)
           HASH=$(git rev-parse --short HEAD)
-          VERSION="rev.${DATE}_${HASH}"
+          VERSION="rev_${DATE}_${HASH}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: kanban.js書き換え
+      - name: kanban.js更新
         run: |
-          sed -i "s/^const APP_VERSION = .*/const APP_VERSION = \"${VERSION}\";/" kanban.js
+          sed -i "s/^const APP_VERSION = .*/const APP_VERSION = \"${VERSION}\";/" addin/kanban/kanban.js
 
-      - name: コミット＆Push
+      - name: index.html更新
+        run: |
+          sed -i "s/^const VIEW_VERSION = .*/const VIEW_VERSION = \"${VERSION}\";/" addin/kanban/index.html
+
+      - name: commit & push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add kanban.js
+          git add .
           git commit -m "auto: version update ${VERSION}" || echo "no changes"
           git push
