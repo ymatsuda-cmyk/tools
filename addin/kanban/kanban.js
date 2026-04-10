@@ -65,7 +65,8 @@ async function loadExcelData() {
         note: row[14],
         rowIndex: i + 11,
 
-        isNoSchedule: !row[15] && !row[16]  
+        isNoSchedule: !row[15] && !row[16],
+        isStar: row[14] && row[14].toString().startsWith('★')  // 備考の先頭に★があるかチェック
       };
 
       t.status = getStatus(t);
@@ -161,7 +162,13 @@ function renderBoard() {
 
   const normal = filtered
     .filter(t => t.status !== "完了")
-    .sort((a,b)=>excelDateToJS(a.end)-excelDateToJS(b.end));
+    .sort((a, b) => {
+      // スター付きを優先
+      if (a.isStar && !b.isStar) return -1;
+      if (!a.isStar && b.isStar) return 1;
+      // 同じスター状態なら期限日順
+      return excelDateToJS(a.end) - excelDateToJS(b.end);
+    });
 
   const done = filtered
     .filter(t => t.status === "完了")
@@ -207,6 +214,15 @@ function createCard(t) {
 
   const left = document.createElement("span");
   const right = document.createElement("span");
+  const star = document.createElement("span");
+  
+  star.className = "star-icon";
+  star.textContent = t.isStar ? "★" : "☆";
+  star.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleStar(t);
+  });
 
   right.textContent = t.user || "";
 
@@ -223,12 +239,18 @@ function createCard(t) {
 
   row1.appendChild(left);
   row1.appendChild(right);
+  row1.appendChild(star);
 
   const row2 = document.createElement("div");
   row2.textContent = t.title;
 
   d.appendChild(row1);
   d.appendChild(row2);
+
+  // スター状態に応じてカードスタイルを適用 
+  if (t.isStar) {
+    d.classList.add("starred");
+  }
 
   applyColor(d, t);
 
@@ -369,6 +391,43 @@ function isValidDate(v) {
   return v instanceof Date && !isNaN(v);
 }
 
+// ===== スター切り替え =====
+async function toggleStar(task) {
+  // スター状態を切り替え
+  task.isStar = !task.isStar;
+  
+  // 備考を更新
+  let newNote = task.note || "";
+  
+  if (task.isStar) {
+    // ★を★に変更：先頭に★を付与
+    if (!newNote.startsWith('★')) {
+      newNote = '★' + newNote;
+    }
+  } else {
+    // ★を☆に変更：備考から★を完全に削除（""に置換）
+    newNote = newNote.replace(/★/g, "");
+  }
+  
+  // Excelに備考を更新
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+    const row = task.rowIndex;
+    const cell = sheet.getRange(`O${row}`);
+    
+    cell.values = [[newNote]];
+    cell.format.wrapText = false;
+    
+    await ctx.sync();
+  });
+  
+  // タスクの備考を更新
+  task.note = newNote;
+  
+  // 画面を再描画
+  renderBoard();
+}
+
 function openModal(task) {
   currentTask = task;
 
@@ -414,6 +473,11 @@ function isMatch(t) {
 
   // 分類
   if (selectedCategory && t.category !== selectedCategory) return false;
+
+  // ★ 本日フィルタ：スター付きのみ表示
+  if (selectedPeriod === "today") {
+    return t.isStar;
+  }
 
   // ★ 日付なし（TODO）
   if (t.isNoSchedule) {

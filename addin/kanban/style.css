@@ -65,6 +65,25 @@ button.active {
   transition: all 0.15s ease;
 }
 
+/* ===== スター付きカード ===== */
+.card.starred {
+  background: #e6f3ff;
+  border: 2px solid #9cbed7;
+}
+
+/* ===== スターアイコン ===== */
+.star-icon {
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  margin-left: 5px;
+  color: #ffd700;
+}
+
+.star-icon:hover {
+  transform: scale(1.2);
+}
+
 /* ===== ドラッグ中 ===== */
 .card.dragging {
   opacity: 0.5;
