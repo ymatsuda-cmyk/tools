@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_4721b0f";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -55,7 +55,9 @@ async function loadExcelData() {
         actualStart: row[17],
         actualEnd: row[18],
         note: row[14],
-        rowIndex: i + 2
+        rowIndex: i + 2,
+
+        isNoSchedule: !row[15] && !row[16]  
       };
 
       t.status = getStatus(t);
@@ -202,7 +204,10 @@ function createCard(t) {
 
   right.textContent = t.user || "";
 
-  if (t.status === "未着手") {
+  // ★ ここ修正（重要）
+  if (t.isNoSchedule) {
+    left.textContent = "TODO";
+  } else if (t.status === "未着手") {
     left.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
   } else if (t.status === "対応中") {
     left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
@@ -382,8 +387,17 @@ async function saveNote() {
 }
 
 function isMatch(t) {
+
+  // 担当者
   if (selectedUser && t.user !== selectedUser) return false;
+
+  // 分類
   if (selectedCategory && t.category !== selectedCategory) return false;
+
+  // ★ 日付なし（TODO）
+  if (t.isNoSchedule) {
+    return selectedPeriod === "all";
+  }
 
   const start = excelDateToJS(t.start);
   const end = excelDateToJS(t.end);
@@ -393,7 +407,7 @@ function isMatch(t) {
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const monday = getMonday(new Date());
+  const monday = getMonday(today);
   const sunday = addDays(monday, 6);
   const nextMonday = addDays(monday, 7);
   const nextSunday = addDays(monday, 13);
@@ -401,21 +415,18 @@ function isMatch(t) {
   switch (selectedPeriod) {
 
     case "past":
-      return end < today;
+      return end < monday;
 
     case "week":
-      return (
-        (start <= sunday && end >= monday) // ★期間が重なってるか
-      );
+      return (start <= sunday && end >= monday);
 
     case "nextweek":
-      return (
-        (start <= nextSunday && end >= nextMonday)
-      );
+      return (start <= nextSunday && end >= nextMonday);
 
     case "future":
       return start > nextSunday;
 
+    case "all":
     default:
       return true;
   }
