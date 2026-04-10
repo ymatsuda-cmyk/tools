@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_7f3f50e";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -302,20 +302,19 @@ function addDays(d,n){
 async function updateStatus(task, lane) {
   let actualStart = task.actualStart;
   let actualEnd = task.actualEnd;
-  console.log("Before:", actualStart);
 
   if (lane === "todo") {
-    actualStart = null;
-    actualEnd = null;
+    actualStart = "";
+    actualEnd = "";
   }
 
   if (lane === "doing") {
-    if (!actualStart) actualStart = new Date();
-    actualEnd = null;
+    if (!isValidDate(actualStart)) actualStart = new Date();
+    actualEnd = "";
   }
 
   if (lane === "done") {
-    if (!actualStart) actualStart = new Date();
+    if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = new Date();
   }
 
@@ -326,15 +325,22 @@ async function updateStatus(task, lane) {
     const startCell = sheet.getRange(`R${row}`);
     const endCell = sheet.getRange(`S${row}`);
 
-    // ★ m/d で書き込み
-    startCell.values = [[toMD(actualStart)]];
-    startCell.numberFormat = [["yyyy/m/d"]];
-    endCell.values = [[toMD(actualEnd)]];
-    endCell.numberFormat = [["yyyy/m/d"]];
+    // ★ 文字列じゃなく Date を直接渡す
+    startCell.values = [[actualStart || ""]];
+    endCell.values = [[actualEnd || ""]];
+
+    // ★ 表示だけ m/d にする
+    startCell.numberFormat = [["m/d"]];
+    endCell.numberFormat = [["m/d"]];
+
     await ctx.sync();
   });
 
   await init();
+}
+
+function isValidDate(v) {
+  return v instanceof Date && !isNaN(v);
 }
 
 function openModal(task) {
