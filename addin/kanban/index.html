@@ -34,6 +34,7 @@
 <div class="top-bar">
   <span id="version-label"></span>
   <button onclick="init(); updateVersionDisplay();">Reload</button>
+  <button onclick="resetSize();" title="サイズとフィルター設定をリセット">Reset</button>
 </div>
 
 <h4>担当者</h4>
@@ -77,9 +78,12 @@
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <h3 id="modal-title"></h3>
-    <textarea id="modal-note"></textarea>
-    <button onclick="saveNote()">保存</button>
-    <button onclick="closeModal()">閉じる</button>
+    <textarea id="modal-note" placeholder="備考を入力してください..."></textarea>
+    <div class="modal-actions">
+      <button onclick="saveNote()">保存</button>
+      <button onclick="closeModal()">閉じる</button>
+      <small style="color: #666; margin-left: 10px;">ESC: 閉じる</small>
+    </div>
   </div>
 </div>
 

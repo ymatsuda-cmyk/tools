@@ -12,29 +12,205 @@ let selectedCategory = null;
 let selectedPeriod = "all";
 
 Office.onReady(() => {
-  // アドインコンテナの幅を強制設定
-  try {
-    document.documentElement.style.minWidth = "800px";
-    document.body.style.minWidth = "800px";
-    
-    // 親ウィンドウへのサイズヒント（可能な場合）
-    if (window.parent && window.parent.postMessage) {
-      window.parent.postMessage({
-        type: 'resize',
-        width: 800
-      }, '*');
-    }
-  } catch (e) {
-    console.log("Size setting error:", e);
-  }
+  // 保存されたサイズを復元
+  restoreSavedSize();
+  
+  // 保存されたフィルター設定を復元
+  restoreSavedFilters();
+  
+  // サイズ変更の監視を開始
+  setupSizeMonitoring();
   
   init();
 });
 
+// ===== サイズ記憶機能 =====
+function restoreSavedSize() {
+  try {
+    const savedSize = localStorage.getItem('kanban-taskpane-size');
+    if (savedSize) {
+      const size = JSON.parse(savedSize);
+      
+      // 最小サイズの制限
+      const minWidth = 400;
+      const minHeight = 300;
+      const width = Math.max(size.width || 800, minWidth);
+      const height = Math.max(size.height || 600, minHeight);
+      
+      // DOM要素のサイズを設定
+      document.documentElement.style.minWidth = width + "px";
+      document.body.style.minWidth = width + "px";
+      
+      // Office APIを使用してタスクペインのサイズを設定（可能な場合）
+      if (Office.context.requirements.isSetSupported('TaskPaneApp', '1.1')) {
+        try {
+          Office.addin.setTaskpaneSize(width, height);
+        } catch (e) {
+          console.log("TaskPane resize not supported:", e);
+        }
+      }
+      
+      // 親ウィンドウへのサイズヒント
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+          type: 'resize',
+          width: width,
+          height: height
+        }, '*');
+      }
+      
+      console.log(`Restored size: ${width}x${height}`);
+    } else {
+      // デフォルトサイズを設定
+      setDefaultSize();
+    }
+  } catch (e) {
+    console.log("Size restoration error:", e);
+    setDefaultSize();
+  }
+}
+
+function setDefaultSize() {
+  const defaultWidth = 800;
+  const defaultHeight = 600;
+  
+  document.documentElement.style.minWidth = defaultWidth + "px";
+  document.body.style.minWidth = defaultWidth + "px";
+  
+  if (window.parent && window.parent.postMessage) {
+    window.parent.postMessage({
+      type: 'resize',
+      width: defaultWidth,
+      height: defaultHeight
+    }, '*');
+  }
+}
+
+function setupSizeMonitoring() {
+  let saveTimeout;
+  
+  // ResizeObserverでサイズ変更を監視
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        
+        // デバウンス処理（連続した変更を制限）
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          saveSizeToStorage(Math.round(width), Math.round(height));
+        }, 500);
+      }
+    });
+    
+    // body要素を監視
+    resizeObserver.observe(document.body);
+  } else {
+    // ResizeObserverが利用できない場合はwindowのresizeイベントを使用
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
+    
+    window.addEventListener('resize', () => {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        const currentWidth = window.innerWidth; 
+        const currentHeight = window.innerHeight;
+        
+        if (currentWidth !== lastWidth || currentHeight !== lastHeight) {
+          saveSizeToStorage(currentWidth, currentHeight);
+          lastWidth = currentWidth;
+          lastHeight = currentHeight;
+        }
+      }, 500);
+    });
+  }
+}
+
+function saveSizeToStorage(width, height) {
+  try {
+    const sizeData = {
+      width: width,
+      height: height,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem('kanban-taskpane-size', JSON.stringify(sizeData));
+    console.log(`Saved size: ${width}x${height}`);
+  } catch (e) {
+    console.log("Size saving error:", e);
+  }
+}
+
+// サイズ設定をリセットする関数
+function resetSize() {
+  try {
+    localStorage.removeItem('kanban-taskpane-size');
+    localStorage.removeItem('kanban-filters');
+    console.log("Size and filter settings reset");
+    
+    // ページをリロードして新しい設定を適用
+    window.location.reload();
+  } catch (e) {
+    console.log("Reset error:", e);
+  }
+}
+
+// ===== フィルター記憶機能 =====
+function restoreSavedFilters() {
+  try {
+    const savedFilters = localStorage.getItem('kanban-filters');
+    if (savedFilters) {
+      const filters = JSON.parse(savedFilters);
+      
+      selectedUser = filters.user || null;
+      selectedCategory = filters.category || null;
+      selectedPeriod = filters.period || "all";
+      
+      console.log('Restored filters:', filters);
+    }
+  } catch (e) {
+    console.log("Filter restoration error:", e);
+    // エラー時はデフォルト値を維持
+    selectedUser = null;
+    selectedCategory = null; 
+    selectedPeriod = "all";
+  }
+}
+
+function saveFilters() {
+  try {
+    const filterData = {
+      user: selectedUser,
+      category: selectedCategory,
+      period: selectedPeriod,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem('kanban-filters', JSON.stringify(filterData));
+    console.log('Saved filters:', filterData);
+  } catch (e) {
+    console.log("Filter saving error:", e);
+  }
+}
+
 async function init() {
-  // DOMレベルでの最小幅強制設定
-  document.documentElement.style.minWidth = "800px";
-  document.body.style.minWidth = "800px";
+  // 保存されたサイズまたはデフォルトサイズを適用
+  try {
+    const savedSize = localStorage.getItem('kanban-taskpane-size');
+    let minWidth = 800;
+    
+    if (savedSize) {
+      const size = JSON.parse(savedSize);
+      minWidth = Math.max(size.width || 800, 400);
+    }
+    
+    document.documentElement.style.minWidth = minWidth + "px";
+    document.body.style.minWidth = minWidth + "px";
+  } catch (e) {
+    // エラー時はデフォルトサイズ
+    document.documentElement.style.minWidth = "800px";
+    document.body.style.minWidth = "800px";
+  }
   
   // ボードコンテナの幅も確実に設定
   const boardEl = document.getElementById("board");
@@ -135,6 +311,7 @@ function renderUserFilter() {
 
     b.onclick = () => {
       selectedUser = (selectedUser === u) ? null : u;
+      saveFilters(); // フィルタ設定を保存
       renderBoard();
       renderFilters();
     };
@@ -161,6 +338,7 @@ function renderCategoryFilter() {
 
     b.onclick = () => {
       selectedCategory = (selectedCategory === c) ? null : c;
+      saveFilters(); // フィルタ設定を保存
       renderBoard();
       renderFilters();
     };
@@ -171,6 +349,7 @@ function renderCategoryFilter() {
 
 function setPeriod(p) {
   selectedPeriod = (selectedPeriod === p) ? "all" : p;
+  saveFilters(); // フィルタ設定を保存
   renderBoard();
   renderPeriodFilter();
 }
@@ -242,9 +421,12 @@ function createCard(t) {
   row1.className = "card-row1";
 
   const left = document.createElement("span");
-  const right = document.createElement("span");
+  const rightGroup = document.createElement("span");
+  rightGroup.className = "right-group";
   
-  right.textContent = t.user || "";
+  const user = document.createElement("span");
+  user.className = "user-name";
+  user.textContent = t.user || "";
 
   // ★ ここ修正（重要）
   if (t.isNoSchedule) {
@@ -257,8 +439,8 @@ function createCard(t) {
     left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
   }
 
-  row1.appendChild(left);
-  row1.appendChild(right);
+  // 右グループにユーザー名を追加
+  rightGroup.appendChild(user);
   
   // 完了状態以外にのみスターアイコンを追加
   if (t.status !== "完了") {
@@ -276,8 +458,12 @@ function createCard(t) {
       e.stopPropagation();
       toggleStar(t);
     });
-    row1.appendChild(star);
+    rightGroup.appendChild(star);
   }
+
+  // 日付情報と右グループ（ユーザー名+スター）を追加
+  row1.appendChild(left);
+  row1.appendChild(rightGroup);
 
   const row2 = document.createElement("div");
   row2.textContent = t.title;
@@ -486,11 +672,56 @@ function openModal(task) {
   document.getElementById("modal-title").textContent = task.title;
   document.getElementById("modal-note").value = task.note || "";
 
-  document.getElementById("modal").classList.remove("hidden");
+  const modal = document.getElementById("modal");
+  modal.classList.remove("hidden");
+  
+  // Escキーでモーダルを閉じる
+  const handleEscKey = (event) => {
+    if (event.key === 'Escape') {
+      closeModal();
+    }
+  };
+  
+  // モーダル外クリックで閉じる
+  const handleOverlayClick = (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  };
+  
+  // モーダルコンテンツ内のクリックでイベント伝播を止める
+  const modalContent = modal.querySelector('.modal-content');
+  const handleContentClick = (event) => {
+    event.stopPropagation();
+  };
+  
+  // イベントリスナーを追加
+  document.addEventListener('keydown', handleEscKey);
+  modal.addEventListener('click', handleOverlayClick);
+  modalContent.addEventListener('click', handleContentClick);
+  
+  // クリーンアップ関数をモーダルに保存
+  modal._cleanup = () => {
+    document.removeEventListener('keydown', handleEscKey);
+    modal.removeEventListener('click', handleOverlayClick);
+    modalContent.removeEventListener('click', handleContentClick);
+  };
+  
+  // テキストエリアにフォーカス
+  setTimeout(() => {
+    document.getElementById("modal-note").focus();
+  }, 100);
 }
 
 function closeModal() {
-  document.getElementById("modal").classList.add("hidden");
+  const modal = document.getElementById("modal");
+  modal.classList.add("hidden");
+  
+  // イベントリスナーをクリーンアップ
+  if (modal._cleanup) {
+    modal._cleanup();
+    modal._cleanup = null;
+  }
 }
 
 async function saveNote() {
