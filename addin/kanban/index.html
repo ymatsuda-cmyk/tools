@@ -15,7 +15,7 @@
     function renderVersion() {
       if (!SHOW_VERSION) return;
       document.getElementById("version-label").textContent =
-        `view(${VIEW_VERSION}) js(${window.APP_VERSION || "unknown"})`;
+        `view(${VIEW_VERSION}) js(${window.APP_VERSION || ""})`;
     }
   </script>
 </head>
@@ -36,7 +36,7 @@
 <div id="category-filters"></div>
 
 <h4>期間</h4>
-<div id="period-filters">
+<div>
   <button data-period="all" onclick="setPeriod('all')">全期間</button>
   <button data-period="past" onclick="setPeriod('past')">以前</button>
   <button data-period="week" onclick="setPeriod('week')">今週</button>
@@ -47,20 +47,22 @@
 <hr>
 
 <div id="board">
-  <div class="lane" id="todo" ondragover="allowDrop(event)" ondrop="drop(event,'todo')">
+
+  <div class="lane" id="todo">
     <h3>未着手</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="doing" ondragover="allowDrop(event)" ondrop="drop(event,'doing')">
+  <div class="lane" id="doing">
     <h3>対応中</h3>
     <div class="card-list"></div>
   </div>
 
-  <div class="lane" id="done" ondragover="allowDrop(event)" ondrop="drop(event,'done')">
+  <div class="lane" id="done">
     <h3>完了</h3>
     <div class="card-list"></div>
   </div>
+
 </div>
 
 <!-- モーダル -->

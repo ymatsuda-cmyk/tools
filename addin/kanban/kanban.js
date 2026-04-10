@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_d76ea5a";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -17,6 +17,21 @@ async function init() {
   renderPeriodFilter();
 }
 
+// ===== Excel日付変換 =====
+function excelDateToJS(value) {
+  if (!value) return null;
+  if (typeof value === "number") {
+    return new Date((value - 25569) * 86400 * 1000);
+  }
+  return new Date(value);
+}
+
+function fmt(v) {
+  const d = excelDateToJS(v);
+  if (!d || isNaN(d)) return "";
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
 // ===== データ取得 =====
 async function loadExcelData() {
   await Excel.run(async (ctx) => {
@@ -28,7 +43,6 @@ async function loadExcelData() {
     const rows = range.values;
 
     allTasks = rows.slice(1).map((row, i) => {
-      // ===== 除外条件 =====
       if (!row[25] || row[19] === "-") return null;
 
       const t = {
@@ -55,13 +69,6 @@ function getStatus(t) {
   if (t.actualEnd) return "完了";
   if (t.actualStart) return "対応中";
   return "未着手";
-}
-
-// ===== 日付フォーマット =====
-function fmt(d) {
-  if (!d) return "";
-  const date = new Date(d);
-  return `${date.getMonth()+1}/${date.getDate()}`;
 }
 
 // ===== フィルタ =====
@@ -138,16 +145,18 @@ function renderBoard() {
 
   const normal = filtered
     .filter(t => t.status !== "完了")
-    .sort((a,b)=>new Date(a.end)-new Date(b.end));
+    .sort((a,b)=>excelDateToJS(a.end)-excelDateToJS(b.end));
 
   const done = filtered
     .filter(t => t.status === "完了")
-    .sort((a,b)=>new Date(b.actualEnd)-new Date(a.actualEnd));
+    .sort((a,b)=>excelDateToJS(b.actualEnd)-excelDateToJS(a.actualEnd));
 
   [...normal, ...done].forEach(t=>{
     const lane = getLane(t.status);
     document.querySelector(`#${lane} .card-list`).appendChild(createCard(t));
   });
+
+  setupDnD();
 }
 
 // ===== カード =====
@@ -156,9 +165,9 @@ function createCard(t) {
   d.className = "card";
   d.draggable = true;
 
-  // ===== ドラッグイベント =====
   d.addEventListener("dragstart", (e) => {
     currentDraggedId = t.id;
+    e.dataTransfer.setData("text/plain", t.id);
     d.classList.add("dragging");
   });
 
@@ -166,17 +175,17 @@ function createCard(t) {
     d.classList.remove("dragging");
   });
 
-  // ===== 左クリック =====
-  d.addEventListener("click", () => jumpToExcel(t.rowIndex));
+  d.addEventListener("click", (e) => {
+    if (e.button !== 0) return;
+    jumpToExcel(t.rowIndex);
+  });
 
-  // ===== 右クリック（復活）=====
   d.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
     openModal(t);
   });
 
-  // ===== レイアウト =====
   const row1 = document.createElement("div");
   row1.className = "card-row1";
 
@@ -214,20 +223,20 @@ function applyColor(el, t) {
     return;
   }
 
-  const end = new Date(t.end);
+  const end = excelDateToJS(t.end);
+  if (!end) return;
+
   const today = new Date();
   today.setHours(0,0,0,0);
 
   const monday = getMonday(new Date());
   const sunday = addDays(monday, 6);
 
-  // 遅延
   if (end < today) {
     el.style.border = "2px solid red";
     return;
   }
 
-  // 今週
   if (end >= monday && end <= sunday) {
     el.style.border = "2px solid green";
     return;
@@ -236,16 +245,22 @@ function applyColor(el, t) {
   el.style.border = "1px solid #ccc";
 }
 
-// ===== ドロップ =====
-function allowDrop(e){ e.preventDefault(); }
+// ===== DnD =====
+function setupDnD() {
+  ["todo","doing","done"].forEach(id=>{
+    const lane = document.getElementById(id);
 
-function drop(e, lane){
-  e.preventDefault();
-  const t = allTasks.find(x=>x.id===currentDraggedId);
-  if(t) updateStatus(t,lane);
+    lane.ondragover = (e)=>e.preventDefault();
+
+    lane.ondrop = (e)=>{
+      e.preventDefault();
+      const t = allTasks.find(x=>x.id===currentDraggedId);
+      if (t) updateStatus(t, id);
+    };
+  });
 }
 
-// ===== Excel操作 =====
+// ===== Excel =====
 async function jumpToExcel(row){
   await Excel.run(async (ctx)=>{
     const s = ctx.workbook.worksheets.getItem("wbs");
