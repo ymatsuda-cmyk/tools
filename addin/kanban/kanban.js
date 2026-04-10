@@ -364,6 +364,11 @@ async function updateStatus(task, lane) {
   if (lane === "done") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = new Date();
+    
+    // 完了時は★→☆に変更
+    if (task.isStar) {
+      task.isStar = false;
+    }
   }
 
   await Excel.run(async (ctx) => {
@@ -380,6 +385,15 @@ async function updateStatus(task, lane) {
     // 表示形式をm/d に設定
     startCell.numberFormat = [["m/d"]];
     endCell.numberFormat = [["m/d"]];
+
+    // 完了時に備考から★を削除
+    if (lane === "done" && task.note && task.note.includes('★')) {
+      let newNote = (task.note || "").replace(/★/g, "");
+      const noteCell = sheet.getRange(`O${row}`);
+      noteCell.values = [[newNote]];
+      noteCell.format.wrapText = false;
+      task.note = newNote; // タスクの備考も更新
+    }
 
     await ctx.sync();
   });

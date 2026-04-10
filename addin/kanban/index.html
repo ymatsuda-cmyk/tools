@@ -15,7 +15,7 @@
     function renderVersion() {
       if (!SHOW_VERSION) return;
       document.getElementById("version-label").textContent =
-        `js(${window.APP_VERSION || "loading..."})`;  
+        `${window.APP_VERSION || "loading..."}`;  
     }
 
     // Office.onReady後にバージョンを再表示
@@ -29,8 +29,6 @@
 </head>
 
 <body onload="renderVersion()">
-
-<h2>カンバン</h2>
 
 <div class="top-bar">
   <span id="version-label"></span>
