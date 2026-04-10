@@ -265,6 +265,12 @@ function createCard(t) {
     const star = document.createElement("span");
     star.className = "star-icon";
     star.textContent = t.isStar ? "★" : "☆";
+    
+    // ★の場合は金色クラスを追加
+    if (t.isStar) {
+      star.classList.add("filled");
+    }
+    
     star.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();

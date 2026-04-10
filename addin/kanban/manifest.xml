@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
   <Id>6b7e3c52-8c2b-4d6f-9c9e-123456789abc</Id>
@@ -21,4 +23,60 @@
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
+  
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="KanbanGroup">
+                <Label resid="KanbanGroupLabel"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="ShowKanbanButton">
+                  <Label resid="ShowKanbanButtonLabel"/>
+                  <Supertip>
+                    <Title resid="ShowKanbanButtonLabel"/>
+                    <Description resid="ShowKanbanButtonTooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>KanbanTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMDA3OGQ0Ii8+CjxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSIzIiBoZWlnaHQ9IjEyIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI2LjUiIHk9IjIiIHdpZHRoPSIzIiBoZWlnaHQ9IjEyIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIxMSIgeT0iMiIgd2lkdGg9IjMiIGhlaWdodD0iMTIiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPg=="/>
+        <bt:Image id="Icon.32x32" DefaultValue="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMDA3OGQ0Ii8+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI2IiBoZWlnaHQ9IjI0IiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIxMyIgeT0iNCIgd2lkdGg9IjYiIGhlaWdodD0iMjQiIGZpbGw9IndoaXRlIi8+CjxyZWN0IHg9IjIyIiB5PSI0IiB3aWR0aD0iNiIgaGVpZ2h0PSIyNCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+"/>
+        <bt:Image id="Icon.80x80" DefaultValue="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA3OGQ0Ii8+CjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjE1IiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIzMi41IiB5PSIxMCIgd2lkdGg9IjE1IiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI1NSIgeT0iMTAiIHdpZHRoPSIxNSIgaGVpZ2h0PSI2MCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
+        <bt:String id="ShowKanbanButtonLabel" DefaultValue="カンバン表示"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="ShowKanbanButtonTooltip" DefaultValue="タスクをカンバンボード形式で表示します"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+
 </OfficeApp>

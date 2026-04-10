@@ -79,6 +79,11 @@ button.active {
   user-select: none;
   font-size: 14px;
   margin-left: 5px;
+  color: #ccc; /* ☆は灰色 */
+}
+
+/* ===== ★（満ちた星）は金色 ===== */
+.star-icon.filled {
   color: #ffd700;
 }
 
