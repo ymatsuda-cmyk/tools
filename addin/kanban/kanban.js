@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_0ae8926";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -326,8 +326,8 @@ async function updateStatus(task, lane) {
     const endCell = sheet.getRange(`S${row}`);
 
     // ★ 文字列じゃなく Date を直接渡す
-    startCell.values = [[actualStart || ""]];
-    endCell.values = [[actualEnd || ""]];
+    startCell.values = [[toMD(actualStart) || ""]];
+    endCell.values = [[toMD(actualEnd) || ""]];
 
     // ★ 表示だけ m/d にする
     startCell.numberFormat = [["m/d"]];
