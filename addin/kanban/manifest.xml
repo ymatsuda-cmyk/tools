@@ -18,11 +18,18 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+    <SourceLocation DefaultValue="file://Z:/tools/tools/addin/kanban/index.html"/>
     <RequestedWidth>800</RequestedWidth>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
+  
+  <!-- デスクトップ版との互換性向上 -->
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="ExcelApi" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
   
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
@@ -67,7 +74,7 @@
         <bt:Image id="Icon.80x80" DefaultValue="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA3OGQ0Ii8+CjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjE1IiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIzMi41IiB5PSIxMCIgd2lkdGg9IjE1IiBoZWlnaHQ9IjYwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI1NSIgeT0iMTAiIHdpZHRoPSIxNSIgaGVpZ2h0PSI2MCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="file://Z:/tools/tools/addin/kanban/index.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
