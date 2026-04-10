@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_11911a8";
+const APP_VERSION = "rev_20260410_fix1";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -28,6 +28,9 @@ async function loadExcelData() {
     const rows = range.values;
 
     allTasks = rows.slice(1).map((row, i) => {
+      // ===== 除外条件 =====
+      if (!row[25] || row[19] === "-") return null;
+
       const t = {
         id: row[24],
         category: row[0],
@@ -40,9 +43,10 @@ async function loadExcelData() {
         note: row[14],
         rowIndex: i + 2
       };
+
       t.status = getStatus(t);
       return t;
-    });
+    }).filter(x => x);
   });
 }
 
@@ -51,6 +55,13 @@ function getStatus(t) {
   if (t.actualEnd) return "完了";
   if (t.actualStart) return "対応中";
   return "未着手";
+}
+
+// ===== 日付フォーマット =====
+function fmt(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  return `${date.getMonth()+1}/${date.getDate()}`;
 }
 
 // ===== フィルタ =====
@@ -67,7 +78,6 @@ function renderUserFilter() {
   users.forEach(u => {
     const b = document.createElement("button");
     b.textContent = u;
-
     if (selectedUser === u) b.classList.add("active");
 
     b.onclick = () => {
@@ -88,7 +98,6 @@ function renderCategoryFilter() {
   cats.forEach(c => {
     const b = document.createElement("button");
     b.textContent = c;
-
     if (selectedCategory === c) b.classList.add("active");
 
     b.onclick = () => {
@@ -109,11 +118,7 @@ function setPeriod(p) {
 
 function renderPeriodFilter() {
   document.querySelectorAll("[data-period]").forEach(b => {
-    if (b.dataset.period === selectedPeriod) {
-      b.classList.add("active");
-    } else {
-      b.classList.remove("active");
-    }
+    b.classList.toggle("active", b.dataset.period === selectedPeriod);
   });
 }
 
@@ -151,6 +156,27 @@ function createCard(t) {
   d.className = "card";
   d.draggable = true;
 
+  // ===== ドラッグイベント =====
+  d.addEventListener("dragstart", (e) => {
+    currentDraggedId = t.id;
+    d.classList.add("dragging");
+  });
+
+  d.addEventListener("dragend", () => {
+    d.classList.remove("dragging");
+  });
+
+  // ===== 左クリック =====
+  d.addEventListener("click", () => jumpToExcel(t.rowIndex));
+
+  // ===== 右クリック（復活）=====
+  d.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openModal(t);
+  });
+
+  // ===== レイアウト =====
   const row1 = document.createElement("div");
   row1.className = "card-row1";
 
@@ -160,11 +186,11 @@ function createCard(t) {
   right.textContent = t.user || "";
 
   if (t.status === "未着手") {
-    left.textContent = `${t.start}～${t.end}`;
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
   } else if (t.status === "対応中") {
-    left.textContent = `${t.start}～${t.end} → ${t.actualStart}～`;
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
   } else {
-    left.textContent = `${t.start}～${t.end} → ${t.actualStart}～${t.actualEnd}`;
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
   }
 
   row1.appendChild(left);
@@ -178,43 +204,45 @@ function createCard(t) {
 
   applyColor(d, t);
 
-  d.ondragstart = () => currentDraggedId = t.id;
-  d.onclick = () => jumpToExcel(t.rowIndex);
-  d.oncontextmenu = (e) => {
-    e.preventDefault();
-    openModal(t);
-  };
-
   return d;
 }
 
 // ===== 色 =====
 function applyColor(el, t) {
   if (t.status === "完了") {
-    el.style.border = "2px solid #555";
+    el.style.border = "2px solid #333";
     return;
   }
-
-  if (!t.end) return;
 
   const end = new Date(t.end);
   const today = new Date();
   today.setHours(0,0,0,0);
 
   const monday = getMonday(new Date());
-  const nextMonday = addDays(monday, 7);
+  const sunday = addDays(monday, 6);
 
+  // 遅延
   if (end < today) {
     el.style.border = "2px solid red";
     return;
   }
 
-  if (end >= monday && end < nextMonday) {
+  // 今週
+  if (end >= monday && end <= sunday) {
     el.style.border = "2px solid green";
     return;
   }
 
   el.style.border = "1px solid #ccc";
+}
+
+// ===== ドロップ =====
+function allowDrop(e){ e.preventDefault(); }
+
+function drop(e, lane){
+  e.preventDefault();
+  const t = allTasks.find(x=>x.id===currentDraggedId);
+  if(t) updateStatus(t,lane);
 }
 
 // ===== Excel操作 =====
