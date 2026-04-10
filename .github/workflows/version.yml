@@ -1,0 +1,32 @@
+name: versioning
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    if: "!contains(github.event.head_commit.message, 'auto: version update')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: バージョン生成
+        run: |
+          DATE=$(date +%Y%m%d)
+          HASH=$(git rev-parse --short HEAD)
+          VERSION="rev.${DATE}_${HASH}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: kanban.js書き換え
+        run: |
+          sed -i "s/^const APP_VERSION = .*/const APP_VERSION = \"${VERSION}\";/" kanban.js
+
+      - name: コミット＆Push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add kanban.js
+          git commit -m "auto: version update ${VERSION}" || echo "no changes"
+          git push
