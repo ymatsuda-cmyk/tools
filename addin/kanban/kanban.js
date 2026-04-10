@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_b150587";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -325,11 +325,11 @@ async function updateStatus(task, lane) {
     const startCell = sheet.getRange(`R${row}`);
     const endCell = sheet.getRange(`S${row}`);
 
-    // ★ 文字列じゃなく Date を直接渡す
-    startCell.values = [[toMD(actualStart) || ""]];
-    endCell.values = [[toMD(actualEnd) || ""]];
+    // ✅ Date型のまま渡す（ここが超重要）
+    startCell.values = [[actualStart || ""]];
+    endCell.values = [[actualEnd || ""]];
 
-    // ★ 表示だけ m/d にする
+    // ✅ 表示だけ m/d にする
     startCell.numberFormat = [["m/d"]];
     endCell.numberFormat = [["m/d"]];
 
@@ -379,12 +379,6 @@ async function saveNote() {
 
   closeModal();
   await init();
-}
-
-function toMD(d) {
-  if (!d) return "";
-  const dt = new Date(d);
-  return `${dt.getMonth()+1}/${dt.getDate()}`;
 }
 
 function isMatch(t) {
