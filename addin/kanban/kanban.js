@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_2d89ecb";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -288,4 +288,76 @@ function addDays(d,n){
   const t=new Date(d);
   t.setDate(t.getDate()+n);
   return t;
+}
+
+async function updateStatus(task, lane) {
+  let actualStart = task.actualStart;
+  let actualEnd = task.actualEnd;
+
+  if (lane === "todo") {
+    actualStart = null;
+    actualEnd = null;
+  }
+
+  if (lane === "doing") {
+    if (!actualStart) {
+      actualStart = new Date();
+    }
+    actualEnd = null;
+  }
+
+  if (lane === "done") {
+    if (!actualStart) {
+      actualStart = new Date();
+    }
+    actualEnd = new Date();
+  }
+
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+
+    const row = task.rowIndex;
+
+    const startCell = sheet.getRange(`R${row}`);
+    const endCell = sheet.getRange(`S${row}`);
+
+    // 値だけ更新（書式は維持）
+    startCell.values = [[actualStart || ""]];
+    endCell.values = [[actualEnd || ""]];
+
+    await ctx.sync();
+  });
+
+  await init(); // 再描画
+}
+
+function openModal(task) {
+  currentTask = task;
+
+  document.getElementById("modal-title").textContent = task.title;
+  document.getElementById("modal-note").value = task.note || "";
+
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+
+async function saveNote() {
+  const note = document.getElementById("modal-note").value;
+
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+
+    const cell = sheet.getRange(`O${currentTask.rowIndex}`);
+
+    // 幅が変わらないよう values のみ更新
+    cell.values = [[note]];
+
+    await ctx.sync();
+  });
+
+  closeModal();
+  await init();
 }
