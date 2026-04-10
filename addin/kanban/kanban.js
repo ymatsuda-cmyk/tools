@@ -302,6 +302,21 @@ function addDays(d,n){
   return t;
 }
 
+// JavaScriptのDateをExcelシリアル値に変換
+function dateToExcelSerial(date) {
+  if (!date || !(date instanceof Date) || isNaN(date)) return "";
+  
+  // Excel epoch: 1900年1月1日
+  const excelEpoch = new Date(1900, 0, 1);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  
+  // 日数差を計算
+  const daysDiff = Math.floor((date - excelEpoch) / msPerDay);
+  
+  // Excelの1900年うるう年バグを考慮（1900年3月1日以降は+1）
+  return daysDiff + (date >= new Date(1900, 2, 1) ? 2 : 1);
+}
+
 async function updateStatus(task, lane) {
   let actualStart = task.actualStart;
   let actualEnd = task.actualEnd;
@@ -328,11 +343,11 @@ async function updateStatus(task, lane) {
     const startCell = sheet.getRange(`R${row}`);
     const endCell = sheet.getRange(`S${row}`);
 
-    // ✅ Date型のまま渡す（ここが超重要）
-    startCell.values = [[actualStart || ""]];
-    endCell.values = [[actualEnd || ""]];
+    // Date型をExcelシリアル値に変換して設定
+    startCell.values = [[dateToExcelSerial(actualStart)]];
+    endCell.values = [[dateToExcelSerial(actualEnd)]];
 
-    // ✅ 表示だけ m/d にする
+    // 表示形式をm/d に設定
     startCell.numberFormat = [["m/d"]];
     endCell.numberFormat = [["m/d"]];
 
