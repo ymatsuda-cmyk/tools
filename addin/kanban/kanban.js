@@ -243,16 +243,7 @@ function createCard(t) {
 
   const left = document.createElement("span");
   const right = document.createElement("span");
-  const star = document.createElement("span");
   
-  star.className = "star-icon";
-  star.textContent = t.isStar ? "★" : "☆";
-  star.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleStar(t);
-  });
-
   right.textContent = t.user || "";
 
   // ★ ここ修正（重要）
@@ -268,7 +259,19 @@ function createCard(t) {
 
   row1.appendChild(left);
   row1.appendChild(right);
-  row1.appendChild(star);
+  
+  // 完了状態以外にのみスターアイコンを追加
+  if (t.status !== "完了") {
+    const star = document.createElement("span");
+    star.className = "star-icon";
+    star.textContent = t.isStar ? "★" : "☆";
+    star.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleStar(t);
+    });
+    row1.appendChild(star);
+  }
 
   const row2 = document.createElement("div");
   row2.textContent = t.title;
