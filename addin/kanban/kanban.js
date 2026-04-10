@@ -42,7 +42,7 @@ async function loadExcelData() {
 
     const rows = range.values;
 
-    allTasks = rows.slice(1).map((row, i) => {
+    allTasks = rows.slice(10).map((row, i) => {
       if (!row[25] || row[19] === "-") return null;
 
       const t = {
@@ -55,7 +55,7 @@ async function loadExcelData() {
         actualStart: row[17],
         actualEnd: row[18],
         note: row[14],
-        rowIndex: i + 2,
+        rowIndex: i + 11,
 
         isNoSchedule: !row[15] && !row[16]  
       };
@@ -82,7 +82,6 @@ function renderFilters() {
 function renderUserFilter() {
   const users = [...new Set(
     allTasks
-      .filter(t => t.rowIndex >= 11)
       .map(t => t.user)
       .filter(v => v && v !== "#")
   )];
@@ -109,7 +108,6 @@ function renderUserFilter() {
 function renderCategoryFilter() {
   const cats = [...new Set(
     allTasks
-      .filter(t => t.rowIndex >= 11)
       .map(t => t.category)
       .filter(v => v && v !== "#")
   )];
