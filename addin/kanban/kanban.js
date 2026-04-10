@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_80d5a6d";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -127,12 +127,6 @@ function renderPeriodFilter() {
   document.querySelectorAll("[data-period]").forEach(b => {
     b.classList.toggle("active", b.dataset.period === selectedPeriod);
   });
-}
-
-function isMatch(t) {
-  if (selectedUser && t.user !== selectedUser) return false;
-  if (selectedCategory && t.category !== selectedCategory) return false;
-  return true;
 }
 
 // ===== 描画 =====
@@ -300,35 +294,31 @@ async function updateStatus(task, lane) {
   }
 
   if (lane === "doing") {
-    if (!actualStart) {
-      actualStart = new Date();
-    }
+    if (!actualStart) actualStart = new Date();
     actualEnd = null;
   }
 
   if (lane === "done") {
-    if (!actualStart) {
-      actualStart = new Date();
-    }
+    if (!actualStart) actualStart = new Date();
     actualEnd = new Date();
   }
 
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
-
     const row = task.rowIndex;
 
     const startCell = sheet.getRange(`R${row}`);
     const endCell = sheet.getRange(`S${row}`);
 
-    // 値だけ更新（書式は維持）
-    startCell.values = [[actualStart || ""]];
-    endCell.values = [[actualEnd || ""]];
-
+    // ★ m/d で書き込み
+    startCell.values = [[toMD(actualStart)]];
+    startCell.numberFormat = [["m/d"]];
+    endCell.values = [[toMD(actualEnd)]];
+    endCell.numberFormat = [["m/d"]];
     await ctx.sync();
   });
 
-  await init(); // 再描画
+  await init();
 }
 
 function openModal(task) {
@@ -360,4 +350,43 @@ async function saveNote() {
 
   closeModal();
   await init();
+}
+
+function toMD(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  return `${dt.getMonth()+1}/${dt.getDate()}`;
+}
+
+function isMatch(t) {
+  if (selectedUser && t.user !== selectedUser) return false;
+  if (selectedCategory && t.category !== selectedCategory) return false;
+
+  const end = excelDateToJS(t.end);
+  if (!end) return false;
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const monday = getMonday(new Date());
+  const sunday = addDays(monday, 6);
+  const nextMonday = addDays(monday, 7);
+  const nextSunday = addDays(monday, 13);
+
+  switch (selectedPeriod) {
+    case "past":
+      return end < today;
+
+    case "week":
+      return end >= monday && end <= sunday;
+
+    case "nextweek":
+      return end >= nextMonday && end <= nextSunday;
+
+    case "future":
+      return end > nextSunday;
+
+    default:
+      return true;
+  }
 }
