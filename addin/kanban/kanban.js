@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260410_fd45f05";
+const APP_VERSION = "rev_20260410_fix_final";
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -303,7 +303,7 @@ async function updateStatus(task, lane) {
   let actualStart = task.actualStart;
   let actualEnd = task.actualEnd;
   console.log("Before:", actualStart);
-  
+
   if (lane === "todo") {
     actualStart = null;
     actualEnd = null;
@@ -328,9 +328,9 @@ async function updateStatus(task, lane) {
 
     // ★ m/d で書き込み
     startCell.values = [[toMD(actualStart)]];
-    startCell.numberFormat = [["m/d"]];
+    startCell.numberFormat = [["yyyy/m/d"]];
     endCell.values = [[toMD(actualEnd)]];
-    endCell.numberFormat = [["m/d"]];
+    endCell.numberFormat = [["yyyy/m/d"]];
     await ctx.sync();
   });
 
