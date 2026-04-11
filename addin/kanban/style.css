@@ -134,6 +134,14 @@ button.active {
   word-break: break-word;
 }
 
+/* ===== 分類表示 ===== */
+.classification-row {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+  margin: 2px 0;
+}
+
 /* ===== モーダル ===== */
 .modal {
   position: fixed;

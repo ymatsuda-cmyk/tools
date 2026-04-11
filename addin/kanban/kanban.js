@@ -261,6 +261,7 @@ async function loadExcelData() {
       const t = {
         id: row[24],
         category: row[0],
+        classification: row[1],  // B列の分類を追加
         title: row[25],
         user: row[13],
         start: row[15],
@@ -465,10 +466,21 @@ function createCard(t) {
   row1.appendChild(left);
   row1.appendChild(rightGroup);
 
+  // B列の分類を表示する行を追加
+  let descriptionRow = null;
+  if (t.classification && t.classification.trim() !== "") {
+    descriptionRow = document.createElement("div");
+    descriptionRow.className = "classification-row";
+    descriptionRow.textContent = `<${t.classification}>`;
+  }
+
   const row2 = document.createElement("div");
   row2.textContent = t.title;
 
   d.appendChild(row1);
+  if (descriptionRow) {
+    d.appendChild(descriptionRow);
+  }
   d.appendChild(row2);
 
   // スター状態に応じてカードスタイルを適用 
@@ -764,7 +776,12 @@ function isMatch(t) {
 
   // ★ 日付なし（TODO）
   if (t.isNoSchedule) {
-    return selectedPeriod === "all";
+    return selectedPeriod === "all" || selectedPeriod === "todo";
+  }
+
+  // ★ TODOフィルタが選択されている場合、日付ありのタスクは除外
+  if (selectedPeriod === "todo") {
+    return false;
   }
 
   const start = excelDateToJS(t.start);
