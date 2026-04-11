@@ -396,6 +396,7 @@ function createCard(t) {
   const d = document.createElement("div");
   d.className = "card";
   d.draggable = true;
+  d.setAttribute('data-task-id', t.id);  // ドロップアニメーション用のID属性を追加
 
   d.addEventListener("dragstart", (e) => {
     currentDraggedId = t.id;
@@ -466,21 +467,24 @@ function createCard(t) {
   row1.appendChild(left);
   row1.appendChild(rightGroup);
 
-  // B列の分類を表示する行を追加
-  let descriptionRow = null;
-  if (t.classification && t.classification.trim() !== "") {
-    descriptionRow = document.createElement("div");
-    descriptionRow.className = "classification-row";
-    descriptionRow.textContent = `<${t.classification}>`;
-  }
-
+  // タイトル行（タイトル + 分類）
   const row2 = document.createElement("div");
-  row2.textContent = t.title;
+  row2.className = "card-title-row";
+  
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "card-title";
+  titleSpan.textContent = t.title;
+  
+  const classificationSpan = document.createElement("span");
+  classificationSpan.className = "card-classification";
+  if (t.classification && t.classification.trim() !== "") {
+    classificationSpan.textContent = `<${t.classification}>`;
+  }
+  
+  row2.appendChild(titleSpan);
+  row2.appendChild(classificationSpan);
 
   d.appendChild(row1);
-  if (descriptionRow) {
-    d.appendChild(descriptionRow);
-  }
   d.appendChild(row2);
 
   // スター状態に応じてカードスタイルを適用 
@@ -533,7 +537,24 @@ function setupDnD() {
     lane.ondrop = (e)=>{
       e.preventDefault();
       const t = allTasks.find(x=>x.id===currentDraggedId);
-      if (t) updateStatus(t, id);
+      if (t) {
+        // ドロップされたカード要素を取得
+        const draggedCard = document.querySelector(`[data-task-id="${currentDraggedId}"]`);
+        if (draggedCard) {
+          // アニメーションを追加
+          draggedCard.classList.add('card-drop-animation');
+          
+          // アニメーション完了後にステータス更新
+          draggedCard.addEventListener('animationend', function onAnimationEnd() {
+            draggedCard.classList.remove('card-drop-animation');
+            draggedCard.removeEventListener('animationend', onAnimationEnd);
+            updateStatus(t, id);
+          });
+        } else {
+          // カード要素が見つからない場合は即座に更新
+          updateStatus(t, id);
+        }
+      }
     };
   });
 }
