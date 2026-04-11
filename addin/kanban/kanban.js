@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260411_27060c1";
+const APP_VERSION = "rev_20260411_a08c091";
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
@@ -247,55 +247,38 @@ function fmt(v) {
 
 // ===== データ取得 =====
 async function loadExcelData() {
-  try {
-    await Excel.run(async (ctx) => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-      const range = sheet.getUsedRange();
-      range.load("values");
-      await ctx.sync();
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+    const range = sheet.getUsedRange();
+    range.load("values");
+    await ctx.sync();
 
-      const rows = range.values;
+    const rows = range.values;
 
-      // データが取得できない場合の処理
-      if (!rows || !Array.isArray(rows) || rows.length <= 10) {
-        console.warn("Excel data not found or insufficient rows");
-        allTasks = [];
-        return;
-      }
+    allTasks = rows.slice(10).map((row, i) => {
+      if (!row[25] || row[19] === "-") return null;
 
-      allTasks = rows.slice(10).map((row, i) => {
-        if (!row || !row[25] || row[19] === "-") return null;
+      const t = {
+        id: row[24],
+        category: row[0],
+        classification: row[1],  // B列の分類を追加
+        title: row[25],
+        user: row[13],
+        start: row[15],
+        end: row[16],
+        actualStart: row[17],
+        actualEnd: row[18],
+        note: row[14],
+        rowIndex: i + 11,
 
-        const t = {
-          id: row[24],
-          category: row[0],
-          classification: row[1],  // B列の分類を追加
-          title: row[25],
-          user: row[13],
-          start: row[15],
-          end: row[16],
-          actualStart: row[17],
-          actualEnd: row[18],
-          note: row[14],
-          rowIndex: i + 11,
+        isNoSchedule: !row[15] && !row[16],
+        isStar: row[14] && row[14].toString().startsWith('★')  // 備考の先頭に★があるかチェック
+      };
 
-          isNoSchedule: !row[15] && !row[16],
-          isStar: row[14] && row[14].toString().startsWith('★')  // 備考の先頭に★があるかチェック
-        };
-
-        t.status = getStatus(t);
-        return t;
-      }).filter(x => x);
-    });
-  } catch (error) {
-    console.error("Error loading Excel data:", error);
-    allTasks = [];
-    // エラー時はユーザーにメッセージを表示
-    const boards = document.querySelectorAll('.card-list');
-    if (boards.length > 0) {
-      boards[0].innerHTML = '<div style="padding: 10px; color: red; font-size: 12px;">Excelデータの読み込みに失敗しました。<br>「wbs」シートが存在するか確認してください。</div>';
-    }
-  }
+      t.status = getStatus(t);
+      return t;
+    }).filter(x => x);
+  });
 }
 
 // ===== ステータス =====
