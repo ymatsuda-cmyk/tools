@@ -531,7 +531,7 @@ async function jumpToExcel(row){
   await Excel.run(async (ctx)=>{
     const s = ctx.workbook.worksheets.getItem("wbs");
     s.activate();
-    s.getRow(row - 1).select();
+    s.getRange(`${row}:${row}`).select();
     await ctx.sync();
   });
 }
