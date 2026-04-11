@@ -396,7 +396,6 @@ function createCard(t) {
   const d = document.createElement("div");
   d.className = "card";
   d.draggable = true;
-  d.setAttribute('data-task-id', t.id);  // ドロップアニメーション用のID属性を追加
 
   d.addEventListener("dragstart", (e) => {
     currentDraggedId = t.id;
@@ -537,24 +536,7 @@ function setupDnD() {
     lane.ondrop = (e)=>{
       e.preventDefault();
       const t = allTasks.find(x=>x.id===currentDraggedId);
-      if (t) {
-        // ドロップされたカード要素を取得
-        const draggedCard = document.querySelector(`[data-task-id="${currentDraggedId}"]`);
-        if (draggedCard) {
-          // アニメーションを追加
-          draggedCard.classList.add('card-drop-animation');
-          
-          // アニメーション完了後にステータス更新
-          draggedCard.addEventListener('animationend', function onAnimationEnd() {
-            draggedCard.classList.remove('card-drop-animation');
-            draggedCard.removeEventListener('animationend', onAnimationEnd);
-            updateStatus(t, id);
-          });
-        } else {
-          // カード要素が見つからない場合は即座に更新
-          updateStatus(t, id);
-        }
-      }
+      if (t) updateStatus(t, id);
     };
   });
 }
