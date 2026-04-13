@@ -691,11 +691,12 @@ async function toggleStar(task) {
 function openModal(task) {
   currentTask = task;
 
-  // 元の備考内容を保存
+  // 元の備考内容を保存（空の場合はテンプレートを使用）
   const originalNote = task.note || "";
+  const displayNote = originalNote || "\n＜タスク＞\n＜状況＞";
   
   document.getElementById("modal-title").textContent = task.title;
-  document.getElementById("modal-note").value = originalNote;
+  document.getElementById("modal-note").value = displayNote;
 
   const modal = document.getElementById("modal");
   modal.classList.remove("hidden");
