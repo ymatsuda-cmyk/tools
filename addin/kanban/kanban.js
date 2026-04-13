@@ -32,9 +32,9 @@ function restoreSavedSize() {
       const size = JSON.parse(savedSize);
       
       // 最小サイズの制限
-      const minWidth = 400;
+      const minWidth = 200;
       const minHeight = 300;
-      const width = Math.max(size.width || 400, minWidth);
+      const width = Math.max(size.width || 200, minWidth);
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
@@ -71,7 +71,7 @@ function restoreSavedSize() {
 }
 
 function setDefaultSize() {
-  const defaultWidth = 400;
+  const defaultWidth = 200;
   const defaultHeight = 600;
   
   document.documentElement.style.minWidth = defaultWidth + "px";
