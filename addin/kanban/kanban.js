@@ -1,7 +1,7 @@
 <<<<<<< HEAD
-const APP_VERSION = "rev_20260413_c9a2dcd";
+const APP_VERSION = "rev_20260413_9a22738";
 =======
-const APP_VERSION = "rev_20260413_01d1114";
+const APP_VERSION = "rev_20260413_9a22738";
 >>>>>>> 1f2ac8557f87b5283e638b91a76c378bb223352f
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
