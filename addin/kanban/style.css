@@ -194,8 +194,7 @@ button.active {
   background: #fff;
   padding: 15px;
   border-radius: 6px;
-  width: 500px;
-  height: 500px;
+  width: 300px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
@@ -207,7 +206,7 @@ button.active {
   border: 1px solid #ddd;
   border-radius: 4px;
   resize: vertical;
-  min-height: 80px;
+  min-height: 300px;
 }
 
 .modal-actions {
