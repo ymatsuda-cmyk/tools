@@ -194,7 +194,8 @@ button.active {
   background: #fff;
   padding: 15px;
   border-radius: 6px;
-  width: 300px;
+  width: 500px;
+  height: 500px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 

@@ -691,8 +691,11 @@ async function toggleStar(task) {
 function openModal(task) {
   currentTask = task;
 
+  // 元の備考内容を保存
+  const originalNote = task.note || "";
+  
   document.getElementById("modal-title").textContent = task.title;
-  document.getElementById("modal-note").value = task.note || "";
+  document.getElementById("modal-note").value = originalNote;
 
   const modal = document.getElementById("modal");
   modal.classList.remove("hidden");
@@ -704,10 +707,14 @@ function openModal(task) {
     }
   };
   
-  // モーダル外クリックで閉じる
+  // モーダル外クリックで閉じる（変更がない場合のみ）
   const handleOverlayClick = (event) => {
     if (event.target === modal) {
-      closeModal();
+      const currentNote = document.getElementById("modal-note").value;
+      // 変更がない場合のみ閉じる
+      if (currentNote === originalNote) {
+        closeModal();
+      }
     }
   };
   
