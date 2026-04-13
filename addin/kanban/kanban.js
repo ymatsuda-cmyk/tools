@@ -503,11 +503,18 @@ function applyColor(el, t) {
     return;
   }
 
-  const start = excelDateToJS(t.start);
-  const end = excelDateToJS(t.end);
+  const startRaw = excelDateToJS(t.start);
+  const endRaw = excelDateToJS(t.end);
 
-  if (!start || !end) return;
+  if (!startRaw || !endRaw) return;
 
+  // 時刻情報を除去して日付のみで比較
+  const start = new Date(startRaw);
+  start.setHours(0,0,0,0);
+  
+  const end = new Date(endRaw);
+  end.setHours(0,0,0,0);
+  
   const today = new Date();
   today.setHours(0,0,0,0);
 
