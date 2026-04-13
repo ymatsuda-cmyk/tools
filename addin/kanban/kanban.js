@@ -215,7 +215,7 @@ async function init() {
   // ボードコンテナの幅も確実に設定
   const boardEl = document.getElementById("board");
   if (boardEl) {
-    boardEl.style.minWidth = "350px";
+    boardEl.style.minWidth = "200px";
     boardEl.style.width = "100%";
   }
 
