@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 const APP_VERSION = "rev_20260413_c9a2dcd";
-=======
-const APP_VERSION = "rev_20260413_01d1114";
->>>>>>> 1f2ac8557f87b5283e638b91a76c378bb223352f
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
@@ -201,19 +197,19 @@ async function init() {
   // 保存されたサイズまたはデフォルトサイズを適用
   try {
     const savedSize = localStorage.getItem('kanban-taskpane-size');
-    let minWidth = 400;
+    let minWidth = 200;
     
     if (savedSize) {
       const size = JSON.parse(savedSize);
-      minWidth = Math.max(size.width || 400, 400);
+      minWidth = Math.max(size.width || 200, 200);
     }
     
     document.documentElement.style.minWidth = minWidth + "px";
     document.body.style.minWidth = minWidth + "px";
   } catch (e) {
     // エラー時はデフォルトサイズ
-    document.documentElement.style.minWidth = "400px";
-    document.body.style.minWidth = "400px";
+    document.documentElement.style.minWidth = "200px";
+    document.body.style.minWidth = "200px";
   }
   
   // ボードコンテナの幅も確実に設定
