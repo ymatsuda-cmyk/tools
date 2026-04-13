@@ -19,7 +19,7 @@
 
   <DefaultSettings>
     <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
-    <RequestedWidth>800</RequestedWidth>
+    <RequestedWidth>400</RequestedWidth>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>

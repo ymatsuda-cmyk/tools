@@ -45,8 +45,8 @@ button.active {
 /* ===== レーン ===== */
 .lane {
   flex: 1;
-  min-width: 180px;
-  background: #f4f4f4;
+  min-width: 100px;
+  background: #f4f4f4d1;
   padding: 10px;
   border-radius: 6px;
   min-height: 300px;
