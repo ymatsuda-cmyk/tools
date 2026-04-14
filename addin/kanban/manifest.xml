@@ -36,12 +36,12 @@
     </Sets>
   </Requirements>
   
-  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides/1.0" xsi:type="VersionOverridesV1_0">
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
           <!-- コマンド用 HTML ファイルの定義（リボンボタンに必須） -->
-          <FunctionFile resid="Commands.Url"/>
+          <FunctionFile resid="Commands.Html"/>
           
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
@@ -83,8 +83,10 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
-        <!-- コマンド用 HTML（Taskpaneと同じURLで問題なし） -->
-        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+        <!-- コマンド用 HTML（リボンボタン専用） -->
+        <bt:Url id="Commands.Html" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/commands.html"/>
+        <!-- 従来のCommands.Urlも保持（互換性のため） -->
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
