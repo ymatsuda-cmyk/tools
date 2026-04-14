@@ -35,6 +35,9 @@
     <Hosts>
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
+          <!-- コマンド用 HTML ファイルの定義（リボンボタンに必須） -->
+          <FunctionFile resid="Commands.Url"/>
+          
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
               <Group id="KanbanGroup">
@@ -75,6 +78,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
+        <!-- コマンド用 HTML（Taskpaneと同じURLで問題なし） -->
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
