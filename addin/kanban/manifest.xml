@@ -24,6 +24,11 @@
 
   <Permissions>ReadWriteDocument</Permissions>
   
+  <!-- 外部ドメイン許可（GitHub Pages用）- 管理センター検証必須 -->
+  <AppDomains>
+    <AppDomain>ymatsuda-cmyk.github.io</AppDomain>
+  </AppDomains>
+  
   <!-- デスクトップ版との互換性重視 -->
   <Requirements>
     <Sets DefaultMinVersion="1.1">
@@ -72,9 +77,9 @@
     
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://api.iconify.design/material-symbols:view-kanban.svg?color=%230078d4&width=16&height=16"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://api.iconify.design/material-symbols:view-kanban.svg?color=%230078d4&width=32&height=32"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://api.iconify.design/material-symbols:view-kanban.svg?color=%230078d4&width=80&height=80"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/icons/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/icons/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/icons/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/index.html"/>
