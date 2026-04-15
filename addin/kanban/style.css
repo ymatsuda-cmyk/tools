@@ -52,7 +52,7 @@ button.active {
   background: #f4f4f4d1;
   padding: 10px;
   border-radius: 6px;
-  min-height: 300px;
+  min-height: 100px; /* JavaScriptによる動的高さ調整のため最小限に */
   box-sizing: border-box;
 }
 

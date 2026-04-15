@@ -25,10 +25,11 @@ Office.onReady(() => {
   // サイズ変更の監視を開始
   setupSizeMonitoring();
   
-  // 初期化後に幅調整を実行
+  // 初期化後に幅・高さ調整を実行
   setTimeout(() => {
     const containerWidth = document.body.clientWidth || window.innerWidth;
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // 高さ調整も追加
   }, 100);
   
   init();
@@ -200,6 +201,43 @@ function adjustCardWidths(cardWidth) {
     card.style.maxWidth = cardWidth + 'px';
     card.style.boxSizing = 'border-box';
   });
+}
+
+// ===== レーン高さ調整機能 =====
+function adjustLaneHeights() {
+  const lanes = document.querySelectorAll('.lane');
+  let maxHeight = 0;
+  
+  // 一度全レーンの高さをリセット
+  lanes.forEach(lane => {
+    lane.style.height = 'auto';
+  });
+  
+  // 少し待ってから高さを測定（DOM更新待ち）
+  setTimeout(() => {
+    // 各レーンの高さを測定し、最大値を見つける
+    lanes.forEach(lane => {
+      // 非表示レーン（保留が非表示の場合）をスキップ
+      if (lane.style.display === 'none') return;
+      
+      const height = lane.offsetHeight;
+      if (height > maxHeight) {
+        maxHeight = height;
+      }
+    });
+    
+    // 最小高さを確保（カードが少ない場合でも見栄えを良くする）
+    maxHeight = Math.max(maxHeight, 200);
+    
+    // 全レーンの高さを最大値に合わせる
+    lanes.forEach(lane => {
+      if (lane.style.display !== 'none') {
+        lane.style.height = maxHeight + 'px';
+      }
+    });
+    
+    console.log(`Lane heights adjusted to: ${maxHeight}px`);
+  }, 20);
 }
 
 function saveSizeToStorage(width, height) {
@@ -443,10 +481,11 @@ function toggleHeldDisplay() {
   localStorage.setItem('kanban-show-held', showHeld);
   renderBoard();
   
-  // 保留レーンの表示切替後に幅調整
+  // 保留レーンの表示切替後に幅・高さ調整
   setTimeout(() => {
     const containerWidth = document.body.clientWidth || window.innerWidth;
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // 高さ調整も追加
   }, 50);
 }
 
@@ -489,16 +528,17 @@ function renderBoard() {
     .sort((a,b)=>excelDateToJS(b.actualEnd)-excelDateToJS(a.actualEnd));
 
   [...normal, ...done].forEach(t=>{
-    const lane = getLane(t.status);
+    const lane = getLane(t);  // タスク全体を渡すように変更
     document.querySelector(`#${lane} .card-list`).appendChild(createCard(t));
   });
 
   setupDnD();
   
-  // カード描画後に幅調整を実行
+  // カード描画後に幅・高さ調整を実行
   setTimeout(() => {
     const containerWidth = document.body.clientWidth || window.innerWidth;
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // 高さ調整を追加
   }, 10);
 }
 
@@ -670,7 +710,14 @@ async function jumpToExcel(row){
 }
 
 // ===== util =====
-function getLane(s){
+function getLane(task){
+  // 備考欄に▲がある場合は保留レーンに表示
+  if (task.note && task.note.includes('▲')) {
+    return "held";
+  }
+  
+  // 通常のステータス判定
+  const s = task.status;
   if(s==="未着手") return "todo";
   if(s==="保留") return "held";
   if(s==="対応中") return "doing";
@@ -712,6 +759,13 @@ async function updateStatus(task, lane) {
   if (lane === "todo") {
     actualStart = "";
     actualEnd = "";
+    
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
+      await updateTaskStatus(task, "未着手");
+    }
   }
 
   if (lane === "held") {
@@ -730,16 +784,20 @@ async function updateStatus(task, lane) {
       newNote = lines.join('\n');
     }
     task.note = newNote;
+    
+    // ステータスも「保留」に変更
+    await updateTaskStatus(task, "保留");
   }
 
   if (lane === "doing") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = "";
     
-    // 保留レーンから移動した場合は▲→△に変更
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
     if (task.note && task.note.includes('▲')) {
       let newNote = task.note.replace(/▲/g, "△");
       task.note = newNote;
+      await updateTaskStatus(task, "対応中");
     }
   }
 
@@ -752,10 +810,11 @@ async function updateStatus(task, lane) {
       task.isStar = false;
     }
     
-    // 保留レーンから移動した場合は▲→△に変更
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
     if (task.note && task.note.includes('▲')) {
       let newNote = task.note.replace(/▲/g, "△");
       task.note = newNote;
+      await updateTaskStatus(task, "完了");
     }
   }
 
