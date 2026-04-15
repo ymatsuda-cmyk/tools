@@ -646,7 +646,7 @@ function applyColor(el, t) {
 
 // ===== DnD =====
 function setupDnD() {
-  ["todo","doing","done"].forEach(id=>{
+  ["todo","held","doing","done"].forEach(id=>{
     const lane = document.getElementById(id);
 
     lane.ondragover = (e)=>e.preventDefault();
