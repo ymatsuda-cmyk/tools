@@ -40,16 +40,20 @@ button.active {
   gap: 10px;
   margin-top: 10px;
   width: 100%;
+  overflow-x: auto; /* 横スクロールを許可 */
+  align-items: flex-start;
 }
 
 /* ===== レーン ===== */
 .lane {
+  /* 動的幅調整に対応するため、flexは初期設定のみ使用 */
   flex: 1;
-  min-width: 50px;
+  min-width: 70px; /* padding(20px) + カード最小幅(50px) */
   background: #f4f4f4d1;
   padding: 10px;
   border-radius: 6px;
   min-height: 300px;
+  box-sizing: border-box;
 }
 
 .lane h3 {
@@ -75,6 +79,11 @@ button.active {
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
+  width: 100%; /* レーンいっぱいに広げる */
+  min-width: 50px; /* 最小幅を保証 */
+  box-sizing: border-box;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ===== スター付きカード ===== */
