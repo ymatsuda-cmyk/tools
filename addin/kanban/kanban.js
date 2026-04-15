@@ -769,9 +769,12 @@ async function updateStatus(task, lane) {
   }
 
   if (lane === "held") {
-    // 保留状態：実際の開始日はクリア、終了日もクリア
-    actualStart = "";
-    actualEnd = "";
+    // 保留状態：基本的には実績日時は変更しない
+    // ただし、完了から保留に移動した場合のみ実績完了日を空にする
+    if (task.status === "完了") {
+      actualEnd = ""; // 完了からの移動時のみ実績完了日をクリア
+    }
+    // actualStart は常に維持
     
     // 保留レーンにドラッグ：△→▲に変更
     let newNote = ensureStatusSymbols(task.note || "");
