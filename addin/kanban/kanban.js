@@ -718,19 +718,25 @@ async function updateStatus(task, lane) {
     // 保留状態：実際の開始日はクリア、終了日もクリア
     actualStart = "";
     actualEnd = "";
-    // 保留アイコンを▲に変更
-    if (!task.note.includes('▲')) {
-      let newNote = task.note || "";
-      newNote = '▲' + newNote.replace(/△/g, "");
-      task.note = newNote;
+    
+    // 保留レーンにドラッグ：△→▲に変更
+    let newNote = ensureStatusSymbols(task.note || "");
+    if (newNote.includes('△')) {
+      newNote = newNote.replace(/△/g, "▲");
+    } else if (!newNote.includes('▲')) {
+      // 既に▲がない場合は追加
+      const lines = newNote.split('\n');
+      lines[0] = lines[0].replace(/△/, '') + '▲';
+      newNote = lines.join('\n');
     }
+    task.note = newNote;
   }
 
   if (lane === "doing") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = "";
     
-    // 保留レーンから移動した場合は△にする
+    // 保留レーンから移動した場合は▲→△に変更
     if (task.note && task.note.includes('▲')) {
       let newNote = task.note.replace(/▲/g, "△");
       task.note = newNote;
@@ -746,7 +752,7 @@ async function updateStatus(task, lane) {
       task.isStar = false;
     }
     
-    // 保留レーンから移動した場合は△にする
+    // 保留レーンから移動した場合は▲→△に変更
     if (task.note && task.note.includes('▲')) {
       let newNote = task.note.replace(/▲/g, "△");
       task.note = newNote;
@@ -846,6 +852,29 @@ async function toggleStar(task) {
   renderBoard();
 }
 
+// ===== ステータス記号管理 =====
+function ensureStatusSymbols(noteText) {
+  if (!noteText) noteText = "";
+  
+  // 行で分割
+  const lines = noteText.split('\n');
+  let firstLine = lines[0] || "";
+  
+  // ★/☆がない場合、☆を追加
+  if (!firstLine.includes('★') && !firstLine.includes('☆')) {
+    firstLine = '☆' + firstLine;
+  }
+  
+  // ▲/△がない場合、△を追加
+  if (!firstLine.includes('▲') && !firstLine.includes('△')) {
+    firstLine = firstLine + '△';
+  }
+  
+  // 1行目を更新して復元
+  lines[0] = firstLine;
+  return lines.join('\n');
+}
+
 function openModal(task) {
   currentTask = task;
 
@@ -857,8 +886,11 @@ function openModal(task) {
   
   if (!displayNote.trim()) {
     // 完全に空の場合：ステータス記号とテンプレートを追加
-    displayNote = "☆\n＜タスク＞\n＜状況＞";
+    displayNote = "☆△\n＜タスク＞\n＜状況＞";
   } else {
+    // ステータス記号を確認・追加
+    displayNote = ensureStatusSymbols(displayNote);
+    
     // 内容がある場合：行数をチェック
     const lines = displayNote.split('\n');
     
