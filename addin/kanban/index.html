@@ -54,12 +54,22 @@
   <button data-period="todo" onclick="setPeriod('todo')">TODO</button>
 </div>
 
+<h4>表示</h4>
+<div>
+  <label><input type="checkbox" id="show-held" checked onchange="toggleHeldDisplay()"> 保留を表示</label>
+</div>
+
 <hr>
 
 <div id="board">
 
   <div class="lane" id="todo">
     <h3>未着手</h3>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="held">
+    <h3>保留</h3>
     <div class="card-list"></div>
   </div>
 

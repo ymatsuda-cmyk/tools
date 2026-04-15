@@ -57,6 +57,15 @@ button.active {
   text-align: center;
 }
 
+/* ===== 保留レーン専用スタイル ===== */
+#held {
+  background: #fff4e6; /* 薄いオレンジ背景 */
+}
+
+#held h3 {
+  color: #ff6600; /* オレンジ色のタイトル */
+}
+
 /* ===== カード ===== */
 .card {
   background: #fff;
@@ -92,6 +101,30 @@ button.active {
   transform: scale(1.2);
 }
 
+/* ===== 保留アイコン ===== */
+.held-icon {
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  margin-left: 5px;
+}
+
+.held-icon.held-active {
+  color: #ff6600; /* ▲は橙色 */
+}
+
+.held-icon.held-released {
+  color: #999; /* △は灰色 */
+}
+
+.held-icon.held-none {
+  color: #ddd; /* ○は薄い灰色 */
+}
+
+.held-icon:hover {
+  transform: scale(1.2);
+}
+
 /* ===== ドラッグ中 ===== */
 .card.dragging {
   opacity: 0.5;
@@ -99,7 +132,7 @@ button.active {
   box-shadow: 0 6px 14px rgba(0,0,0,0.25);
 }
 
-/* ===== 1行目（日時＋担当＋スター） ===== */
+/* ===== 1行目（ステータス管理エリア：担当＋スター＋保留） ===== */
 .card-row1 {
   display: flex;
   justify-content: space-between;
@@ -114,6 +147,20 @@ button.active {
   margin-right: 5px;
 }
 
+/* ===== 2行目（日付情報エリア） ===== */
+.card-row2 {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+.date-info {
+  flex: 1;
+}
+
 .right-group {
   display: flex;
   align-items: center;
@@ -125,6 +172,10 @@ button.active {
 }
 
 .right-group .star-icon {
+  margin-left: 0;
+}
+
+.right-group .held-icon {
   margin-left: 0;
 }
 

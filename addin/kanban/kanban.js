@@ -10,6 +10,7 @@ let currentTask = null;
 let selectedUser = null;
 let selectedCategory = null;
 let selectedPeriod = "all";
+let showHeld = true; // 保留表示フラグ
 
 Office.onReady(() => {
   // 保存されたサイズを復元
@@ -17,6 +18,9 @@ Office.onReady(() => {
   
   // 保存されたフィルター設定を復元
   restoreSavedFilters();
+  
+  // 保留表示設定を復元
+  restoreHeldDisplay();
   
   // サイズ変更の監視を開始
   setupSizeMonitoring();
@@ -361,11 +365,34 @@ function renderPeriodFilter() {
   });
 }
 
+// ===== 保留表示切替 =====
+function toggleHeldDisplay() {
+  showHeld = document.getElementById('show-held').checked;
+  localStorage.setItem('kanban-show-held', showHeld);
+  renderBoard();
+}
+
+// 保留表示設定を復元
+function restoreHeldDisplay() {
+  const saved = localStorage.getItem('kanban-show-held');
+  showHeld = saved !== null ? saved === 'true' : true;
+  document.getElementById('show-held').checked = showHeld;
+}
+
 // ===== 描画 =====
 function renderBoard() {
-  ["todo","doing","done"].forEach(l =>
-    document.querySelector(`#${l} .card-list`).innerHTML = ""
-  );
+  ["todo","held","doing","done"].forEach(l => {
+    const lane = document.querySelector(`#${l} .card-list`);
+    if (lane) {
+      lane.innerHTML = "";
+    }
+  });
+
+  // 保留レーンの表示/非表示切替
+  const heldLane = document.getElementById('held');
+  if (heldLane) {
+    heldLane.style.display = showHeld ? 'block' : 'none';
+  }
 
   const filtered = allTasks.filter(isMatch);
 
@@ -421,27 +448,17 @@ function createCard(t) {
   const row1 = document.createElement("div");
   row1.className = "card-row1";
 
-  const left = document.createElement("span");
-  const rightGroup = document.createElement("span");
-  rightGroup.className = "right-group";
+  // 1行目：ステータス管理エリア（★、☆、▲、△）
+  const statusLeft = document.createElement("span"); 
+  const statusRight = document.createElement("span");
+  statusRight.className = "right-group";
   
   const user = document.createElement("span");
   user.className = "user-name";
   user.textContent = t.user || "";
 
-  // ★ ここ修正（重要）
-  if (t.isNoSchedule) {
-    left.textContent = "TODO";
-  } else if (t.status === "未着手") {
-    left.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
-  } else if (t.status === "対応中") {
-    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
-  } else {
-    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
-  }
-
-  // 右グループにユーザー名を追加
-  rightGroup.appendChild(user);
+  // ユーザー名を右グループに追加
+  statusRight.appendChild(user);
   
   // 完了状態以外にのみスターアイコンを追加
   if (t.status !== "完了") {
@@ -459,16 +476,61 @@ function createCard(t) {
       e.stopPropagation();
       toggleStar(t);
     });
-    rightGroup.appendChild(star);
+    statusRight.appendChild(star);
   }
 
-  // 日付情報と右グループ（ユーザー名+スター）を追加
-  row1.appendChild(left);
-  row1.appendChild(rightGroup);
+  // 保留状態アイコン（▲、△）を追加
+  if (t.status !== "完了") {
+    const heldIcon = document.createElement("span");
+    heldIcon.className = "held-icon";
+    
+    // 保留状態の判定（備考欄で▲をチェック）
+    if (t.note && t.note.includes('▲')) {
+      heldIcon.textContent = "▲";
+      heldIcon.classList.add("held-active");
+    } else if (t.note && t.note.includes('△')) {
+      heldIcon.textContent = "△";
+      heldIcon.classList.add("held-released");
+    } else {
+      heldIcon.textContent = "○";
+      heldIcon.classList.add("held-none");
+    }
+    
+    heldIcon.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleHeldStatus(t);
+    });
+    statusRight.appendChild(heldIcon);
+  }
+
+  // 1行目にステータス情報を配置
+  row1.appendChild(statusLeft);
+  row1.appendChild(statusRight);
+
+  // 2行目：日付情報（従来の1行目の内容）
+  const row2 = document.createElement("div");
+  row2.className = "card-row2";
+  
+  const dateInfo = document.createElement("span");
+  dateInfo.className = "date-info";
+  
+  // ★ ここ修正（重要）
+  if (t.isNoSchedule) {
+    dateInfo.textContent = "TODO";
+  } else if (t.status === "未着手" || t.status === "保留") {
+    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
+  } else if (t.status === "対応中") {
+    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
+  } else {
+    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
+  }
+  
+  row2.appendChild(dateInfo);
 
   // タイトル行（タイトル + 分類）
-  const row2 = document.createElement("div");
-  row2.className = "card-title-row";
+  const row3 = document.createElement("div");
+  row3.className = "card-title-row";
   
   const titleSpan = document.createElement("span");
   titleSpan.className = "card-title";
@@ -480,11 +542,12 @@ function createCard(t) {
     classificationSpan.textContent = `<${t.classification}>`;
   }
   
-  row2.appendChild(titleSpan);
-  row2.appendChild(classificationSpan);
+  row3.appendChild(titleSpan);
+  row3.appendChild(classificationSpan);
 
   d.appendChild(row1);
   d.appendChild(row2);
+  d.appendChild(row3);
 
   // スター状態に応じてカードスタイルを適用 
   if (t.isStar) {
@@ -561,6 +624,7 @@ async function jumpToExcel(row){
 // ===== util =====
 function getLane(s){
   if(s==="未着手") return "todo";
+  if(s==="保留") return "held";
   if(s==="対応中") return "doing";
   return "done";
 }
@@ -602,9 +666,27 @@ async function updateStatus(task, lane) {
     actualEnd = "";
   }
 
+  if (lane === "held") {
+    // 保留状態：実際の開始日はクリア、終了日もクリア
+    actualStart = "";
+    actualEnd = "";
+    // 保留アイコンを▲に変更
+    if (!task.note.includes('▲')) {
+      let newNote = task.note || "";
+      newNote = '▲' + newNote.replace(/△/g, "");
+      task.note = newNote;
+    }
+  }
+
   if (lane === "doing") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = "";
+    
+    // 保留レーンから移動した場合は△にする
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
+    }
   }
 
   if (lane === "done") {
@@ -614,6 +696,12 @@ async function updateStatus(task, lane) {
     // 完了時は★→☆に変更
     if (task.isStar) {
       task.isStar = false;
+    }
+    
+    // 保留レーンから移動した場合は△にする
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
     }
   }
 
@@ -632,6 +720,13 @@ async function updateStatus(task, lane) {
     startCell.numberFormat = [["m/d"]];
     endCell.numberFormat = [["m/d"]];
 
+    // 備考の更新（保留状態変更やスター削除）
+    if ((lane === "done" || lane === "doing" || lane === "held") && task.note !== undefined) {
+      const noteCell = sheet.getRange(`O${row}`);
+      noteCell.values = [[task.note]];
+      noteCell.format.wrapText = false;
+    }
+
     // 完了時に備考から★を削除
     if (lane === "done" && task.note && task.note.includes('★')) {
       let newNote = (task.note || "").replace(/★/g, "");
@@ -645,6 +740,21 @@ async function updateStatus(task, lane) {
   });
 
   await init();
+}
+
+// ===== ステータス文字列更新 =====
+async function updateTaskStatus(task, newStatus) {
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+    const row = task.rowIndex;
+    const statusCell = sheet.getRange(`H${row}`);
+    
+    statusCell.values = [[newStatus]];
+    
+    await ctx.sync();
+  });
+  
+  task.status = newStatus;
 }
 
 function isValidDate(v) {
@@ -683,6 +793,49 @@ async function toggleStar(task) {
   
   // タスクの備考を更新
   task.note = newNote;
+  
+  // 画面を再描画
+  renderBoard();
+}
+
+// ===== 保留状態切り替え =====
+async function toggleHeldStatus(task) {
+  let newNote = task.note || "";
+  
+  // 現在の保留状態を判定
+  const isHeld = newNote.includes('▲');
+  const wasReleased = newNote.includes('△');
+  
+  if (isHeld) {
+    // ▲ → △（保留解除）
+    newNote = newNote.replace(/▲/g, "△");
+  } else if (wasReleased) {
+    // △ → ○（通常状態）
+    newNote = newNote.replace(/△/g, "");
+  } else {
+    // ○ → ▲（保留状態）
+    newNote = '▲' + newNote;
+  }
+  
+  // Excelに備考を更新
+  await Excel.run(async (ctx) => {
+    const sheet = ctx.workbook.worksheets.getItem("wbs");
+    const row = task.rowIndex;
+    const cell = sheet.getRange(`O${row}`);
+    
+    cell.values = [[newNote]];
+    cell.format.wrapText = false;
+    
+    await ctx.sync();
+  });
+  
+  // タスクの備考を更新
+  task.note = newNote;
+  
+  // 保留状態になった場合、ステータスを「保留」に変更
+  if (newNote.includes('▲') && task.status !== '保留') {
+    await updateTaskStatus(task, '保留');
+  }
   
   // 画面を再描画
   renderBoard();
