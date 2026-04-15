@@ -532,17 +532,27 @@ function createCard(t) {
   const row1 = document.createElement("div");
   row1.className = "card-row1";
 
-  // 1行目：ステータス管理エリア（★、☆、▲、△）
-  const statusLeft = document.createElement("span"); 
-  const statusRight = document.createElement("span");
-  statusRight.className = "right-group";
+  const left = document.createElement("span");
+  const rightGroup = document.createElement("span");
+  rightGroup.className = "right-group";
   
   const user = document.createElement("span");
   user.className = "user-name";
   user.textContent = t.user || "";
 
+  // 日付情報を設定
+  if (t.isNoSchedule) {
+    left.textContent = "TODO";
+  } else if (t.status === "未着手" || t.status === "保留") {
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
+  } else if (t.status === "対応中") {
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
+  } else {
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
+  }
+
   // ユーザー名を右グループに追加
-  statusRight.appendChild(user);
+  rightGroup.appendChild(user);
   
   // 完了状態以外にのみスターアイコンを追加
   if (t.status !== "完了") {
@@ -560,61 +570,16 @@ function createCard(t) {
       e.stopPropagation();
       toggleStar(t);
     });
-    statusRight.appendChild(star);
+    rightGroup.appendChild(star);
   }
 
-  // 保留状態アイコン（▲、△）を追加
-  if (t.status !== "完了") {
-    const heldIcon = document.createElement("span");
-    heldIcon.className = "held-icon";
-    
-    // 保留状態の判定（備考欄で▲をチェック）
-    if (t.note && t.note.includes('▲')) {
-      heldIcon.textContent = "▲";
-      heldIcon.classList.add("held-active");
-    } else if (t.note && t.note.includes('△')) {
-      heldIcon.textContent = "△";
-      heldIcon.classList.add("held-released");
-    } else {
-      heldIcon.textContent = "○";
-      heldIcon.classList.add("held-none");
-    }
-    
-    heldIcon.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleHeldStatus(t);
-    });
-    statusRight.appendChild(heldIcon);
-  }
-
-  // 1行目にステータス情報を配置
-  row1.appendChild(statusLeft);
-  row1.appendChild(statusRight);
-
-  // 2行目：日付情報（従来の1行目の内容）
-  const row2 = document.createElement("div");
-  row2.className = "card-row2";
-  
-  const dateInfo = document.createElement("span");
-  dateInfo.className = "date-info";
-  
-  // ★ ここ修正（重要）
-  if (t.isNoSchedule) {
-    dateInfo.textContent = "TODO";
-  } else if (t.status === "未着手" || t.status === "保留") {
-    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
-  } else if (t.status === "対応中") {
-    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
-  } else {
-    dateInfo.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
-  }
-  
-  row2.appendChild(dateInfo);
+  // 日付情報と右グループ（ユーザー名+スター）を追加
+  row1.appendChild(left);
+  row1.appendChild(rightGroup);
 
   // タイトル行（タイトル + 分類）
-  const row3 = document.createElement("div");
-  row3.className = "card-title-row";
+  const row2 = document.createElement("div");
+  row2.className = "card-title-row";
   
   const titleSpan = document.createElement("span");
   titleSpan.className = "card-title";
@@ -626,12 +591,11 @@ function createCard(t) {
     classificationSpan.textContent = `<${t.classification}>`;
   }
   
-  row3.appendChild(titleSpan);
-  row3.appendChild(classificationSpan);
+  row2.appendChild(titleSpan);
+  row2.appendChild(classificationSpan);
 
   d.appendChild(row1);
   d.appendChild(row2);
-  d.appendChild(row3);
 
   // スター状態に応じてカードスタイルを適用 
   if (t.isStar) {
@@ -882,55 +846,17 @@ async function toggleStar(task) {
   renderBoard();
 }
 
-// ===== 保留状態切り替え =====
-async function toggleHeldStatus(task) {
-  let newNote = task.note || "";
-  
-  // 現在の保留状態を判定
-  const isHeld = newNote.includes('▲');
-  const wasReleased = newNote.includes('△');
-  
-  if (isHeld) {
-    // ▲ → △（保留解除）
-    newNote = newNote.replace(/▲/g, "△");
-  } else if (wasReleased) {
-    // △ → ○（通常状態）
-    newNote = newNote.replace(/△/g, "");
-  } else {
-    // ○ → ▲（保留状態）
-    newNote = '▲' + newNote;
-  }
-  
-  // Excelに備考を更新
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const row = task.rowIndex;
-    const cell = sheet.getRange(`O${row}`);
-    
-    cell.values = [[newNote]];
-    cell.format.wrapText = false;
-    
-    await ctx.sync();
-  });
-  
-  // タスクの備考を更新
-  task.note = newNote;
-  
-  // 保留状態になった場合、ステータスを「保留」に変更
-  if (newNote.includes('▲') && task.status !== '保留') {
-    await updateTaskStatus(task, '保留');
-  }
-  
-  // 画面を再描画
-  renderBoard();
-}
-
 function openModal(task) {
   currentTask = task;
 
   // 元の備考内容を保存（空の場合はテンプレートを使用）
   const originalNote = task.note || "";
-  const displayNote = originalNote || "\n＜タスク＞\n＜状況＞";
+  
+  // 1行目にステータス管理エリア、2行目以降にタスク情報
+  let displayNote = originalNote;
+  if (!displayNote.trim()) {
+    displayNote = "☆\n＜タスク＞\n＜状況＞";
+  }
   
   document.getElementById("modal-title").textContent = task.title;
   document.getElementById("modal-note").value = displayNote;
