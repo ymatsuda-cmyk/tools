@@ -849,13 +849,23 @@ async function toggleStar(task) {
 function openModal(task) {
   currentTask = task;
 
-  // 元の備考内容を保存（空の場合はテンプレートを使用）
+  // 元の備考内容を保存
   const originalNote = task.note || "";
   
-  // 1行目にステータス管理エリア、2行目以降にタスク情報
+  // 備考欄のテンプレート処理
   let displayNote = originalNote;
+  
   if (!displayNote.trim()) {
+    // 完全に空の場合：ステータス記号とテンプレートを追加
     displayNote = "☆\n＜タスク＞\n＜状況＞";
+  } else {
+    // 内容がある場合：行数をチェック
+    const lines = displayNote.split('\n');
+    
+    // 2行目がない場合（1行のみまたは空行のみ）
+    if (lines.length < 2 || (lines.length === 2 && !lines[1].trim())) {
+      displayNote = displayNote.trimEnd() + "\n＜タスク＞\n＜状況＞";
+    }
   }
   
   document.getElementById("modal-title").textContent = task.title;
