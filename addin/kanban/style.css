@@ -60,14 +60,24 @@ button.active {
   background: #f4f4f4d1;
   padding: 8px; /* paddingを縮めてカード領域を最大化 */
   border-radius: 6px;
-  min-height: 150px;
-  max-height: 80vh;
-  overflow-y: auto;
+  min-height: 150px; /* 初期値、JavaScriptで動的に調整 */
+  overflow-y: hidden; /* スクロールバーを非表示 */
+  overflow-x: hidden; /* 横スクロールバーも非表示 */
   box-sizing: border-box;
   word-wrap: break-word;
   display: flex;
   flex-direction: column;
   width: 100%; /* ペイン全体を活用 */
+}
+
+/* レーンのスクロールバーを完全に非表示にする */
+.lane::-webkit-scrollbar {
+  display: none; /* Webkit系ブラウザ用 */
+}
+
+.lane {
+  -ms-overflow-style: none; /* IE/Edge用 */
+  scrollbar-width: none; /* Firefox用 */
 }
 
 .lane h3 {
@@ -82,6 +92,28 @@ button.active {
   gap: 8px; /* カード間の余白 */
   flex: 1; /* 残りスペースを占有 */
   width: 100%;
+  overflow-y: auto; /* カードが多い場合はカードリスト内でスクロール */
+  overflow-x: hidden; /* 横スクロールは不要 */
+  max-height: calc(100% - 40px); /* ヘッダー分を引いた高さまで */
+  padding-right: 2px; /* スクロールバーの余白 */
+}
+
+/* カードリストのスクロールバーをスタイリング */
+.card-list::-webkit-scrollbar {
+  width: 6px; /* スクロールバーの幅を細く */
+}
+
+.card-list::-webkit-scrollbar-track {
+  background: transparent; /* トラックを透明に */
+}
+
+.card-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2); /* つまみを薄いグレーに */
+  border-radius: 3px;
+}
+
+.card-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4); /* ホバー時は少し濃く */
 }
 
 /* ===== 保留レーン専用スタイル ===== */

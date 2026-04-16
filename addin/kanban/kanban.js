@@ -108,13 +108,14 @@ function setupSizeMonitoring() {
   let saveTimeout;
   let adjustTimeout;
   
-  // ペイン幅への完全追従のためのサイズ調整関数
+  // ペインサイズ追従のためのサイズ調整関数
   function performSizeAdjustment() {
     clearTimeout(adjustTimeout);
     adjustTimeout = setTimeout(() => {
-      // ペインの実際の幅を取得
+      // ペインの実際の幅と高さを取得
       const containerWidth = getActualPaneWidth();
       adjustLaneWidths(containerWidth);
+      adjustLaneHeights(); // 高さもペインに追従させる
     }, 10); // 即座に調整
   }
   
@@ -299,41 +300,49 @@ function adjustCardWidths(maxCardWidth) {
   });
 }
 
-// ===== レーン高さ調整機能 =====
+// 実際のペイン高さを正確に取得する関数
+function getActualPaneHeight() {
+  // 複数の方法で高さを取得し、最も正確なものを選択
+  const bodyHeight = document.body.clientHeight;
+  const bodyOffsetHeight = document.body.offsetHeight;
+  const docElementHeight = document.documentElement.clientHeight;
+  const windowHeight = window.innerHeight;
+  
+  // タスクペインの場合は通常bodyのclientHeightが最も適切
+  let paneHeight = Math.max(bodyHeight || 0, docElementHeight || 0);
+  
+  // フォールバックとしてwindowHeightを使用
+  if (paneHeight <= 0) {
+    paneHeight = windowHeight || 600;
+  }
+  
+  // 上部要素（フィルター等）の高さを考慮
+  const topBarHeight = 200; // フィルター部分の概算高さ
+  const availableHeight = Math.max(paneHeight - topBarHeight, 200);
+  
+  return availableHeight;
+}
+
+// ===== レーン高さ調整機能（ペイン高さ追従版） =====
 function adjustLaneHeights() {
   const lanes = document.querySelectorAll('.lane');
-  let maxHeight = 0;
   
-  // 一度全レーンの高さをリセット
+  // ペイン高さを取得してレーンの最小高さとして設定
+  const paneHeight = getActualPaneHeight();
+  
   lanes.forEach(lane => {
-    lane.style.height = 'auto';
+    // 非表示レーン（保留が非表示の場合）をスキップ
+    if (lane.style.display === 'none') return;
+    
+    // ペイン高さをレーンの最小高さとして設定（スクロールバーなし）
+    lane.style.height = paneHeight + 'px';
+    lane.style.minHeight = paneHeight + 'px';
+    lane.style.maxHeight = 'none'; // 最大高さ制限を解除
+    lane.style.overflowY = 'hidden'; // スクロールバー完全非表示
+    lane.style.overflowX = 'hidden';
   });
   
-  // 少し待ってから高さを測定（DOM更新待ち）
-  setTimeout(() => {
-    // 各レーンの高さを測定し、最大値を見つける
-    lanes.forEach(lane => {
-      // 非表示レーン（保留が非表示の場合）をスキップ
-      if (lane.style.display === 'none') return;
-      
-      const height = lane.offsetHeight;
-      if (height > maxHeight) {
-        maxHeight = height;
-      }
-    });
-    
-    // 最小高さを確保（カードが少ない場合でも見栄えを良くする）
-    maxHeight = Math.max(maxHeight, 200);
-    
-    // 全レーンの高さを最大値に合わせる
-    lanes.forEach(lane => {
-      if (lane.style.display !== 'none') {
-        lane.style.height = maxHeight + 'px';
-      }
-    });
-    
-    console.log(`Lane heights adjusted to: ${maxHeight}px`);
-  }, 20);
+  console.log(`Lane heights set to pane height: ${paneHeight}px (no scrollbar)`);
 }
 
 function saveSizeToStorage(width, height) {
@@ -436,10 +445,11 @@ async function init() {
   renderBoard();
   renderPeriodFilter();
   
-  // データ読み込み後にペイン追従レーン幅とカード幅を調整
+  // データ読み込み後にペイン追従レーン幅とカード幅、高さを調整
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // ペイン高さに追従
   }, 50); // レンダリング完了を待つため少し遅延
   
   // バージョン表示を更新
