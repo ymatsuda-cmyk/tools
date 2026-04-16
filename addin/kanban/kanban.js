@@ -316,33 +316,75 @@ function getActualPaneHeight() {
     paneHeight = windowHeight || 600;
   }
   
-  // 上部要素（フィルター等）の高さを考慮
-  const topBarHeight = 200; // フィルター部分の概算高さ
-  const availableHeight = Math.max(paneHeight - topBarHeight, 200);
+  // 上部要素（フィルター等）の高さを動的に計算
+  const boardElement = document.getElementById('board');
+  let topBarHeight = 150; // デフォルト値
+  
+  if (boardElement) {
+    // ボード要素の位置から上部要素の高さを計算
+    const boardRect = boardElement.getBoundingClientRect();
+    topBarHeight = Math.max(boardRect.top, 100); // 最小100pxを保証
+  }
+  
+  // 利用可能高さを計算（下部余白も考慮）
+  const availableHeight = Math.max(paneHeight - topBarHeight - 20, 200);
   
   return availableHeight;
 }
 
-// ===== レーン高さ調整機能（ペイン高さ追従版） =====
+// ===== レーン高さ調整機能（最長レーンベース版） =====
 function adjustLaneHeights() {
   const lanes = document.querySelectorAll('.lane');
   
-  // ペイン高さを取得してレーンの最小高さとして設定
-  const paneHeight = getActualPaneHeight();
+  // ペイン高さを取得してレーン高さの上限とする
+  const maxPaneHeight = getActualPaneHeight();
   
-  lanes.forEach(lane => {
-    // 非表示レーン（保留が非表示の場合）をスキップ
-    if (lane.style.display === 'none') return;
-    
-    // ペイン高さをレーンの最小高さとして設定（スクロールバーなし）
-    lane.style.height = paneHeight + 'px';
-    lane.style.minHeight = paneHeight + 'px';
-    lane.style.maxHeight = 'none'; // 最大高さ制限を解除
-    lane.style.overflowY = 'hidden'; // スクロールバー完全非表示
-    lane.style.overflowX = 'hidden';
+  // 1. 各レーンの自然な高さをリセットして測定
+  const visibleLanes = Array.from(lanes).filter(lane => 
+    lane.style.display !== 'none'
+  );
+  
+  if (visibleLanes.length === 0) return;
+  
+  // 一時的に全レーンの高さをリセット
+  visibleLanes.forEach(lane => {
+    lane.style.height = 'auto';
+    lane.style.minHeight = 'auto';
+    lane.style.maxHeight = 'none';
   });
   
-  console.log(`Lane heights set to pane height: ${paneHeight}px (no scrollbar)`);
+  // DOM更新を待ってから高さを測定
+  setTimeout(() => {
+    let maxNaturalHeight = 0;
+    
+    // 各レーンの実際の高さ（コンテンツベース）を測定
+    visibleLanes.forEach(lane => {
+      const naturalHeight = lane.offsetHeight;
+      if (naturalHeight > maxNaturalHeight) {
+        maxNaturalHeight = naturalHeight;
+      }
+    });
+    
+    // 2. 最終的なレーン高さを決定
+    // - 最長レーンの高さを基準
+    // - ただしペイン高さを超えない
+    // - 最小150pxを保証
+    const finalHeight = Math.min(
+      Math.max(maxNaturalHeight, 150), 
+      maxPaneHeight
+    );
+    
+    // 3. 全レーンを同じ高さに統一
+    visibleLanes.forEach(lane => {
+      lane.style.height = finalHeight + 'px';
+      lane.style.minHeight = finalHeight + 'px';
+      lane.style.maxHeight = finalHeight + 'px';
+      lane.style.overflowY = 'hidden'; // レーン自体はスクロールしない
+      lane.style.overflowX = 'hidden';
+    });
+    
+    console.log(`Lane heights adjusted: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
+  }, 50); // DOM更新待ちのディレイを少し長めに
 }
 
 function saveSizeToStorage(width, height) {
@@ -659,6 +701,7 @@ function renderBoard() {
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // 高さ調整も追加
   }, 100);
 }
 

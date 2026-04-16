@@ -60,7 +60,8 @@ button.active {
   background: #f4f4f4d1;
   padding: 8px; /* paddingを縮めてカード領域を最大化 */
   border-radius: 6px;
-  min-height: 150px; /* 初期値、JavaScriptで動的に調整 */
+  min-height: 150px; /* 初期最小値、JavaScriptで最適化される */
+  height: auto; /* 初期値：コンテンツに応じた自然な高さ */
   overflow-y: hidden; /* スクロールバーを非表示 */
   overflow-x: hidden; /* 横スクロールバーも非表示 */
   box-sizing: border-box;
