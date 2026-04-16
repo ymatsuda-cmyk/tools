@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260416_52bfcec";
+const APP_VERSION = "rev_20260416_8dd48c3";
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
@@ -11,6 +11,10 @@ let selectedUser = null;
 let selectedCategory = null;
 let selectedPeriod = "all";
 let showHeld = true; // 保留表示フラグ
+
+// レーン高さ調整のデバウンス用変数
+let heightAdjustTimeout = null;
+let isAdjustingHeights = false;
 
 Office.onReady(() => {
   // 保存されたサイズを復元
@@ -25,17 +29,34 @@ Office.onReady(() => {
   // サイズ変更の監視を開始
   setupSizeMonitoring();
   
+  // 初期化後にペイン追従幅調整を複数回実行（確実に反映させる）
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    adjustLaneHeights();
+  }, 50);
+  
+  // さらに追加で実行（DOM完全読み込み後）
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); 
+  }, 200);
+  
   init();
 });
 
-// ===== サイズ関連関数 =====
+// ===== サイズ記憶機能 =====
 function restoreSavedSize() {
   try {
-    const savedSize = localStorage.getItem('kanban_taskpane_size');
+    const savedSize = localStorage.getItem('kanban-taskpane-size');
     if (savedSize) {
       const size = JSON.parse(savedSize);
-      const width = Math.max(size.width || 200, 200);
-      const minHeight = 200;
+      
+      // 最小サイズの制限
+      const minWidth = 200;
+      const minHeight = 300;
+      const width = Math.max(size.width || 200, minWidth);
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
@@ -112,11 +133,8 @@ function setupSizeMonitoring() {
         const { width, height } = entry.contentRect;
         
         // リアルタイムでレーン幅を調整
-      // 初回のみ高さ調整を実行（チラつき防止）
-      if (!isAdjustingHeights) {
-        adjustLaneHeights();
-      }
-    }, 50); // ディレイを少し長めにして安定化
+        performSizeAdjustment();
+        
         // デバウンス処理（連続した変更を制限）
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
@@ -321,66 +339,32 @@ function getActualPaneHeight() {
   return availableHeight;
 }
 
-// レーン高さ調整のデバウンス用間数
-let heightAdjustTimeout = null;
-let isAdjustingHeights = false;
-
-// ===== レーン高さ調整機能（チラつき防止版） =====
+// ===== レーン高さ調整機能（最長レーンベース版） =====
 function adjustLaneHeights() {
-  // 既に調整中の場合はスキップしてチラつきを防ぐ
-  if (isAdjustingHeights) {
-    return;
-  }
+  const lanes = document.querySelectorAll('.lane');
   
-  /レーン高さ調整のデバウンス用間数
-let heightAdjustTimeout = null;
-let isAdjustingHeights = false;
-
-// ===== レーン高さ調整機能（チラつき防止版） =====
-function adjustLaneHeights() {
-  // 既に調整中の場合はスキップしてチラつきを防ぐ
-  if (isAdjustingHeights) {
-    return;
-  }
+  // ペイン高さを取得してレーン高さの上限とする
+  const maxPaneHeight = getActualPaneHeight();
   
-  // デバウンス処理（連続呼び出しを制限）
-  clearTimeout(heightAdjustTimeout);
-  heightAdjustTimeout = setTimeout(() => {
-    performHeightAdjustment();
-  }, 10);
-}
-
-function performHeightAdjustment() {
-  if (isAdjustingHeights) return;
-  isAdjustingHeights = true;
+  // 1. 各レーンの自然な高さをリセットして測定
+  const visibleLanes = Array.from(lanes).filter(lane => 
+    lane.style.display !== 'none'
+  );
   
-  try {
-    const lanes = document.querySelectorAll('.lane');
-    const maxPaneHeight = getActualPaneHeight();
-    
-    const visibleLanes = Array.from(lanes).filter(lane => 
-      lane.style.display !== 'none'
-    );
-    
-    if (visibleLanes.length === 0) {
-      isAdjustingHeights = false;
-      return;
-    }
-    
-    // 1. 一時的に全レーンの高さをリセット（非表示で測定）
-    visibleLanes.forEach(lane => {
-      lane.style.visibility = 'hidden'; // チラつき防止
-      lane.style.height = 'auto';
-      lane.style.minHeight = 'auto';
-      lane.style.maxHeight = 'none';
-    });
-    
-    // 2. DOM更新を強制実行してから測定（同期的）
-    document.body.offsetHeight; // reflowを強制実行
-    
+  if (visibleLanes.length === 0) return;
+  
+  // 一時的に全レーンの高さをリセット
+  visibleLanes.forEach(lane => {
+    lane.style.height = 'auto';
+    lane.style.minHeight = 'auto';
+    lane.style.maxHeight = 'none';
+  });
+  
+  // DOM更新を待ってから高さを測定
+  setTimeout(() => {
     let maxNaturalHeight = 0;
     
-    // 3. 各レーンの実際の高さを測定
+    // 各レーンの実際の高さ（コンテンツベース）を測定
     visibleLanes.forEach(lane => {
       const naturalHeight = lane.offsetHeight;
       if (naturalHeight > maxNaturalHeight) {
@@ -388,40 +372,26 @@ function performHeightAdjustment() {
       }
     });
     
-    // 4. 最終的なレーン高さを決定
+    // 2. 最終的なレーン高さを決定
+    // - 最長レーンの高さを基準
+    // - ただしペイン高さを超えない
+    // - 最小150pxを保証
     const finalHeight = Math.min(
       Math.max(maxNaturalHeight, 150), 
       maxPaneHeight
     );
     
-    // 5. 全レーンを同じ高さに統一（一括変更）
+    // 3. 全レーンを同じ高さに統一
     visibleLanes.forEach(lane => {
       lane.style.height = finalHeight + 'px';
       lane.style.minHeight = finalHeight + 'px';
       lane.style.maxHeight = finalHeight + 'px';
-      lane.style.overflowY = 'hidden';
+      lane.style.overflowY = 'hidden'; // レーン自体はスクロールしない
       lane.style.overflowX = 'hidden';
-      lane.style.visibility = 'visible'; // 表示を復活
     });
     
-    console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
-    
-  } finally {
-    isAdjustingHeights = false;
-  }> {
-      lane.style.height = finalHeight + 'px';
-      lane.style.minHeight = finalHeight + 'px';
-      lane.style.maxHeight = finalHeight + 'px';
-      lane.style.overflowY = 'hidden';
-      lane.style.overflowX = 'hidden';
-      lane.style.visibility = 'visible'; // 表示を復活
-    });
-    
-    console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
-    
-  } finally {
-    isAdjustingHeights = false;
-  }
+    console.log(`Lane heights adjusted: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
+  }, 50); // DOM更新待ちのディレイを少し長めに
 }
 
 function saveSizeToStorage(width, height) {
@@ -515,10 +485,7 @@ async function init() {
   if (boardEl) {
     boardEl.style.width = "100%"; // ペイン幅に完全追従
     boardEl.style.maxWidth = "100%";
-    // 初期初回のみ高さ調整を実行
-    setTimeout(() => {
-      adjustLaneHeights();
-    }, 100);;
+    boardEl.style.minWidth = "200px";
     boardEl.style.boxSizing = "border-box";
   }
 
@@ -527,12 +494,12 @@ async function init() {
   renderBoard();
   renderPeriodFilter();
   
-  // 最終的なレイアウト調整（一回のみ）
+  // データ読み込み後にペイン追従レーン幅とカード幅、高さを調整
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
-    adjustLaneHeights(); // 最後に1回だけ実行
-  }, 100); // 十分な遅延でDOM安定化を待つ
+    adjustLaneHeights(); // ペイン高さに追従
+  }, 50); // レンダリング完了を待つため少し遅延
   
   // バージョン表示を更新
   if (typeof updateVersionDisplay === 'function') {
@@ -661,10 +628,11 @@ function renderCategoryFilter() {
 function setPeriod(p) {
   selectedPeriod = (selectedPeriod === p) ? "all" : p;
   saveFilters(); // フィルタ設定を保存
-  renderBoard();（高さは必要時のみ）
-  setTimeout(() => {
-    const containerWidth = getActualPaneWidth();
-    adjustLaneWidths(containerWidthilter() {
+  renderBoard();
+  renderPeriodFilter();
+}
+
+function renderPeriodFilter() {
   document.querySelectorAll("[data-period]").forEach(b => {
     b.classList.toggle("active", b.dataset.period === selectedPeriod);
   });
@@ -676,10 +644,11 @@ function toggleHeldDisplay() {
   localStorage.setItem('kanban-show-held', showHeld);
   renderBoard();
   
-  // 保留レーンの表示切替後にペイン追従幅調整（高さは必要時のみ）
+  // 保留レーンの表示切替後にペイン追従幅調整
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
+    adjustLaneHeights();
   }, 50);
 }
 
@@ -713,20 +682,34 @@ function renderBoard() {
       // スター付きを優先
       if (a.isStar && !b.isStar) return -1;
       if (!a.isStar && b.isStar) return 1;
-      // 同じスター状態なら期限と高さ調整（一回のみ）
-  setTimeout(() => {
-    const containerWidth = getActualPaneWidth();
-    adjustLaneWidths(containerWidth);
-    adjustLaneHeights();
-  }, 5
+      // 同じスター状態なら期限日順
+      return excelDateToJS(a.end) - excelDateToJS(b.end);
+    });
+
+  const done = filtered
+    .filter(t => t.status === "完了")
+    .sort((a,b)=>excelDateToJS(b.actualEnd)-excelDateToJS(a.actualEnd));
+
+  [...normal, ...done].forEach(t=>{
+    const lane = getLane(t);  // タスク全体を渡すように変更
+    document.querySelector(`#${lane} .card-list`).appendChild(createCard(t));
+  });
+
   setupDnD();
   
-  // カード描画後にペイン追従幅調整と高さ調整（一回のみ）
+  // カード描画後にペイン追従幅調整を複数回実行
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
     adjustLaneHeights();
-  }, 50);
+  }, 10);
+  
+  // もう一度確実に実行
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    adjustLaneHeights(); // 高さ調整も追加
+  }, 100);
 }
 
 // ===== カード =====
