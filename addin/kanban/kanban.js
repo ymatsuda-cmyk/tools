@@ -25,6 +25,17 @@ Office.onReady(() => {
   // サイズ変更の監視を開始
   setupSizeMonitoring();
   
+  init();
+});
+
+// ===== サイズ関連関数 =====
+function restoreSavedSize() {
+  try {
+    const savedSize = localStorage.getItem('kanban_taskpane_size');
+    if (savedSize) {
+      const size = JSON.parse(savedSize);
+      const width = Math.max(size.width || 200, 200);
+      const minHeight = 200;
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
