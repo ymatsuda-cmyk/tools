@@ -1,8 +1,11 @@
 body {
   font-family: sans-serif;
-  margin: 10px;
-  min-width: 400px;
+  margin: 5px; /* マージンを小さくしてペインを最大限活用 */
+  min-width: 200px;
   width: 100%;
+  max-width: 100%; /* ペイン幅に完全追従 */
+  box-sizing: border-box;
+  overflow-x: hidden; /* 横スクロールを防ぐ */
 }
 
 /* ===== 上部バー ===== */
@@ -37,31 +40,34 @@ button.active {
 /* ===== ボード =====  */
 #board {
   display: flex;
-  gap: 15px; /* ギャップを少し広めに */
+  gap: 10px; /* ギャップを少し縮めてペイン活用を最大化 */
   margin-top: 10px;
-  width: auto; /* 自動幅（JavaScript で動的制御） */
+  width: 100%; /* ペイン幅に完全追従 */
   max-width: 100%;
+  min-width: 200px;
   overflow-x: auto; /* 必要時のみ横スクロール */
   overflow-y: visible;
   align-items: flex-start;
   box-sizing: border-box;
+  justify-content: flex-start; /* レーンを左詰めで配置 */
 }
 
 /* ===== レーン ===== */
 .lane {
-  /* JavaScript により動的に幅制御されるため、初期 flex 設定は控えめに */
-  flex: 0 0 auto; /* 成長・縮小しない、コンテンツサイズ */
-  min-width: 140px; /* カード120px + padding20px */
+  /* ペイン幅に完全追従するためのflexbox設定 */
+  flex: 0 0 auto; /* 成長・縮小しない、JavaScriptで制御 */
+  min-width: 88px; /* カード80px + padding8px */
   background: #f4f4f4d1;
-  padding: 10px;
+  padding: 8px; /* paddingを縮めてカード領域を最大化 */
   border-radius: 6px;
-  min-height: 150px; /* 少し高めに設定 */
-  max-height: 80vh; /* 画面の80%以内に制限 */
-  overflow-y: auto; /* 縦方向のみスクロール */
+  min-height: 150px;
+  max-height: 80vh;
+  overflow-y: auto;
   box-sizing: border-box;
   word-wrap: break-word;
   display: flex;
-  flex-direction: column; /* カードを縦に配置 */
+  flex-direction: column;
+  width: 100%; /* ペイン全体を活用 */
 }
 
 .lane h3 {
@@ -91,20 +97,20 @@ button.active {
 .card {
   background: #fff;
   margin-bottom: 8px;
-  padding: 6px 8px;
+  padding: 4px 6px; /* paddingを小さくして内容領域を最大化 */
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
-  width: calc(100% - 4px); /* レーンいっぱいに広げる（わずかな余白を残す） */
-  min-width: 120px; /* より広い最小幅を保証 */
+  width: calc(100% - 2px); /* レーンの全幅を使用（はみ出し防止のためわずかな余白） */
+  min-width: 80px; /* 最小幅を小さくして狭いペインでも対応 */
   max-width: none; /* 最大幅制限を解除してペインと連動 */
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  hyphens: auto; /* 長い単語の自動ハイフネーション */
+  hyphens: auto;
   line-height: 1.3;
-  flex-shrink: 0; /* カードの縮小を防ぐ */
+  flex-shrink: 0;
 }
 
 /* ===== スター付きカード ===== */
