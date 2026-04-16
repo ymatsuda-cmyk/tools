@@ -290,7 +290,7 @@ function adjustLaneWidths(containerWidth) {
   // カードをレーン幅に完全追従させる
   adjustCardWidths(laneWidth - padding);
   
-  console.log(`Pane-following adjustment: Pane=${containerWidth}px, Lane=${laneWidth}px (${laneCount} lanes), Board=${boardTotalWidth}px`);
+  // console.log(`Pane-following adjustment: Pane=${containerWidth}px, Lane=${laneWidth}px (${laneCount} lanes), Board=${boardTotalWidth}px`);
 }
 
 // カード幅の調整 - ペイン幅に完全追従
@@ -409,7 +409,7 @@ function performHeightAdjustment() {
       lane.style.visibility = 'visible'; // 表示を復活
     });
     
-    console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
+    // console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
     
   } finally {
     isAdjustingHeights = false;
