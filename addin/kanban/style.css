@@ -61,7 +61,7 @@ button.active {
   padding: 8px; /* paddingを縮めてカード領域を最大化 */
   border-radius: 6px;
   min-height: 150px; /* 初期最小値、JavaScriptで最適化される */
-  height: auto; /* 初期値：コンテンツに応じた自然な高さ */
+  height: 150px; /* 初期固定値でちらつき防止 */
   overflow-y: hidden; /* スクロールバーを非表示 */
   overflow-x: hidden; /* 横スクロールバーも非表示 */
   box-sizing: border-box;
@@ -69,6 +69,7 @@ button.active {
   display: flex;
   flex-direction: column;
   width: 100%; /* ペイン全体を活用 */
+  transition: none; /* トランジションを無効化してちらつき防止 */
 }
 
 /* レーンのスクロールバーを完全に非表示にする */
@@ -97,6 +98,7 @@ button.active {
   overflow-x: hidden; /* 横スクロールは不要 */
   max-height: calc(100% - 40px); /* ヘッダー分を引いた高さまで */
   padding-right: 2px; /* スクロールバーの余白 */
+  transition: none; /* トランジション無効でちらつき防止 */
 }
 
 /* カードリストのスクロールバーをスタイリング */
@@ -134,7 +136,7 @@ button.active {
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: box-shadow 0.15s ease; /* box-shadowのみトランジション */
   width: calc(100% - 2px); /* レーンの全幅を使用（はみ出し防止のためわずかな余白） */
   min-width: 80px; /* 最小幅を小さくして狭いペインでも対応 */
   max-width: none; /* 最大幅制限を解除してペインと連動 */
