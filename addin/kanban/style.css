@@ -37,23 +37,29 @@ button.active {
 /* ===== ボード =====  */
 #board {
   display: flex;
-  gap: 10px;
+  gap: 15px; /* ギャップを少し広めに */
   margin-top: 10px;
-  width: 100%;
-  overflow-x: auto; /* 横スクロールを許可 */
+  width: auto; /* 自動幅（JavaScript で動的制御） */
+  max-width: 100%;
+  overflow-x: auto; /* 必要時のみ横スクロール */
+  overflow-y: visible;
   align-items: flex-start;
+  box-sizing: border-box;
 }
 
 /* ===== レーン ===== */
 .lane {
-  /* 動的幅調整に対応するため、flexは初期設定のみ使用 */
-  flex: 1;
-  min-width: 70px; /* padding(20px) + カード最小幅(50px) */
+  /* JavaScript により動的に幅制御されるため、初期 flex 設定は控えめに */
+  flex: 0 0 auto; /* 成長・縮小しない、コンテンツサイズ */
+  min-width: 140px; /* カード120px + padding20px */
   background: #f4f4f4d1;
   padding: 10px;
   border-radius: 6px;
-  min-height: 100px; /* JavaScriptによる動的高さ調整のため最小限に */
+  min-height: 150px; /* 少し高めに設定 */
+  max-height: 80vh; /* 画面の80%以内に制限 */
+  overflow-y: auto; /* 縦方向のみスクロール */
   box-sizing: border-box;
+  word-wrap: break-word;
 }
 
 .lane h3 {
@@ -80,10 +86,13 @@ button.active {
   user-select: none;
   transition: all 0.15s ease;
   width: 100%; /* レーンいっぱいに広げる */
-  min-width: 50px; /* 最小幅を保証 */
+  min-width: 120px; /* より広い最小幅を保証 */
+  max-width: 100%;
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  hyphens: auto; /* 長い単語の自動ハイフネーション */
+  line-height: 1.3;
 }
 
 /* ===== スター付きカード ===== */

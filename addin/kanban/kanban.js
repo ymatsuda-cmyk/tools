@@ -119,16 +119,22 @@ function setupSizeMonitoring() {
     
     // body要素を監視
     resizeObserver.observe(document.body);
+    
+    // board要素も監視（より正確な幅検知のため）
+    const boardElement = document.getElementById('board');
+    if (boardElement) {
+      resizeObserver.observe(boardElement);
+    }
   } else {
     // ResizeObserverが利用できない場合はwindowのresizeイベントを使用
-    let lastWidth = window.innerWidth;
-    let lastHeight = window.innerHeight;
+    let lastWidth = document.body.clientWidth || window.innerWidth;
+    let lastHeight = document.body.clientHeight || window.innerHeight;
     
     window.addEventListener('resize', () => {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
-        const currentWidth = window.innerWidth; 
-        const currentHeight = window.innerHeight;
+        const currentWidth = document.body.clientWidth || window.innerWidth; 
+        const currentHeight = document.body.clientHeight || window.innerHeight;
         
         if (currentWidth !== lastWidth || currentHeight !== lastHeight) {
           adjustLaneWidths(currentWidth);
@@ -136,20 +142,38 @@ function setupSizeMonitoring() {
           lastWidth = currentWidth;
           lastHeight = currentHeight;
         }
-      }, 500);
+      }, 300); // より短いディレイ
     });
   }
+  
+  // 初期表示時にも調整を実行
+  setTimeout(() => {
+    const initialWidth = document.body.clientWidth || window.innerWidth;
+    adjustLaneWidths(initialWidth);
+  }, 100);
 }
 
 // ===== レーン幅調整機能 =====
 function adjustLaneWidths(containerWidth) {
-  // コンテナた管理領域の端数を考慮
+  // 実際のコンテナ幅を正確に取得
+  if (!containerWidth) {
+    const boardElement = document.getElementById('board');
+    const bodyElement = document.body;
+    
+    // 複数の方法で幅を取得し、最も適切なものを選択
+    const boardWidth = boardElement ? boardElement.offsetWidth : 0;
+    const bodyWidth = bodyElement.clientWidth || window.innerWidth;
+    
+    containerWidth = Math.max(boardWidth, bodyWidth - 40); // margin考慮
+  }
+  
+  // コンテナ管理領域の余白を考慮
   const margin = 20; // body margin
-  const gap = 10; // レーン間ギャップ
+  const gap = 15; // レーン間ギャップ（少し広めに）
   const padding = 20; // レーン内padding
   
   // ボードの利用可能幅を計算
-  const boardTotalWidth = containerWidth - (margin * 2);
+  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 300); // 最低300px確保
   
   // 保留レーンが表示されているか確認
   const heldLane = document.getElementById('held');
@@ -165,31 +189,47 @@ function adjustLaneWidths(containerWidth) {
   // 各レーンの幅を計算（等幅分割）
   let laneWidth = Math.floor(availableWidth / laneCount);
   
-  // 最小幅の保証（カード50px + padding）
-  const minLaneWidth = 50 + padding;
+  // 最小幅の保証（カード120px + padding）
+  const minLaneWidth = 120 + padding; // より広い最小幅
   laneWidth = Math.max(laneWidth, minLaneWidth);
   
   // カードの幅を計算 （レーン幅 - padding）
-  const cardWidth = Math.max(laneWidth - padding, 50);
+  const cardWidth = Math.max(laneWidth - padding, 120);
+  
+  // ボード全体の幅を設定
+  const boardElement = document.getElementById('board');
+  if (boardElement) {
+    const totalBoardWidth = (laneWidth * laneCount) + totalGapWidth;
+    boardElement.style.width = Math.min(totalBoardWidth, boardTotalWidth) + 'px';
+    boardElement.style.maxWidth = 'none';
+  }
   
   // CSSでレーン幅を動的に設定
   const lanes = document.querySelectorAll('.lane');
   lanes.forEach(lane => {
     // 保留レーンが非表示の場合はスキップ
     if (lane.id === 'held' && !isHeldVisible) {
+      lane.style.display = 'none';
       return;
+    }
+    
+    // 保留レーンが表示される場合は表示
+    if (lane.id === 'held' && isHeldVisible) {
+      lane.style.display = 'block';
     }
     
     lane.style.width = laneWidth + 'px';
     lane.style.minWidth = minLaneWidth + 'px';
     lane.style.maxWidth = laneWidth + 'px';
     lane.style.flex = 'none'; // flexboxの自動サイズを無効化
+    lane.style.flexShrink = '0'; // 縮小を防ぐ
+    lane.style.flexGrow = '0'; // 拡大を防ぐ
   });
   
   // カードの幅を調整
   adjustCardWidths(cardWidth);
   
-  console.log(`Lane width adjusted: ${laneWidth}px (${laneCount} lanes), Card width: ${cardWidth}px`);
+  console.log(`Lane width adjusted: ${laneWidth}px (${laneCount} lanes), Card width: ${cardWidth}px, Board width: ${boardTotalWidth}px`);
 }
 
 // カード幅の調整
@@ -197,9 +237,11 @@ function adjustCardWidths(cardWidth) {
   const cards = document.querySelectorAll('.card');
   cards.forEach(card => {
     card.style.width = '100%'; // レーンいっぱいに広げる
-    card.style.minWidth = '50px';
+    card.style.minWidth = '120px'; // より広い最小幅
     card.style.maxWidth = cardWidth + 'px';
     card.style.boxSizing = 'border-box';
+    card.style.wordWrap = 'break-word'; // 長いテキストの折り返し
+    card.style.overflowWrap = 'break-word';
   });
 }
 
