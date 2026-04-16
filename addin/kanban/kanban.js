@@ -193,8 +193,8 @@ function adjustLaneWidths(containerWidth) {
   const minLaneWidth = 120 + padding; // より広い最小幅
   laneWidth = Math.max(laneWidth, minLaneWidth);
   
-  // カードの幅を計算 （レーン幅 - padding）
-  const cardWidth = Math.max(laneWidth - padding, 120);
+  // カードの最大幅は制限しない（レーン幅95%まで使用可能）
+  const cardMaxWidth = Math.max(laneWidth * 0.95, 120); // レーンの95%まで拡張可能
   
   // ボード全体の幅を設定
   const boardElement = document.getElementById('board');
@@ -227,9 +227,9 @@ function adjustLaneWidths(containerWidth) {
   });
   
   // カードの幅を調整
-  adjustCardWidths(cardWidth);
+  adjustCardWidths(cardMaxWidth);
   
-  console.log(`Lane width adjusted: ${laneWidth}px (${laneCount} lanes), Card width: ${cardWidth}px, Board width: ${boardTotalWidth}px`);
+  console.log(`Lane width adjusted: ${laneWidth}px (${laneCount} lanes), Card max width: ${cardMaxWidth}px, Board width: ${boardTotalWidth}px`);
 }
 
 // カード幅の調整
@@ -238,10 +238,11 @@ function adjustCardWidths(cardWidth) {
   cards.forEach(card => {
     card.style.width = '100%'; // レーンいっぱいに広げる
     card.style.minWidth = '120px'; // より広い最小幅
-    card.style.maxWidth = cardWidth + 'px';
+    card.style.maxWidth = 'none'; // 最大幅制限を撤廃してレーン幅まで広がるように
     card.style.boxSizing = 'border-box';
     card.style.wordWrap = 'break-word'; // 長いテキストの折り返し
     card.style.overflowWrap = 'break-word';
+    card.style.flexShrink = '0'; // カードの縮小を制限
   });
 }
 
@@ -379,6 +380,12 @@ async function init() {
   renderFilters();
   renderBoard();
   renderPeriodFilter();
+  
+  // データ読み込み後にレーン幅とカード幅を調整
+  setTimeout(() => {
+    const containerWidth = document.body.clientWidth || window.innerWidth;
+    adjustLaneWidths(containerWidth);
+  }, 50); // レンダリング完了を待つため少し遅延
   
   // バージョン表示を更新
   if (typeof updateVersionDisplay === 'function') {

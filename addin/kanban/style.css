@@ -60,11 +60,22 @@ button.active {
   overflow-y: auto; /* 縦方向のみスクロール */
   box-sizing: border-box;
   word-wrap: break-word;
+  display: flex;
+  flex-direction: column; /* カードを縦に配置 */
 }
 
 .lane h3 {
   margin-top: 0;
   text-align: center;
+}
+
+/* ===== カードリスト ===== */
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* カード間の余白 */
+  flex: 1; /* 残りスペースを占有 */
+  width: 100%;
 }
 
 /* ===== 保留レーン専用スタイル ===== */
@@ -85,14 +96,15 @@ button.active {
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
-  width: 100%; /* レーンいっぱいに広げる */
+  width: calc(100% - 4px); /* レーンいっぱいに広げる（わずかな余白を残す） */
   min-width: 120px; /* より広い最小幅を保証 */
-  max-width: 100%;
+  max-width: none; /* 最大幅制限を解除してペインと連動 */
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
   hyphens: auto; /* 長い単語の自動ハイフネーション */
   line-height: 1.3;
+  flex-shrink: 0; /* カードの縮小を防ぐ */
 }
 
 /* ===== スター付きカード ===== */
