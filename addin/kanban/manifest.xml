@@ -29,8 +29,8 @@
   
   <!-- デスクトップ版との互換性重視 -->
   <Requirements>
-    <Sets DefaultMinVersion="1.5">
-      <Set Name="ExcelApi" MinVersion="1.5"/>
+    <Sets DefaultMinVersion="1.7">
+      <Set Name="ExcelApi" MinVersion="1.7"/>
     </Sets>
   </Requirements>
   
