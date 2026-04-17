@@ -1009,11 +1009,11 @@ async function updateStatus(task, lane) {
   }
 
   await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const row = task.rowIndex;
-
-    const startCell = sheet.getRange(`R${row}`);
-    const endCell = sheet.getRange(`S${row}`);
+    const sheet = ctx.workb
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
+      // await updateTaskStatus(task, "未着手"); // H列への文言追加を停止}`);
 
     // Date型をExcelシリアル値に変換して設定
     startCell.values = [[dateToExcelSerial(actualStart)]];
@@ -1037,8 +1037,8 @@ async function updateStatus(task, lane) {
       noteCell.values = [[newNote]];
       noteCell.format.wrapText = false;
       task.note = newNote; // タスクの備考も更新
-    }
-
+    }//更新を停止（H列への文言追加を防ぐ）
+    
     await ctx.sync();
   });
 
@@ -1046,10 +1046,10 @@ async function updateStatus(task, lane) {
 }
 
 // ===== ステータス文字列更新 =====
-async function updateTaskStatus(task, newStatus) {
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const row = task.rowIndex;
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
+      // await updateTaskStatus(task, "対応中"); // H列への文言追加を停止
     const statusCell = sheet.getRange(`H${row}`);
     
     statusCell.values = [[newStatus]];
@@ -1063,10 +1063,10 @@ async function updateTaskStatus(task, newStatus) {
 function isValidDate(v) {
   return v instanceof Date && !isNaN(v);
 }
-
-// ===== スター切り替え =====
-async function toggleStar(task) {
-  // スター状態を切り替え
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
+      // await updateTaskStatus(task, "完了"); // H列への文言追加を停止
   task.isStar = !task.isStar;
   
   // 備考を更新
