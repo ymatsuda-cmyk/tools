@@ -760,10 +760,10 @@ function createCard(t) {
     jumpToExcel(t.rowIndex);
   });
 
-  d.addEventListener("contextmenu", (e) => {
+  d.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openModal(t);
+    await openModal(t);
   });
 
   const row1 = document.createElement("div");
@@ -1134,11 +1134,25 @@ function ensureStatusSymbols(noteText) {
   return lines.join('\n');
 }
 
-function openModal(task) {
+async function openModal(task) {
   currentTask = task;
 
-  // 元の備考内容を保存
-  const originalNote = task.note || "";
+  // O列から最新の備考内容を取得
+  let originalNote = "";
+  try {
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
+      const noteCell = sheet.getRange(`O${task.rowIndex}`);
+      noteCell.load("values");
+      await ctx.sync();
+      
+      originalNote = (noteCell.values[0][0] || "").toString();
+    });
+  } catch (error) {
+    console.log("O列の読み取りエラー:", error);
+    // エラーの場合はタスクオブジェクトの値を使用
+    originalNote = task.note || "";
+  }
   
   // 備考欄のテンプレート処理
   let displayNote = originalNote;
@@ -1176,8 +1190,8 @@ function openModal(task) {
   const handleOverlayClick = (event) => {
     if (event.target === modal) {
       const currentNote = document.getElementById("modal-note").value;
-      // 変更がない場合のみ閉じる
-      if (currentNote === originalNote) {
+      // 変更がない場合のみ閉じる（O列から取得した最新値と比較）
+      if (currentNote === displayNote) {
         closeModal();
       }
     }
