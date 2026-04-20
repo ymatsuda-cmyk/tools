@@ -348,11 +348,11 @@ function adjustLaneHeights() {
     return;
   }
   
-  // デバウンス処理（連続呼び出しを制限）
+  // デバウンス処理を200msに延長してスクロール操作との競合を削減
   clearTimeout(heightAdjustTimeout);
   heightAdjustTimeout = setTimeout(() => {
     performHeightAdjustment();
-  }, 50);
+  }, 200);
 }
 
 function performHeightAdjustment() {
@@ -401,12 +401,21 @@ function performHeightAdjustment() {
     
     // 5. 全レーンを同じ高さに統一（一括変更）
     visibleLanes.forEach(lane => {
+      // スクロール位置を保存
+      const cardList = lane.querySelector('.card-list');
+      const scrollTop = cardList ? cardList.scrollTop : 0;
+      
       lane.style.height = finalHeight + 'px';
       lane.style.minHeight = finalHeight + 'px';
       lane.style.maxHeight = finalHeight + 'px';
-      lane.style.overflowY = 'hidden';
+      lane.style.overflowY = 'auto'; // スクロール可能に変更
       lane.style.overflowX = 'hidden';
       lane.style.visibility = 'visible'; // 表示を復活
+      
+      // スクロール位置を復元
+      if (cardList && scrollTop > 0) {
+        cardList.scrollTop = scrollTop;
+      }
     });
     
     // console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
@@ -524,7 +533,7 @@ async function init() {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
     adjustLaneHeights();
-  }, 200); // 十分な遅延でDOM安定化を待つ
+  }, 500); // 遅延を延長してDOM安定化を確実に待つ
   
   // バージョン表示を更新
   if (typeof updateVersionDisplay === 'function') {
@@ -722,11 +731,12 @@ function renderBoard() {
 
   setupDnD();
   
-  // カード描画後にペイン追従幅調整のみ（高さは自動調整で対応）
+  // カード描画後のレイアウト調整を最小限に抑制
   setTimeout(() => {
     const containerWidth = getActualPaneWidth();
     adjustLaneWidths(containerWidth);
-  }, 100);
+    // 高さ調整は必要時のみ実行（スクロール体験を優先）
+  }, 200);
 }
 
 // ===== カード =====

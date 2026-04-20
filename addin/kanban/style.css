@@ -62,8 +62,8 @@ button.active {
   border-radius: 6px;
   min-height: 150px; /* 初期最小値、JavaScriptで最適化される */
   height: 150px; /* 初期固定値でちらつき防止 */
-  overflow-y: hidden; /* スクロールバーを非表示 */
-  overflow-x: hidden; /* 横スクロールバーも非表示 */
+  overflow-y: auto; /* スクロール可能に変更 */
+  overflow-x: hidden; /* 横スクロールバーは非表示 */
   box-sizing: border-box;
   word-wrap: break-word;
   display: flex;
@@ -72,14 +72,23 @@ button.active {
   transition: none; /* トランジションを無効化してちらつき防止 */
 }
 
-/* レーンのスクロールバーを完全に非表示にする */
+/* レーンのスクロールバーをスタイリング */
 .lane::-webkit-scrollbar {
-  display: none; /* Webkit系ブラウザ用 */
+  width: 6px;
 }
 
-.lane {
-  -ms-overflow-style: none; /* IE/Edge用 */
-  scrollbar-width: none; /* Firefox用 */
+.lane::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.lane::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.lane::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .lane h3 {
@@ -94,9 +103,9 @@ button.active {
   gap: 8px; /* カード間の余白 */
   flex: 1; /* 残りスペースを占有 */
   width: 100%;
-  overflow-y: auto; /* カードが多い場合はカードリスト内でスクロール */
+  overflow-y: visible; /* 親レーンがスクロール管理するためvisible */
   overflow-x: hidden; /* 横スクロールは不要 */
-  max-height: calc(100% - 40px); /* ヘッダー分を引いた高さまで */
+  max-height: none; /* 高さ制限を削除、親レーンで管理 */
   padding-right: 2px; /* スクロールバーの余白 */
   transition: none; /* トランジション無効でちらつき防止 */
 }
