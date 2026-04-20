@@ -1253,8 +1253,17 @@ async function saveNote() {
     await ctx.sync();
   });
 
+  // タスクオブジェクトの備考を直接更新（Excel再読み込みを回避）
+  if (currentTask) {
+    currentTask.note = note;
+    // スター状態も更新
+    currentTask.isStar = note.startsWith('★');
+  }
+
   closeModal();
-  await init();
+  
+  // 軽量な再描画（Excelデータ再読み込みなし）
+  renderBoard();
 }
 
 function isMatch(t) {
