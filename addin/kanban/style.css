@@ -281,21 +281,28 @@ button.active {
 
 .modal-content {
   background: #fff;
-  padding: 15px;
+  padding: 20px; /* paddingを統一して増加 */
   border-radius: 6px;
-  width: 300px;
+  width: 600px; /* 幅を大幅に拡張 */
+  max-width: 90vw; /* 画面の90%を超えない */
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-sizing: border-box; /* paddingを含めたサイズ計算 */
 }
 
 .modal textarea {
   width: 100%;
   margin-top: 10px;
   margin-bottom: 10px;
-  padding: 8px;
+  padding: 12px; /* paddingを増加して操作性向上 */
   border: 1px solid #ddd;
   border-radius: 4px;
-  resize: vertical;
+  resize: both; /* 横方向のリサイズも有効化 */
   min-height: 300px;
+  min-width: 200px; /* 最小幅を設定 */
+  box-sizing: border-box; /* paddingを含めたサイズ計算 */
+  font-family: inherit; /* フォントファミリー継承 */
+  font-size: 14px; /* 読みやすいフォントサイズ */
+  line-height: 1.4; /* 行間を調整 */
 }
 
 .modal-actions {
