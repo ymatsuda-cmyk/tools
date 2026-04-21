@@ -23,6 +23,9 @@ Office.onReady(() => {
   // 保存されたフィルター設定を復元
   restoreSavedFilters();
   
+  // フィルターセクションの表示状態を復元
+  restoreFilterSectionState();
+  
   // 保留表示設定を復元
   restoreHeldDisplay();
   
@@ -1319,5 +1322,80 @@ function isMatch(t) {
     case "all":
     default:
       return true;
+  }
+}
+
+// ===== フィルタエリア表示制御 =====
+// フィルタセクションの表示状態を管理
+let filterSectionState = {
+  'user-filter': false,
+  'category-filter': false,
+  'period-filter': false
+};
+
+// フィルタエリアの表示/非表示を切り替え
+function toggleFilterSection(sectionId) {
+  // 現在の状態を切り替え
+  filterSectionState[sectionId] = !filterSectionState[sectionId];
+  
+  // DOM要素を取得
+  const section = document.getElementById(sectionId);
+  const button = document.getElementById(`btn-${sectionId}`);
+  
+  if (section && button) {
+    // 表示状態を更新
+    if (filterSectionState[sectionId]) {
+      section.classList.remove('hidden');
+      button.classList.add('active');
+    } else {
+      section.classList.add('hidden');
+      button.classList.remove('active');
+    }
+    
+    // 状態をローカルストレージに保存
+    saveFilterSectionState();
+    
+    // レイアウトを再調整
+    setTimeout(() => {
+      const containerWidth = getActualPaneWidth();
+      adjustLaneWidths(containerWidth);
+    }, 100);
+  }
+}
+
+// フィルタセクションの状態をローカルストレージに保存
+function saveFilterSectionState() {
+  try {
+    localStorage.setItem('kanban-filter-sections', JSON.stringify(filterSectionState));
+  } catch (e) {
+    console.log("Filter section state saving error:", e);
+  }
+}
+
+// フィルタセクションの状態をローカルストレージから復元
+function restoreFilterSectionState() {
+  try {
+    const saved = localStorage.getItem('kanban-filter-sections');
+    if (saved) {
+      filterSectionState = { ...filterSectionState, ...JSON.parse(saved) };
+    }
+    
+    // DOM更新
+    Object.keys(filterSectionState).forEach(sectionId => {
+      const section = document.getElementById(sectionId);
+      const button = document.getElementById(`btn-${sectionId}`);
+      
+      if (section && button) {
+        if (filterSectionState[sectionId]) {
+          section.classList.remove('hidden');
+          button.classList.add('active');
+        } else {
+          section.classList.add('hidden');
+          button.classList.remove('active');
+        }
+      }
+    });
+  } catch (e) {
+    console.log("Filter section state restoration error:", e);
   }
 }

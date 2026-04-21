@@ -37,21 +37,34 @@
   <button onclick="resetSize();" title="サイズとフィルター設定をリセット">Reset</button>
 </div>
 
-<h4>担当者</h4>
-<div id="user-filters"></div>
+<!-- フィルタ制御ボタン -->
+<div class="filter-control-buttons">
+  <button class="filter-toggle-btn" id="btn-user-filter" onclick="toggleFilterSection('user-filter')">担当者</button>
+  <button class="filter-toggle-btn" id="btn-category-filter" onclick="toggleFilterSection('category-filter')">分類</button>
+  <button class="filter-toggle-btn" id="btn-period-filter" onclick="toggleFilterSection('period-filter')">期間</button>
+</div>
 
-<h4>分類</h4>
-<div id="category-filters"></div>
+<div class="filter-section hidden" id="user-filter">
+  <h4>担当者</h4>
+  <div id="user-filters"></div>
+</div>
 
-<h4>期間</h4>
-<div>
-  <button data-period="all" onclick="setPeriod('all')">全期間</button>
-  <button data-period="past" onclick="setPeriod('past')">以前</button>
-  <button data-period="week" onclick="setPeriod('week')">今週</button>
-  <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
-  <button data-period="future" onclick="setPeriod('future')">以降</button>
-  <button data-period="today" onclick="setPeriod('today')">本日★</button>
-  <button data-period="todo" onclick="setPeriod('todo')">TODO</button>
+<div class="filter-section hidden" id="category-filter">
+  <h4>分類</h4>
+  <div id="category-filters"></div>
+</div>
+
+<div class="filter-section hidden" id="period-filter">
+  <h4>期間</h4>
+  <div>
+    <button data-period="all" onclick="setPeriod('all')">全期間</button>
+    <button data-period="past" onclick="setPeriod('past')">以前</button>
+    <button data-period="week" onclick="setPeriod('week')">今週</button>
+    <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
+    <button data-period="future" onclick="setPeriod('future')">以降</button>
+    <button data-period="today" onclick="setPeriod('today')">本日★</button>
+    <button data-period="todo" onclick="setPeriod('todo')">TODO</button>
+  </div>
 </div>
 
 <div>

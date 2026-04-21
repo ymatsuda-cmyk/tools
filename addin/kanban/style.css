@@ -24,6 +24,52 @@ body {
   margin-right: 5px;
 }
 
+/* ===== フィルタ制御ボタン ===== */
+.filter-control-buttons {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-toggle-btn {
+  margin: 2px;
+  padding: 4px 8px;
+  cursor: pointer;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.filter-toggle-btn:hover {
+  background: #e0e0e0;
+  border-color: #999;
+}
+
+.filter-toggle-btn.active {
+  background: #0078d4;
+  color: #fff;
+  border: 1px solid #0078d4;
+}
+
+/* ===== フィルタエリア ===== */
+.filter-section {
+  margin-bottom: 10px;
+}
+
+.filter-section.hidden {
+  display: none;
+}
+
+.filter-section h4 {
+  margin: 10px 0 5px 0;
+  font-size: 14px;
+  color: #333;
+}
+
 /* ===== フィルタボタン ===== */
 button {
   margin: 2px;
