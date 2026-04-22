@@ -39,10 +39,10 @@ function restoreSavedSize() {
     if (savedSize) {
       const size = JSON.parse(savedSize);
       
-      // 最小サイズの制限
-      const minWidth = 200;
-      const minHeight = 300;
-      const width = Math.max(size.width || 200, minWidth);
+// 最小サイズの制限（より小さく設定して画面に収める）
+  const minWidth = 180;
+  const minHeight = 300;
+  const width = Math.max(size.width || 180, minWidth);
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
@@ -79,7 +79,7 @@ function restoreSavedSize() {
 }
 
 function setDefaultSize() {
-  const defaultWidth = 200;
+  const defaultWidth = 180;
   const defaultHeight = 600;
   
   document.documentElement.style.minWidth = defaultWidth + "px";
@@ -220,8 +220,8 @@ function getActualPaneWidth() {
     paneWidth = windowWidth || 400;
   }
   
-  // 最低幅を保証
-  return Math.max(paneWidth, 200);
+  // 最低幅を保証（より小さく設定）
+  return Math.max(paneWidth, 180);
 }
 
 // ===== レーン幅調整機能 =====
@@ -231,13 +231,13 @@ function adjustLaneWidths(containerWidth) {
     containerWidth = getActualPaneWidth();
   }
   
-  // ペイン幅に完全追従するための計算
-  const margin = 10; // body marginを小さくして最大限活用
-  const gap = 10; // レーン間ギャップ
-  const padding = 8; // レーン内paddingを小さくしてカード領域を幅広く
+  // ペイン幅に完全追従するための計算（さらに小さく設定）
+  const margin = 5; // body marginをさらに小さくして最大限活用
+  const gap = 5; // レーン間ギャップを小さくして画面に収める
+  const padding = 6; // レーン内paddingを小さくしてカード領域を幅広く
   
   // ボードの利用可能幅を最大限活用
-  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 200);
+  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 180);
   
   // 保留レーンが表示されているか確認
   const heldLane = document.getElementById('held');
@@ -253,8 +253,8 @@ function adjustLaneWidths(containerWidth) {
   // 各レーンの幅を計算（等幅分割でペインをフル活用）
   let laneWidth = Math.floor(availableWidth / laneCount);
   
-  // 最小幅の保証（カード80px + padding）
-  const minLaneWidth = 80 + padding; 
+  // 最小幅の保証（カード65px + padding）を小さくして画面に収める
+  const minLaneWidth = 65 + padding; 
   laneWidth = Math.max(laneWidth, minLaneWidth);
   
   // ボード全体をペイン幅に完全追従させる
@@ -262,7 +262,7 @@ function adjustLaneWidths(containerWidth) {
   if (boardElement) {
     boardElement.style.width = '100%'; // ペイン幅に完全追従
     boardElement.style.maxWidth = 'none';
-    boardElement.style.minWidth = '200px';
+    boardElement.style.minWidth = '180px';
     boardElement.style.boxSizing = 'border-box';
   }
   
@@ -302,7 +302,7 @@ function adjustCardWidths(maxCardWidth) {
   cards.forEach(card => {
     // カードをレーン幅に完全追従させる
     card.style.width = '100%'; 
-    card.style.minWidth = '80px'; // 最小幅を小さくして狭いペインでも対応
+    card.style.minWidth = '65px'; // 最小幅をさらに小さくして狭いペインでも対応
     card.style.maxWidth = 'none'; // 最大幅制限を完全解除
     card.style.boxSizing = 'border-box';
     card.style.wordWrap = 'break-word'; // 長いテキストの折り返し
