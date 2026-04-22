@@ -1,7 +1,7 @@
 body {
   font-family: sans-serif;
-  margin: 2px; /* マージンを極小にして画面を最大限活用 */
-  min-width: 150px;
+  margin: 1px; /* マージンを最小にしてデスクトップ版に対応 */
+  min-width: 120px;
   width: 100%;
   max-width: 100%; /* ペイン幅に完全追従 */
   box-sizing: border-box;
@@ -86,11 +86,11 @@ button.active {
 /* ===== ボード =====  */
 #board {
   display: flex;
-  gap: 3px; /* ギャップを極小にして画面に収める */
+  gap: 2px; /* ギャップを最小にしてデスクトップ版に対応 */
   margin-top: 10px;
   width: 100%; /* ペイン幅に完全追従 */
   max-width: 100%;
-  min-width: 150px;
+  min-width: 120px;
   overflow-x: auto; /* 必要時のみ横スクロール */
   overflow-y: visible;
   align-items: flex-start;
@@ -102,9 +102,9 @@ button.active {
 .lane {
   /* ペイン幅に完全追従するためのflexbox設定 */
   flex: 0 0 auto; /* 成長・縮小しない、JavaScriptで制御 */
-  min-width: 59px; /* カード55px + padding4px */
+  min-width: 51px; /* カード48px + padding3px */
   background: #f4f4f4d1;
-  padding: 4px; /* paddingを極小にしてカード領域を最大化 */
+  padding: 3px; /* paddingを最小にしてデスクトップ版対応 */
   border-radius: 6px;
   min-height: 150px; /* 初期最小値、JavaScriptで最適化される */
   height: 150px; /* 初期固定値でちらつき防止 */
@@ -186,22 +186,22 @@ button.active {
 /* ===== カード ===== */
 .card {
   background: #fff;
-  margin-bottom: 6px;
-  padding: 2px 4px; /* paddingを極小にして内容領域を最大化 */
+  margin-bottom: 4px;
+  padding: 1px 3px; /* paddingを最小にしてデスクトップ版対応 */
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
   transition: box-shadow 0.15s ease; /* box-shadowのみトランジション */
   width: calc(100% - 2px); /* レーンの全幅を使用（はみ出し防止のためわずかな余白） */
-  min-width: 55px; /* 最小幅を極小にして狭いペインでも対応 */
+  min-width: 48px; /* 最小幅をデスクトップ版対応で最小に */
   max-width: none; /* 最大幅制限を解除してペインと連動 */
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
-  line-height: 1.2;
+  line-height: 1.1;
   flex-shrink: 0;
-  font-size: 11px; /* フォントサイズを小さくして情報密度を高める */
+  font-size: 10px; /* フォントサイズを最小にして情報密度を高める */
 }
 
 /* ===== スター付きカード ===== */

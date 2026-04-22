@@ -39,10 +39,10 @@ function restoreSavedSize() {
     if (savedSize) {
       const size = JSON.parse(savedSize);
       
-// 最小サイズの制限（極小に設定して画面に収める）
-  const minWidth = 150;
+// 最小サイズの制限（デスクトップ版対応で極小に設定）
+  const minWidth = 120;
   const minHeight = 300;
-  const width = Math.max(size.width || 150, minWidth);
+  const width = Math.max(size.width || 120, minWidth);
       const height = Math.max(size.height || 600, minHeight);
       
       // DOM要素のサイズを設定
@@ -79,7 +79,7 @@ function restoreSavedSize() {
 }
 
 function setDefaultSize() {
-  const defaultWidth = 150;
+  const defaultWidth = 120;
   const defaultHeight = 600;
   
   document.documentElement.style.minWidth = defaultWidth + "px";
@@ -204,7 +204,7 @@ function setupSizeMonitoring() {
   });
 }
 
-// 実際のペイン幅を正確に取得する関数
+// 実際のペイン幅を正確に取得する関数（デスクトップ版対応強化）
 function getActualPaneWidth() {
   // 複数の方法で幅を取得し、最も正確なものを選択
   const bodyWidth = document.body.clientWidth;
@@ -212,16 +212,16 @@ function getActualPaneWidth() {
   const docElementWidth = document.documentElement.clientWidth;
   const windowWidth = window.innerWidth;
   
-  // タスクペインの場合は通常bodyのclientWidthが最も適切
+  // デスクトップ版とWeb版の差を考慮した幅取得
   let paneWidth = Math.max(bodyWidth || 0, docElementWidth || 0);
   
-  // フォールバックとしてwindowWidthを使用
-  if (paneWidth <= 0) {
-    paneWidth = windowWidth || 400;
+  // デスクトップ版で幅が正確に取得できない場合の対策
+  if (paneWidth <= 0 || paneWidth > 2000) {
+    paneWidth = Math.min(windowWidth || 300, bodyOffsetWidth || 300);
   }
   
-  // 最低幅を保証（さらに小さく設定）
-  return Math.max(paneWidth, 150);
+  // 最低幅を保証（デスクトップ版対応で極小設定）
+  return Math.max(paneWidth, 120);
 }
 
 // ===== レーン幅調整機能 =====
@@ -231,13 +231,13 @@ function adjustLaneWidths(containerWidth) {
     containerWidth = getActualPaneWidth();
   }
   
-  // ペイン幅に完全追従するための計算（極小設定で最大収容）
-  const margin = 2; // body marginを極小にして最大限活用
-  const gap = 3; // レーン間ギャップを極小にして画面に収める
-  const padding = 4; // レーン内paddingを極小にしてカード領域を確保
+  // ペイン幅に完全追従するための計算（デスクトップ版対応でさらに極小設定）
+  const margin = 1; // body marginを最小にして最大限活用
+  const gap = 2; // レーン間ギャップを最小にしてデスクトップ版に対応
+  const padding = 3; // レーン内paddingを最小にしてカード領域を確保
   
   // ボードの利用可能幅を最大限活用
-  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 150);
+  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 120);
   
   // 保留レーンが表示されているか確認
   const heldLane = document.getElementById('held');
@@ -253,8 +253,8 @@ function adjustLaneWidths(containerWidth) {
   // 各レーンの幅を計算（等幅分割でペインをフル活用）
   let laneWidth = Math.floor(availableWidth / laneCount);
   
-  // 最小幅の保証（カード55px + padding）を極小にして画面に収める
-  const minLaneWidth = 55 + padding; 
+  // 最小幅の保証（カード48px + padding）をデスクトップ版対応で最小に
+  const minLaneWidth = 48 + padding; 
   laneWidth = Math.max(laneWidth, minLaneWidth);
   
   // ボード全体をペイン幅に完全追従させる
@@ -262,7 +262,7 @@ function adjustLaneWidths(containerWidth) {
   if (boardElement) {
     boardElement.style.width = '100%'; // ペイン幅に完全追従
     boardElement.style.maxWidth = 'none';
-    boardElement.style.minWidth = '150px';
+    boardElement.style.minWidth = '120px';
     boardElement.style.boxSizing = 'border-box';
   }
   
@@ -302,7 +302,7 @@ function adjustCardWidths(maxCardWidth) {
   cards.forEach(card => {
     // カードをレーン幅に完全追従させる
     card.style.width = '100%'; 
-    card.style.minWidth = '55px'; // 最小幅を極小にして狭いペインでも対応
+    card.style.minWidth = '48px'; // 最小幅をデスクトップ版対応で最小に
     card.style.maxWidth = 'none'; // 最大幅制限を完全解除
     card.style.boxSizing = 'border-box';
     card.style.wordWrap = 'break-word'; // 長いテキストの折り返し
