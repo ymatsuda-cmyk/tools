@@ -136,7 +136,7 @@
           v = String(v);
           obj[colDef.key] = v;
         }
-        if (r === 0) {
+        if (r === 130) {
           console.log('Excel row[130]:', row);
           console.log('Parsed bug obj[130]:', obj);
         }
