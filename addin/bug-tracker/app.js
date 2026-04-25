@@ -92,57 +92,132 @@
   }
 
   async function loadFromExcel() {
-    if (!state.inOffice) {
-      state.bugs = demoData();
-      return;
-    }
-    setStatus('読み込み中...');
-    await Excel.run(async (ctx) => {
-      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-      const used = sheet.getUsedRange(true);
-      used.load(['rowCount', 'columnCount']);
-      await ctx.sync();
-
-      const rowCount = used.rowCount || 0;
-      if (rowCount < DATA_START) { state.bugs = []; return; }
-
-      const dataRange = sheet.getRangeByIndexes(
-        DATA_START - 1, 0, rowCount - (DATA_START - 1), COL_COUNT
-      );
-      dataRange.load(['values', 'numberFormat']);
-      await ctx.sync();
-
-      const values = dataRange.values;
-      const bugs = [];
-      for (let r = 0; r < values.length; r++) {
-        const row = values[r];
-        if (row.every(v => v === '' || v === null)) continue;
-        const obj = { rowIndex: DATA_START + r };
-        for (let c = 0; c < COL_COUNT; c++) {
-          const colDef = COLUMNS[c];
-          let v = row[c];
-          if (colDef.type === 'date') v = excelSerialToDateStr(v);
-          if (v === null || v === undefined) v = '';
-          v = String(v);
-          obj[colDef.key] = v;
-        }
-        if (r === 130) {
-          console.log('Excel row[130]:', row);
-          console.log('Parsed bug obj[130]:', obj);
-        }
-        bugs.push(obj);
+      if (tabKey === 'kaiseki') {
+        // 解析タブ：原因（編集可）、解析完了チェック
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '原因' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 3,
+              style: 'width:98%;',
+              placeholder: '原因を入力してください',
+              'data-key': 'cause'
+            });
+            ta.textContent = bug.cause || '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'kaisekikanryo' }),
+            el('span', { text: '解析完了（修正待ちに変更）' })
+          ])
+        ]));
+      } else if (tabKey === 'shochi') {
+        // 処置タブ：影響範囲、処置内容、修正Ver、対応者（編集可）、処置完了チェック
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '影響範囲' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'scope' });
+            inp.value = bug.scope || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '処置内容' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '処置内容を入力してください',
+              'data-key': 'fix'
+            });
+            ta.textContent = bug.fix || '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '修正Ver' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'fixVer' });
+            inp.value = bug.fixVer || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '対応者' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'fixer' });
+            inp.value = bug.fixer || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'shochikanryo' }),
+            el('span', { text: '処置完了（確認待ちに変更）' })
+          ])
+        ]));
+      } else if (tabKey === 'kekka') {
+        // 結果確認タブ：確認内容、確認者（編集可）、確認完了・再発チェック
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '確認内容' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '確認内容を入力してください',
+              'data-key': 'verify'
+            });
+            ta.textContent = bug.verify || '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '確認者' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'verifier' });
+            inp.value = bug.verifier || bug.reporter || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'kekkakanryo' }),
+            el('span', { text: '確認完了（完了に変更）' })
+          ]),
+          el('label', { style: 'margin-left:16px;' }, [
+            el('input', { type: 'checkbox', 'data-key': 'saihatsu' }),
+            el('span', { text: '再発' })
+          ])
+        ]));
+      } else if (tabKey === 'kanri') {
+        // 管理タブ：タグ、優先度、影響度（編集可）
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: 'タグ' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'tag' });
+            inp.value = bug.tag || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '優先度' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'priority' });
+            inp.value = bug.priority || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '影響度' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'severity' });
+            inp.value = bug.severity || '';
+            return inp;
+          })()
+        ]));
       }
-      state.bugs = bugs;
-    });
-    setStatus('');
-  }
-
-  async function saveBugToExcel(bug) {
-    if (!state.inOffice) {
-      const idx = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
-      if (idx >= 0) state.bugs[idx] = bug;
-      return;
-    }
     setStatus('保存中...');
     await Excel.run(async (ctx) => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
