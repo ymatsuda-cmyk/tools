@@ -469,7 +469,48 @@
               el('span', { text: '解析完了（修正待ちに変更）' })
             ])
           ]));
-        } else if (tabKey === 'shochi') {
+      } else if (tabKey === 'shochi') {
+        // 処置タブ：影響範囲、処置内容、修正Ver、対応者（編集可）、処置完了チェック
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '影響範囲' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'scope' });
+            inp.value = bug.scope || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '処置内容' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '処置内容を入力してください',
+              'data-key': 'fix'
+            });
+            ta.textContent = bug.fix || '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '修正Ver' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'fixVer' });
+            inp.value = bug.fixVer || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '対応者' }), el('br'),
+          (() => {
+            const inp = el('input', { type: 'text', style: 'width:98%;', 'data-key': 'fixer' });
+            inp.value = bug.fixer || '';
+            return inp;
+          })()
+        ]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'shochikanryo' }),
             el('span', { text: '処置完了（確認待ちに変更）' })
           ])
         ]));
