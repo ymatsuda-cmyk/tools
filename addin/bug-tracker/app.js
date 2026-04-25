@@ -285,7 +285,8 @@
       { key: 'jisho', label: '事象' },
       { key: 'kaiseki', label: '解析' },
       { key: 'shochi', label: '処置' },
-      { key: 'kekka', label: '結果確認' }
+      { key: 'kekka', label: '結果確認' },
+      { key: 'kanri', label: '管理' }
     ];
     // 状況に応じた初期タブ
     const statusTabMap = {
@@ -297,6 +298,19 @@
       '完了': 'jisho'
     };
     let activeTab = statusTabMap[bug.status] || 'jisho';
+
+    // 常時表示エリア
+    const alwaysArea = el('div', { class: 'always-area', style: 'margin-bottom:12px;padding:8px 0;border-bottom:1px solid #ccc;' }, [
+      el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;' }, [
+        el('div', {}, [el('b', { text: 'ID: ' }), el('span', { text: bug.id || '' })]),
+        el('div', {}, [el('b', { text: '状況: ' }), el('span', { text: bug.status || '' })]),
+        el('div', {}, [el('b', { text: 'タイトル: ' }), el('span', { text: bug.title || '' })]),
+        el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: bug.origin || '' })]),
+        el('div', {}, [el('b', { text: '発生日: ' }), el('span', { text: bug.occurredOn || '' })]),
+        el('div', {}, [el('b', { text: '登録者: ' }), el('span', { text: bug.reporter || '' })])
+      ])
+    ]);
+    body.appendChild(alwaysArea);
 
     const tabHeader = el('div', { class: 'tab-header', style: 'display:flex;gap:8px;margin-bottom:8px;' },
       tabNames.map(tab => {
@@ -323,33 +337,63 @@
     function renderTab(tabKey) {
       tabContent.innerHTML = '';
       if (tabKey === 'jisho') {
-        // 事象タブ: ID、状況、タイトル、タグ、優先度、影響度、発生日、登録者、発生起因、再現手順、期待する動作、実際の動作
-        tabContent.appendChild(el('div', { style: 'margin-bottom:8px;font-weight:bold;' }, [el('span', { text: `ID: ${bug.id || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `状況: ${bug.status || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `タイトル: ${bug.title || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `タグ: ${bug.tag || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `優先度: ${bug.priority || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `影響度: ${bug.severity || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `発生日: ${bug.occurredOn || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `登録者: ${bug.reporter || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `発生起因: ${bug.origin || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `再現手順: ${bug.steps || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `期待する動作: ${bug.expected || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `実際の動作: ${bug.actual || ''}` })]));
+        // 事象タブ：再現手順、期待する動作、実際の動作（編集可）
+        tabContent.appendChild(el('div', {}, [el('label', { text: '再現手順' }), el('br'),
+          el('textarea', { rows: 5, style: 'width:98%;', value: bug.steps || '', 'data-key': 'steps' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '期待する動作' }), el('br'),
+          el('textarea', { rows: 2, style: 'width:98%;', value: bug.expected || '', 'data-key': 'expected' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '実際の動作' }), el('br'),
+          el('textarea', { rows: 2, style: 'width:98%;', value: bug.actual || '', 'data-key': 'actual' })]));
       } else if (tabKey === 'kaiseki') {
-        // 解析タブ: 原因（チャット形式は今後実装）
-        tabContent.appendChild(el('div', { style: 'margin-bottom:8px;font-weight:bold;' }, [el('span', { text: '原因（チャット形式は今後実装）' })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: bug.cause || '' })]));
+        // 解析タブ：原因（編集可）、解析完了チェック
+        tabContent.appendChild(el('div', {}, [el('label', { text: '原因' }), el('br'),
+          el('textarea', { rows: 3, style: 'width:98%;', value: bug.cause || '', 'data-key': 'cause' })]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'kaisekikanryo' }),
+            el('span', { text: '解析完了（修正待ちに変更）' })
+          ])
+        ]));
       } else if (tabKey === 'shochi') {
-        // 処置タブ: 影響範囲、処置内容、修正Ver、対応者
-        tabContent.appendChild(el('div', {}, [el('span', { text: `影響範囲: ${bug.scope || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `処置内容: ${bug.fix || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `修正Ver: ${bug.fixVer || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `対応者: ${bug.fixer || ''}` })]));
+        // 処置タブ：影響範囲、処置内容、修正Ver、対応者（編集可）、処置完了チェック
+        tabContent.appendChild(el('div', {}, [el('label', { text: '影響範囲' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.scope || '', 'data-key': 'scope' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '処置内容' }), el('br'),
+          el('textarea', { rows: 2, style: 'width:98%;', value: bug.fix || '', 'data-key': 'fix' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '対応者' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.fixer || '', 'data-key': 'fixer' })]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'shochikanryo' }),
+            el('span', { text: '処置完了（確認待ちに変更）' })
+          ])
+        ]));
       } else if (tabKey === 'kekka') {
-        // 結果確認タブ: 確認内容、確認者
-        tabContent.appendChild(el('div', {}, [el('span', { text: `確認内容: ${bug.verify || ''}` })]));
-        tabContent.appendChild(el('div', {}, [el('span', { text: `確認者: ${bug.verifier || ''}` })]));
+        // 結果確認タブ：確認内容、確認者（編集可）、確認完了・再発チェック
+        tabContent.appendChild(el('div', {}, [el('label', { text: '確認内容' }), el('br'),
+          el('textarea', { rows: 2, style: 'width:98%;', value: bug.verify || '', 'data-key': 'verify' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '確認者' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.verifier || bug.reporter || '', 'data-key': 'verifier' })]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            el('input', { type: 'checkbox', 'data-key': 'kekkakanryo' }),
+            el('span', { text: '確認完了（完了に変更）' })
+          ]),
+          el('label', { style: 'margin-left:16px;' }, [
+            el('input', { type: 'checkbox', 'data-key': 'saihatsu' }),
+            el('span', { text: '再発' })
+          ])
+        ]));
+      } else if (tabKey === 'kanri') {
+        // 管理タブ：タグ、優先度、影響度（編集可）
+        tabContent.appendChild(el('div', {}, [el('label', { text: 'タグ' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.tag || '', 'data-key': 'tag' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '優先度' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.priority || '', 'data-key': 'priority' })]));
+        tabContent.appendChild(el('div', {}, [el('label', { text: '影響度' }), el('br'),
+          el('input', { type: 'text', style: 'width:98%;', value: bug.severity || '', 'data-key': 'severity' })]));
       }
     }
 
