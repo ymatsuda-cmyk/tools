@@ -137,8 +137,8 @@
           obj[colDef.key] = v;
         }
         if (r === 0) {
-          console.log('Excel row[0]:', row);
-          console.log('Parsed bug obj[0]:', obj);
+          console.log('Excel row[130]:', row);
+          console.log('Parsed bug obj[130]:', obj);
         }
         bugs.push(obj);
       }
