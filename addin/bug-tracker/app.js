@@ -338,12 +338,36 @@
       tabContent.innerHTML = '';
       if (tabKey === 'jisho') {
         // 事象タブ：再現手順、期待する動作、実際の動作（編集可）
-        tabContent.appendChild(el('div', {}, [el('label', { text: '再現手順' }), el('br'),
-          el('textarea', { rows: 5, style: 'width:98%;', value: bug.steps || '', 'data-key': 'steps' })]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '期待する動作' }), el('br'),
-          el('textarea', { rows: 2, style: 'width:98%;', value: bug.expected || '', 'data-key': 'expected' })]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '実際の動作' }), el('br'),
-          el('textarea', { rows: 2, style: 'width:98%;', value: bug.actual || '', 'data-key': 'actual' })]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '再現手順' }), el('br'),
+          el('textarea', {
+            rows: 5,
+            style: 'width:98%;',
+            value: (bug.steps !== undefined && bug.steps !== null) ? bug.steps : '',
+            placeholder: '再現手順を入力してください',
+            'data-key': 'steps'
+          })
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '期待する動作' }), el('br'),
+          el('textarea', {
+            rows: 2,
+            style: 'width:98%;',
+            value: (bug.expected !== undefined && bug.expected !== null) ? bug.expected : '',
+            placeholder: '期待する動作を入力してください',
+            'data-key': 'expected'
+          })
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '実際の動作' }), el('br'),
+          el('textarea', {
+            rows: 2,
+            style: 'width:98%;',
+            value: (bug.actual !== undefined && bug.actual !== null) ? bug.actual : '',
+            placeholder: '実際の動作を入力してください',
+            'data-key': 'actual'
+          })
+        ]));
       } else if (tabKey === 'kaiseki') {
         // 解析タブ：原因（編集可）、解析完了チェック
         tabContent.appendChild(el('div', {}, [el('label', { text: '原因' }), el('br'),
