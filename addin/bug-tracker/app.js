@@ -336,33 +336,42 @@
         console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '再現手順' }), el('br'),
-          el('textarea', {
-            rows: 5,
-            style: 'width:98%;',
-            value: (bug.steps !== undefined && bug.steps !== null) ? bug.steps : '',
-            placeholder: '再現手順を入力してください',
-            'data-key': 'steps'
-          })
+          (() => {
+            const ta = el('textarea', {
+              rows: 5,
+              style: 'width:98%;',
+              placeholder: '再現手順を入力してください',
+              'data-key': 'steps'
+            });
+            ta.textContent = (bug.steps !== undefined && bug.steps !== null) ? bug.steps : '';
+            return ta;
+          })()
         ]));
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '期待する動作' }), el('br'),
-          el('textarea', {
-            rows: 2,
-            style: 'width:98%;',
-            value: (bug.expected !== undefined && bug.expected !== null) ? bug.expected : '',
-            placeholder: '期待する動作を入力してください',
-            'data-key': 'expected'
-          })
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '期待する動作を入力してください',
+              'data-key': 'expected'
+            });
+            ta.textContent = (bug.expected !== undefined && bug.expected !== null) ? bug.expected : '';
+            return ta;
+          })()
         ]));
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '実際の動作' }), el('br'),
-          el('textarea', {
-            rows: 2,
-            style: 'width:98%;',
-            value: (bug.actual !== undefined && bug.actual !== null) ? bug.actual : '',
-            placeholder: '実際の動作を入力してください',
-            'data-key': 'actual'
-          })
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '実際の動作を入力してください',
+              'data-key': 'actual'
+            });
+            ta.textContent = (bug.actual !== undefined && bug.actual !== null) ? bug.actual : '';
+            return ta;
+          })()
         ]));
       } else if (tabKey === 'kaiseki') {
         // 解析タブ：原因（編集可）、解析完了チェック
