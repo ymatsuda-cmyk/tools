@@ -342,102 +342,134 @@
     const body = $('#modal-body');
     body.innerHTML = '';
 
+    // データ初期値
     const newBugData = {
-      id: getNextId(),
-      title: '',
-      status: '新規',
-      updated: getTodayString(),
-      assignee: '',
-      occurredOn: getTodayString(),
+      id: String(getNextId()).padStart(4, '0'),
+      occurredOn: (() => {
+        const d = new Date();
+        return `${d.getMonth()+1}/${d.getDate()}`;
+      })(),
       reporter: '',
       origin: '',
+      reproRate: '',
       steps: '',
       expected: '',
-      actual: '',
-      reproRate: '',
-      cause: '',
-      scope: '',
-      fix: '',
-      fixVer: '',
-      fixer: '',
-      verify: '',
-      verifier: '',
-      tag: '',
-      priority: '',
-      severity: ''
+      actual: ''
     };
 
-    // 必須項目のマップ作成
-    const requiredFields = {
-      title: true,
-      reporter: true,
-      origin: true,
-      steps: true,
-      expected: true,
-      actual: true,
-      reproRate: true
-    };
-
-    const groups = {};
-    COLUMNS.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
-
-    Object.keys(groups).forEach(gname => {
-      const wrap = el('div', { class: 'field-group' });
-      wrap.appendChild(el('h3', { text: gname }));
-      groups[gname].forEach(c => {
+    // 1行目: ID, 発生日, 登録者
+    const row1 = el('div', { class: 'form-row' }, [
+      (() => {
         const fld = el('div', { class: 'field' });
-        const isRequired = requiredFields[c.key];
-        const labelText = c.label + (isRequired ? ' *' : '');
-        const label = el('label', { text: labelText });
-        if (isRequired) label.style.color = '#d32f2f';
-        fld.appendChild(label);
-        
-        let input;
-        const v = newBugData[c.key] || '';
-        
-        if (c.type === 'select') {
-          input = el('select');
-          if (isRequired) input.required = true;
-          c.options.forEach(o => {
-            const op = el('option', { value: o, text: o || '(なし)' });
-            if (o === v) op.selected = true;
-            input.appendChild(op);
-          });
-        } else if (c.type === 'textarea') {
-          input = el('textarea', { rows: c.key === 'steps' ? '2' : '3' });
-          input.value = String(v);
-          if (isRequired) input.required = true;
-          if (c.key === 'steps') {
-            input.placeholder = '1. 再現手順を記載してください\n2. 詳細な操作手順\n3. 発生までの流れ';
-          }
-        } else if (c.type === 'date') {
-          input = el('input', { type: 'date' });
-          input.value = String(v).slice(0, 10);
-          if (isRequired) input.required = true;
-        } else if (c.type === 'readonly') {
-          input = el('input', { type: 'text', readonly: 'readonly' });
-          input.value = String(v);
-        } else {
-          input = el('input', { type: 'text' });
-          input.value = String(v);
-          if (isRequired) input.required = true;
-          if (c.key === 'reporter') {
-            input.maxLength = 6;
-            input.placeholder = '全角6文字以内';
-          }
-        }
-        
-        input.dataset.key = c.key;
-        if (isRequired) {
-          input.style.borderColor = '#d32f2f';
-          input.style.borderWidth = '2px';
-        }
-        
+        fld.appendChild(el('label', { text: 'ID *' }));
+        const input = el('input', { type: 'text', readonly: 'readonly', style: 'width:4em;text-align:center;' });
+        input.value = newBugData.id;
+        input.dataset.key = 'id';
         fld.appendChild(input);
-        wrap.appendChild(fld);
-      });
-      body.appendChild(wrap);
-    });
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field' });
+        fld.appendChild(el('label', { text: '発生日 *' }));
+        const input = el('input', { type: 'text', style: 'width:5em;text-align:center;' });
+        input.value = newBugData.occurredOn;
+        input.required = true;
+        input.dataset.key = 'occurredOn';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field' });
+        fld.appendChild(el('label', { text: '登録者 *' }));
+        const input = el('input', { type: 'text', maxlength: 6, style: 'width:7em;' });
+        input.value = newBugData.reporter;
+        input.required = true;
+        input.placeholder = '全角6文字以内';
+        input.dataset.key = 'reporter';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 2行目: 発生起因, 再現率
+    const row2 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field' });
+        fld.appendChild(el('label', { text: '発生起因 *' }));
+        const input = el('select');
+        ['','定義(通常)','定義(電源断)','定義(通信断)'].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'origin';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field' });
+        fld.appendChild(el('label', { text: '再現率 *' }));
+        const input = el('select');
+        ['','毎回','時々','1回のみ'].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'reproRate';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 3行目: 再現手順（10行）
+    const row3 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '再現手順 *' }));
+        const input = el('textarea', { rows: 10, style: 'width:98%;' });
+        input.value = newBugData.steps;
+        input.required = true;
+        input.placeholder = '1. 再現手順を記載してください\n2. 詳細な操作手順\n3. 発生までの流れ';
+        input.dataset.key = 'steps';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 4行目: 期待する動作
+    const row4 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '期待する動作 *' }));
+        const input = el('textarea', { rows: 2, style: 'width:98%;' });
+        input.value = newBugData.expected;
+        input.required = true;
+        input.dataset.key = 'expected';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 5行目: 実際の動作
+    const row5 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '実際の動作 *' }));
+        const input = el('textarea', { rows: 2, style: 'width:98%;' });
+        input.value = newBugData.actual;
+        input.required = true;
+        input.dataset.key = 'actual';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // レイアウトをbodyに追加
+    body.appendChild(row1);
+    body.appendChild(row2);
+    body.appendChild(row3);
+    body.appendChild(row4);
+    body.appendChild(row5);
 
     $('#modal').classList.remove('hidden');
   }
