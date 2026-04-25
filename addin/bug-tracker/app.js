@@ -279,44 +279,81 @@
 
     const body = $('#modal-body');
     body.innerHTML = '';
-    const groups = {};
-    COLUMNS.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
 
-    Object.keys(groups).forEach(gname => {
-      const wrap = el('div', { class: 'field-group' });
-      wrap.appendChild(el('h3', { text: gname }));
-      groups[gname].forEach(c => {
-        const fld = el('div', { class: 'field' });
-        fld.appendChild(el('label', { text: c.label }));
-        let input;
-        const v = bug[c.key] ?? '';
-        if (c.type === 'select') {
-          input = el('select');
-          c.options.forEach(o => {
-            const op = el('option', { value: o, text: o || '(なし)' });
-            if (o === v) op.selected = true;
-            input.appendChild(op);
-          });
-        } else if (c.type === 'textarea') {
-          input = el('textarea', { rows: '3' });
-          input.value = String(v);
-        } else if (c.type === 'date') {
-          input = el('input', { type: 'date' });
-          input.value = String(v).slice(0, 10);
-        } else if (c.type === 'readonly') {
-          input = el('input', { type: 'text', readonly: 'readonly' });
-          input.value = String(v);
-        } else {
-          input = el('input', { type: 'text' });
-          input.value = String(v);
-        }
-        input.dataset.key = c.key;
-        fld.appendChild(input);
-        wrap.appendChild(fld);
-      });
-      body.appendChild(wrap);
-    });
+    // タブUI
+    const tabNames = [
+      { key: 'jisho', label: '事象' },
+      { key: 'kaiseki', label: '解析' },
+      { key: 'shochi', label: '処置' },
+      { key: 'kekka', label: '結果確認' }
+    ];
+    // 状況に応じた初期タブ
+    const statusTabMap = {
+      '新規': 'jisho',
+      '解析中': 'kaiseki',
+      '修正待ち': 'shochi',
+      '確認待ち': 'kekka',
+      '再発': 'kekka',
+      '完了': 'jisho'
+    };
+    let activeTab = statusTabMap[bug.status] || 'jisho';
 
+    const tabHeader = el('div', { class: 'tab-header', style: 'display:flex;gap:8px;margin-bottom:8px;' },
+      tabNames.map(tab => {
+        const btn = el('button', {
+          class: 'tab-btn' + (activeTab === tab.key ? ' active' : ''),
+          type: 'button',
+          style: 'padding:6px 16px;'
+        }, [el('span', { text: tab.label })]);
+        btn.dataset.tab = tab.key;
+        btn.addEventListener('click', () => {
+          body.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderTab(tab.key);
+        });
+        return btn;
+      })
+    );
+    body.appendChild(tabHeader);
+
+    // タブ内容表示部
+    const tabContent = el('div', { class: 'tab-content' });
+    body.appendChild(tabContent);
+
+    function renderTab(tabKey) {
+      tabContent.innerHTML = '';
+      if (tabKey === 'jisho') {
+        // 事象タブ: ID、状況、タイトル、タグ、優先度、影響度、発生日、登録者、発生起因、再現手順、期待する動作、実際の動作
+        tabContent.appendChild(el('div', { style: 'margin-bottom:8px;font-weight:bold;' }, [el('span', { text: `ID: ${bug.id || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `状況: ${bug.status || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `タイトル: ${bug.title || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `タグ: ${bug.tag || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `優先度: ${bug.priority || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `影響度: ${bug.severity || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `発生日: ${bug.occurredOn || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `登録者: ${bug.reporter || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `発生起因: ${bug.origin || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `再現手順: ${bug.steps || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `期待する動作: ${bug.expected || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `実際の動作: ${bug.actual || ''}` })]));
+      } else if (tabKey === 'kaiseki') {
+        // 解析タブ: 原因（チャット形式は今後実装）
+        tabContent.appendChild(el('div', { style: 'margin-bottom:8px;font-weight:bold;' }, [el('span', { text: '原因（チャット形式は今後実装）' })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: bug.cause || '' })]));
+      } else if (tabKey === 'shochi') {
+        // 処置タブ: 影響範囲、処置内容、修正Ver、対応者
+        tabContent.appendChild(el('div', {}, [el('span', { text: `影響範囲: ${bug.scope || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `処置内容: ${bug.fix || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `修正Ver: ${bug.fixVer || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `対応者: ${bug.fixer || ''}` })]));
+      } else if (tabKey === 'kekka') {
+        // 結果確認タブ: 確認内容、確認者
+        tabContent.appendChild(el('div', {}, [el('span', { text: `確認内容: ${bug.verify || ''}` })]));
+        tabContent.appendChild(el('div', {}, [el('span', { text: `確認者: ${bug.verifier || ''}` })]));
+      }
+    }
+
+    renderTab(activeTab);
     $('#modal').classList.remove('hidden');
   }
 
