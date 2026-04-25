@@ -324,21 +324,47 @@
     state.editingRow = null;
   }
   async function saveModal() {
-    const bug = state.bugs.find(b => b.rowIndex === state.editingRow);
-    if (!bug) { closeModal(); return; }
-    $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
-      const k = inp.dataset.key;
-      const col = COLUMNS.find(c => c.key === k);
-      if (!col || col.type === 'readonly') return;
-      bug[k] = inp.value;
-    });
-    try {
-      await saveBugToExcel(bug);
-      render();
-      closeModal();
-    } catch (e) {
-      console.error(e);
-      setStatus('保存失敗: ' + (e.message || e));
+    if (state.editingRow === 'new') {
+      // 新規登録の場合
+      const validation = validateNewBugForm();
+      if (!validation.isValid) {
+        alert('入力エラー:\\n' + validation.errors.join('\\n'));
+        return;
+      }
+      
+      const newBugData = validation.formData;
+      // 自動設定項目
+      newBugData.id = getNextId();
+      newBugData.status = '新規';
+      newBugData.updated = newBugData.occurredOn; // 更新日 = 発生日
+      newBugData.assignee = newBugData.reporter; // 更新者 = 登録者（この場合担当者として設定）
+      
+      try {
+        await saveNewBug(newBugData);
+        render();
+        closeModal();
+      } catch (e) {
+        console.error(e);
+        setStatus('登録失敗: ' + (e.message || e));
+      }
+    } else {
+      // 既存のバグ編集の場合
+      const bug = state.bugs.find(b => b.rowIndex === state.editingRow);
+      if (!bug) { closeModal(); return; }
+      $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
+        const k = inp.dataset.key;
+        const col = COLUMNS.find(c => c.key === k);
+        if (!col || col.type === 'readonly') return;
+        bug[k] = inp.value;
+      });
+      try {
+        await saveBugToExcel(bug);
+        render();
+        closeModal();
+      } catch (e) {
+        console.error(e);
+        setStatus('保存失敗: ' + (e.message || e));
+      }
     }
   }
 
@@ -373,9 +399,251 @@
     ];
   }
 
+  function getNextId() {
+    const maxId = Math.max(0, ...state.bugs.map(b => parseInt(b.id) || 0));
+    return maxId + 1;
+  }
+
+  function getTodayString() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  }
+
+  function openNewBugModal() {
+    state.editingRow = 'new';
+    $('#modal-title').textContent = '新規バグ登録';
+
+    const body = $('#modal-body');
+    body.innerHTML = '';
+
+    const newBugData = {
+      id: getNextId(),
+      title: '',
+      status: '新規',
+      updated: getTodayString(),
+      assignee: '',
+      occurredOn: getTodayString(),
+      reporter: '',
+      origin: '',
+      steps: '',
+      expected: '',
+      actual: '',
+      reproRate: '',
+      cause: '',
+      scope: '',
+      fix: '',
+      fixVer: '',
+      fixer: '',
+      verify: '',
+      verifier: '',
+      tag: '',
+      priority: '',
+      severity: ''
+    };
+
+    // 必須項目のマップ作成
+    const requiredFields = {
+      title: true,
+      reporter: true,
+      origin: true,
+      steps: true,
+      expected: true,
+      actual: true,
+      reproRate: true
+    };
+
+    const groups = {};
+    COLUMNS.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
+
+    Object.keys(groups).forEach(gname => {
+      const wrap = el('div', { class: 'field-group' });
+      wrap.appendChild(el('h3', { text: gname }));
+      groups[gname].forEach(c => {
+        const fld = el('div', { class: 'field' });
+        const isRequired = requiredFields[c.key];
+        const labelText = c.label + (isRequired ? ' *' : '');
+        const label = el('label', { text: labelText });
+        if (isRequired) label.style.color = '#d32f2f';
+        fld.appendChild(label);
+        
+        let input;
+        const v = newBugData[c.key] || '';
+        
+        if (c.type === 'select') {
+          input = el('select');
+          if (isRequired) input.required = true;
+          c.options.forEach(o => {
+            const op = el('option', { value: o, text: o || '(なし)' });
+            if (o === v) op.selected = true;
+            input.appendChild(op);
+          });
+        } else if (c.type === 'textarea') {
+          input = el('textarea', { rows: c.key === 'steps' ? '2' : '3' });
+          input.value = String(v);
+          if (isRequired) input.required = true;
+          if (c.key === 'steps') {
+            input.placeholder = '1. 再現手順を記載してください\\n2. 詳細な操作手順\\n3. 発生までの流れ';
+          }
+        } else if (c.type === 'date') {
+          input = el('input', { type: 'date' });
+          input.value = String(v).slice(0, 10);
+          if (isRequired) input.required = true;
+        } else if (c.type === 'readonly') {
+          input = el('input', { type: 'text', readonly: 'readonly' });
+          input.value = String(v);
+        } else {
+          input = el('input', { type: 'text' });
+          input.value = String(v);
+          if (isRequired) input.required = true;
+          if (c.key === 'reporter') {
+            input.maxLength = 6;
+            input.placeholder = '全角6文字以内';
+          }
+        }
+        
+        input.dataset.key = c.key;
+        if (isRequired) {
+          input.style.borderColor = '#d32f2f';
+          input.style.borderWidth = '2px';
+        }
+        
+        fld.appendChild(input);
+        wrap.appendChild(fld);
+      });
+      body.appendChild(wrap);
+    });
+
+    $('#modal').classList.remove('hidden');
+  }
+
+  async function saveNewBug(bugData) {
+    if (!state.inOffice) {
+      // デモモードの場合
+      const maxRowIndex = Math.max(0, ...state.bugs.map(b => b.rowIndex || 0));
+      bugData.rowIndex = maxRowIndex + 1;
+      state.bugs.push(bugData);
+      return;
+    }
+
+    setStatus('保存中...');
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      const used = sheet.getUsedRange(true);
+      used.load(['rowCount']);
+      await ctx.sync();
+      
+      const newRowIndex = (used.rowCount || DATA_START - 1) + 1;
+      bugData.rowIndex = newRowIndex;
+      
+      const rowVals = [];
+      for (let c = 0; c < COL_COUNT; c++) {
+        const colDef = COLUMNS[c];
+        let v = bugData[colDef.key];
+        if (v === undefined || v === null) v = '';
+        rowVals.push(v);
+      }
+      
+      const writeRange = sheet.getRangeByIndexes(newRowIndex - 1, 0, 1, COL_COUNT);
+      writeRange.values = [rowVals];
+      await ctx.sync();
+      
+      state.bugs.push(bugData);
+    });
+    setStatus('登録しました');
+    setTimeout(() => setStatus(''), 2000);
+  }
+
+  function validateNewBugForm() {
+    const errors = [];
+    const formData = {};
+    
+    $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
+      const k = inp.dataset.key;
+      const col = COLUMNS.find(c => c.key === k);
+      if (!col) return;
+      
+      const value = inp.value.trim();
+      formData[k] = value;
+      
+      // 必須項目チェック
+      if (['title', 'reporter', 'origin', 'steps', 'expected', 'actual', 'reproRate'].includes(k)) {
+        if (!value) {
+          errors.push(`${col.label}は必須項目です`);
+          inp.style.backgroundColor = '#ffebee';
+        } else {
+          inp.style.backgroundColor = '';
+        }
+      }
+      
+      // 登録者の文字数チェック
+      if (k === 'reporter' && value) {
+        if (value.length > 6) {
+          errors.push('登録者は全角6文字以内で入力してください');
+          inp.style.backgroundColor = '#ffebee';
+        }
+      }
+    });
+    
+    return { isValid: errors.length === 0, errors, formData };
+  }
+
   function bindEvents() {
     $('#btn-view-list').addEventListener('click',   () => setView('list'));
     $('#btn-view-kanban').addEventListener('click', () => setView('kanban'));
+    $('#btn-add-new').addEventListener('click', () => openNewBugModal());
+    $('#btn-reload').addEventListener('click', async () => {
+      await loadFromExcel();
+      render();
+    });
+    $('#kanban-group').addEventListener('change', (e) => {
+      state.kanbanGroup = e.target.value;
+      render();
+    });
+    $('#filter-text').addEventListener('input', (e) => { state.filters.text = e.target.value; render(); });
+    $('#filter-priority').addEventListener('change', (e) => { state.filters.priority = e.target.value; render(); });
+    $('#filter-status').addEventListener('change',   (e) => { state.filters.status   = e.target.value; render(); });
+    $('#modal-save').addEventListener('click', saveModal);
+    $('#modal-cancel').addEventListener('click', closeModal);
+    $('#modal-close').addEventListener('click', closeModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('#modal').classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+  }
+
+  function init() {
+    bindEvents();
+    ensureOffice(() => {
+      loadFromExcel().then(render);
+    });
+  }
+
+  init();
+})();
+          errors.push(`${col.label}は必須項目です`);
+          inp.style.backgroundColor = '#ffebee';
+        } else {
+          inp.style.backgroundColor = '';
+        }
+      }
+      
+      // 登録者の文字数チェック
+      if (k === 'reporter' && value) {
+        if (value.length > 6) {
+          errors.push('登録者は全角6文字以内で入力してください');
+          inp.style.backgroundColor = '#ffebee';
+        }
+      }
+    });
+    
+    return { isValid: errors.length === 0, errors, formData };
+  }
+
+  function bindEvents() {
+    $('#btn-view-list').addEventListener('click',   () => setView('list'));
+    $('#btn-view-kanban').addEventListener('click', () => setView('kanban'));
+    $('#btn-add-new').addEventListener('click', () => openNewBugModal());
     $('#btn-reload').addEventListener('click', async () => {
       await loadFromExcel();
       render();
