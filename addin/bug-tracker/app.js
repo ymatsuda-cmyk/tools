@@ -357,7 +357,7 @@
       actual: ''
     };
 
-    // 1行目: ID, 発生日, 登録者
+    // 1行目: ID, 発生日, 登録者（コンボボックス）
     const row1 = el('div', { class: 'form-row' }, [
       (() => {
         const fld = el('div', { class: 'field' });
@@ -374,6 +374,7 @@
         const input = el('input', { type: 'text', style: 'width:5em;text-align:center;' });
         input.value = newBugData.occurredOn;
         input.required = true;
+        input.placeholder = 'm/d';
         input.dataset.key = 'occurredOn';
         fld.appendChild(input);
         return fld;
@@ -381,10 +382,12 @@
       (() => {
         const fld = el('div', { class: 'field' });
         fld.appendChild(el('label', { text: '登録者 *' }));
-        const input = el('input', { type: 'text', maxlength: 6, style: 'width:7em;' });
-        input.value = newBugData.reporter;
+        const input = el('select', { style: 'width:7em;' });
+        ['', '政次', '高橋', '伊藤', '松田'].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
         input.required = true;
-        input.placeholder = '全角6文字以内';
         input.dataset.key = 'reporter';
         fld.appendChild(input);
         return fld;
@@ -514,34 +517,40 @@
   function validateNewBugForm() {
     const errors = [];
     const formData = {};
-    
-    $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
+    const modalBody = $('#modal-body');
+    modalBody.querySelectorAll('[data-key]').forEach(inp => {
       const k = inp.dataset.key;
-      const col = COLUMNS.find(c => c.key === k);
-      if (!col) return;
-      
-      const value = inp.value.trim();
+      let value = inp.value.trim();
       formData[k] = value;
-      
+
       // 必須項目チェック
-      if (['title', 'reporter', 'origin', 'steps', 'expected', 'actual', 'reproRate'].includes(k)) {
+      if ([
+        'id', 'occurredOn', 'reporter', 'origin', 'reproRate', 'steps', 'expected', 'actual'
+      ].includes(k)) {
         if (!value) {
-          errors.push(`${col.label}は必須項目です`);
+          errors.push(`${inp.previousSibling ? inp.previousSibling.textContent.replace('*','').trim() : k}は必須項目です`);
           inp.style.backgroundColor = '#ffebee';
         } else {
           inp.style.backgroundColor = '';
         }
       }
-      
-      // 登録者の文字数チェック
-      if (k === 'reporter' && value) {
-        if (value.length > 6) {
-          errors.push('登録者は全角6文字以内で入力してください');
+
+      // 発生日のm/d形式チェック
+      if (k === 'occurredOn' && value) {
+        if (!/^\d{1,2}\/\d{1,2}$/.test(value)) {
+          errors.push('発生日は m/d 形式で入力してください');
           inp.style.backgroundColor = '#ffebee';
+        } else {
+          // 実在日付か判定
+          const [m, d] = value.split('/').map(Number);
+          const dt = new Date(2026, m - 1, d);
+          if (dt.getMonth() + 1 !== m || dt.getDate() !== d) {
+            errors.push('発生日が不正です');
+            inp.style.backgroundColor = '#ffebee';
+          }
         }
       }
     });
-    
     return { isValid: errors.length === 0, errors, formData };
   }
 
