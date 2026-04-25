@@ -37,7 +37,7 @@
   ];
 
   const STATUS_ORDER = ['新規','解析中','修正待ち','確認待ち','再発','完了'];
-  const ASSIGNEE_ORDER = ['政次','高橋','伊藤','松田','(未割当)'];
+  const ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
   const state = {
@@ -238,6 +238,7 @@
 
     groups.forEach((items, key) => {
       const col = el('div', { class: 'kanban-col' });
+      col.dataset.group = key;
       const header = el('div', { class: 'kanban-col-header' }, [
         el('span', { text: key || '(未設定)' }),
         el('span', { class: 'count', text: String(items.length) })
@@ -246,14 +247,108 @@
       items.forEach(b => body.appendChild(renderCard(b)));
       col.appendChild(header);
       col.appendChild(body);
+      
+      // ドロップイベントを担当者別表示時のみ追加
+      if (state.kanbanGroup === 'assignee') {
+        body.addEventListener('dragover', handleDragOver);
+        body.addEventListener('dragleave', handleDragLeave);
+        body.addEventListener('drop', handleDrop);
+      }
+      
       board.appendChild(col);
     });
 
     $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
   }
+  
+  // ドラッグ&ドロップ機能（担当者別表示用）
+  let draggedCard = null;
+  
+  function handleDragStart(e) {
+    draggedCard = e.target;
+    e.target.classList.add('dragging');
+  }
+  
+  function handleDragOver(e) {
+    e.preventDefault(); // ドロップを許可
+    e.currentTarget.classList.add('drag-over');
+  }
+  
+  function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+  
+  async function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedCard) return;
+    
+    const targetCol = e.currentTarget.parentElement;
+    const newAssignee = targetCol.dataset.group;
+    const rowIndex = parseInt(draggedCard.dataset.row);
+    const bug = state.bugs.find(b => b.rowIndex === rowIndex);
+    
+    if (!bug) return;
+    
+    const oldAssignee = bug.assignee || '(未割当)';
+    
+    // 担当者から未割当への移動を禁止
+    if (oldAssignee !== '(未割当)' && newAssignee === '(未割当)') {
+      setStatus('担当者から未割当には移動できません');
+      setTimeout(() => setStatus(''), 3000);
+      cleanupDrag();
+      return;
+    }
+    
+    // 同じ担当者への移動は何もしない
+    if (oldAssignee === newAssignee) {
+      cleanupDrag();
+      return;
+    }
+    
+    // 担当者を更新
+    const newAssigneeValue = newAssignee === '(未割当)' ? '' : newAssignee;
+    bug.assignee = newAssigneeValue;
+    
+    // 未割当から担当者への移動時は状態を「解析中」に変更
+    if (oldAssignee === '(未割当)' && newAssignee !== '(未割当)') {
+      bug.status = '解析中';
+      setStatus(`担当者を「${newAssignee}」に変更し、状況を「解析中」に変更しました`);
+    } else {
+      setStatus(`担当者を「${newAssignee}」に変更しました`);
+    }
+    
+    setTimeout(() => setStatus(''), 3000);
+    
+    // Excel保存
+    try {
+      await saveBugToExcel(bug);
+    } catch (e) {
+      console.error('保存エラー:', e);
+      setStatus('保存に失敗しました');
+    }
+    
+    cleanupDrag();
+    // 表示更新
+    render();
+  }
+  
+  function cleanupDrag() {
+    if (draggedCard) {
+      draggedCard.classList.remove('dragging');
+      draggedCard = null;
+    }
+    // 全てのdrag-overクラスを削除
+    document.querySelectorAll('.drag-over').forEach(el => {
+      el.classList.remove('drag-over');
+    });
+  }
+  
   function renderCard(b) {
     const card = el('div', { class: 'kanban-card pri-' + (b.priority || '') });
     card.dataset.row = b.rowIndex;
+    card.draggable = state.kanbanGroup === 'assignee'; // 担当者別表示時のみドラッグ可能
     card.appendChild(el('div', { class: 'id', text: `#${b.id || ''}` }));
     card.appendChild(el('div', { class: 'title', text: b.title || '(無題)' }));
     const meta = el('div', { class: 'meta' });
@@ -263,6 +358,12 @@
     if (b.tag)      meta.appendChild(el('span', { text: 'タグ:' + b.tag }));
     card.appendChild(meta);
     card.addEventListener('click', () => openModal(b.rowIndex));
+    
+    // ドラッグ&ドロップイベントを担当者別表示時のみ追加
+    if (state.kanbanGroup === 'assignee') {
+      card.addEventListener('dragstart', handleDragStart);
+      card.addEventListener('dragend', cleanupDrag);
+    }
     return card;
   }
 

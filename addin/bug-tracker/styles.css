@@ -52,6 +52,7 @@ tbody tr:hover { background: #f7faff; }
 .kanban-col-header .count { font-size: 11px; color: #666; background: #fff; border-radius: 10px; padding: 1px 8px; }
 .kanban-col-body { padding: 6px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .kanban-card { background: #fff; border: 1px solid #d8dde3; border-radius: 5px; padding: 8px; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.04); }
+.kanban-card[draggable="true"] { cursor: move; }
 .kanban-card:hover { border-color: #2e7dd7; }
 .kanban-card .id { font-size: 10px; color: #888; }
 .kanban-card .title { font-weight: 600; margin: 2px 0 4px; word-break: break-word; white-space: normal; }
@@ -59,6 +60,11 @@ tbody tr:hover { background: #f7faff; }
 .kanban-card.pri-高 { border-left: 3px solid #d32f2f; }
 .kanban-card.pri-中 { border-left: 3px solid #f9a825; }
 .kanban-card.pri-低 { border-left: 3px solid #1976d2; }
+
+/* ドラッグ&ドロップ用スタイル */
+.kanban-col-body { position: relative; }
+.kanban-col-body.drag-over { background-color: #e3f2fd; border: 2px dashed #2196f3; }
+.kanban-card.dragging { opacity: 0.5; transform: rotate(5deg); }
 
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal.hidden { display: none; }
