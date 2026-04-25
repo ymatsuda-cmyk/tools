@@ -357,21 +357,21 @@
       actual: ''
     };
 
-    // 1行目: ID, 発生日, 登録者（コンボボックス）
-    const row1 = el('div', { class: 'form-row' }, [
+    // 1行目: ID, 発生日, 登録者（横並び3列）
+    const row1 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
       (() => {
-        const fld = el('div', { class: 'field' });
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: 'ID *' }));
-        const input = el('input', { type: 'text', readonly: 'readonly', style: 'width:4em;text-align:center;' });
+        const input = el('input', { type: 'text', readonly: 'readonly', style: 'width:100%;text-align:center;' });
         input.value = newBugData.id;
         input.dataset.key = 'id';
         fld.appendChild(input);
         return fld;
       })(),
       (() => {
-        const fld = el('div', { class: 'field' });
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '発生日 *' }));
-        const input = el('input', { type: 'text', style: 'width:5em;text-align:center;' });
+        const input = el('input', { type: 'text', style: 'width:100%;text-align:center;' });
         input.value = newBugData.occurredOn;
         input.required = true;
         input.placeholder = 'm/d';
@@ -380,9 +380,9 @@
         return fld;
       })(),
       (() => {
-        const fld = el('div', { class: 'field' });
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '登録者 *' }));
-        const input = el('select', { style: 'width:7em;' });
+        const input = el('select', { style: 'width:100%;' });
         ['', '政次', '高橋', '伊藤', '松田'].forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
           input.appendChild(op);
@@ -394,12 +394,12 @@
       })()
     ]);
 
-    // 2行目: 発生起因, 再現率
-    const row2 = el('div', { class: 'form-row' }, [
+    // 2行目: 発生起因, 再現率（横並び2列）
+    const row2 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
       (() => {
-        const fld = el('div', { class: 'field' });
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '発生起因 *' }));
-        const input = el('select');
+        const input = el('select', { style: 'width:100%;' });
         ['','定義(通常)','定義(電源断)','定義(通信断)'].forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
           input.appendChild(op);
@@ -410,9 +410,9 @@
         return fld;
       })(),
       (() => {
-        const fld = el('div', { class: 'field' });
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '再現率 *' }));
-        const input = el('select');
+        const input = el('select', { style: 'width:100%;' });
         ['','毎回','時々','1回のみ'].forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
           input.appendChild(op);
