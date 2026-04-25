@@ -333,6 +333,7 @@
       tabContent.innerHTML = '';
       if (tabKey === 'jisho') {
         // 事象タブ：再現手順、期待する動作、実際の動作（編集可）
+        console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '再現手順' }), el('br'),
           el('textarea', {
