@@ -1,0 +1,77 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; font-family: "Yu Gothic UI", "Yu Gothic", "Segoe UI", sans-serif; font-size: 13px; color: #222; background: #f5f6f8; }
+
+.topbar { background: #fff; border-bottom: 1px solid #e0e3e8; padding: 8px 12px; position: sticky; top: 0; z-index: 5; }
+.topbar h1 { margin: 0 0 6px 0; font-size: 16px; }
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.view-switch { display: inline-flex; border: 1px solid #c8ccd2; border-radius: 6px; overflow: hidden; }
+.view-btn { background: #fff; border: 0; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+.view-btn.active { background: #2e7dd7; color: #fff; }
+
+.kanban-controls { display: inline-flex; gap: 6px; align-items: center; }
+.hidden { display: none !important; }
+
+.btn { padding: 6px 12px; border: 1px solid #c8ccd2; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn:hover { background: #f0f2f5; }
+.btn.primary { background: #2e7dd7; color: #fff; border-color: #2e7dd7; }
+.btn.primary:hover { background: #2566b1; }
+.btn-icon { background: transparent; border: 0; font-size: 18px; cursor: pointer; }
+.status-msg { margin-left: auto; color: #666; font-size: 12px; }
+
+.filters { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.filters input, .filters select { padding: 4px 8px; border: 1px solid #c8ccd2; border-radius: 4px; font-size: 12px; }
+.filters input { flex: 1; min-width: 150px; }
+
+main { padding: 8px; }
+.view { display: none; }
+.view.active { display: block; }
+
+.table-wrap { overflow: auto; max-height: calc(100vh - 160px); background: #fff; border: 1px solid #e0e3e8; border-radius: 4px; }
+table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
+thead th { position: sticky; top: 0; background: #f0f2f5; border-bottom: 2px solid #c8ccd2; padding: 6px 8px; text-align: left; white-space: nowrap; font-weight: 600; }
+tbody td { border-bottom: 1px solid #eef0f3; padding: 6px 8px; vertical-align: top; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f7faff; }
+
+.badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; line-height: 1.6; }
+.badge.pri-高 { background: #ffe2e0; color: #c62828; }
+.badge.pri-中 { background: #fff3cd; color: #b07b00; }
+.badge.pri-低 { background: #e3f2fd; color: #1565c0; }
+
+.badge.st-新規 { background: #e3f2fd; color: #1565c0; }
+.badge.st-解析中 { background: #fff3cd; color: #8a6d00; }
+.badge.st-修正待ち { background: #ffe0b2; color: #c47700; }
+.badge.st-確認待ち { background: #e1bee7; color: #6a1b9a; }
+.badge.st-再発 { background: #ffcdd2; color: #b71c1c; }
+.badge.st-完了 { background: #c8e6c9; color: #2e7d32; }
+
+.kanban-board { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+.kanban-col { background: #eceff3; border-radius: 6px; min-width: 260px; max-width: 280px; flex: 0 0 260px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); }
+.kanban-col-header { padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #d8dde3; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #eceff3; border-radius: 6px 6px 0 0; }
+.kanban-col-header .count { font-size: 11px; color: #666; background: #fff; border-radius: 10px; padding: 1px 8px; }
+.kanban-col-body { padding: 6px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.kanban-card { background: #fff; border: 1px solid #d8dde3; border-radius: 5px; padding: 8px; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.04); }
+.kanban-card:hover { border-color: #2e7dd7; }
+.kanban-card .id { font-size: 10px; color: #888; }
+.kanban-card .title { font-weight: 600; margin: 2px 0 4px; word-break: break-word; white-space: normal; }
+.kanban-card .meta { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; color: #555; }
+.kanban-card.pri-高 { border-left: 3px solid #d32f2f; }
+.kanban-card.pri-中 { border-left: 3px solid #f9a825; }
+.kanban-card.pri-低 { border-left: 3px solid #1976d2; }
+
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal.hidden { display: none; }
+.modal-content { background: #fff; width: min(720px, 95vw); max-height: 90vh; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
+.modal-header, .modal-footer { padding: 10px 14px; border-bottom: 1px solid #e0e3e8; display: flex; justify-content: space-between; align-items: center; }
+.modal-footer { border-bottom: 0; border-top: 1px solid #e0e3e8; gap: 6px; justify-content: flex-end; }
+.modal-header h2 { margin: 0; font-size: 15px; }
+.modal-body { padding: 12px 14px; overflow-y: auto; }
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: 11px; color: #555; margin-bottom: 2px; }
+.field input, .field select, .field textarea { width: 100%; padding: 5px 8px; border: 1px solid #c8ccd2; border-radius: 4px; font-size: 13px; font-family: inherit; }
+.field textarea { resize: vertical; min-height: 60px; }
+.field-group { background: #f7f8fa; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
+.field-group h3 { margin: 0 0 6px 0; font-size: 12px; color: #555; }
+
+.footer { padding: 4px 12px; background: #fff; border-top: 1px solid #e0e3e8; display: flex; justify-content: space-between; font-size: 11px; color: #777; }

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>バグ管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>バグ管理</h1>
+    <div class="toolbar">
+      <div class="view-switch" role="tablist">
+        <button id="btn-view-list"   class="view-btn active" role="tab">一覧</button>
+        <button id="btn-view-kanban" class="view-btn"        role="tab">カンバン</button>
+      </div>
+
+      <div id="kanban-controls" class="kanban-controls hidden">
+        <label>
+          列分け:
+          <select id="kanban-group">
+            <option value="status">状況</option>
+            <option value="assignee">担当者</option>
+          </select>
+        </label>
+      </div>
+
+      <button id="btn-reload" class="btn">↻ 再読込</button>
+      <span id="status-msg" class="status-msg"></span>
+    </div>
+
+    <div class="filters">
+      <input type="search" id="filter-text" placeholder="🔍 タイトル/担当者/タグ で絞り込み" />
+      <select id="filter-priority">
+        <option value="">優先度: すべて</option>
+        <option value="高">高</option>
+        <option value="中">中</option>
+        <option value="低">低</option>
+      </select>
+      <select id="filter-status">
+        <option value="">状況: すべて</option>
+        <option>新規</option>
+        <option>解析中</option>
+        <option>修正待ち</option>
+        <option>確認待ち</option>
+        <option>再発</option>
+        <option>完了</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-list" class="view active">
+      <div class="table-wrap">
+        <table id="bug-table">
+          <thead><tr id="bug-thead"></tr></thead>
+          <tbody id="bug-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="view-kanban" class="view">
+      <div id="kanban-board" class="kanban-board"></div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">バグ詳細</h2>
+        <button id="modal-close" class="btn-icon">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer">
+        <button id="modal-save" class="btn primary">保存</button>
+        <button id="modal-cancel" class="btn">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span id="env-label"></span>
+    <span id="row-count"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
