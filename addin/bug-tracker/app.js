@@ -132,7 +132,9 @@
           const colDef = COLUMNS[c];
           let v = row[c];
           if (colDef.type === 'date') v = excelSerialToDateStr(v);
-          else if (v === null) v = '';
+          // Excelの####やnull/undefinedもそのまま文字列として格納
+          if (v === null || v === undefined) v = '';
+          v = String(v);
           obj[colDef.key] = v;
         }
         bugs.push(obj);
