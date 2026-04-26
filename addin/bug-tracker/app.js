@@ -1206,19 +1206,29 @@
           container.innerHTML = '';
           const presetTags = state.presetTags || [];
           
+          // 現在選択されているタグを取得
+          const hiddenInput = document.querySelector('#tag-hidden-input');
+          const currentTags = hiddenInput ? 
+            (hiddenInput.value || '').split('/').map(t => t.trim()).filter(t => t) : [];
+          
           presetTags.forEach(tag => {
+            // 選択状態に応じて背景色を決定
+            const isSelected = currentTags.includes(tag);
+            const baseColor = isSelected ? '#007acc' : '#cccccc';
+            const hoverColor = isSelected ? '#0056a3' : '#999999';
+            
             const btn = el('button', {
               type: 'button',
               text: tag,
-              style: 'background:#007acc;color:white;padding:4px 12px;border:none;border-radius:12px;cursor:pointer;font-size:12px;margin:2px;transition:background-color 0.2s ease;'
+              style: `background:${baseColor};color:white;padding:4px 12px;border:none;border-radius:12px;cursor:pointer;font-size:12px;margin:2px;transition:background-color 0.2s ease;`
             });
             
             // ホバー効果
             btn.addEventListener('mouseenter', () => {
-              btn.style.backgroundColor = '#0056a3';
+              btn.style.backgroundColor = hoverColor;
             });
             btn.addEventListener('mouseleave', () => {
-              btn.style.backgroundColor = '#007acc';
+              btn.style.backgroundColor = baseColor;
             });
             
             btn.addEventListener('click', () => addTag(tag));
@@ -1238,6 +1248,20 @@
           });
         }, 0);
         
+        // プリセットタグをY3セルに保存する関数
+        async function savePresetTags() {
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              const presetTagCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 24, 1, 1); // Y列は24番目（0ベース）
+              presetTagCell.values = [[state.presetTags.join('/')]]; // プリセットタグを/区切りで保存
+              await ctx.sync();
+            });
+          } catch (error) {
+            console.error('プリセットタグ保存エラー:', error);
+          }
+        }
+
         // タグ追加関数
         function addTag(tagName) {
           const tagsDisplay = document.querySelector('#tags-display');
@@ -1256,6 +1280,8 @@
             state.presetTags.push(tagName.trim());
             // プリセットボタンを再描画
             renderPresetButtons();
+            // Y3セルに保存
+            savePresetTags();
           }
           
           addTagChip(tagName.trim());
@@ -1304,6 +1330,8 @@
           });
           
           hiddenInput.value = tags.join('/');
+          // プリセットボタンの表示を更新（選択状態に応じて色分け）
+          renderPresetButtons();
         }
       }
     }
