@@ -21,7 +21,7 @@
       { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['', ...ASSIGNEE_ORDER.slice(1)] }, // 動的に設定
       { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
       { key: 'reporter',   letter: 'G', label: '登録者',       group: '発生情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-      { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)'] },
+      { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['', ...ORIGIN_LIST] },
       { key: 'originNumber', letter: 'I', label: '起因番号',   group: '発生情報', type: 'text' }, // 新規追加
       { key: 'steps',      letter: 'J', label: '再現手順',     group: '発生情報', type: 'textarea' },
       { key: 'expected',   letter: 'K', label: '期待する動作', group: '発生情報', type: 'textarea' },
@@ -40,8 +40,8 @@
       { key: 'verifier',   letter: 'X', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
       { key: 'verifyDate', letter: 'Y', label: '確認日',       group: '結果確認', type: 'date' },
       { key: 'tag',        letter: 'Z', label: 'タグ',         group: '管理',     type: 'text' },
-      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['','高（最優先）','中','低（改善）'] },
-      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','軽微'] },
+      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['', ...PRIORITY_LIST] },
+      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['', ...SEVERITY_LIST] },
       { key: 'starred',    letter: 'AC', label: '本日分',     group: '管理',     type: 'text' },
       { key: 'periodStart', letter: 'AD', label: '期間開始',   group: '設定',     type: 'date' },
       { key: 'periodEnd',   letter: 'AE', label: '期間終了',   group: '設定',     type: 'date' }
@@ -54,6 +54,9 @@
   let STATUS_DISPLAY_NAMES = {};
   let ASSIGNEE_ORDER = ['(未割当)'];
   let REPORTER_LIST = [];
+  let PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+  let SEVERITY_LIST = ['致命的','重大','軽微'];
+  let ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
   const state = {
@@ -126,6 +129,9 @@
       const memberList = ['政次','高橋','伊藤','松田'];
       ASSIGNEE_ORDER = ['(未割当)', ...memberList];
       REPORTER_LIST = [...memberList];
+      PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+      SEVERITY_LIST = ['致命的','重大','軽微'];
+      ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
       return;
     }
     setStatus('読み込み中...');
@@ -133,7 +139,7 @@
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       
       // 各種設定をセルから取得
-      const configCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 2, 1, 23); // C3:Y3
+      const configCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 2, 1, 28); // C3:AD3
       configCells.load(['values']);
       await ctx.sync();
       
@@ -178,12 +184,36 @@
       // G3セル：登録者リスト（廃止予定 - E3セルを使用）
       // const reporterConfig = configValues[4];
       
+      // H3セル：発生起因リスト（/区切り）
+      const originConfig = configValues[5]; // H3 (H列は7番目なので5ベース)
+      if (originConfig && typeof originConfig === 'string') {
+        ORIGIN_LIST = originConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
+      }
+      
       // Y3セル：プリセットタグ
       const presetTagValue = configValues[23]; // Z3 (Z列は25番目なので23ベース)
       if (presetTagValue && typeof presetTagValue === 'string') {
         state.presetTags = presetTagValue.split('/').map(t => t.trim()).filter(t => t);
       } else {
         state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デフォルト
+      }
+      
+      // AA3セル：優先度リスト（/区切り）
+      const priorityConfig = configValues[26]; // AA3 (AA列は26番目なので26ベース)
+      if (priorityConfig && typeof priorityConfig === 'string') {
+        PRIORITY_LIST = priorityConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+      }
+      
+      // AB3セル：影響度リスト（/区切り）
+      const severityConfig = configValues[27]; // AB3 (AB列は27番目なので27ベース)
+      if (severityConfig && typeof severityConfig === 'string') {
+        SEVERITY_LIST = severityConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        SEVERITY_LIST = ['致命的','重大','軽微'];
       }
       
 
@@ -1197,8 +1227,10 @@
       };
       
       if (tabKey === 'jisho') {
-        // 事象タブ：タイトル、再現手順、期待する動作、実際の動作（編集可）
+        // 事象タブ：タイトル、発生起因・起因番号・再現率、再現手順、期待する動作、実際の動作（編集可）
         console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
+        
+        // タイトル
         tabContent.appendChild(el('div', {}, [
           el('label', { text: 'タイトル' }), el('br'),
           el('input', { 
@@ -1209,6 +1241,52 @@
             placeholder: 'バグのタイトルを入力してください' 
           })
         ]));
+        
+        // 発生起因・起因番号・再現率（横並び3列）
+        const originRow = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' }, [
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '発生起因' }));
+            fld.appendChild(el('br'));
+            const input = el('select', { style: 'width:100%;', 'data-key': 'origin' });
+            ['', ...ORIGIN_LIST].forEach(o => {
+              const op = el('option', { value: o, text: o || '(選択)' });
+              if (o === (bug.origin || '')) {
+                op.selected = true;
+              }
+              input.appendChild(op);
+            });
+            fld.appendChild(input);
+            return fld;
+          })(),
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '起因番号' }));
+            fld.appendChild(el('br'));
+            const input = el('input', { type: 'text', style: 'width:100%;', 'data-key': 'originNumber' });
+            input.value = bug.originNumber || '';
+            input.placeholder = '起因番号を入力';
+            fld.appendChild(input);
+            return fld;
+          })(),
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '再現率' }));
+            fld.appendChild(el('br'));
+            const input = el('select', { style: 'width:100%;', 'data-key': 'reproRate' });
+            ['','毎回','時々','1回のみ'].forEach(o => {
+              const op = el('option', { value: o, text: o || '(選択)' });
+              if (o === (bug.reproRate || '')) {
+                op.selected = true;
+              }
+              input.appendChild(op);
+            });
+            fld.appendChild(input);
+            return fld;
+          })()
+        ]);
+        tabContent.appendChild(originRow);
+        
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '再現手順' }), el('br'),
           (() => {
@@ -1555,7 +1633,7 @@
             field.appendChild(el('label', { text: '優先度' }));
             field.appendChild(el('br'));
             const select = el('select', { style: 'width:100%;', 'data-key': 'priority' });
-            ['','高','中','低'].forEach(option => {
+            ['', ...PRIORITY_LIST].forEach(option => {
               const op = el('option', { value: option, text: option || '(選択)' });
               if (option === (bug.priority || '中')) { // 初期値は中、既存の値があればそれを使用
                 op.selected = true;
@@ -1570,7 +1648,7 @@
             field.appendChild(el('label', { text: '影響度' }));
             field.appendChild(el('br'));
             const select = el('select', { style: 'width:100%;', 'data-key': 'severity' });
-            ['','致命的','重大','警備'].forEach(option => {
+            ['', ...SEVERITY_LIST].forEach(option => {
               const op = el('option', { value: option, text: option || '(選択)' });
               if (option === (bug.severity || '')) { // 初期値は空
                 op.selected = true;
@@ -1915,6 +1993,8 @@
         return `${d.getMonth()+1}/${d.getDate()}`;
       })(),
       reporter: '',
+      priority: '', // 優先度を追加（必須項目）
+      severity: '', // 影響度を追加
       origin: '',
       originNumber: '', // 起因番号を追加
       reproRate: '',
@@ -1923,7 +2003,7 @@
       actual: ''
     };
 
-    // 1行目: ID, 発生日, 登録者（横並び3列）
+    // 1行目: ID, 発生日, 登録者, 優先度, 影響度（横並び5列）
     const row1 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
       (() => {
         const fld = el('div', { class: 'field', style: 'flex:1;' });
@@ -1973,6 +2053,36 @@
         input.dataset.key = 'reporter';
         fld.appendChild(input);
         return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '優先度 *' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['', ...PRIORITY_LIST].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          // デフォルトは「中」
+          if (o === '中') {
+            op.selected = true;
+            newBugData.priority = o;
+          }
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'priority';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '影響度' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['', ...SEVERITY_LIST].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.dataset.key = 'severity';
+        fld.appendChild(input);
+        return fld;
       })()
     ]);
 
@@ -1982,7 +2092,7 @@
         const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '発生起因 *' }));
         const input = el('select', { style: 'width:100%;' });
-        ['','定義(通常)','定義(電源断)','定義(通信断)'].forEach(o => {
+        ['', ...ORIGIN_LIST].forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
           input.appendChild(op);
         });
@@ -2138,7 +2248,7 @@
 
       // 必須項目チェック
       if ([
-        'id', 'title', 'occurredOn', 'reporter', 'origin', 'reproRate', 'steps', 'expected', 'actual'
+        'id', 'title', 'occurredOn', 'reporter', 'priority', 'origin', 'reproRate', 'steps', 'expected', 'actual'
       ].includes(k)) {
         if (!value) {
           errors.push(`${inp.previousSibling ? inp.previousSibling.textContent.replace('*','').trim() : k}は必須項目です`);
@@ -2182,8 +2292,6 @@
       newBugData.status = '新規';
       newBugData.updated = newBugData.occurredOn; // 更新日 = 発生日
       newBugData.assignee = newBugData.reporter; // 更新者 = 登録者（この場合担当者として設定）
-      newBugData.priority = '中'; // 優先度の初期値
-      newBugData.severity = ''; // 影響度の初期値
       newBugData.tag = ''; // タグの初期値
       newBugData.starred = ''; // 本日分の初期値
       
