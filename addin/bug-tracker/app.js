@@ -744,7 +744,8 @@
         
         const scopeOptions = ['定義(通常)', '定義(電源断)', '定義(通信断)', 'RPA', 'アプリ'];
         const currentScope = bug.scope || '';
-        const selectedScopes = currentScope.split('/').map(s => s.trim()).filter(s => s);
+        // 影響範囲から（済）を除去して修正対象を抽出
+        const selectedScopes = currentScope.split('/').map(s => s.trim().replace(/（済）$/, '')).filter(s => s);
         
         // 修正完了状況を取得（新しいフィールドとして追加）
         const currentCompleted = bug.scopeCompleted || '';
