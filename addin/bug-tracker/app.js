@@ -404,34 +404,40 @@
       case '解析待ち':
         nameText = b.analyst || '(未設定)';
         if (!b.analyst) nameStyle += 'color:#999;';
-        // 解析日を表示
-        if (b.analysisDate && b.analyst) {
+        // 解析日を表示（解析者と有効な解析日がある場合のみ）
+        if (b.analyst && b.analysisDate && b.analysisDate.trim() !== '') {
           const date = new Date(b.analysisDate);
-          const month = date.getMonth() + 1;
-          const day = date.getDate();
-          nameText += ` (${month}/${day})`;
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
         }
         break;
       case '修正待ち':
         nameText = b.fixer || '(未設定)';
         if (!b.fixer) nameStyle += 'color:#999;';
-        // 対応日を表示
-        if (b.fixDate && b.fixer) {
+        // 対応日を表示（対応者と有効な対応日がある場合のみ）
+        if (b.fixer && b.fixDate && b.fixDate.trim() !== '') {
           const date = new Date(b.fixDate);
-          const month = date.getMonth() + 1;
-          const day = date.getDate();
-          nameText += ` (${month}/${day})`;
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
         }
         break;
       case '確認待ち':
         nameText = b.verifier || '(未設定)';
         if (!b.verifier) nameStyle += 'color:#999;';
-        // 確認日を表示
-        if (b.verifyDate && b.verifier) {
+        // 確認日を表示（確認者と有効な確認日がある場合のみ）
+        if (b.verifier && b.verifyDate && b.verifyDate.trim() !== '') {
           const date = new Date(b.verifyDate);
-          const month = date.getMonth() + 1;
-          const day = date.getDate();
-          nameText += ` (${month}/${day})`;
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
         }
         break;
       default:
