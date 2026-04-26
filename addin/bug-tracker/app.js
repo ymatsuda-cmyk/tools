@@ -751,6 +751,11 @@
               // 解析日が入っていたらチェック
               if (bug.analysisDate && bug.analysisDate.trim() !== '') {
                 checkbox.checked = true;
+                checkbox.disabled = true; // 解析日が入っている場合は読み取り専用
+              }
+              // 対応日や確認日が入っている場合も読み取り専用
+              if ((bug.fixDate && bug.fixDate.trim() !== '') || (bug.verifyDate && bug.verifyDate.trim() !== '')) {
+                checkbox.disabled = true;
               }
               return checkbox;
             })(),
@@ -907,6 +912,11 @@
               // 対応日が入っていたらチェック
               if (bug.fixDate && bug.fixDate.trim() !== '') {
                 checkbox.checked = true;
+                checkbox.disabled = true; // 対応日が入っている場合は読み取り専用
+              }
+              // 確認日が入っている場合も読み取り専用
+              if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+                checkbox.disabled = true;
               }
               return checkbox;
             })(),
@@ -945,6 +955,7 @@
             // 確認日が入っていたらチェック
             if (bug.verifyDate && bug.verifyDate.trim() !== '') {
               radio.checked = true;
+              radio.disabled = true; // 確認日が入っている場合は読み取り専用
             }
             return radio;
           })(),
@@ -960,9 +971,13 @@
               value: 'reject', 
               'data-key': 'sashimodoshi' 
             });
-            // 差し戻しに○が入っていたらチェック
-            if (bug.reject === '○') {
+            // 差し戻しに○が入っていて、かつ確認日がない場合のみチェック
+            if (bug.reject === '○' && (!bug.verifyDate || bug.verifyDate.trim() === '')) {
               radio.checked = true;
+            }
+            // 確認日が入っている場合は読み取り専用
+            if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+              radio.disabled = true;
             }
             return radio;
           })(),
