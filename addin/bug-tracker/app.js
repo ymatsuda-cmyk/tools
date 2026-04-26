@@ -1053,35 +1053,76 @@
         
         // 2行目：タグ（チップ形式）
         const row2 = el('div', {}, [
-          el('label', { text: 'タグ', style: 'display:block;margin-bottom:8px;font-weight:bold;' }),
-          
-          // プリセットタグボタン群
+          // タグヘッダー（ラベル + ＋ボタン）
           (() => {
+            const headerContainer = el('div', { 
+              style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;' 
+            });
+            
+            headerContainer.appendChild(el('label', { 
+              text: 'タグ', 
+              style: 'font-weight:bold;' 
+            }));
+            
+            const toggleBtn = el('button', {
+              type: 'button',
+              text: '＋',
+              id: 'tag-toggle-btn',
+              style: 'height:16px;width:16px;border:1px solid #007acc;background:#007acc;color:white;border-radius:8px;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;transition:transform 0.3s ease;padding:0;'
+            });
+            
+            toggleBtn.addEventListener('click', () => {
+              const tagInputArea = document.querySelector('#tag-input-area');
+              const btn = document.querySelector('#tag-toggle-btn');
+              
+              if (tagInputArea && btn) {
+                const isVisible = tagInputArea.style.maxHeight !== '0px' && tagInputArea.style.maxHeight !== '';
+                
+                if (isVisible) {
+                  // 閉じる
+                  tagInputArea.style.maxHeight = '0px';
+                  tagInputArea.style.opacity = '0';
+                  btn.textContent = '＋';
+                  btn.style.transform = 'rotate(0deg)';
+                } else {
+                  // 開く
+                  tagInputArea.style.maxHeight = '300px';
+                  tagInputArea.style.opacity = '1';
+                  btn.textContent = '−';
+                  btn.style.transform = 'rotate(180deg)';
+                }
+              }
+            });
+            
+            headerContainer.appendChild(toggleBtn);
+            return headerContainer;
+          })(),
+          
+          // タグ入力エリア（スライド対応）
+          (() => {
+            const inputArea = el('div', {
+              id: 'tag-input-area',
+              style: 'max-height:0px;opacity:0;overflow:hidden;transition:max-height 0.3s ease, opacity 0.3s ease;margin-bottom:12px;'
+            });
+            
+            // プリセットタグボタン群
             const presetContainer = el('div', { style: 'margin-bottom:12px;' });
             presetContainer.appendChild(el('div', { 
               text: 'プリセットタグ:', 
               style: 'font-size:12px;color:#666;margin-bottom:6px;' 
             }));
             
-            const buttonContainer = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;' });
-            const presetTags = state.presetTags;
-            
-            presetTags.forEach(tag => {
-              const btn = el('button', {
-                type: 'button',
-                text: tag,
-                style: 'padding:4px 8px;border:1px solid #ddd;background:#f5f5f5;border-radius:4px;cursor:pointer;font-size:12px;'
-              });
-              btn.addEventListener('click', () => addTag(tag));
-              buttonContainer.appendChild(btn);
+            const buttonContainer = el('div', { 
+              style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;',
+              id: 'preset-tags-container'
             });
             
+            // 初期表示は後で行う
+            
             presetContainer.appendChild(buttonContainer);
-            return presetContainer;
-          })(),
-          
-          // カスタムタグ入力
-          (() => {
+            inputArea.appendChild(presetContainer);
+            
+            // カスタムタグ入力
             const customContainer = el('div', { style: 'margin-bottom:12px;' });
             customContainer.appendChild(el('div', { 
               text: 'カスタムタグ:', 
@@ -1120,7 +1161,9 @@
             inputContainer.appendChild(input);
             inputContainer.appendChild(addBtn);
             customContainer.appendChild(inputContainer);
-            return customContainer;
+            inputArea.appendChild(customContainer);
+            
+            return inputArea;
           })(),
           
           // 選択されたタグ表示エリア
@@ -1155,8 +1198,39 @@
         tabContent.appendChild(row1);
         tabContent.appendChild(row2);
         
+        // プリセットボタン更新関数（グローバルスコープ）
+        function renderPresetButtons() {
+          const container = document.querySelector('#preset-tags-container');
+          if (!container) return;
+          
+          container.innerHTML = '';
+          const presetTags = state.presetTags || [];
+          
+          presetTags.forEach(tag => {
+            const btn = el('button', {
+              type: 'button',
+              text: tag,
+              style: 'background:#007acc;color:white;padding:4px 12px;border:none;border-radius:12px;cursor:pointer;font-size:12px;margin:2px;transition:background-color 0.2s ease;'
+            });
+            
+            // ホバー効果
+            btn.addEventListener('mouseenter', () => {
+              btn.style.backgroundColor = '#0056a3';
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.backgroundColor = '#007acc';
+            });
+            
+            btn.addEventListener('click', () => addTag(tag));
+            container.appendChild(btn);
+          });
+        }
+        
         // タグ機能の初期化（DOM追加後に実行）
         setTimeout(() => {
+          // プリセットボタンを初期表示
+          renderPresetButtons();
+          
           // 既存のタグを表示（/区切り）
           const currentTags = (bug.tag || '').split('/').map(t => t.trim()).filter(t => t);
           currentTags.forEach(tag => {
@@ -1175,6 +1249,13 @@
           const currentTags = (hiddenInput.value || '').split('/').map(t => t.trim()).filter(t => t);
           if (currentTags.includes(tagName.trim())) {
             return; // 既に存在する場合は追加しない
+          }
+          
+          // プリセットタグにない場合は追加
+          if (!state.presetTags.includes(tagName.trim())) {
+            state.presetTags.push(tagName.trim());
+            // プリセットボタンを再描画
+            renderPresetButtons();
           }
           
           addTagChip(tagName.trim());
