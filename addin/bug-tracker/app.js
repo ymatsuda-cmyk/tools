@@ -364,6 +364,7 @@
   
   function renderTrend() {
     renderTrendChart();
+    renderStats();
   }
 
   async function getTrendPeriod() {
@@ -543,6 +544,79 @@
           mode: 'index'
         }
       }
+    });
+  }
+
+  function renderStats() {
+    const tbody = document.querySelector('#statsTable tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    // 優先度の順序定義
+    const priorities = [
+      { key: '高', label: '高', className: 'high' },
+      { key: '中', label: '中', className: 'medium' },  
+      { key: '低', label: '低', className: 'low' },
+      { key: '', label: '未設定', className: 'none' }
+    ];
+
+    priorities.forEach(priority => {
+      // 該当優先度のバグを抽出
+      const priorityBugs = state.bugs.filter(bug => bug.priority === priority.key);
+      
+      if (priorityBugs.length === 0) return; // 該当なしはスキップ
+
+      const totalCount = priorityBugs.length;
+      const fixedCount = priorityBugs.filter(bug => bug.fixDate && bug.fixDate.trim() !== '').length;
+      const verifiedCount = priorityBugs.filter(bug => bug.verifyDate && bug.verifyDate.trim() !== '').length;
+      
+      const fixedRate = totalCount > 0 ? Math.round((fixedCount / totalCount) * 100) : 0;
+      const verifiedRate = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+
+      const row = el('tr');
+      
+      // 優先度列
+      const priorityCell = el('td');
+      if (priority.key) {
+        const badge = el('span', { 
+          class: `priority-badge ${priority.className}`,
+          text: priority.label 
+        });
+        priorityCell.appendChild(badge);
+      } else {
+        priorityCell.textContent = priority.label;
+      }
+      row.appendChild(priorityCell);
+      
+      // 総件数列
+      row.appendChild(el('td', { text: totalCount.toString() }));
+      
+      // 対応完了件数列
+      row.appendChild(el('td', { text: fixedCount.toString() }));
+      
+      // 対応完了率列
+      const fixedRateCell = el('td');
+      const fixedRateSpan = el('span', { 
+        class: `completion-rate ${fixedRate >= 80 ? 'high' : fixedRate >= 50 ? 'medium' : 'low'}`,
+        text: `${fixedRate}%` 
+      });
+      fixedRateCell.appendChild(fixedRateSpan);
+      row.appendChild(fixedRateCell);
+      
+      // 確認完了件数列  
+      row.appendChild(el('td', { text: verifiedCount.toString() }));
+      
+      // 確認完了率列
+      const verifiedRateCell = el('td');
+      const verifiedRateSpan = el('span', { 
+        class: `completion-rate ${verifiedRate >= 80 ? 'high' : verifiedRate >= 50 ? 'medium' : 'low'}`,
+        text: `${verifiedRate}%` 
+      });
+      verifiedRateCell.appendChild(verifiedRateSpan);
+      row.appendChild(verifiedRateCell);
+      
+      tbody.appendChild(row);
     });
   }
   

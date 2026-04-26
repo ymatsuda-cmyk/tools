@@ -55,9 +55,29 @@
 
     <section id="view-trend" class="view">
       <div class="trend-container">
-        <h3>バグ対応生産性推移</h3>
         <div class="chart-container">
           <canvas id="trendChart" width="800" height="400"></canvas>
+        </div>
+        <div class="stats-container">
+          <h4>優先度別完了率</h4>
+          <table id="statsTable" class="stats-table">
+            <thead>
+              <tr>
+                <th rowspan="2">優先度</th>
+                <th rowspan="2">総件数</th>
+                <th colspan="2">修正済</th>
+                <th colspan="2">完了</th>
+              </tr>
+              <tr>
+                <th>件数</th>
+                <th>完了率</th>
+                <th>件数</th>
+                <th>完了率</th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>

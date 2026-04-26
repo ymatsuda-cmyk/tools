@@ -143,3 +143,131 @@ tbody tr:hover { background: #f7faff; }
   width: 100% !important;
   height: 100% !important;
 }
+
+/* 統計テーブル用スタイル */
+.stats-container {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e3e8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stats-container h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.stats-table {
+  width: auto;
+  border-collapse: collapse;
+  font-size: 11px;
+  background: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  table-layout: fixed;
+  max-width: 280px;
+}
+
+.stats-table th {
+  background: #f0f2f5;
+  padding: 3px 4px;
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 2px solid #c8ccd2;
+  border-right: 1px solid #d8dde3;
+  white-space: nowrap;
+}
+
+.stats-table th:last-child {
+  border-right: none;
+}
+
+.stats-table td {
+  padding: 2px 3px;
+  border-bottom: 1px solid #eef0f3;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stats-table td:first-child {
+  text-align: left;
+}
+
+/* テーブル列幅の固定設定 */
+.stats-table th:nth-child(1),
+.stats-table td:nth-child(1) {
+  width: 25px;
+  text-align: center;
+}
+
+.stats-table th:nth-child(2),
+.stats-table td:nth-child(2) {
+  width: 25px;
+}
+
+.stats-table th:nth-child(3),
+.stats-table td:nth-child(3) {
+  width: 25px;
+}
+
+.stats-table th:nth-child(4),
+.stats-table td:nth-child(4) {
+  width: 35px;
+}
+
+.stats-table th:nth-child(5),
+.stats-table td:nth-child(5) {
+  width: 25px;
+}
+
+.stats-table th:nth-child(6),
+.stats-table td:nth-child(6) {
+  width: 35px;
+}
+
+.stats-table tr:hover {
+  background: #f7faff;
+}
+
+.priority-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.priority-badge.high {
+  background: #ffe2e0;
+  color: #c62828;
+}
+
+.priority-badge.medium {
+  background: #fff3cd;
+  color: #b07b00;
+}
+
+.priority-badge.low {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.completion-rate {
+  font-weight: 600;
+}
+
+.completion-rate.high {
+  color: #4caf50;
+}
+
+.completion-rate.medium {
+  color: #ff9800;
+}
+
+.completion-rate.low {
+  color: #f44336;
+}
