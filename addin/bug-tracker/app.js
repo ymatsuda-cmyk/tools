@@ -9,7 +9,7 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 28;
+  const COL_COUNT  = 30;
 
   // 動的にフィールド定義を生成する関数
   function getColumns() {
@@ -41,7 +41,9 @@
       { key: 'verifyDate', letter: 'Y', label: '確認日',       group: '結果確認', type: 'date' },
       { key: 'tag',        letter: 'Z', label: 'タグ',         group: '管理',     type: 'text' },
       { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] },
+      { key: 'starred',    letter: 'AC', label: '☆',         group: '管理',     type: 'text' },
+      { key: 'todayWork',  letter: 'AD', label: '本日分',     group: '管理',     type: 'text' }
     ];
   }
 
@@ -250,7 +252,12 @@
       
       const today = new Date();
       const tStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-      sheet.getRangeByIndexes(rowIndex0, 3, 1, 1).values = [[tStr]];
+      const updatedRange = sheet.getRangeByIndexes(rowIndex0, 3, 1, 1);
+      updatedRange.values = [[tStr]];
+      
+      // 更新日セルの文字列折り返しを無効にする
+      updatedRange.format.wrapText = false;
+      
       bug.updated = tStr;
       await ctx.sync();
     });
@@ -751,6 +758,11 @@
       card.style.backgroundColor = '#fff3f3';
     }
     
+    // 星付き状態の場合はカードの背景を薄い水色に（本日分欄を基準）
+    if (b.todayWork === '○') {
+      card.style.backgroundColor = '#e3f2fd';
+    }
+    
     // 1行目：左端にID、発生起因。右端に優先度と差し戻しマーク
     const row1 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;' });
     
@@ -774,6 +786,16 @@
         style: 'background:#f44336;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;' 
       }));
     }
+    
+    // 星マーク（優先度の左側）- 本日分欄を基準に表示制御
+    const isStarred = b.todayWork === '○';
+    const starIcon = el('span', {
+      text: isStarred ? '★' : '☆',
+      style: `cursor:pointer;font-size:14px;margin-right:4px;user-select:none;${isStarred ? 'color:#ffc107;' : 'color:#ccc;'}`,
+      class: 'star-icon',
+      'data-row': b.rowIndex
+    });
+    rightPart1.appendChild(starIcon);
     
     // 優先度バッジ
     if (b.priority) {
@@ -865,7 +887,22 @@
     card.appendChild(row2);
     card.appendChild(row3);
     
-    card.addEventListener('click', () => openModal(b.rowIndex));
+    // カードクリックイベント（星クリックの場合は除外）
+    card.addEventListener('click', (e) => {
+      // 星アイコンのクリックかチェック
+      if (e.target.classList.contains('star-icon')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rowIndex = parseInt(e.target.dataset.row);
+        const bug = state.bugs.find(b => b.rowIndex === rowIndex);
+        if (bug) {
+          toggleStar(bug);
+        }
+        return;
+      }
+      // 星以外のクリックの場合、詳細画面を開く
+      openModal(b.rowIndex);
+    });
     
     // ドラッグ&ドロップイベントを必要時のみ追加
     if (dragEnabled) {
@@ -1745,6 +1782,10 @@
               const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
               const presetTagCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 24, 1, 1); // Y列は24番目（0ベース）
               presetTagCell.values = [[state.presetTags.join('/')]]; // プリセットタグを/区切りで保存
+              
+              // プリセットタグセルの文字列折り返しを無効にする
+              presetTagCell.format.wrapText = false;
+              
               await ctx.sync();
             });
           } catch (error) {
@@ -2070,6 +2111,10 @@
       
       const writeRange = sheet.getRangeByIndexes(newRowIndex - 1, 0, 1, COL_COUNT);
       writeRange.values = [rowVals];
+      
+      // 文字列の折り返しを無効にする
+      writeRange.format.wrapText = false;
+      
       await ctx.sync();
       
       state.bugs.push(bugData);
@@ -2136,6 +2181,8 @@
       newBugData.priority = '中'; // 優先度の初期値
       newBugData.severity = ''; // 影響度の初期値
       newBugData.tag = ''; // タグの初期値
+      newBugData.starred = ''; // 星マークの初期値
+      newBugData.todayWork = ''; // 本日分の初期値
       
       try {
         await saveNewBug(newBugData);
@@ -2461,6 +2508,34 @@
         closeModal();
       }
     });
+  }
+
+  // 星マーククリック処理
+  async function toggleStar(bug) {
+    try {
+      // 本日分の状態を確認（現在の表示制御基準）
+      const isCurrentlyStarred = bug.todayWork === '○';
+      
+      // 本日分の状態を切り替え
+      if (isCurrentlyStarred) {
+        // 星を外す場合：空欄
+        bug.todayWork = '';
+        bug.starred = ''; // 同期
+      } else {
+        // 星を付ける場合：○
+        bug.todayWork = '○';
+        bug.starred = '★'; // 同期
+      }
+      
+      // Excelに保存
+      await saveBugToExcel(bug);
+      
+      // 画面を再描画
+      render();
+    } catch (error) {
+      console.error('星の状態更新エラー:', error);
+      alert('星の状態を更新できませんでした。');
+    }
   }
 
   function init() {
