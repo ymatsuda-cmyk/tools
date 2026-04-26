@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- 赤色の背景 -->
+  <rect width="80" height="80" rx="12" fill="#dc3545"/>
+  
+  <!-- カンバンボードの3列 -->
+  <rect x="10" y="15" width="18" height="50" rx="4" fill="#fff" opacity="0.95"/>
+  <rect x="31" y="15" width="18" height="50" rx="4" fill="#fff" opacity="0.95"/>
+  <rect x="52" y="15" width="18" height="50" rx="4" fill="#fff" opacity="0.95"/>
+  
+  <!-- 各列のヘッダー表示 -->
+  <rect x="12" y="18" width="14" height="3" rx="1" fill="#6c757d" opacity="0.7"/>
+  <rect x="33" y="18" width="14" height="3" rx="1" fill="#6c757d" opacity="0.7"/>
+  <rect x="54" y="18" width="14" height="3" rx="1" fill="#6c757d" opacity="0.7"/>
+  
+  <!-- カードサンプル（進捗を表現） -->
+  <!-- 未着手列 -->
+  <rect x="12" y="24" width="14" height="8" rx="2" fill="#dc3545"/>
+  <rect x="12" y="35" width="14" height="8" rx="2" fill="#dc3545"/>
+  <rect x="12" y="46" width="14" height="8" rx="2" fill="#dc3545"/>
+  
+  <!-- 進行中列 -->
+  <rect x="33" y="24" width="14" height="8" rx="2" fill="#ffc107"/>
+  <rect x="33" y="35" width="14" height="8" rx="2" fill="#ffc107"/>
+  
+  <!-- 完了列 -->
+  <rect x="54" y="24" width="14" height="8" rx="2" fill="#28a745"/>
+  
+  <!-- 小さなバグアイコン（右下コーナー） -->
+  <circle cx="65" cy="65" r="8" fill="#fff"/>
+  <ellipse cx="65" cy="65" rx="5" ry="3.5" fill="#dc3545"/>
+  <circle cx="63" cy="63.5" r="0.8" fill="#fff"/>
+  <circle cx="67" cy="63.5" r="0.8" fill="#fff"/>
+  
+  <!-- バグの足 -->
+  <path d="M58 62 Q55 60 53 58" stroke="#dc3545" stroke-width="1.5" fill="none"/>
+  <path d="M72 62 Q75 60 77 58" stroke="#dc3545" stroke-width="1.5" fill="none"/>
+  <path d="M58 68 Q55 70 53 72" stroke="#dc3545" stroke-width="1.5" fill="none"/>
+  <path d="M72 68 Q75 70 77 72" stroke="#dc3545" stroke-width="1.5" fill="none"/>
+</svg>

@@ -1433,6 +1433,7 @@
     // データ初期値
     const newBugData = {
       id: String(getNextId()).padStart(4, '0'),
+      title: '', // タイトルを追加
       occurredOn: (() => {
         const d = new Date();
         return `${d.getMonth()+1}/${d.getDate()}`;
@@ -1528,8 +1529,23 @@
       })()
     ]);
 
-    // 3行目: 再現手順（10行）
+    // 3行目: タイトル
     const row3 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: 'タイトル *' }));
+        const input = el('input', { type: 'text', style: 'width:98%;' });
+        input.value = newBugData.title;
+        input.required = true;
+        input.placeholder = 'バグのタイトルを入力してください';
+        input.dataset.key = 'title';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 4行目: 再現手順（10行）
+    const row4 = el('div', { class: 'form-row' }, [
       (() => {
         const fld = el('div', { class: 'field', style: 'width:100%;' });
         fld.appendChild(el('label', { text: '再現手順 *' }));
@@ -1543,8 +1559,8 @@
       })()
     ]);
 
-    // 4行目: 期待する動作
-    const row4 = el('div', { class: 'form-row' }, [
+    // 5行目: 期待する動作
+    const row5 = el('div', { class: 'form-row' }, [
       (() => {
         const fld = el('div', { class: 'field', style: 'width:100%;' });
         fld.appendChild(el('label', { text: '期待する動作 *' }));
@@ -1557,8 +1573,8 @@
       })()
     ]);
 
-    // 5行目: 実際の動作
-    const row5 = el('div', { class: 'form-row' }, [
+    // 6行目: 実際の動作
+    const row6 = el('div', { class: 'form-row' }, [
       (() => {
         const fld = el('div', { class: 'field', style: 'width:100%;' });
         fld.appendChild(el('label', { text: '実際の動作 *' }));
@@ -1574,9 +1590,10 @@
     // レイアウトをbodyに追加
     body.appendChild(row1);
     body.appendChild(row2);
-    body.appendChild(row3);
-    body.appendChild(row4);
-    body.appendChild(row5);
+    body.appendChild(row3); // タイトル
+    body.appendChild(row4); // 再現手順
+    body.appendChild(row5); // 期待する動作
+    body.appendChild(row6); // 実際の動作
 
     $('#modal').classList.remove('hidden');
   }
@@ -1630,7 +1647,7 @@
 
       // 必須項目チェック
       if ([
-        'id', 'occurredOn', 'reporter', 'origin', 'reproRate', 'steps', 'expected', 'actual'
+        'id', 'title', 'occurredOn', 'reporter', 'origin', 'reproRate', 'steps', 'expected', 'actual'
       ].includes(k)) {
         if (!value) {
           errors.push(`${inp.previousSibling ? inp.previousSibling.textContent.replace('*','').trim() : k}は必須項目です`);
