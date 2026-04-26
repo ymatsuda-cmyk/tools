@@ -9,7 +9,7 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 22;
+  const COL_COUNT  = 23;
 
   const COLUMNS = [
     { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
@@ -25,25 +25,25 @@
     { key: 'actual',     letter: 'K', label: '実際の動作',   group: '発生情報', type: 'textarea' },
     { key: 'reproRate',  letter: 'L', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
     { key: 'cause',      letter: 'M', label: '原因',         group: '対応情報', type: 'textarea' },
-    { key: 'scope',      letter: 'N', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
-    { key: 'fix',        letter: 'O', label: '対応内容',     group: '対応情報', type: 'textarea' },
-    { key: 'fixVer',     letter: 'P', label: '修正Ver',     group: '対応情報', type: 'text' },
-    { key: 'fixer',      letter: 'Q', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'verify',     letter: 'R', label: '確認内容',     group: '結果確認', type: 'textarea' },
-    { key: 'verifier',   letter: 'S', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'tag',        letter: 'T', label: 'タグ',         group: '管理',     type: 'text' },
-    { key: 'priority',   letter: 'U', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-    { key: 'severity',   letter: 'V', label: '影響度',       group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+    { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'scope',      letter: 'O', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
+    { key: 'fix',        letter: 'P', label: '対応内容',     group: '対応情報', type: 'textarea' },
+    { key: 'fixVer',     letter: 'Q', label: '修正Ver',     group: '対応情報', type: 'text' },
+    { key: 'fixer',      letter: 'R', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'verify',     letter: 'S', label: '確認内容',     group: '結果確認', type: 'textarea' },
+    { key: 'verifier',   letter: 'T', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'tag',        letter: 'U', label: 'タグ',         group: '管理',     type: 'text' },
+    { key: 'priority',   letter: 'V', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
+    { key: 'severity',   letter: 'W', label: '影響度',       group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
   ];
 
-  const STATUS_ORDER = ['新規','解析中','修正待ち','確認待ち','再発','完了'];
+  const STATUS_ORDER = ['新規','解析中','修正待ち','確認待ち','完了'];
   const ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
   const state = {
     bugs: [],
-    view: 'list',
-    kanbanGroup: 'status',
+    view: 'assignee',  // 'assignee' または 'status'
     filters: { text: '', priority: '', status: '' },
     inOffice: false,
     editingRow: null
@@ -188,50 +188,18 @@
     });
   }
 
-  function renderList() {
-    const thead = $('#bug-thead');
-    thead.innerHTML = '';
-    COLUMNS.forEach(c => thead.appendChild(el('th', { text: c.label })));
 
-    const tbody = $('#bug-tbody');
-    tbody.innerHTML = '';
 
-    const bugs = sortByPriority(applyFilters(state.bugs));
-    bugs.forEach(b => {
-      const tr = el('tr');
-      tr.dataset.row = b.rowIndex;
-      COLUMNS.forEach(c => {
-        const td = el('td');
-        const v = b[c.key] ?? '';
-        if (c.key === 'priority' && v) {
-          td.appendChild(el('span', { class: `badge pri-${v}`, text: v }));
-        } else if (c.key === 'status' && v) {
-          td.appendChild(el('span', { class: `badge st-${v}`, text: v }));
-        } else {
-          td.textContent = String(v).replace(/\n/g, ' / ');
-          td.title = String(v);
-        }
-        tr.appendChild(td);
-      });
-      tr.addEventListener('click', () => openModal(b.rowIndex));
-      tbody.appendChild(tr);
-    });
-
-    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
-  }
-
-  function renderKanban() {
-    const board = $('#kanban-board');
+  function renderKanbanAssignee() {
+    const board = $('#kanban-board-assignee');
     board.innerHTML = '';
-    const groupKey = state.kanbanGroup;
-    const order = groupKey === 'status' ? STATUS_ORDER : ASSIGNEE_ORDER;
+    const order = ASSIGNEE_ORDER;
 
     const bugs = sortByPriority(applyFilters(state.bugs));
     const groups = new Map();
     order.forEach(k => groups.set(k, []));
     bugs.forEach(b => {
-      let key = b[groupKey] || '';
-      if (groupKey === 'assignee' && !key) key = '(未割当)';
+      let key = b.assignee || '(未割当)';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(b);
     });
@@ -244,16 +212,46 @@
         el('span', { class: 'count', text: String(items.length) })
       ]);
       const body = el('div', { class: 'kanban-col-body' });
-      items.forEach(b => body.appendChild(renderCard(b)));
+      items.forEach(b => body.appendChild(renderCard(b, true))); // drag enabled
       col.appendChild(header);
       col.appendChild(body);
       
-      // ドロップイベントを担当者別表示時のみ追加
-      if (state.kanbanGroup === 'assignee') {
-        body.addEventListener('dragover', handleDragOver);
-        body.addEventListener('dragleave', handleDragLeave);
-        body.addEventListener('drop', handleDrop);
-      }
+      // ドロップイベントを追加（担当者別表示用）
+      body.addEventListener('dragover', handleDragOver);
+      body.addEventListener('dragleave', handleDragLeave);
+      body.addEventListener('drop', handleDrop);
+      
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
+  function renderKanbanStatus() {
+    const board = $('#kanban-board-status');
+    board.innerHTML = '';
+    const order = STATUS_ORDER;
+
+    const bugs = sortByPriority(applyFilters(state.bugs));
+    const groups = new Map();
+    order.forEach(k => groups.set(k, []));
+    bugs.forEach(b => {
+      let key = b.status || '';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(b);
+    });
+
+    groups.forEach((items, key) => {
+      const col = el('div', { class: 'kanban-col' });
+      col.dataset.group = key;
+      const header = el('div', { class: 'kanban-col-header' }, [
+        el('span', { text: key || '(未設定)' }),
+        el('span', { class: 'count', text: String(items.length) })
+      ]);
+      const body = el('div', { class: 'kanban-col-body' });
+      items.forEach(b => body.appendChild(renderCard(b, false))); // drag disabled
+      col.appendChild(header);
+      col.appendChild(body);
       
       board.appendChild(col);
     });
@@ -345,22 +343,81 @@
     });
   }
   
-  function renderCard(b) {
+  function renderCard(b, dragEnabled = false) {
     const card = el('div', { class: 'kanban-card pri-' + (b.priority || '') });
     card.dataset.row = b.rowIndex;
-    card.draggable = state.kanbanGroup === 'assignee'; // 担当者別表示時のみドラッグ可能
-    card.appendChild(el('div', { class: 'id', text: `#${b.id || ''}` }));
-    card.appendChild(el('div', { class: 'title', text: b.title || '(無題)' }));
-    const meta = el('div', { class: 'meta' });
-    if (b.priority) meta.appendChild(el('span', { class: `badge pri-${b.priority}`, text: '優:' + b.priority }));
-    if (b.status)   meta.appendChild(el('span', { class: `badge st-${b.status}`,   text: b.status }));
-    if (b.assignee) meta.appendChild(el('span', { text: '担当:' + b.assignee }));
-    if (b.tag)      meta.appendChild(el('span', { text: 'タグ:' + b.tag }));
-    card.appendChild(meta);
+    card.draggable = dragEnabled; // ドラッグ可否をパラメータで制御
+    
+    // 1行目：左端にID、発生起因。右端に優先度
+    const row1 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;' });
+    const leftPart1 = el('div', { style: 'display:flex;gap:8px;' }, [
+      el('span', { class: 'id', text: `#${b.id || ''}`, style: 'font-weight:bold;font-size:12px;' }),
+      el('span', { text: b.origin || '', style: 'font-size:11px;color:#666;' })
+    ]);
+    const rightPart1 = el('div', {});
+    if (b.priority) {
+      rightPart1.appendChild(el('span', { class: `badge pri-${b.priority}`, text: b.priority, style: 'font-size:11px;' }));
+    }
+    row1.appendChild(leftPart1);
+    row1.appendChild(rightPart1);
+    
+    // 2行目：タイトル
+    const row2 = el('div', { 
+      class: 'title', 
+      text: b.title || '(無題)', 
+      style: 'margin-bottom:4px;font-weight:500;line-height:1.3;' 
+    });
+    
+    // 3行目：左端に状態、右端に名前
+    const row3 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;' });
+    const leftPart3 = el('div', {});
+    if (b.status) {
+      leftPart3.appendChild(el('span', { class: `badge st-${b.status}`, text: b.status, style: 'font-size:11px;' }));
+    }
+    
+    const rightPart3 = el('div', {});
+    // 状態により表示する名前を変更
+    let nameText = '';
+    let nameStyle = 'font-size:11px;';
+    
+    switch(b.status) {
+      case '新規':
+        nameText = '(未割当)';
+        nameStyle += 'color:#999;';
+        break;
+      case '解析中':
+        nameText = b.analyst || '(未設定)';
+        if (!b.analyst) nameStyle += 'color:#999;';
+        break;
+      case '修正待ち':
+        nameText = b.fixer || '(未設定)';
+        if (!b.fixer) nameStyle += 'color:#999;';
+        break;
+      case '確認待ち':
+        nameText = b.verifier || '(未設定)';
+        if (!b.verifier) nameStyle += 'color:#999;';
+        break;
+      default:
+        if (b.assignee) {
+          nameText = b.assignee;
+        } else {
+          nameText = '(未割当)';
+          nameStyle += 'color:#999;';
+        }
+    }
+    
+    rightPart3.appendChild(el('span', { text: nameText, style: nameStyle }));
+    row3.appendChild(leftPart3);
+    row3.appendChild(rightPart3);
+    
+    card.appendChild(row1);
+    card.appendChild(row2);
+    card.appendChild(row3);
+    
     card.addEventListener('click', () => openModal(b.rowIndex));
     
-    // ドラッグ&ドロップイベントを担当者別表示時のみ追加
-    if (state.kanbanGroup === 'assignee') {
+    // ドラッグ&ドロップイベントを必要時のみ追加
+    if (dragEnabled) {
       card.addEventListener('dragstart', handleDragStart);
       card.addEventListener('dragend', cleanupDrag);
     }
@@ -396,24 +453,110 @@
     let activeTab = statusTabMap[bug.status] || 'jisho';
 
     // 常時表示エリア
-    const alwaysArea = el('div', { class: 'always-area', style: 'margin-bottom:12px;padding:8px 0;border-bottom:1px solid #ccc;' }, [
-      el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;' }, [
-        el('div', {}, [el('b', { text: 'ID: ' }), el('span', { text: bug.id || '' })]),
-        el('div', {}, [el('b', { text: '状況: ' }), el('span', { text: bug.status || '' })]),
-        el('div', {}, [el('b', { text: 'タイトル: ' }), el('span', { text: bug.title || '' })]),
-        el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: bug.origin || '' })]),
-        el('div', {}, [el('b', { text: '発生日: ' }), el('span', { text: bug.occurredOn || '' })]),
-        el('div', {}, [el('b', { text: '登録者: ' }), el('span', { text: bug.reporter || '' })])
-      ])
+    const alwaysArea = el('div', { class: 'always-area', style: 'margin-bottom:12px;padding:8px 0;border-bottom:1px solid #ccc;' });
+    
+    // 1行目：ID、状態、発生起因
+    const row1 = el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;' }, [
+      el('div', {}, [el('b', { text: 'ID: ' }), el('span', { text: bug.id || '' })]),
+      el('div', {}, [el('b', { text: '状態: ' }), el('span', { text: bug.status || '' })]),
+      el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: bug.origin || '' })])
     ]);
+    alwaysArea.appendChild(row1);
+    
+    // 日付をm/d形式に変換する関数
+    function formatToMD(dateStr) {
+      if (!dateStr) return '';
+      if (dateStr.includes('/')) return dateStr; // 既にm/d形式
+      if (dateStr.includes('-')) {
+        // yyyy-mm-dd形式からm/d形式に変換
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          const month = parseInt(parts[1]);
+          const day = parseInt(parts[2]);
+          return `${month}/${day}`;
+        }
+      }
+      return dateStr;
+    }
+    
+    // ワークフローテーブル
+    const workflowTable = el('table', { style: 'width:100%;border-collapse:collapse;font-size:12px;' });
+    
+    // ヘッダー行
+    const thead = el('thead');
+    const headerRow = el('tr');
+    ['新規', '解析', '修正', '確認'].forEach(header => {
+      headerRow.appendChild(el('th', { 
+        text: header, 
+        style: 'border:1px solid #ddd;padding:6px;background:#f5f5f5;text-align:center;font-weight:bold;' 
+      }));
+    });
+    thead.appendChild(headerRow);
+    workflowTable.appendChild(thead);
+    
+    // データ行
+    const tbody = el('tbody');
+    const dataRow = el('tr');
+    
+    // 新規列
+    const newCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
+    if (bug.reporter || bug.occurredOn) {
+      const reporterText = bug.reporter || '(未設定)';
+      const dateText = formatToMD(bug.occurredOn);
+      const displayText = (dateText && dateText !== '') ? `${reporterText} (${dateText})` : reporterText;
+      newCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
+    } else {
+      newCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
+    }
+    dataRow.appendChild(newCell);
+    
+    // 解析列
+    const analysisCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
+    if (bug.status !== '新規') {
+      const analystText = bug.analyst || '(未設定)';
+      const analysisDate = formatToMD(bug.updated);
+      const displayText = (analysisDate && analysisDate !== '') ? `${analystText} (${analysisDate})` : analystText;
+      analysisCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
+    } else {
+      analysisCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
+    }
+    dataRow.appendChild(analysisCell);
+    
+    // 修正列
+    const fixCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
+    if (['修正待ち', '確認待ち', '完了'].includes(bug.status)) {
+      const fixerText = bug.fixer || '(未設定)';
+      const fixDate = formatToMD(bug.updated);
+      const displayText = (fixDate && fixDate !== '') ? `${fixerText} (${fixDate})` : fixerText;
+      fixCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
+    } else {
+      fixCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
+    }
+    dataRow.appendChild(fixCell);
+    
+    // 確認列
+    const verifyCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
+    if (['確認待ち', '完了'].includes(bug.status)) {
+      const verifierText = bug.verifier || '(未設定)';
+      const verifyDate = formatToMD(bug.updated);
+      const displayText = (verifyDate && verifyDate !== '') ? `${verifierText} (${verifyDate})` : verifierText;
+      verifyCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
+    } else {
+      verifyCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
+    }
+    dataRow.appendChild(verifyCell);
+    
+    tbody.appendChild(dataRow);
+    workflowTable.appendChild(tbody);
+    alwaysArea.appendChild(workflowTable);
+    
     body.appendChild(alwaysArea);
 
-    const tabHeader = el('div', { class: 'tab-header', style: 'display:flex;gap:8px;margin-bottom:8px;' },
+    const tabHeader = el('div', { class: 'tab-header' },
       tabNames.map(tab => {
         const btn = el('button', {
           class: 'tab-btn' + (activeTab === tab.key ? ' active' : ''),
-          type: 'button',
-          style: 'padding:6px 16px;'
+          type: 'button'
         }, [el('span', { text: tab.label })]);
         btn.dataset.tab = tab.key;
         btn.addEventListener('click', () => {
@@ -439,7 +582,7 @@
           el('label', { text: '再現手順' }), el('br'),
           (() => {
             const ta = el('textarea', {
-              rows: 5,
+              rows: 10,
               style: 'width:98%;',
               placeholder: '再現手順を入力してください',
               'data-key': 'steps'
@@ -480,7 +623,7 @@
           el('label', { text: '原因' }), el('br'),
           (() => {
             const ta = el('textarea', {
-              rows: 3,
+              rows: 15,
               style: 'width:98%;',
               placeholder: '原因を入力してください',
               'data-key': 'cause'
@@ -496,14 +639,110 @@
           ])
         ]));
       } else if (tabKey === 'shochi') {
-        // 処置タブ：影響範囲、処置内容、修正Ver、対応者（編集可）、処置完了チェック
-        tabContent.appendChild(el('div', {}, [el('label', { text: '影響範囲' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.scope || '', 'data-key': 'scope' })]));
-        tabContent.appendChild(el('div', {}, [
-          el('label', { text: '処置内容' }), el('br'),
+        // 処置タブ：影響範囲（チェックボックス表）と処置内容を横並び、修正Ver（編集可）、処置完了チェック
+        
+        // メインコンテナ（横並び）
+        const mainContainer = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' });
+        
+        // 左側：影響範囲のチェックボックス表
+        const leftPanel = el('div', { style: 'flex:0 0 auto;min-width:fit-content;' });
+        
+        const scopeOptions = ['定義(通常)', '定義(電源断)', '定義(通信断)', 'RPA', 'アプリ'];
+        const currentScope = bug.scope || '';
+        const selectedScopes = currentScope.split('/').map(s => s.trim()).filter(s => s);
+        
+        // 修正完了状況を取得（新しいフィールドとして追加）
+        const currentCompleted = bug.scopeCompleted || '';
+        const completedScopes = currentCompleted.split('/').map(s => s.trim()).filter(s => s);
+        
+        leftPanel.appendChild(el('div', { style: 'margin-bottom:16px;' }, [
+          el('label', { text: '影響範囲', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
+          (() => {
+            const table = el('table', { style: 'border-collapse:collapse;width:100%;' });
+            
+            // ヘッダー行
+            const headerRow = el('tr');
+            headerRow.appendChild(el('th', { 
+              text: '修正対象', 
+              style: 'border:1px solid #ddd;padding:8px;background:#f5f5f5;text-align:left;white-space:nowrap;min-width:120px;' 
+            }));
+            headerRow.appendChild(el('th', { 
+              text: '修正完了', 
+              style: 'border:1px solid #ddd;padding:8px;background:#f5f5f5;text-align:center;white-space:nowrap;width:80px;' 
+            }));
+            table.appendChild(headerRow);
+            
+            // 各オプションの行
+            scopeOptions.forEach(option => {
+              const row = el('tr');
+              
+              // 修正対象列
+              const targetCell = el('td', { style: 'border:1px solid #ddd;padding:6px;white-space:nowrap;' });
+              const targetCheckbox = el('input', { 
+                type: 'checkbox', 
+                value: option,
+                'data-scope-option': option,
+                style: 'margin-right:8px;'
+              });
+              
+              if (selectedScopes.includes(option)) {
+                targetCheckbox.checked = true;
+              }
+              
+              const targetLabel = el('label', { style: 'display:flex;align-items:center;cursor:pointer;white-space:nowrap;' }, [
+                targetCheckbox,
+                el('span', { text: option })
+              ]);
+              
+              targetCell.appendChild(targetLabel);
+              row.appendChild(targetCell);
+              
+              // 修正完了列
+              const completedCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap;' });
+              const completedCheckbox = el('input', { 
+                type: 'checkbox', 
+                value: option,
+                'data-scope-completed': option,
+                style: 'display:none;' // 初期は非表示
+              });
+              
+              if (completedScopes.includes(option)) {
+                completedCheckbox.checked = true;
+              }
+              
+              // 修正対象がチェックされている場合は完了チェックボックスを表示
+              if (selectedScopes.includes(option)) {
+                completedCheckbox.style.display = 'inline-block';
+              }
+              
+              // 修正対象チェックボックスの変更イベント
+              targetCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                  completedCheckbox.style.display = 'inline-block';
+                } else {
+                  completedCheckbox.style.display = 'none';
+                  completedCheckbox.checked = false;
+                }
+              });
+              
+              completedCell.appendChild(completedCheckbox);
+              row.appendChild(completedCell);
+              table.appendChild(row);
+            });
+            
+            return table;
+          })()
+        ]));
+        
+        mainContainer.appendChild(leftPanel);
+        
+        // 右側：処置内容
+        const rightPanel = el('div', { style: 'flex:1;margin-left:16px;' });
+        rightPanel.appendChild(el('div', {}, [
+          el('label', { text: '処置内容', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
           (() => {
             const ta = el('textarea', {
-              rows: 2,
+              rows: 15,
               style: 'width:98%;',
               placeholder: '処置内容を入力してください',
               'data-key': 'fix'
@@ -512,10 +751,13 @@
             return ta;
           })()
         ]));
+        
+        mainContainer.appendChild(rightPanel);
+        tabContent.appendChild(mainContainer);
+        
+        // 下部：修正Ver、処置完了チェック
         tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
           el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' })]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '対応者' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.fixer || '', 'data-key': 'fixer' })]));
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
             el('input', { type: 'checkbox', 'data-key': 'shochikanryo' }),
@@ -523,12 +765,12 @@
           ])
         ]));
       } else if (tabKey === 'kekka') {
-        // 結果確認タブ：確認内容、確認者（編集可）、確認完了・再発チェック
+        // 結果確認タブ：確認内容（編集可）、確認完了・差し戻しラジオボタン
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '確認内容' }), el('br'),
           (() => {
             const ta = el('textarea', {
-              rows: 2,
+              rows: 10,
               style: 'width:98%;',
               placeholder: '確認内容を入力してください',
               'data-key': 'verify'
@@ -537,18 +779,36 @@
             return ta;
           })()
         ]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '確認者' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.verifier || bug.reporter || '', 'data-key': 'verifier' })]));
-        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
-          el('label', {}, [
-            el('input', { type: 'checkbox', 'data-key': 'kekkakanryo' }),
-            el('span', { text: '確認完了（完了に変更）' })
-          ]),
-          el('label', { style: 'margin-left:16px;' }, [
-            el('input', { type: 'checkbox', 'data-key': 'saihatsu' }),
-            el('span', { text: '再発' })
-          ])
-        ]));
+        
+        // ラジオボタングループ
+        const radioGroup = el('div', { style: 'margin-top:8px;' });
+        const groupName = `result_${bug.rowIndex || 'new'}`;
+        
+        // 確認完了ラジオボタン
+        const completeRadio = el('label', { style: 'margin-right:16px;' }, [
+          el('input', { 
+            type: 'radio', 
+            name: groupName, 
+            value: 'complete', 
+            'data-key': 'kekkakanryo' 
+          }),
+          el('span', { text: '確認完了（完了に変更）' })
+        ]);
+        
+        // 差し戻しラジオボタン
+        const rejectRadio = el('label', {}, [
+          el('input', { 
+            type: 'radio', 
+            name: groupName, 
+            value: 'reject', 
+            'data-key': 'sashimodoshi' 
+          }),
+          el('span', { text: '差し戻し（修正待ちに変更）' })
+        ]);
+        
+        radioGroup.appendChild(completeRadio);
+        radioGroup.appendChild(rejectRadio);
+        tabContent.appendChild(radioGroup);
       } else if (tabKey === 'kanri') {
         // 管理タブ：タグ、優先度、影響度（編集可）
         tabContent.appendChild(el('div', {}, [el('label', { text: 'タグ' }), el('br'),
@@ -826,12 +1086,63 @@
       // 既存のバグ編集の場合
       const bug = state.bugs.find(b => b.rowIndex === state.editingRow);
       if (!bug) { closeModal(); return; }
+      
+      // ラジオボタンの状態を確認
+      const selectedRadio = $('#modal-body').querySelector('input[type="radio"]:checked');
+      const isComplete = selectedRadio && selectedRadio.value === 'complete';
+      const isReject = selectedRadio && selectedRadio.value === 'reject';
+      
       $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
         const k = inp.dataset.key;
         const col = COLUMNS.find(c => c.key === k);
         if (!col || col.type === 'readonly') return;
-        bug[k] = inp.value;
+        if (!['kekkakanryo', 'sashimodoshi'].includes(k)) { // ラジオボタンは除外
+          bug[k] = inp.value;
+        }
       });
+      
+      // 処置完了チェックボックスの状態を確認
+      const shochoKanryoCheck = $('#modal-body').querySelector('[data-key="shochikanryo"]');
+      const isShochoKanryo = shochoKanryoCheck && shochoKanryoCheck.checked;
+      
+      // 影響範囲のチェックボックスを集約
+      const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
+      const selectedScopes = [];
+      scopeCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          selectedScopes.push(cb.value);
+        }
+      });
+      bug.scope = selectedScopes.join('/');
+      
+      // 修正完了状況のチェックボックスを集約
+      const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
+      const completedScopes = [];
+      completedCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          completedScopes.push(cb.value);
+        }
+      });
+      bug.scopeCompleted = completedScopes.join('/');
+      
+      // 処置完了がチェックされている場合、修正対象がすべて修正完了になっているかを確認
+      if (isShochoKanryo && selectedScopes.length > 0) {
+        const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
+        if (incompleteScopes.length > 0) {
+          alert(`処置完了にするには、以下の修正対象の修正完了にもチェックを付けてください：\n${incompleteScopes.join('\n')}`);
+          return; // 保存を中止
+        }
+      }
+      
+      // ラジオボタンの選択に応じて状態を変更
+      if (isComplete && bug.status === '確認待ち') {
+        bug.status = '完了';
+        setStatus('確認完了のため状態を「完了」に変更しました');
+      } else if (isReject && bug.status === '確認待ち') {
+        bug.status = '修正待ち';
+        setStatus('差し戻しのため状態を「修正待ち」に変更しました');
+      }
+      
       try {
         await saveBugToExcel(bug);
         render();
@@ -845,16 +1156,15 @@
 
   function setView(v) {
     state.view = v;
-    $('#btn-view-list').classList.toggle('active',   v === 'list');
-    $('#btn-view-kanban').classList.toggle('active', v === 'kanban');
-    $('#view-list').classList.toggle('active',   v === 'list');
-    $('#view-kanban').classList.toggle('active', v === 'kanban');
-    $('#kanban-controls').classList.toggle('hidden', v !== 'kanban');
+    $('#btn-view-assignee').classList.toggle('active', v === 'assignee');
+    $('#btn-view-status').classList.toggle('active',   v === 'status');
+    $('#view-assignee').classList.toggle('active', v === 'assignee');
+    $('#view-status').classList.toggle('active',   v === 'status');
     render();
   }
   function render() {
-    if (state.view === 'list') renderList();
-    else renderKanban();
+    if (state.view === 'assignee') renderKanbanAssignee();
+    else renderKanbanStatus();
   }
 
   function demoData() {
@@ -875,15 +1185,11 @@
   }
 
   function bindEvents() {
-    $('#btn-view-list').addEventListener('click',   () => setView('list'));
-    $('#btn-view-kanban').addEventListener('click', () => setView('kanban'));
+    $('#btn-view-assignee').addEventListener('click', () => setView('assignee'));
+    $('#btn-view-status').addEventListener('click',   () => setView('status'));
     $('#btn-add-new').addEventListener('click', () => openNewBugModal());
     $('#btn-reload').addEventListener('click', async () => {
       await loadFromExcel();
-      render();
-    });
-    $('#kanban-group').addEventListener('change', (e) => {
-      state.kanbanGroup = e.target.value;
       render();
     });
     $('#filter-text').addEventListener('input', (e) => { state.filters.text = e.target.value; render(); });

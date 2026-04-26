@@ -13,18 +13,8 @@
     <h1>バグ管理</h1>
     <div class="toolbar">
       <div class="view-switch" role="tablist">
-        <button id="btn-view-list"   class="view-btn active" role="tab">一覧</button>
-        <button id="btn-view-kanban" class="view-btn"        role="tab">カンバン</button>
-      </div>
-
-      <div id="kanban-controls" class="kanban-controls hidden">
-        <label>
-          列分け:
-          <select id="kanban-group">
-            <option value="status">状況</option>
-            <option value="assignee">担当者</option>
-          </select>
-        </label>
+        <button id="btn-view-assignee" class="view-btn active" role="tab">割り当て</button>
+        <button id="btn-view-status"   class="view-btn"        role="tab">状態別</button>
       </div>
 
       <button id="btn-add-new" class="btn primary">➕ 新規追加</button>
@@ -53,17 +43,12 @@
   </header>
 
   <main>
-    <section id="view-list" class="view active">
-      <div class="table-wrap">
-        <table id="bug-table">
-          <thead><tr id="bug-thead"></tr></thead>
-          <tbody id="bug-tbody"></tbody>
-        </table>
-      </div>
+    <section id="view-assignee" class="view active">
+      <div id="kanban-board-assignee" class="kanban-board"></div>
     </section>
 
-    <section id="view-kanban" class="view">
-      <div id="kanban-board" class="kanban-board"></div>
+    <section id="view-status" class="view">
+      <div id="kanban-board-status" class="kanban-board"></div>
     </section>
   </main>
 

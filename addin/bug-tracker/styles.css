@@ -46,6 +46,42 @@ tbody tr:hover { background: #f7faff; }
 .badge.st-再発 { background: #ffcdd2; color: #b71c1c; }
 .badge.st-完了 { background: #c8e6c9; color: #2e7d32; }
 
+/* タブスタイル */
+.tab-header { 
+  display: flex; 
+  gap: 4px; 
+  margin-bottom: 12px; 
+  border-bottom: 1px solid #e0e3e8;
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border: 1px solid #c8ccd2;
+  border-radius: 6px;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.tab-btn:hover {
+  background: #f0f2f5;
+}
+
+.tab-btn.active {
+  background: #2e7dd7;
+  color: #fff;
+  border-color: #2e7dd7;
+}
+
+.tab-content {
+  padding-top: 8px;
+}
+
 .kanban-board { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
 .kanban-col { background: #eceff3; border-radius: 6px; min-width: 260px; max-width: 280px; flex: 0 0 260px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); }
 .kanban-col-header { padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #d8dde3; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #eceff3; border-radius: 6px 6px 0 0; }
