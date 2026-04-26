@@ -1000,13 +1000,208 @@
         radioGroup.appendChild(rejectRadio);
         tabContent.appendChild(radioGroup);
       } else if (tabKey === 'kanri') {
-        // 管理タブ：タグ、優先度、影響度（編集可）
-        tabContent.appendChild(el('div', {}, [el('label', { text: 'タグ' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.tag || '', 'data-key': 'tag' })]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '優先度' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.priority || '', 'data-key': 'priority' })]));
-        tabContent.appendChild(el('div', {}, [el('label', { text: '影響度' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.severity || '', 'data-key': 'severity' })]));
+        // 管理タブ：優先度、影響度、タグ（編集可）
+        
+        // 1行目：優先度と影響度（横並び）
+        const row1 = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' }, [
+          (() => {
+            const field = el('div', { style: 'flex:1;' });
+            field.appendChild(el('label', { text: '優先度' }));
+            field.appendChild(el('br'));
+            const select = el('select', { style: 'width:100%;', 'data-key': 'priority' });
+            ['','高','中','低'].forEach(option => {
+              const op = el('option', { value: option, text: option || '(選択)' });
+              if (option === (bug.priority || '中')) { // 初期値は中、既存の値があればそれを使用
+                op.selected = true;
+              }
+              select.appendChild(op);
+            });
+            field.appendChild(select);
+            return field;
+          })(),
+          (() => {
+            const field = el('div', { style: 'flex:1;' });
+            field.appendChild(el('label', { text: '影響度' }));
+            field.appendChild(el('br'));
+            const select = el('select', { style: 'width:100%;', 'data-key': 'severity' });
+            ['','致命的','重大','警備'].forEach(option => {
+              const op = el('option', { value: option, text: option || '(選択)' });
+              if (option === (bug.severity || '')) { // 初期値は空
+                op.selected = true;
+              }
+              select.appendChild(op);
+            });
+            field.appendChild(select);
+            return field;
+          })()
+        ]);
+        
+        // 2行目：タグ（チップ形式）
+        const row2 = el('div', {}, [
+          el('label', { text: 'タグ', style: 'display:block;margin-bottom:8px;font-weight:bold;' }),
+          
+          // プリセットタグボタン群
+          (() => {
+            const presetContainer = el('div', { style: 'margin-bottom:12px;' });
+            presetContainer.appendChild(el('div', { 
+              text: 'プリセットタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const buttonContainer = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;' });
+            const presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス'];
+            
+            presetTags.forEach(tag => {
+              const btn = el('button', {
+                type: 'button',
+                text: tag,
+                style: 'padding:4px 8px;border:1px solid #ddd;background:#f5f5f5;border-radius:4px;cursor:pointer;font-size:12px;'
+              });
+              btn.addEventListener('click', () => addTag(tag));
+              buttonContainer.appendChild(btn);
+            });
+            
+            presetContainer.appendChild(buttonContainer);
+            return presetContainer;
+          })(),
+          
+          // カスタムタグ入力
+          (() => {
+            const customContainer = el('div', { style: 'margin-bottom:12px;' });
+            customContainer.appendChild(el('div', { 
+              text: 'カスタムタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const inputContainer = el('div', { style: 'display:flex;gap:8px;' });
+            const input = el('input', { 
+              type: 'text', 
+              placeholder: 'カスタムタグを入力',
+              style: 'flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;',
+              id: 'custom-tag-input'
+            });
+            
+            const addBtn = el('button', {
+              type: 'button',
+              text: '追加',
+              style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;'
+            });
+            
+            addBtn.addEventListener('click', () => {
+              const value = input.value.trim();
+              if (value) {
+                addTag(value);
+                input.value = '';
+              }
+            });
+            
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addBtn.click();
+              }
+            });
+            
+            inputContainer.appendChild(input);
+            inputContainer.appendChild(addBtn);
+            customContainer.appendChild(inputContainer);
+            return customContainer;
+          })(),
+          
+          // 選択されたタグ表示エリア
+          (() => {
+            const tagContainer = el('div', { 
+              style: 'border:1px solid #ddd;border-radius:4px;padding:8px;min-height:40px;background:#fafafa;',
+              id: 'selected-tags-container'
+            });
+            tagContainer.appendChild(el('div', { 
+              text: '選択されたタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const tagsDisplay = el('div', { 
+              style: 'display:flex;flex-wrap:wrap;gap:6px;',
+              id: 'tags-display'
+            });
+            
+            tagContainer.appendChild(tagsDisplay);
+            
+            // 既存のタグを表示
+            const currentTags = (bug.tag || '').split(' ').filter(t => t.trim());
+            currentTags.forEach(tag => {
+              if (tag.trim()) addTagChip(tag.trim());
+            });
+            
+            return tagContainer;
+          })(),
+          
+          // 隠し入力フィールド（実際の値を保存）
+          el('input', { 
+            type: 'hidden', 
+            'data-key': 'tag',
+            id: 'tag-hidden-input',
+            value: bug.tag || ''
+          })
+        ]);
+        
+        // タグ追加関数
+        function addTag(tagName) {
+          const tagsDisplay = $('#tags-display');
+          const hiddenInput = $('#tag-hidden-input');
+          
+          // 既存チェック
+          const currentTags = (hiddenInput.value || '').split(' ').filter(t => t.trim());
+          if (currentTags.includes(tagName.trim())) {
+            return; // 既に存在する場合は追加しない
+          }
+          
+          addTagChip(tagName.trim());
+          updateHiddenInput();
+        }
+        
+        // タグチップ追加関数
+        function addTagChip(tagName) {
+          const tagsDisplay = $('#tags-display');
+          
+          const chip = el('div', {
+            style: 'display:inline-flex;align-items:center;background:#007acc;color:white;padding:2px 8px;border-radius:12px;font-size:12px;gap:4px;'
+          });
+          
+          chip.appendChild(el('span', { text: tagName }));
+          
+          const removeBtn = el('button', {
+            type: 'button',
+            text: '×',
+            style: 'background:none;border:none;color:white;cursor:pointer;font-size:14px;padding:0;margin-left:4px;'
+          });
+          
+          removeBtn.addEventListener('click', () => {
+            chip.remove();
+            updateHiddenInput();
+          });
+          
+          chip.appendChild(removeBtn);
+          tagsDisplay.appendChild(chip);
+        }
+        
+        // 隠し入力フィールド更新関数
+        function updateHiddenInput() {
+          const tagsDisplay = $('#tags-display');
+          const hiddenInput = $('#tag-hidden-input');
+          const tags = [];
+          
+          tagsDisplay.querySelectorAll('div').forEach(chip => {
+            const span = chip.querySelector('span');
+            if (span) {
+              tags.push(span.textContent.trim());
+            }
+          });
+          
+          hiddenInput.value = tags.join(' ');
+        }
+        
+        tabContent.appendChild(row1);
+        tabContent.appendChild(row2);
       }
     }
 
@@ -1263,6 +1458,9 @@
       newBugData.status = '新規';
       newBugData.updated = newBugData.occurredOn; // 更新日 = 発生日
       newBugData.assignee = newBugData.reporter; // 更新者 = 登録者（この場合担当者として設定）
+      newBugData.priority = '中'; // 優先度の初期値
+      newBugData.severity = ''; // 影響度の初期値
+      newBugData.tag = ''; // タグの初期値
       
       try {
         await saveNewBug(newBugData);
@@ -1290,6 +1488,14 @@
           bug[k] = inp.value;
         }
       });
+      
+      // 管理タブの変更を確実に反映
+      const prioritySelect = $('#modal-body').querySelector('[data-key="priority"]');
+      const severitySelect = $('#modal-body').querySelector('[data-key="severity"]');
+      const tagInput = $('#modal-body').querySelector('[data-key="tag"]');
+      if (prioritySelect) bug.priority = prioritySelect.value;
+      if (severitySelect) bug.severity = severitySelect.value;
+      if (tagInput) bug.tag = tagInput.value;
       
       // 処置完了チェックボックスの状態を確認
       const shochoKanryoCheck = $('#modal-body').querySelector('[data-key="shochikanryo"]');
