@@ -1229,6 +1229,13 @@
       });
       bug.scope = scopeWithStatus.join('/');
       
+      // state.bugs配列も更新（Excel保存前に確実に反映）
+      const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+      if (bugIndex >= 0) {
+        state.bugs[bugIndex].scope = bug.scope;
+        state.bugs[bugIndex].scopeCompleted = bug.scopeCompleted;
+      }
+      
       // 処置完了がチェックされている場合のバリデーションと更新
       if (isShochoKanryo) {
         // 修正対象にチェックが付いている場合のバリデーション
@@ -1295,6 +1302,7 @@
       }
       
       try {
+        // 影響範囲の修正完了状態を含めてExcelに保存
         await saveBugToExcel(bug);
         render();
         closeModal();
