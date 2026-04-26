@@ -9,7 +9,7 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 30;
+  const COL_COUNT  = 31;
 
   // 動的にフィールド定義を生成する関数
   function getColumns() {
@@ -40,10 +40,11 @@
       { key: 'verifier',   letter: 'X', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
       { key: 'verifyDate', letter: 'Y', label: '確認日',       group: '結果確認', type: 'date' },
       { key: 'tag',        letter: 'Z', label: 'タグ',         group: '管理',     type: 'text' },
-      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] },
-      { key: 'starred',    letter: 'AC', label: '☆',         group: '管理',     type: 'text' },
-      { key: 'todayWork',  letter: 'AD', label: '本日分',     group: '管理',     type: 'text' }
+      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['','高（最優先）','中','低（改善）'] },
+      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','軽微'] },
+      { key: 'starred',    letter: 'AC', label: '本日分',     group: '管理',     type: 'text' },
+      { key: 'periodStart', letter: 'AD', label: '期間開始',   group: '設定',     type: 'date' },
+      { key: 'periodEnd',   letter: 'AE', label: '期間終了',   group: '設定',     type: 'date' }
     ];
   }
 
@@ -387,11 +388,11 @@
       };
     }
 
-    // Excel モードではAC3, AD3セルから期間を取得
+    // Excel モードではAD3, AE3セルから期間を取得
     try {
       return await Excel.run(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-        const periodCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 28, 1, 2); // AC3:AD3
+        const periodCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 29, 1, 2); // AD3:AE3
         periodCells.load(['values']);
         await ctx.sync();
         
@@ -758,8 +759,8 @@
       card.style.backgroundColor = '#fff3f3';
     }
     
-    // 星付き状態の場合はカードの背景を薄い水色に（本日分欄を基準）
-    if (b.todayWork === '○') {
+    // 星付き状態の場合はカードの背景を薄い水色に（AC列/本日分を基準）
+    if (b.starred === '○') {
       card.style.backgroundColor = '#e3f2fd';
     }
     
@@ -787,8 +788,8 @@
       }));
     }
     
-    // 星マーク（優先度の左側）- 本日分欄を基準に表示制御
-    const isStarred = b.todayWork === '○';
+    // 星マーク（優先度の左側）- AC列/本日分を基準に表示制御
+    const isStarred = b.starred === '○';
     const starIcon = el('span', {
       text: isStarred ? '★' : '☆',
       style: `cursor:pointer;font-size:14px;margin-right:4px;user-select:none;${isStarred ? 'color:#ffc107;' : 'color:#ccc;'}`,
@@ -2181,8 +2182,7 @@
       newBugData.priority = '中'; // 優先度の初期値
       newBugData.severity = ''; // 影響度の初期値
       newBugData.tag = ''; // タグの初期値
-      newBugData.starred = ''; // 星マークの初期値
-      newBugData.todayWork = ''; // 本日分の初期値
+      newBugData.starred = ''; // 本日分の初期値
       
       try {
         await saveNewBug(newBugData);
@@ -2513,18 +2513,16 @@
   // 星マーククリック処理
   async function toggleStar(bug) {
     try {
-      // 本日分の状態を確認（現在の表示制御基準）
-      const isCurrentlyStarred = bug.todayWork === '○';
+      // AC列（本日分）の状態を確認
+      const isCurrentlyStarred = bug.starred === '○';
       
-      // 本日分の状態を切り替え
+      // AC列（本日分）の状態を切り替え
       if (isCurrentlyStarred) {
-        // 星を外す場合：空欄
-        bug.todayWork = '';
-        bug.starred = ''; // 同期
+        // 星を外す場合：空欄（★→☆）
+        bug.starred = '';
       } else {
-        // 星を付ける場合：○
-        bug.todayWork = '○';
-        bug.starred = '★'; // 同期
+        // 星を付ける場合：○（☆→★）
+        bug.starred = '○';
       }
       
       // Excelに保存
