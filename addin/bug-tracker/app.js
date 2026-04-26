@@ -746,7 +746,14 @@
         ]));
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
-            el('input', { type: 'checkbox', 'data-key': 'kaisekikanryo' }),
+            (() => {
+              const checkbox = el('input', { type: 'checkbox', 'data-key': 'kaisekikanryo' });
+              // 解析日が入っていたらチェック
+              if (bug.analysisDate && bug.analysisDate.trim() !== '') {
+                checkbox.checked = true;
+              }
+              return checkbox;
+            })(),
             el('span', { text: '解析完了（修正待ちに変更）' })
           ])
         ]));
@@ -895,7 +902,14 @@
           el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' })]));
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
-            el('input', { type: 'checkbox', 'data-key': 'shochikanryo' }),
+            (() => {
+              const checkbox = el('input', { type: 'checkbox', 'data-key': 'shochikanryo' });
+              // 対応日が入っていたらチェック
+              if (bug.fixDate && bug.fixDate.trim() !== '') {
+                checkbox.checked = true;
+              }
+              return checkbox;
+            })(),
             el('span', { text: '処置完了（確認待ちに変更）' })
           ])
         ]));
@@ -921,12 +935,19 @@
         
         // 確認完了ラジオボタン
         const completeRadio = el('label', { style: 'margin-right:16px;' }, [
-          el('input', { 
-            type: 'radio', 
-            name: groupName, 
-            value: 'complete', 
-            'data-key': 'kekkakanryo' 
-          }),
+          (() => {
+            const radio = el('input', { 
+              type: 'radio', 
+              name: groupName, 
+              value: 'complete', 
+              'data-key': 'kekkakanryo' 
+            });
+            // 確認日が入っていたらチェック
+            if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+              radio.checked = true;
+            }
+            return radio;
+          })(),
           el('span', { text: '確認完了（完了に変更）' })
         ]);
         
@@ -1354,8 +1375,13 @@
       
       // ラジオボタンの選択に応じて状態を変更
       if (isComplete && bug.status === '確認待ち') {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        bug.verifyDate = `${year}-${month}-${day}`; // 確認日を当日に設定
         bug.status = '完了';
-        setStatus('確認完了のため状態を「完了」に変更しました');
+        setStatus('確認完了のため確認日を当日に設定し、状態を「完了」に変更しました');
       } else if (isReject && bug.status === '確認待ち') {
         bug.status = '修正待ち';
         bug.reject = '○'; // 差し戻し列を○で更新
