@@ -550,76 +550,100 @@
       return dateStr;
     }
     
-    // ワークフローテーブル
-    const workflowTable = el('table', { style: 'width:100%;border-collapse:collapse;font-size:12px;' });
+    // ワークフローテーブル（流れるような表現）
+    const workflowContainer = el('div', { style: 'width:100%;' });
     
-    // ヘッダー行
-    const thead = el('thead');
-    const headerRow = el('tr');
-    ['新規', '解析', '修正', '確認'].forEach(header => {
-      headerRow.appendChild(el('th', { 
-        text: header, 
-        style: 'border:1px solid #ddd;padding:6px;background:#f5f5f5;text-align:center;font-weight:bold;' 
-      }));
+    // ワークフローステップの定義
+    const workflowSteps = [
+      { key: 'new', label: '新規', person: bug.reporter, date: bug.occurredOn, status: '新規' },
+      { key: 'analysis', label: '解析', person: bug.analyst, date: bug.analysisDate, status: '解析待ち' },
+      { key: 'fix', label: '修正', person: bug.fixer, date: bug.fixDate, status: '修正待ち' },
+      { key: 'verify', label: '確認', person: bug.verifier, date: bug.verifyDate, status: '確認待ち' }
+    ];
+    
+    // 現在のステータスのインデックスを取得
+    const currentStatusIndex = workflowSteps.findIndex(step => step.status === bug.status);
+    const completedStatusIndex = currentStatusIndex === -1 && bug.status === '完了' ? workflowSteps.length : currentStatusIndex;
+    
+    // フレックスコンテナ
+    const flowContainer = el('div', { 
+      style: 'display:flex;align-items:center;justify-content:space-between;padding:8px;' 
     });
-    thead.appendChild(headerRow);
-    workflowTable.appendChild(thead);
     
-    // データ行
-    const tbody = el('tbody');
-    const dataRow = el('tr');
+    workflowSteps.forEach((step, index) => {
+      // ステップの状態を判定
+      let stepState = 'pending'; // 未完了
+      if (index < completedStatusIndex || (bug.status === '完了' && index < workflowSteps.length)) {
+        stepState = 'completed'; // 完了
+      } else if (index === completedStatusIndex) {
+        stepState = 'current'; // 現在
+      }
+      
+      // ステップの色を決定
+      let bgColor = '#f5f5f5';
+      let textColor = '#999';
+      let borderColor = '#ddd';
+      
+      if (stepState === 'completed') {
+        bgColor = '#e8f5e8';
+        textColor = '#2e7d2e';
+        borderColor = '#4caf50';
+      } else if (stepState === 'current') {
+        bgColor = '#e3f2fd';
+        textColor = '#1976d2';
+        borderColor = '#2196f3';
+      }
+      
+      // ステップボックス
+      const stepBox = el('div', {
+        style: `
+          flex: 1;
+          border: 2px solid ${borderColor};
+          background: ${bgColor};
+          border-radius: 8px;
+          padding: 8px;
+          text-align: center;
+          position: relative;
+          margin: 0 4px;
+          transition: all 0.3s ease;
+        `
+      });
+      
+      // ステップラベル
+      stepBox.appendChild(el('div', {
+        text: step.label,
+        style: `font-weight:bold;font-size:12px;color:${textColor};margin-bottom:4px;`
+      }));
+      
+      // 担当者と日付
+      const personText = step.person || '(未設定)';
+      const dateText = formatToMD(step.date);
+      const displayText = (dateText && dateText !== '') ? `${personText} (${dateText})` : personText;
+      
+      stepBox.appendChild(el('div', {
+        text: stepState === 'pending' ? '-' : displayText,
+        style: `font-size:11px;color:${stepState === 'pending' ? '#ccc' : textColor};`
+      }));
+      
+      flowContainer.appendChild(stepBox);
+      
+      // 矢印を追加（最後のステップ以外）
+      if (index < workflowSteps.length - 1) {
+        const arrow = el('div', {
+          text: '→',
+          style: `
+            font-size: 18px;
+            color: ${index < completedStatusIndex ? '#4caf50' : '#ddd'};
+            margin: 0 8px;
+            font-weight: bold;
+          `
+        });
+        flowContainer.appendChild(arrow);
+      }
+    });
     
-    // 新規列
-    const newCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
-    if (bug.reporter || bug.occurredOn) {
-      const reporterText = bug.reporter || '(未設定)';
-      const dateText = formatToMD(bug.occurredOn);
-      const displayText = (dateText && dateText !== '') ? `${reporterText} (${dateText})` : reporterText;
-      newCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
-    } else {
-      newCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
-    }
-    dataRow.appendChild(newCell);
-    
-    // 解析列
-    const analysisCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
-    if (bug.status !== '新規') {
-      const analystText = bug.analyst || '(未設定)';
-      const analysisDate = formatToMD(bug.updated);
-      const displayText = (analysisDate && analysisDate !== '') ? `${analystText} (${analysisDate})` : analystText;
-      analysisCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
-    } else {
-      analysisCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
-    }
-    dataRow.appendChild(analysisCell);
-    
-    // 修正列
-    const fixCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
-    if (['修正待ち', '確認待ち', '完了'].includes(bug.status)) {
-      const fixerText = bug.fixer || '(未設定)';
-      const fixDate = formatToMD(bug.updated);
-      const displayText = (fixDate && fixDate !== '') ? `${fixerText} (${fixDate})` : fixerText;
-      fixCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
-    } else {
-      fixCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
-    }
-    dataRow.appendChild(fixCell);
-    
-    // 確認列
-    const verifyCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;' });
-    if (['確認待ち', '完了'].includes(bug.status)) {
-      const verifierText = bug.verifier || '(未設定)';
-      const verifyDate = formatToMD(bug.updated);
-      const displayText = (verifyDate && verifyDate !== '') ? `${verifierText} (${verifyDate})` : verifierText;
-      verifyCell.appendChild(el('div', { text: displayText, style: 'font-weight:bold;' }));
-    } else {
-      verifyCell.appendChild(el('div', { text: '-', style: 'color:#ccc;' }));
-    }
-    dataRow.appendChild(verifyCell);
-    
-    tbody.appendChild(dataRow);
-    workflowTable.appendChild(tbody);
-    alwaysArea.appendChild(workflowTable);
+    workflowContainer.appendChild(flowContainer);
+    alwaysArea.appendChild(workflowContainer);
     
     body.appendChild(alwaysArea);
 
