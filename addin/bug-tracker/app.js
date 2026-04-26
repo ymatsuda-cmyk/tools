@@ -9,7 +9,7 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 26;
+  const COL_COUNT  = 27;
 
   const COLUMNS = [
     { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
@@ -33,11 +33,12 @@
     { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
     { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
     { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
-    { key: 'verifier',   letter: 'V', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'verifyDate', letter: 'W', label: '確認日',       group: '結果確認', type: 'date' },
-    { key: 'tag',        letter: 'X', label: 'タグ',         group: '管理',     type: 'text' },
-    { key: 'priority',   letter: 'Y', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-    { key: 'severity',   letter: 'Z', label: '影響度',       group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+    { key: 'reject',     letter: 'V', label: '差し戻し',     group: '結果確認', type: 'text' },
+    { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'verifyDate', letter: 'X', label: '確認日',       group: '結果確認', type: 'date' },
+    { key: 'tag',        letter: 'Y', label: 'タグ',         group: '管理',     type: 'text' },
+    { key: 'priority',   letter: 'Z', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
+    { key: 'severity',   letter: 'AA', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
   ];
 
   const STATUS_ORDER = ['新規','解析待ち','修正待ち','確認待ち','完了'];
@@ -392,13 +393,29 @@
     card.dataset.row = b.rowIndex;
     card.draggable = dragEnabled; // ドラッグ可否をパラメータで制御
     
-    // 1行目：左端にID、発生起因。右端に優先度
+    // 差し戻し状態の場合はカードにスタイルを追加
+    if (b.reject === '○' && b.status === '修正待ち') {
+      card.style.borderLeft = '4px solid #f44336';
+      card.style.backgroundColor = '#fff3f3';
+    }
+    
+    // 1行目：左端にID、発生起因。右端に優先度と差し戻しマーク
     const row1 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;' });
     const leftPart1 = el('div', { style: 'display:flex;gap:8px;' }, [
       el('span', { class: 'id', text: `#${b.id || ''}`, style: 'font-weight:bold;font-size:12px;' }),
       el('span', { text: b.origin || '', style: 'font-size:11px;color:#666;' })
     ]);
-    const rightPart1 = el('div', {});
+    const rightPart1 = el('div', { style: 'display:flex;gap:4px;align-items:center;' });
+    
+    // 差し戻しマーク
+    if (b.reject === '○' && b.status === '修正待ち') {
+      rightPart1.appendChild(el('span', { 
+        text: '⚠ 差し戻し', 
+        style: 'background:#f44336;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;' 
+      }));
+    }
+    
+    // 優先度バッジ
     if (b.priority) {
       rightPart1.appendChild(el('span', { class: `badge pri-${b.priority}`, text: b.priority, style: 'font-size:11px;' }));
     }
@@ -1321,7 +1338,9 @@
         setStatus('確認完了のため状態を「完了」に変更しました');
       } else if (isReject && bug.status === '確認待ち') {
         bug.status = '修正待ち';
-        setStatus('差し戻しのため状態を「修正待ち」に変更しました');
+        bug.reject = '○'; // 差し戻し列を○で更新
+        bug.assignee = bug.fixer; // 担当者を対応者に設定
+        setStatus('差し戻しのため状態を「修正待ち」に変更し、担当者を対応者に設定しました');
       }
       
       try {
