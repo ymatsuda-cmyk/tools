@@ -527,7 +527,7 @@
     const row3 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;' });
     const leftPart3 = el('div', {});
     if (b.status) {
-      leftPart3.appendChild(el('span', { class: `badge st-${b.status}`, text: b.status, style: 'font-size:11px;' }));
+      leftPart3.appendChild(el('span', { class: `badge st-${b.status}`, text: STATUS_DISPLAY_NAMES[b.status] || b.status, style: 'font-size:11px;' }));
     }
     
     const rightPart3 = el('div', {});
