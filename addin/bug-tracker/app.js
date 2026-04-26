@@ -359,6 +359,12 @@
     
     // Excel保存
     try {
+      // state.bugsも確実に更新
+      const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+      if (bugIndex >= 0) {
+        state.bugs[bugIndex] = bug;
+      }
+      
       await saveBugToExcel(bug);
     } catch (e) {
       console.error('保存エラー:', e);
