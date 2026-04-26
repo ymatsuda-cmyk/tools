@@ -747,9 +747,14 @@
         // 影響範囲から（済）を除去して修正対象を抽出
         const selectedScopes = currentScope.split('/').map(s => s.trim().replace(/（済）$/, '')).filter(s => s);
         
-        // 修正完了状況を取得（新しいフィールドとして追加）
+        // 修正完了状況を取得（scopeCompletedフィールド + 影響範囲の（済）から抽出）
         const currentCompleted = bug.scopeCompleted || '';
-        const completedScopes = currentCompleted.split('/').map(s => s.trim()).filter(s => s);
+        let completedScopes = currentCompleted.split('/').map(s => s.trim()).filter(s => s);
+        
+        // 影響範囲から（済）が付いているアイテムも修正完了に含める
+        const scopeWithCompleted = currentScope.split('/').map(s => s.trim()).filter(s => s.includes('（済）'));
+        const completedFromScope = scopeWithCompleted.map(s => s.replace(/（済）$/, ''));
+        completedScopes = [...new Set([...completedScopes, ...completedFromScope])];
         
         leftPanel.appendChild(el('div', { style: 'margin-bottom:16px;' }, [
           el('label', { text: '影響範囲', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
