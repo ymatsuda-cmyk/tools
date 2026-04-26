@@ -60,7 +60,8 @@
     inOffice: false,
     editingRow: null,
     presetTags: [], // プリセットタグを保存
-    lastSelectedReporter: localStorage.getItem('bugTracker_lastReporter') || '' // 前回選択した登録者
+    lastSelectedReporter: localStorage.getItem('bugTracker_lastReporter') || '', // 前回選択した登録者
+    tabFormData: {} // タブのフォームデータを一時保存
   };
 
   function $(sel) { return document.querySelector(sel); }
@@ -1038,6 +1039,9 @@
         }, [el('span', { text: tab.label })]);
         btn.dataset.tab = tab.key;
         btn.addEventListener('click', () => {
+          // タブ切り替え前に現在のタブのデータを保存
+          saveCurrentTabData();
+          
           body.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           renderTab(tab.key);
@@ -1050,6 +1054,96 @@
     // タブ内容表示部
     const tabContent = el('div', { class: 'tab-content' });
     body.appendChild(tabContent);
+
+    // タブのフォームデータを保存する関数
+    function saveCurrentTabData() {
+      const currentTab = body.querySelector('.tab-btn.active')?.dataset.tab;
+      if (!currentTab) return;
+      
+      const formData = {};
+      
+      // すべてのinput, textarea, select要素のデータを保存
+      tabContent.querySelectorAll('input, textarea, select').forEach(element => {
+        if (element.dataset.key) {
+          if (element.type === 'checkbox') {
+            formData[element.dataset.key] = element.checked;
+          } else {
+            formData[element.dataset.key] = element.value || element.textContent;
+          }
+        }
+      });
+      
+      // チェックボックス表の特別処理（影響範囲）
+      const scopeCheckboxes = tabContent.querySelectorAll('input[data-scope-option]');
+      if (scopeCheckboxes.length > 0) {
+        formData['_scopeCheckboxes'] = {};
+        scopeCheckboxes.forEach(checkbox => {
+          formData['_scopeCheckboxes'][checkbox.dataset.scopeOption] = checkbox.checked;
+        });
+      }
+      
+      // 修正完了チェックボックスの特別処理
+      const completedCheckboxes = tabContent.querySelectorAll('input[data-scope-completed]');
+      if (completedCheckboxes.length > 0) {
+        formData['_completedCheckboxes'] = {};
+        completedCheckboxes.forEach(checkbox => {
+          formData['_completedCheckboxes'][checkbox.dataset.scopeCompleted] = checkbox.checked;
+        });
+      }
+      
+      // タブ別にデータを保存
+      if (!state.tabFormData[state.editingRow]) {
+        state.tabFormData[state.editingRow] = {};
+      }
+      state.tabFormData[state.editingRow][currentTab] = formData;
+    }
+    
+    // タブのフォームデータを復元する関数
+    function loadTabData(tabKey) {
+      if (!state.tabFormData[state.editingRow] || !state.tabFormData[state.editingRow][tabKey]) {
+        return; // 保存されたデータがない場合はそのまま
+      }
+      
+      const formData = state.tabFormData[state.editingRow][tabKey];
+      
+      // 通常のinput, textarea, select要素を復元
+      Object.keys(formData).forEach(key => {
+        if (key.startsWith('_')) return; // 特別処理用のキーはスキップ
+        
+        const element = tabContent.querySelector(`[data-key="${key}"]`);
+        if (element) {
+          if (element.type === 'checkbox') {
+            element.checked = formData[key];
+          } else {
+            if (element.tagName === 'TEXTAREA') {
+              element.textContent = formData[key];
+            } else {
+              element.value = formData[key];
+            }
+          }
+        }
+      });
+      
+      // 影響範囲チェックボックスを復元
+      if (formData['_scopeCheckboxes']) {
+        Object.keys(formData['_scopeCheckboxes']).forEach(scope => {
+          const element = tabContent.querySelector(`input[data-scope-option="${scope}"]`);
+          if (element) {
+            element.checked = formData['_scopeCheckboxes'][scope];
+          }
+        });
+      }
+      
+      // 修正完了チェックボックスを復元
+      if (formData['_completedCheckboxes']) {
+        Object.keys(formData['_completedCheckboxes']).forEach(scope => {
+          const element = tabContent.querySelector(`input[data-scope-completed="${scope}"]`);
+          if (element) {
+            element.checked = formData['_completedCheckboxes'][scope];
+          }
+        });
+      }
+    }
 
     function renderTab(tabKey) {
       tabContent.innerHTML = '';
@@ -1113,6 +1207,9 @@
             return ta;
           })()
         ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
       } else if (tabKey === 'kaiseki') {
         // 解析タブ：原因（編集可）、解析完了チェック
         tabContent.appendChild(el('div', {}, [
@@ -1151,6 +1248,9 @@
             el('span', { text: '解析完了（修正に変更）' })
           ])
         ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
       } else if (tabKey === 'shochi') {
         // 処置タブ：影響範囲（チェックボックス表）と処置内容を横並び、修正Ver（編集可）、処置完了チェック
         
@@ -1325,6 +1425,9 @@
             el('span', { text: '処置完了（確認に変更）' })
           ])
         ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
       } else if (tabKey === 'kekka') {
         // 結果確認タブ：確認内容（編集可）、確認完了・差し戻しラジオボタン
         tabContent.appendChild(el('div', {}, [
@@ -1398,6 +1501,9 @@
         radioGroup.appendChild(completeRadio);
         radioGroup.appendChild(rejectRadio);
         tabContent.appendChild(radioGroup);
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
       } else if (tabKey === 'kanri') {
         // 管理タブ：優先度、影響度、タグ（編集可）
         
@@ -1717,6 +1823,9 @@
           // プリセットボタンの表示を更新（選択状態に応じて色分け）
           renderPresetButtons();
         }
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
       }
     }
 
@@ -1726,6 +1835,12 @@
 
   function closeModal() {
     $('#modal').classList.add('hidden');
+    
+    // タブのフォームデータをクリア
+    if (state.editingRow && state.tabFormData[state.editingRow]) {
+      delete state.tabFormData[state.editingRow];
+    }
+    
     state.editingRow = null;
   }
 
