@@ -30,18 +30,19 @@
       { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
       { key: 'analysisDate', letter: 'O', label: '解析日',     group: '対応情報', type: 'date' },
       { key: 'scope',      letter: 'P', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
-    { key: 'fix',        letter: 'Q', label: '対応内容',     group: '対応情報', type: 'textarea' },
-    { key: 'fixVer',     letter: 'R', label: '修正Ver',     group: '対応情報', type: 'text' },
-    { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-    { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
-    { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
-    { key: 'reject',     letter: 'V', label: '差し戻し',     group: '結果確認', type: 'text' },
-    { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-    { key: 'verifyDate', letter: 'X', label: '確認日',       group: '結果確認', type: 'date' },
-    { key: 'tag',        letter: 'Y', label: 'タグ',         group: '管理',     type: 'text' },
-    { key: 'priority',   letter: 'Z', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-    { key: 'severity',   letter: 'AA', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
-  ];
+      { key: 'fix',        letter: 'Q', label: '対応内容',     group: '対応情報', type: 'textarea' },
+      { key: 'fixVer',     letter: 'R', label: '修正Ver',     group: '対応情報', type: 'text' },
+      { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
+      { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
+      { key: 'reject',     letter: 'V', label: '差し戻し',     group: '結果確認', type: 'text' },
+      { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'verifyDate', letter: 'X', label: '確認日',       group: '結果確認', type: 'date' },
+      { key: 'tag',        letter: 'Y', label: 'タグ',         group: '管理',     type: 'text' },
+      { key: 'priority',   letter: 'Z', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
+      { key: 'severity',   letter: 'AA', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+    ];
+  }
 
   const STATUS_ORDER = ['新規','解析待ち','修正待ち','確認待ち','完了'];
   
