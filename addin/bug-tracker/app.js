@@ -199,7 +199,9 @@
     board.innerHTML = '';
     const order = ASSIGNEE_ORDER;
 
-    const bugs = sortByPriority(applyFilters(state.bugs));
+    // 担当者別表示では完了状態を除外
+    const filteredBugs = applyFilters(state.bugs).filter(b => b.status !== '完了');
+    const bugs = sortByPriority(filteredBugs);
     const groups = new Map();
     order.forEach(k => groups.set(k, []));
     bugs.forEach(b => {
@@ -688,8 +690,18 @@
     function renderTab(tabKey) {
       tabContent.innerHTML = '';
       if (tabKey === 'jisho') {
-        // 事象タブ：再現手順、期待する動作、実際の動作（編集可）
+        // 事象タブ：タイトル、再現手順、期待する動作、実際の動作（編集可）
         console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: 'タイトル' }), el('br'),
+          el('input', { 
+            type: 'text', 
+            style: 'width:98%;margin-bottom:16px;', 
+            value: bug.title || '', 
+            'data-key': 'title',
+            placeholder: 'バグのタイトルを入力してください' 
+          })
+        ]));
         tabContent.appendChild(el('div', {}, [
           el('label', { text: '再現手順' }), el('br'),
           (() => {
