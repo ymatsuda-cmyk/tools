@@ -2150,6 +2150,96 @@
       const bug = state.bugs.find(b => b.rowIndex === state.editingRow);
       if (!bug) { closeModal(); return; }
       
+      // 保存前に現在のタブのデータを一時保存
+      const currentTab = $('#modal-body').querySelector('.tab-btn.active')?.dataset.tab;
+      if (currentTab) {
+        const tabContent = $('#modal-body').querySelector('.tab-content');
+        const formData = {};
+        
+        // すべてのinput, textarea, select要素のデータを保存
+        tabContent.querySelectorAll('input, textarea, select').forEach(element => {
+          if (element.dataset.key) {
+            if (element.type === 'checkbox') {
+              formData[element.dataset.key] = element.checked;
+            } else {
+              formData[element.dataset.key] = element.value || element.textContent;
+            }
+          }
+        });
+        
+        // チェックボックス表の特別処理（影響範囲）
+        const scopeCheckboxes = tabContent.querySelectorAll('input[data-scope-option]');
+        if (scopeCheckboxes.length > 0) {
+          formData['_scopeCheckboxes'] = {};
+          scopeCheckboxes.forEach(checkbox => {
+            formData['_scopeCheckboxes'][checkbox.dataset.scopeOption] = checkbox.checked;
+          });
+        }
+        
+        // 修正完了チェックボックスの特別処理
+        const completedCheckboxes = tabContent.querySelectorAll('input[data-scope-completed]');
+        if (completedCheckboxes.length > 0) {
+          formData['_completedCheckboxes'] = {};
+          completedCheckboxes.forEach(checkbox => {
+            formData['_completedCheckboxes'][checkbox.dataset.scopeCompleted] = checkbox.checked;
+          });
+        }
+        
+        // タブ別にデータを保存
+        if (!state.tabFormData[state.editingRow]) {
+          state.tabFormData[state.editingRow] = {};
+        }
+        state.tabFormData[state.editingRow][currentTab] = formData;
+      }
+      
+      // 一時保存されているすべてのタブデータをバグオブジェクトに反映
+      if (state.tabFormData[state.editingRow]) {
+        Object.keys(state.tabFormData[state.editingRow]).forEach(tabKey => {
+          const tabData = state.tabFormData[state.editingRow][tabKey];
+          
+          // 通常のフィールドを反映
+          Object.keys(tabData).forEach(fieldKey => {
+            if (fieldKey.startsWith('_')) return; // 特別処理用のキーはスキップ
+            
+            const col = getColumns().find(c => c.key === fieldKey);
+            if (col && col.type !== 'readonly' && !['kekkakanryo', 'sashimodoshi'].includes(fieldKey)) {
+              // チェックボックスの場合は特別処理
+              if (fieldKey === 'kaisekikanryo' || fieldKey === 'shochikanryo') {
+                // これらは後で別途処理されるのでスキップ
+                return;
+              }
+              bug[fieldKey] = tabData[fieldKey];
+            }
+          });
+          
+          // 影響範囲チェックボックスの特別処理
+          if (tabKey === 'shochi' && tabData['_scopeCheckboxes'] && tabData['_completedCheckboxes']) {
+            const selectedScopes = [];
+            const completedScopes = [];
+            
+            Object.keys(tabData['_scopeCheckboxes']).forEach(scope => {
+              if (tabData['_scopeCheckboxes'][scope]) {
+                selectedScopes.push(scope);
+              }
+            });
+            
+            Object.keys(tabData['_completedCheckboxes']).forEach(scope => {
+              if (tabData['_completedCheckboxes'][scope]) {
+                completedScopes.push(scope);
+              }
+            });
+            
+            bug.scopeCompleted = completedScopes.join('/');
+            
+            // 修正対象と修正完了を統合して影響範囲に設定
+            const scopeWithStatus = selectedScopes.map(scope => {
+              return completedScopes.includes(scope) ? `${scope}（済）` : scope;
+            });
+            bug.scope = scopeWithStatus.join('/');
+          }
+        });
+      }
+      
       // ラジオボタンの状態を確認
       const selectedRadio = $('#modal-body').querySelector('input[type="radio"]:checked');
       const isComplete = selectedRadio && selectedRadio.value === 'complete';
