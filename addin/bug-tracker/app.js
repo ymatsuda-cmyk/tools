@@ -392,7 +392,7 @@
     }
     
     const rightPart3 = el('div', {});
-    // 状態により表示する名前を変更
+    // 状態により表示する名前と日付を変更
     let nameText = '';
     let nameStyle = 'font-size:11px;';
     
@@ -404,14 +404,35 @@
       case '解析待ち':
         nameText = b.analyst || '(未設定)';
         if (!b.analyst) nameStyle += 'color:#999;';
+        // 解析日を表示
+        if (b.analysisDate && b.analyst) {
+          const date = new Date(b.analysisDate);
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          nameText += ` (${month}/${day})`;
+        }
         break;
       case '修正待ち':
         nameText = b.fixer || '(未設定)';
         if (!b.fixer) nameStyle += 'color:#999;';
+        // 対応日を表示
+        if (b.fixDate && b.fixer) {
+          const date = new Date(b.fixDate);
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          nameText += ` (${month}/${day})`;
+        }
         break;
       case '確認待ち':
         nameText = b.verifier || '(未設定)';
         if (!b.verifier) nameStyle += 'color:#999;';
+        // 確認日を表示
+        if (b.verifyDate && b.verifier) {
+          const date = new Date(b.verifyDate);
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          nameText += ` (${month}/${day})`;
+        }
         break;
       default:
         if (b.assignee) {
