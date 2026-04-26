@@ -1217,7 +1217,8 @@
         const day = String(today.getDate()).padStart(2, '0');
         bug.analysisDate = `${year}-${month}-${day}`;
         bug.status = '修正待ち';
-        setStatus('解析完了のため解析日を当日に設定し、状況を「修正待ち」に変更しました');
+        bug.fixer = bug.analyst; // 対応者を解析者の名前で更新
+        setStatus('解析完了のため解析日を当日に設定し、状況を「修正待ち」に変更、対応者を解析者で設定しました');
       }
       
       // ラジオボタンの選択に応じて状態を変更
@@ -1257,16 +1258,16 @@
     return [
       { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析待ち', updated: '2025-04-10', assignee: '高橋',
         occurredOn: '2025-04-08', reporter: '政次', origin: '定義(通常)', steps: '1.ログイン\n2.TOPへ', expected: 'TOP表示', actual: '真っ白', reproRate: '毎回',
-        cause: '', scope: 'アプリ', fix: '', fixVer: '', fixer: '', verify: '', verifier: '', tag: 'UI', priority: '高', severity: '致命的' },
+        cause: '', analyst: '政次', analysisDate: '2025-04-10', scope: 'アプリ', fix: '', fixVer: '', fixer: '', fixDate: '', verify: '', verifier: '', verifyDate: '', tag: 'UI', priority: '高', severity: '致命的' },
       { rowIndex: 5, id: 2, title: '通信断時にRPAが停止', status: '修正待ち', updated: '2025-04-12', assignee: '伊藤',
         occurredOn: '2025-04-09', reporter: '松田', origin: '定義(通信断)', steps: '1.通信断発生', expected: '自動復旧', actual: '停止のまま', reproRate: '時々',
-        cause: 'タイムアウト未設定', scope: 'RPA', fix: 'リトライ実装', fixVer: 'v1.2', fixer: '伊藤', verify: '', verifier: '', tag: 'RPA', priority: '中', severity: '重大' },
+        cause: 'タイムアウト未設定', analyst: '伊藤', analysisDate: '2025-04-11', scope: 'RPA', fix: 'リトライ実装', fixVer: 'v1.2', fixer: '伊藤', fixDate: '2025-04-12', verify: '', verifier: '', verifyDate: '', tag: 'RPA', priority: '中', severity: '重大' },
       { rowIndex: 6, id: 3, title: '電源断後に設定が消える', status: '新規', updated: '', assignee: '',
         occurredOn: '2025-04-14', reporter: '高橋', origin: '定義(電源断)', steps: '1.電源断', expected: '保持', actual: '消失', reproRate: '1回のみ',
-        cause: '', scope: '', fix: '', fixVer: '', fixer: '', verify: '', verifier: '', tag: '', priority: '低', severity: '警備' },
+        cause: '', analyst: '', analysisDate: '', scope: '', fix: '', fixVer: '', fixer: '', fixDate: '', verify: '', verifier: '', verifyDate: '', tag: '', priority: '低', severity: '警備' },
       { rowIndex: 7, id: 4, title: 'タイトル文字化け', status: '完了', updated: '2025-04-13', assignee: '松田',
         occurredOn: '2025-04-05', reporter: '政次', origin: '定義(通常)', steps: '', expected: '', actual: '', reproRate: '毎回',
-        cause: 'エンコード不一致', scope: 'アプリ', fix: 'UTF-8統一', fixVer: 'v1.1', fixer: '松田', verify: '解消確認', verifier: '政次', tag: 'i18n', priority: '中', severity: '重大' }
+        cause: 'エンコード不一致', analyst: '松田', analysisDate: '2025-04-06', scope: 'アプリ', fix: 'UTF-8統一', fixVer: 'v1.1', fixer: '松田', fixDate: '2025-04-07', verify: '解消確認', verifier: '政次', verifyDate: '2025-04-13', tag: 'i18n', priority: '中', severity: '重大' }
     ];
   }
 
