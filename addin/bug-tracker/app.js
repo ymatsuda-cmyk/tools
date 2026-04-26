@@ -16,7 +16,7 @@
     return [
       { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
       { key: 'title',      letter: 'B', label: 'タイトル',      group: '基本情報', type: 'text' },
-      { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析待ち','修正待ち','確認待ち','再発','完了'] },
+      { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析','修正','確認','再発','完了'] },
       { key: 'updated',    letter: 'D', label: '更新日',       group: '基本情報', type: 'date' },
       { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['', ...ASSIGNEE_ORDER.slice(1)] }, // 動的に設定
       { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
@@ -45,7 +45,7 @@
     ];
   }
 
-  const STATUS_ORDER = ['新規','解析待ち','修正待ち','確認待ち','完了'];
+  const STATUS_ORDER = ['新規','解析','修正','確認','完了'];
   
   // 動的に設定されるマッピング（セルから取得）
   let STATUS_DISPLAY_NAMES = {};
@@ -112,9 +112,9 @@
       // デモ用設定
       STATUS_DISPLAY_NAMES = {
         '新規': '新規',
-        '解析待ち': '解析',
-        '修正待ち': '修正',
-        '確認待ち': '確認',
+        '解析': '解析',
+        '修正': '修正',
+        '確認': '確認',
         '再発': '再発',
         '完了': '完了'
       };
@@ -148,9 +148,9 @@
       } else {
         STATUS_DISPLAY_NAMES = {
           '新規': '新規',
-          '解析待ち': '解析',
-          '修正待ち': '修正',
-          '確認待ち': '確認',
+          '解析': '解析',
+          '修正': '修正',
+          '確認': '確認',
           '再発': '再発',
           '完了': '完了'
         };
@@ -415,15 +415,15 @@
     let statusMessage = '';
     if (newAssignee !== '(未割当)') {
       switch(bug.status) {
-        case '解析待ち':
+        case '解析':
           bug.analyst = newAssignee;
           statusMessage = `担当者を「${newAssignee}」に変更し、解析者も更新しました`;
           break;
-        case '修正待ち':
+        case '修正':
           bug.fixer = newAssignee;
           statusMessage = `担当者を「${newAssignee}」に変更し、対応者も更新しました`;
           break;
-        case '確認待ち':
+        case '確認':
           bug.verifier = newAssignee;
           statusMessage = `担当者を「${newAssignee}」に変更し、確認者も更新しました`;
           break;
@@ -433,11 +433,11 @@
       }
     }
     
-    // 未割当から担当者への移動時は状態を「解析待ち」に変更し、解析者を設定
+    // 未割当から担当者への移動時は状態を「解析」に変更し、解析者を設定
     if (oldAssignee === '(未割当)' && newAssignee !== '(未割当)') {
-      bug.status = '解析待ち';
+      bug.status = '解析';
       bug.analyst = newAssignee; // 解析者に担当者を設定
-      statusMessage = `担当者を「${newAssignee}」に変更し、状況を「解析待ち」に変更しました`;
+      statusMessage = `担当者を「${newAssignee}」に変更し、状況を「解析」に変更しました`;
     }
     
     setStatus(statusMessage || `担当者を「${newAssignee}」に変更しました`);
@@ -480,7 +480,7 @@
     card.draggable = dragEnabled; // ドラッグ可否をパラメータで制御
     
     // 差し戻し状態の場合はカードにスタイルを追加
-    if (b.reject === '○' && b.status === '修正待ち') {
+    if (b.reject === '○' && b.status === '修正') {
       card.style.borderLeft = '4px solid #f44336';
       card.style.backgroundColor = '#fff3f3';
     }
@@ -502,7 +502,7 @@
     const rightPart1 = el('div', { style: 'display:flex;gap:4px;align-items:center;' });
     
     // 差し戻しマーク
-    if (b.reject === '○' && b.status === '修正待ち') {
+    if (b.reject === '○' && b.status === '修正') {
       rightPart1.appendChild(el('span', { 
         text: '⚠ 差し戻し', 
         style: 'background:#f44336;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;' 
@@ -540,7 +540,7 @@
         nameText = '(未割当)';
         nameStyle += 'color:#999;';
         break;
-      case '解析待ち':
+      case '解析':
         nameText = b.analyst || '(未設定)';
         if (!b.analyst) nameStyle += 'color:#999;';
         // 解析日を表示（解析者と有効な解析日がある場合のみ）
@@ -553,7 +553,7 @@
           }
         }
         break;
-      case '修正待ち':
+      case '修正':
         nameText = b.fixer || '(未設定)';
         if (!b.fixer) nameStyle += 'color:#999;';
         // 対応日を表示（対応者と有効な対応日がある場合のみ）
@@ -566,7 +566,7 @@
           }
         }
         break;
-      case '確認待ち':
+      case '確認':
         nameText = b.verifier || '(未設定)';
         if (!b.verifier) nameStyle += 'color:#999;';
         // 確認日を表示（確認者と有効な確認日がある場合のみ）
@@ -626,9 +626,9 @@
     // 状況に応じた初期タブ
     const statusTabMap = {
       '新規': 'jisho',
-      '解析待ち': 'kaiseki',
-      '修正待ち': 'shochi',
-      '確認待ち': 'kekka',
+      '解析': 'kaiseki',
+      '修正': 'shochi',
+      '確認': 'kekka',
       '再発': 'kekka',
       '完了': 'jisho'
     };
@@ -671,9 +671,9 @@
     // ワークフローステップの定義
     const workflowSteps = [
       { key: 'new', label: '新規', person: bug.reporter, date: bug.occurredOn, status: '新規' },
-      { key: 'analysis', label: '解析', person: bug.analyst, date: bug.analysisDate, status: '解析待ち' },
-      { key: 'fix', label: '修正', person: bug.fixer, date: bug.fixDate, status: '修正待ち' },
-      { key: 'verify', label: '確認', person: bug.verifier, date: bug.verifyDate, status: '確認待ち' }
+      { key: 'analysis', label: '解析', person: bug.analyst, date: bug.analysisDate, status: '解析' },
+      { key: 'fix', label: '修正', person: bug.fixer, date: bug.fixDate, status: '修正' },
+      { key: 'verify', label: '確認', person: bug.verifier, date: bug.verifyDate, status: '確認' }
     ];
     
     // 現在のステータスのインデックスを取得
@@ -788,9 +788,9 @@
       
       // 状況に応じた入力制御フラグ
       const isDisabled = {
-        kaiseki: bug.status === '新規' || bug.status === '確認待ち',
-        shochi: bug.status === '新規' || bug.status === '解析待ち' || bug.status === '確認待ち',
-        kekka: bug.status === '新規' || bug.status === '解析待ち' || bug.status === '修正待ち'
+        kaiseki: bug.status === '新規' || bug.status === '確認',
+        shochi: bug.status === '新規' || bug.status === '解析' || bug.status === '確認',
+        kekka: bug.status === '新規' || bug.status === '解析' || bug.status === '修正'
       };
       
       if (tabKey === 'jisho') {
@@ -880,7 +880,7 @@
               }
               return checkbox;
             })(),
-            el('span', { text: '解析完了（修正待ちに変更）' })
+            el('span', { text: '解析完了（修正に変更）' })
           ])
         ]));
       } else if (tabKey === 'shochi') {
@@ -1054,7 +1054,7 @@
               }
               return checkbox;
             })(),
-            el('span', { text: '処置完了（確認待ちに変更）' })
+            el('span', { text: '処置完了（確認に変更）' })
           ])
         ]));
       } else if (tabKey === 'kekka') {
@@ -1124,7 +1124,7 @@
             }
             return radio;
           })(),
-          el('span', { text: '差し戻し（修正待ちに変更）' })
+          el('span', { text: '差し戻し（修正に変更）' })
         ]);
         
         radioGroup.appendChild(completeRadio);
@@ -1876,17 +1876,17 @@
         }
         
         // 処置完了時の自動更新
-        if (bug.status === '修正待ち') {
+        if (bug.status === '修正') {
           const today = new Date();
           const year = today.getFullYear();
           const month = String(today.getMonth() + 1).padStart(2, '0');
           const day = String(today.getDate()).padStart(2, '0');
           bug.fixDate = `${year}-${month}-${day}`;
-          bug.status = '確認待ち';
+          bug.status = '確認';
           bug.verifier = bug.reporter; // 確認者を登録者に設定
           bug.assignee = bug.reporter; // 担当者を登録者に設定
           bug.reject = ''; // 差し戻しをクリア
-          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者と担当者を登録者で設定、差し戻しをクリアしました');
+          setStatus('処置完了のため対応日を当日に設定し、状況を「確認」に変更、確認者と担当者を登録者で設定、差し戻しをクリアしました');
         }
       } else if (isShochoKanryo && !isShochoTab) {
         // 処置タブ以外で処置完了がチェックされた場合は警告
@@ -1894,20 +1894,20 @@
         return;
       }
       
-      // 解析完了がチェックされている場合、解析日を当日に設定し、状況を修正待ちに変更
-      if (isKaisekiKanryo && bug.status === '解析待ち') {
+      // 解析完了がチェックされている場合、解析日を当日に設定し、状況を修正に変更
+      if (isKaisekiKanryo && bug.status === '解析') {
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const day = String(today.getDate()).padStart(2, '0');
         bug.analysisDate = `${year}-${month}-${day}`;
-        bug.status = '修正待ち';
+        bug.status = '修正';
         bug.fixer = bug.analyst; // 対応者を解析者の名前で更新
-        setStatus('解析完了のため解析日を当日に設定し、状況を「修正待ち」に変更、対応者を解析者で設定しました');
+        setStatus('解析完了のため解析日を当日に設定し、状況を「修正」に変更、対応者を解析者で設定しました');
       }
       
       // ラジオボタンの選択に応じて状態を変更
-      if (isComplete && bug.status === '確認待ち') {
+      if (isComplete && bug.status === '確認') {
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -1915,12 +1915,12 @@
         bug.verifyDate = `${year}-${month}-${day}`; // 確認日を当日に設定
         bug.status = '完了';
         setStatus('確認完了のため確認日を当日に設定し、状態を「完了」に変更しました');
-      } else if (isReject && bug.status === '確認待ち') {
-        bug.status = '修正待ち';
+      } else if (isReject && bug.status === '確認') {
+        bug.status = '修正';
         bug.reject = '○'; // 差し戻し列を○で更新
         bug.fixDate = ''; // 対応日を空欄に
         bug.assignee = bug.fixer; // 担当者を対応者に設定
-        setStatus('差し戻しのため状態を「修正待ち」に変更し、対応日を空欄にして担当者を対応者に設定しました');
+        setStatus('差し戻しのため状態を「修正」に変更し、対応日を空欄にして担当者を対応者に設定しました');
       }
       
       try {
@@ -1950,10 +1950,10 @@
 
   function demoData() {
     return [
-      { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析待ち', updated: '2025-04-10', assignee: '高橋',
+      { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析', updated: '2025-04-10', assignee: '高橋',
         occurredOn: '2025-04-08', reporter: '政次', origin: '定義(通常)', steps: '1.ログイン\n2.TOPへ', expected: 'TOP表示', actual: '真っ白', reproRate: '毎回',
         cause: '', analyst: '政次', analysisDate: '2025-04-10', scope: 'アプリ', fix: '', fixVer: '', fixer: '', fixDate: '', verify: '', verifier: '', verifyDate: '', tag: 'UI', priority: '高', severity: '致命的' },
-      { rowIndex: 5, id: 2, title: '通信断時にRPAが停止', status: '修正待ち', updated: '2025-04-12', assignee: '伊藤',
+      { rowIndex: 5, id: 2, title: '通信断時にRPAが停止', status: '修正', updated: '2025-04-12', assignee: '伊藤',
         occurredOn: '2025-04-09', reporter: '松田', origin: '定義(通信断)', steps: '1.通信断発生', expected: '自動復旧', actual: '停止のまま', reproRate: '時々',
         cause: 'タイムアウト未設定', analyst: '伊藤', analysisDate: '2025-04-11', scope: 'RPA', fix: 'リトライ実装', fixVer: 'v1.2', fixer: '伊藤', fixDate: '2025-04-12', verify: '', verifier: '', verifyDate: '', tag: 'RPA', priority: '中', severity: '重大' },
       { rowIndex: 6, id: 3, title: '電源断後に設定が消える', status: '新規', updated: '', assignee: '',
