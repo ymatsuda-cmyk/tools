@@ -9,12 +9,12 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 23;
+  const COL_COUNT  = 26;
 
   const COLUMNS = [
     { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
     { key: 'title',      letter: 'B', label: 'タイトル',      group: '基本情報', type: 'text' },
-    { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析中','修正待ち','確認待ち','再発','完了'] },
+    { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析待ち','修正待ち','確認待ち','再発','完了'] },
     { key: 'updated',    letter: 'D', label: '更新日',       group: '基本情報', type: 'date' },
     { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
     { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
@@ -26,18 +26,21 @@
     { key: 'reproRate',  letter: 'L', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
     { key: 'cause',      letter: 'M', label: '原因',         group: '対応情報', type: 'textarea' },
     { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'scope',      letter: 'O', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
-    { key: 'fix',        letter: 'P', label: '対応内容',     group: '対応情報', type: 'textarea' },
-    { key: 'fixVer',     letter: 'Q', label: '修正Ver',     group: '対応情報', type: 'text' },
-    { key: 'fixer',      letter: 'R', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'verify',     letter: 'S', label: '確認内容',     group: '結果確認', type: 'textarea' },
-    { key: 'verifier',   letter: 'T', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'tag',        letter: 'U', label: 'タグ',         group: '管理',     type: 'text' },
-    { key: 'priority',   letter: 'V', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-    { key: 'severity',   letter: 'W', label: '影響度',       group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+    { key: 'analysisDate', letter: 'O', label: '解析日',     group: '対応情報', type: 'date' },
+    { key: 'scope',      letter: 'P', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
+    { key: 'fix',        letter: 'Q', label: '対応内容',     group: '対応情報', type: 'textarea' },
+    { key: 'fixVer',     letter: 'R', label: '修正Ver',     group: '対応情報', type: 'text' },
+    { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
+    { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
+    { key: 'verifier',   letter: 'V', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'verifyDate', letter: 'W', label: '確認日',       group: '結果確認', type: 'date' },
+    { key: 'tag',        letter: 'X', label: 'タグ',         group: '管理',     type: 'text' },
+    { key: 'priority',   letter: 'Y', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
+    { key: 'severity',   letter: 'Z', label: '影響度',       group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
   ];
 
-  const STATUS_ORDER = ['新規','解析中','修正待ち','確認待ち','完了'];
+  const STATUS_ORDER = ['新規','解析待ち','修正待ち','確認待ち','完了'];
   const ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
@@ -199,7 +202,13 @@
     const groups = new Map();
     order.forEach(k => groups.set(k, []));
     bugs.forEach(b => {
-      let key = b.assignee || '(未割当)';
+      let key;
+      // 新規の場合は必ず未割当レーンに表示
+      if (b.status === '新規') {
+        key = '(未割当)';
+      } else {
+        key = b.assignee || '(未割当)';
+      }
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(b);
     });
@@ -309,10 +318,11 @@
     const newAssigneeValue = newAssignee === '(未割当)' ? '' : newAssignee;
     bug.assignee = newAssigneeValue;
     
-    // 未割当から担当者への移動時は状態を「解析中」に変更
+    // 未割当から担当者への移動時は状態を「解析待ち」に変更し、解析者を設定
     if (oldAssignee === '(未割当)' && newAssignee !== '(未割当)') {
-      bug.status = '解析中';
-      setStatus(`担当者を「${newAssignee}」に変更し、状況を「解析中」に変更しました`);
+      bug.status = '解析待ち';
+      bug.analyst = newAssignee; // 解析者に担当者を設定
+      setStatus(`担当者を「${newAssignee}」に変更し、状況を「解析待ち」に変更しました`);
     } else {
       setStatus(`担当者を「${newAssignee}」に変更しました`);
     }
@@ -385,7 +395,7 @@
         nameText = '(未割当)';
         nameStyle += 'color:#999;';
         break;
-      case '解析中':
+      case '解析待ち':
         nameText = b.analyst || '(未設定)';
         if (!b.analyst) nameStyle += 'color:#999;';
         break;
@@ -444,7 +454,7 @@
     // 状況に応じた初期タブ
     const statusTabMap = {
       '新規': 'jisho',
-      '解析中': 'kaiseki',
+      '解析待ち': 'kaiseki',
       '修正待ち': 'shochi',
       '確認待ち': 'kekka',
       '再発': 'kekka',
@@ -1105,6 +1115,10 @@
       const shochoKanryoCheck = $('#modal-body').querySelector('[data-key="shochikanryo"]');
       const isShochoKanryo = shochoKanryoCheck && shochoKanryoCheck.checked;
       
+      // 解析完了チェックボックスの状態を確認
+      const kaisekiKanryoCheck = $('#modal-body').querySelector('[data-key="kaisekikanryo"]');
+      const isKaisekiKanryo = kaisekiKanryoCheck && kaisekiKanryoCheck.checked;
+      
       // 影響範囲のチェックボックスを集約
       const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
       const selectedScopes = [];
@@ -1132,6 +1146,17 @@
           alert(`処置完了にするには、以下の修正対象の修正完了にもチェックを付けてください：\n${incompleteScopes.join('\n')}`);
           return; // 保存を中止
         }
+      }
+      
+      // 解析完了がチェックされている場合、解析日を当日に設定し、状況を修正待ちに変更
+      if (isKaisekiKanryo && bug.status === '解析待ち') {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        bug.analysisDate = `${year}-${month}-${day}`;
+        bug.status = '修正待ち';
+        setStatus('解析完了のため解析日を当日に設定し、状況を「修正待ち」に変更しました');
       }
       
       // ラジオボタンの選択に応じて状態を変更
@@ -1169,7 +1194,7 @@
 
   function demoData() {
     return [
-      { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析中', updated: '2025-04-10', assignee: '高橋',
+      { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析待ち', updated: '2025-04-10', assignee: '高橋',
         occurredOn: '2025-04-08', reporter: '政次', origin: '定義(通常)', steps: '1.ログイン\n2.TOPへ', expected: 'TOP表示', actual: '真っ白', reproRate: '毎回',
         cause: '', scope: 'アプリ', fix: '', fixVer: '', fixer: '', verify: '', verifier: '', tag: 'UI', priority: '高', severity: '致命的' },
       { rowIndex: 5, id: 2, title: '通信断時にRPAが停止', status: '修正待ち', updated: '2025-04-12', assignee: '伊藤',
