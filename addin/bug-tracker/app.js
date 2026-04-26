@@ -50,7 +50,8 @@
     view: 'assignee',  // 'assignee' または 'status'
     filters: { text: '', priority: '', status: '' },
     inOffice: false,
-    editingRow: null
+    editingRow: null,
+    presetTags: [] // プリセットタグを保存
   };
 
   function $(sel) { return document.querySelector(sel); }
@@ -98,11 +99,25 @@
   async function loadFromExcel() {
     if (!state.inOffice) {
       state.bugs = demoData();
+      state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デモ用プリセット
       return;
     }
     setStatus('読み込み中...');
     await Excel.run(async (ctx) => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      
+      // プリセットタグをY3セルから取得
+      const presetTagCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 24, 1, 1); // Y列は24番目（0ベース）
+      presetTagCell.load(['values']);
+      await ctx.sync();
+      
+      const presetTagValue = presetTagCell.values[0][0];
+      if (presetTagValue && typeof presetTagValue === 'string') {
+        state.presetTags = presetTagValue.split('/').map(t => t.trim()).filter(t => t);
+      } else {
+        state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デフォルト
+      }
+      
       const used = sheet.getUsedRange(true);
       used.load(['rowCount', 'columnCount']);
       await ctx.sync();
@@ -1049,7 +1064,7 @@
             }));
             
             const buttonContainer = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;' });
-            const presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス'];
+            const presetTags = state.presetTags;
             
             presetTags.forEach(tag => {
               const btn = el('button', {
@@ -1125,13 +1140,6 @@
             });
             
             tagContainer.appendChild(tagsDisplay);
-            
-            // 既存のタグを表示
-            const currentTags = (bug.tag || '').split(' ').filter(t => t.trim());
-            currentTags.forEach(tag => {
-              if (tag.trim()) addTagChip(tag.trim());
-            });
-            
             return tagContainer;
           })(),
           
@@ -1144,13 +1152,27 @@
           })
         ]);
         
+        tabContent.appendChild(row1);
+        tabContent.appendChild(row2);
+        
+        // タグ機能の初期化（DOM追加後に実行）
+        setTimeout(() => {
+          // 既存のタグを表示（/区切り）
+          const currentTags = (bug.tag || '').split('/').map(t => t.trim()).filter(t => t);
+          currentTags.forEach(tag => {
+            if (tag.trim()) addTagChip(tag.trim());
+          });
+        }, 0);
+        
         // タグ追加関数
         function addTag(tagName) {
-          const tagsDisplay = $('#tags-display');
-          const hiddenInput = $('#tag-hidden-input');
+          const tagsDisplay = document.querySelector('#tags-display');
+          const hiddenInput = document.querySelector('#tag-hidden-input');
           
-          // 既存チェック
-          const currentTags = (hiddenInput.value || '').split(' ').filter(t => t.trim());
+          if (!tagsDisplay || !hiddenInput) return;
+          
+          // 既存チェック（/区切り）
+          const currentTags = (hiddenInput.value || '').split('/').map(t => t.trim()).filter(t => t);
           if (currentTags.includes(tagName.trim())) {
             return; // 既に存在する場合は追加しない
           }
@@ -1161,7 +1183,8 @@
         
         // タグチップ追加関数
         function addTagChip(tagName) {
-          const tagsDisplay = $('#tags-display');
+          const tagsDisplay = document.querySelector('#tags-display');
+          if (!tagsDisplay) return;
           
           const chip = el('div', {
             style: 'display:inline-flex;align-items:center;background:#007acc;color:white;padding:2px 8px;border-radius:12px;font-size:12px;gap:4px;'
@@ -1186,10 +1209,12 @@
         
         // 隠し入力フィールド更新関数
         function updateHiddenInput() {
-          const tagsDisplay = $('#tags-display');
-          const hiddenInput = $('#tag-hidden-input');
-          const tags = [];
+          const tagsDisplay = document.querySelector('#tags-display');
+          const hiddenInput = document.querySelector('#tag-hidden-input');
           
+          if (!tagsDisplay || !hiddenInput) return;
+          
+          const tags = [];
           tagsDisplay.querySelectorAll('div').forEach(chip => {
             const span = chip.querySelector('span');
             if (span) {
@@ -1197,11 +1222,8 @@
             }
           });
           
-          hiddenInput.value = tags.join(' ');
+          hiddenInput.value = tags.join('/');
         }
-        
-        tabContent.appendChild(row1);
-        tabContent.appendChild(row2);
       }
     }
 
