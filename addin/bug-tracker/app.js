@@ -324,14 +324,36 @@
     const newAssigneeValue = newAssignee === '(未割当)' ? '' : newAssignee;
     bug.assignee = newAssigneeValue;
     
+    // 状態に応じて適切な担当者フィールドも更新
+    let statusMessage = '';
+    if (newAssignee !== '(未割当)') {
+      switch(bug.status) {
+        case '解析待ち':
+          bug.analyst = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、解析者も更新しました`;
+          break;
+        case '修正待ち':
+          bug.fixer = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、対応者も更新しました`;
+          break;
+        case '確認待ち':
+          bug.verifier = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、確認者も更新しました`;
+          break;
+        default:
+          statusMessage = `担当者を「${newAssignee}」に変更しました`;
+          break;
+      }
+    }
+    
     // 未割当から担当者への移動時は状態を「解析待ち」に変更し、解析者を設定
     if (oldAssignee === '(未割当)' && newAssignee !== '(未割当)') {
       bug.status = '解析待ち';
       bug.analyst = newAssignee; // 解析者に担当者を設定
-      setStatus(`担当者を「${newAssignee}」に変更し、状況を「解析待ち」に変更しました`);
-    } else {
-      setStatus(`担当者を「${newAssignee}」に変更しました`);
+      statusMessage = `担当者を「${newAssignee}」に変更し、状況を「解析待ち」に変更しました`;
     }
+    
+    setStatus(statusMessage || `担当者を「${newAssignee}」に変更しました`);
     
     setTimeout(() => setStatus(''), 3000);
     
