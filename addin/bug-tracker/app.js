@@ -1244,40 +1244,64 @@
       const kaisekiKanryoCheck = $('#modal-body').querySelector('[data-key="kaisekikanryo"]');
       const isKaisekiKanryo = kaisekiKanryoCheck && kaisekiKanryoCheck.checked;
       
-      // 影響範囲のチェックボックスを集約
-      const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
-      const selectedScopes = [];
-      scopeCheckboxes.forEach(cb => {
-        if (cb.checked) {
-          selectedScopes.push(cb.value);
+      // 現在アクティブなタブを確認
+      const activeTab = $('#modal-body').querySelector('.tab-btn.active');
+      const isShochoTab = activeTab && activeTab.dataset.tab === 'shochi';
+      
+      // 影響範囲の更新は処置タブでの操作時のみ実行（差し戻し時の影響範囲消失を防止）
+      if (isShochoTab) {
+        // 影響範囲のチェックボックスを集約
+        const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
+        const selectedScopes = [];
+        scopeCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            selectedScopes.push(cb.value);
+          }
+        });
+        
+        // 修正完了状況のチェックボックスを集約
+        const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
+        const completedScopes = [];
+        completedCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            completedScopes.push(cb.value);
+          }
+        });
+        bug.scopeCompleted = completedScopes.join('/');
+        
+        // 修正対象と修正完了を統合して影響範囲に設定
+        const scopeWithStatus = selectedScopes.map(scope => {
+          return completedScopes.includes(scope) ? `${scope}（済）` : scope;
+        });
+        bug.scope = scopeWithStatus.join('/');
+        
+        // state.bugs配列も更新（Excel保存前に確実に反映）
+        const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+        if (bugIndex >= 0) {
+          state.bugs[bugIndex].scope = bug.scope;
+          state.bugs[bugIndex].scopeCompleted = bug.scopeCompleted;
         }
-      });
-      
-      // 修正完了状況のチェックボックスを集約
-      const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
-      const completedScopes = [];
-      completedCheckboxes.forEach(cb => {
-        if (cb.checked) {
-          completedScopes.push(cb.value);
-        }
-      });
-      bug.scopeCompleted = completedScopes.join('/');
-      
-      // 修正対象と修正完了を統合して影響範囲に設定
-      const scopeWithStatus = selectedScopes.map(scope => {
-        return completedScopes.includes(scope) ? `${scope}（済）` : scope;
-      });
-      bug.scope = scopeWithStatus.join('/');
-      
-      // state.bugs配列も更新（Excel保存前に確実に反映）
-      const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
-      if (bugIndex >= 0) {
-        state.bugs[bugIndex].scope = bug.scope;
-        state.bugs[bugIndex].scopeCompleted = bug.scopeCompleted;
       }
       
-      // 処置完了がチェックされている場合のバリデーションと更新
-      if (isShochoKanryo) {
+      // 処置完了がチェックされている場合のバリデーションと更新（処置タブでの操作時のみ）
+      if (isShochoKanryo && isShochoTab) {
+        // 影響範囲のチェックボックス情報を再取得（処置タブの場合のみ）
+        const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
+        const selectedScopes = [];
+        scopeCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            selectedScopes.push(cb.value);
+          }
+        });
+        
+        const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
+        const completedScopes = [];
+        completedCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            completedScopes.push(cb.value);
+          }
+        });
+        
         // 修正対象にチェックが付いている場合のバリデーション
         if (selectedScopes.length > 0) {
           // 修正完了チェックの確認
@@ -1310,14 +1334,10 @@
           bug.assignee = bug.reporter; // 担当者を登録者に設定
           setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者と担当者を登録者で設定しました');
         }
-      } else {
-        // 処置完了がチェックされていない場合、修正対象がすべて修正完了になっているかを確認
-        if (selectedScopes.length > 0) {
-          const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
-          if (incompleteScopes.length > 0) {
-            // この場合は警告のみで保存は継続
-          }
-        }
+      } else if (isShochoKanryo && !isShochoTab) {
+        // 処置タブ以外で処置完了がチェックされた場合は警告
+        alert('処置完了は処置タブで実行してください');
+        return;
       }
       
       // 解析完了がチェックされている場合、解析日を当日に設定し、状況を修正待ちに変更
