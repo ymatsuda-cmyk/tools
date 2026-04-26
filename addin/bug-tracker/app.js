@@ -1360,7 +1360,8 @@
           bug.status = '確認待ち';
           bug.verifier = bug.reporter; // 確認者を登録者に設定
           bug.assignee = bug.reporter; // 担当者を登録者に設定
-          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者と担当者を登録者で設定しました');
+          bug.reject = ''; // 差し戻しをクリア
+          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者と担当者を登録者で設定、差し戻しをクリアしました');
         }
       } else if (isShochoKanryo && !isShochoTab) {
         // 処置タブ以外で処置完了がチェックされた場合は警告
