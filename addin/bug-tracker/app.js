@@ -744,17 +744,34 @@
         
         const scopeOptions = ['定義(通常)', '定義(電源断)', '定義(通信断)', 'RPA', 'アプリ'];
         const currentScope = bug.scope || '';
+        
+        // デバッグ情報を出力
+        console.log('=== 修正完了抽出デバッグ ===');
+        console.log('currentScope:', JSON.stringify(currentScope));
+        
         // 影響範囲から（済）を除去して修正対象を抽出
         const selectedScopes = currentScope.split('/').map(s => s.trim().replace(/（済）$/, '')).filter(s => s);
+        console.log('selectedScopes:', selectedScopes);
         
         // 修正完了状況を取得（scopeCompletedフィールド + 影響範囲の（済）から抽出）
         const currentCompleted = bug.scopeCompleted || '';
         let completedScopes = currentCompleted.split('/').map(s => s.trim()).filter(s => s);
+        console.log('currentCompleted:', JSON.stringify(currentCompleted));
+        console.log('completedScopes from field:', completedScopes);
         
         // 影響範囲から（済）が付いているアイテムも修正完了に含める
-        const scopeWithCompleted = currentScope.split('/').map(s => s.trim()).filter(s => s.includes('（済）'));
+        const scopeItems = currentScope.split('/').map(s => s.trim()).filter(s => s);
+        console.log('scopeItems:', scopeItems);
+        
+        const scopeWithCompleted = scopeItems.filter(s => s.includes('（済）'));
+        console.log('scopeWithCompleted:', scopeWithCompleted);
+        
         const completedFromScope = scopeWithCompleted.map(s => s.replace(/（済）$/, ''));
+        console.log('completedFromScope:', completedFromScope);
+        
         completedScopes = [...new Set([...completedScopes, ...completedFromScope])];
+        console.log('final completedScopes:', completedScopes);
+        console.log('=== デバッグ終了 ===');
         
         leftPanel.appendChild(el('div', { style: 'margin-bottom:16px;' }, [
           el('label', { text: '影響範囲', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
