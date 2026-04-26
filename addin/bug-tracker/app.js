@@ -11,30 +11,32 @@
   const DATA_START = 4;
   const COL_COUNT  = 27;
 
-  const COLUMNS = [
-    { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
-    { key: 'title',      letter: 'B', label: 'タイトル',      group: '基本情報', type: 'text' },
-    { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析待ち','修正待ち','確認待ち','再発','完了'] },
-    { key: 'updated',    letter: 'D', label: '更新日',       group: '基本情報', type: 'date' },
-    { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
-    { key: 'reporter',   letter: 'G', label: '登録者',       group: '発生情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)'] },
-    { key: 'steps',      letter: 'I', label: '再現手順',     group: '発生情報', type: 'textarea' },
-    { key: 'expected',   letter: 'J', label: '期待する動作', group: '発生情報', type: 'textarea' },
-    { key: 'actual',     letter: 'K', label: '実際の動作',   group: '発生情報', type: 'textarea' },
-    { key: 'reproRate',  letter: 'L', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
-    { key: 'cause',      letter: 'M', label: '原因',         group: '対応情報', type: 'textarea' },
-    { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
-    { key: 'analysisDate', letter: 'O', label: '解析日',     group: '対応情報', type: 'date' },
-    { key: 'scope',      letter: 'P', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
+  // 動的にフィールド定義を生成する関数
+  function getColumns() {
+    return [
+      { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
+      { key: 'title',      letter: 'B', label: 'タイトル',      group: '基本情報', type: 'text' },
+      { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析待ち','修正待ち','確認待ち','再発','完了'] },
+      { key: 'updated',    letter: 'D', label: '更新日',       group: '基本情報', type: 'date' },
+      { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['', ...ASSIGNEE_ORDER.slice(1)] }, // 動的に設定
+      { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
+      { key: 'reporter',   letter: 'G', label: '登録者',       group: '発生情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)'] },
+      { key: 'steps',      letter: 'I', label: '再現手順',     group: '発生情報', type: 'textarea' },
+      { key: 'expected',   letter: 'J', label: '期待する動作', group: '発生情報', type: 'textarea' },
+      { key: 'actual',     letter: 'K', label: '実際の動作',   group: '発生情報', type: 'textarea' },
+      { key: 'reproRate',  letter: 'L', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
+      { key: 'cause',      letter: 'M', label: '原因',         group: '対応情報', type: 'textarea' },
+      { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'analysisDate', letter: 'O', label: '解析日',     group: '対応情報', type: 'date' },
+      { key: 'scope',      letter: 'P', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
     { key: 'fix',        letter: 'Q', label: '対応内容',     group: '対応情報', type: 'textarea' },
     { key: 'fixVer',     letter: 'R', label: '修正Ver',     group: '対応情報', type: 'text' },
-    { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
     { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
     { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
     { key: 'reject',     letter: 'V', label: '差し戻し',     group: '結果確認', type: 'text' },
-    { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['','政次','高橋','伊藤','松田'] },
+    { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
     { key: 'verifyDate', letter: 'X', label: '確認日',       group: '結果確認', type: 'date' },
     { key: 'tag',        letter: 'Y', label: 'タグ',         group: '管理',     type: 'text' },
     { key: 'priority',   letter: 'Z', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
@@ -191,12 +193,13 @@
 
       const values = dataRange.values;
       const bugs = [];
+      const columns = getColumns(); // 一度取得して再利用
       for (let r = 0; r < values.length; r++) {
         const row = values[r];
         if (row.every(v => v === '' || v === null)) continue;
         const obj = { rowIndex: DATA_START + r };
         for (let c = 0; c < COL_COUNT; c++) {
-          const colDef = COLUMNS[c];
+          const colDef = columns[c];
           let v = row[c];
           if (colDef.type === 'date') v = excelSerialToDateStr(v);
           if (v === null || v === undefined) v = '';
@@ -1462,10 +1465,26 @@
         const fld = el('div', { class: 'field', style: 'flex:1;' });
         fld.appendChild(el('label', { text: '登録者 *' }));
         const input = el('select', { style: 'width:100%;' });
-        ['', '政次', '高橋', '伊藤', '松田'].forEach(o => {
+        
+        // 動的に登録者リストを設定
+        const reporterOptions = ['', ...REPORTER_LIST];
+        reporterOptions.forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
+          // 前回選択した登録者を初期選択
+          if (o === state.lastSelectedReporter) {
+            op.selected = true;
+            newBugData.reporter = o;
+          }
           input.appendChild(op);
         });
+        
+        // 登録者変更時にlocalStorageに保存
+        input.addEventListener('change', (e) => {
+          const selectedReporter = e.target.value;
+          state.lastSelectedReporter = selectedReporter;
+          localStorage.setItem('bugTracker_lastReporter', selectedReporter);
+        });
+        
         input.required = true;
         input.dataset.key = 'reporter';
         fld.appendChild(input);
@@ -1672,7 +1691,7 @@
       
       $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
         const k = inp.dataset.key;
-        const col = COLUMNS.find(c => c.key === k);
+        const col = getColumns().find(c => c.key === k);
         if (!col || col.type === 'readonly') return;
         if (!['kekkakanryo', 'sashimodoshi'].includes(k)) { // ラジオボタンは除外
           bug[k] = inp.value;
