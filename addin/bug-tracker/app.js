@@ -233,9 +233,10 @@
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       const rowIndex0 = bug.rowIndex - 1;
       const writeRange = sheet.getRangeByIndexes(rowIndex0, 1, 1, COL_COUNT - 1);
+      const columns = getColumns(); // 一度取得して再利用
       const rowVals = [];
       for (let c = 1; c < COL_COUNT; c++) {
-        const colDef = COLUMNS[c];
+        const colDef = columns[c];
         let v = bug[colDef.key];
         if (v === undefined || v === null) v = '';
         rowVals.push(v);
@@ -1599,9 +1600,10 @@
       const newRowIndex = (used.rowCount || DATA_START - 1) + 1;
       bugData.rowIndex = newRowIndex;
       
+      const columns = getColumns(); // 一度取得して再利用
       const rowVals = [];
       for (let c = 0; c < COL_COUNT; c++) {
-        const colDef = COLUMNS[c];
+        const colDef = columns[c];
         let v = bugData[colDef.key];
         if (v === undefined || v === null) v = '';
         rowVals.push(v);
