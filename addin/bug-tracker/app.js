@@ -30,7 +30,7 @@
       { key: 'cause',      letter: 'N', label: '原因',         group: '対応情報', type: 'textarea' },
       { key: 'analyst',    letter: 'O', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
       { key: 'analysisDate', letter: 'P', label: '解析日',     group: '対応情報', type: 'date' },
-      { key: 'scope',      letter: 'Q', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
+      { key: 'scope',      letter: 'Q', label: '影響範囲',     group: '対応情報', type: 'select', options: ['', ...ORIGIN_LIST, 'RPA', 'アプリ'] },
       { key: 'fix',        letter: 'R', label: '対応内容',     group: '対応情報', type: 'textarea' },
       { key: 'fixVer',     letter: 'S', label: '修正Ver',     group: '対応情報', type: 'text' },
       { key: 'fixer',      letter: 'T', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
@@ -1379,7 +1379,7 @@
         // 左側：影響範囲のチェックボックス表
         const leftPanel = el('div', { style: 'flex:0 0 auto;min-width:fit-content;' });
         
-        const scopeOptions = ['定義(通常)', '定義(電源断)', '定義(通信断)', 'RPA', 'アプリ'];
+        const scopeOptions = [...ORIGIN_LIST, 'RPA', 'アプリ']; // H3セルの値 + 固定の選択肢
         const currentScope = bug.scope || '';
         
         // デバッグ情報を出力
