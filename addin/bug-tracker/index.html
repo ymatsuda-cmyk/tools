@@ -13,8 +13,8 @@
     <h1>バグ管理</h1>
     <div class="toolbar">
       <div class="view-switch" role="tablist">
-        <button id="btn-view-assignee" class="view-btn active" role="tab">割り当て</button>
-        <button id="btn-view-status"   class="view-btn"        role="tab">状態別</button>
+        <button id="btn-view-status"   class="view-btn active" role="tab">バグ状況</button>
+        <button id="btn-view-assignee" class="view-btn"        role="tab">割り当て</button>
       </div>
 
       <button id="btn-add-new" class="btn primary">➕ 新規追加</button>
@@ -43,12 +43,12 @@
   </header>
 
   <main>
-    <section id="view-assignee" class="view active">
-      <div id="kanban-board-assignee" class="kanban-board"></div>
+    <section id="view-status" class="view active">
+      <div id="kanban-board-status" class="kanban-board"></div>
     </section>
 
-    <section id="view-status" class="view">
-      <div id="kanban-board-status" class="kanban-board"></div>
+    <section id="view-assignee" class="view">
+      <div id="kanban-board-assignee" class="kanban-board"></div>
     </section>
   </main>
 

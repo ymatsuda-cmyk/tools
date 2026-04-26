@@ -55,7 +55,7 @@
 
   const state = {
     bugs: [],
-    view: 'assignee',  // 'assignee' または 'status'
+    view: 'status',  // 'assignee' または 'status'
     filters: { text: '', priority: '', status: '' },
     inOffice: false,
     editingRow: null,
@@ -243,6 +243,10 @@
         rowVals.push(v);
       }
       writeRange.values = [rowVals];
+      
+      // 文字列の折り返しを無効にする
+      writeRange.format.wrapText = false;
+      
       const today = new Date();
       const tStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
       sheet.getRangeByIndexes(rowIndex0, 3, 1, 1).values = [[tStr]];
@@ -540,6 +544,7 @@
         nameText = '(未割当)';
         nameStyle += 'color:#999;';
         break;
+      case '解析待ち':
       case '解析':
         nameText = b.analyst || '(未設定)';
         if (!b.analyst) nameStyle += 'color:#999;';
@@ -553,6 +558,7 @@
           }
         }
         break;
+      case '修正待ち':
       case '修正':
         nameText = b.fixer || '(未設定)';
         if (!b.fixer) nameStyle += 'color:#999;';
@@ -566,6 +572,7 @@
           }
         }
         break;
+      case '確認待ち':
       case '確認':
         nameText = b.verifier || '(未設定)';
         if (!b.verifier) nameStyle += 'color:#999;';

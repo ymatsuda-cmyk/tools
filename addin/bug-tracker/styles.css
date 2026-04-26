@@ -40,9 +40,9 @@ tbody tr:hover { background: #f7faff; }
 .badge.pri-低 { background: #e3f2fd; color: #1565c0; }
 
 .badge.st-新規 { background: #e3f2fd; color: #1565c0; }
-.badge.st-解析中 { background: #fff3cd; color: #8a6d00; }
-.badge.st-修正待ち { background: #ffe0b2; color: #c47700; }
-.badge.st-確認待ち { background: #e1bee7; color: #6a1b9a; }
+.badge.st-解析待ち, .badge.st-解析 { background: #ffebee; color: #c62828; }
+.badge.st-修正待ち, .badge.st-修正 { background: #ffe0b2; color: #c47700; }
+.badge.st-確認待ち, .badge.st-確認 { background: #e1bee7; color: #6a1b9a; }
 .badge.st-再発 { background: #ffcdd2; color: #b71c1c; }
 .badge.st-完了 { background: #c8e6c9; color: #2e7d32; }
 
