@@ -1946,12 +1946,15 @@
     state.view = v;
     $('#btn-view-assignee').classList.toggle('active', v === 'assignee');
     $('#btn-view-status').classList.toggle('active',   v === 'status');
+    $('#btn-view-trend').classList.toggle('active',   v === 'trend');
     $('#view-assignee').classList.toggle('active', v === 'assignee');
     $('#view-status').classList.toggle('active',   v === 'status');
+    $('#view-trend').classList.toggle('active',   v === 'trend');
     render();
   }
   function render() {
     if (state.view === 'assignee') renderKanbanAssignee();
+    else if (state.view === 'trend') renderTrend();
     else renderKanbanStatus();
   }
 
@@ -1975,6 +1978,7 @@
   function bindEvents() {
     $('#btn-view-assignee').addEventListener('click', () => setView('assignee'));
     $('#btn-view-status').addEventListener('click',   () => setView('status'));
+    $('#btn-view-trend').addEventListener('click',   () => setView('trend'));
     $('#btn-add-new').addEventListener('click', () => openNewBugModal());
     $('#btn-reload').addEventListener('click', async () => {
       await loadFromExcel();

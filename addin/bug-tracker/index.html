@@ -6,6 +6,7 @@
   <title>バグ管理</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -15,6 +16,7 @@
       <div class="view-switch" role="tablist">
         <button id="btn-view-status"   class="view-btn active" role="tab">バグ状況</button>
         <button id="btn-view-assignee" class="view-btn"        role="tab">割り当て</button>
+        <button id="btn-view-trend"    class="view-btn"        role="tab">推移</button>
       </div>
 
       <button id="btn-add-new" class="btn primary">➕ 新規追加</button>
@@ -49,6 +51,15 @@
 
     <section id="view-assignee" class="view">
       <div id="kanban-board-assignee" class="kanban-board"></div>
+    </section>
+
+    <section id="view-trend" class="view">
+      <div class="trend-container">
+        <h3>バグ対応生産性推移</h3>
+        <div class="chart-container">
+          <canvas id="trendChart" width="800" height="400"></canvas>
+        </div>
+      </div>
     </section>
   </main>
 
