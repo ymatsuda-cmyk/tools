@@ -498,7 +498,8 @@
             backgroundColor: 'transparent',
             borderWidth: 2,
             fill: false,
-            tension: 0.4 // スムーズな線
+            tension: 0.4, // スムーズな線
+            pointRadius: 0 // ○表示を無効化
           },
           {
             label: '対応完了件数',
@@ -507,7 +508,8 @@
             backgroundColor: 'rgba(255, 152, 0, 0.3)',
             borderWidth: 2,
             fill: true,
-            tension: 0.4
+            tension: 0.4,
+            pointRadius: 0 // ○表示を無効化
           },
           {
             label: '確認完了件数',
@@ -516,7 +518,8 @@
             backgroundColor: 'rgba(76, 175, 80, 0.3)',
             borderWidth: 2,
             fill: true,
-            tension: 0.4
+            tension: 0.4,
+            pointRadius: 0 // ○表示を無効化
           }
         ]
       },
