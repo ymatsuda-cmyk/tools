@@ -298,7 +298,13 @@
     
     if (!bug) return;
     
-    const oldAssignee = bug.assignee || '(未割当)';
+    // 実際の表示レーンを基準にoldAssigneeを判定
+    let oldAssignee;
+    if (bug.status === '新規') {
+      oldAssignee = '(未割当)';  // 新規は必ず未割当レーンに表示されるため
+    } else {
+      oldAssignee = bug.assignee || '(未割当)';
+    }
     
     // 担当者から未割当への移動を禁止
     if (oldAssignee !== '(未割当)' && newAssignee === '(未割当)') {
