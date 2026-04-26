@@ -1212,7 +1212,6 @@
           selectedScopes.push(cb.value);
         }
       });
-      bug.scope = selectedScopes.join('/');
       
       // 修正完了状況のチェックボックスを集約
       const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
@@ -1223,6 +1222,12 @@
         }
       });
       bug.scopeCompleted = completedScopes.join('/');
+      
+      // 修正対象と修正完了を統合して影響範囲に設定
+      const scopeWithStatus = selectedScopes.map(scope => {
+        return completedScopes.includes(scope) ? `${scope}（済）` : scope;
+      });
+      bug.scope = scopeWithStatus.join('/');
       
       // 処置完了がチェックされている場合のバリデーションと更新
       if (isShochoKanryo) {
@@ -1255,7 +1260,8 @@
           bug.fixDate = `${year}-${month}-${day}`;
           bug.status = '確認待ち';
           bug.verifier = bug.reporter; // 確認者を登録者に設定
-          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者を登録者で設定しました');
+          bug.assignee = bug.reporter; // 担当者を登録者に設定
+          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更、確認者と担当者を登録者で設定しました');
         }
       } else {
         // 処置完了がチェックされていない場合、修正対象がすべて修正完了になっているかを確認
