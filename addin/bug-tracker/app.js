@@ -117,8 +117,10 @@
         '再発': '再発',
         '完了': '完了'
       };
-      ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
-      REPORTER_LIST = ['政次','高橋','伊藤','松田'];
+      // E3セルから担当者リストと登録者リストを取得（デモモード）
+      const memberList = ['政次','高橋','伊藤','松田'];
+      ASSIGNEE_ORDER = ['(未割当)', ...memberList];
+      REPORTER_LIST = [...memberList];
       return;
     }
     setStatus('読み込み中...');
@@ -153,21 +155,23 @@
         };
       }
       
-      // D3セル：割り当て表記設定（/区切り）
-      const assigneeConfig = configValues[1]; // D3 (D列は3番目なので1ベース)
-      if (assigneeConfig && typeof assigneeConfig === 'string') {
-        ASSIGNEE_ORDER = ['(未割当)', ...assigneeConfig.split('/').map(s => s.trim()).filter(s => s)];
+      // E3セル：担当者・登録者リスト（/区切り）
+      const memberConfig = configValues[2]; // E3 (E列は4番目なので2ベース)
+      if (memberConfig && typeof memberConfig === 'string') {
+        const memberList = memberConfig.split('/').map(s => s.trim()).filter(s => s);
+        ASSIGNEE_ORDER = ['(未割当)', ...memberList];
+        REPORTER_LIST = [...memberList];
       } else {
-        ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
+        const defaultMembers = ['政次','高橋','伊藤','松田'];
+        ASSIGNEE_ORDER = ['(未割当)', ...defaultMembers];
+        REPORTER_LIST = [...defaultMembers];
       }
       
-      // G3セル：登録者リスト（/区切り）
-      const reporterConfig = configValues[4]; // G3 (G列は6番目なので4ベース)
-      if (reporterConfig && typeof reporterConfig === 'string') {
-        REPORTER_LIST = reporterConfig.split('/').map(s => s.trim()).filter(s => s);
-      } else {
-        REPORTER_LIST = ['政次','高橋','伊藤','松田'];
-      }
+      // D3セル：割り当て表記設定（廃止予定 - E3セルを使用）
+      // const assigneeConfig = configValues[1];
+      
+      // G3セル：登録者リスト（廃止予定 - E3セルを使用）
+      // const reporterConfig = configValues[4];
       
       // Y3セル：プリセットタグ
       const presetTagValue = configValues[22]; // Y3 (Y列は24番目なので22ベース)
