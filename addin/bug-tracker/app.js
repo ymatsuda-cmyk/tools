@@ -358,6 +358,193 @@
 
     $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
   }
+
+  // 推移グラフ表示
+  let trendChart = null;
+  
+  function renderTrend() {
+    renderTrendChart();
+  }
+
+  async function getTrendPeriod() {
+    if (!state.inOffice) {
+      // デモモード用のデフォルト期間
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 30); // 30日前から
+      return {
+        start: startDate.toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+      };
+    }
+
+    // Excel モードではAC3, AD3セルから期間を取得
+    try {
+      return await Excel.run(async (ctx) => {
+        const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+        const periodCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 28, 1, 2); // AC3:AD3
+        periodCells.load(['values']);
+        await ctx.sync();
+        
+        const values = periodCells.values[0];
+        let startDate = values[0] || '';
+        let endDate = values[1] || '';
+        
+        // 数値（Excelシリアル日付）の場合は変換
+        if (typeof startDate === 'number') {
+          startDate = excelSerialToDateStr(startDate);
+        }
+        if (typeof endDate === 'number') {
+          endDate = excelSerialToDateStr(endDate);
+        }
+        
+        return { start: startDate, end: endDate };
+      });
+    } catch (error) {
+      console.error('期間取得エラー:', error);
+      // エラー時はデフォルト期間を使用
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 30);
+      return {
+        start: startDate.toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+      };
+    }
+  }
+
+  async function renderTrendChart() {
+    const period = await getTrendPeriod();
+    
+    if (!period.start || !period.end) {
+      console.warn('期間が設定されていません');
+      return;
+    }
+
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+    
+    // 日付ラベル配列を生成
+    const dateLabels = [];
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      dateLabels.push(new Date(currentDate).toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // 各日付でのデータを集計
+    const occurrenceData = [];
+    const fixedData = [];
+    const verifiedData = [];
+
+    dateLabels.forEach(dateStr => {
+      const date = new Date(dateStr);
+      
+      // その日までのバグ発生件数（累計）
+      const occurrenceCount = state.bugs.filter(bug => {
+        if (!bug.occurredOn) return false;
+        const occurredDate = new Date(bug.occurredOn);
+        return occurredDate <= date;
+      }).length;
+
+      // その日までの対応完了件数（累計）
+      const fixedCount = state.bugs.filter(bug => {
+        if (!bug.fixDate) return false;
+        const fixDate = new Date(bug.fixDate);
+        return fixDate <= date;
+      }).length;
+
+      // その日までの確認完了件数（累計）
+      const verifiedCount = state.bugs.filter(bug => {
+        if (!bug.verifyDate) return false;
+        const verifyDate = new Date(bug.verifyDate);
+        return verifyDate <= date;
+      }).length;
+
+      occurrenceData.push(occurrenceCount);
+      fixedData.push(fixedCount);
+      verifiedData.push(verifiedCount);
+    });
+
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    
+    // 既存のチャートがあれば破棄
+    if (trendChart) {
+      trendChart.destroy();
+    }
+
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dateLabels.map(date => {
+          const d = new Date(date);
+          return `${d.getMonth() + 1}/${d.getDate()}`;
+        }),
+        datasets: [
+          {
+            label: 'バグ発生件数',
+            data: occurrenceData,
+            borderColor: '#2e7dd7',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4 // スムーズな線
+          },
+          {
+            label: '対応完了件数',
+            data: fixedData,
+            borderColor: '#ff9800',
+            backgroundColor: 'rgba(255, 152, 0, 0.3)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+          },
+          {
+            label: '確認完了件数',
+            data: verifiedData,
+            borderColor: '#4caf50',
+            backgroundColor: 'rgba(76, 175, 80, 0.3)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `バグ対応生産性推移 (${period.start} ～ ${period.end})`
+          },
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '件数'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: '日付'
+            }
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        }
+      }
+    });
+  }
   
   // ドラッグ&ドロップ機能（担当者別表示用）
   let draggedCard = null;
