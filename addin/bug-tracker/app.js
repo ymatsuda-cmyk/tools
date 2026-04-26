@@ -953,12 +953,19 @@
         
         // 差し戻しラジオボタン
         const rejectRadio = el('label', {}, [
-          el('input', { 
-            type: 'radio', 
-            name: groupName, 
-            value: 'reject', 
-            'data-key': 'sashimodoshi' 
-          }),
+          (() => {
+            const radio = el('input', { 
+              type: 'radio', 
+              name: groupName, 
+              value: 'reject', 
+              'data-key': 'sashimodoshi' 
+            });
+            // 差し戻しに○が入っていたらチェック
+            if (bug.reject === '○') {
+              radio.checked = true;
+            }
+            return radio;
+          })(),
           el('span', { text: '差し戻し（修正待ちに変更）' })
         ]);
         
@@ -1385,8 +1392,9 @@
       } else if (isReject && bug.status === '確認待ち') {
         bug.status = '修正待ち';
         bug.reject = '○'; // 差し戻し列を○で更新
+        bug.fixDate = ''; // 対応日を空欄に
         bug.assignee = bug.fixer; // 担当者を対応者に設定
-        setStatus('差し戻しのため状態を「修正待ち」に変更し、担当者を対応者に設定しました');
+        setStatus('差し戻しのため状態を「修正待ち」に変更し、対応日を空欄にして担当者を対応者に設定しました');
       }
       
       try {
