@@ -9,7 +9,7 @@
   const HEADER_ROW = 2;
   const SAMPLE_ROW = 3;
   const DATA_START = 4;
-  const COL_COUNT  = 27;
+  const COL_COUNT  = 28;
 
   // 動的にフィールド定義を生成する関数
   function getColumns() {
@@ -22,25 +22,26 @@
       { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
       { key: 'reporter',   letter: 'G', label: '登録者',       group: '発生情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
       { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)'] },
-      { key: 'steps',      letter: 'I', label: '再現手順',     group: '発生情報', type: 'textarea' },
-      { key: 'expected',   letter: 'J', label: '期待する動作', group: '発生情報', type: 'textarea' },
-      { key: 'actual',     letter: 'K', label: '実際の動作',   group: '発生情報', type: 'textarea' },
-      { key: 'reproRate',  letter: 'L', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
-      { key: 'cause',      letter: 'M', label: '原因',         group: '対応情報', type: 'textarea' },
-      { key: 'analyst',    letter: 'N', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-      { key: 'analysisDate', letter: 'O', label: '解析日',     group: '対応情報', type: 'date' },
-      { key: 'scope',      letter: 'P', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
-      { key: 'fix',        letter: 'Q', label: '対応内容',     group: '対応情報', type: 'textarea' },
-      { key: 'fixVer',     letter: 'R', label: '修正Ver',     group: '対応情報', type: 'text' },
-      { key: 'fixer',      letter: 'S', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-      { key: 'fixDate',    letter: 'T', label: '対応日',       group: '対応情報', type: 'date' },
-      { key: 'verify',     letter: 'U', label: '確認内容',     group: '結果確認', type: 'textarea' },
-      { key: 'reject',     letter: 'V', label: '差し戻し',     group: '結果確認', type: 'text' },
-      { key: 'verifier',   letter: 'W', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
-      { key: 'verifyDate', letter: 'X', label: '確認日',       group: '結果確認', type: 'date' },
-      { key: 'tag',        letter: 'Y', label: 'タグ',         group: '管理',     type: 'text' },
-      { key: 'priority',   letter: 'Z', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
-      { key: 'severity',   letter: 'AA', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
+      { key: 'originNumber', letter: 'I', label: '起因番号',   group: '発生情報', type: 'text' }, // 新規追加
+      { key: 'steps',      letter: 'J', label: '再現手順',     group: '発生情報', type: 'textarea' },
+      { key: 'expected',   letter: 'K', label: '期待する動作', group: '発生情報', type: 'textarea' },
+      { key: 'actual',     letter: 'L', label: '実際の動作',   group: '発生情報', type: 'textarea' },
+      { key: 'reproRate',  letter: 'M', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
+      { key: 'cause',      letter: 'N', label: '原因',         group: '対応情報', type: 'textarea' },
+      { key: 'analyst',    letter: 'O', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'analysisDate', letter: 'P', label: '解析日',     group: '対応情報', type: 'date' },
+      { key: 'scope',      letter: 'Q', label: '影響範囲',     group: '対応情報', type: 'select', options: ['','定義(通常)','定義(電源断)','定義(通信断)','RPA','アプリ'] },
+      { key: 'fix',        letter: 'R', label: '対応内容',     group: '対応情報', type: 'textarea' },
+      { key: 'fixVer',     letter: 'S', label: '修正Ver',     group: '対応情報', type: 'text' },
+      { key: 'fixer',      letter: 'T', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'fixDate',    letter: 'U', label: '対応日',       group: '対応情報', type: 'date' },
+      { key: 'verify',     letter: 'V', label: '確認内容',     group: '結果確認', type: 'textarea' },
+      { key: 'reject',     letter: 'W', label: '差し戻し',     group: '結果確認', type: 'text' },
+      { key: 'verifier',   letter: 'X', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'verifyDate', letter: 'Y', label: '確認日',       group: '結果確認', type: 'date' },
+      { key: 'tag',        letter: 'Z', label: 'タグ',         group: '管理',     type: 'text' },
+      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['','高','中','低'] },
+      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['','致命的','重大','警備'] }
     ];
   }
 
@@ -174,7 +175,7 @@
       // const reporterConfig = configValues[4];
       
       // Y3セル：プリセットタグ
-      const presetTagValue = configValues[22]; // Y3 (Y列は24番目なので22ベース)
+      const presetTagValue = configValues[23]; // Z3 (Z列は25番目なので23ベース)
       if (presetTagValue && typeof presetTagValue === 'string') {
         state.presetTags = presetTagValue.split('/').map(t => t.trim()).filter(t => t);
       } else {
@@ -486,9 +487,17 @@
     
     // 1行目：左端にID、発生起因。右端に優先度と差し戻しマーク
     const row1 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;' });
+    
+    // 発生起因と起因番号を組み合わせて表示
+    const originText = (() => {
+      if (!b.origin) return '';
+      if (!b.originNumber) return b.origin;
+      return `${b.origin}-${b.originNumber}`;
+    })();
+    
     const leftPart1 = el('div', { style: 'display:flex;gap:8px;' }, [
       el('span', { class: 'id', text: `#${b.id || ''}`, style: 'font-weight:bold;font-size:12px;' }),
-      el('span', { text: b.origin || '', style: 'font-size:11px;color:#666;' })
+      el('span', { text: originText, style: 'font-size:11px;color:#666;' })
     ]);
     const rightPart1 = el('div', { style: 'display:flex;gap:4px;align-items:center;' });
     
@@ -628,11 +637,15 @@
     // 常時表示エリア
     const alwaysArea = el('div', { class: 'always-area', style: 'margin-bottom:12px;padding:8px 0;border-bottom:1px solid #ccc;' });
     
-    // 1行目：ID、状態、発生起因
+    // 発生起因のみ表示
+    const originDisplay = (() => {
+      if (!bug.origin) return '';
+      if (!bug.originNumber) return bug.origin;
+      return `${bug.origin}-${bug.originNumber}`;
+    })();
+    
     const row1 = el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;' }, [
-      el('div', {}, [el('b', { text: 'ID: ' }), el('span', { text: bug.id || '' })]),
-      el('div', {}, [el('b', { text: '状態: ' }), el('span', { text: bug.status || '' })]),
-      el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: bug.origin || '' })])
+      el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: originDisplay })])
     ]);
     alwaysArea.appendChild(row1);
     
@@ -772,6 +785,14 @@
 
     function renderTab(tabKey) {
       tabContent.innerHTML = '';
+      
+      // 状況に応じた入力制御フラグ
+      const isDisabled = {
+        kaiseki: bug.status === '新規' || bug.status === '確認待ち',
+        shochi: bug.status === '新規' || bug.status === '解析待ち' || bug.status === '確認待ち',
+        kekka: bug.status === '新規' || bug.status === '解析待ち' || bug.status === '修正待ち'
+      };
+      
       if (tabKey === 'jisho') {
         // 事象タブ：タイトル、再現手順、期待する動作、実際の動作（編集可）
         console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
@@ -836,6 +857,7 @@
               'data-key': 'cause'
             });
             ta.textContent = (bug.cause !== undefined && bug.cause !== null) ? bug.cause : '';
+            ta.disabled = isDisabled.kaiseki; // 入力制御
             return ta;
           })()
         ]));
@@ -850,6 +872,10 @@
               }
               // 対応日や確認日が入っている場合も読み取り専用
               if ((bug.fixDate && bug.fixDate.trim() !== '') || (bug.verifyDate && bug.verifyDate.trim() !== '')) {
+                checkbox.disabled = true;
+              }
+              // 状況に応じた入力制御も適用
+              if (isDisabled.kaiseki) {
                 checkbox.disabled = true;
               }
               return checkbox;
@@ -931,6 +957,8 @@
                 targetCheckbox.checked = true;
               }
               
+              targetCheckbox.disabled = isDisabled.shochi; // 入力制御
+              
               const targetLabel = el('label', { style: 'display:flex;align-items:center;cursor:pointer;white-space:nowrap;' }, [
                 targetCheckbox,
                 el('span', { text: option })
@@ -951,6 +979,8 @@
               if (completedScopes.includes(option)) {
                 completedCheckbox.checked = true;
               }
+              
+              completedCheckbox.disabled = isDisabled.shochi; // 入力制御
               
               // 修正対象がチェックされている場合は完了チェックボックスを表示
               if (selectedScopes.includes(option)) {
@@ -990,6 +1020,7 @@
               'data-key': 'fix'
             });
             ta.textContent = (bug.fix !== undefined && bug.fix !== null) ? bug.fix : '';
+            ta.disabled = isDisabled.shochi; // 入力制御
             return ta;
           })()
         ]));
@@ -999,7 +1030,11 @@
         
         // 下部：修正Ver、処置完了チェック
         tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
-          el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' })]));
+          (() => {
+            const input = el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' });
+            input.disabled = isDisabled.shochi; // 入力制御
+            return input;
+          })()]));
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
             (() => {
@@ -1011,6 +1046,10 @@
               }
               // 確認日が入っている場合も読み取り専用
               if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+                checkbox.disabled = true;
+              }
+              // 状況に応じた入力制御も適用
+              if (isDisabled.shochi) {
                 checkbox.disabled = true;
               }
               return checkbox;
@@ -1030,6 +1069,7 @@
               'data-key': 'verify'
             });
             ta.textContent = (bug.verify !== undefined && bug.verify !== null) ? bug.verify : '';
+            ta.disabled = isDisabled.kekka; // 入力制御
             return ta;
           })()
         ]));
@@ -1052,6 +1092,10 @@
               radio.checked = true;
               radio.disabled = true; // 確認日が入っている場合は読み取り専用
             }
+            // 状況に応じた入力制御も適用
+            if (isDisabled.kekka) {
+              radio.disabled = true;
+            }
             return radio;
           })(),
           el('span', { text: '確認完了（完了に変更）' })
@@ -1072,6 +1116,10 @@
             }
             // 確認日が入っている場合は読み取り専用
             if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+              radio.disabled = true;
+            }
+            // 状況に応じた入力制御も適用
+            if (isDisabled.kekka) {
               radio.disabled = true;
             }
             return radio;
@@ -1440,6 +1488,7 @@
       })(),
       reporter: '',
       origin: '',
+      originNumber: '', // 起因番号を追加
       reproRate: '',
       steps: '',
       expected: '',
@@ -1499,7 +1548,7 @@
       })()
     ]);
 
-    // 2行目: 発生起因, 再現率（横並び2列）
+    // 2行目: 発生起因, 起因番号, 再現率（横並び3列）
     const row2 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
       (() => {
         const fld = el('div', { class: 'field', style: 'flex:1;' });
@@ -1511,6 +1560,16 @@
         });
         input.required = true;
         input.dataset.key = 'origin';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '起因番号' }));
+        const input = el('input', { type: 'text', style: 'width:100%;' });
+        input.value = newBugData.originNumber;
+        input.placeholder = '起因番号を入力';
+        input.dataset.key = 'originNumber';
         fld.appendChild(input);
         return fld;
       })(),
