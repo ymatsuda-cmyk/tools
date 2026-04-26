@@ -42,7 +42,11 @@
   ];
 
   const STATUS_ORDER = ['新規','解析待ち','修正待ち','確認待ち','完了'];
-  const ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
+  
+  // 動的に設定されるマッピング（セルから取得）
+  let STATUS_DISPLAY_NAMES = {};
+  let ASSIGNEE_ORDER = ['(未割当)'];
+  let REPORTER_LIST = [];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
   const state = {
@@ -51,7 +55,8 @@
     filters: { text: '', priority: '', status: '' },
     inOffice: false,
     editingRow: null,
-    presetTags: [] // プリセットタグを保存
+    presetTags: [], // プリセットタグを保存
+    lastSelectedReporter: localStorage.getItem('bugTracker_lastReporter') || '' // 前回選択した登録者
   };
 
   function $(sel) { return document.querySelector(sel); }
@@ -100,23 +105,76 @@
     if (!state.inOffice) {
       state.bugs = demoData();
       state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デモ用プリセット
+      // デモ用設定
+      STATUS_DISPLAY_NAMES = {
+        '新規': '新規',
+        '解析待ち': '解析',
+        '修正待ち': '修正',
+        '確認待ち': '確認',
+        '再発': '再発',
+        '完了': '完了'
+      };
+      ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
+      REPORTER_LIST = ['政次','高橋','伊藤','松田'];
       return;
     }
     setStatus('読み込み中...');
     await Excel.run(async (ctx) => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       
-      // プリセットタグをY3セルから取得
-      const presetTagCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 24, 1, 1); // Y列は24番目（0ベース）
-      presetTagCell.load(['values']);
+      // 各種設定をセルから取得
+      const configCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 2, 1, 23); // C3:Y3
+      configCells.load(['values']);
       await ctx.sync();
       
-      const presetTagValue = presetTagCell.values[0][0];
+      const configValues = configCells.values[0];
+      
+      // C3セル：状態別表記設定（「元の状態:表示名/元の状態:表示名」形式）
+      const statusDisplayConfig = configValues[0]; // C3 (C列は2番目なので0ベース)
+      if (statusDisplayConfig && typeof statusDisplayConfig === 'string') {
+        STATUS_DISPLAY_NAMES = {};
+        statusDisplayConfig.split('/').forEach(pair => {
+          const [original, display] = pair.split(':').map(s => s.trim());
+          if (original && display) {
+            STATUS_DISPLAY_NAMES[original] = display;
+          }
+        });
+      } else {
+        STATUS_DISPLAY_NAMES = {
+          '新規': '新規',
+          '解析待ち': '解析',
+          '修正待ち': '修正',
+          '確認待ち': '確認',
+          '再発': '再発',
+          '完了': '完了'
+        };
+      }
+      
+      // D3セル：割り当て表記設定（/区切り）
+      const assigneeConfig = configValues[1]; // D3 (D列は3番目なので1ベース)
+      if (assigneeConfig && typeof assigneeConfig === 'string') {
+        ASSIGNEE_ORDER = ['(未割当)', ...assigneeConfig.split('/').map(s => s.trim()).filter(s => s)];
+      } else {
+        ASSIGNEE_ORDER = ['(未割当)','政次','高橋','伊藤','松田'];
+      }
+      
+      // G3セル：登録者リスト（/区切り）
+      const reporterConfig = configValues[4]; // G3 (G列は6番目なので4ベース)
+      if (reporterConfig && typeof reporterConfig === 'string') {
+        REPORTER_LIST = reporterConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        REPORTER_LIST = ['政次','高橋','伊藤','松田'];
+      }
+      
+      // Y3セル：プリセットタグ
+      const presetTagValue = configValues[22]; // Y3 (Y列は24番目なので22ベース)
       if (presetTagValue && typeof presetTagValue === 'string') {
         state.presetTags = presetTagValue.split('/').map(t => t.trim()).filter(t => t);
       } else {
         state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デフォルト
       }
+      
+
       
       const used = sheet.getUsedRange(true);
       used.load(['rowCount', 'columnCount']);
@@ -271,8 +329,9 @@
     groups.forEach((items, key) => {
       const col = el('div', { class: 'kanban-col' });
       col.dataset.group = key;
+      const displayName = STATUS_DISPLAY_NAMES[key] || key || '(未設定)';
       const header = el('div', { class: 'kanban-col-header' }, [
-        el('span', { text: key || '(未設定)' }),
+        el('span', { text: displayName }),
         el('span', { class: 'count', text: String(items.length) })
       ]);
       const body = el('div', { class: 'kanban-col-body' });
