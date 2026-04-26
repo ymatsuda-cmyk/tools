@@ -1224,12 +1224,45 @@
       });
       bug.scopeCompleted = completedScopes.join('/');
       
-      // 処置完了がチェックされている場合、修正対象がすべて修正完了になっているかを確認
-      if (isShochoKanryo && selectedScopes.length > 0) {
-        const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
-        if (incompleteScopes.length > 0) {
-          alert(`処置完了にするには、以下の修正対象の修正完了にもチェックを付けてください：\n${incompleteScopes.join('\n')}`);
-          return; // 保存を中止
+      // 処置完了がチェックされている場合のバリデーションと更新
+      if (isShochoKanryo) {
+        // 修正対象にチェックが付いている場合のバリデーション
+        if (selectedScopes.length > 0) {
+          // 修正完了チェックの確認
+          const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
+          if (incompleteScopes.length > 0) {
+            alert(`処置完了にするには、以下の修正対象の修正完了にもチェックを付けてください：\n${incompleteScopes.join('\n')}`);
+            return; // 保存を中止
+          }
+          
+          // 修正Verと処置内容の入力確認
+          if (!bug.fixVer || bug.fixVer.trim() === '') {
+            alert('修正対象にチェックが付いている場合、修正Verの入力が必要です');
+            return;
+          }
+          if (!bug.fix || bug.fix.trim() === '') {
+            alert('修正対象にチェックが付いている場合、処置内容の入力が必要です');
+            return;
+          }
+        }
+        
+        // 処置完了時の自動更新
+        if (bug.status === '修正待ち') {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          bug.fixDate = `${year}-${month}-${day}`;
+          bug.status = '確認待ち';
+          setStatus('処置完了のため対応日を当日に設定し、状況を「確認待ち」に変更しました');
+        }
+      } else {
+        // 処置完了がチェックされていない場合、修正対象がすべて修正完了になっているかを確認
+        if (selectedScopes.length > 0) {
+          const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
+          if (incompleteScopes.length > 0) {
+            // この場合は警告のみで保存は継続
+          }
         }
       }
       
