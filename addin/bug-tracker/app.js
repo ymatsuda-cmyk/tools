@@ -1993,7 +1993,7 @@
         return `${d.getMonth()+1}/${d.getDate()}`;
       })(),
       reporter: '',
-      priority: '', // 優先度を追加（必須項目）
+      priority: '中', // 優先度のデフォルト値を「中」に設定
       severity: '', // 影響度を追加
       origin: '',
       originNumber: '', // 起因番号を追加
@@ -2060,10 +2060,9 @@
         const input = el('select', { style: 'width:100%;' });
         ['', ...PRIORITY_LIST].forEach(o => {
           const op = el('option', { value: o, text: o || '(選択)' });
-          // デフォルトは「中」
-          if (o === '中') {
+          // データの初期値と一致する場合に選択
+          if (o === newBugData.priority) {
             op.selected = true;
-            newBugData.priority = o;
           }
           input.appendChild(op);
         });
