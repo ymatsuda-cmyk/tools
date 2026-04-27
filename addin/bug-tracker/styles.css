@@ -120,66 +120,116 @@ tbody tr:hover { background: #f7faff; }
 
 /* 推移グラフ用スタイル */
 .trend-container {
-  padding: 16px;
-  background: #fff;
-  border-radius: 8px;
+  padding: 24px;
+  background: #0d111b;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
   margin: 8px;
+  min-height: 600px;
+}
+
+#view-trend {
+  background: #030712;
+  min-height: 100vh;
+  margin: -8px;
+  padding: 32px 24px;
 }
 
 .trend-container h3 {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  color: #333;
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e7eb;
+  text-align: left;
+  font-family: "'Space Grotesk', sans-serif";
+}
+
+/* チャートタイプ切り替えボタン */
+.chart-type-controls {
+  margin-bottom: 15px;
   text-align: center;
 }
 
+.chart-btn {
+  margin: 0 5px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+  font-family: "'DM Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+.chart-btn:hover {
+  opacity: 0.8;
+}
+
+.chart-btn.active {
+  background: #6366f1;
+  color: #fff;
+}
+
+/* Chart.jsキャンバスコンテナ */
 .chart-container {
   width: 100%;
-  height: 500px;
+  height: 320px;
   position: relative;
+  background: #0d111b;
+  border-radius: 8px;
+  padding: 0;
 }
 
 .chart-container canvas {
   width: 100% !important;
   height: 100% !important;
+  border-radius: 8px;
 }
 
-/* 統計テーブル用スタイル */
+/* ダークテーマ統計テーブル */
 .stats-container {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e0e3e8;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #1f2937;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .stats-container h4 {
-  margin: 0 0 12px 0;
+  margin: 0 0 16px 0;
   font-size: 16px;
-  color: #333;
+  font-weight: 700;
+  color: #e5e7eb;
+  font-family: "'Space Grotesk', sans-serif";
 }
 
 .stats-table {
   width: auto;
   border-collapse: collapse;
-  font-size: 11px;
-  background: #fff;
-  border-radius: 4px;
+  font-size: 12px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
   table-layout: fixed;
-  max-width: 280px;
+  max-width: 400px;
+  font-family: "'DM Mono', 'Fira Code', 'Courier New', monospace";
 }
 
 .stats-table th {
-  background: #f0f2f5;
-  padding: 3px 4px;
+  background: #1f2937;
+  padding: 8px 12px;
   text-align: center;
   font-weight: 600;
-  border-bottom: 2px solid #c8ccd2;
-  border-right: 1px solid #d8dde3;
+  border-bottom: 2px solid #374151;
+  border-right: 1px solid #374151;
   white-space: nowrap;
+  color: #9ca3af;
+  font-size: 11px;
 }
 
 .stats-table th:last-child {
@@ -187,14 +237,48 @@ tbody tr:hover { background: #f7faff; }
 }
 
 .stats-table td {
-  padding: 2px 3px;
-  border-bottom: 1px solid #eef0f3;
+  padding: 8px 12px;
+  border-bottom: 1px solid #1f2937;
+  border-right: 1px solid #1f2937;
   text-align: center;
   white-space: nowrap;
+  color: #f9fafb;
+  font-size: 11px;
 }
 
 .stats-table td:first-child {
   text-align: left;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+.stats-table td:last-child {
+  border-right: none;
+}
+
+.stats-table tr:hover {
+  background: #1e293b;
+}
+
+/* Google Fonts の読み込み */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@700;800&display=swap');
+
+/* スクロールバーのダークテーマ最適化 */
+.trend-container ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.trend-container ::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+.trend-container ::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+.trend-container ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
 }
 
 /* テーブル列幅の固定設定 */
