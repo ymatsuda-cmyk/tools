@@ -1590,8 +1590,9 @@
               
               await ctx.sync();
               
-              const majorVersion = majorVersionCell.values[0][0] || '1';
-              const minorVersion = minorVersionCell.values[0][0] || '0';
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const minorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
               
               const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
               
@@ -1616,8 +1617,8 @@
                 major: majorVersion,
                 minor: minorVersion,
                 current: currentVersion,
-                next: `Rev.${majorVersion}.${parseInt(minorVersion) + 1}`,
-                nextMinor: parseInt(minorVersion) + 1
+                next: `Rev.${majorVersion}.${minorVersion + 1}`,
+                nextMinor: minorVersion + 1
               };
             });
           } catch (error) {
@@ -1683,8 +1684,9 @@
               
               await ctx.sync();
               
-              const majorVersion = majorVersionCell.values[0][0] || '1';
-              const currentMinorVersion = parseInt(minorVersionCell.values[0][0] || '0');
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const currentMinorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
               const newMinorVersion = currentMinorVersion + 1;
               
               // S3セルを更新
