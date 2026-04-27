@@ -1538,7 +1538,11 @@
           style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
         });
         
-        if (isDisabled.shochi) {
+        // ボタンの非活性化判定
+        const shouldDisableButtons = isDisabled.shochi || 
+          (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+        
+        if (shouldDisableButtons) {
           existingVersionButton.disabled = true;
           existingVersionButton.style.opacity = '0.5';
           existingVersionButton.style.cursor = 'not-allowed';
@@ -1590,9 +1594,16 @@
               
               await ctx.sync();
               
+              // デバッグ：セルの実際の値を確認
+              console.log('AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('S3セルの値:', minorVersionCell.values[0][0]);
+              
               // 整数値として取得（小数点を除去）
               const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
               const minorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
+              
+              console.log('処理後 - メジャーバージョン:', majorVersion);
+              console.log('処理後 - マイナーバージョン:', minorVersion);
               
               const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
               
@@ -1636,6 +1647,12 @@
         
         // 既存バージョンを選択する関数
         function selectExistingVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
+          const button = document.querySelector('#existing-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
           const textArea = document.querySelector('#version-display-text');
           const hiddenInput = document.querySelector('#fix-ver-hidden');
           
@@ -1661,7 +1678,12 @@
         
         // 新しいバージョンを払い出す関数
         async function createNewVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
           const button = document.querySelector('#new-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
           const textArea = document.querySelector('#version-display-text');
           const hiddenInput = document.querySelector('#fix-ver-hidden');
           const existingButton = document.querySelector('#existing-version-button');
@@ -1683,6 +1705,10 @@
               minorVersionCell.load('values');
               
               await ctx.sync();
+              
+              // デバッグ：セルの実際の値を確認
+              console.log('新規作成時 - AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('新規作成時 - S3セルの値:', minorVersionCell.values[0][0]);
               
               // 整数値として取得（小数点を除去）
               const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
@@ -1729,11 +1755,18 @@
             console.error('バージョン払い出しエラー:', error);
             alert('バージョン払い出しに失敗しました: ' + error.message);
           } finally {
-            // ボタンを元に戻す
+            // ボタンを元に戻す（条件に応じて有効/無効を設定）
             if (button) {
-              button.disabled = isDisabled.shochi;
+              const shouldDisable = isDisabled.shochi || 
+                (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+              
+              button.disabled = shouldDisable;
               button.textContent = 'さらに新しいバージョンを払い出す';
-              if (!isDisabled.shochi) {
+              
+              if (shouldDisable) {
+                button.style.opacity = '0.5';
+                button.style.cursor = 'not-allowed';
+              } else {
                 button.style.opacity = '1';
                 button.style.cursor = 'pointer';
               }
