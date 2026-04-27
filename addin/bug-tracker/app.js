@@ -1515,13 +1515,188 @@
         mainContainer.appendChild(rightPanel);
         tabContent.appendChild(mainContainer);
         
-        // 下部：修正Ver、処置完了チェック
-        tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
-          (() => {
-            const input = el('input', { type: 'text', style: 'width:98%;', placeholder: '修正版番号を入力してください（例：Rev.20260427）', value: bug.fixVer || '', 'data-key': 'fixVer' });
-            input.disabled = isDisabled.shochi; // 入力制御
-            return input;
-          })()]));
+        // 下部：修正Ver（シンプル表示）、処置完了チェック
+        const versionContainer = el('div', {});
+        
+        // ラベル行（修正Ver + ボタン）
+        const labelRow = el('div', { style: 'display:flex;align-items:center;gap:16px;margin-bottom:8px;' });
+        labelRow.appendChild(el('label', { text: '修正Ver', style: 'font-weight:bold;' }));
+        
+        // 新規バージョン作成ボタン
+        const newVersionButton = el('button', { 
+          type: 'button',
+          text: 'さらに新しいバージョンを払い出す',
+          id: 'new-version-button',
+          style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
+        
+        if (isDisabled.shochi) {
+          newVersionButton.disabled = true;
+          newVersionButton.style.opacity = '0.5';
+          newVersionButton.style.cursor = 'not-allowed';
+        }
+        
+        labelRow.appendChild(newVersionButton);
+        versionContainer.appendChild(labelRow);
+        
+        // バージョン表示テキストエリア
+        const versionTextArea = el('textarea', {
+          rows: 2,
+          style: 'width:98%;resize:none;background:#f9f9f9;border:1px solid #ddd;padding:8px;',
+          readonly: true,
+          id: 'version-display-text',
+          placeholder: 'バージョン情報を取得中...'
+        });
+        
+        versionContainer.appendChild(versionTextArea);
+        
+        // 隠し入力フィールド（実際の値を保存）
+        const hiddenVersionInput = el('input', { 
+          type: 'hidden', 
+          'data-key': 'fixVer',
+          id: 'fix-ver-hidden',
+          value: bug.fixVer || ''
+        });
+        versionContainer.appendChild(hiddenVersionInput);
+        
+        // バージョン情報を初期化する関数
+        async function initializeVersionDisplay() {
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1); // AF列は31番目（0ベース）
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1); // S列は18番目（0ベース）
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              const majorVersion = majorVersionCell.values[0][0] || '1';
+              const minorVersion = minorVersionCell.values[0][0] || '0';
+              
+              const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
+              
+              // テキストエリアに表示
+              if (textArea) {
+                if (bug.fixVer && bug.fixVer.trim() !== '') {
+                  // 既存バージョンがある場合
+                  textArea.value = `${bug.fixVer} （既存バージョン）`;
+                } else {
+                  // 既存バージョンがない場合は最新を表示
+                  textArea.value = `${currentVersion} （最新バージョン）`;
+                }
+              }
+              
+              // グローバル変数に保存（他の処理で使用）
+              window.versionInfo = {
+                major: majorVersion,
+                minor: minorVersion,
+                current: currentVersion,
+                next: `Rev.${majorVersion}.${parseInt(minorVersion) + 1}`,
+                nextMinor: parseInt(minorVersion) + 1
+              };
+            });
+          } catch (error) {
+            console.error('バージョン情報取得エラー:', error);
+            // エラー時のフォールバック表示
+            if (textArea) {
+              if (bug.fixVer && bug.fixVer.trim() !== '') {
+                textArea.value = `${bug.fixVer} （既存バージョン）`;
+              } else {
+                textArea.value = 'バージョン情報を取得できませんでした';
+              }
+            }
+          }
+        }
+        
+        // 新しいバージョンを払い出す関数
+        async function createNewVersion() {
+          const button = document.querySelector('#new-version-button');
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          if (button) {
+            button.disabled = true;
+            button.textContent = '処理中...';
+          }
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1);
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1);
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              const majorVersion = majorVersionCell.values[0][0] || '1';
+              const currentMinorVersion = parseInt(minorVersionCell.values[0][0] || '0');
+              const newMinorVersion = currentMinorVersion + 1;
+              
+              // S3セルを更新
+              minorVersionCell.values = [[newMinorVersion]];
+              
+              await ctx.sync();
+              
+              const newVersion = `Rev.${majorVersion}.${newMinorVersion}`;
+              
+              // バグオブジェクトの修正Verを更新
+              bug.fixVer = newVersion;
+              
+              // 隠し入力フィールドも更新
+              if (hiddenInput) {
+                hiddenInput.value = newVersion;
+              }
+              
+              // テキストエリアの表示を更新
+              if (textArea) {
+                textArea.value = `${newVersion} （新しいバージョン）`;
+              }
+              
+              // グローバル変数を更新
+              window.versionInfo = {
+                major: majorVersion,
+                minor: newMinorVersion,
+                current: newVersion,
+                next: `Rev.${majorVersion}.${newMinorVersion + 1}`,
+                nextMinor: newMinorVersion + 1
+              };
+              
+              console.log(`新しいバージョンを払い出しました: ${newVersion}`);
+            });
+          } catch (error) {
+            console.error('バージョン払い出しエラー:', error);
+            alert('バージョン払い出しに失敗しました: ' + error.message);
+          } finally {
+            // ボタンを元に戻す
+            if (button) {
+              button.disabled = isDisabled.shochi;
+              button.textContent = 'さらに新しいバージョンを払い出す';
+              if (!isDisabled.shochi) {
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+              }
+            }
+          }
+        }
+        
+        // ボタンのイベントリスナー
+        newVersionButton.addEventListener('click', createNewVersion);
+        
+        // 初期化を実行（DOM追加後）
+        setTimeout(initializeVersionDisplay, 0);
+        
+        tabContent.appendChild(versionContainer);
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
             (() => {
@@ -2496,7 +2671,7 @@
           
           // 修正Verと処置内容の入力確認
           if (!bug.fixVer || bug.fixVer.trim() === '') {
-            alert('修正対象にチェックが付いている場合、修正Verの入力が必要です');
+            alert('修正対象にチェックが付いている場合、修正Verが必要です。\n新しいバージョンを払い出すか、既存のバージョンを指定してください。');
             return;
           }
           if (!bug.fix || bug.fix.trim() === '') {
