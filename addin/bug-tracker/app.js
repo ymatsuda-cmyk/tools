@@ -1518,7 +1518,7 @@
         // 下部：修正Ver、処置完了チェック
         tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
           (() => {
-            const input = el('input', { type: 'text', style: 'width:98%;', placeholder: 'Rev.yyyymmdd　例）Rev.20260427', value: bug.fixVer || '', 'data-key': 'fixVer' });
+            const input = el('input', { type: 'text', style: 'width:98%;', placeholder: '修正版番号を入力してください（例：Rev.20260427）', value: bug.fixVer || '', 'data-key': 'fixVer' });
             input.disabled = isDisabled.shochi; // 入力制御
             return input;
           })()]));
