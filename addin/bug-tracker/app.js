@@ -583,6 +583,7 @@
 
     // 各日付でのデータを集計
     const occurrenceData = [];
+    const analysisData = [];
     const fixedData = [];
     const verifiedData = [];
 
@@ -594,6 +595,13 @@
         if (!bug.occurredOn) return false;
         const occurredDate = new Date(bug.occurredOn);
         return occurredDate <= date;
+      }).length;
+
+      // その日までの解析完了件数（累計）
+      const analysisCount = state.bugs.filter(bug => {
+        if (!bug.analysisDate) return false;
+        const analysisDate = new Date(bug.analysisDate);
+        return analysisDate <= date;
       }).length;
 
       // その日までの対応完了件数（累計）
@@ -611,6 +619,7 @@
       }).length;
 
       occurrenceData.push(occurrenceCount);
+      analysisData.push(analysisCount);
       fixedData.push(fixedCount);
       verifiedData.push(verifiedCount);
     });
@@ -631,9 +640,9 @@
         }),
         datasets: [
           {
-            label: 'バグ発生件数',
+            label: '合計（バグ発生件数）',
             data: occurrenceData,
-            borderColor: '#2e7dd7',
+            borderColor: '#5470c6',  // 青系統
             backgroundColor: 'transparent',
             borderWidth: 2,
             fill: false,
@@ -641,20 +650,30 @@
             pointRadius: 0 // ○表示を無効化
           },
           {
-            label: '対応完了件数',
-            data: fixedData,
-            borderColor: '#ff9800',
-            backgroundColor: 'rgba(255, 152, 0, 0.3)',
+            label: '解析（解析完了件数）',
+            data: analysisData,
+            borderColor: '#ee6666',  // 赤系統
+            backgroundColor: 'rgba(238, 102, 102, 0.1)',
             borderWidth: 2,
             fill: true,
             tension: 0.4,
             pointRadius: 0 // ○表示を無効化
           },
           {
-            label: '確認完了件数',
+            label: '対応（対応完了件数）',
+            data: fixedData,
+            borderColor: '#fac858',  // オレンジ系統
+            backgroundColor: 'rgba(250, 200, 88, 0.2)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0 // ○表示を無効化
+          },
+          {
+            label: '完了（確認完了件数）',
             data: verifiedData,
-            borderColor: '#4caf50',
-            backgroundColor: 'rgba(76, 175, 80, 0.3)',
+            borderColor: '#91cc75',  // 緑系統
+            backgroundColor: 'rgba(145, 204, 117, 0.2)',
             borderWidth: 2,
             fill: true,
             tension: 0.4,
