@@ -535,41 +535,40 @@
     
     const controls = el('div', { 
       class: 'chart-type-controls',
-      style: 'margin-bottom: 15px; text-align: center;'
+      style: 'margin-bottom: 15px; text-align: center; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;'
     });
     
     const buttons = [
       { type: 'line', label: '折れ線グラフ' },
       { type: 'area', label: '面グラフ' },
-      { type: 'bar', label: '棒グラフ' }
+      { type: 'bar', label: '棒グラフ' },
+      { type: 'network', label: '🕸 関連図', isSpecial: true }
     ];
     
-    buttons.forEach(({ type, label }) => {
+    buttons.forEach(({ type, label, isSpecial }) => {
+      const btnClass = isSpecial ? `chart-btn network-btn ${type === 'network' && chartType === 'network' ? 'active' : ''}` : `chart-btn ${chartType === type ? 'active' : ''}`;
+      
       const btn = el('button', {
-        class: `chart-btn ${chartType === type ? 'active' : ''}`,
-        text: label,
-        style: `margin: 0 5px; padding: 8px 16px; border: none; border-radius: 6px; 
-                background: ${chartType === type ? '#6366f1' : '#1f2937'}; 
-                color: ${chartType === type ? '#fff' : '#9ca3af'};
-                cursor: pointer; font-size: 12px; transition: all 0.15s;
-                font-family: inherit;`
+        class: btnClass,
+        text: label
       });
       
       btn.addEventListener('click', () => {
+        if (type === 'network') {
+          openKeywordNetworkWindow();
+          return;
+        }
+        
         chartType = type;
-        document.querySelectorAll('.chart-btn').forEach(b => {
+        document.querySelectorAll('.chart-btn:not(.network-btn)').forEach(b => {
           b.classList.remove('active');
-          b.style.background = '#1f2937';
-          b.style.color = '#9ca3af';
         });
         btn.classList.add('active');
-        btn.style.background = '#6366f1';
-        btn.style.color = '#fff';
         renderTrendChart();
       });
       
       btn.addEventListener('mouseenter', () => {
-        if (chartType !== type) {
+        if (chartType !== type && !isSpecial) {
           btn.style.opacity = '0.8';
         }
       });
@@ -595,7 +594,45 @@
       }
     }
   }
+
+  // ======= キーワード関連図機能 =======
+  function openKeywordNetworkWindow() {
+    // 新しいウィンドウでキーワード関連図を開く
+    const networkWindow = window.open(
+      'keyword-network.html',
+      'KeywordNetwork',
+      'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes'
+    );
+    
+    if (!networkWindow) {
+      alert('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。');
+      return;
+    }
+    
+    // ウィンドウが読み込まれたらバグデータを送信
+    networkWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }, 500); // 初期化待ち
+    });
+    
+    // データリクエストへの対応
+    window.addEventListener('message', function(event) {
+      if (event.source === networkWindow && event.data.type === 'REQUEST_BUG_DATA') {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }
+    });
+  }
   
+  // グローバルスコープからアクセス可能にする
+  window.openKeywordNetworkWindow = openKeywordNetworkWindow;
+
   function renderTrend() {
     // DOMの準備が完了してからチャート機能を実行
     setTimeout(() => {
