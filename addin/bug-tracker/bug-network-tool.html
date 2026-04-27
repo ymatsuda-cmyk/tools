@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バグ関連図ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@300;400;500;700&display=swap');
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --ink: #1c1a16;
+  --ink2: #5a5650;
+  --ink3: #999690;
+  --rule: #e0dcd4;
+  --accent: #1c1a16;
+
+  --cat-rpa: #c0392b;
+  --cat-expected: #1a6bb5;
+  --cat-edy: #c47a1a;
+  --cat-app: #1a7a4a;
+  --cat-other: #7a7470;
+
+  --status-new: #c0392b;
+  --status-analysis: #c47a1a;
+  --status-fix: #1a6bb5;
+  --status-check: #1a7a4a;
+  --status-done: #999690;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'IBM Plex Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+header {
+  background: var(--ink);
+  color: #f0ede6;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 20px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.logo span { color: var(--cat-rpa); }
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0ede6;
+  color: var(--ink);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.upload-btn:hover { background: #fff; }
+
+.ctrl-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #c8c4bc;
+}
+.ctrl-pill label { white-space: nowrap; }
+.ctrl-pill select {
+  background: transparent;
+  border: none;
+  color: #f0ede6;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+.ctrl-pill select option { color: var(--ink); background: #fff; }
+
+#fileInput { display: none; }
+
+/* ── Main layout ── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  overflow: hidden;
+}
+
+/* ── Canvas area ── */
+.canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: grab;
+}
+.canvas-wrap:active { cursor: grabbing; }
+
+#graphCanvas {
+  position: absolute;
+  top: 0; left: 0;
+}
+
+/* ── Empty state ── */
+#emptyState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.empty-icon {
+  width: 64px; height: 64px;
+  border: 2px dashed var(--rule);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.empty-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--ink3);
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ── Zoom controls ── */
+.zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zoom-btn {
+  width: 32px; height: 32px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink2);
+  transition: background 0.1s;
+}
+.zoom-btn:hover { background: var(--surface2); }
+
+/* ── Stats bar ── */
+.stats-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stat-chip .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+
+/* ── Tooltip ── */
+#tooltip {
+  position: fixed;
+  background: var(--ink);
+  color: #f0ede6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1000;
+  max-width: 240px;
+  line-height: 1.6;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--surface);
+  border-left: 1.5px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--rule);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink3);
+  text-transform: uppercase;
+}
+
+/* Detail panel */
+.detail-panel {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rule);
+  min-height: 120px;
+}
+
+.detail-empty {
+  color: var(--ink3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.detail-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.badge-status-新規       { background: #fdecea; color: var(--status-new);      border-color: #f5bcb8; }
+.badge-status-解析       { background: #fef3e2; color: var(--status-analysis); border-color: #f7d9a0; }
+.badge-status-修正       { background: #e8f0fb; color: var(--status-fix);      border-color: #b5ccf0; }
+.badge-status-確認       { background: #e6f5ec; color: var(--status-check);    border-color: #a8ddb8; }
+.badge-status-完了       { background: #f0efed; color: var(--status-done);     border-color: #d0cdc8; }
+
+.badge-cat {
+  background: var(--surface2);
+  color: var(--ink2);
+  border-color: var(--rule);
+}
+
+.detail-body {
+  font-size: 12px;
+  color: var(--ink2);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+.related-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.related-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.related-tag {
+  background: var(--surface2);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  cursor: pointer;
+  transition: background 0.1s;
+  color: var(--ink2);
+}
+.related-tag:hover { background: var(--ink); color: #f0ede6; }
+
+/* Legend */
+.legend-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.legend-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink3);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink2);
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.legend-item:hover { background: var(--surface2); }
+.legend-item.inactive { opacity: 0.35; }
+
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Bug list */
+.bug-list-wrap {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.bug-list-header {
+  padding: 10px 16px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink3);
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+
+.bug-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 12px;
+}
+.bug-item:hover { background: var(--surface2); }
+.bug-item.selected { background: var(--ink); color: #f0ede6; }
+.bug-item.selected .bug-item-id,
+.bug-item.selected .bug-item-status { opacity: 0.7; }
+
+.bug-item-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bug-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bug-item-id {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink3);
+}
+
+.bug-item-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+
+/* Filter bar */
+.filter-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  gap: 6px;
+}
+
+.filter-bar input {
+  flex: 1;
+  border: 1px solid var(--rule);
+  background: var(--surface2);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: 'IBM Plex Sans JP', sans-serif;
+  outline: none;
+  color: var(--ink);
+}
+.filter-bar input:focus { border-color: var(--ink); }
+
+/* Scrollbar */
+.bug-list-wrap::-webkit-scrollbar { width: 4px; }
+.bug-list-wrap::-webkit-scrollbar-track { background: transparent; }
+.bug-list-wrap::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">BUG<span>.</span>NET</div>
+
+  <div class="header-controls">
+    <div class="ctrl-pill">
+      <label>閾値</label>
+      <select id="thresholdSel">
+        <option value="1">共起1回以上</option>
+        <option value="2" selected>共起2回以上</option>
+        <option value="3">共起3回以上</option>
+        <option value="4">共起4回以上</option>
+      </select>
+    </div>
+
+    <div class="ctrl-pill">
+      <label>担当</label>
+      <select id="assigneeSel">
+        <option value="">全員</option>
+      </select>
+    </div>
+
+    <label class="upload-btn" for="fileInput">
+      ↑ Excelを読込
+    </label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+
+    <button class="upload-btn" id="resetViewBtn" style="background:rgba(255,255,255,0.15);color:#f0ede6;">⟳ リセット</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Canvas -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="graphCanvas"></canvas>
+
+    <div id="emptyState">
+      <div class="empty-icon">🔗</div>
+      <div class="empty-title">
+        Excelファイルを読み込んでください<br>
+        <span style="font-size:11px;opacity:0.6;">バグシートの列構成に対応</span>
+      </div>
+    </div>
+
+    <div class="stats-bar" id="statsBar" style="display:none"></div>
+
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoomIn">+</button>
+      <button class="zoom-btn" id="zoomOut">−</button>
+      <button class="zoom-btn" id="zoomFit" title="全体表示" style="font-size:12px;">⊡</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">詳細 / DETAIL</div>
+
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-empty">ノードをクリックすると<br>詳細情報が表示されます</div>
+    </div>
+
+    <div class="legend-section">
+      <div class="legend-title">カテゴリ</div>
+      <div class="legend-grid" id="legendGrid"></div>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="バグ名で絞り込み...">
+    </div>
+
+    <div class="bug-list-header">バグ一覧</div>
+    <div class="bug-list-wrap">
+      <div id="bugList"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ── Column mapping (バグシートの列構成に対応) ──
+const COL = {
+  ID:       0,   // A: ID
+  TITLE:    1,   // B: タイトル
+  STATUS:   2,   // C: 状況
+  UPDATED:  3,   // D: 更新日
+  ASSIGNEE: 4,   // E: 担当者
+  DATE:     5,   // F: 発生日
+  REPORTER: 6,   // G: 登録者
+  CAUSE:    7,   // H: 発生起因
+  CAUSE_NO: 8,   // I: 起因番号
+  STEPS:    9,   // J: 再現手順
+  EXPECTED: 10,  // K: 期待する動作
+  ACTUAL:   11,  // L: 実際の動作
+  REPRODUCE:12,  // M: 再現率
+  ROOT:     13,  // N: 原因
+  ANALYZER: 14,  // O: 解析者
+  SCOPE:    16,  // Q: 影響範囲
+  CONTENT:  17,  // R: 対応内容
+};
+
+const CAT_RULES = [
+  { key: 'rpa',      label: 'RPA不具合',       color: '#c0392b', test: t => /RPA|PowerAutomate|adb|scrcpy|worker|VBA|PA\b/.test(t) },
+  { key: 'expected', label: '期待値/数式不正',  color: '#1a6bb5', test: t => /期待値|数式|チェック仕様/.test(t) },
+  { key: 'edy',      label: 'Edy残高不正',      color: '#c47a1a', test: t => /Edy|残高/.test(t) },
+  { key: 'app',      label: 'アプリ/端末',      color: '#1a7a4a', test: t => /アプリ|端末|フリーズ|電話番号|レシート|GMO/.test(t) },
+  { key: 'other',    label: 'その他・改善',     color: '#7a7470', test: () => true },
+];
+
+const STATUS_COLORS = {
+  '新規': '#c0392b', '解析': '#c47a1a', '修正': '#1a6bb5',
+  '確認': '#1a7a4a', '完了': '#999690'
+};
+
+function categorize(title) {
+  for (const r of CAT_RULES) if (r.test(title)) return r;
+  return CAT_RULES[CAT_RULES.length - 1];
+}
+
+// ── State ──
+let bugs = [], nodes = [], edges = [], selectedNode = null;
+let panX = 0, panY = 0, scale = 1;
+let panStart = null, dragNode = null, isDrag = false;
+let simStep = 0, animId = null;
+let activeCategories = new Set(CAT_RULES.map(r => r.key));
+let degreeCount = [];
+let filterText = '';
+
+// ── Parse Excel ──
+function parseExcel(data) {
+  const wb = XLSX.read(data, { type: 'binary' });
+  const ws = wb.Sheets['バグ'];
+  if (!ws) { alert('"バグ" という名前のシートが見つかりません。'); return; }
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  const result = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const id = row[COL.ID];
+    if (!id || typeof id !== 'number') continue;
+    const title = String(row[COL.TITLE] || '');
+    const cat = categorize(title);
+    result.push({
+      id,
+      title,
+      short: title.replace(/（課\d+）$/, '').substring(0, 18),
+      status: String(row[COL.STATUS] || '').split('/')[0].trim() || '不明',
+      assignee: String(row[COL.ASSIGNEE] || '').split('/')[0].trim(),
+      cause: String(row[COL.CAUSE] || ''),
+      reproduce: String(row[COL.REPRODUCE] || ''),
+      root: String(row[COL.ROOT] || '').substring(0, 100),
+      scope: String(row[COL.SCOPE] || ''),
+      content: String(row[COL.CONTENT] || '').substring(0, 100),
+      cat: cat.key,
+      catLabel: cat.label,
+      catColor: cat.color,
+    });
+  }
+  return result;
+}
+
+// ── Build graph ──
+function buildGraph() {
+  const threshold = parseInt(document.getElementById('thresholdSel').value);
+  const assigneeFilter = document.getElementById('assigneeSel').value;
+
+  let filtered = bugs;
+  if (assigneeFilter) filtered = bugs.filter(b => b.assignee === assigneeFilter);
+  filtered = filtered.filter(b => activeCategories.has(b.cat));
+
+  nodes = filtered.map((b, i) => ({
+    ...b, idx: i,
+    x: 0, y: 0, vx: 0, vy: 0
+  }));
+
+  edges = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let w = 0;
+      if (a.assignee && a.assignee === b.assignee) w += 1;
+      if (a.cause && a.cause === b.cause) w += 1;
+      if (a.cat === b.cat) w += 2;
+      if (a.status === b.status) w += 0.5;
+      if (w >= threshold) edges.push({ source: i, target: j, weight: w });
+    }
+  }
+
+  degreeCount = new Array(nodes.length).fill(0);
+  edges.forEach(e => { degreeCount[e.source]++; degreeCount[e.target]++; });
+
+  initPositions();
+  simStep = 0;
+}
+
+function initPositions() {
+  const W = document.getElementById('canvasWrap').offsetWidth;
+  const H = document.getElementById('canvasWrap').offsetHeight;
+  const cx = W / 2, cy = H / 2;
+  const r = Math.min(W, H) * 0.32;
+  nodes.forEach((n, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2;
+    n.x = cx + Math.cos(angle) * r * (0.7 + Math.random() * 0.3);
+    n.y = cy + Math.sin(angle) * r * (0.7 + Math.random() * 0.3);
+    n.vx = 0; n.vy = 0;
+  });
+}
+
+// ── Force simulation ──
+function simulate() {
+  if (simStep >= 280) return;
+  const W = document.getElementById('canvasWrap').offsetWidth;
+  const H = document.getElementById('canvasWrap').offsetHeight;
+  const cx = W / 2, cy = H / 2;
+  const alpha = Math.max(0.015, 1 - simStep / 280);
+
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = (3200 / (dist * dist)) * alpha;
+      a.vx += dx / dist * f; a.vy += dy / dist * f;
+      b.vx -= dx / dist * f; b.vy -= dy / dist * f;
+    }
+  }
+  edges.forEach(e => {
+    const a = nodes[e.source], b = nodes[e.target];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ideal = 90 + 70 / (e.weight || 1);
+    const f = (dist - ideal) * 0.028 * alpha;
+    a.vx += dx / dist * f; a.vy += dy / dist * f;
+    b.vx -= dx / dist * f; b.vy -= dy / dist * f;
+  });
+  nodes.forEach(n => {
+    n.vx += (cx - n.x) * 0.005 * alpha;
+    n.vy += (cy - n.y) * 0.005 * alpha;
+  });
+  nodes.forEach(n => {
+    if (n === dragNode) return;
+    n.vx *= 0.83; n.vy *= 0.83;
+    n.x += n.vx; n.y += n.vy;
+  });
+  simStep++;
+}
+
+// ── Draw ──
+function draw() {
+  const wrap = document.getElementById('canvasWrap');
+  const canvas = document.getElementById('graphCanvas');
+  const W = wrap.offsetWidth, H = wrap.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  if (nodes.length === 0) return;
+
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
+
+  // Edges
+  edges.forEach(e => {
+    const a = nodes[e.source], b = nodes[e.target];
+    const isHL = selectedNode &&
+      (e.source === selectedNode.idx || e.target === selectedNode.idx);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = isHL ? 'rgba(28,26,22,0.55)' : 'rgba(28,26,22,0.07)';
+    ctx.lineWidth = isHL ? Math.min(e.weight, 4) : Math.min(e.weight * 0.5, 2);
+    ctx.stroke();
+
+    if (isHL && e.weight > 1) {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      ctx.fillStyle = 'rgba(28,26,22,0.4)';
+      ctx.font = '9px IBM Plex Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('×' + Math.floor(e.weight), mx, my - 3);
+    }
+  });
+
+  // Nodes
+  const maxDeg = Math.max(...degreeCount, 1);
+  nodes.forEach(n => {
+    const r = 9 + (degreeCount[n.idx] / maxDeg) * 18;
+    const isSelected = selectedNode && selectedNode.idx === n.idx;
+    const isNeighbor = selectedNode && edges.some(e =>
+      (e.source === selectedNode.idx && e.target === n.idx) ||
+      (e.target === selectedNode.idx && e.source === n.idx)
+    );
+    const dimmed = selectedNode && !isSelected && !isNeighbor;
+    const col = n.catColor;
+
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = dimmed ? '#ccc' : col;
+    ctx.globalAlpha = dimmed ? 0.25 : 0.85;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = isSelected ? '#1c1a16' : (dimmed ? '#ccc' : col);
+    ctx.lineWidth = isSelected ? 2.5 : 1.5;
+    ctx.stroke();
+
+    // Label
+    const labelSize = Math.max(10, 9 + degreeCount[n.idx] * 0.6);
+    ctx.font = `${isSelected ? 500 : 400} ${labelSize}px IBM Plex Sans JP, sans-serif`;
+    ctx.textAlign = 'center';
+    const tw = ctx.measureText(n.short).width;
+    if (!dimmed) {
+      ctx.fillStyle = 'rgba(247,245,240,0.82)';
+      ctx.fillRect(n.x - tw / 2 - 2, n.y + r + 2, tw + 4, 14);
+    }
+    ctx.fillStyle = dimmed ? 'rgba(100,100,100,0.3)' : '#1c1a16';
+    ctx.fillText(n.short, n.x, n.y + r + 13);
+  });
+
+  ctx.restore();
+}
+
+// ── Loop ──
+function loop() {
+  simulate();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+// ── Interaction ──
+function getNodeAt(ex, ey) {
+  const x = (ex - panX) / scale, y = (ey - panY) / scale;
+  const maxDeg = Math.max(...degreeCount, 1);
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const r = 9 + (degreeCount[n.idx] / maxDeg) * 18 + 6;
+    if ((x - n.x) ** 2 + (y - n.y) ** 2 <= r * r) return n;
+  }
+  return null;
+}
+
+const canvasWrap = document.getElementById('canvasWrap');
+const tooltip = document.getElementById('tooltip');
+
+canvasWrap.addEventListener('mousedown', e => {
+  const n = getNodeAt(e.offsetX, e.offsetY);
+  if (n) { dragNode = n; isDrag = false; }
+  else panStart = { x: e.clientX - panX, y: e.clientY - panY };
+});
+
+canvasWrap.addEventListener('mousemove', e => {
+  if (dragNode) {
+    isDrag = true;
+    dragNode.x = (e.offsetX - panX) / scale;
+    dragNode.y = (e.offsetY - panY) / scale;
+    dragNode.vx = 0; dragNode.vy = 0;
+    return;
+  }
+  if (panStart) {
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    return;
+  }
+  const n = getNodeAt(e.offsetX, e.offsetY);
+  if (n) {
+    const nb = edges.filter(ed => ed.source === n.idx || ed.target === n.idx).length;
+    tooltip.innerHTML = `<strong>${n.title}</strong><br>状況: ${n.status} | 担当: ${n.assignee}<br>接続: ${nb}ノード`;
+    tooltip.style.opacity = '1';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY - 8) + 'px';
+  } else {
+    tooltip.style.opacity = '0';
+  }
+});
+
+canvasWrap.addEventListener('mouseup', e => {
+  if (dragNode && !isDrag) {
+    selectedNode = (selectedNode && selectedNode.idx === dragNode.idx) ? null : dragNode;
+    updateDetail();
+    updateBugList();
+  }
+  dragNode = null; panStart = null;
+});
+
+canvasWrap.addEventListener('mouseleave', () => {
+  tooltip.style.opacity = '0';
+  dragNode = null; panStart = null;
+});
+
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  scale = Math.max(0.3, Math.min(4, scale * (e.deltaY > 0 ? 0.9 : 1.11)));
+}, { passive: false });
+
+// Zoom buttons
+document.getElementById('zoomIn').addEventListener('click', () => { scale = Math.min(4, scale * 1.2); });
+document.getElementById('zoomOut').addEventListener('click', () => { scale = Math.max(0.3, scale * 0.83); });
+document.getElementById('zoomFit').addEventListener('click', fitView);
+document.getElementById('resetViewBtn').addEventListener('click', () => {
+  panX = 0; panY = 0; scale = 1; simStep = 0; initPositions();
+});
+
+function fitView() {
+  if (!nodes.length) return;
+  const wrap = document.getElementById('canvasWrap');
+  const W = wrap.offsetWidth, H = wrap.offsetHeight;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
+    minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+  });
+  const pad = 60;
+  const scaleX = (W - pad*2) / (maxX - minX || 1);
+  const scaleY = (H - pad*2) / (maxY - minY || 1);
+  scale = Math.min(scaleX, scaleY, 2);
+  panX = W/2 - ((minX + maxX)/2) * scale;
+  panY = H/2 - ((minY + maxY)/2) * scale;
+}
+
+// ── UI Updates ──
+function updateDetail() {
+  const panel = document.getElementById('detailPanel');
+  if (!selectedNode) {
+    panel.innerHTML = '<div class="detail-empty">ノードをクリックすると<br>詳細情報が表示されます</div>';
+    return;
+  }
+  const n = selectedNode;
+  const neighbors = edges
+    .filter(e => e.source === n.idx || e.target === n.idx)
+    .map(e => {
+      const oid = e.source === n.idx ? e.target : e.source;
+      return { node: nodes[oid], weight: e.weight };
+    })
+    .sort((a, b) => b.weight - a.weight);
+
+  const statusCls = 'badge badge-status-' + (n.status || '不明');
+
+  panel.innerHTML = `
+    <div class="detail-title">${n.title}</div>
+    <div class="detail-meta">
+      <span class="${statusCls}">${n.status}</span>
+      <span class="badge badge-cat">${n.catLabel}</span>
+      <span class="badge badge-cat">担当: ${n.assignee}</span>
+    </div>
+    ${n.cause ? `<div class="detail-body">起因: ${n.cause}</div>` : ''}
+    ${n.root ? `<div class="detail-body" style="font-size:11px;">${n.root}</div>` : ''}
+    ${neighbors.length ? `
+      <div class="related-title" style="margin-top:8px;">関連バグ (${neighbors.length}件)</div>
+      <div class="related-tags">
+        ${neighbors.slice(0, 8).map(nb =>
+          `<span class="related-tag" data-idx="${nb.node.idx}" title="${nb.node.title}">${nb.node.short}</span>`
+        ).join('')}
+      </div>` : ''}
+  `;
+
+  panel.querySelectorAll('.related-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      const idx = parseInt(tag.dataset.idx);
+      selectedNode = nodes[idx];
+      updateDetail();
+      updateBugList();
+    });
+  });
+}
+
+function updateBugList() {
+  const search = filterText.toLowerCase();
+  const list = document.getElementById('bugList');
+  const visible = bugs.filter(b =>
+    activeCategories.has(b.cat) &&
+    (!search || b.title.toLowerCase().includes(search) || b.assignee.toLowerCase().includes(search))
+  );
+
+  list.innerHTML = visible.map(b => {
+    const matched = nodes.find(n => n.id === b.id);
+    const isSelected = selectedNode && selectedNode.id === b.id;
+    return `<div class="bug-item ${isSelected ? 'selected' : ''}" data-id="${b.id}">
+      <div class="bug-item-dot" style="background:${b.catColor}"></div>
+      <div class="bug-item-name" title="${b.title}">${b.short}</div>
+      <div class="bug-item-id">#${b.id}</div>
+      <div class="bug-item-status">${b.status}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.bug-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = parseInt(item.dataset.id);
+      const n = nodes.find(n => n.id === id);
+      if (n) {
+        selectedNode = (selectedNode && selectedNode.id === id) ? null : n;
+        updateDetail();
+        updateBugList();
+        if (selectedNode) {
+          panX = canvasWrap.offsetWidth / 2 - n.x * scale;
+          panY = canvasWrap.offsetHeight / 2 - n.y * scale;
+        }
+      }
+    });
+  });
+}
+
+function updateStats() {
+  const bar = document.getElementById('statsBar');
+  if (!bugs.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const counts = {};
+  bugs.forEach(b => { counts[b.status] = (counts[b.status] || 0) + 1; });
+  bar.innerHTML = `<div class="stat-chip"><span class="dot" style="background:var(--ink)"></span>${bugs.length}件</div>` +
+    Object.entries(counts).map(([s, c]) =>
+      `<div class="stat-chip"><span class="dot" style="background:${STATUS_COLORS[s] || '#999'}"></span>${s} ${c}</div>`
+    ).join('');
+}
+
+function updateLegend() {
+  const grid = document.getElementById('legendGrid');
+  grid.innerHTML = CAT_RULES.map(r => {
+    const cnt = bugs.filter(b => b.cat === r.key).length;
+    if (!cnt) return '';
+    return `<div class="legend-item ${activeCategories.has(r.key) ? '' : 'inactive'}" data-cat="${r.key}">
+      <div class="legend-dot" style="background:${r.color}"></div>
+      <span>${r.label} (${cnt})</span>
+    </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.legend-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const cat = item.dataset.cat;
+      if (activeCategories.has(cat)) activeCategories.delete(cat);
+      else activeCategories.add(cat);
+      buildGraph();
+      updateLegend();
+      updateBugList();
+      selectedNode = null;
+      updateDetail();
+    });
+  });
+}
+
+function updateAssigneeOptions() {
+  const sel = document.getElementById('assigneeSel');
+  const assignees = [...new Set(bugs.map(b => b.assignee).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">全員</option>' +
+    assignees.map(a => `<option value="${a}">${a}</option>`).join('');
+}
+
+function refresh() {
+  buildGraph();
+  updateStats();
+  updateLegend();
+  updateBugList();
+  selectedNode = null;
+  updateDetail();
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+// ── File load ──
+document.getElementById('fileInput').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const parsed = parseExcel(e.target.result);
+    if (!parsed || !parsed.length) { alert('バグデータが見つかりませんでした。\n「バグ」シートに正しいデータが入っているか確認してください。'); return; }
+    bugs = parsed;
+    updateAssigneeOptions();
+    refresh();
+  };
+  reader.readAsBinaryString(file);
+  this.value = '';
+});
+
+// ── Controls ──
+document.getElementById('thresholdSel').addEventListener('change', () => { if (bugs.length) refresh(); });
+document.getElementById('assigneeSel').addEventListener('change', () => { if (bugs.length) refresh(); });
+document.getElementById('searchInput').addEventListener('input', function () {
+  filterText = this.value;
+  updateBugList();
+});
+
+// ── Start ──
+loop();
+</script>
+</body>
+</html>

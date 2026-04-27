@@ -596,87 +596,10 @@
   }
 
   // ======= キーワード関連図機能 =======
-  
-  // AG3セルから関連図設定を読み込む
-  async function getRelationConfig() {
-    if (!state.inOffice) {
-      // デモモード用のデフォルト設定
-      return {
-        targetColumns: ['ID', 'タイトル', '登録者', '発生起因', '原因', '影響範囲', '対応内容'],
-        columnIndexes: [0, 1, 2, 3, 4, 5, 6] // デモ用のインデックス
-      };
-    }
-
-    try {
-      return await Excel.run(async (ctx) => {
-        const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-        
-        // AG3セルから関連図設定を取得
-        const relationCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 32, 1, 1); // AG3 (32番目の列)
-        relationCell.load(['values']);
-        
-        // 2行目（ヘッダー行）を取得
-        const headerRange = sheet.getRangeByIndexes(1, 0, 1, 50); // 2行目の最初の50列
-        headerRange.load(['values']);
-        
-        await ctx.sync();
-        
-        const relationValue = relationCell.values[0][0];
-        console.log('AG3関連図設定値:', relationValue);
-        
-        if (!relationValue || typeof relationValue !== 'string') {
-          // デフォルト設定
-          return {
-            targetColumns: ['ID', 'タイトル', '登録者', '発生起因'],
-            columnIndexes: [0, 1, 2, 3]
-          };
-        }
-        
-        // AG3セルの値を解析（/区切りの列名として解釈）
-        const targetColumnNames = relationValue
-          .split('/')
-          .map(col => col.trim())
-          .filter(col => col.length > 0);
-        
-        console.log('対象列名:', targetColumnNames);
-        
-        // ヘッダー行から該当列のインデックスを検索
-        const headerRow = headerRange.values[0];
-        const columnIndexes = [];
-        const foundColumns = [];
-        
-        targetColumnNames.forEach(targetCol => {
-          const index = headerRow.findIndex(header => 
-            header && header.toString().trim() === targetCol
-          );
-          if (index !== -1) {
-            columnIndexes.push(index);
-            foundColumns.push(targetCol);
-            console.log(`列「${targetCol}」をインデックス${index}で発見`);
-          } else {
-            console.warn(`列「${targetCol}」が見つかりません`);
-          }
-        });
-        
-        return {
-          targetColumns: foundColumns.length > 0 ? foundColumns : ['ID', 'タイトル'],
-          columnIndexes: columnIndexes.length > 0 ? columnIndexes : [0, 1]
-        };
-      });
-    } catch (error) {
-      console.error('関連図設定取得エラー:', error);
-      // エラー時はデフォルト設定
-      return {
-        targetColumns: ['ID', 'タイトル', '登録者'],
-        columnIndexes: [0, 1, 2]
-      };
-    }
-  }
-
   function openKeywordNetworkWindow() {
     // 新しいウィンドウでキーワード関連図を開く
     const networkWindow = window.open(
-      'keyword-network.html',
+      'bug-network-tool.html',
       'KeywordNetwork',
       'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes'
     );
@@ -686,17 +609,9 @@
       return;
     }
     
-    // ウィンドウが読み込まれたらデータを送信
+    // ウィンドウが読み込まれたらバグデータを送信
     networkWindow.addEventListener('load', () => {
-      setTimeout(async () => {
-        // 関連図設定を取得して送信
-        const relationConfig = await getRelationConfig();
-        networkWindow.postMessage({
-          type: 'RELATION_CONFIG_DATA',
-          config: relationConfig
-        }, window.location.origin);
-        
-        // バグデータも送信
+      setTimeout(() => {
         networkWindow.postMessage({
           type: 'BUG_DATA',
           bugs: state.bugs
@@ -706,20 +621,11 @@
     
     // データリクエストへの対応
     window.addEventListener('message', function(event) {
-      if (event.source !== networkWindow) return;
-      
-      if (event.data.type === 'REQUEST_BUG_DATA') {
+      if (event.source === networkWindow && event.data.type === 'REQUEST_BUG_DATA') {
         networkWindow.postMessage({
           type: 'BUG_DATA',
           bugs: state.bugs
         }, window.location.origin);
-      } else if (event.data.type === 'REQUEST_RELATION_CONFIG') {
-        getRelationConfig().then(config => {
-          networkWindow.postMessage({
-            type: 'RELATION_CONFIG_DATA',
-            config: config
-          }, window.location.origin);
-        });
       }
     });
   }

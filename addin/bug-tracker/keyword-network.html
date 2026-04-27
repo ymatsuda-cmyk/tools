@@ -496,16 +496,15 @@ const CLUSTER_COLORS = ['#c0392b','#1a6bb5','#c47a1a','#1a7a4a','#7a7470','#9996
 const CLUSTER_NAMES = ['UI関連','RPA関連','通信関連','データ関連','ステータス','その他'];
 
 // ======= Build graph from bug data =======
-function buildGraphFromBugData(bugData, relationConfig = null) {
+function buildGraphFromBugData(bugData) {
   console.log('Building graph from bug data:', bugData);
-  console.log('Relation config (AG3):', relationConfig);
   
-  // Extract keywords from bug data based on relation config
+  // Extract keywords from bug data
   const keywordFreq = {};
   const cooccurrences = {};
   
   bugData.forEach(bug => {
-    const keywords = extractKeywords(bug, relationConfig);
+    const keywords = extractKeywords(bug);
     
     // Count keyword frequency
     keywords.forEach(kw => {
@@ -568,80 +567,9 @@ function buildGraphFromBugData(bugData, relationConfig = null) {
   document.getElementById('empty').style.display = 'none';
 }
 
-function extractKeywords(bug, relationConfig = null) {
+function extractKeywords(bug) {
   const keywords = [];
   
-  // AG3設定がある場合は指定された列インデックスを対象とする
-  if (relationConfig && relationConfig.columnIndexes && relationConfig.targetColumns) {
-    console.log('Using AG3 relation config:', relationConfig.targetColumns);
-    
-    relationConfig.columnIndexes.forEach((columnIndex, i) => {
-      const columnName = relationConfig.targetColumns[i];
-      let value = '';
-      
-      // 列インデックスに基づいてデータを取得
-      if (Array.isArray(bug.data) && bug.data[columnIndex]) {
-        value = bug.data[columnIndex].toString();
-      } else {
-        // フォールバック: 従来のフィールド名での取得
-        switch(columnName) {
-          case 'ID':
-          case 'id':
-            value = bug.id || bug.ID || '';
-            break;
-          case 'タイトル':
-          case 'title':
-            value = bug.title || '';
-            break;
-          case '登録者':
-          case 'assignee':
-            value = bug.assignee || '';
-            break;
-          case '発生起因':
-          case 'origin':
-            value = bug.origin || '';
-            break;
-          case '原因':
-          case 'cause':
-            value = bug.cause || '';
-            break;
-          case '影響範囲':
-          case 'impact':
-            value = bug.impact || '';
-            break;
-          case '対応内容':
-          case 'solution':
-            value = bug.solution || '';
-            break;
-          default:
-            value = bug[columnName] || '';
-        }
-      }
-      
-      if (value && value.toString().trim().length > 0) {
-        const cleanValue = value.toString().trim();
-        
-        // タイトル系の列は単語分割
-        if (columnName.includes('タイトル') || columnName.toLowerCase().includes('title')) {
-          const titleWords = cleanValue
-            .split(/[\s　、，,\(\)（）【】\[\]「」『』]+/)
-            .filter(w => w.length >= 2 && !/^\d+$/.test(w));
-          keywords.push(...titleWords);
-        } else {
-          // その他の列は値をそのまま使用
-          if (columnName.includes('発生起因') || columnName.toLowerCase().includes('origin')) {
-            keywords.push(cleanValue.replace(/\(.*\)/, '').trim()); // 括弧内を除去
-          } else {
-            keywords.push(cleanValue);
-          }
-        }
-      }
-    });
-    
-    return keywords.filter(kw => kw && kw.length > 0);
-  }
-  
-  // 従来の自動抽出ロジック（AG3設定がない場合）
   // Extract from title (split by common delimiters)
   if (bug.title) {
     const titleWords = bug.title
@@ -1040,33 +968,20 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 });
 
 // ======= Data receiving from parent window =======
-let currentRelationConfig = null; // Store AG3 relation config
-
 window.addEventListener('message', function(event) {
   if (event.origin !== window.location.origin) return;
   
   if (event.data.type === 'BUG_DATA') {
     console.log('Received bug data:', event.data.bugs);
     window.bugData = event.data.bugs;
-    
-    // Use stored relation config if available
-    buildGraphFromBugData(event.data.bugs, currentRelationConfig);
-  } else if (event.data.type === 'RELATION_CONFIG_DATA') {
-    console.log('Received AG3 relation config:', event.data.config);
-    currentRelationConfig = event.data.config;
-    
-    // If we already have bug data, rebuild the graph with new config
-    if (window.bugData) {
-      buildGraphFromBugData(window.bugData, currentRelationConfig);
-    }
+    buildGraphFromBugData(event.data.bugs);
   }
 });
 
 // ======= Initialization =======
 function init() {
-  // Request relation config and bug data from parent if opened in popup
+  // Request bug data from parent if opened in popup
   if (window.opener) {
-    window.opener.postMessage({ type: 'REQUEST_RELATION_CONFIG' }, window.location.origin);
     window.opener.postMessage({ type: 'REQUEST_BUG_DATA' }, window.location.origin);
   }
   
