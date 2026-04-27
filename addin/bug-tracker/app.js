@@ -404,11 +404,14 @@
 
     const bugs = sortByPriority(applyFilters(state.bugs));
     
+    // 修正Verが設定されているバグのみを対象にする
+    const bugsWithFixVer = bugs.filter(b => b.fixVer && b.fixVer.trim() !== '');
+    
     // バージョン別にグループ化
     const versionGroups = new Map();
     
-    bugs.forEach(b => {
-      const version = b.fixVer || '未設定';
+    bugsWithFixVer.forEach(b => {
+      const version = b.fixVer;
       if (!versionGroups.has(version)) {
         versionGroups.set(version, []);
       }
@@ -417,10 +420,6 @@
     
     // バージョンを降順でソート（Rev.X.Yの形式を考慮）
     const sortedVersions = Array.from(versionGroups.keys()).sort((a, b) => {
-      // '未設定'は最後に表示
-      if (a === '未設定') return 1;
-      if (b === '未設定') return -1;
-      
       // Rev.X.Y形式の場合、数値で比較
       const aMatch = a.match(/Rev\.(\d+)\.(\d+)/);
       const bMatch = b.match(/Rev\.(\d+)\.(\d+)/);
