@@ -16,6 +16,7 @@
       <div class="view-switch" role="tablist">
         <button id="btn-view-status"   class="view-btn active" role="tab">バグ状況</button>
         <button id="btn-view-assignee" class="view-btn"        role="tab">割り当て</button>
+        <button id="btn-view-version"  class="view-btn"        role="tab">リリース</button>
         <button id="btn-view-trend"    class="view-btn"        role="tab">推移</button>
       </div>
 
@@ -51,6 +52,10 @@
 
     <section id="view-assignee" class="view">
       <div id="kanban-board-assignee" class="kanban-board"></div>
+    </section>
+
+    <section id="view-version" class="view">
+      <div id="kanban-board-version" class="kanban-board version-kanban"></div>
     </section>
 
     <section id="view-trend" class="view">

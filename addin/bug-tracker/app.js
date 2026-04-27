@@ -398,6 +398,116 @@
     $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
   }
 
+  function renderKanbanVersion() {
+    const board = $('#kanban-board-version');
+    board.innerHTML = '';
+
+    const bugs = sortByPriority(applyFilters(state.bugs));
+    
+    // バージョン別にグループ化
+    const versionGroups = new Map();
+    
+    bugs.forEach(b => {
+      const version = b.fixVer || '未設定';
+      if (!versionGroups.has(version)) {
+        versionGroups.set(version, []);
+      }
+      versionGroups.get(version).push(b);
+    });
+    
+    // バージョンを降順でソート（Rev.X.Yの形式を考慮）
+    const sortedVersions = Array.from(versionGroups.keys()).sort((a, b) => {
+      // '未設定'は最後に表示
+      if (a === '未設定') return 1;
+      if (b === '未設定') return -1;
+      
+      // Rev.X.Y形式の場合、数値で比較
+      const aMatch = a.match(/Rev\.(\d+)\.(\d+)/);
+      const bMatch = b.match(/Rev\.(\d+)\.(\d+)/);
+      
+      if (aMatch && bMatch) {
+        const aMajor = parseInt(aMatch[1]);
+        const aMinor = parseInt(aMatch[2]);
+        const bMajor = parseInt(bMatch[1]);
+        const bMinor = parseInt(bMatch[2]);
+        
+        if (aMajor !== bMajor) {
+          return bMajor - aMajor; // メジャーバージョン降順
+        }
+        return bMinor - aMinor; // マイナーバージョン降順
+      }
+      
+      // その他の場合は文字列で降順ソート
+      return b.localeCompare(a);
+    });
+    
+    // 各バージョンの列を作成
+    sortedVersions.forEach(version => {
+      const items = versionGroups.get(version);
+      const col = el('div', { class: 'kanban-col version-col' });
+      col.dataset.version = version;
+      
+      const header = el('div', { class: 'kanban-col-header version-header' }, [
+        el('span', { class: 'version-title', text: version }),
+        el('span', { class: 'count', text: `${items.length}件` })
+      ]);
+      
+      const body = el('div', { class: 'kanban-col-body' });
+      
+      items.forEach(bug => {
+        // バグカードを作成（修正対象も表示）
+        const card = el('div', { 
+          class: 'kanban-card version-card', 
+          'data-id': bug.id,
+          'data-row-index': bug.rowIndex 
+        });
+        
+        // バグID
+        const idElement = el('div', { 
+          class: 'bug-id', 
+          text: `#${String(bug.id).padStart(3, '0')}`,
+          style: 'font-weight:bold;color:#007acc;margin-bottom:4px;'
+        });
+        
+        // タイトル
+        const titleElement = el('div', { 
+          class: 'bug-title', 
+          text: bug.title || '(タイトルなし)',
+          style: 'margin-bottom:8px;font-size:14px;line-height:1.3;'
+        });
+        
+        // 修正対象
+        const scopeElement = el('div', { 
+          class: 'bug-scope',
+          style: 'background:#f0f8ff;padding:4px 8px;border-radius:4px;font-size:12px;color:#333;'
+        });
+        
+        if (bug.scope && bug.scope.trim() !== '') {
+          scopeElement.textContent = `修正対象: ${bug.scope}`;
+        } else {
+          scopeElement.textContent = '修正対象: 未設定';
+          scopeElement.style.background = '#fff0f0';
+          scopeElement.style.color = '#999';
+        }
+        
+        card.appendChild(idElement);
+        card.appendChild(titleElement);
+        card.appendChild(scopeElement);
+        
+        // クリックイベント
+        card.addEventListener('click', () => openModal(bug.rowIndex));
+        
+        body.appendChild(card);
+      });
+      
+      col.appendChild(header);
+      col.appendChild(body);
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
   // 推移グラフ表示
   let trendChart = null;
   
@@ -2839,14 +2949,17 @@
     state.view = v;
     $('#btn-view-assignee').classList.toggle('active', v === 'assignee');
     $('#btn-view-status').classList.toggle('active',   v === 'status');
+    $('#btn-view-version').classList.toggle('active',  v === 'version');
     $('#btn-view-trend').classList.toggle('active',   v === 'trend');
     $('#view-assignee').classList.toggle('active', v === 'assignee');
     $('#view-status').classList.toggle('active',   v === 'status');
+    $('#view-version').classList.toggle('active',  v === 'version');
     $('#view-trend').classList.toggle('active',   v === 'trend');
     render();
   }
   function render() {
     if (state.view === 'assignee') renderKanbanAssignee();
+    else if (state.view === 'version') renderKanbanVersion();
     else if (state.view === 'trend') renderTrend();
     else renderKanbanStatus();
   }
@@ -2871,6 +2984,7 @@
   function bindEvents() {
     $('#btn-view-assignee').addEventListener('click', () => setView('assignee'));
     $('#btn-view-status').addEventListener('click',   () => setView('status'));
+    $('#btn-view-version').addEventListener('click',  () => setView('version'));
     $('#btn-view-trend').addEventListener('click',   () => setView('trend'));
     $('#btn-add-new').addEventListener('click', () => openNewBugModal());
     $('#btn-reload').addEventListener('click', async () => {
