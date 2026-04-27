@@ -959,8 +959,8 @@
     const tabNames = [
       { key: 'jisho', label: '事象' },
       { key: 'kaiseki', label: '解析' },
-      { key: 'shochi', label: '処置' },
-      { key: 'kekka', label: '結果確認' },
+      { key: 'shochi', label: '修正' },
+      { key: 'kekka', label: '確認' },
       { key: 'kanri', label: '管理' }
     ];
     // 状況に応じた初期タブ
@@ -1518,7 +1518,7 @@
         // 下部：修正Ver、処置完了チェック
         tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
           (() => {
-            const input = el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' });
+            const input = el('input', { type: 'text', style: 'width:98%;', placeholder: 'Rev.yyyymmdd　例）Rev.20260427', value: bug.fixVer || '', 'data-key': 'fixVer' });
             input.disabled = isDisabled.shochi; // 入力制御
             return input;
           })()]));
