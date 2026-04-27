@@ -1518,9 +1518,17 @@
         // 下部：修正Ver（シンプル表示）、処置完了チェック
         const versionContainer = el('div', {});
         
-        // ラベル行（修正Ver + ボタン）
-        const labelRow = el('div', { style: 'display:flex;align-items:center;gap:16px;margin-bottom:8px;' });
+        // ラベル行（修正Ver + 既存バージョンボタン + 新規ボタン）
+        const labelRow = el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;' });
         labelRow.appendChild(el('label', { text: '修正Ver', style: 'font-weight:bold;' }));
+        
+        // 既存バージョンボタン
+        const existingVersionButton = el('button', { 
+          type: 'button',
+          text: 'Rev.0.0',
+          id: 'existing-version-button',
+          style: 'padding:4px 12px;border:1px solid #28a745;background:#28a745;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
         
         // 新規バージョン作成ボタン
         const newVersionButton = el('button', { 
@@ -1531,11 +1539,15 @@
         });
         
         if (isDisabled.shochi) {
+          existingVersionButton.disabled = true;
+          existingVersionButton.style.opacity = '0.5';
+          existingVersionButton.style.cursor = 'not-allowed';
           newVersionButton.disabled = true;
           newVersionButton.style.opacity = '0.5';
           newVersionButton.style.cursor = 'not-allowed';
         }
         
+        labelRow.appendChild(existingVersionButton);
         labelRow.appendChild(newVersionButton);
         versionContainer.appendChild(labelRow);
         
@@ -1562,6 +1574,7 @@
         // バージョン情報を初期化する関数
         async function initializeVersionDisplay() {
           const textArea = document.querySelector('#version-display-text');
+          const existingButton = document.querySelector('#existing-version-button');
           const hiddenInput = document.querySelector('#fix-ver-hidden');
           
           try {
@@ -1582,14 +1595,19 @@
               
               const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
               
+              // 既存バージョンボタンのテキストを更新
+              if (existingButton) {
+                existingButton.textContent = currentVersion;
+              }
+              
               // テキストエリアに表示
               if (textArea) {
                 if (bug.fixVer && bug.fixVer.trim() !== '') {
                   // 既存バージョンがある場合
-                  textArea.value = `${bug.fixVer} （既存バージョン）`;
+                  textArea.value = `${bug.fixVer} （設定済み）`;
                 } else {
-                  // 既存バージョンがない場合は最新を表示
-                  textArea.value = `${currentVersion} （最新バージョン）`;
+                  // 既存バージョンがない場合は空にする
+                  textArea.value = 'バージョンを選択してください';
                 }
               }
               
@@ -1607,11 +1625,36 @@
             // エラー時のフォールバック表示
             if (textArea) {
               if (bug.fixVer && bug.fixVer.trim() !== '') {
-                textArea.value = `${bug.fixVer} （既存バージョン）`;
+                textArea.value = `${bug.fixVer} （設定済み）`;
               } else {
                 textArea.value = 'バージョン情報を取得できませんでした';
               }
             }
+          }
+        }
+        
+        // 既存バージョンを選択する関数
+        function selectExistingVersion() {
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          if (window.versionInfo) {
+            const existingVersion = window.versionInfo.current;
+            
+            // バグオブジェクトの修正Verを更新
+            bug.fixVer = existingVersion;
+            
+            // 隠し入力フィールドも更新
+            if (hiddenInput) {
+              hiddenInput.value = existingVersion;
+            }
+            
+            // テキストエリアの表示を更新
+            if (textArea) {
+              textArea.value = `${existingVersion} （既存バージョン）`;
+            }
+            
+            console.log(`既存バージョンを選択しました: ${existingVersion}`);
           }
         }
         
@@ -1620,6 +1663,7 @@
           const button = document.querySelector('#new-version-button');
           const textArea = document.querySelector('#version-display-text');
           const hiddenInput = document.querySelector('#fix-ver-hidden');
+          const existingButton = document.querySelector('#existing-version-button');
           
           if (button) {
             button.disabled = true;
@@ -1663,6 +1707,11 @@
                 textArea.value = `${newVersion} （新しいバージョン）`;
               }
               
+              // 既存バージョンボタンも更新
+              if (existingButton) {
+                existingButton.textContent = newVersion;
+              }
+              
               // グローバル変数を更新
               window.versionInfo = {
                 major: majorVersion,
@@ -1691,6 +1740,7 @@
         }
         
         // ボタンのイベントリスナー
+        existingVersionButton.addEventListener('click', selectExistingVersion);
         newVersionButton.addEventListener('click', createNewVersion);
         
         // 初期化を実行（DOM追加後）
@@ -2576,6 +2626,16 @@
       const selectedRadio = $('#modal-body').querySelector('input[type="radio"]:checked');
       const isComplete = selectedRadio && selectedRadio.value === 'complete';
       const isReject = selectedRadio && selectedRadio.value === 'reject';
+      
+      // 修正Verのテキストエリアから値を取得して設定
+      const versionTextArea = $('#modal-body').querySelector('#version-display-text');
+      if (versionTextArea && versionTextArea.value && versionTextArea.value.trim() !== '' && versionTextArea.value !== 'バージョンを選択してください') {
+        // テキストエリアからバージョン番号を抽出（Rev.x.x部分のみ）
+        const versionMatch = versionTextArea.value.match(/Rev\.\d+\.\d+/);
+        if (versionMatch) {
+          bug.fixVer = versionMatch[0];
+        }
+      }
       
       $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
         const k = inp.dataset.key;
