@@ -55,8 +55,8 @@ function dateStr(v) {
 }
 
 function extractBugIds(text) {
-  // "バ9,バ16（済）,バ17" → [{id:"バ9",resolved:false},{id:"バ16",resolved:true},...]
-  const matches = text.match(/バ\d+(?:（済）)?/g) || [];
+  // "バ9,課16（済）,バ17" → [{id:"バ9",resolved:false},{id:"課16",resolved:true},...]
+  const matches = text.match(/[バ課]\d+(?:（済）)?/g) || [];
   return matches.map(m => ({
     id: m.replace("（済）", ""),
     resolved: m.includes("（済）"),
@@ -218,9 +218,17 @@ async function readWorkbook(context) {
   // bugMapをbugDataに変換
   const bugData = Object.values(bugMap)
     .sort((a, b) => {
-      const na = parseInt(a.id.replace("バ", ""));
-      const nb = parseInt(b.id.replace("バ", ""));
-      return na - nb;
+      const getPrefix = (id) => id.charAt(0); // 「バ」または「課」
+      const getNumber = (id) => parseInt(id.slice(1));
+      
+      const prefixA = getPrefix(a.id);
+      const prefixB = getPrefix(b.id);
+      
+      // 同じプリフィックスなら番号で比較、異なるならプリフィックスで比較
+      if (prefixA === prefixB) {
+        return getNumber(a.id) - getNumber(b.id);
+      }
+      return prefixA.localeCompare(prefixB);
     })
     .map(b => ({
       id: b.id,
@@ -272,26 +280,32 @@ async function writeBugResolution(context, bugId, resolved, scenarios) {
         let newVal = cellVal;
         if (resolved) {
           // バ9 → バ9（済）  ※すでに（済）がついている場合はそのまま
-          // カンマ区切りで分割して個別に処理
-          const parts = cellVal.split(',').map(part => {
+          // カンマ・読点・スペース区切りで分割して個別に処理
+          const parts = cellVal.split(/[,、\s]+/).map(part => {
             const trimmed = part.trim();
             if (trimmed === bugId && !trimmed.includes('（済）')) {
               return bugId + '（済）';
             }
-            return part;
-          });
-          newVal = parts.join(',');
+            return trimmed;
+          }).filter(part => part); // 空文字を除去
+          
+          // 元の区切り文字を保持（全角読点があれば全角、なければ半角カンマ）
+          const separator = cellVal.includes('、') ? '、' : ',';
+          newVal = parts.join(separator);
         } else {
           // バ9（済） → バ9  
-          // カンマ区切りで分割して個別に処理
-          const parts = cellVal.split(',').map(part => {
+          // カンマ・読点・スペース区切りで分割して個別に処理
+          const parts = cellVal.split(/[,、\s]+/).map(part => {
             const trimmed = part.trim();
             if (trimmed === bugId + '（済）') {
               return bugId;
             }
-            return part;
-          });
-          newVal = parts.join(',');
+            return trimmed;
+          }).filter(part => part); // 空文字を除去
+          
+          // 元の区切り文字を保持（全角読点があれば全角、なければ半角カンマ）
+          const separator = cellVal.includes('、') ? '、' : ',';
+          newVal = parts.join(separator);
         }
 
         if (newVal !== cellVal) {
