@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --ink: #1c1a16;
+    --ink2: #5a5650;
+    --ink3: #999690;
+    --rule: #e0dcd4;
+    --accent: #1c1a16;
+
+    --cat-rpa: #c0392b;
+    --cat-expected: #1a6bb5;
+    --cat-edy: #c47a1a;
+    --cat-app: #1a7a4a;
+    --cat-other: #7a7470;
+
+    --status-new: #c0392b;
+    --status-analysis: #c47a1a;
+    --status-fix: #1a6bb5;
+    --status-check: #1a7a4a;
+    --status-done: #999690;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  /* Header */
+  header {
+    padding: 20px 32px 16px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .header-left { flex: 1; min-width: 200px; }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--surface2);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    color: var(--bg);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(240, 237, 230, 0.9);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 8px 14px;
+  }
+
+  .ctrl-group label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .ctrl-group input[type=range] { 
+    width: 90px; 
+    accent-color: var(--cat-rpa);
+    background: var(--rule);
+  }
+
+  .ctrl-group select {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    color: var(--ink);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .mono-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink2);
+    min-width: 30px;
+    text-align: center;
+  }
+
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--surface);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn:hover {
+    background: var(--cat-rpa);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+  .btn-ghost:hover { 
+    background: var(--cat-rpa); 
+    color: var(--surface);
+  }
+
+  /* Main area */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    overflow: hidden;
+  }
+
+  /* Canvas */
+  #canvas-wrap {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    cursor: grab;
+  }
+  #canvas-wrap:active { cursor: grabbing; }
+
+  #graph-canvas {
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed;
+    background: var(--ink);
+    color: var(--bg);
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    font-family: 'IBM Plex Mono', monospace;
+    max-width: 220px;
+    line-height: 1.5;
+    box-shadow: 0 4px 16px rgba(28, 26, 22, 0.3);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-left: 2px solid var(--ink);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .sidebar-section { margin-bottom: 24px; }
+
+  .sidebar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--ink3);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+
+  .legend-item:hover {
+    background: var(--surface2);
+  }
+
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid var(--rule);
+  }
+
+  .node-list { max-height: 350px; overflow-y: auto; }
+
+  .node-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+
+  .node-item:hover { 
+    background: var(--surface2);
+    color: var(--cat-rpa);
+  }
+  .node-item .cnt { 
+    font-family: 'IBM Plex Mono', monospace; 
+    font-size: 11px; 
+    color: var(--ink3); 
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  .selected-info {
+    background: var(--surface2);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    min-height: 80px;
+  }
+
+  .selected-info .kw-name {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--cat-rpa);
+  }
+
+  .selected-info .kw-stat {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink3);
+    margin-bottom: 8px;
+  }
+
+  .related-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .tag {
+    background: var(--cat-rpa);
+    color: var(--surface);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Empty state */
+  #empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--ink3);
+    font-size: 16px;
+  }
+
+  #empty .big { 
+    font-size: 64px; 
+    opacity: 0.7;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .loading { 
+    animation: spin 1s linear infinite; 
+    display: inline-block; 
+  }
+
+  /* Scrollbar styling */
+  .sidebar::-webkit-scrollbar,
+  .node-list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar::-webkit-scrollbar-track,
+  .node-list::-webkit-scrollbar-track {
+    background: var(--surface);
+  }
+
+  .sidebar::-webkit-scrollbar-thumb,
+  .node-list::-webkit-scrollbar-thumb {
+    background: var(--rule);
+    border-radius: 3px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb:hover,
+  .node-list::-webkit-scrollbar-thumb:hover {
+    background: var(--ink3);
+  }
+
+  /* Stats panel */
+  .stats-panel {
+    background: var(--surface2);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .stat-item {
+    background: var(--surface);
+    padding: 8px;
+    border-radius: 6px;
+  }
+
+  .stat-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--cat-rpa);
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--ink3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-left">
+    </div>
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>閾値</label>
+        <input type="range" id="threshold" min="1" max="10" value="2">
+        <span class="mono-val" id="thresholdVal">2</span>
+        <label>回以上の共起</label>
+      </div>
+      <div class="ctrl-group">
+        <label>ノード数</label>
+        <input type="range" id="maxNodes" min="5" max="30" value="20">
+        <span class="mono-val" id="maxNodesVal">20</span>
+      </div>
+      <div class="ctrl-group">
+        <label>レイアウト</label>
+        <select id="layout">
+          <option value="force">Force-directed</option>
+          <option value="radial">Radial</option>
+          <option value="cluster">クラスター</option>
+        </select>
+      </div>
+      <button class="btn" id="resetBtn">↺ リセット</button>
+      <button class="btn btn-ghost" onclick="window.close()">✕ 閉じる</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="canvas-wrap">
+      <canvas id="graph-canvas"></canvas>
+      <div id="empty">
+        <div class="big">🔍</div>
+        <div>バグデータからキーワードを解析中...</div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="stats-panel">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value" id="totalNodes">0</div>
+              <div class="stat-label">Keywords</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="totalEdges">0</div>
+              <div class="stat-label">Relations</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">選択中</div>
+        <div class="selected-info" id="selectedInfo">
+          <div style="color:var(--ink3);font-size:12px;">ノードをクリックして詳細表示</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">カテゴリ凡例</div>
+        <div id="legend"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">キーワード一覧</div>
+        <div class="node-list" id="nodeList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ======= Graph State =======
+let nodes = [], edges = [], clusters = [];
+let selectedNode = null;
+let animFrame = null;
+let isDragging = false, dragNode = null;
+let panX = 0, panY = 0, panStart = null;
+let scale = 1;
+let simStep = 0;
+
+// ======= Bug Category Colors =======
+const CLUSTER_COLORS = ['#c0392b','#1a6bb5','#c47a1a','#1a7a4a','#7a7470','#999690'];
+const CLUSTER_NAMES = ['UI関連','RPA関連','通信関連','データ関連','ステータス','その他'];
+
+// ======= Build graph from bug data =======
+function buildGraphFromBugData(bugData) {
+  console.log('Building graph from bug data:', bugData);
+  
+  // Extract keywords from bug data
+  const keywordFreq = {};
+  const cooccurrences = {};
+  
+  bugData.forEach(bug => {
+    const keywords = extractKeywords(bug);
+    
+    // Count keyword frequency
+    keywords.forEach(kw => {
+      keywordFreq[kw] = (keywordFreq[kw] || 0) + 1;
+    });
+    
+    // Count co-occurrences
+    const uniqueKws = [...new Set(keywords)];
+    for (let i = 0; i < uniqueKws.length; i++) {
+      for (let j = i + 1; j < uniqueKws.length; j++) {
+        const pair = [uniqueKws[i], uniqueKws[j]].sort().join('|||');
+        cooccurrences[pair] = (cooccurrences[pair] || 0) + 1;
+      }
+    }
+  });
+
+  const threshold = parseInt(document.getElementById('threshold').value);
+  const maxNodes = parseInt(document.getElementById('maxNodes').value);
+
+  // Select top keywords
+  const topKeywords = Object.entries(keywordFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxNodes);
+
+  const kwSet = new Set(topKeywords.map(([kw]) => kw));
+
+  // Create nodes
+  nodes = topKeywords.map(([label, count], i) => ({
+    id: i, 
+    label, 
+    count,
+    x: 0, 
+    y: 0, 
+    vx: 0, 
+    vy: 0,
+    cluster: getKeywordCluster(label)
+  }));
+
+  const idOf = {};
+  nodes.forEach(n => { idOf[n.label] = n.id; });
+
+  // Create edges
+  edges = Object.entries(cooccurrences)
+    .filter(([key, cnt]) => cnt >= threshold)
+    .map(([key, cnt]) => {
+      const [a, b] = key.split('|||');
+      if (!kwSet.has(a) || !kwSet.has(b)) return null;
+      return { source: idOf[a], target: idOf[b], weight: cnt };
+    })
+    .filter(Boolean);
+
+  console.log(`Created ${nodes.length} nodes and ${edges.length} edges`);
+  
+  // Initialize positions and start simulation
+  initPositions();
+  updateSidebar();
+  updateStats();
+  
+  // Hide empty state
+  document.getElementById('empty').style.display = 'none';
+}
+
+function extractKeywords(bug) {
+  const keywords = [];
+  
+  // Extract from title (split by common delimiters)
+  if (bug.title) {
+    const titleWords = bug.title
+      .split(/[\s　、，,\(\)（）【】\[\]「」『』]+/)
+      .filter(w => w.length >= 2 && !/^\d+$/.test(w)); // Filter out pure numbers
+    keywords.push(...titleWords);
+  }
+  
+  // Extract from tags
+  if (bug.tag) {
+    const tagWords = bug.tag.split(/[\s　、，,]+/).filter(w => w.length >= 1);
+    keywords.push(...tagWords);
+  }
+  
+  // Add metadata as keywords
+  if (bug.priority) keywords.push(bug.priority);
+  if (bug.status) keywords.push(bug.status);
+  if (bug.severity) keywords.push(bug.severity);
+  if (bug.origin) keywords.push(bug.origin.replace(/\(.*\)/, '').trim()); // Remove parentheses
+  if (bug.assignee && bug.assignee !== '(未割当)') keywords.push(bug.assignee);
+  
+  // Add some derived keywords
+  if (bug.reproRate === '毎回') keywords.push('再現性高');
+  if (bug.reproRate === '1回のみ') keywords.push('再現性低');
+  if (bug.cause && bug.cause.length > 0) keywords.push('原因判明');
+  if (bug.fix && bug.fix.length > 0) keywords.push('対応済');
+  
+  return keywords.filter(kw => kw && kw.length > 0);
+}
+
+function getKeywordCluster(keyword) {
+  // UI関連
+  if (['UI', '画面', '表示', '文字', 'ログイン', 'TOP', '白', '崩れ', 'プレビュー', 'アップロード'].some(w => keyword.includes(w))) return 0;
+  
+  // RPA関連  
+  if (['RPA', '自動', '実行', 'スケジュール', 'Power', 'Automate', '停止', 'タイムアウト'].some(w => keyword.includes(w))) return 1;
+  
+  // 通信・接続関連
+  if (['通信', '接続', 'ネットワーク', 'データベース', 'タイムアウト', '断', '電源', '復旧'].some(w => keyword.includes(w))) return 2;
+  
+  // データ関連
+  if (['データ', 'ファイル', 'CSV', 'Excel', 'バックアップ', 'ログ', 'レシート', '読み', '出力', 'エンコード', 'UTF'].some(w => keyword.includes(w))) return 3;
+  
+  // ステータス・管理関連
+  if (['高', '中', '低', '新規', '完了', '解析', '修正', '確認', '再発', '致命的', '重大', '軽微', '優先', 'NG', '不正'].some(w => keyword.includes(w))) return 4;
+  
+  // その他
+  return 5;
+}
+
+// ======= Layout and positioning =======
+function initPositions() {
+  const layout = document.getElementById('layout').value;
+  const W = document.getElementById('canvas-wrap').offsetWidth;
+  const H = document.getElementById('canvas-wrap').offsetHeight;
+  const cx = W / 2, cy = H / 2;
+  const r = Math.min(W, H) * 0.35;
+
+  if (layout === 'radial') {
+    nodes.forEach((n, i) => {
+      const angle = (i / nodes.length) * Math.PI * 2;
+      n.x = cx + Math.cos(angle) * r;
+      n.y = cy + Math.sin(angle) * r;
+    });
+  } else if (layout === 'cluster') {
+    const clusterCenters = {};
+    const uniqueClusters = [...new Set(nodes.map(n => n.cluster))];
+    uniqueClusters.forEach((c, i) => {
+      const angle = (i / uniqueClusters.length) * Math.PI * 2;
+      clusterCenters[c] = { 
+        x: cx + Math.cos(angle) * r * 0.7, 
+        y: cy + Math.sin(angle) * r * 0.7 
+      };
+    });
+    nodes.forEach(n => {
+      const cc = clusterCenters[n.cluster];
+      n.x = cc.x + (Math.random() - 0.5) * 120;
+      n.y = cc.y + (Math.random() - 0.5) * 120;
+    });
+  } else {
+    // Force: random initialization
+    nodes.forEach(n => {
+      n.x = cx + (Math.random() - 0.5) * r * 1.5;
+      n.y = cy + (Math.random() - 0.5) * r * 1.5;
+    });
+  }
+  
+  nodes.forEach(n => { n.vx = 0; n.vy = 0; });
+  simStep = 0; // Reset simulation
+}
+
+// ======= Force simulation =======
+const MAX_SIM_STEPS = 300;
+
+function tick() {
+  const layout = document.getElementById('layout').value;
+  if (layout === 'force' && simStep < MAX_SIM_STEPS) {
+    applyForces();
+    simStep++;
+  }
+  draw();
+  animFrame = requestAnimationFrame(tick);
+}
+
+function applyForces() {
+  const W = document.getElementById('canvas-wrap').offsetWidth;
+  const H = document.getElementById('canvas-wrap').offsetHeight;
+  const cx = W / 2, cy = H / 2;
+  const alpha = Math.max(0.02, 1 - simStep / MAX_SIM_STEPS);
+
+  // Repulsion between nodes
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const force = (4000 / (dist * dist)) * alpha;
+      a.vx += dx / dist * force;
+      a.vy += dy / dist * force;
+      b.vx -= dx / dist * force;
+      b.vy -= dy / dist * force;
+    }
+  }
+
+  // Attraction along edges
+  edges.forEach(e => {
+    const a = nodes[e.source], b = nodes[e.target];
+    if (!a || !b) return;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const idealDist = 80 + 80 / Math.sqrt(e.weight || 1);
+    const force = (dist - idealDist) * 0.05 * alpha;
+    a.vx += dx / dist * force;
+    a.vy += dy / dist * force;
+    b.vx -= dx / dist * force;
+    b.vy -= dy / dist * force;
+  });
+
+  // Center gravity
+  nodes.forEach(n => {
+    if (n === dragNode) return;
+    n.vx += (cx - n.x) * 0.008 * alpha;
+    n.vy += (cy - n.y) * 0.008 * alpha;
+  });
+
+  // Integration with damping
+  nodes.forEach(n => {
+    if (n === dragNode) return;
+    n.vx *= 0.88;
+    n.vy *= 0.88;
+    n.x += n.vx;
+    n.y += n.vy;
+  });
+}
+
+// ======= Drawing =======
+function draw() {
+  const wrap = document.getElementById('canvas-wrap');
+  const canvas = document.getElementById('graph-canvas');
+  const W = wrap.offsetWidth, H = wrap.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
+
+  // Draw edges
+  edges.forEach(e => {
+    const a = nodes[e.source], b = nodes[e.target];
+    if (!a || !b) return;
+    const isHighlighted = selectedNode && (e.source === selectedNode.id || e.target === selectedNode.id);
+    
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = isHighlighted ? '#1c1a16' : 'rgba(28,26,22,0.15)';
+    ctx.lineWidth = isHighlighted ? Math.min(e.weight * 1.5, 5) : Math.min(e.weight * 0.8, 3);
+    ctx.stroke();
+
+    // Weight label on highlighted edges
+    if (isHighlighted && e.weight > 1) {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      ctx.fillStyle = '#5a5650';
+      ctx.font = '10px DM Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.weight, mx, my - 3);
+    }
+  });
+
+  // Draw nodes
+  const maxCount = Math.max(...nodes.map(n => n.count), 1);
+  nodes.forEach(n => {
+    const r = 10 + (n.count / maxCount) * 25;
+    const color = CLUSTER_COLORS[n.cluster % CLUSTER_COLORS.length];
+    const isSelected = selectedNode && selectedNode.id === n.id;
+    const isNeighbor = selectedNode && edges.some(e =>
+      (e.source === selectedNode.id && e.target === n.id) ||
+      (e.target === selectedNode.id && e.source === n.id)
+    );
+    const dimmed = selectedNode && !isSelected && !isNeighbor;
+
+    // Node circle
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = dimmed ? 'rgba(153,150,144,0.3)' : color;
+    ctx.fill();
+    ctx.strokeStyle = isSelected ? '#1c1a16' : (dimmed ? 'rgba(153,150,144,0.2)' : color);
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.stroke();
+
+    // Node label
+    ctx.fillStyle = dimmed ? 'rgba(153,150,144,0.4)' : '#1c1a16';
+    ctx.font = `${isSelected ? 'bold ' : ''}${Math.max(11, 10 + (n.count / maxCount) * 4)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Label background for readability
+    if (!dimmed) {
+      const textWidth = ctx.measureText(n.label).width;
+      ctx.fillStyle = 'rgba(247, 245, 240, 0.9)';
+      ctx.fillRect(n.x - textWidth / 2 - 4, n.y + r + 4, textWidth + 8, 16);
+      ctx.fillStyle = isSelected ? '#1c1a16' : '#5a5650';
+    }
+    ctx.fillText(n.label, n.x, n.y + r + 12);
+  });
+
+  ctx.restore();
+}
+
+// ======= UI Updates =======
+function updateSidebar() {
+  // Update legend
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  const usedClusters = [...new Set(nodes.map(n => n.cluster))].sort();
+  usedClusters.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const count = nodes.filter(n => n.cluster === c).length;
+    item.innerHTML = `<div class="legend-dot" style="background:${CLUSTER_COLORS[c]}"></div><span>${CLUSTER_NAMES[c]} (${count})</span>`;
+    legend.appendChild(item);
+  });
+
+  // Update node list
+  const list = document.getElementById('nodeList');
+  list.innerHTML = '';
+  [...nodes].sort((a, b) => b.count - a.count).forEach(n => {
+    const item = document.createElement('div');
+    item.className = 'node-item';
+    item.innerHTML = `<span>${n.label}</span><span class="cnt">${n.count}</span>`;
+    item.addEventListener('click', () => selectNode(n));
+    list.appendChild(item);
+  });
+}
+
+function updateStats() {
+  document.getElementById('totalNodes').textContent = nodes.length;
+  document.getElementById('totalEdges').textContent = edges.length;
+}
+
+function selectNode(n) {
+  selectedNode = (selectedNode && selectedNode.id === n.id) ? null : n;
+  updateSelectedInfo();
+}
+
+function updateSelectedInfo() {
+  const info = document.getElementById('selectedInfo');
+  if (!selectedNode) {
+    info.innerHTML = '<div style="color:var(--ink3);font-size:12px;">ノードをクリックして詳細表示</div>';
+    return;
+  }
+  
+  const n = selectedNode;
+  const neighbors = edges
+    .filter(e => e.source === n.id || e.target === n.id)
+    .map(e => {
+      const otherId = e.source === n.id ? e.target : e.source;
+      return { label: nodes[otherId]?.label, weight: e.weight };
+    })
+    .filter(x => x.label)
+    .sort((a, b) => b.weight - a.weight);
+
+  info.innerHTML = `
+    <div class="kw-name">${n.label}</div>
+    <div class="kw-stat">出現回数: ${n.count} ／ カテゴリ: ${CLUSTER_NAMES[n.cluster]}</div>
+    <div class="kw-stat">関連: ${neighbors.length}個のキーワード</div>
+    <div class="related-tags">
+      ${neighbors.slice(0, 8).map(nb => `<span class="tag">${nb.label} ×${nb.weight}</span>`).join('')}
+    </div>
+  `;
+}
+
+// ======= Interaction =======
+function getNodeAt(ex, ey) {
+  const maxCount = Math.max(...nodes.map(n => n.count), 1);
+  const x = (ex - panX) / scale;
+  const y = (ey - panY) / scale;
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const r = 10 + (n.count / maxCount) * 25;
+    if ((x - n.x) ** 2 + (y - n.y) ** 2 <= (r + 8) ** 2) return n;
+  }
+  return null;
+}
+
+const wrap = document.getElementById('canvas-wrap');
+const tooltip = document.getElementById('tooltip');
+
+wrap.addEventListener('mousedown', e => {
+  const n = getNodeAt(e.offsetX, e.offsetY);
+  if (n) {
+    dragNode = n;
+    isDragging = false;
+  } else {
+    panStart = { x: e.clientX - panX, y: e.clientY - panY };
+  }
+});
+
+wrap.addEventListener('mousemove', e => {
+  if (dragNode) {
+    isDragging = true;
+    dragNode.x = (e.offsetX - panX) / scale;
+    dragNode.y = (e.offsetY - panY) / scale;
+    dragNode.vx = 0; dragNode.vy = 0;
+    return;
+  }
+  if (panStart) {
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    return;
+  }
+  
+  const n = getNodeAt(e.offsetX, e.offsetY);
+  if (n) {
+    tooltip.style.opacity = '1';
+    const neighbors = edges.filter(ed => ed.source === n.id || ed.target === n.id).length;
+    tooltip.innerHTML = `<b>${n.label}</b><br>出現: ${n.count}回<br>接続: ${neighbors}ノード<br>カテゴリ: ${CLUSTER_NAMES[n.cluster]}`;
+    tooltip.style.left = (e.clientX + 16) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+  } else {
+    tooltip.style.opacity = '0';
+  }
+});
+
+wrap.addEventListener('mouseup', e => {
+  if (dragNode && !isDragging) {
+    selectNode(dragNode);
+  }
+  dragNode = null;
+  panStart = null;
+  isDragging = false;
+});
+
+wrap.addEventListener('mouseleave', () => {
+  tooltip.style.opacity = '0';
+  dragNode = null;
+  panStart = null;
+});
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  scale = Math.max(0.3, Math.min(3, scale * delta));
+}, { passive: false });
+
+// ======= Controls =======
+function rebuild() {
+  if (!window.bugData) return;
+  
+  selectedNode = null;
+  simStep = 0;
+  buildGraphFromBugData(window.bugData);
+}
+
+document.getElementById('threshold').addEventListener('input', function () {
+  document.getElementById('thresholdVal').textContent = this.value;
+  rebuild();
+});
+
+document.getElementById('maxNodes').addEventListener('input', function () {
+  document.getElementById('maxNodesVal').textContent = this.value;
+  rebuild();
+});
+
+document.getElementById('layout').addEventListener('change', () => {
+  simStep = 0;
+  initPositions();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  panX = 0; panY = 0; scale = 1;
+  simStep = 0;
+  if (nodes.length > 0) initPositions();
+});
+
+// ======= Data receiving from parent window =======
+window.addEventListener('message', function(event) {
+  if (event.origin !== window.location.origin) return;
+  
+  if (event.data.type === 'BUG_DATA') {
+    console.log('Received bug data:', event.data.bugs);
+    window.bugData = event.data.bugs;
+    buildGraphFromBugData(event.data.bugs);
+  }
+});
+
+// ======= Initialization =======
+function init() {
+  // Request bug data from parent if opened in popup
+  if (window.opener) {
+    window.opener.postMessage({ type: 'REQUEST_BUG_DATA' }, window.location.origin);
+  }
+  
+  // Start animation loop
+  tick();
+}
+
+// Start when page loads
+window.addEventListener('load', init);
+
+</script>
+</body>
+</html>

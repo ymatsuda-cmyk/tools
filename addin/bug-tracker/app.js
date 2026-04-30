@@ -398,12 +398,253 @@
     $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
   }
 
+  function renderKanbanVersion() {
+    const board = $('#kanban-board-version');
+    board.innerHTML = '';
+
+    const bugs = sortByPriority(applyFilters(state.bugs));
+    
+    // 修正Verが設定されているバグのみを対象にする
+    const bugsWithFixVer = bugs.filter(b => b.fixVer && b.fixVer.trim() !== '');
+    
+    // バージョン別にグループ化
+    const versionGroups = new Map();
+    
+    bugsWithFixVer.forEach(b => {
+      const version = b.fixVer;
+      if (!versionGroups.has(version)) {
+        versionGroups.set(version, []);
+      }
+      versionGroups.get(version).push(b);
+    });
+    
+    // バージョンを降順でソート（Rev.X.Yの形式を考慮）
+    const sortedVersions = Array.from(versionGroups.keys()).sort((a, b) => {
+      // Rev.X.Y形式の場合、数値で比較
+      const aMatch = a.match(/Rev\.(\d+)\.(\d+)/);
+      const bMatch = b.match(/Rev\.(\d+)\.(\d+)/);
+      
+      if (aMatch && bMatch) {
+        const aMajor = parseInt(aMatch[1]);
+        const aMinor = parseInt(aMatch[2]);
+        const bMajor = parseInt(bMatch[1]);
+        const bMinor = parseInt(bMatch[2]);
+        
+        if (aMajor !== bMajor) {
+          return bMajor - aMajor; // メジャーバージョン降順
+        }
+        return bMinor - aMinor; // マイナーバージョン降順
+      }
+      
+      // その他の場合は文字列で降順ソート
+      return b.localeCompare(a);
+    });
+    
+    // 各バージョンの列を作成
+    sortedVersions.forEach(version => {
+      const items = versionGroups.get(version);
+      const col = el('div', { class: 'kanban-col version-col' });
+      col.dataset.version = version;
+      
+      const header = el('div', { class: 'kanban-col-header version-header' }, [
+        el('span', { class: 'version-title', text: version }),
+        el('span', { class: 'count', text: `${items.length}件` })
+      ]);
+      
+      const body = el('div', { class: 'kanban-col-body' });
+      
+      items.forEach(bug => {
+        // バグカードを作成（修正対象も表示）
+        const card = el('div', { 
+          class: 'kanban-card version-card', 
+          'data-id': bug.id,
+          'data-row-index': bug.rowIndex 
+        });
+        
+        // バグID
+        const idElement = el('div', { 
+          class: 'bug-id', 
+          text: `#${String(bug.id).padStart(3, '0')}`,
+          style: 'font-weight:bold;color:#007acc;margin-bottom:4px;'
+        });
+        
+        // タイトル
+        const titleElement = el('div', { 
+          class: 'bug-title', 
+          text: bug.title || '(タイトルなし)',
+          style: 'margin-bottom:8px;font-size:14px;line-height:1.3;'
+        });
+        
+        // 修正対象
+        const scopeElement = el('div', { 
+          class: 'bug-scope',
+          style: 'background:#f0f8ff;padding:4px 8px;border-radius:4px;font-size:12px;color:#333;'
+        });
+        
+        if (bug.scope && bug.scope.trim() !== '') {
+          scopeElement.textContent = `修正対象: ${bug.scope}`;
+        } else {
+          scopeElement.textContent = '修正対象: 未設定';
+          scopeElement.style.background = '#fff0f0';
+          scopeElement.style.color = '#999';
+        }
+        
+        card.appendChild(idElement);
+        card.appendChild(titleElement);
+        card.appendChild(scopeElement);
+        
+        // クリックイベント
+        card.addEventListener('click', () => openModal(bug.rowIndex));
+        
+        body.appendChild(card);
+      });
+      
+      col.appendChild(header);
+      col.appendChild(body);
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
   // 推移グラフ表示
   let trendChart = null;
+  let chartType = 'line'; // line, bar, area
+
+  // ダークテーマ最適化カラーパレット
+  const CHART_COLORS = {
+    occurrence: { primary: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    analysis: { primary: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    fixed: { primary: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    verified: { primary: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' }
+  };
+
+  // チャートタイプ切り替えボタンを追加する関数
+  function addChartTypeToggle() {
+    const analysisSection = document.querySelector('#analysis-section');
+    if (!analysisSection) {
+      console.warn('analysis-section not found');
+      return;
+    }
+    
+    // 既存のコントロールを削除
+    const existingControls = analysisSection.querySelector('.chart-type-controls');
+    if (existingControls) {
+      existingControls.remove();
+    }
+    
+    const controls = el('div', { 
+      class: 'chart-type-controls',
+      style: 'margin-bottom: 15px; text-align: center; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;'
+    });
+    
+    const buttons = [
+      { type: 'line', label: '折れ線グラフ' },
+      { type: 'area', label: '面グラフ' },
+      { type: 'bar', label: '棒グラフ' },
+      { type: 'network', label: '🕸 関連図', isSpecial: true }
+    ];
+    
+    buttons.forEach(({ type, label, isSpecial }) => {
+      const btnClass = isSpecial ? `chart-btn network-btn ${type === 'network' && chartType === 'network' ? 'active' : ''}` : `chart-btn ${chartType === type ? 'active' : ''}`;
+      
+      const btn = el('button', {
+        class: btnClass,
+        text: label
+      });
+      
+      btn.addEventListener('click', () => {
+        if (type === 'network') {
+          openKeywordNetworkWindow();
+          return;
+        }
+        
+        chartType = type;
+        document.querySelectorAll('.chart-btn:not(.network-btn)').forEach(b => {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        renderTrendChart();
+      });
+      
+      btn.addEventListener('mouseenter', () => {
+        if (chartType !== type && !isSpecial) {
+          btn.style.opacity = '0.8';
+        }
+      });
+      
+      btn.addEventListener('mouseleave', () => {
+        btn.style.opacity = '1';
+      });
+      
+      controls.appendChild(btn);
+    });
+    
+    // 最も安全な挿入方法：h3要素の直後に追加
+    const h3Element = analysisSection.querySelector('h3');
+    if (h3Element) {
+      // h3要素の直後に挿入（insertAdjacentElementを使用）
+      h3Element.insertAdjacentElement('afterend', controls);
+    } else {
+      // h3がない場合は先頭に追加
+      if (analysisSection.firstElementChild) {
+        analysisSection.insertBefore(controls, analysisSection.firstElementChild);
+      } else {
+        analysisSection.appendChild(controls);
+      }
+    }
+  }
+
+  // ======= キーワード関連図機能 =======
+  function openKeywordNetworkWindow() {
+    // 新しいウィンドウでキーワード関連図を開く
+    const networkWindow = window.open(
+      'bug-network-tool.html',
+      'KeywordNetwork',
+      'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes'
+    );
+    
+    if (!networkWindow) {
+      alert('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。');
+      return;
+    }
+    
+    // ウィンドウが読み込まれたらバグデータを送信
+    networkWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }, 500); // 初期化待ち
+    });
+    
+    // データリクエストへの対応
+    window.addEventListener('message', function(event) {
+      if (event.source === networkWindow && event.data.type === 'REQUEST_BUG_DATA') {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }
+    });
+  }
   
+  // グローバルスコープからアクセス可能にする
+  window.openKeywordNetworkWindow = openKeywordNetworkWindow;
+
   function renderTrend() {
-    renderTrendChart();
-    renderStats();
+    // DOMの準備が完了してからチャート機能を実行
+    setTimeout(() => {
+      try {
+        addChartTypeToggle();
+        renderTrendChart();
+        renderStats();
+      } catch (error) {
+        console.error('推移グラフの描画でエラーが発生しました:', error);
+        setStatus('推移グラフの描画に失敗しました');
+      }
+    }, 100);
   }
 
   async function getTrendPeriod() {
@@ -474,6 +715,7 @@
 
     // 各日付でのデータを集計
     const occurrenceData = [];
+    const analysisData = [];
     const fixedData = [];
     const verifiedData = [];
 
@@ -485,6 +727,13 @@
         if (!bug.occurredOn) return false;
         const occurredDate = new Date(bug.occurredOn);
         return occurredDate <= date;
+      }).length;
+
+      // その日までの解析完了件数（累計）
+      const analysisCount = state.bugs.filter(bug => {
+        if (!bug.analysisDate) return false;
+        const analysisDate = new Date(bug.analysisDate);
+        return analysisDate <= date;
       }).length;
 
       // その日までの対応完了件数（累計）
@@ -502,55 +751,116 @@
       }).length;
 
       occurrenceData.push(occurrenceCount);
+      analysisData.push(analysisCount);
       fixedData.push(fixedCount);
       verifiedData.push(verifiedCount);
     });
 
-    const ctx = document.getElementById('trendChart').getContext('2d');
+    const ctx = document.getElementById('trendChart');
+    if (!ctx) {
+      console.warn('trendChartキャンバスが見つかりません');
+      return;
+    }
+    
+    const canvasContext = ctx.getContext('2d');
+    if (!canvasContext) {
+      console.warn('Canvas 2Dコンテキストを取得できませんでした');
+      return;
+    }
+    
+    // グラデーション作成関数
+    function createGradient(color) {
+      const gradient = canvasContext.createLinearGradient(0, 0, 0, ctx.height);
+      gradient.addColorStop(0, color.primary + '40'); // 25% opacity at top
+      gradient.addColorStop(1, color.primary + '00'); // 0% opacity at bottom
+      return gradient;
+    }
     
     // 既存のチャートがあれば破棄
     if (trendChart) {
       trendChart.destroy();
     }
 
-    trendChart = new Chart(ctx, {
-      type: 'line',
+    // カスタムツールチップ
+    const customTooltip = {
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      borderWidth: 1,
+      cornerRadius: 8,
+      titleColor: '#9ca3af',
+      bodyColor: '#f9fafb',
+      titleFont: {
+        size: 12,
+        family: "'DM Mono', 'Fira Code', 'Courier New', monospace"
+      },
+      bodyFont: {
+        size: 13,
+        family: "'DM Mono', 'Fira Code', 'Courier New', monospace",
+        weight: '600'
+      },
+      displayColors: true,
+      padding: 12
+    };
+
+    // データセット設定
+    const createDataset = (label, data, colorKey, isMainLine = false) => {
+      const color = CHART_COLORS[colorKey];
+      
+      if (chartType === 'bar') {
+        return {
+          label,
+          data,
+          backgroundColor: isMainLine ? color.primary : color.bg,
+          borderColor: color.primary,
+          borderWidth: 2,
+          borderRadius: 4,
+          borderSkipped: false
+        };
+      } else if (chartType === 'area') {
+        return {
+          label,
+          data,
+          borderColor: color.primary,
+          backgroundColor: createGradient(color),
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBorderWidth: 2,
+          pointHoverBorderColor: '#fff'
+        };
+      } else { // line
+        return {
+          label,
+          data,
+          borderColor: color.primary,
+          backgroundColor: isMainLine ? 'transparent' : color.bg,
+          borderWidth: isMainLine ? 3 : 2,
+          fill: !isMainLine,
+          tension: 0.4,
+          pointRadius: isMainLine ? 3 : 0,
+          pointBackgroundColor: color.primary,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          pointHoverBorderWidth: 2
+        };
+      }
+    };
+
+    trendChart = new Chart(canvasContext, {
+      type: chartType === 'bar' ? 'bar' : 'line',
       data: {
         labels: dateLabels.map(date => {
           const d = new Date(date);
           return `${d.getMonth() + 1}/${d.getDate()}`;
         }),
         datasets: [
-          {
-            label: 'バグ発生件数',
-            data: occurrenceData,
-            borderColor: '#2e7dd7',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            fill: false,
-            tension: 0.4, // スムーズな線
-            pointRadius: 0 // ○表示を無効化
-          },
-          {
-            label: '対応完了件数',
-            data: fixedData,
-            borderColor: '#ff9800',
-            backgroundColor: 'rgba(255, 152, 0, 0.3)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0 // ○表示を無効化
-          },
-          {
-            label: '確認完了件数',
-            data: verifiedData,
-            borderColor: '#4caf50',
-            backgroundColor: 'rgba(76, 175, 80, 0.3)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0 // ○表示を無効化
-          }
+          createDataset('合計（バグ発生件数）', occurrenceData, 'occurrence', true),
+          createDataset('解析（解析完了件数）', analysisData, 'analysis'),
+          createDataset('対応（対応完了件数）', fixedData, 'fixed'),
+          createDataset('完了（確認完了件数）', verifiedData, 'verified')
         ]
       },
       options: {
@@ -559,31 +869,87 @@
         plugins: {
           title: {
             display: true,
-            text: `バグ対応生産性推移 (${period.start} ～ ${period.end})`
+            text: `バグ対応生産性推移 (${period.start} ～ ${period.end})`,
+            color: '#e5e7eb',
+            font: {
+              size: 16,
+              family: "'Space Grotesk', sans-serif",
+              weight: '700'
+            },
+            padding: 20
           },
           legend: {
             display: true,
-            position: 'top'
-          }
+            position: 'top',
+            labels: {
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', 'Fira Code', 'Courier New', monospace"
+              },
+              padding: 15,
+              usePointStyle: true,
+              pointStyle: 'rect'
+            }
+          },
+          tooltip: customTooltip
         },
         scales: {
           y: {
             beginAtZero: true,
             title: {
               display: true,
-              text: '件数'
+              text: '件数',
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', monospace"
+              }
+            },
+            ticks: {
+              color: '#6b7280',
+              font: {
+                size: 11,
+                family: "'DM Mono', monospace"
+              }
+            },
+            grid: {
+              color: '#1f2937',
+              drawBorder: false
             }
           },
           x: {
             title: {
               display: true,
-              text: '日付'
+              text: '日付',
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', monospace"
+              }
+            },
+            ticks: {
+              color: '#6b7280',
+              font: {
+                size: 11,
+                family: "'DM Mono', monospace"
+              },
+              maxTicksLimit: 10
+            },
+            grid: {
+              color: '#1f2937',
+              drawBorder: false
             }
           }
         },
         interaction: {
           intersect: false,
           mode: 'index'
+        },
+        elements: {
+          point: {
+            hoverBackgroundColor: '#fff'
+          }
         }
       }
     });
@@ -959,8 +1325,8 @@
     const tabNames = [
       { key: 'jisho', label: '事象' },
       { key: 'kaiseki', label: '解析' },
-      { key: 'shochi', label: '処置' },
-      { key: 'kekka', label: '結果確認' },
+      { key: 'shochi', label: '修正' },
+      { key: 'kekka', label: '確認' },
       { key: 'kanri', label: '管理' }
     ];
     // 状況に応じた初期タブ
@@ -1515,13 +1881,273 @@
         mainContainer.appendChild(rightPanel);
         tabContent.appendChild(mainContainer);
         
-        // 下部：修正Ver、処置完了チェック
-        tabContent.appendChild(el('div', {}, [el('label', { text: '修正Ver' }), el('br'),
-          (() => {
-            const input = el('input', { type: 'text', style: 'width:98%;', value: bug.fixVer || '', 'data-key': 'fixVer' });
-            input.disabled = isDisabled.shochi; // 入力制御
-            return input;
-          })()]));
+        // 下部：修正Ver（シンプル表示）、処置完了チェック
+        const versionContainer = el('div', {});
+        
+        // ラベル行（修正Ver + 既存バージョンボタン + 新規ボタン）
+        const labelRow = el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;' });
+        labelRow.appendChild(el('label', { text: '修正Ver', style: 'font-weight:bold;' }));
+        
+        // 既存バージョンボタン
+        const existingVersionButton = el('button', { 
+          type: 'button',
+          text: 'Rev.0.0',
+          id: 'existing-version-button',
+          style: 'padding:4px 12px;border:1px solid #28a745;background:#28a745;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
+        
+        // 新規バージョン作成ボタン
+        const newVersionButton = el('button', { 
+          type: 'button',
+          text: 'さらに新しいバージョンを払い出す',
+          id: 'new-version-button',
+          style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
+        
+        // ボタンの非活性化判定
+        const shouldDisableButtons = isDisabled.shochi || 
+          (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+        
+        if (shouldDisableButtons) {
+          existingVersionButton.disabled = true;
+          existingVersionButton.style.opacity = '0.5';
+          existingVersionButton.style.cursor = 'not-allowed';
+          newVersionButton.disabled = true;
+          newVersionButton.style.opacity = '0.5';
+          newVersionButton.style.cursor = 'not-allowed';
+        }
+        
+        labelRow.appendChild(existingVersionButton);
+        labelRow.appendChild(newVersionButton);
+        versionContainer.appendChild(labelRow);
+        
+        // バージョン表示テキストエリア
+        const versionTextArea = el('textarea', {
+          rows: 2,
+          style: 'width:98%;resize:none;background:#f9f9f9;border:1px solid #ddd;padding:8px;',
+          readonly: true,
+          id: 'version-display-text',
+          placeholder: 'バージョン情報を取得中...'
+        });
+        
+        versionContainer.appendChild(versionTextArea);
+        
+        // 隠し入力フィールド（実際の値を保存）
+        const hiddenVersionInput = el('input', { 
+          type: 'hidden', 
+          'data-key': 'fixVer',
+          id: 'fix-ver-hidden',
+          value: bug.fixVer || ''
+        });
+        versionContainer.appendChild(hiddenVersionInput);
+        
+        // バージョン情報を初期化する関数
+        async function initializeVersionDisplay() {
+          const textArea = document.querySelector('#version-display-text');
+          const existingButton = document.querySelector('#existing-version-button');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1); // AF列は31番目（0ベース）
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1); // S列は18番目（0ベース）
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              // デバッグ：セルの実際の値を確認
+              console.log('AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('S3セルの値:', minorVersionCell.values[0][0]);
+              
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const minorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
+              
+              console.log('処理後 - メジャーバージョン:', majorVersion);
+              console.log('処理後 - マイナーバージョン:', minorVersion);
+              
+              const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
+              
+              // 既存バージョンボタンのテキストを更新
+              if (existingButton) {
+                existingButton.textContent = currentVersion;
+              }
+              
+              // テキストエリアに表示
+              if (textArea) {
+                if (bug.fixVer && bug.fixVer.trim() !== '') {
+                  // 既存バージョンがある場合
+                  textArea.value = `${bug.fixVer} （設定済み）`;
+                } else {
+                  // 既存バージョンがない場合は空にする
+                  textArea.value = 'バージョンを選択してください';
+                }
+              }
+              
+              // グローバル変数に保存（他の処理で使用）
+              window.versionInfo = {
+                major: majorVersion,
+                minor: minorVersion,
+                current: currentVersion,
+                next: `Rev.${majorVersion}.${minorVersion + 1}`,
+                nextMinor: minorVersion + 1
+              };
+            });
+          } catch (error) {
+            console.error('バージョン情報取得エラー:', error);
+            // エラー時のフォールバック表示
+            if (textArea) {
+              if (bug.fixVer && bug.fixVer.trim() !== '') {
+                textArea.value = `${bug.fixVer} （設定済み）`;
+              } else {
+                textArea.value = 'バージョン情報を取得できませんでした';
+              }
+            }
+          }
+        }
+        
+        // 既存バージョンを選択する関数
+        function selectExistingVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
+          const button = document.querySelector('#existing-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          if (window.versionInfo) {
+            const existingVersion = window.versionInfo.current;
+            
+            // バグオブジェクトの修正Verを更新
+            bug.fixVer = existingVersion;
+            
+            // 隠し入力フィールドも更新
+            if (hiddenInput) {
+              hiddenInput.value = existingVersion;
+            }
+            
+            // テキストエリアの表示を更新
+            if (textArea) {
+              textArea.value = `${existingVersion} （既存バージョン）`;
+            }
+            
+            console.log(`既存バージョンを選択しました: ${existingVersion}`);
+          }
+        }
+        
+        // 新しいバージョンを払い出す関数
+        async function createNewVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
+          const button = document.querySelector('#new-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          const existingButton = document.querySelector('#existing-version-button');
+          
+          if (button) {
+            button.disabled = true;
+            button.textContent = '処理中...';
+          }
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1);
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1);
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              // デバッグ：セルの実際の値を確認
+              console.log('新規作成時 - AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('新規作成時 - S3セルの値:', minorVersionCell.values[0][0]);
+              
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const currentMinorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
+              const newMinorVersion = currentMinorVersion + 1;
+              
+              // S3セルを更新
+              minorVersionCell.values = [[newMinorVersion]];
+              
+              await ctx.sync();
+              
+              const newVersion = `Rev.${majorVersion}.${newMinorVersion}`;
+              
+              // バグオブジェクトの修正Verを更新
+              bug.fixVer = newVersion;
+              
+              // 隠し入力フィールドも更新
+              if (hiddenInput) {
+                hiddenInput.value = newVersion;
+              }
+              
+              // テキストエリアの表示を更新
+              if (textArea) {
+                textArea.value = `${newVersion} （新しいバージョン）`;
+              }
+              
+              // 既存バージョンボタンも更新
+              if (existingButton) {
+                existingButton.textContent = newVersion;
+              }
+              
+              // グローバル変数を更新
+              window.versionInfo = {
+                major: majorVersion,
+                minor: newMinorVersion,
+                current: newVersion,
+                next: `Rev.${majorVersion}.${newMinorVersion + 1}`,
+                nextMinor: newMinorVersion + 1
+              };
+              
+              console.log(`新しいバージョンを払い出しました: ${newVersion}`);
+            });
+          } catch (error) {
+            console.error('バージョン払い出しエラー:', error);
+            alert('バージョン払い出しに失敗しました: ' + error.message);
+          } finally {
+            // ボタンを元に戻す（条件に応じて有効/無効を設定）
+            if (button) {
+              const shouldDisable = isDisabled.shochi || 
+                (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+              
+              button.disabled = shouldDisable;
+              button.textContent = 'さらに新しいバージョンを払い出す';
+              
+              if (shouldDisable) {
+                button.style.opacity = '0.5';
+                button.style.cursor = 'not-allowed';
+              } else {
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+              }
+            }
+          }
+        }
+        
+        // ボタンのイベントリスナー
+        existingVersionButton.addEventListener('click', selectExistingVersion);
+        newVersionButton.addEventListener('click', createNewVersion);
+        
+        // 初期化を実行（DOM追加後）
+        setTimeout(initializeVersionDisplay, 0);
+        
+        tabContent.appendChild(versionContainer);
         tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
           el('label', {}, [
             (() => {
@@ -2402,6 +3028,16 @@
       const isComplete = selectedRadio && selectedRadio.value === 'complete';
       const isReject = selectedRadio && selectedRadio.value === 'reject';
       
+      // 修正Verのテキストエリアから値を取得して設定
+      const versionTextArea = $('#modal-body').querySelector('#version-display-text');
+      if (versionTextArea && versionTextArea.value && versionTextArea.value.trim() !== '' && versionTextArea.value !== 'バージョンを選択してください') {
+        // テキストエリアからバージョン番号を抽出（Rev.x.x部分のみ）
+        const versionMatch = versionTextArea.value.match(/Rev\.\d+\.\d+/);
+        if (versionMatch) {
+          bug.fixVer = versionMatch[0];
+        }
+      }
+      
       $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
         const k = inp.dataset.key;
         const col = getColumns().find(c => c.key === k);
@@ -2496,7 +3132,7 @@
           
           // 修正Verと処置内容の入力確認
           if (!bug.fixVer || bug.fixVer.trim() === '') {
-            alert('修正対象にチェックが付いている場合、修正Verの入力が必要です');
+            alert('修正対象にチェックが付いている場合、修正Verが必要です。\n新しいバージョンを払い出すか、既存のバージョンを指定してください。');
             return;
           }
           if (!bug.fix || bug.fix.trim() === '') {
@@ -2569,38 +3205,181 @@
     state.view = v;
     $('#btn-view-assignee').classList.toggle('active', v === 'assignee');
     $('#btn-view-status').classList.toggle('active',   v === 'status');
+    $('#btn-view-version').classList.toggle('active',  v === 'version');
     $('#btn-view-trend').classList.toggle('active',   v === 'trend');
     $('#view-assignee').classList.toggle('active', v === 'assignee');
     $('#view-status').classList.toggle('active',   v === 'status');
+    $('#view-version').classList.toggle('active',  v === 'version');
     $('#view-trend').classList.toggle('active',   v === 'trend');
     render();
   }
   function render() {
     if (state.view === 'assignee') renderKanbanAssignee();
+    else if (state.view === 'version') renderKanbanVersion();
     else if (state.view === 'trend') renderTrend();
     else renderKanbanStatus();
   }
 
   function demoData() {
-    return [
-      { rowIndex: 4, id: 1, title: 'ログイン後に画面が真っ白', status: '解析', updated: '2025-04-10', assignee: '高橋',
-        occurredOn: '2025-04-08', reporter: '政次', origin: '定義(通常)', steps: '1.ログイン\n2.TOPへ', expected: 'TOP表示', actual: '真っ白', reproRate: '毎回',
-        cause: '', analyst: '政次', analysisDate: '2025-04-10', scope: 'アプリ', fix: '', fixVer: '', fixer: '', fixDate: '', verify: '', verifier: '', verifyDate: '', tag: 'UI', priority: '高', severity: '致命的' },
-      { rowIndex: 5, id: 2, title: '通信断時にRPAが停止', status: '修正', updated: '2025-04-12', assignee: '伊藤',
-        occurredOn: '2025-04-09', reporter: '松田', origin: '定義(通信断)', steps: '1.通信断発生', expected: '自動復旧', actual: '停止のまま', reproRate: '時々',
-        cause: 'タイムアウト未設定', analyst: '伊藤', analysisDate: '2025-04-11', scope: 'RPA', fix: 'リトライ実装', fixVer: 'v1.2', fixer: '伊藤', fixDate: '2025-04-12', verify: '', verifier: '', verifyDate: '', tag: 'RPA', priority: '中', severity: '重大' },
-      { rowIndex: 6, id: 3, title: '電源断後に設定が消える', status: '新規', updated: '', assignee: '',
-        occurredOn: '2025-04-14', reporter: '高橋', origin: '定義(電源断)', steps: '1.電源断', expected: '保持', actual: '消失', reproRate: '1回のみ',
-        cause: '', analyst: '', analysisDate: '', scope: '', fix: '', fixVer: '', fixer: '', fixDate: '', verify: '', verifier: '', verifyDate: '', tag: '', priority: '低', severity: '警備' },
-      { rowIndex: 7, id: 4, title: 'タイトル文字化け', status: '完了', updated: '2025-04-13', assignee: '松田',
-        occurredOn: '2025-04-05', reporter: '政次', origin: '定義(通常)', steps: '', expected: '', actual: '', reproRate: '毎回',
-        cause: 'エンコード不一致', analyst: '松田', analysisDate: '2025-04-06', scope: 'アプリ', fix: 'UTF-8統一', fixVer: 'v1.1', fixer: '松田', fixDate: '2025-04-07', verify: '解消確認', verifier: '政次', verifyDate: '2025-04-13', tag: 'i18n', priority: '中', severity: '重大' }
+    // 過去30日間の推移が見えるサンプルデータを生成
+    const today = new Date();
+    const bugs = [];
+    let bugId = 1;
+
+    // 日付をYYYY-MM-DD形式で取得
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    // 指定日数前の日付を取得
+    function daysAgo(days) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - days);
+      return date;
+    }
+
+    // 過去30日間のバグ発生データ
+    const bugTemplates = [
+      { title: 'ログイン後に画面が真っ白', origin: '定義(通常)', tag: 'UI', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: '通信断時にRPAが停止', origin: '定義(通信断)', tag: 'RPA', priority: '中', severity: '重大', reporter: '松田' },
+      { title: '電源断後に設定が消失', origin: '定義(電源断)', tag: '設定', priority: '低', severity: '軽微', reporter: '高橋' },
+      { title: '文字コード不正でエラー', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '伊藤' },
+      { title: 'メモリリークで動作停止', origin: '定義(通常)', tag: 'パフォーマンス', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: 'CSVファイル読み込み失敗', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '松田' },
+      { title: '認証タイムアウトエラー', origin: '定義(通信断)', tag: '認証', priority: '高', severity: '重大', reporter: '高橋' },
+      { title: 'UI表示崩れ（IE対応）', origin: '定義(通常)', tag: 'UI', priority: '低', severity: '軽微', reporter: '伊藤' },
+      { title: 'バックアップ処理が重い', origin: '定義(通常)', tag: 'パフォーマンス', priority: '中', severity: '軽微', reporter: '政次' },
+      { title: 'ログ出力でディスク容量不足', origin: '定義(通常)', tag: 'データ', priority: '高', severity: '重大', reporter: '松田' },
+      { title: 'スケジュール実行が失敗', origin: '定義(通常)', tag: 'RPA', priority: '中', severity: '重大', reporter: '高橋' },
+      { title: '印刷プレビューが表示されない', origin: '定義(通常)', tag: 'UI', priority: '低', severity: '軽微', reporter: '伊藤' },
+      { title: 'データベース接続エラー', origin: '定義(通信断)', tag: 'データ', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: '画像アップロード処理遅延', origin: '定義(通常)', tag: 'パフォーマンス', priority: '中', severity: '軽微', reporter: '松田' },
+      { title: 'Excel出力で数式が消える', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '高橋' }
     ];
+
+    const assignees = ['政次', '高橋', '伊藤', '松田'];
+
+    // 過去30日間にバグを分散して発生させる
+    for (let i = 0; i < 25; i++) {
+      const template = bugTemplates[i % bugTemplates.length];
+      const occurredDaysAgo = 30 - Math.floor(i * 1.2); // 30日前から少しずつ最近まで
+      const occurredDate = daysAgo(Math.max(0, occurredDaysAgo));
+      
+      // バグの進行状況をランダムに設定
+      const progressRandom = Math.random();
+      let status = '新規';
+      let assignee = '';
+      let analysisDate = '';
+      let analyst = '';
+      let fixDate = '';
+      let fixer = '';
+      let verifyDate = '';
+      let verifier = '';
+      let cause = '';
+      let fix = '';
+      let fixVer = '';
+      let verify = '';
+
+      if (progressRandom > 0.8) {
+        // 20%: 新規のまま
+        status = '新規';
+      } else if (progressRandom > 0.6) {
+        // 20%: 解析中
+        status = '解析';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 3 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+      } else if (progressRandom > 0.4) {
+        // 20%: 修正中
+        status = '修正';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+      } else if (progressRandom > 0.2) {
+        // 20%: 確認中
+        status = '確認';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+      } else {
+        // 20%: 完了
+        status = '完了';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+        const verifyDaysAgo = Math.max(0, fixDaysAgo - Math.floor(Math.random() * 2 + 1));
+        verifyDate = formatDate(daysAgo(verifyDaysAgo));
+        verifier = assignees[Math.floor(Math.random() * assignees.length)];
+        verify = '動作確認完了';
+      }
+
+      bugs.push({
+        rowIndex: bugId + 3,
+        id: bugId,
+        title: `${template.title} (${bugId})`,
+        status: status,
+        updated: status !== '新規' ? formatDate(new Date()) : '',
+        assignee: assignee,
+        occurredOn: formatDate(occurredDate),
+        reporter: template.reporter,
+        origin: template.origin,
+        originNumber: '',
+        steps: '1. 操作実行\n2. エラー発生',
+        expected: '正常動作',
+        actual: 'エラーまたは異常動作',
+        reproRate: ['毎回', '時々', '1回のみ'][Math.floor(Math.random() * 3)],
+        cause: cause,
+        analyst: analyst,
+        analysisDate: analysisDate,
+        scope: template.tag === 'RPA' ? 'RPA' : 'アプリ',
+        fix: fix,
+        fixVer: fixVer,
+        fixer: fixer,
+        fixDate: fixDate,
+        verify: verify,
+        reject: '',
+        verifier: verifier,
+        verifyDate: verifyDate,
+        tag: template.tag,
+        priority: template.priority,
+        severity: template.severity,
+        starred: '',
+        periodStart: '',
+        periodEnd: ''
+      });
+
+      bugId++;
+    }
+
+    return bugs;
   }
 
   function bindEvents() {
     $('#btn-view-assignee').addEventListener('click', () => setView('assignee'));
     $('#btn-view-status').addEventListener('click',   () => setView('status'));
+    $('#btn-view-version').addEventListener('click',  () => setView('version'));
     $('#btn-view-trend').addEventListener('click',   () => setView('trend'));
     $('#btn-add-new').addEventListener('click', () => openNewBugModal());
     $('#btn-reload').addEventListener('click', async () => {
