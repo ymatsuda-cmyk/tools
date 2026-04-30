@@ -23,7 +23,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/taskpane/taskpane.html"/>
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/Scenario/taskpane/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -77,8 +77,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin"/>
-        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/taskpane/commands.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/taskpane/taskpane.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/Scenario/taskpane/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/Scenario/taskpane/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="シナリオ一覧アドインへようこそ"/>
