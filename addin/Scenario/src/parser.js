@@ -269,16 +269,29 @@ async function writeBugResolution(context, bugId, resolved, scenarios) {
         // そのバグIDが含まれていなければスキップ
         if (!cellVal.includes(bugId)) continue;
 
-        let newVal;
+        let newVal = cellVal;
         if (resolved) {
           // バ9 → バ9（済）  ※すでに（済）がついている場合はそのまま
-          newVal = cellVal.replace(
-            new RegExp(bugId + "(?!（済）)", "g"),
-            bugId + "（済）"
-          );
+          // カンマ区切りで分割して個別に処理
+          const parts = cellVal.split(',').map(part => {
+            const trimmed = part.trim();
+            if (trimmed === bugId && !trimmed.includes('（済）')) {
+              return bugId + '（済）';
+            }
+            return part;
+          });
+          newVal = parts.join(',');
         } else {
-          // バ9（済） → バ9
-          newVal = cellVal.replace(new RegExp(bugId + "（済）", "g"), bugId);
+          // バ9（済） → バ9  
+          // カンマ区切りで分割して個別に処理
+          const parts = cellVal.split(',').map(part => {
+            const trimmed = part.trim();
+            if (trimmed === bugId + '（済）') {
+              return bugId;
+            }
+            return part;
+          });
+          newVal = parts.join(',');
         }
 
         if (newVal !== cellVal) {
