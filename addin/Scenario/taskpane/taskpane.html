@@ -156,8 +156,9 @@ main{padding:12px 14px;overflow-x:auto;}
 .modal-title{font-size:14px;font-weight:700;color:var(--text);}
 .modal-close{background:transparent;border:1px solid var(--border2);border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text2);}
 .modal-close:hover{border-color:var(--err);color:var(--err);}
-.modal-body{padding:16px;max-height:60vh;overflow-y:auto;}
+.modal-body{padding:16px;max-height:50vh;overflow-y:auto;display:flex;gap:16px;}
 .modal-footer{padding:12px 16px;background:#f8f9fb;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.edit-section{flex:1;}
 .scenario-info{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-bottom:12px;}
 .scenario-info h4{margin:0 0 6px 0;font-size:12px;color:var(--accent);}
 .bug-section{margin-bottom:16px;}
@@ -169,10 +170,8 @@ main{padding:12px 14px;overflow-x:auto;}
 .bug-item{display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--surface);}
 .bug-item:last-child{border-bottom:none;}
 .bug-item:hover{background:#f8faff;}
-.bug-item.added{background:#e0f7ff;border-left:3px solid #06b6d4;} /* 新規追加 - 薄い水色 */
-.bug-item.removed{background:#f3f4f6;color:#6b7280;opacity:0.8;} /* 削除 - 灰色 */
-.bug-item.removed .bug-id, .bug-item.removed .bug-title{text-decoration:line-through;}
-.bug-item.removed .remove-bug-btn{display:none;} /* 削除済みアイテムは削除ボタンを非表示 */
+.bug-item.added{background:#e0f7ff;border-left:3px solid #06b6d4;}
+.bug-item.removed{background:#f5f5f5;color:#888;opacity:0.7;text-decoration:line-through;}
 .bug-checkbox{width:14px;height:14px;margin-right:8px;cursor:pointer;accent-color:var(--accent);}
 .bug-id{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:600;min-width:40px;margin-right:8px;}
 .bug-title{flex:1;font-size:11px;color:var(--text);margin-right:8px;}
@@ -192,14 +191,19 @@ main{padding:12px 14px;overflow-x:auto;}
 .bug-selector-header{padding:12px 16px;background:#f8f9fb;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .bug-selector-title{font-size:13px;font-weight:600;color:var(--text);}
 .bug-selector-body{padding:0;max-height:50vh;overflow-y:auto;}
-.selectable-bug{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;}
+.selectable-bug{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px;}
 .selectable-bug:last-child{border-bottom:none;}
 .selectable-bug:hover{background:var(--accent-light);}
-.selectable-bug.selected{background:#e0f7ff;border-left:3px solid #06b6d4;}
-.selectable-bug.selected:hover{background:#bae6fd;}
-.selectable-bug.disabled{opacity:0.5;cursor:not-allowed;background:#f5f5f5;}
+/* バグ選択機能 */
+.selectable-bug{position:relative;cursor:pointer;}
+.selectable-bug:hover{background:#f8faff;}
+.selectable-bug.selected{background:var(--accent-light);border-left:3px solid var(--accent);}
+.selectable-bug.selected::after{content:"✓";position:absolute;right:10px;color:var(--accent);font-weight:bold;}
+.selectable-bug.disabled{background:#f5f5f5;color:#999;cursor:not-allowed;opacity:0.6;}
 .selectable-bug.disabled:hover{background:#f5f5f5;}
-.selectable-bug .bug-status.already-selected{color:#999;font-style:italic;}
+.selectable-bug.disabled .bug-id{color:#999;}
+.selectable-bug.disabled .bug-title{color:#999;}
+.selectable-bug.disabled .bug-status{color:#999;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
@@ -291,30 +295,32 @@ main{padding:12px 14px;overflow-x:auto;}
       <button class="modal-close" id="closeModal">✕ 閉じる</button>
     </div>
     <div class="modal-body">
-      <div class="scenario-info">
-        <h4>シナリオ情報</h4>
-        <div id="scenarioDetails"></div>
-      </div>
-      <div class="bug-section">
-        <div class="bug-section-header">
-          <h5>完了阻害となる課題</h5>
-          <button class="add-bug-btn" onclick="showBugSelector('block')">
-            <span>+</span> 追加
-          </button>
+      <div class="edit-section">
+        <div class="scenario-info">
+          <h4>シナリオ情報</h4>
+          <div id="scenarioDetails"></div>
         </div>
-        <div class="bug-list" id="blockBugList">
-          <div class="empty-bugs">課題はありません</div>
+        <div class="bug-section">
+          <div class="bug-section-header">
+            <h5>完了阻害となる課題</h5>
+            <button class="add-bug-btn" onclick="showBugSelector('block')">
+              <span>+</span> 追加
+            </button>
+          </div>
+          <div class="bug-list" id="blockBugList">
+            <div class="empty-bugs">課題はありません</div>
+          </div>
         </div>
-      </div>
-      <div class="bug-section">
-        <div class="bug-section-header">
-          <h5>軽微な課題</h5>
-          <button class="add-bug-btn" onclick="showBugSelector('minor')">
-            <span>+</span> 追加
-          </button>
-        </div>
-        <div class="bug-list" id="minorBugList">
-          <div class="empty-bugs">課題はありません</div>
+        <div class="bug-section">
+          <div class="bug-section-header">
+            <h5>軽微な課題</h5>
+            <button class="add-bug-btn" onclick="showBugSelector('minor')">
+              <span>+</span> 追加
+            </button>
+          </div>
+          <div class="bug-list" id="minorBugList">
+            <div class="empty-bugs">課題はありません</div>
+          </div>
         </div>
       </div>
     </div>
@@ -330,14 +336,11 @@ main{padding:12px 14px;overflow-x:auto;}
   <div class="bug-selector-content">
     <div class="bug-selector-header">
       <div class="bug-selector-title">バグを選択してください</div>
+      <button class="btn btn-primary" id="addSelectedBugs" onclick="addSelectedBugs()" style="margin-right:8px;">追加</button>
       <button class="modal-close" onclick="closeBugSelector()">✕</button>
     </div>
     <div class="bug-selector-body" id="bugSelectorList">
       <div class="empty-bugs">バグデータを読み込み中...</div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeBugSelector()">キャンセル</button>
-      <button class="btn btn-primary" id="addSelectedBugs" onclick="addSelectedBugs()">選択したバグを追加</button>
     </div>
   </div>
 </div>
@@ -360,6 +363,7 @@ var originalScenarioData = null; // 編集前のデータ保持
 var originalBugIds = { block: [], minor: [] }; // 編集前のバグIDリスト
 var bugSheetData = {}; // バグシートからのデータキャッシュ
 var currentEditingBugType = null; // 'block' or 'minor'
+var selectedBugIds = []; // 選択されたバグIDリスト
 
 async function openEditModal(rowIdx, sheetName, cardElement) {
   try {
@@ -499,42 +503,36 @@ function showEditModal(scenario) {
 function displayBugList(containerId, bugText, bugType) {
   const container = document.getElementById(containerId);
   
-  // 元のバグIDリストを取得（編集前の状態）
-  const originalIds = bugType === '完了阻害' ? originalBugIds.block : originalBugIds.minor;
-  
   if (!bugText) {
     container.innerHTML = '<div class="empty-bugs">課題はありません</div>';
     return;
   }
 
-  // 現在のバグIDを抽出
-  const currentBugIds = extractBugIds(bugText);
+  // バグIDを抽出
+  const bugIds = extractBugIds(bugText);
   
-  if (currentBugIds.length === 0) {
+  if (bugIds.length === 0) {
     container.innerHTML = '<div class="empty-bugs">課題はありません</div>';
     return;
   }
 
-  // 新規追加・削除を判定
-  const currentIds = currentBugIds.map(b => b.id);
-  const addedIds = currentIds.filter(id => !originalIds.includes(id));
-  const removedIds = originalIds.filter(id => !currentIds.includes(id));
+  // 元のバグIDリストを取得（追加・削除判定用）
+  const originalIds = bugType === '完了阻害' ? originalBugIds.block : originalBugIds.minor;
+  const currentIds = bugIds.map(b => b.id);
 
   let html = "";
-  
-  // 現在のバグを表示
-  currentBugIds.forEach((bug, index) => {
+  bugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
     const statusClass = bug.resolved ? "closed" : "open";
     const statusText = bug.resolved ? "解消済み" : (status || "未解消");
     
-    // 新規追加されたバグかチェック
-    const isAdded = addedIds.includes(bug.id);
-    const itemClass = isAdded ? "bug-item added" : "bug-item";
+    // 追加・削除判定
+    const isAdded = !originalIds.includes(bug.id); // 元のリストにない = 新規追加
+    const statusSuffix = isAdded ? ' added' : '';
 
-    html += `<div class="${itemClass}">
+    html += `<div class="bug-item${statusSuffix}">
       <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} 
              onchange="updateBugStatus('${bug.id}', this.checked, '${bugType}')">
       <span class="bug-id">${bug.id}</span>
@@ -546,18 +544,23 @@ function displayBugList(containerId, bugText, bugType) {
     </div>`;
   });
   
-  // 削除されたバグを表示（灰色）
-  removedIds.forEach(bugId => {
-    const sheetBug = bugSheetData[bugId];
-    const title = sheetBug ? sheetBug.title : "詳細情報なし";
-    const status = sheetBug ? sheetBug.status : "不明";
-    
-    html += `<div class="bug-item removed">
-      <span class="bug-id">${bugId}</span>
-      <span class="bug-title">${esc(title)}</span>
-      <span class="bug-status">${esc(status)} (削除済み)</span>
-      <span class="restore-indicator">削除済み</span>
-    </div>`;
+  // 削除されたバグを表示（元のリストにあって現在のリストにないもの）
+  originalIds.forEach(originalId => {
+    if (!currentIds.includes(originalId)) {
+      const sheetBug = bugSheetData[originalId];
+      const title = sheetBug ? sheetBug.title : "詳細情報なし";
+      const status = sheetBug ? sheetBug.status : "不明";
+      
+      html += `<div class="bug-item removed">
+        <input type="checkbox" class="bug-checkbox" data-bug-id="${originalId}" disabled>
+        <span class="bug-id">${originalId}</span>
+        <span class="bug-title">${esc(title)} <small>(削除済み)</small></span>
+        <span class="bug-status">${esc(status)}</span>
+        <button class="remove-bug-btn" onclick="restoreBug('${originalId}', '${bugType}')" title="復元">
+          ↻
+        </button>
+      </div>`;
+    }
   });
 
   container.innerHTML = html;
@@ -565,33 +568,35 @@ function displayBugList(containerId, bugText, bugType) {
 
 function showBugSelector(bugType) {
   currentEditingBugType = bugType;
+  selectedBugIds = []; // 選択状態をリセット
   const modal = document.getElementById("bugSelectorModal");
   const list = document.getElementById("bugSelectorList");
   
-  // 現在のバグIDリストを取得（完了阻害と軽微の両方）
-  const currentBlockBugText = currentEditingScenario.blockText || "";
-  const currentMinorBugText = currentEditingScenario.minorText || "";
-  const allCurrentBugIds = [
-    ...extractBugIds(currentBlockBugText).map(b => b.id),
-    ...extractBugIds(currentMinorBugText).map(b => b.id)
-  ];
+  // 現在のバグIDリストを取得（完了阻害・軽微両方を確認）
+  const blockBugIds = extractBugIds(currentEditingScenario.blockText || "").map(b => b.id);
+  const minorBugIds = extractBugIds(currentEditingScenario.minorText || "").map(b => b.id);
+  const allExistingBugIds = [...blockBugIds, ...minorBugIds];
   
   let html = "";
+  let availableCount = 0;
+  
   Object.values(bugSheetData).forEach(bug => {
-    const isAlreadySelected = allCurrentBugIds.includes(bug.id);
-    const className = isAlreadySelected ? 'selectable-bug disabled' : 'selectable-bug';
-    const clickHandler = isAlreadySelected ? '' : `onclick="toggleBugSelection('${bug.id}')"`;
-    const statusLabel = isAlreadySelected ? '(既に選択済み)' : esc(bug.status);
+    const isDisabled = allExistingBugIds.includes(bug.id);
+    const bugClass = isDisabled ? "selectable-bug disabled" : "selectable-bug";
+    const clickHandler = isDisabled ? "" : `onclick="toggleBugSelection('${bug.id}')"`;
     
-    html += `<div class="${className}" data-bug-id="${bug.id}" ${clickHandler}>
+    if (!isDisabled) availableCount++;
+    
+    html += `<div class="${bugClass}" data-bug-id="${bug.id}" ${clickHandler}>
       <span class="bug-id">${bug.id}</span>
       <span class="bug-title">${esc(bug.title)}</span>
-      <span class="bug-status ${isAlreadySelected ? 'already-selected' : 'open'}">${statusLabel}</span>
+      <span class="bug-status open">${esc(bug.status)}</span>
+      ${isDisabled ? '<span style="position:absolute;right:10px;color:#999;font-size:12px;">追加済み</span>' : ''}
     </div>`;
   });
   
-  if (html === "") {
-    html = '<div class="empty-bugs">追加可能なバグはありません</div>';
+  if (availableCount === 0) {
+    html += '<div class="empty-bugs">追加可能なバグはありません</div>';
   }
   
   list.innerHTML = html;
@@ -601,52 +606,52 @@ function showBugSelector(bugType) {
 function closeBugSelector() {
   document.getElementById("bugSelectorModal").style.display = "none";
   currentEditingBugType = null;
+  selectedBugIds = []; // 選択状態をクリア
 }
 
 function toggleBugSelection(bugId) {
-  const bugElement = document.querySelector(`[data-bug-id="${bugId}"]`);
-  if (!bugElement || bugElement.classList.contains('disabled')) return;
+  const element = document.querySelector(`[data-bug-id="${bugId}"]`);
+  if (!element) return;
   
-  bugElement.classList.toggle('selected');
-}
-
-function selectExcelRow(rowIdx, sheetName) {
-  // Excel行を選択する処理
-  Excel.run(function (ctx) {
-    const sheet = ctx.workbook.worksheets.getItem(sheetName);
-    const range = sheet.getCell(rowIdx - 1, 0).getEntireRow(); // 0ベースなのでrowIdx-1
-    range.select();
-    return ctx.sync();
-  }).then(function() {
-    showSaveStatus(`${sheetName} シートの ${rowIdx} 行を選択しました`, "ok");
-  }).catch(function(error) {
-    console.error("行選択エラー:", error);
-    showSaveStatus(`行選択エラー: ${error.message}`, "err");
-  });
-}
-
-function addSelectedBugs() {
-  if (!currentEditingBugType) return;
-  
-  const selectedElements = document.querySelectorAll('.selectable-bug.selected');
-  if (selectedElements.length === 0) {
-    showSaveStatus("バグが選択されていません", "err");
+  // 非活性なバグは選択できない
+  if (element.classList.contains('disabled')) {
+    showSaveStatus("このバグは既に追加済みです", "warn");
     return;
   }
   
-  const selectedBugIds = Array.from(selectedElements).map(el => el.dataset.bugId);
+  if (selectedBugIds.includes(bugId)) {
+    // 選択解除
+    selectedBugIds = selectedBugIds.filter(id => id !== bugId);
+    element.classList.remove('selected');
+  } else {
+    // 選択
+    selectedBugIds.push(bugId);
+    element.classList.add('selected');
+  }
+}
+
+function addSelectedBugs() {
+  if (selectedBugIds.length === 0) {
+    showSaveStatus("バグを選択してください", "warn");
+    return;
+  }
+  
+  if (!currentEditingBugType) {
+    showSaveStatus("バグタイプが設定されていません", "err");
+    return;
+  }
+  
+  // 選択されたバグをシナリオに追加
   const fieldName = currentEditingBugType === 'block' ? 'blockText' : 'minorText';
   const currentText = currentEditingScenario[fieldName] || "";
   
-  // 複数のバグIDを追加
   let newText = currentText;
-  const separator = currentText.includes('、') ? '、' : ',';
-  
   selectedBugIds.forEach(bugId => {
     if (!newText) {
       newText = bugId;
     } else {
-      newText += separator + bugId;
+      const separator = newText.includes('、') ? '、' : ',';
+      newText = newText + separator + bugId;
     }
   });
   
@@ -658,6 +663,25 @@ function addSelectedBugs() {
   
   closeBugSelector();
   showSaveStatus(`${selectedBugIds.length}件のバグを追加しました`, "ok");
+}
+
+// デモモード用：バグシートデータを拡充
+function initDemoBugSheetData() {
+  bugSheetData = {
+    "バ1": { id: "バ1", title: "処理タイムアウト時の画面表示異常", status: "対応中" },
+    "バ2": { id: "バ2", title: "中止ボタン押下後の応答遅延", status: "未対応" },
+    "バ3": { id: "バ3", title: "エラーメッセージの文言修正", status: "対応済み" },
+    "バ9": { id: "バ9", title: "楽天Edy処理未了時の強制残高照会エラー", status: "対応中" },
+    "バ16": { id: "バ16", title: "楽天Edy決済処理の中断処理問題", status: "未対応" },
+    "バ17": { id: "バ17", title: "楽天Edy残高不足時の現金併用処理エラー", status: "対応中" },
+    "バ20": { id: "バ20", title: "iD決済の通信エラー時のリトライ機能", status: "未対応" },
+    "バ25": { id: "バ25", title: "交通系IC読み取りエラー", status: "対応済み" },
+    "バ30": { id: "バ30", title: "QUICPay認証失敗時の処理", status: "対応中" },
+    "バ35": { id: "バ35", title: "WAON残高照会の応答遅延", status: "未対応" },
+    "課1": { id: "課1", title: "nanaco決済画面の改善", status: "検討中" },
+    "課2": { id: "課2", title: "クレジット決済の署名画面修正", status: "対応中" },
+    "課3": { id: "課3", title: "銀聯決済の表示改善", status: "未対応" }
+  };
 }
 
 function removeBug(bugId, bugType) {
@@ -678,6 +702,28 @@ function removeBug(bugId, bugType) {
   displayBugList(containerId, newText, bugType);
   
   showSaveStatus(`${bugId} を削除しました`, "ok");
+}
+
+function restoreBug(bugId, bugType) {
+  const fieldName = bugType === '完了阻害' ? 'blockText' : 'minorText';
+  const currentText = currentEditingScenario[fieldName] || "";
+  
+  // バグIDを復元
+  let newText;
+  if (!currentText) {
+    newText = bugId;
+  } else {
+    const separator = currentText.includes('、') ? '、' : ',';
+    newText = currentText + separator + bugId;
+  }
+  
+  currentEditingScenario[fieldName] = newText;
+  
+  // UI更新
+  const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
+  displayBugList(containerId, newText, bugType);
+  
+  showSaveStatus(`${bugId} を復元しました`, "ok");
 }
 
 function closeEditModal() {
@@ -917,7 +963,9 @@ function makeOps(d){
 
 function makeCard(d){
   const cardId = `card-${d.excelSheet}-${d.rowIdx}`;
-  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" onclick="selectExcelRow('+d.rowIdx+', \''+d.excelSheet+'\')" oncontextmenu="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this); return false;">';
+  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" '
+    +'onclick="selectExcelRow(\''+d.excelSheet+'\', '+d.rowIdx+')" '
+    +'oncontextmenu="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this); return false;">'
     +'<div class="card-header">'
     +'<span class="no-badge">#'+d.no+'</span>'
     +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
@@ -1142,20 +1190,8 @@ function startWithDemo(){
   creationData=DEMO_CREATION;
   bugData=DEMO_BUGS;
   
-  // デモ用バグシートデータを設定
-  bugSheetData = {
-    "バ1": { id: "バ1", title: "カードタッチエラー", status: "調査中" },
-    "バ2": { id: "バ2", title: "通信タイムアウト", status: "修正中" },
-    "バ3": { id: "バ3", title: "画面フリーズ", status: "テスト待ち" },
-    "バ4": { id: "バ4", title: "レシート印刷異常", status: "未対応" },
-    "バ5": { id: "バ5", title: "決済ログ欠損", status: "調査中" },
-    "バ9": { id: "バ9", title: "残高照会タイムアウト対応", status: "調査中" },
-    "バ16": { id: "バ16", title: "リトライ処理エラー", status: "修正待ち" },
-    "バ17": { id: "バ17", title: "強制残高照会失敗", status: "テスト中" },
-    "課1": { id: "課1", title: "UI改善要望", status: "検討中" },
-    "課2": { id: "課2", title: "操作性向上", status: "計画中" },
-    "課3": { id: "課3", title: "エラーメッセージ改善", status: "実装予定" }
-  };
+  // デモ用バグシートデータを初期化
+  initDemoBugSheetData();
   
   buildFilterUI();
   switchView("creation");
