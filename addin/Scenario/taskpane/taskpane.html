@@ -473,16 +473,33 @@ async function loadBugSheetData() {
 
     const values = usedRange.values;
     
-    // バグデータをパース（仮の構造：A列=バグID, B列=タイトル, C列=状況）
+    // バグデータをパース（A列=数字のみのID, B列=タイトル, C列=状況）
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
-      if (row[0] && /^[バ課]\d+$/.test(String(row[0]).trim())) {
-        const bugId = String(row[0]).trim();
-        bugSheetData[bugId] = {
-          id: bugId,
-          title: String(row[1] || "").trim(),
-          status: String(row[2] || "").trim()
+      const idValue = String(row[0] || "").trim();
+      
+      // 数字のみをチェック（完全一致のため）
+      if (idValue && /^\d+$/.test(idValue)) {
+        const title = String(row[1] || "").trim();
+        const status = String(row[2] || "").trim();
+        
+        // バ + 数字 のパターンで登録
+        const bugIdBa = "バ" + idValue;
+        bugSheetData[bugIdBa] = {
+          id: bugIdBa,
+          title: title,
+          status: status
         };
+        
+        // 課 + 数字 のパターンで登録
+        const bugIdKa = "課" + idValue;
+        bugSheetData[bugIdKa] = {
+          id: bugIdKa,
+          title: title,
+          status: status
+        };
+        
+        console.log(`登録: ${bugIdBa}, ${bugIdKa} → ${title}`);
       }
     }
   });
