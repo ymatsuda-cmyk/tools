@@ -151,16 +151,20 @@ main{padding:12px 14px;overflow-x:auto;}
 #saveStatus.err{background:var(--err);}
 /* ── EDIT MODAL ── */
 .edit-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;display:none;align-items:center;justify-content:center;}
-.modal-content{background:var(--surface);border-radius:10px;max-width:600px;max-height:80vh;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);margin:20px;}
+.modal-content{background:var(--surface);border-radius:10px;max-width:700px;max-height:85vh;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);margin:20px;}
 .modal-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f9fb;border-bottom:1px solid var(--border);}
 .modal-title{font-size:14px;font-weight:700;color:var(--text);}
 .modal-close{background:transparent;border:1px solid var(--border2);border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text2);}
 .modal-close:hover{border-color:var(--err);color:var(--err);}
-.modal-body{padding:16px;max-height:60vh;overflow-y:auto;}
+.modal-body{padding:16px;max-height:55vh;overflow-y:auto;}
+.modal-footer{padding:12px 16px;background:#f8f9fb;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
 .scenario-info{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-bottom:12px;}
 .scenario-info h4{margin:0 0 6px 0;font-size:12px;color:var(--accent);}
 .bug-section{margin-bottom:16px;}
-.bug-section h5{font-size:11px;font-weight:600;color:var(--text2);margin:0 0 6px 0;text-transform:uppercase;letter-spacing:.06em;}
+.bug-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.bug-section h5{font-size:11px;font-weight:600;color:var(--text2);margin:0;text-transform:uppercase;letter-spacing:.06em;}
+.add-bug-btn{background:var(--accent);color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.add-bug-btn:hover{opacity:.85;}
 .bug-list{border:1px solid var(--border);border-radius:6px;overflow:hidden;}
 .bug-item{display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--surface);}
 .bug-item:last-child{border-bottom:none;}
@@ -171,7 +175,22 @@ main{padding:12px 14px;overflow-x:auto;}
 .bug-status{font-size:10px;padding:2px 6px;border-radius:10px;white-space:nowrap;}
 .bug-status.open{background:var(--err-bg);color:var(--err);}
 .bug-status.closed{background:var(--ok-bg);color:var(--ok);}
+.remove-bug-btn{background:transparent;border:none;color:var(--err);cursor:pointer;padding:2px;border-radius:3px;font-size:12px;}
+.remove-bug-btn:hover{background:var(--err-bg);}
 .empty-bugs{text-align:center;padding:16px;color:var(--muted);font-size:11px;}
+.btn{padding:6px 12px;border:1px solid var(--border2);border-radius:6px;font-size:12px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn-primary:hover{opacity:.85;}
+.btn-secondary{background:#fff;color:var(--text2);}
+.btn-secondary:hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
+.bug-selector-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
+.bug-selector-content{background:var(--surface);border-radius:8px;max-width:500px;max-height:70vh;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);margin:20px;}
+.bug-selector-header{padding:12px 16px;background:#f8f9fb;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.bug-selector-title{font-size:13px;font-weight:600;color:var(--text);}
+.bug-selector-body{padding:0;max-height:50vh;overflow-y:auto;}
+.selectable-bug{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:8px;}
+.selectable-bug:last-child{border-bottom:none;}
+.selectable-bug:hover{background:var(--accent-light);}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
@@ -268,17 +287,44 @@ main{padding:12px 14px;overflow-x:auto;}
         <div id="scenarioDetails"></div>
       </div>
       <div class="bug-section">
-        <h5>完了阻害となる課題</h5>
+        <div class="bug-section-header">
+          <h5>完了阻害となる課題</h5>
+          <button class="add-bug-btn" onclick="showBugSelector('block')">
+            <span>+</span> 追加
+          </button>
+        </div>
         <div class="bug-list" id="blockBugList">
           <div class="empty-bugs">課題はありません</div>
         </div>
       </div>
       <div class="bug-section">
-        <h5>軽微な課題</h5>
+        <div class="bug-section-header">
+          <h5>軽微な課題</h5>
+          <button class="add-bug-btn" onclick="showBugSelector('minor')">
+            <span>+</span> 追加
+          </button>
+        </div>
         <div class="bug-list" id="minorBugList">
           <div class="empty-bugs">課題はありません</div>
         </div>
       </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelEdit">キャンセル</button>
+      <button class="btn btn-primary" id="saveEdit">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bug Selector Modal -->
+<div id="bugSelectorModal" class="bug-selector-modal">
+  <div class="bug-selector-content">
+    <div class="bug-selector-header">
+      <div class="bug-selector-title">バグを選択してください</div>
+      <button class="modal-close" onclick="closeBugSelector()">✕</button>
+    </div>
+    <div class="bug-selector-body" id="bugSelectorList">
+      <div class="empty-bugs">バグデータを読み込み中...</div>
     </div>
   </div>
 </div>
@@ -297,7 +343,9 @@ var DEMO_BUGS     = [{"id":"バ9","resolved":false,"scenarios":[{"sheet":"異常
 
 // ─── カードクリック・編集モーダル ─────────────────────
 var currentEditingScenario = null;
+var originalScenarioData = null; // 編集前のデータ保持
 var bugSheetData = {}; // バグシートからのデータキャッシュ
+var currentEditingBugType = null; // 'block' or 'minor'
 
 async function openEditModal(rowIdx, sheetName, cardElement) {
   try {
@@ -307,20 +355,22 @@ async function openEditModal(rowIdx, sheetName, cardElement) {
       showSaveStatus("シナリオデータが見つかりません", "err");
       return;
     }
-    currentEditingScenario = scenario;
 
     // Excelで行を選択
     if (typeof Excel !== "undefined") {
       await selectExcelRow(sheetName, rowIdx);
+      // Excelからリアルタイムでデータ取得
+      await loadRealTimeScenarioData(sheetName, rowIdx, scenario);
     }
+
+    currentEditingScenario = { ...scenario }; // コピーを作成
+    originalScenarioData = { ...scenario }; // 元データ保持
 
     // バグシートデータを取得
-    if (typeof Excel !== "undefined") {
-      await loadBugSheetData();
-    }
+    await loadBugSheetData();
 
     // モーダルを表示
-    showEditModal(scenario);
+    showEditModal(currentEditingScenario);
 
   } catch (error) {
     console.error("編集モーダル表示エラー:", error);
@@ -328,7 +378,36 @@ async function openEditModal(rowIdx, sheetName, cardElement) {
   }
 }
 
+async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
+  if (typeof Excel === "undefined") return;
+
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+    const usedRange = sheet.getUsedRange();
+    usedRange.load("values");
+    await context.sync();
+
+    const values = usedRange.values;
+    if (rowIdx < values.length) {
+      const row = values[rowIdx];
+      
+      // シート定義から列インデックスを取得
+      const sheetDef = SHEET_DEFS[sheetName];
+      if (sheetDef) {
+        if (sheetDef.colBlock >= 0 && row.length > sheetDef.colBlock) {
+          scenario.blockText = String(row[sheetDef.colBlock] || "").trim();
+        }
+        if (sheetDef.colMinor >= 0 && row.length > sheetDef.colMinor) {
+          scenario.minorText = String(row[sheetDef.colMinor] || "").trim();
+        }
+      }
+    }
+  });
+}
+
 async function selectExcelRow(sheetName, rowIdx) {
+  if (typeof Excel === "undefined") return;
+  
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
     const range = sheet.getRangeByIndexes(rowIdx, 0, 1, 100); // 行全体を選択
@@ -414,7 +493,7 @@ function displayBugList(containerId, bugText, bugType) {
   }
 
   let html = "";
-  bugIds.forEach(bug => {
+  bugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
@@ -427,15 +506,234 @@ function displayBugList(containerId, bugText, bugType) {
       <span class="bug-id">${bug.id}</span>
       <span class="bug-title">${esc(title)}</span>
       <span class="bug-status ${statusClass}">${esc(statusText)}</span>
+      <button class="remove-bug-btn" onclick="removeBug('${bug.id}', '${bugType}')" title="削除">
+        ✕
+      </button>
     </div>`;
   });
 
   container.innerHTML = html;
 }
 
+function showBugSelector(bugType) {
+  currentEditingBugType = bugType;
+  const modal = document.getElementById("bugSelectorModal");
+  const list = document.getElementById("bugSelectorList");
+  
+  // 現在のバグIDリストを取得
+  const currentBugText = bugType === 'block' ? currentEditingScenario.blockText : currentEditingScenario.minorText;
+  const currentBugIds = extractBugIds(currentBugText || "").map(b => b.id);
+  
+  let html = "";
+  Object.values(bugSheetData).forEach(bug => {
+    // 既に追加されているバグは除外
+    if (currentBugIds.includes(bug.id)) return;
+    
+    html += `<div class="selectable-bug" onclick="addBugToScenario('${bug.id}')">
+      <span class="bug-id">${bug.id}</span>
+      <span class="bug-title">${esc(bug.title)}</span>
+      <span class="bug-status open">${esc(bug.status)}</span>
+    </div>`;
+  });
+  
+  if (html === "") {
+    html = '<div class="empty-bugs">追加可能なバグはありません</div>';
+  }
+  
+  list.innerHTML = html;
+  modal.style.display = "flex";
+}
+
+function closeBugSelector() {
+  document.getElementById("bugSelectorModal").style.display = "none";
+  currentEditingBugType = null;
+}
+
+function addBugToScenario(bugId) {
+  if (!currentEditingBugType) return;
+  
+  const fieldName = currentEditingBugType === 'block' ? 'blockText' : 'minorText';
+  const currentText = currentEditingScenario[fieldName] || "";
+  
+  // バグIDを追加
+  let newText;
+  if (!currentText) {
+    newText = bugId;
+  } else {
+    const separator = currentText.includes('、') ? '、' : ',';
+    newText = currentText + separator + bugId;
+  }
+  
+  currentEditingScenario[fieldName] = newText;
+  
+  // UI更新
+  const containerId = currentEditingBugType === 'block' ? 'blockBugList' : 'minorBugList';
+  displayBugList(containerId, newText, currentEditingBugType === 'block' ? '完了阻害' : '軽微');
+  
+  closeBugSelector();
+  showSaveStatus(`${bugId} を追加しました`, "ok");
+}
+
+function removeBug(bugId, bugType) {
+  const fieldName = bugType === '完了阻害' ? 'blockText' : 'minorText';
+  const currentText = currentEditingScenario[fieldName] || "";
+  
+  if (!currentText) return;
+  
+  // バグIDを除去
+  const separator = currentText.includes('、') ? '、' : ',';
+  const parts = currentText.split(/[,、\s]+/).map(part => part.trim()).filter(part => part !== bugId);
+  const newText = parts.join(separator);
+  
+  currentEditingScenario[fieldName] = newText;
+  
+  // UI更新
+  const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
+  displayBugList(containerId, newText, bugType);
+  
+  showSaveStatus(`${bugId} を削除しました`, "ok");
+}
+
 function closeEditModal() {
   document.getElementById("editModal").style.display = "none";
   currentEditingScenario = null;
+  originalScenarioData = null;
+}
+
+function cancelEdit() {
+  // 変更を破棄
+  currentEditingScenario = null;
+  originalScenarioData = null;
+  closeEditModal();
+  showSaveStatus("編集をキャンセルしました", "ok");
+}
+
+async function saveEdit() {
+  if (!currentEditingScenario || !originalScenarioData) {
+    showSaveStatus("保存対象がありません", "err");
+    return;
+  }
+
+  try {
+    // Excelに保存
+    if (typeof Excel !== "undefined") {
+      await saveToExcel();
+    }
+
+    // 元データを更新
+    const originalIndex = creationData.findIndex(d => 
+      d.rowIdx === originalScenarioData.rowIdx && 
+      d.excelSheet === originalScenarioData.excelSheet
+    );
+    
+    if (originalIndex >= 0) {
+      creationData[originalIndex].blockText = currentEditingScenario.blockText;
+      creationData[originalIndex].minorText = currentEditingScenario.minorText;
+      
+      // レーンの再計算
+      creationData[originalIndex].lane = getLane(
+        creationData[originalIndex].start,
+        creationData[originalIndex].end,
+        currentEditingScenario.blockText
+      );
+    }
+
+    // バグデータの更新
+    updateBugDataFromScenario();
+
+    // UIを更新
+    applyFilter();
+    renderSummary();
+    closeEditModal();
+    
+    showSaveStatus("保存が完了しました", "ok");
+
+  } catch (error) {
+    console.error("保存エラー:", error);
+    showSaveStatus("保存エラー: " + error.message, "err");
+  }
+}
+
+async function saveToExcel() {
+  if (typeof Excel === "undefined") return;
+
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem(currentEditingScenario.excelSheet);
+    const rowIdx = currentEditingScenario.rowIdx;
+    
+    // シート定義から列インデックスを取得
+    const sheetDef = SHEET_DEFS[currentEditingScenario.excelSheet];
+    if (!sheetDef) return;
+
+    // 完了阻害となる課題を保存
+    if (sheetDef.colBlock >= 0) {
+      const blockCell = sheet.getCell(rowIdx, sheetDef.colBlock);
+      blockCell.values = [[currentEditingScenario.blockText || ""]];
+    }
+
+    // 軽微な課題を保存
+    if (sheetDef.colMinor >= 0) {
+      const minorCell = sheet.getCell(rowIdx, sheetDef.colMinor);
+      minorCell.values = [[currentEditingScenario.minorText || ""]];
+    }
+
+    await context.sync();
+  });
+}
+
+function updateBugDataFromScenario() {
+  if (!currentEditingScenario) return;
+
+  // 既存のバグデータから該当シナリオを削除
+  bugData.forEach(bug => {
+    bug.scenarios = bug.scenarios.filter(s => 
+      !(s.excelSheet === currentEditingScenario.excelSheet && 
+        s.rowIdx === currentEditingScenario.rowIdx)
+    );
+  });
+
+  // 新しいバグデータを追加
+  ['blockText', 'minorText'].forEach(textField => {
+    const text = currentEditingScenario[textField];
+    const isBlock = textField === 'blockText';
+    
+    if (text) {
+      const bugs = extractBugIds(text);
+      bugs.forEach(bugInfo => {
+        let bugEntry = bugData.find(b => b.id === bugInfo.id);
+        if (!bugEntry) {
+          bugEntry = { id: bugInfo.id, resolved: false, scenarios: [] };
+          bugData.push(bugEntry);
+        }
+
+        bugEntry.scenarios.push({
+          sheet: currentEditingScenario.sheet,
+          no: currentEditingScenario.no,
+          brand: currentEditingScenario.brand,
+          op1Func: currentEditingScenario.op1Func,
+          op1Stat: currentEditingScenario.op1Stat,
+          op2Func: currentEditingScenario.op2Func,
+          op2Stat: currentEditingScenario.op2Stat,
+          op3Func: currentEditingScenario.op3Func,
+          op3Stat: currentEditingScenario.op3Stat,
+          isBlock: isBlock,
+          resolved: bugInfo.resolved,
+          excelSheet: currentEditingScenario.excelSheet,
+          rowIdx: currentEditingScenario.rowIdx,
+          colBlock: currentEditingScenario.colBlock,
+          colMinor: currentEditingScenario.colMinor
+        });
+      });
+    }
+  });
+
+  // 空になったバグエントリを削除
+  bugData.splice(0, bugData.length, ...bugData.filter(b => b.scenarios.length > 0));
+
+  // resolvedフラグの更新
+  bugData.forEach(bug => {
+    bug.resolved = bug.scenarios.every(s => s.resolved);
+  });
 }
 
 async function updateBugStatus(bugId, isResolved, bugType) {
@@ -531,7 +829,7 @@ function makeOps(d){
 
 function makeCard(d){
   const cardId = `card-${d.excelSheet}-${d.rowIdx}`;
-  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" onclick="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this)">'
+  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" oncontextmenu="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this); return false;">'
     +'<div class="card-header">'
     +'<span class="no-badge">#'+d.no+'</span>'
     +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
@@ -758,9 +1056,17 @@ function startWithDemo(){
   
   // デモ用バグシートデータを設定
   bugSheetData = {
+    "バ1": { id: "バ1", title: "カードタッチエラー", status: "調査中" },
+    "バ2": { id: "バ2", title: "通信タイムアウト", status: "修正中" },
+    "バ3": { id: "バ3", title: "画面フリーズ", status: "テスト待ち" },
+    "バ4": { id: "バ4", title: "レシート印刷異常", status: "未対応" },
+    "バ5": { id: "バ5", title: "決済ログ欠損", status: "調査中" },
     "バ9": { id: "バ9", title: "残高照会タイムアウト対応", status: "調査中" },
     "バ16": { id: "バ16", title: "リトライ処理エラー", status: "修正待ち" },
-    "バ17": { id: "バ17", title: "強制残高照会失敗", status: "テスト中" }
+    "バ17": { id: "バ17", title: "強制残高照会失敗", status: "テスト中" },
+    "課1": { id: "課1", title: "UI改善要望", status: "検討中" },
+    "課2": { id: "課2", title: "操作性向上", status: "計画中" },
+    "課3": { id: "課3", title: "エラーメッセージ改善", status: "実装予定" }
   };
   
   buildFilterUI();
@@ -802,8 +1108,13 @@ function onReady(){
 
   // モーダル関連イベント
   document.getElementById("closeModal").addEventListener("click", closeEditModal);
+  document.getElementById("cancelEdit").addEventListener("click", cancelEdit);
+  document.getElementById("saveEdit").addEventListener("click", saveEdit);
   document.getElementById("editModal").addEventListener("click", function(e) {
     if (e.target === this) closeEditModal(); // 背景クリックで閉じる
+  });
+  document.getElementById("bugSelectorModal").addEventListener("click", function(e) {
+    if (e.target === this) closeBugSelector(); // 背景クリックで閉じる
   });
 
   // Office.onReady()を最初に呼び出し、その中で初期化処理を実行
