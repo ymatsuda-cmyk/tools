@@ -535,13 +535,17 @@ function onReady(){
     if(typeof Excel!=="undefined") loadData();
   });
 
-  if(typeof Office==="undefined"||typeof Excel==="undefined"){
-    startWithDemo();
-  } else {
+  // Office.onReady()を最初に呼び出し、その中で初期化処理を実行
+  if(typeof Office!=="undefined"){
     Office.onReady(function(info){
-      if(info.host===Office.HostType.Excel){loadData();}
-      else{startWithDemo();}
+      if(info.host===Office.HostType.Excel){
+        loadData();
+      } else {
+        startWithDemo();
+      }
     });
+  } else {
+    startWithDemo();
   }
 }
 
