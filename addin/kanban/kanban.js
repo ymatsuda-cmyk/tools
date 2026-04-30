@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260430_91fee1f";
+const APP_VERSION = "rev_20260430_d5453d2";
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
