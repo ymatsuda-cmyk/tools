@@ -444,7 +444,9 @@ async function loadBugSheetData() {
   if (Object.keys(bugSheetData).length > 0) return; // キャッシュがあれば使用
 
   if (typeof Excel === "undefined") {
-    console.log("デモモード：バグシートデータはstartWithDemo()で設定済み");
+    console.log("デモモード：バグシートデータを初期化");
+    // デモモードでbugSheetDataが空の場合は再初期化
+    initDemoBugSheetData();
     return;
   }
 
@@ -487,6 +489,7 @@ async function loadBugSheetData() {
 }
 
 function showEditModal(scenario) {
+  console.log("showEditModal - bugSheetData:", bugSheetData); // デバッグ用
   // シナリオ情報を表示
   document.getElementById("scenarioDetails").innerHTML = 
     `<strong>#${scenario.no} ${scenario.brand}</strong><br>
@@ -523,6 +526,7 @@ function displayBugList(containerId, bugText, bugType) {
   let html = "";
   bugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
+    console.log(`Bug ${bug.id}:`, sheetBug); // デバッグ用
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
     const statusClass = bug.resolved ? "closed" : "open";
