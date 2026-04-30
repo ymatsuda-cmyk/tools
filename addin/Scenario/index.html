@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Scenario-tracker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans JP","Segoe UI",sans-serif;background:#f0f2f5;color:#1e293b;padding:40px 20px;}
+.wrap{max-width:680px;margin:0 auto;}
+h1{font-size:22px;font-weight:700;margin-bottom:6px;}
+.sub{color:#475569;margin-bottom:28px;font-size:14px;}
+.card{background:#fff;border:1px solid #e2e6ea;border-radius:10px;padding:22px;margin-bottom:16px;}
+.card h2{font-size:14px;font-weight:700;margin-bottom:10px;color:#2563eb;}
+ol,ul{padding-left:18px;line-height:2.2;font-size:13px;}
+code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:#dc2626;}
+.btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;}
+.btn{display:inline-block;background:#2563eb;color:#fff;padding:9px 20px;border-radius:7px;text-decoration:none;font-weight:700;font-size:13px;}
+.btn:hover{opacity:.85;}
+.btn-demo{background:#475569;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th,td{padding:6px 10px;border:1px solid #e2e6ea;text-align:left;}
+th{background:#f8f9fb;font-weight:600;color:#475569;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#128203; Scenario-tracker</h1>
+  <p class="sub">Excel シナリオ一覧の作成状況・バグ影響を管理する Office アドイン</p>
+
+  <div class="card">
+    <h2>&#128229; インストール手順</h2>
+    <ol>
+      <li><code>manifest.xml</code> をダウンロードし、<code>YOUR_GITHUB_USERNAME</code> を自分のユーザー名に書き換える</li>
+      <li>Excel を開き、<strong>挿入 → アドイン → アドインのアップロード</strong></li>
+      <li>書き換えた <code>manifest.xml</code> を選択</li>
+      <li>シナリオ一覧の Excel ファイルを開き、リボンの <strong>「シナリオ一覧」</strong> をクリック</li>
+    </ol>
+    <div class="btns">
+      <a href="manifest.xml" class="btn" download>manifest.xml をダウンロード</a>
+      <a href="taskpane/taskpane.html" class="btn btn-demo" target="_blank">&#9654; デモを見る</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#128202; 機能</h2>
+    <ul>
+      <li><strong>作成状況ビュー</strong>：5レーンのカンバンボード（未着手 / バグ保留 / 対応中 / 完了（条件付き）/ 完了）</li>
+      <li><strong>バグ影響ビュー</strong>：バグIDごとに影響シナリオを一覧表示</li>
+      <li><strong>解消確認</strong>：チェックでExcelの該当セルに <code>（済）</code> を自動付与</li>
+      <li><strong>フィルター</strong>：フェーズ・ブランド・シート・テキスト検索</li>
+      <li><strong>デモモード</strong>：Excel未接続時は自動でデモデータ表示</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>&#128196; 対応シート</h2>
+    <table>
+      <tr><th>シート名</th><th>フェーズ</th><th>ブランド</th></tr>
+      <tr><td>異常（通常）</td><td>PH1/PH2</td><td>楽天Edy, iD, QUICPay, 交通系IC, WAON, nanaco</td></tr>
+      <tr><td>異常（電源断）</td><td>PH1/PH2</td><td>同上</td></tr>
+      <tr><td>異常（通信断）</td><td>PH1/PH2</td><td>同上</td></tr>
+      <tr><td>正常（クレ・銀聯）</td><td>PH2</td><td>クレジット, 銀聯</td></tr>
+    </table>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+
+  <Id>ABCD1234-ABCD-1234-ABCD-ABCD12345678</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>ライターム</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+  <DisplayName DefaultValue="シナリオ一覧"/>
+  <Description DefaultValue="シナリオの作成状況とバグ影響を管理するアドイン"/>
+  <IconUrl DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/assets/icon-80.png"/>
+  <SupportUrl DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker"/>
+  <AppDomains>
+    <AppDomain>https://YOUR_GITHUB_USERNAME.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/taskpane/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="CommandsGroup">
+                <Label resid="CommandsGroup.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="TaskpaneButton">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="TaskpaneButton.Label"/>
+                    <Description resid="TaskpaneButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/taskpane/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker/taskpane/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="シナリオ一覧アドインへようこそ"/>
+        <bt:String id="CommandsGroup.Label" DefaultValue="シナリオ管理"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="シナリオ一覧"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="シナリオの作成状況とバグ影響を確認できます"/>
+        <bt:String id="GetStarted.LearnMoreUrl" DefaultValue="https://YOUR_GITHUB_USERNAME.github.io/Scenario-tracker"/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="シナリオ一覧パネルを開く"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

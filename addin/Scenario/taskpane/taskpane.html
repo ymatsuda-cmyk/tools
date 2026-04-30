@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シナリオ一覧</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f0f2f5;--surface:#fff;--border:#e2e6ea;--border2:#d0d5dd;
+  --accent:#2563eb;--accent-light:#eff6ff;
+  --text:#1e293b;--text2:#475569;--muted:#94a3b8;--tag:#f1f5f9;
+  --ok:#16a34a;--ok-bg:#dcfce7;--err:#dc2626;--err-bg:#fee2e2;
+  --warn:#d97706;--warn-bg:#fef3c7;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ── HEADER ── */
+header{background:#fff;border-bottom:1px solid var(--border);padding:10px 14px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.header-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+h1{font-size:14px;font-weight:700;}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:6px;}
+.count-badge{background:var(--accent-light);border:1px solid #bfdbfe;padding:2px 8px;border-radius:20px;font-size:11px;color:var(--accent);font-family:"JetBrains Mono",monospace;font-weight:600;}
+.reload-btn{background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;font-weight:600;}
+.reload-btn:hover{opacity:.85;}
+.reload-btn:disabled{opacity:.5;cursor:default;}
+.demo-banner{background:var(--warn-bg);border:1px solid #fde68a;border-radius:6px;padding:5px 10px;margin-bottom:8px;font-size:11px;color:#92400e;display:none;align-items:center;gap:6px;}
+.demo-banner .note{margin-left:auto;color:#b45309;font-weight:600;}
+
+/* ── VIEW TABS ── */
+.view-tabs{display:flex;gap:0;margin-bottom:8px;}
+.view-tab{flex:1;padding:5px 0;background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:12px;font-family:"Noto Sans JP",sans-serif;cursor:pointer;transition:all .15s;text-align:center;}
+.view-tab:first-child{border-radius:6px 0 0 6px;}
+.view-tab:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.view-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+.view-tab:not(.active):hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
+
+/* ── FILTERS ── */
+.filters{display:flex;flex-direction:column;gap:5px;}
+.filter-row{display:flex;gap:5px;align-items:center;}
+.search-wrap{position:relative;flex:1;}
+.search-wrap svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--muted);pointer-events:none;}
+input[type=text]{width:100%;padding:5px 8px 5px 26px;background:#f8f9fb;border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:"Noto Sans JP",sans-serif;outline:none;}
+input[type=text]:focus{border-color:var(--accent);background:#fff;}
+input[type=text]::placeholder{color:var(--muted);}
+select{flex:1;padding:5px 24px 5px 8px;background:#f8f9fb;border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:"Noto Sans JP",sans-serif;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;}
+select:focus{border-color:var(--accent);background-color:#fff;}
+.sheet-tabs{display:flex;gap:3px;flex-wrap:wrap;}
+.tab-btn{padding:3px 8px;background:transparent;border:1px solid var(--border2);border-radius:12px;color:var(--text2);font-size:10px;font-family:"Noto Sans JP",sans-serif;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tab-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+
+/* ── MAIN ── */
+main{padding:12px 14px;overflow-x:auto;}
+
+/* ── BOARD (作成状況) ── */
+.board{display:flex;gap:10px;min-width:max-content;align-items:flex-start;}
+.lane{width:240px;flex-shrink:0;}
+.lane-header{display:flex;align-items:center;padding:6px 10px;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;margin-bottom:6px;border-bottom:2px solid transparent;}
+.lane-count{margin-left:auto;font-size:10px;font-family:"JetBrains Mono",monospace;}
+.lane[data-lane="未着手"] .lane-header{background:#f8f9fb;border-color:#94a3b8;color:#475569;}
+.lane[data-lane="バグ保留"] .lane-header{background:#fff7ed;border-color:#f97316;color:#c2410c;}
+.lane[data-lane="対応中"] .lane-header{background:var(--accent-light);border-color:var(--accent);color:#1d4ed8;}
+.lane[data-lane="完了（条件付き）"] .lane-header{background:#fefce8;border-color:#ca8a04;color:#92400e;}
+.lane[data-lane="完了"] .lane-header{background:#f0fdf4;border-color:var(--ok);color:#15803d;}
+.lane-body{display:flex;flex-direction:column;gap:6px;min-height:40px;}
+.lane-empty{color:var(--muted);font-size:11px;text-align:center;padding:16px 0;}
+.card{width:228px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;position:relative;overflow:hidden;flex-shrink:0;transition:box-shadow .15s;}
+.card:hover{box-shadow:0 2px 10px rgba(37,99,235,.12);border-color:#bfdbfe;}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;border-radius:7px 7px 0 0;}
+.card[data-sheet="異常（通常）"]::before{background:#ef4444;}
+.card[data-sheet="異常（電源断）"]::before{background:#8b5cf6;}
+.card[data-sheet="異常（通信断）"]::before{background:#f59e0b;}
+.card[data-sheet="正常（クレ・銀聯）"]::before{background:#0ea5e9;}
+.card[data-sheet="正常"]::before{background:#22c55e;}
+.card-header{display:flex;align-items:center;gap:4px;margin-bottom:6px;flex-wrap:nowrap;overflow:hidden;}
+.no-badge{background:var(--tag);border:1px solid var(--border);padding:1px 4px;border-radius:3px;font-family:"JetBrains Mono",monospace;font-size:9px;color:var(--text2);white-space:nowrap;flex-shrink:0;}
+.phase-badge{padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.phase-PH1{background:var(--accent-light);color:var(--accent);border:1px solid #bfdbfe;}
+.phase-PH2{background:#fdf4ff;color:#9333ea;border:1px solid #e9d5ff;}
+.brand-name{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+.sheet-tag{padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.st-a{background:#fee2e2;color:#dc2626;}
+.st-b{background:#f5f3ff;color:#7c3aed;}
+.st-c{background:#fef3c7;color:#d97706;}
+.st-d{background:#e0f2fe;color:#0369a1;}
+.st-e{background:#dcfce7;color:#16a34a;}
+.ops{display:flex;flex-direction:column;gap:3px;}
+.op-row{display:flex;align-items:flex-start;gap:4px;}
+.op-label{font-size:8px;font-weight:700;color:var(--muted);background:var(--tag);border:1px solid var(--border);padding:1px 3px;border-radius:2px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.op-content{display:flex;flex-wrap:wrap;gap:2px;align-items:center;flex:1;}
+.op-func{font-size:10px;color:var(--text2);font-weight:500;}
+.op-arrow{font-size:8px;color:var(--muted);}
+.op-stat{font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600;}
+.sc-ok{background:var(--ok-bg);color:var(--ok);}
+.sc-err{background:var(--err-bg);color:var(--err);}
+.sc-warn{background:var(--warn-bg);color:var(--warn);}
+.sc-neu{background:var(--tag);color:var(--text2);}
+
+/* ── BUG VIEW ── */
+#bugView{display:none;}
+.section-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase;}
+
+/* サマリーテーブル */
+.summary-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px;}
+.summary-table th{background:#f8f9fb;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;}
+.summary-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;cursor:pointer;transition:background .12s;}
+.summary-table tr:last-child td{border-bottom:none;}
+.summary-table tbody tr:hover td{background:var(--accent-light);}
+.summary-table tbody tr.selected td{background:#dbeafe;}
+.bid{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:700;padding:2px 9px;border-radius:5px;display:inline-block;}
+.bid-ng{background:var(--err-bg);color:var(--err);border:1px solid #fca5a5;}
+.bid-ok{background:var(--ok-bg);color:var(--ok);border:1px solid #86efac;}
+.prog-wrap{display:flex;align-items:center;gap:6px;}
+.prog-bar{flex:1;height:6px;background:#e2e6ea;border-radius:4px;overflow:hidden;min-width:60px;}
+.prog-fill{height:100%;border-radius:4px;transition:width .3s;}
+.pf-done{background:var(--ok);}
+.pf-part{background:var(--warn);}
+.pf-none{background:var(--err);}
+.prog-pct{font-size:10px;font-family:"JetBrains Mono",monospace;color:var(--text2);white-space:nowrap;}
+.b-block{background:var(--err-bg);color:var(--err);border:1px solid #fca5a5;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;}
+.b-minor{background:var(--warn-bg);color:var(--warn);border:1px solid #fde68a;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;}
+.st-bng{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--err-bg);color:var(--err);}
+.st-bok{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--ok-bg);color:var(--ok);}
+
+/* 詳細パネル */
+.detail-panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.detail-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8f9fb;border-bottom:1px solid var(--border);}
+.detail-close{margin-left:auto;background:transparent;border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--text2);}
+.detail-close:hover{border-color:var(--err);color:var(--err);}
+.detail-table{width:100%;border-collapse:collapse;font-size:11px;}
+.detail-table th{background:#f8f9fb;padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;}
+.detail-table td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.detail-table tr:last-child td{border-bottom:none;}
+.detail-table tr:hover td{background:#f8faff;}
+.detail-table tr.row-done td{opacity:.45;}
+.chk-cell{text-align:center;width:26px;}
+.chk-cell input{width:13px;height:13px;cursor:pointer;accent-color:var(--accent);}
+.empty-detail{padding:24px;text-align:center;color:var(--muted);font-size:12px;}
+
+/* ── システムメッセージ ── */
+#loadingMsg{display:none;text-align:center;padding:40px 20px;color:var(--muted);}
+#loadingMsg .spinner{width:24px;height:24px;border:3px solid #e2e6ea;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+#errorMsg{display:none;margin:12px 14px;padding:10px 14px;background:var(--err-bg);border:1px solid #fca5a5;border-radius:7px;color:var(--err);font-size:12px;}
+#saveStatus{display:none;position:fixed;bottom:14px;right:14px;background:#1e293b;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;z-index:999;box-shadow:0 3px 12px rgba(0,0,0,.2);}
+#saveStatus.ok{background:var(--ok);}
+#saveStatus.err{background:var(--err);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="logo">&#128203;</div>
+    <h1>シナリオ一覧</h1>
+    <div class="header-right">
+      <span class="count-badge" id="countBadge">---</span>
+      <button class="reload-btn" id="reloadBtn">&#8635; 読込</button>
+    </div>
+  </div>
+  <div id="demoBanner" class="demo-banner">
+    <span>&#9888;&#65039; デモモード（Excelなし）でプレビュー中</span>
+    <span class="note">実データはExcelで開いてください</span>
+  </div>
+  <div class="view-tabs">
+    <button class="view-tab active" id="tabCreation">作成状況</button>
+    <button class="view-tab" id="tabBug">バグ影響</button>
+  </div>
+  <div class="filters" id="creationFilters">
+    <div class="filter-row">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="ブランド・機能・処理状況で検索...">
+      </div>
+    </div>
+    <div class="filter-row">
+      <select id="phaseFilter">
+        <option value="">全フェーズ</option>
+        <option value="PH1">PH1</option>
+        <option value="PH2">PH2</option>
+      </select>
+      <select id="brandFilter"><option value="">全ブランド</option></select>
+    </div>
+    <div class="sheet-tabs" id="sheetTabs">
+      <button class="tab-btn active" data-sheet="">全て</button>
+<button class="tab-btn" data-sheet="正常">正常</button><button class="tab-btn" data-sheet="正常（クレ・銀聯）">正常（クレ・銀聯）</button><button class="tab-btn" data-sheet="異常（通常）">異常（通常）</button>
+    </div>
+  </div>
+</header>
+
+<div id="loadingMsg"><div class="spinner"></div>データを読み込んでいます...</div>
+<div id="errorMsg"></div>
+
+<main id="mainContent" style="display:none;">
+
+  <!-- 作成状況ビュー -->
+  <div id="creationView">
+    <div class="board" id="board"></div>
+  </div>
+
+  <!-- バグ影響ビュー -->
+  <div id="bugView">
+    <div class="section-label">バグ一覧 &#9658; クリックで詳細を表示</div>
+    <table class="summary-table" id="summaryTable">
+      <thead>
+        <tr>
+          <th>バグID</th>
+          <th>ステータス</th>
+          <th>種別</th>
+          <th>影響件数</th>
+          <th>解消率</th>
+          <th>影響ブランド</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody"></tbody>
+    </table>
+    <div id="detailPanel" class="detail-panel">
+      <div class="empty-detail">&#8593; バグIDをクリックすると詳細シナリオを表示します</div>
+    </div>
+  </div>
+
+</main>
+
+<div id="saveStatus"></div>
+
+<script src="../src/parser.js"></script>
+<script>
+"use strict";
+var creationData  = [];
+var bugData       = [];
+var selectedBugId = null;
+var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了"];
+
+// ─── デモデータ ───────────────────────────────────────
+var DEMO_CREATION = [{"sheet":"異常（通常）","no":12,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":13,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"中止押下","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ9,バ16,バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":2,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"33:リトライ","op2Stat":"正常終了","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":57,"brand":"iD","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":59,"brand":"iD","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":55,"brand":"iD","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":56,"brand":"iD","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":81,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":83,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":87,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":91,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":67,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":68,"brand":"交通系IC","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":136,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"-","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":137,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":150,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":151,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":213,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":214,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"中止押下","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":1,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"一括　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":2,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"分割　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":57,"brand":"銀聯","op1Func":"売上（銀聯（MS JIS1））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":58,"brand":"銀聯","op1Func":"売上（銀聯（IC））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1}];
+var DEMO_BUGS     = [{"id":"バ9","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":58,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]},{"id":"バ16","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":22,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"強制残高失敗","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":44,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]},{"id":"バ17","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":43,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]}];
+
+// ─── ユーティリティ ───────────────────────────────────
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function sheetTagClass(sheet){
+  var m={"異常（通常）":"st-a","異常（電源断）":"st-b","異常（通信断）":"st-c","正常（クレ・銀聯）":"st-d","正常":"st-e"};
+  return "sheet-tag "+(m[sheet]||"st-e");
+}
+
+function statClass(s){
+  if(!s||s==="-") return "op-stat sc-neu";
+  if(/正常終了|成功/.test(s))                        return "op-stat sc-ok";
+  if(/タイムアウト|中止|未了|失敗|不足|異常/.test(s))  return "op-stat sc-err";
+  if(/指示待ち|処理中/.test(s))                       return "op-stat sc-warn";
+  return "op-stat sc-neu";
+}
+
+function makeOps(d){
+  var h="",ops=[["OP1",d.op1Func,d.op1Stat],["OP2",d.op2Func,d.op2Stat],["OP3",d.op3Func,d.op3Stat]];
+  for(var i=0;i<ops.length;i++){
+    var lb=ops[i][0],fn=ops[i][1],st=ops[i][2];
+    if(!fn&&!st) continue;
+    var ar=(fn&&st&&st!=="-")?'<span class="op-arrow">&#8594;</span>':"";
+    var sh=(st&&st!=="-")?'<span class="'+statClass(st)+'">'+esc(st)+'</span>':"";
+    h+='<div class="op-row"><span class="op-label">'+lb+'</span>'
+      +'<div class="op-content"><span class="op-func">'+esc(fn||"-")+'</span>'+ar+sh+'</div></div>';
+  }
+  return h;
+}
+
+function makeCard(d){
+  return '<div class="card" data-sheet="'+esc(d.sheet)+'">'
+    +'<div class="card-header">'
+    +'<span class="no-badge">#'+d.no+'</span>'
+    +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
+    +'<span class="brand-name">'+esc(d.brand)+'</span>'
+    +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(d.sheet)+'</span>'
+    +'</div><div class="ops">'+makeOps(d)+'</div></div>';
+}
+
+function showLoading(v){document.getElementById("loadingMsg").style.display=v?"":"none";}
+function showError(msg){var e=document.getElementById("errorMsg");e.textContent=msg;e.style.display="";}
+function hideError(){document.getElementById("errorMsg").style.display="none";}
+function showSaveStatus(msg,type){
+  var el=document.getElementById("saveStatus");
+  el.textContent=msg;el.className=type||"";el.style.display="";
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.style.display="none";},2500);
+}
+
+// ─── フィルターUI構築 ─────────────────────────────────
+function buildFilterUI(){
+  var brands=[],seenB={};
+  creationData.forEach(function(d){if(d.brand&&!seenB[d.brand]){seenB[d.brand]=true;brands.push(d.brand);}});
+  brands.sort();
+  var bSel=document.getElementById("brandFilter");
+  bSel.innerHTML='<option value="">全ブランド</option>';
+  brands.forEach(function(b){var o=document.createElement("option");o.value=b;o.textContent=b;bSel.appendChild(o);});
+
+  var shts=[],seenS={};
+  creationData.forEach(function(d){if(!seenS[d.sheet]){seenS[d.sheet]=true;shts.push(d.sheet);}});
+  shts.sort();
+  var te=document.getElementById("sheetTabs");
+  te.innerHTML='<button class="tab-btn active" data-sheet="">全て</button>';
+  shts.forEach(function(s){
+    var b=document.createElement("button");
+    b.className="tab-btn";b.setAttribute("data-sheet",s);b.textContent=s;
+    te.appendChild(b);
+  });
+  te.querySelectorAll(".tab-btn").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      te.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active");});
+      btn.classList.add("active");applyFilter();
+    });
+  });
+}
+
+// ─── 作成状況ビュー ───────────────────────────────────
+function applyFilter(){
+  var q=document.getElementById("searchInput").value.toLowerCase();
+  var ph=document.getElementById("phaseFilter").value;
+  var br=document.getElementById("brandFilter").value;
+  var at=document.querySelector("#sheetTabs .tab-btn.active");
+  var sh=at?at.getAttribute("data-sheet"):"";
+
+  var f=creationData.filter(function(d){
+    if(ph&&d.phase!==ph) return false;
+    if(br&&d.brand!==br) return false;
+    if(sh&&d.sheet!==sh) return false;
+    if(q){
+      var t=[d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase].join(" ").toLowerCase();
+      if(t.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+
+  document.getElementById("countBadge").textContent=f.length+" 件";
+  var html="";
+  LANES.forEach(function(lane){
+    var cards=f.filter(function(d){return d.lane===lane;});
+    html+='<div class="lane" data-lane="'+lane+'">'
+        +'<div class="lane-header"><span>'+lane+'</span><span class="lane-count">'+cards.length+'件</span></div>'
+        +'<div class="lane-body">';
+    if(cards.length===0){html+='<div class="lane-empty">&#8212;</div>';}
+    else{cards.forEach(function(d){html+=makeCard(d);});}
+    html+='</div></div>';
+  });
+  document.getElementById("board").innerHTML=html;
+}
+
+// ─── バグ影響：サマリー ───────────────────────────────
+function renderSummary(){
+  var tbody=document.getElementById("summaryBody");
+  var rows="";
+  bugData.forEach(function(b){
+    var total=b.scenarios.length;
+    var done=b.scenarios.filter(function(s){return s.resolved;}).length;
+    var pct=total>0?Math.round(done/total*100):0;
+    var allDone=done===total;
+    var hasBlock=b.scenarios.some(function(s){return s.isBlock;});
+    var brands=[...new Set(b.scenarios.map(function(s){return s.brand;}))].join(", ");
+    var fc=allDone?"pf-done":(pct>0?"pf-part":"pf-none");
+    var bc=allDone?"bid bid-ok":"bid bid-ng";
+    var disp=allDone?b.id+"（済）":b.id;
+    var sc=allDone?"st-bok":"st-bng";
+    var st=allDone?"全解消済み":"未解消";
+    var ty=hasBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
+    var sel=selectedBugId===b.id;
+    rows+='<tr data-bugid="'+b.id+'"'+(sel?' class="selected"':'')+'>'
+        +'<td><span class="'+bc+'">'+esc(disp)+'</span></td>'
+        +'<td><span class="'+sc+'">'+st+'</span></td>'
+        +'<td>'+ty+'</td>'
+        +'<td style="font-family:JetBrains Mono,monospace;font-weight:600;font-size:11px;">'+done+' / '+total+'</td>'
+        +'<td><div class="prog-wrap">'
+        +'<div class="prog-bar"><div class="prog-fill '+fc+'" style="width:'+pct+'%"></div></div>'
+        +'<span class="prog-pct">'+pct+'%</span>'
+        +'</div></td>'
+        +'<td style="font-size:11px;color:var(--text2);">'+esc(brands)+'</td>'
+        +'</tr>';
+  });
+  tbody.innerHTML=rows;
+  tbody.querySelectorAll("tr").forEach(function(tr){
+    tr.addEventListener("click",function(){
+      var id=this.getAttribute("data-bugid");
+      selectedBugId=(selectedBugId===id)?null:id;
+      renderSummary();
+      renderDetail();
+    });
+  });
+}
+
+// ─── バグ影響：詳細パネル ─────────────────────────────
+function renderDetail(){
+  var panel=document.getElementById("detailPanel");
+  if(!selectedBugId){
+    panel.innerHTML='<div class="empty-detail">&#8593; バグIDをクリックすると詳細シナリオを表示します</div>';
+    return;
+  }
+  var bug=bugData.find(function(b){return b.id===selectedBugId;});
+  if(!bug){panel.innerHTML="";return;}
+
+  var total=bug.scenarios.length;
+  var done=bug.scenarios.filter(function(s){return s.resolved;}).length;
+  var allDone=done===total;
+  var bc=allDone?"bid bid-ok":"bid bid-ng";
+  var disp=allDone?bug.id+"（済）":bug.id;
+
+  var rows="";
+  bug.scenarios.forEach(function(s,si){
+    var rc=s.resolved?' class="row-done"':"";
+    var chk=s.resolved?" checked":"";
+    var ty=s.isBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
+    var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"&#8212;";
+    var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"&#8212;";
+    var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"&#8212;";
+    rows+='<tr'+rc+'>'
+        +'<td class="chk-cell"><input type="checkbox" data-si="'+si+'"'+chk+'></td>'
+        +'<td><span class="no-badge">#'+s.no+'</span></td>'
+        +'<td><strong>'+esc(s.brand)+'</strong></td>'
+        +'<td>'+esc(s.op1Func||"&#8212;")+'</td><td>'+o1s+'</td>'
+        +'<td>'+esc(s.op2Func||"&#8212;")+'</td><td>'+o2s+'</td>'
+        +'<td>'+esc(s.op3Func||"&#8212;")+'</td><td>'+o3s+'</td>'
+        +'<td>'+ty+'</td>'
+        +'</tr>';
+  });
+
+  panel.innerHTML=
+    '<div class="detail-header">'
+    +'<span class="'+bc+'">'+esc(disp)+'</span>'
+    +'<span style="font-size:11px;color:var(--text2);font-weight:500;">'+done+'/'+total+'件解消</span>'
+    +'<button class="detail-close" id="closeDetail">&#10005; 閉じる</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto;">'
+    +'<table class="detail-table"><thead><tr>'
+    +'<th class="chk-cell">済</th>'
+    +'<th>項番</th><th>ブランド</th>'
+    +'<th>OP1機能</th><th>OP1状況</th>'
+    +'<th>OP2機能</th><th>OP2状況</th>'
+    +'<th>OP3機能</th><th>OP3状況</th>'
+    +'<th>種別</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+  // チェックボックスイベント
+  panel.querySelectorAll("input[type=checkbox]").forEach(function(chk){
+    chk.addEventListener("change",function(){
+      var si=parseInt(this.getAttribute("data-si"));
+      bug.scenarios[si].resolved=this.checked;
+      bug.resolved=bug.scenarios.every(function(s){return s.resolved;});
+
+      if(typeof Excel!=="undefined"){
+        Excel.run(function(ctx){
+          return writeBugResolution(ctx,bug.id,this.checked,[bug.scenarios[si]]);
+        }.bind(this)).then(function(){
+          showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" を"+(bug.scenarios[si].resolved?"済み":"未解消")+"に更新","ok");
+        }).catch(function(e){
+          bug.scenarios[si].resolved=!bug.scenarios[si].resolved;
+          showSaveStatus("保存エラー: "+e.message,"err");
+        });
+      } else {
+        showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" ["+(bug.scenarios[si].resolved?"済み":"未解消")+"] (デモ)","ok");
+      }
+      renderSummary();
+      renderDetail();
+    });
+  });
+
+  document.getElementById("closeDetail").addEventListener("click",function(){
+    selectedBugId=null;
+    renderSummary();
+    renderDetail();
+  });
+}
+
+function renderBugView(){
+  document.getElementById("countBadge").textContent=bugData.length+" バグ";
+  renderSummary();
+  renderDetail();
+}
+
+// ─── ビュー切り替え ───────────────────────────────────
+function switchView(view){
+  var isCr=view==="creation";
+  document.getElementById("tabCreation").classList.toggle("active",isCr);
+  document.getElementById("tabBug").classList.toggle("active",!isCr);
+  document.getElementById("creationFilters").style.display=isCr?"":"none";
+  document.getElementById("creationView").style.display=isCr?"":"none";
+  document.getElementById("bugView").style.display=isCr?"none":"block";
+  if(isCr){applyFilter();}else{renderBugView();}
+}
+
+// ─── デモ / Excel 起動 ───────────────────────────────
+function startWithDemo(){
+  document.getElementById("demoBanner").style.display="flex";
+  creationData=DEMO_CREATION;
+  bugData=DEMO_BUGS;
+  buildFilterUI();
+  switchView("creation");
+  document.getElementById("mainContent").style.display="";
+  var rb=document.getElementById("reloadBtn");
+  rb.textContent="&#9654; デモ";
+  rb.style.background="#94a3b8";
+  rb.disabled=true;
+}
+
+async function loadData(){
+  showLoading(true);hideError();
+  document.getElementById("mainContent").style.display="none";
+  document.getElementById("reloadBtn").disabled=true;
+  try{
+    await Excel.run(async function(ctx){
+      var r=await readWorkbook(ctx);
+      creationData=r.creationData;
+      bugData=r.bugData;
+    });
+    selectedBugId=null;
+    buildFilterUI();
+    switchView("creation");
+    document.getElementById("mainContent").style.display="";
+  }catch(e){showError("読み込みエラー: "+e.message);}
+  finally{showLoading(false);document.getElementById("reloadBtn").disabled=false;}
+}
+
+function onReady(){
+  document.getElementById("tabCreation").addEventListener("click",function(){switchView("creation");});
+  document.getElementById("tabBug").addEventListener("click",function(){switchView("bug");});
+  document.getElementById("searchInput").addEventListener("input",applyFilter);
+  document.getElementById("phaseFilter").addEventListener("change",applyFilter);
+  document.getElementById("brandFilter").addEventListener("change",applyFilter);
+  document.getElementById("reloadBtn").addEventListener("click",function(){
+    if(typeof Excel!=="undefined") loadData();
+  });
+
+  if(typeof Office==="undefined"||typeof Excel==="undefined"){
+    startWithDemo();
+  } else {
+    Office.onReady(function(info){
+      if(info.host===Office.HostType.Excel){loadData();}
+      else{startWithDemo();}
+    });
+  }
+}
+
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded",onReady);
+}else{
+  onReady();
+}
+</script>
+</body>
+</html>
