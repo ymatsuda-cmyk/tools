@@ -169,8 +169,10 @@ main{padding:12px 14px;overflow-x:auto;}
 .bug-item{display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--surface);}
 .bug-item:last-child{border-bottom:none;}
 .bug-item:hover{background:#f8faff;}
-.bug-item.added{background:#e0f7ff;border-left:3px solid #06b6d4;}
-.bug-item.removed{background:#f5f5f5;color:#888;opacity:0.7;text-decoration:line-through;}
+.bug-item.added{background:#e0f7ff;border-left:3px solid #06b6d4;} /* 新規追加 - 薄い水色 */
+.bug-item.removed{background:#f3f4f6;color:#6b7280;opacity:0.8;} /* 削除 - 灰色 */
+.bug-item.removed .bug-id, .bug-item.removed .bug-title{text-decoration:line-through;}
+.bug-item.removed .remove-bug-btn{display:none;} /* 削除済みアイテムは削除ボタンを非表示 */
 .bug-checkbox{width:14px;height:14px;margin-right:8px;cursor:pointer;accent-color:var(--accent);}
 .bug-id{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:600;min-width:40px;margin-right:8px;}
 .bug-title{flex:1;font-size:11px;color:var(--text);margin-right:8px;}
@@ -497,28 +499,42 @@ function showEditModal(scenario) {
 function displayBugList(containerId, bugText, bugType) {
   const container = document.getElementById(containerId);
   
+  // 元のバグIDリストを取得（編集前の状態）
+  const originalIds = bugType === '完了阻害' ? originalBugIds.block : originalBugIds.minor;
+  
   if (!bugText) {
     container.innerHTML = '<div class="empty-bugs">課題はありません</div>';
     return;
   }
 
-  // バグIDを抽出
-  const bugIds = extractBugIds(bugText);
+  // 現在のバグIDを抽出
+  const currentBugIds = extractBugIds(bugText);
   
-  if (bugIds.length === 0) {
+  if (currentBugIds.length === 0) {
     container.innerHTML = '<div class="empty-bugs">課題はありません</div>';
     return;
   }
 
+  // 新規追加・削除を判定
+  const currentIds = currentBugIds.map(b => b.id);
+  const addedIds = currentIds.filter(id => !originalIds.includes(id));
+  const removedIds = originalIds.filter(id => !currentIds.includes(id));
+
   let html = "";
-  bugIds.forEach((bug, index) => {
+  
+  // 現在のバグを表示
+  currentBugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
     const statusClass = bug.resolved ? "closed" : "open";
     const statusText = bug.resolved ? "解消済み" : (status || "未解消");
+    
+    // 新規追加されたバグかチェック
+    const isAdded = addedIds.includes(bug.id);
+    const itemClass = isAdded ? "bug-item added" : "bug-item";
 
-    html += `<div class="bug-item">
+    html += `<div class="${itemClass}">
       <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} 
              onchange="updateBugStatus('${bug.id}', this.checked, '${bugType}')">
       <span class="bug-id">${bug.id}</span>
@@ -527,6 +543,20 @@ function displayBugList(containerId, bugText, bugType) {
       <button class="remove-bug-btn" onclick="removeBug('${bug.id}', '${bugType}')" title="削除">
         ✕
       </button>
+    </div>`;
+  });
+  
+  // 削除されたバグを表示（灰色）
+  removedIds.forEach(bugId => {
+    const sheetBug = bugSheetData[bugId];
+    const title = sheetBug ? sheetBug.title : "詳細情報なし";
+    const status = sheetBug ? sheetBug.status : "不明";
+    
+    html += `<div class="bug-item removed">
+      <span class="bug-id">${bugId}</span>
+      <span class="bug-title">${esc(title)}</span>
+      <span class="bug-status">${esc(status)} (削除済み)</span>
+      <span class="restore-indicator">削除済み</span>
     </div>`;
   });
 
