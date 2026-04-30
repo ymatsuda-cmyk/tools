@@ -840,7 +840,8 @@ async function saveEdit() {
       creationData[originalIndex].lane = getLane(
         creationData[originalIndex].start,
         creationData[originalIndex].end,
-        currentEditingScenario.blockText
+        currentEditingScenario.blockText,
+        currentEditingScenario.minorText
       );
     }
 

@@ -63,13 +63,15 @@ function extractBugIds(text) {
   }));
 }
 
-function getLane(start, end, blockText) {
+function getLane(start, end, blockText, minorText) {
   const hasUnresolved = (text) => {
     if (!text) return false;
-    const bugs = text.match(/バ\d+(?:（済）)?/g) || [];
+    const bugs = text.match(/[バ課]\d+(?:（済）)?/g) || [];
     return bugs.some(b => !b.includes("（済）"));
   };
-  const unresolved = hasUnresolved(blockText);
+  const unresolvedBlock = hasUnresolved(blockText);
+  const unresolvedMinor = hasUnresolved(minorText);
+  const unresolved = unresolvedBlock || unresolvedMinor;
   if (!start) return unresolved ? "バグ保留" : "未着手";
   if (!end)   return unresolved ? "バグ保留" : "対応中";
   return unresolved ? "完了（条件付き）" : "完了";
@@ -136,7 +138,7 @@ async function readWorkbook(context) {
       const minorText = colCount > def.colMinor ? cleanVal(row[def.colMinor]) : "";
       const start = colCount > def.colStart ? dateStr(row[def.colStart]) : "";
       const end   = colCount > def.colEnd   ? dateStr(row[def.colEnd])   : "";
-      const lane  = getLane(start, end, blockText);
+      const lane  = getLane(start, end, blockText, minorText);
 
       const key = `${sheetLabel}|${autoNo}|${brand}|${op1Func}`;
       if (seen.has(key)) continue;
