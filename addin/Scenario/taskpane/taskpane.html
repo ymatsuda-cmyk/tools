@@ -958,13 +958,7 @@ async function updateBugStatus(bugId, isResolved, bugType) {
       }
     }
 
-    // Excelに書き戻し
-    if (typeof Excel !== "undefined") {
-      await Excel.run(async (context) => {
-        await writeBugResolution(context, bugId, isResolved, [currentEditingScenario]);
-      });
-    }
-
+    // Excelへの反映は行わない（保存時にまとめて反映）
     // バグテキストを更新
     const fieldName = bugType === "完了阻害" ? "blockText" : "minorText";
     currentEditingScenario[fieldName] = updateBugTextStatus(currentEditingScenario[fieldName], bugId, isResolved);
@@ -978,9 +972,6 @@ async function updateBugStatus(bugId, isResolved, bugType) {
   } catch (error) {
     console.error("バグ状況更新エラー:", error);
     showSaveStatus("更新エラー: " + error.message, "err");
-    // チェックボックスを元に戻す
-    const checkbox = document.querySelector(`[data-bug-id="${bugId}"]`);
-    if (checkbox) checkbox.checked = !isResolved;
   }
 }
 
