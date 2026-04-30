@@ -6,14 +6,14 @@
 // ─── 列定義 ───────────────────────────────────────────
 const SHEET_DEFS = {
   "異常（通常）": {
-    dataStart: 14,
+    dataStart: 14,   // 0-indexed row
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
     colOp3Func: 26, colOp3Stat: 31,
     colCh: 85,
     colPhase: 96, colBlock: 87, colMinor: 88,
-    colToday: 89, colStart: 90, colEnd: 91,
+    colStart: 90, colEnd: 91,
   },
   "異常（電源断）": {
     dataStart: 14,
@@ -23,7 +23,7 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 70, colBlock: 61, colMinor: 62,
-    colToday: 63, colStart: 64, colEnd: 65,
+    colStart: 64, colEnd: 65,
   },
   "異常（通信断）": {
     dataStart: 14,
@@ -33,13 +33,9 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 89, colBlock: 80, colMinor: 81,
-    colToday: 82, colStart: 83, colEnd: 84,
+    colStart: 83, colEnd: 84,
   },
 };
-
-const KU_COL_START = 14;
-const KU_COL_END   = 15;
-const KU_COL_TODAY = 13;
 
 // ─── ユーティリティ ───────────────────────────────────
 function cleanVal(v) {
@@ -73,7 +69,9 @@ function getLane(start, end, blockText, minorText) {
     const bugs = text.match(/[バ課]\d+(?:（済）)?/g) || [];
     return bugs.some(b => !b.includes("（済）"));
   };
-  const unresolved = hasUnresolved(blockText) || hasUnresolved(minorText);
+  const unresolvedBlock = hasUnresolved(blockText);
+  const unresolvedMinor = hasUnresolved(minorText);
+  const unresolved = unresolvedBlock || unresolvedMinor;
   if (!start) return unresolved ? "バグ保留" : "未着手";
   if (!end)   return unresolved ? "バグ保留" : "対応中";
   return unresolved ? "完了（条件付き）" : "完了";
@@ -82,6 +80,8 @@ function getLane(start, end, blockText, minorText) {
 // ─── メイン読み取り関数 ───────────────────────────────
 /**
  * Excelワークブックからシナリオデータとバグデータを読み取る
+ * @param {Excel.Workbook} workbook - Office JS workbook context
+ * @returns {Promise<{creationData: Array, bugData: Array}>}
  */
 async function readWorkbook(context) {
   const sheets = context.workbook.worksheets;
@@ -90,7 +90,7 @@ async function readWorkbook(context) {
 
   const sheetNames = sheets.items.map(s => s.name);
   const creationData = [];
-  const bugMap = {};
+  const bugMap = {};  // bugId -> {id, scenarios[]}
   const seen = new Set();
 
   // ─── 電マネ系3シート ─────────────────────────────────
@@ -108,6 +108,7 @@ async function readWorkbook(context) {
     for (let i = def.dataStart; i < rows.length; i++) {
       const row = rows[i];
 
+      // A列が●のみ対象
       if (cleanVal(row[def.colMode2]) !== "●") continue;
 
       const autoNoRaw = row[def.colAutoNo];
@@ -115,6 +116,7 @@ async function readWorkbook(context) {
       const autoNo = parseInt(autoNoRaw);
       if (isNaN(autoNo)) continue;
 
+      // シートラベル（異常（通常）はCH列で分岐）
       let sheetLabel = sheetName;
       if (sheetName === "異常（通常）" && def.colCh >= 0 && colCount > def.colCh) {
         const chVal = cleanVal(row[def.colCh]);
@@ -134,10 +136,9 @@ async function readWorkbook(context) {
 
       const blockText = colCount > def.colBlock ? cleanVal(row[def.colBlock]) : "";
       const minorText = colCount > def.colMinor ? cleanVal(row[def.colMinor]) : "";
-      const start    = colCount > def.colStart  ? dateStr(row[def.colStart])  : "";
-      const end      = colCount > def.colEnd    ? dateStr(row[def.colEnd])    : "";
-      const todayVal = def.colToday >= 0 && colCount > def.colToday ? cleanVal(row[def.colToday]) : "";
-      const lane     = getLane(start, end, blockText, minorText);
+      const start = colCount > def.colStart ? dateStr(row[def.colStart]) : "";
+      const end   = colCount > def.colEnd   ? dateStr(row[def.colEnd])   : "";
+      const lane  = getLane(start, end, blockText, minorText);
 
       const key = `${sheetLabel}|${autoNo}|${brand}|${op1Func}`;
       if (seen.has(key)) continue;
@@ -147,15 +148,13 @@ async function readWorkbook(context) {
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText, minorText,
-        start, end,
-        colStart: def.colStart, colEnd: def.colEnd,
-        todayVal, colToday: def.colToday,
-        excelSheet: sheetName,
-        rowIdx: i,
+        excelSheet: sheetName,  // Excelへの書き戻しに使用
+        rowIdx: i,              // 0-indexed row in usedRange
         colBlock: def.colBlock,
         colMinor: def.colMinor,
       });
 
+      // バグ影響データ収集
       for (const [colType, text] of [["block", blockText], ["minor", minorText]]) {
         const bugs = extractBugIds(text);
         for (const { id, resolved } of bugs) {
@@ -192,15 +191,14 @@ async function readWorkbook(context) {
       const brand = cleanVal(row[10]);
       if (!brand) continue;
 
-      const gyoumu  = cleanVal(row[3]);
-      const func    = cleanVal(row[4]);
-      const haraiKu = cleanVal(row[5]);
-      const signPin = cleanVal(row[6]);
+      const gyoumu   = cleanVal(row[3]);
+      const func     = cleanVal(row[4]);
+      const haraiKu  = cleanVal(row[5]);
+      const signPin  = cleanVal(row[6]);
       let phase = cleanVal(row[20]) || "PH1";
-      const start    = dateStr(row[KU_COL_START]);
-      const end      = dateStr(row[KU_COL_END]);
-      const todayVal = row.length > KU_COL_TODAY ? cleanVal(row[KU_COL_TODAY]) : "";
-      const lane     = getLane(start, end, "");
+      const start = dateStr(row[14]);
+      const end   = dateStr(row[15]);
+      const lane  = getLane(start, end, "");
 
       const op1Func = func + (gyoumu ? `（${gyoumu}）` : "");
       const op1Stat = [haraiKu, signPin].filter(Boolean).join("　");
@@ -213,22 +211,25 @@ async function readWorkbook(context) {
         sheet: "正常（クレ・銀聯）", no: rowNum, brand,
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
-        start, end,
-        colStart: KU_COL_START, colEnd: KU_COL_END,
-        todayVal, colToday: KU_COL_TODAY,
         excelSheet: kuSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
       });
       rowNum++;
     }
   }
 
+  // bugMapをbugDataに変換
   const bugData = Object.values(bugMap)
     .sort((a, b) => {
-      const getPrefix = (id) => id.charAt(0);
+      const getPrefix = (id) => id.charAt(0); // 「バ」または「課」
       const getNumber = (id) => parseInt(id.slice(1));
+      
       const prefixA = getPrefix(a.id);
       const prefixB = getPrefix(b.id);
-      if (prefixA === prefixB) return getNumber(a.id) - getNumber(b.id);
+      
+      // 同じプリフィックスなら番号で比較、異なるならプリフィックスで比較
+      if (prefixA === prefixB) {
+        return getNumber(a.id) - getNumber(b.id);
+      }
       return prefixA.localeCompare(prefixB);
     })
     .map(b => ({
@@ -242,10 +243,15 @@ async function readWorkbook(context) {
 
 /**
  * バグIDの解消確認をExcelに書き戻す
+ * @param {Excel.RequestContext} context
+ * @param {string} bugId - 例: "バ9"
+ * @param {boolean} resolved - true=済み, false=済みを解除
+ * @param {Array} scenarios - 対象シナリオ一覧
  */
 async function writeBugResolution(context, bugId, resolved, scenarios) {
   const sheets = context.workbook.worksheets;
 
+  // シートごとに処理をまとめる
   const bySheet = {};
   for (const s of scenarios) {
     if (!bySheet[s.excelSheet]) bySheet[s.excelSheet] = [];
@@ -264,52 +270,53 @@ async function writeBugResolution(context, bugId, resolved, scenarios) {
       const ri = scen.rowIdx;
       if (ri >= values.length) continue;
 
+      // block列とminor列それぞれ更新
       for (const [colType, colIdx] of [["block", scen.colBlock], ["minor", scen.colMinor]]) {
         if (colIdx < 0 || colIdx >= values[ri].length) continue;
         const cellVal = String(values[ri][colIdx] || "").trim();
-        if (!cellVal || !cellVal.includes(bugId)) continue;
+        if (!cellVal) continue;
+
+        // そのバグIDが含まれていなければスキップ
+        if (!cellVal.includes(bugId)) continue;
 
         let newVal = cellVal;
         if (resolved) {
+          // バ9 → バ9（済）  ※すでに（済）がついている場合はそのまま
+          // カンマ・読点・スペース区切りで分割して個別に処理
           const parts = cellVal.split(/[,、\s]+/).map(part => {
             const trimmed = part.trim();
-            return (trimmed === bugId && !trimmed.includes('（済）')) ? bugId + '（済）' : trimmed;
-          }).filter(part => part);
+            if (trimmed === bugId && !trimmed.includes('（済）')) {
+              return bugId + '（済）';
+            }
+            return trimmed;
+          }).filter(part => part); // 空文字を除去
+          
+          // 元の区切り文字を保持（全角読点があれば全角、なければ半角カンマ）
           const separator = cellVal.includes('、') ? '、' : ',';
           newVal = parts.join(separator);
         } else {
+          // バ9（済） → バ9  
+          // カンマ・読点・スペース区切りで分割して個別に処理
           const parts = cellVal.split(/[,、\s]+/).map(part => {
             const trimmed = part.trim();
-            return trimmed === bugId + '（済）' ? bugId : trimmed;
-          }).filter(part => part);
+            if (trimmed === bugId + '（済）') {
+              return bugId;
+            }
+            return trimmed;
+          }).filter(part => part); // 空文字を除去
+          
+          // 元の区切り文字を保持（全角読点があれば全角、なければ半角カンマ）
           const separator = cellVal.includes('、') ? '、' : ',';
           newVal = parts.join(separator);
         }
 
-        if (newVal !== cellVal) ws.getCell(ri, colIdx).values = [[newVal]];
+        if (newVal !== cellVal) {
+          const cell = ws.getCell(ri, colIdx);
+          cell.values = [[newVal]];
+        }
       }
     }
   }
 
-  await context.sync();
-}
-
-/**
- * 当日列（〇/空欄）をExcelに書き戻す
- */
-async function writeTodayCell(context, excelSheet, rowIdx, colToday, value) {
-  if (colToday < 0) return;
-  const ws = context.workbook.worksheets.getItem(excelSheet);
-  ws.getCell(rowIdx, colToday).values = [[value]];
-  await context.sync();
-}
-
-/**
- * 実施開始日・終了日をExcelに書き戻す
- */
-async function writeScenarioDates(context, excelSheet, rowIdx, colStart, colEnd, startStr, endStr) {
-  const ws = context.workbook.worksheets.getItem(excelSheet);
-  if (colStart >= 0) ws.getCell(rowIdx, colStart).values = [[startStr]];
-  if (colEnd   >= 0) ws.getCell(rowIdx, colEnd).values   = [[endStr]];
   await context.sync();
 }
