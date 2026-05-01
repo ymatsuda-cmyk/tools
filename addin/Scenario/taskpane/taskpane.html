@@ -662,6 +662,10 @@ function showEditModal(scenario) {
   // 実施完了日の入力可/不可を設定
   updateEndDateInputState();
 
+  // 実施開始日変更時のイベントリスナーを追加
+  startDateInput.addEventListener("input", updateEndDateInputState);
+  startDateInput.addEventListener("change", updateEndDateInputState);
+
   // モーダルを表示
   document.getElementById("editModal").style.display = "flex";
 }
@@ -741,18 +745,30 @@ function displayBugList(containerId, bugText, bugType) {
 // 完了阻害課題の状況に基づいて実施完了日フィールドの有効/無効を制御
 function updateEndDateInputState() {
   const endDateInput = document.getElementById("endDateInput");
-  if (!endDateInput || !currentEditingScenario) return;
+  const startDateInput = document.getElementById("startDateInput");
+  if (!endDateInput || !startDateInput || !currentEditingScenario) return;
   
   // 完了阻害課題に未解決バグがあるかチェック
   const hasUnresolvedBlock = hasUnresolvedBugs(currentEditingScenario.blockText || "");
   
-  if (hasUnresolvedBlock) {
-    // 完了阻害課題がある場合は実施完了日を無効化
+  // 実施開始日が空欄かチェック
+  const hasNoStartDate = !startDateInput.value.trim();
+  
+  if (hasUnresolvedBlock || hasNoStartDate) {
+    // 完了阻害課題があるか実施開始日が空欄の場合は実施完了日を無効化
     endDateInput.disabled = true;
+    endDateInput.value = ""; // 既存の値をクリア
     endDateInput.style.backgroundColor = "#f5f5f5";
-    endDateInput.title = "完了阻害となる課題があるため入力できません";
+    
+    if (hasUnresolvedBlock && hasNoStartDate) {
+      endDateInput.title = "完了阻害となる課題があり、実施開始日も未入力のため入力できません";
+    } else if (hasUnresolvedBlock) {
+      endDateInput.title = "完了阻害となる課題があるため入力できません";
+    } else {
+      endDateInput.title = "実施開始日を先に入力してください";
+    }
   } else {
-    // 完了阻害課題がない場合は実施完了日を有効化
+    // 完了阻害課題がなく実施開始日が入力済みの場合は実施完了日を有効化
     endDateInput.disabled = false;
     endDateInput.style.backgroundColor = "";
     endDateInput.title = "";
@@ -979,6 +995,13 @@ function restoreBug(bugId, bugType) {
 }
 
 function closeEditModal() {
+  // イベントリスナーを削除
+  const startDateInput = document.getElementById("startDateInput");
+  if (startDateInput) {
+    startDateInput.removeEventListener("input", updateEndDateInputState);
+    startDateInput.removeEventListener("change", updateEndDateInputState);
+  }
+  
   document.getElementById("editModal").style.display = "none";
   currentEditingScenario = null;
   originalScenarioData = null;
