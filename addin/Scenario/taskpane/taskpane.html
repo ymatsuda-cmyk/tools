@@ -1049,7 +1049,7 @@ async function saveToExcel() {
       const startDate = convertToExcelDate(startDateInput.value);
       if (startDate) {
         startDateCell.values = [[startDate]]; // 日付型として設定
-        startDateCell.numberFormat = [["yy/mm/dd"]]; // 日付フォーマットを設定
+        startDateCell.numberFormat = [["m/d"]]; // m/d形式で表示
       } else {
         startDateCell.values = [[""]]; // 空の場合は空文字
       }
@@ -1062,7 +1062,7 @@ async function saveToExcel() {
       const endDate = convertToExcelDate(endDateInput.value);
       if (endDate) {
         endDateCell.values = [[endDate]]; // 日付型として設定
-        endDateCell.numberFormat = [["yy/mm/dd"]]; // 日付フォーマットを設定
+        endDateCell.numberFormat = [["m/d"]]; // m/d形式で表示
       } else {
         endDateCell.values = [[""]]; // 空の場合は空文字
       }
@@ -1368,9 +1368,57 @@ function buildFilterUI(){
   te.querySelectorAll(".tab-btn").forEach(function(btn){
     btn.addEventListener("click",function(){
       te.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active");});
-      btn.classList.add("active");applyFilter();
+      btn.classList.add("active");
+      applyFilter();
+      saveFilterSettings();
     });
   });
+}
+
+// ─── フィルタ設定の保存・復元 ─────────────────────────
+function saveFilterSettings() {
+  try {
+    const settings = {
+      searchInput: document.getElementById("searchInput").value,
+      phaseFilter: document.getElementById("phaseFilter").value,
+      brandFilter: document.getElementById("brandFilter").value,
+      activeSheet: document.querySelector("#sheetTabs .tab-btn.active")?.getAttribute("data-sheet") || ""
+    };
+    localStorage.setItem('kanban-filter-settings', JSON.stringify(settings));
+  } catch (error) {
+    console.log("フィルタ設定の保存に失敗:", error);
+  }
+}
+
+function loadFilterSettings() {
+  try {
+    const saved = localStorage.getItem('kanban-filter-settings');
+    if (!saved) return;
+    
+    const settings = JSON.parse(saved);
+    
+    // フィルタ値を復元
+    if (settings.searchInput !== undefined) {
+      document.getElementById("searchInput").value = settings.searchInput;
+    }
+    if (settings.phaseFilter !== undefined) {
+      document.getElementById("phaseFilter").value = settings.phaseFilter;
+    }
+    if (settings.brandFilter !== undefined) {
+      document.getElementById("brandFilter").value = settings.brandFilter;
+    }
+    
+    // アクティブシートタブを復元
+    if (settings.activeSheet) {
+      const targetTab = document.querySelector(`#sheetTabs .tab-btn[data-sheet="${settings.activeSheet}"]`);
+      if (targetTab) {
+        document.querySelectorAll('#sheetTabs .tab-btn').forEach(tab => tab.classList.remove('active'));
+        targetTab.classList.add('active');
+      }
+    }
+  } catch (error) {
+    console.log("フィルタ設定の復元に失敗:", error);
+  }
 }
 
 // ─── 作成状況ビュー ───────────────────────────────────
@@ -1571,6 +1619,11 @@ function startWithDemo(){
   rb.textContent="&#9654; デモ";
   rb.style.background="#94a3b8";
   rb.disabled=true;
+  
+  // フィルタ設定を復元
+  loadFilterSettings();
+  // 復元した設定でフィルタを適用
+  applyFilter();
 }
 
 async function loadData(){
@@ -1587,6 +1640,11 @@ async function loadData(){
     buildFilterUI();
     switchView("creation");
     document.getElementById("mainContent").style.display="";
+    
+    // フィルタ設定を復元
+    loadFilterSettings();
+    // 復元した設定でフィルタを適用
+    applyFilter();
   }catch(e){showError("読み込みエラー: "+e.message);}
   finally{showLoading(false);document.getElementById("reloadBtn").disabled=false;}
 }
@@ -1594,9 +1652,18 @@ async function loadData(){
 function onReady(){
   document.getElementById("tabCreation").addEventListener("click",function(){switchView("creation");});
   document.getElementById("tabBug").addEventListener("click",function(){switchView("bug");});
-  document.getElementById("searchInput").addEventListener("input",applyFilter);
-  document.getElementById("phaseFilter").addEventListener("change",applyFilter);
-  document.getElementById("brandFilter").addEventListener("change",applyFilter);
+  document.getElementById("searchInput").addEventListener("input", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
+  document.getElementById("phaseFilter").addEventListener("change", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
+  document.getElementById("brandFilter").addEventListener("change", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
   document.getElementById("reloadBtn").addEventListener("click",function(){
     if(typeof Excel!=="undefined") loadData();
   });
