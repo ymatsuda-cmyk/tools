@@ -1561,7 +1561,7 @@ function applyFilter(){
     html+='<div class="lane" data-lane="'+lane+'">'
         +'<div class="lane-header"><span>'+lane+'</span><span class="lane-count">'+cards.length+'件</span></div>'
         +'<div class="lane-body">';
-    if(cards.length===0){html+='<div class="lane-empty">&#8212;</div>';}
+    if(cards.length===0){html+='<div class="lane-empty">－</div>';}
     else{cards.forEach(function(d){html+=makeCard(d);});}
     html+='</div></div>';
   });
@@ -1654,18 +1654,17 @@ function renderDetail(){
     var rc=s.resolved?' class="row-done"':"";
     var chk=s.resolved?" checked":"";
     var ty=s.isBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
-    var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"&#8212;";
-    var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"&#8212;";
-    var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"&#8212;";
+    var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"－";
+    var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"－";
+    var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"－";
     
     rows+='<tr'+rc+' class="scenario-row" style="cursor:pointer" data-si="'+originalIndex+'">'
         +'<td class="chk-cell"><input type="checkbox" data-si="'+originalIndex+'"'+chk+'></td>'
         +'<td><span class="no-badge">#'+s.no+'</span></td>'
         +'<td><strong>'+esc(s.brand)+'</strong></td>'
-        +'<td class="sheet-name">'+esc(s.excelSheet)+'</td>'
-        +'<td>'+esc(s.op1Func||"&#8212;")+'</td><td>'+o1s+'</td>'
-        +'<td>'+esc(s.op2Func||"&#8212;")+'</td><td>'+o2s+'</td>'
-        +'<td>'+esc(s.op3Func||"&#8212;")+'</td><td>'+o3s+'</td>'
+        +'<td>'+esc(s.op1Func||"－")+'</td><td>'+o1s+'</td>'
+        +'<td>'+esc(s.op2Func||"－")+'</td><td>'+o2s+'</td>'
+        +'<td>'+esc(s.op3Func||"－")+'</td><td>'+o3s+'</td>'
         +'<td>'+ty+'</td>'
         +'</tr>';
   });
@@ -1680,7 +1679,7 @@ function renderDetail(){
     +'<div style="overflow-x:auto;">'
     +'<table class="detail-table"><thead><tr>'
     +'<th class="chk-cell">済</th>'
-    +'<th>項番</th><th>ブランド</th><th>シート</th>'
+    +'<th>項番</th><th>ブランド</th>'
     +'<th>OP1機能</th><th>OP1状況</th>'
     +'<th>OP2機能</th><th>OP2状況</th>'
     +'<th>OP3機能</th><th>OP3状況</th>'
