@@ -354,14 +354,20 @@ async function readWorkbook(context) {
   // ─── バグシート読み取り ─────────────────────────────────
   const bugSheetMap = {};  // bugId -> {title, status}
   
+  console.log("利用可能シート:", sheetNames);
+  console.log("バグシートを探しています:", BUG_SHEET_DEF.sheetName);
+  
   if (sheetNames.includes(BUG_SHEET_DEF.sheetName)) {
     try {
+      console.log("バグシートが見つかりました。読み取り開始...");
       const bugSheet = sheets.getItem(BUG_SHEET_DEF.sheetName);
       const bugUsedRange = bugSheet.getUsedRange();
       bugUsedRange.load(["values"]);
       await context.sync();
 
       const bugRows = bugUsedRange.values;
+      console.log("バグシート行数:", bugRows.length);
+      console.log("最初の5行:", bugRows.slice(0, Math.min(5, bugRows.length)));
       
       for (let i = BUG_SHEET_DEF.dataStart; i < bugRows.length; i++) {
         const row = bugRows[i];
@@ -370,7 +376,9 @@ async function readWorkbook(context) {
         const title = cleanVal(row[BUG_SHEET_DEF.colTitle]);
         const status = cleanVal(row[BUG_SHEET_DEF.colStatus]);
         
-        if (bugIdRaw && title) {
+        console.log(`行${i + 1}: ID="${bugIdRaw}", タイトル="${title}", ステータス="${status}"`);
+        
+        if (bugIdRaw) {
           // バグIDから数字部分を抽出（例：「9」「バ9」「ID:9」→「9」）
           const numberMatch = bugIdRaw.match(/(\d+)/);
           if (numberMatch) {
@@ -378,7 +386,9 @@ async function readWorkbook(context) {
             // 「バ」+数字の形式でキーを作成
             const standardBugId = `バ${bugNumber}`;
             bugSheetMap[standardBugId] = { title, status };
-            console.log(`バグシート読み取り: ${bugIdRaw} → ${standardBugId} (${title})`);
+            console.log(`✓ バグシート読み取り: ${bugIdRaw} → ${standardBugId} (タイトル:"${title}", ステータス:"${status}")`);
+          } else {
+            console.log(`⚠ バグID "${bugIdRaw}" から数字を抽出できませんでした`);
           }
         }
       }
@@ -388,6 +398,9 @@ async function readWorkbook(context) {
       console.warn("バグシートの読み取りに失敗:", error.message);
     }
   }
+
+  console.log("バグシートデータ読み取り完了:", Object.keys(bugSheetMap).length, "件");
+  console.log("バグシートマップ内容:", bugSheetMap);
 
   // bugMapをbugDataに変換
   const bugData = Object.values(bugMap)
@@ -406,6 +419,11 @@ async function readWorkbook(context) {
     })
     .map(b => {
       const bugSheetData = bugSheetMap[b.id] || {};
+      console.log(`バグ${b.id}にバグシートデータを適用:`, {
+        found: !!bugSheetMap[b.id],
+        title: bugSheetData.title || "なし",
+        status: bugSheetData.status || "なし"
+      });
       return {
         id: b.id,
         title: bugSheetData.title || "",
