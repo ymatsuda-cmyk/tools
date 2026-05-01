@@ -13,7 +13,7 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: 85,
     colPhase: 96, colBlock: 87, colMinor: 88,
-    colStart: 90, colEnd: 91, colToday: 94, // CR列（本日列）
+    colStart: 90, colEnd: 91, colToday: 95, // CR列（本日列）修正：94→95
   },
   "異常（電源断）": {
     dataStart: 14,
@@ -147,25 +147,13 @@ async function readWorkbook(context) {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const finalRowIdx = usedRangeStartRow + i;
-      
-      // カード#137のデバッグ出力
-      if (autoNo === 137) {
-        console.log(`カード#137のデバッグ情報:`);
-        console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
-        console.log(`  配列インデックスi: ${i}`);
-        console.log(`  計算されたrowIdx: ${finalRowIdx}`);
-        console.log(`  シート: ${sheetName}`);
-        console.log(`  本日列: ${def.colToday}`);
-      }
-
       creationData.push({
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText, minorText,
         isStar, // 本日列の★/☆状態
         excelSheet: sheetName,  // Excelへの書き戻しに使用
-        rowIdx: finalRowIdx,  // 実際のExcel行番号（1-indexed）
+        rowIdx: usedRangeStartRow + i,  // 実際のExcel行番号（1-indexed）
         colBlock: def.colBlock,
         colMinor: def.colMinor,
         colToday: def.colToday, // 本日列のインデックス
@@ -208,7 +196,7 @@ async function readWorkbook(context) {
       dataStart: 14, colMode2: 0, colAutoNo: 1, colBrand: 3,
       colOp1Func: 4, colOp1Stat: 9, colOp2Func: 15, colOp2Stat: 20,
       colOp3Func: 26, colOp3Stat: 31, colPhase: 96,
-      colStart: 90, colEnd: 91, colToday: 94 // CR列（本日列）
+      colStart: 90, colEnd: 91, colToday: 95 // CR列（本日列）修正：94→95
     };
 
     for (let i = normalDef.dataStart; i < rows.length; i++) {

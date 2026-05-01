@@ -1028,9 +1028,6 @@ async function toggleStar(event, excelSheet, rowIdx) {
       return;
     }
     
-    // デバッグ出力
-    console.log(`カード#${scenario.no}: rowIdx=${rowIdx}, colToday=${scenario.colToday}, sheet=${excelSheet}`);
-    
     // 異常（通常）シート以外は処理しない
     if (scenario.colToday < 0) {
       showSaveStatus("この機能はこのシートでは利用できません", "warn");
@@ -1040,24 +1037,6 @@ async function toggleStar(event, excelSheet, rowIdx) {
     // スター状態を切り替え
     const newStarState = !scenario.isStar;
     const todayValue = newStarState ? "〇" : "";
-    
-    // デバッグ出力：Excel座標
-    const excelRow = rowIdx - 1; // 0-indexed
-    const excelCol = scenario.colToday; // 0-indexed
-    
-    // Excel列番号をアルファベットに変換（94列目 → CR）
-    function numberToColumnName(col) {
-      let name = '';
-      while (col >= 0) {
-        name = String.fromCharCode((col % 26) + 65) + name;
-        col = Math.floor(col / 26) - 1;
-      }
-      return name;
-    }
-    
-    const colLetter = numberToColumnName(excelCol);
-    const cellAddress = `${colLetter}${rowIdx}`; // 1-indexed行番号
-    console.log(`Excel座標: 行=${excelRow}(0-indexed), 列=${excelCol}, セル=${cellAddress}`);
     
     // Excelの本日列を更新
     if (typeof Excel !== "undefined") {
