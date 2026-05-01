@@ -165,6 +165,17 @@ main{padding:12px 14px;overflow-x:auto;}
 .edit-section{flex:1;}
 .scenario-info{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-bottom:12px;}
 .scenario-info h4{margin:0 0 6px 0;font-size:12px;color:var(--accent);}
+.sheet-info{margin-top:8px;padding:6px 0;font-size:11px;}
+.sheet-name{color:#374151;font-weight:500;}
+
+/* 日付入力セクション */
+.date-section{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;margin-bottom:12px;}
+.date-section h4{margin:0 0 8px 0;font-size:12px;color:#334155;font-weight:600;}
+.date-inputs{display:flex;gap:12px;flex-wrap:wrap;}
+.date-input-group{flex:1;min-width:140px;}
+.date-input-group label{display:block;font-size:11px;color:#475569;margin-bottom:4px;font-weight:500;}
+.date-input{width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background-color:#fff;}
+.date-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,0.1);}
 .bug-section{margin-bottom:16px;}
 .bug-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .bug-section h5{font-size:11px;font-weight:600;color:var(--text2);margin:0;text-transform:uppercase;letter-spacing:.06em;}
@@ -310,6 +321,20 @@ main{padding:12px 14px;overflow-x:auto;}
         <div class="scenario-info">
           <h4>シナリオ情報</h4>
           <div id="scenarioDetails"></div>
+          <div class="sheet-info" id="sheetInfo"></div>
+        </div>
+        <div class="date-section">
+          <h4>実施日程</h4>
+          <div class="date-inputs">
+            <div class="date-input-group">
+              <label for="startDateInput">実施開始日:</label>
+              <input type="date" id="startDateInput" class="date-input" />
+            </div>
+            <div class="date-input-group">
+              <label for="endDateInput">実施完了日:</label>
+              <input type="date" id="endDateInput" class="date-input" />
+            </div>
+          </div>
         </div>
         <div class="bug-section">
           <div class="bug-section-header">
@@ -417,6 +442,42 @@ async function openEditModal(rowIdx, sheetName, cardElement) {
   }
 }
 
+// 日付フォーマット関数
+function formatDateForInput(excelDateValue) {
+  if (!excelDateValue) return "";
+  
+  let date;
+  if (typeof excelDateValue === "number") {
+    // Excelシリアル日付からJavaScript Dateに変換
+    date = new Date((excelDateValue - 25569) * 86400 * 1000);
+  } else if (typeof excelDateValue === "string") {
+    date = new Date(excelDateValue);
+  } else if (excelDateValue instanceof Date) {
+    date = excelDateValue;
+  } else {
+    return "";
+  }
+  
+  if (isNaN(date.getTime())) return "";
+  
+  // yyyy-mm-dd形式で返す（HTML5 date input用）
+  return date.toISOString().split('T')[0];
+}
+
+function formatDateForExcel(inputDateString) {
+  if (!inputDateString) return "";
+  
+  const date = new Date(inputDateString);
+  if (isNaN(date.getTime())) return "";
+  
+  // yy/mm/dd形式でフォーマット
+  const year = date.getFullYear() % 100; // 2桁年
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  
+  return `${year.toString().padStart(2, '0')}/${month}/${day}`;
+}
+
 async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
   if (typeof Excel === "undefined") return;
 
@@ -433,13 +494,38 @@ async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
       const row = values[arrayIndex];
       
       // シート定義から列インデックスを取得
-      const sheetDef = SHEET_DEFS[sheetName];
+      let sheetDef = SHEET_DEFS[sheetName];
+      
+      // 正常シートと正常（クレ・銀聯）シートの特別処理
+      if (sheetName === "正常") {
+        sheetDef = {
+          colBlock: -1, colMinor: -1,
+          colStart: 90, colEnd: 91
+        };
+      } else if (sheetName === "正常（クレ・銀聯）") {
+        sheetDef = {
+          colBlock: -1, colMinor: -1,
+          colStart: 14, colEnd: 15
+        };
+      }
+      
       if (sheetDef) {
+        // バグテキストの更新
         if (sheetDef.colBlock >= 0 && row.length > sheetDef.colBlock) {
           scenario.blockText = String(row[sheetDef.colBlock] || "").trim();
         }
         if (sheetDef.colMinor >= 0 && row.length > sheetDef.colMinor) {
           scenario.minorText = String(row[sheetDef.colMinor] || "").trim();
+        }
+        
+        // 日付の読み込み（yy/mm/dd形式に変換）
+        if (sheetDef.colStart >= 0 && row.length > sheetDef.colStart) {
+          const startDateValue = row[sheetDef.colStart];
+          scenario.startDate = formatDateForInput(startDateValue);
+        }
+        if (sheetDef.colEnd >= 0 && row.length > sheetDef.colEnd) {
+          const endDateValue = row[sheetDef.colEnd];
+          scenario.endDate = formatDateForInput(endDateValue);
         }
       }
     }
@@ -540,7 +626,19 @@ function showEditModal(scenario) {
   let opsHtml = ops.map((op, i) => `<div>操作${i+1}: ${op}</div>`).join("");
 
   document.getElementById("scenarioDetails").innerHTML =
-    `<strong>#${scenario.no} ${sheetType} ${scenario.brand}</strong><br>${opsHtml}`;
+    `<strong>#${scenario.no} ${scenario.brand}</strong><br>${opsHtml}`;
+  
+  // シート情報を追加
+  document.getElementById("sheetInfo").innerHTML = 
+    `<div class="sheet-name"><strong>シート:</strong> ${sheetType}</div>`;
+
+  // 日付情報を設定
+  const startDateInput = document.getElementById("startDateInput");
+  const endDateInput = document.getElementById("endDateInput");
+  
+  // Excelから取得した日付を表示
+  startDateInput.value = scenario.startDate || "";
+  endDateInput.value = scenario.endDate || "";
 
   // バグリストを表示
   displayBugList("blockBugList", scenario.blockText, "完了阻害");
@@ -884,7 +982,21 @@ async function saveToExcel() {
     const rowIdx = currentEditingScenario.rowIdx;
     
     // シート定義から列インデックスを取得
-    const sheetDef = SHEET_DEFS[currentEditingScenario.excelSheet];
+    let sheetDef = SHEET_DEFS[currentEditingScenario.excelSheet];
+    
+    // 正常シートと正常（クレ・銀聯）シートの特別処理
+    if (currentEditingScenario.excelSheet === "正常") {
+      sheetDef = {
+        colBlock: -1, colMinor: -1,
+        colStart: 90, colEnd: 91
+      };
+    } else if (currentEditingScenario.excelSheet === "正常（クレ・銀聯）") {
+      sheetDef = {
+        colBlock: -1, colMinor: -1,
+        colStart: 14, colEnd: 15
+      };
+    }
+    
     if (!sheetDef) return;
 
     // 完了阻害となる課題を保存
@@ -897,6 +1009,22 @@ async function saveToExcel() {
     if (sheetDef.colMinor >= 0) {
       const minorCell = sheet.getCell(rowIdx - 1, sheetDef.colMinor);
       minorCell.values = [[currentEditingScenario.minorText || ""]];
+    }
+
+    // 実施開始日を保存
+    if (sheetDef.colStart >= 0) {
+      const startDateCell = sheet.getCell(rowIdx - 1, sheetDef.colStart);
+      const startDateInput = document.getElementById("startDateInput");
+      const formattedStartDate = formatDateForExcel(startDateInput.value);
+      startDateCell.values = [[formattedStartDate]];
+    }
+
+    // 実施完了日を保存
+    if (sheetDef.colEnd >= 0) {
+      const endDateCell = sheet.getCell(rowIdx - 1, sheetDef.colEnd);
+      const endDateInput = document.getElementById("endDateInput");
+      const formattedEndDate = formatDateForExcel(endDateInput.value);
+      endDateCell.values = [[formattedEndDate]];
     }
 
     await context.sync();
