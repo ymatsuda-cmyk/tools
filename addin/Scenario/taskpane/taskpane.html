@@ -477,6 +477,16 @@ function formatDateForExcel(inputDateString) {
   return `${year.toString().padStart(2, '0')}/${month}/${day}`;
 }
 
+// 日付入力値をExcelのDate型に変換
+function convertToExcelDate(inputDateString) {
+  if (!inputDateString) return null;
+  
+  const date = new Date(inputDateString);
+  if (isNaN(date.getTime())) return null;
+  
+  return date; // Office.jsはJavaScriptのDateオブジェクトを直接受け付ける
+}
+
 async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
   if (typeof Excel === "undefined") return;
 
@@ -1027,16 +1037,26 @@ async function saveToExcel() {
     if (sheetDef.colStart >= 0) {
       const startDateCell = sheet.getCell(rowIdx - 1, sheetDef.colStart);
       const startDateInput = document.getElementById("startDateInput");
-      const formattedStartDate = formatDateForExcel(startDateInput.value);
-      startDateCell.values = [[formattedStartDate]];
+      const startDate = convertToExcelDate(startDateInput.value);
+      if (startDate) {
+        startDateCell.values = [[startDate]]; // 日付型として設定
+        startDateCell.numberFormat = [["yy/mm/dd"]]; // 日付フォーマットを設定
+      } else {
+        startDateCell.values = [[""]]; // 空の場合は空文字
+      }
     }
 
     // 実施完了日を保存
     if (sheetDef.colEnd >= 0) {
       const endDateCell = sheet.getCell(rowIdx - 1, sheetDef.colEnd);
       const endDateInput = document.getElementById("endDateInput");
-      const formattedEndDate = formatDateForExcel(endDateInput.value);
-      endDateCell.values = [[formattedEndDate]];
+      const endDate = convertToExcelDate(endDateInput.value);
+      if (endDate) {
+        endDateCell.values = [[endDate]]; // 日付型として設定
+        endDateCell.numberFormat = [["yy/mm/dd"]]; // 日付フォーマットを設定
+      } else {
+        endDateCell.values = [[""]]; // 空の場合は空文字
+      }
     }
 
     await context.sync();
