@@ -1652,20 +1652,29 @@ function renderDetail(){
   // チェックボックスイベント
   panel.querySelectorAll("input[type=checkbox]").forEach(function(chk){
     chk.addEventListener("change",function(){
+      console.log("Checkbox changed:", this.checked, "for bug scenario index:", this.getAttribute("data-si"));
+      
       var si=parseInt(this.getAttribute("data-si"));
+      
+      console.log("Scenario info before update:", bug.scenarios[si]);
+      
       bug.scenarios[si].resolved=this.checked;
       bug.resolved=bug.scenarios.every(function(s){return s.resolved;});
 
       if(typeof Excel!=="undefined"){
+        console.log("Excel is available, calling writeBugResolution...");
         Excel.run(function(ctx){
           return writeBugResolution(ctx,bug.id,this.checked,bug.scenarios[si]);
         }.bind(this)).then(function(){
+          console.log("writeBugResolution succeeded");
           showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" を"+(bug.scenarios[si].resolved?"済み":"未解消")+"に更新","ok");
         }).catch(function(e){
+          console.error("writeBugResolution failed:", e);
           bug.scenarios[si].resolved=!bug.scenarios[si].resolved;
           showSaveStatus("保存エラー: "+e.message,"err");
         });
       } else {
+        console.log("Excel not available, demo mode");
         showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" ["+(bug.scenarios[si].resolved?"済み":"未解消")+"] (デモ)","ok");
       }
       renderSummary();
