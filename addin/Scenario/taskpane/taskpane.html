@@ -659,6 +659,9 @@ function showEditModal(scenario) {
   displayBugList("blockBugList", scenario.blockText, "完了阻害");
   displayBugList("minorBugList", scenario.minorText, "軽微");
 
+  // 実施完了日の入力可/不可を設定
+  updateEndDateInputState();
+
   // モーダルを表示
   document.getElementById("editModal").style.display = "flex";
 }
@@ -728,6 +731,39 @@ function displayBugList(containerId, bugText, bugType) {
   });
 
   container.innerHTML = html;
+  
+  // 実施完了日の入力状態を更新
+  if (containerId === "blockBugList") {
+    updateEndDateInputState();
+  }
+}
+
+// 完了阻害課題の状況に基づいて実施完了日フィールドの有効/無効を制御
+function updateEndDateInputState() {
+  const endDateInput = document.getElementById("endDateInput");
+  if (!endDateInput || !currentEditingScenario) return;
+  
+  // 完了阻害課題に未解決バグがあるかチェック
+  const hasUnresolvedBlock = hasUnresolvedBugs(currentEditingScenario.blockText || "");
+  
+  if (hasUnresolvedBlock) {
+    // 完了阻害課題がある場合は実施完了日を無効化
+    endDateInput.disabled = true;
+    endDateInput.style.backgroundColor = "#f5f5f5";
+    endDateInput.title = "完了阻害となる課題があるため入力できません";
+  } else {
+    // 完了阻害課題がない場合は実施完了日を有効化
+    endDateInput.disabled = false;
+    endDateInput.style.backgroundColor = "";
+    endDateInput.title = "";
+  }
+}
+
+// 未解決バグの有無をチェック
+function hasUnresolvedBugs(bugText) {
+  if (!bugText) return false;
+  const bugs = bugText.match(/[バ課]\d+(?:（済）)?/g) || [];
+  return bugs.some(b => !b.includes("（済）"));
 }
 
 function showBugSelector(bugType) {
@@ -862,6 +898,11 @@ function addSelectedBugs() {
   const containerId = currentEditingBugType === 'block' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, currentEditingBugType === 'block' ? '完了阻害' : '軽微');
   
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (currentEditingBugType === 'block') {
+    updateEndDateInputState();
+  }
+  
   closeBugSelector();
   showSaveStatus(`${selectedBugIds.length}件のバグを追加しました`, "ok");
 }
@@ -902,6 +943,11 @@ function removeBug(bugId, bugType) {
   const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, bugType);
   
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (bugType === '完了阻害') {
+    updateEndDateInputState();
+  }
+  
   showSaveStatus(`${bugId} を削除しました`, "ok");
 }
 
@@ -923,6 +969,11 @@ function restoreBug(bugId, bugType) {
   // UI更新
   const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, bugType);
+  
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (bugType === '完了阻害') {
+    updateEndDateInputState();
+  }
   
   showSaveStatus(`${bugId} を復元しました`, "ok");
 }
@@ -1115,10 +1166,15 @@ function calculateLane(start, end, blockText, minorText) {
     return bugs.some(b => !b.includes("（済）"));
   };
   const unresolvedBlock = hasUnresolved(blockText);
-  const unresolved = unresolvedBlock; // 完了阻害のみでバグ保留判定
-  if (!start) return unresolved ? "バグ保留" : "未着手";
-  if (!end)   return unresolved ? "バグ保留" : "対応中";
-  return unresolved ? "完了（条件付き）" : "完了";
+  const unresolvedMinor = hasUnresolved(minorText);
+  
+  // バグ保留判定（完了阻害課題で判定）
+  if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
+  if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
+  
+  // 完了判定（軽微な課題で完了条件付きを判定）
+  if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
+  return unresolvedMinor ? "完了（条件付き）" : "完了";
 }
 
 function updateBugDataFromScenario() {
@@ -1202,6 +1258,11 @@ async function updateBugStatus(bugId, isResolved, bugType) {
     displayBugList(containerId, currentEditingScenario[fieldName], bugType);
     
     showSaveStatus(`${bugId} を${isResolved ? "解消済み" : "未解消"}に更新`, "ok");
+    
+    // 完了阻害課題の場合は実施完了日の入力状態を更新
+    if (bugType === "完了阻害") {
+      updateEndDateInputState();
+    }
 
   } catch (error) {
     console.error("バグ状況更新エラー:", error);

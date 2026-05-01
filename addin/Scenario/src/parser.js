@@ -70,10 +70,15 @@ function getLane(start, end, blockText, minorText) {
     return bugs.some(b => !b.includes("（済）"));
   };
   const unresolvedBlock = hasUnresolved(blockText);
-  const unresolved = unresolvedBlock; // 完了阻害のみでバグ保留判定
-  if (!start) return unresolved ? "バグ保留" : "未着手";
-  if (!end)   return unresolved ? "バグ保留" : "対応中";
-  return unresolved ? "完了（条件付き）" : "完了";
+  const unresolvedMinor = hasUnresolved(minorText);
+  
+  // バグ保留判定（完了阻害課題で判定）
+  if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
+  if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
+  
+  // 完了判定（軽微な課題で完了条件付きを判定）
+  if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
+  return unresolvedMinor ? "完了（条件付き）" : "完了";
 }
 
 // ─── メイン読み取り関数 ───────────────────────────────
