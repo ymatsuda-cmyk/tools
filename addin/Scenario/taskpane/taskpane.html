@@ -1719,6 +1719,7 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
 
   // 現在のセル値を取得
   const targetCell = sheet.getCell(scenario.rowIdx - 1, targetColumn);
+  targetCell.load("values");
   await context.sync();
 
   const currentText = targetCell.values[0][0] || "";
