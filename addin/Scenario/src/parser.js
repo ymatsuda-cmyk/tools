@@ -264,7 +264,7 @@ async function readWorkbook(context) {
       const end   = dateStr(row[15]);
       const todayValue = cleanVal(row[19]); // T列（本日列）
       const isStar = todayValue === "〇"; // 本日列が〇の場合は★
-      const lane  = getLane(start, end, "");
+      const lane  = getLane(start, end, "", "");
 
       const op1Func = func + (gyoumu ? `（${gyoumu}）` : "");
       const op1Stat = [haraiKu, signPin].filter(Boolean).join("　");
@@ -273,12 +273,23 @@ async function readWorkbook(context) {
       if (seen.has(key)) continue;
       seen.add(key);
 
+      const finalRowIdx = usedRangeStartRow + i;
+      
+      // カード#1のデバッグ出力
+      if (rowNum === 1) {
+        console.log(`正常（クレ・銀聯）カード#1のデバッグ情報:`);
+        console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
+        console.log(`  配列インデックスi: ${i}`);
+        console.log(`  計算されたrowIdx: ${finalRowIdx}`);
+        console.log(`  シート: ${kuSheetName}`);
+      }
+
       creationData.push({
         sheet: "正常（クレ・銀聯）", no: rowNum, brand,
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
-        isStar: false, // 正常（クレ・銀聯）シートも★機能対応
-        excelSheet: kuSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
+        isStar, // T列から★/☆状態を取得
+        excelSheet: kuSheetName, rowIdx: finalRowIdx, colBlock: -1, colMinor: -1,
         colToday: 19, // T列（本日列）
       });
       rowNum++;
