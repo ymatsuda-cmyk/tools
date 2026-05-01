@@ -11,7 +11,6 @@ let selectedUser = null;
 let selectedCategory = null;
 let selectedPeriod = "all";
 let showHeld = true; // 保留表示フラグ
-let todayMode = false; // ★/☆表示切り替えフラグ
 
 // レーン高さ調整のデバウンス用変数
 let heightAdjustTimeout = null;
@@ -29,9 +28,6 @@ Office.onReady(() => {
   
   // 保留表示設定を復元
   restoreHeldDisplay();
-  
-  // 本日モード設定を復元
-  restoreTodayMode();
   
   init();
 });
@@ -700,57 +696,6 @@ function restoreHeldDisplay() {
   document.getElementById('show-held').checked = showHeld;
 }
 
-// ===== 本日モード設定 =====
-function restoreTodayMode() {
-  const saved = localStorage.getItem('kanban-today-mode');
-  if (saved !== null) {
-    todayMode = saved === 'true';
-    updateTodayModeButton();
-  }
-}
-
-function updateTodayModeButton() {
-  const btn = document.getElementById('star-toggle-btn');
-  if (btn) {
-    btn.textContent = todayMode ? '★' : '☆';
-    btn.title = todayMode ? '本日列を空欄にする' : '本日列を〇にする';
-  }
-}
-
-function saveTodayMode() {
-  localStorage.setItem('kanban-today-mode', todayMode.toString());
-}
-
-async function toggleTodayMode() {
-  todayMode = !todayMode;
-  saveTodayMode();
-  updateTodayModeButton();
-  
-  // 本日列を一括更新
-  await updateAllTodayColumns();
-  
-  // 画面を再描画
-  renderBoard();
-}
-
-async function updateAllTodayColumns() {
-  const targetValue = todayMode ? '〇' : '';
-  
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    
-    for (const task of allTasks) {
-      if (task && task.rowIndex) {
-        // CR列（69番目のインデックス）に値を設定
-        const cell = sheet.getRange(`CR${task.rowIndex}`);
-        cell.values = [[targetValue]];
-      }
-    }
-    
-    await ctx.sync();
-  });
-}
-
 // ===== 描画 =====
 function renderBoard() {
   ["todo","held","doing","done"].forEach(l => {
@@ -883,9 +828,7 @@ function createCard(t) {
   const classificationSpan = document.createElement("span");
   classificationSpan.className = "card-classification";
   if (t.classification && t.classification.trim() !== "") {
-    // 分類名称の変換
-    let displayText = convertClassificationName(t.classification);
-    classificationSpan.textContent = `<${displayText}>`;
+    classificationSpan.textContent = `<${t.classification}>`;
   }
   
   row2.appendChild(titleSpan);
@@ -902,20 +845,6 @@ function createCard(t) {
   applyColor(d, t);
 
   return d;
-}
-
-// ===== 分類名称変換 =====
-function convertClassificationName(classification) {
-  if (!classification) return classification;
-  
-  const nameMap = {
-    '正常（クレ・銀聯）': '正常(ク)',
-    '異常（通常）': '通常',
-    '異常（電源断）': '電断',
-    '異常（通信断）': '通断'
-  };
-  
-  return nameMap[classification] || classification;
 }
 
 // ===== 色 =====

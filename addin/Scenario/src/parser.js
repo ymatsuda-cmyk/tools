@@ -13,7 +13,7 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: 85,
     colPhase: 96, colBlock: 87, colMinor: 88,
-    colStart: 90, colEnd: 91,
+    colStart: 90, colEnd: 91, colToday: 94, // CR列（本日列）
   },
   "異常（電源断）": {
     dataStart: 14,
@@ -138,6 +138,8 @@ async function readWorkbook(context) {
       const minorText = colCount > def.colMinor ? cleanVal(row[def.colMinor]) : "";
       const start = colCount > def.colStart ? dateStr(row[def.colStart]) : "";
       const end   = colCount > def.colEnd   ? dateStr(row[def.colEnd])   : "";
+      const todayValue = colCount > def.colToday ? cleanVal(row[def.colToday]) : "";
+      const isStar = todayValue === "〇"; // 本日列が〇の場合は★
       const lane  = getLane(start, end, blockText, minorText);
 
       const key = `${sheetLabel}|${autoNo}|${brand}|${op1Func}`;
@@ -148,10 +150,12 @@ async function readWorkbook(context) {
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText, minorText,
+        isStar, // 本日列の★/☆状態
         excelSheet: sheetName,  // Excelへの書き戻しに使用
         rowIdx: i,              // 0-indexed row in usedRange
         colBlock: def.colBlock,
         colMinor: def.colMinor,
+        colToday: def.colToday, // 本日列のインデックス
       });
 
       // バグ影響データ収集
@@ -211,7 +215,9 @@ async function readWorkbook(context) {
         sheet: "正常（クレ・銀聯）", no: rowNum, brand,
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
+        isStar: false, // 正常（クレ・銀聯）シートは★機能なし
         excelSheet: kuSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
+        colToday: -1, // 本日列なし
       });
       rowNum++;
     }

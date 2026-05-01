@@ -27,6 +27,10 @@ h1{font-size:14px;font-weight:700;}
 .reload-btn{background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;font-weight:600;}
 .reload-btn:hover{opacity:.85;}
 .reload-btn:disabled{opacity:.5;cursor:default;}
+
+#star-toggle-btn{background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;padding:4px 8px;color:#f39c12;transition:all 0.2s ease;margin-left:6px;}
+#star-toggle-btn:hover{background:#f8f8f8;border-color:#bbb;}
+
 .demo-banner{background:var(--warn-bg);border:1px solid #fde68a;border-radius:6px;padding:5px 10px;margin-bottom:8px;font-size:11px;color:#92400e;display:none;align-items:center;gap:6px;}
 .demo-banner .note{margin-left:auto;color:#b45309;font-weight:600;}
 
@@ -204,6 +208,12 @@ main{padding:12px 14px;overflow-x:auto;}
 .selectable-bug.disabled .bug-id{color:#999;}
 .selectable-bug.disabled .bug-title{color:#999;}
 .selectable-bug.disabled .bug-status{color:#999;}
+/* ★/☆ スターアイコン */
+.star-icon{cursor:pointer;user-select:none;font-size:16px;margin-left:8px;color:#ccc;transition:color 0.15s,transform 0.15s;}
+.star-icon.filled{color:#ffd700;}
+.star-icon:hover{transform:scale(1.2);opacity:0.8;}
+/* ★カードの背景色 */
+.card.starred{background:#e6f3ff !important;border-color:#9cced7 !important;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
@@ -218,6 +228,7 @@ main{padding:12px 14px;overflow-x:auto;}
     <div class="header-right">
       <span class="count-badge" id="countBadge">---</span>
       <button class="reload-btn" id="reloadBtn">&#8635; 読込</button>
+      <button id="star-toggle-btn" onclick="toggleTodayMode();" title="本日列の表示を切り替え">☆</button>
     </div>
   </div>
   <div id="demoBanner" class="demo-banner">
@@ -247,7 +258,7 @@ main{padding:12px 14px;overflow-x:auto;}
     </div>
     <div class="sheet-tabs" id="sheetTabs">
       <button class="tab-btn active" data-sheet="">全て</button>
-<button class="tab-btn" data-sheet="正常">正常</button><button class="tab-btn" data-sheet="正常（クレ・銀聯）">正常（クレ・銀聯）</button><button class="tab-btn" data-sheet="異常（通常）">異常（通常）</button>
+<button class="tab-btn" data-sheet="正常">正常</button><button class="tab-btn" data-sheet="正常（クレ・銀聯）">正常(ク)</button><button class="tab-btn" data-sheet="異常（通常）">通常</button>
     </div>
   </div>
 </header>
@@ -355,9 +366,10 @@ var creationData  = [];
 var bugData       = [];
 var selectedBugId = null;
 var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了"];
+var todayMode = false; // ★/☆表示切り替えフラグ
 
 // ─── デモデータ ───────────────────────────────────────
-var DEMO_CREATION = [{"sheet":"異常（通常）","no":12,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":13,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"中止押下","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ9,バ16,バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":2,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"33:リトライ","op2Stat":"正常終了","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":57,"brand":"iD","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":59,"brand":"iD","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":55,"brand":"iD","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":56,"brand":"iD","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":81,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":83,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":87,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":91,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":67,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":68,"brand":"交通系IC","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":136,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"-","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":137,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":150,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":151,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":213,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":214,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"中止押下","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":1,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"一括　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":2,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"分割　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":57,"brand":"銀聯","op1Func":"売上（銀聯（MS JIS1））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":58,"brand":"銀聯","op1Func":"売上（銀聯（IC））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1}];
+var DEMO_CREATION = [{"sheet":"異常（通常）","no":12,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":true,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":13,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"中止押下","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ9,バ16,バ17","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ17","minorText":"","isStar":true,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","phase":"PH1","lane":"対応中","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常","no":2,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"33:リトライ","op2Stat":"正常終了","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"異常（通常）","no":57,"brand":"iD","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":59,"brand":"iD","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常","no":55,"brand":"iD","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常","no":56,"brand":"iD","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"異常（通常）","no":81,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":83,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":87,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"対応中","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":91,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","phase":"PH1","lane":"対応中","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常","no":67,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常","no":68,"brand":"交通系IC","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"異常（通常）","no":136,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"-","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常","no":137,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"異常（通常）","no":150,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":151,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":213,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":214,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"中止押下","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常（クレ・銀聯）","no":1,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"一括　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常（クレ・銀聯）","no":2,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"分割　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常（クレ・銀聯）","no":57,"brand":"銀聯","op1Func":"売上（銀聯（MS JIS1））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1},{"sheet":"正常（クレ・銀聯）","no":58,"brand":"銀聯","op1Func":"売上（銀聯（IC））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":-1}];
 var DEMO_BUGS     = [{"id":"バ9","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":58,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]},{"id":"バ16","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":43,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]}];
 
 // ─── カードクリック・編集モーダル ─────────────────────
@@ -1000,6 +1012,55 @@ function updateBugTextStatus(originalText, bugId, isResolved) {
 // ─── ユーティリティ ───────────────────────────────────
 function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+// ★/☆の切り替え処理
+async function toggleStar(event, excelSheet, rowIdx) {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  try {
+    // 対応するシナリオデータを見つける
+    const scenario = creationData.find(d => d.excelSheet === excelSheet && d.rowIdx === rowIdx);
+    if (!scenario) {
+      showSaveStatus("シナリオデータが見つかりません", "err");
+      return;
+    }
+    
+    // 異常（通常）シート以外は処理しない
+    if (scenario.sheet !== '異常（通常）' || scenario.colToday < 0) {
+      showSaveStatus("この機能は異常（通常）シートでのみ利用可能です", "warn");
+      return;
+    }
+    
+    // スター状態を切り替え
+    const newStarState = !scenario.isStar;
+    const todayValue = newStarState ? "〇" : "";
+    
+    // Excelの本日列を更新
+    if (typeof Excel !== "undefined") {
+      await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(excelSheet);
+        const todayCell = sheet.getCell(rowIdx, scenario.colToday);
+        todayCell.values = [[todayValue]];
+        await context.sync();
+      });
+    }
+    
+    // データモデルを更新
+    scenario.isStar = newStarState;
+    
+    // UI を更新（カード全体を再描画）
+    applyFilter(); // フィルタを再適用してカード表示を更新（★カードが先頭に来るように）
+    
+    const symbol = newStarState ? '★' : '☆';
+    const action = newStarState ? '本日実施タスクに設定' : '本日実施タスクから解除';
+    showSaveStatus(`${action}しました ${symbol}`, "ok");
+    
+  } catch (error) {
+    console.error("スター切り替えエラー:", error);
+    showSaveStatus("更新エラー: " + error.message, "err");
+  }
+}
+
 function sheetTagClass(sheet){
   var m={"異常（通常）":"st-a","異常（電源断）":"st-b","異常（通信断）":"st-c","正常（クレ・銀聯）":"st-d","正常":"st-e"};
   return "sheet-tag "+(m[sheet]||"st-e");
@@ -1028,7 +1089,19 @@ function makeOps(d){
 
 function makeCard(d){
   const cardId = `card-${d.excelSheet}-${d.rowIdx}`;
-  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" '
+  
+  // ★/☆アイコンの作成（異常（通常）シートのみ）
+  let starIcon = '';
+  if (d.sheet === '異常（通常）' && d.colToday >= 0) {
+    const starSymbol = d.isStar ? '★' : '☆';
+    const starClass = d.isStar ? 'star-icon filled' : 'star-icon';
+    starIcon = `<span class="${starClass}" onclick="toggleStar(event, '${d.excelSheet}', ${d.rowIdx})">${starSymbol}</span>`;
+  }
+  
+  // ★カードの場合はstarredクラスを追加
+  const cardClass = d.isStar ? 'card starred' : 'card';
+  
+  return '<div class="'+cardClass+'" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" '
     +'onclick="selectExcelRow(\''+d.excelSheet+'\', '+d.rowIdx+')" '
     +'oncontextmenu="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this); return false;">'
     +'<div class="card-header">'
@@ -1036,6 +1109,7 @@ function makeCard(d){
     +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
     +'<span class="brand-name">'+esc(d.brand)+'</span>'
     +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(d.sheet)+'</span>'
+    + starIcon // ★/☆アイコンをsheet-tagの右に追加
     +'</div><div class="ops">'+makeOps(d)+'</div></div>';
 }
 
@@ -1093,6 +1167,15 @@ function applyFilter(){
       if(t.indexOf(q)===-1) return false;
     }
     return true;
+  });
+  
+  // ★カードを先頭に表示するためのソート
+  f.sort(function(a, b) {
+    // ★カード（isStar=true）を先頭に
+    if (a.isStar && !b.isStar) return -1;
+    if (!a.isStar && b.isStar) return 1;
+    // 同じ★状態の場合は元の順序を維持
+    return 0;
   });
 
   document.getElementById("countBadge").textContent=f.length+" 件";
@@ -1306,6 +1389,9 @@ function onReady(){
     if (e.target === this) closeBugSelector(); // 背景クリックで閉じる
   });
 
+  // 本日モード設定を復元
+  restoreTodayMode();
+
   // Office.onReady()を最初に呼び出し、その中で初期化処理を実行
   if(typeof Office!=="undefined"){
     Office.onReady(function(info){
@@ -1318,6 +1404,85 @@ function onReady(){
   } else {
     startWithDemo();
   }
+}
+
+// ===== 分類名称変換 =====
+function convertClassificationName(classification) {
+  if (!classification) return classification;
+  
+  const nameMap = {
+    '正常（クレ・銀聯）': '正常(ク)',
+    '異常（通常）': '通常',
+    '異常（電源断）': '電断',
+    '異常（通信断）': '通断'
+  };
+  
+  return nameMap[classification] || classification;
+}
+
+// ===== 本日モード設定 =====
+function restoreTodayMode() {
+  const saved = localStorage.getItem('scenario-today-mode');
+  if (saved !== null) {
+    todayMode = saved === 'true';
+    updateTodayModeButton();
+  }
+}
+
+function updateTodayModeButton() {
+  const btn = document.getElementById('star-toggle-btn');
+  if (btn) {
+    btn.textContent = todayMode ? '★' : '☆';
+    btn.title = todayMode ? '本日列を空欄にする' : '本日列を〇にする';
+  }
+}
+
+function saveTodayMode() {
+  localStorage.setItem('scenario-today-mode', todayMode.toString());
+}
+
+async function toggleTodayMode() {
+  todayMode = !todayMode;
+  saveTodayMode();
+  updateTodayModeButton();
+  
+  // 本日列を一括更新（実装はExcel構造に応じて調整が必要）
+  if (typeof Excel !== "undefined") {
+    try {
+      await updateAllTodayColumns();
+    } catch (e) {
+      console.warn("本日列の更新でエラーが発生しました:", e);
+      showSaveStatus("本日列の更新でエラーが発生しました", "err");
+    }
+  }
+}
+
+async function updateAllTodayColumns() {
+  const targetValue = todayMode ? '〇' : '';
+  
+  // シナリオアプリケーション用の実装
+  // 各シートでCR列（本日列）を更新
+  const sheets = ['正常', '正常（クレ・銀聯）', '異常（通常）', '異常（電源断）', '異常（通信断）'];
+  
+  await Excel.run(async (ctx) => {
+    for (const sheetName of sheets) {
+      try {
+        const sheet = ctx.workbook.worksheets.getItem(sheetName);
+        
+        for (const item of creationData) {
+          if (item.excelSheet === sheetName && item.rowIdx) {
+            // CR列に値を設定
+            const cell = sheet.getRange(`CR${item.rowIdx}`);
+            cell.values = [[targetValue]];
+          }
+        }
+      } catch (sheetError) {
+        console.warn(`シート ${sheetName} の更新でエラー:`, sheetError);
+      }
+    }
+    
+    await ctx.sync();
+  });
 }
 
 if(document.readyState==="loading"){
