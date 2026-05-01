@@ -37,6 +37,15 @@ const SHEET_DEFS = {
   },
 };
 
+// バグシート定義
+const BUG_SHEET_DEF = {
+  sheetName: "（転記用）バグシート",
+  dataStart: 1,    // データ開始行（0-indexed）
+  colBugId: 0,     // バグID列
+  colTitle: 1,     // タイトル列  
+  colStatus: 2,    // 状況列
+};
+
 // ─── ユーティリティ ───────────────────────────────────
 function cleanVal(v) {
   if (v === null || v === undefined || v === "") return "";
@@ -342,6 +351,36 @@ async function readWorkbook(context) {
     }
   }
 
+  // ─── バグシート読み取り ─────────────────────────────────
+  const bugSheetMap = {};  // bugId -> {title, status}
+  
+  if (sheetNames.includes(BUG_SHEET_DEF.sheetName)) {
+    try {
+      const bugSheet = sheets.getItem(BUG_SHEET_DEF.sheetName);
+      const bugUsedRange = bugSheet.getUsedRange();
+      bugUsedRange.load(["values"]);
+      await context.sync();
+
+      const bugRows = bugUsedRange.values;
+      
+      for (let i = BUG_SHEET_DEF.dataStart; i < bugRows.length; i++) {
+        const row = bugRows[i];
+        
+        const bugId = cleanVal(row[BUG_SHEET_DEF.colBugId]);
+        const title = cleanVal(row[BUG_SHEET_DEF.colTitle]);
+        const status = cleanVal(row[BUG_SHEET_DEF.colStatus]);
+        
+        if (bugId) {
+          bugSheetMap[bugId] = { title, status };
+        }
+      }
+      
+      console.log("バグシートデータ読み取り完了:", Object.keys(bugSheetMap).length, "件");
+    } catch (error) {
+      console.warn("バグシートの読み取りに失敗:", error.message);
+    }
+  }
+
   // bugMapをbugDataに変換
   const bugData = Object.values(bugMap)
     .sort((a, b) => {
@@ -357,11 +396,16 @@ async function readWorkbook(context) {
       }
       return prefixA.localeCompare(prefixB);
     })
-    .map(b => ({
-      id: b.id,
-      resolved: b.scenarios.every(s => s.resolved),
-      scenarios: b.scenarios,
-    }));
+    .map(b => {
+      const bugSheetData = bugSheetMap[b.id] || {};
+      return {
+        id: b.id,
+        title: bugSheetData.title || "",
+        status: bugSheetData.status || "",
+        resolved: b.scenarios.every(s => s.resolved),
+        scenarios: b.scenarios,
+      };
+    });
 
   return { creationData, bugData };
 }

@@ -303,11 +303,12 @@ main{padding:12px 14px;overflow-x:auto;}
       <thead>
         <tr>
           <th>バグID</th>
+          <th>タイトル</th>
           <th>ステータス</th>
           <th>種別</th>
           <th>影響件数</th>
           <th>解消率</th>
-          <th>影響ブランド</th>
+          <th>影響シート</th>
         </tr>
       </thead>
       <tbody id="summaryBody"></tbody>
@@ -1581,23 +1582,26 @@ function renderSummary(){
     var allDone=done===total;
     var hasBlock=b.scenarios.some(function(s){return s.isBlock;});
     var brands=[...new Set(b.scenarios.map(function(s){return s.brand;}))].join(", ");
+    var sheets=[...new Set(b.scenarios.map(function(s){return s.excelSheet||s.sheet||"不明"}))].join(", ");
     var fc=allDone?"pf-done":(pct>0?"pf-part":"pf-none");
     var bc=allDone?"bid bid-ok":"bid bid-ng";
     var disp=allDone?b.id+"（済）":b.id;
     var sc=allDone?"st-bok":"st-bng";
-    var st=allDone?"全解消済み":"未解消";
+    var st=b.status || (allDone?"解消済み":"未解消");
+    var title=b.title || "";
     var ty=hasBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
     var sel=selectedBugId===b.id;
     rows+='<tr data-bugid="'+b.id+'"'+(sel?' class="selected"':'')+'>'
         +'<td><span class="'+bc+'">'+esc(disp)+'</span></td>'
-        +'<td><span class="'+sc+'">'+st+'</span></td>'
+        +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">'+esc(title)+'</td>'
+        +'<td><span class="'+sc+'">'+esc(st)+'</span></td>'
         +'<td>'+ty+'</td>'
         +'<td style="font-family:JetBrains Mono,monospace;font-weight:600;font-size:11px;">'+done+' / '+total+'</td>'
         +'<td><div class="prog-wrap">'
         +'<div class="prog-bar"><div class="prog-fill '+fc+'" style="width:'+pct+'%"></div></div>'
         +'<span class="prog-pct">'+pct+'%</span>'
         +'</div></td>'
-        +'<td style="font-size:11px;color:var(--text2);">'+esc(brands)+'</td>'
+        +'<td style="font-size:11px;color:var(--text2);">'+esc(sheets)+'</td>'
         +'</tr>';
   });
   tbody.innerHTML=rows;
