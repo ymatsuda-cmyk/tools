@@ -1688,12 +1688,21 @@ function renderBugView(){
 
 // バグ解消状態をExcelに更新
 async function writeBugResolution(context, bugId, isResolved, scenario) {
+  console.log("writeBugResolution called:", { bugId, isResolved, scenario });
+  
   if (!scenario.excelSheet || scenario.rowIdx === undefined) {
     throw new Error("シナリオ情報が不完全です");
   }
 
   const sheet = context.workbook.worksheets.getItem(scenario.excelSheet);
   const targetColumn = scenario.isBlock ? scenario.colBlock : scenario.colMinor;
+  
+  console.log("Target info:", { 
+    excelSheet: scenario.excelSheet, 
+    rowIdx: scenario.rowIdx, 
+    targetColumn, 
+    isBlock: scenario.isBlock 
+  });
   
   if (targetColumn < 0) {
     throw new Error("対象列が設定されていません");
@@ -1704,6 +1713,7 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
   await context.sync();
 
   const currentText = targetCell.values[0][0] || "";
+  console.log("Current cell text:", currentText);
   
   // バグIDの状態を更新
   let newText;
@@ -1714,7 +1724,7 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
     } else if (currentText.includes(bugId)) {
       newText = currentText.replace(bugId, bugId + "（済）");
     } else {
-      throw new Error(`バグID ${bugId} がセルに見つかりません`);
+      throw new Error(`バグID ${bugId} がセル「${currentText}」に見つかりません（行:${scenario.rowIdx}, 列:${targetColumn}）`);
     }
   } else {
     // 解消済み → 未解消に変更
@@ -1723,13 +1733,17 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
     } else if (currentText.includes(bugId)) {
       newText = currentText; // 既に未解消状態
     } else {
-      throw new Error(`バグID ${bugId} がセルに見つかりません`);
+      throw new Error(`バグID ${bugId} がセル「${currentText}」に見つかりません（行:${scenario.rowIdx}, 列:${targetColumn}）`);
     }
   }
+
+  console.log("Text change:", { from: currentText, to: newText });
 
   // セルに新しい値を設定
   targetCell.values = [[newText]];
   await context.sync();
+  
+  console.log("Update completed successfully");
 }
 
 // ─── ビュー切り替え ───────────────────────────────────
