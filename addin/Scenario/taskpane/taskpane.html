@@ -1494,7 +1494,18 @@ function applyFilter(){
     if(br&&d.brand!==br) return false;
     if(sh&&d.sheet!==sh) return false;
     if(q){
-      var t=[d.no,d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase,d.startDate].join(" ").toLowerCase();
+      // 日付を検索しやすい形式に変換
+      const formatDateForSearch = (dateStr) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `${month}/${day} ${month.toString().padStart(2,'0')}/${day.toString().padStart(2,'0')}`;
+      };
+      
+      const searchableStartDate = formatDateForSearch(d.startDate);
+      var t=[d.no,d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase,searchableStartDate].join(" ").toLowerCase();
       if(t.indexOf(q)===-1) return false;
     }
     return true;
