@@ -99,10 +99,11 @@ async function readWorkbook(context) {
 
     const ws = sheets.getItem(sheetName);
     const usedRange = ws.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const rows = usedRange.values;
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
     const colCount = rows[0] ? rows[0].length : 0;
 
     for (let i = def.dataStart; i < rows.length; i++) {
@@ -146,13 +147,25 @@ async function readWorkbook(context) {
       if (seen.has(key)) continue;
       seen.add(key);
 
+      const finalRowIdx = usedRangeStartRow + i;
+      
+      // カード#137のデバッグ出力
+      if (autoNo === 137) {
+        console.log(`カード#137のデバッグ情報:`);
+        console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
+        console.log(`  配列インデックスi: ${i}`);
+        console.log(`  計算されたrowIdx: ${finalRowIdx}`);
+        console.log(`  シート: ${sheetName}`);
+        console.log(`  本日列: ${def.colToday}`);
+      }
+
       creationData.push({
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText, minorText,
         isStar, // 本日列の★/☆状態
         excelSheet: sheetName,  // Excelへの書き戻しに使用
-        rowIdx: i,              // 0-indexed row in usedRange
+        rowIdx: finalRowIdx,  // 実際のExcel行番号（1-indexed）
         colBlock: def.colBlock,
         colMinor: def.colMinor,
         colToday: def.colToday, // 本日列のインデックス
@@ -169,7 +182,7 @@ async function readWorkbook(context) {
             isBlock: colType === "block",
             resolved,
             excelSheet: sheetName,
-            rowIdx: i,
+            rowIdx: usedRangeStartRow + i,  // 実際のExcel行番号（1-indexed）
             colBlock: def.colBlock,
             colMinor: def.colMinor,
           });
@@ -183,10 +196,11 @@ async function readWorkbook(context) {
   if (sheetNames.includes(normalSheetName)) {
     const ws = sheets.getItem(normalSheetName);
     const usedRange = ws.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const rows = usedRange.values;
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
     const colCount = rows[0] ? rows[0].length : 0;
     
     // 正常シートも異常系シートと同様の構造と仮定
@@ -229,7 +243,7 @@ async function readWorkbook(context) {
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText: "", minorText: "",
         isStar,
-        excelSheet: normalSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
+        excelSheet: normalSheetName, rowIdx: usedRangeStartRow + i, colBlock: -1, colMinor: -1,
         colToday: normalDef.colToday, // CR列（本日列）
       });
     }
@@ -240,10 +254,11 @@ async function readWorkbook(context) {
   if (sheetNames.includes(kuSheetName)) {
     const ws = sheets.getItem(kuSheetName);
     const usedRange = ws.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const rows = usedRange.values;
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
     let rowNum = 1;
     for (let i = 5; i < rows.length; i++) {
       const row = rows[i];

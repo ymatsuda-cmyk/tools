@@ -423,12 +423,14 @@ async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
     const usedRange = sheet.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const values = usedRange.values;
-    if (rowIdx < values.length) {
-      const row = values[rowIdx];
+    // rowIdxは実際のExcel行番号（1-indexed）、usedRangeの配列インデックス（0-indexed）に変換
+    const arrayIndex = rowIdx - 1 - usedRange.rowIndex;
+    if (arrayIndex >= 0 && arrayIndex < values.length) {
+      const row = values[arrayIndex];
       
       // シート定義から列インデックスを取得
       const sheetDef = SHEET_DEFS[sheetName];
@@ -449,7 +451,8 @@ async function selectExcelRow(sheetName, rowIdx) {
   
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
-    const range = sheet.getRangeByIndexes(rowIdx, 0, 1, 100); // 行全体を選択
+    // rowIdxは実際のExcel行番号（1-indexed）なので、0-indexedに変換
+    const range = sheet.getRangeByIndexes(rowIdx - 1, 0, 1, 100); // 行全体を選択
     range.select();
     await context.sync();
   });
@@ -886,13 +889,13 @@ async function saveToExcel() {
 
     // 完了阻害となる課題を保存
     if (sheetDef.colBlock >= 0) {
-      const blockCell = sheet.getCell(rowIdx, sheetDef.colBlock);
+      const blockCell = sheet.getCell(rowIdx - 1, sheetDef.colBlock);
       blockCell.values = [[currentEditingScenario.blockText || ""]];
     }
 
     // 軽微な課題を保存
     if (sheetDef.colMinor >= 0) {
-      const minorCell = sheet.getCell(rowIdx, sheetDef.colMinor);
+      const minorCell = sheet.getCell(rowIdx - 1, sheetDef.colMinor);
       minorCell.values = [[currentEditingScenario.minorText || ""]];
     }
 
@@ -1025,6 +1028,9 @@ async function toggleStar(event, excelSheet, rowIdx) {
       return;
     }
     
+    // デバッグ出力
+    console.log(`カード#${scenario.no}: rowIdx=${rowIdx}, colToday=${scenario.colToday}, sheet=${excelSheet}`);
+    
     // 異常（通常）シート以外は処理しない
     if (scenario.colToday < 0) {
       showSaveStatus("この機能はこのシートでは利用できません", "warn");
@@ -1035,11 +1041,30 @@ async function toggleStar(event, excelSheet, rowIdx) {
     const newStarState = !scenario.isStar;
     const todayValue = newStarState ? "〇" : "";
     
+    // デバッグ出力：Excel座標
+    const excelRow = rowIdx - 1; // 0-indexed
+    const excelCol = scenario.colToday; // 0-indexed
+    
+    // Excel列番号をアルファベットに変換（94列目 → CR）
+    function numberToColumnName(col) {
+      let name = '';
+      while (col >= 0) {
+        name = String.fromCharCode((col % 26) + 65) + name;
+        col = Math.floor(col / 26) - 1;
+      }
+      return name;
+    }
+    
+    const colLetter = numberToColumnName(excelCol);
+    const cellAddress = `${colLetter}${rowIdx}`; // 1-indexed行番号
+    console.log(`Excel座標: 行=${excelRow}(0-indexed), 列=${excelCol}, セル=${cellAddress}`);
+    
     // Excelの本日列を更新
     if (typeof Excel !== "undefined") {
       await Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getItem(excelSheet);
-        const todayCell = sheet.getCell(rowIdx, scenario.colToday);
+        // rowIdxは実際のExcel行番号（1-indexed）なので、0-indexedに変換
+        const todayCell = sheet.getCell(rowIdx - 1, scenario.colToday);
         todayCell.values = [[todayValue]];
         await context.sync();
       });
