@@ -1115,8 +1115,7 @@ function calculateLane(start, end, blockText, minorText) {
     return bugs.some(b => !b.includes("（済）"));
   };
   const unresolvedBlock = hasUnresolved(blockText);
-  const unresolvedMinor = hasUnresolved(minorText);
-  const unresolved = unresolvedBlock || unresolvedMinor;
+  const unresolved = unresolvedBlock; // 完了阻害のみでバグ保留判定
   if (!start) return unresolved ? "バグ保留" : "未着手";
   if (!end)   return unresolved ? "バグ保留" : "対応中";
   return unresolved ? "完了（条件付き）" : "完了";
