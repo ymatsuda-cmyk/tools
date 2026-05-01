@@ -1658,7 +1658,7 @@ function renderDetail(){
 
       if(typeof Excel!=="undefined"){
         Excel.run(function(ctx){
-          return writeBugResolution(ctx,bug.id,this.checked,[bug.scenarios[si]]);
+          return writeBugResolution(ctx,bug.id,this.checked,bug.scenarios[si]);
         }.bind(this)).then(function(){
           showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" を"+(bug.scenarios[si].resolved?"済み":"未解消")+"に更新","ok");
         }).catch(function(e){
@@ -1684,6 +1684,52 @@ function renderBugView(){
   document.getElementById("countBadge").textContent=bugData.length+" バグ";
   renderSummary();
   renderDetail();
+}
+
+// バグ解消状態をExcelに更新
+async function writeBugResolution(context, bugId, isResolved, scenario) {
+  if (!scenario.excelSheet || scenario.rowIdx === undefined) {
+    throw new Error("シナリオ情報が不完全です");
+  }
+
+  const sheet = context.workbook.worksheets.getItem(scenario.excelSheet);
+  const targetColumn = scenario.isBlock ? scenario.colBlock : scenario.colMinor;
+  
+  if (targetColumn < 0) {
+    throw new Error("対象列が設定されていません");
+  }
+
+  // 現在のセル値を取得
+  const targetCell = sheet.getCell(scenario.rowIdx - 1, targetColumn);
+  await context.sync();
+
+  const currentText = targetCell.values[0][0] || "";
+  
+  // バグIDの状態を更新
+  let newText;
+  if (isResolved) {
+    // 未解消 → 解消済みに変更
+    if (currentText.includes(bugId + "（済）")) {
+      newText = currentText; // 既に済みマーク付き
+    } else if (currentText.includes(bugId)) {
+      newText = currentText.replace(bugId, bugId + "（済）");
+    } else {
+      throw new Error(`バグID ${bugId} がセルに見つかりません`);
+    }
+  } else {
+    // 解消済み → 未解消に変更
+    if (currentText.includes(bugId + "（済）")) {
+      newText = currentText.replace(bugId + "（済）", bugId);
+    } else if (currentText.includes(bugId)) {
+      newText = currentText; // 既に未解消状態
+    } else {
+      throw new Error(`バグID ${bugId} がセルに見つかりません`);
+    }
+  }
+
+  // セルに新しい値を設定
+  targetCell.values = [[newText]];
+  await context.sync();
 }
 
 // ─── ビュー切り替え ───────────────────────────────────
