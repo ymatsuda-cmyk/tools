@@ -303,7 +303,8 @@ async function readWorkbook(context) {
       const op1Func = func + (gyoumu ? `（${gyoumu}）` : "");
       const op1Stat = [haraiKu, signPin].filter(Boolean).join("　");
 
-      const key = `正常（クレ・銀聯）|${scenarioId}|${brand}|${op1Func}`;
+      // B列の自動化項番をキーに含めて重複を防ぐ
+      const key = `正常（クレ・銀聯）|${autoNoFromB}|${brand}|${op1Func}`;
       if (seen.has(key)) {
         console.log(`行${i + 1}: 重複キー "${key}" のためスキップ`);
         continue;
