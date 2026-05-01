@@ -366,12 +366,20 @@ async function readWorkbook(context) {
       for (let i = BUG_SHEET_DEF.dataStart; i < bugRows.length; i++) {
         const row = bugRows[i];
         
-        const bugId = cleanVal(row[BUG_SHEET_DEF.colBugId]);
+        const bugIdRaw = cleanVal(row[BUG_SHEET_DEF.colBugId]);
         const title = cleanVal(row[BUG_SHEET_DEF.colTitle]);
         const status = cleanVal(row[BUG_SHEET_DEF.colStatus]);
         
-        if (bugId) {
-          bugSheetMap[bugId] = { title, status };
+        if (bugIdRaw && title) {
+          // バグIDから数字部分を抽出（例：「9」「バ9」「ID:9」→「9」）
+          const numberMatch = bugIdRaw.match(/(\d+)/);
+          if (numberMatch) {
+            const bugNumber = numberMatch[1];
+            // 「バ」+数字の形式でキーを作成
+            const standardBugId = `バ${bugNumber}`;
+            bugSheetMap[standardBugId] = { title, status };
+            console.log(`バグシート読み取り: ${bugIdRaw} → ${standardBugId} (${title})`);
+          }
         }
       }
       
