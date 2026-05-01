@@ -275,12 +275,13 @@ async function readWorkbook(context) {
 
       const finalRowIdx = usedRangeStartRow + i;
       
-      // カード#1のデバッグ出力
-      if (rowNum === 1) {
-        console.log(`正常（クレ・銀聯）カード#1のデバッグ情報:`);
+      // カード#1、#2、#3のデバッグ出力
+      if (rowNum <= 3) {
+        console.log(`正常（クレ・銀聯）カード#${rowNum}のデバッグ情報:`);
         console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
-        console.log(`  配列インデックスi: ${i}`);
+        console.log(`  配列インデックスi: ${i} (Excel行番号: ${i + 1})`);
         console.log(`  計算されたrowIdx: ${finalRowIdx}`);
+        console.log(`  scenarioId: ${scenarioId}, brand: ${brand}`);
         console.log(`  シート: ${kuSheetName}`);
       }
 
