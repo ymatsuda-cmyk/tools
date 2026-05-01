@@ -23,7 +23,7 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 70, colBlock: 61, colMinor: 62,
-    colStart: 64, colEnd: 65,
+    colStart: 64, colEnd: 65, colToday: 69, // BR列（本日列）
   },
   "異常（通信断）": {
     dataStart: 14,
@@ -33,7 +33,7 @@ const SHEET_DEFS = {
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 89, colBlock: 80, colMinor: 81,
-    colStart: 83, colEnd: 84,
+    colStart: 83, colEnd: 84, colToday: 88, // CK列（本日列）
   },
 };
 
@@ -178,6 +178,63 @@ async function readWorkbook(context) {
     }
   }
 
+  // ─── 正常シート ─────────────────────────────────────
+  const normalSheetName = "正常";
+  if (sheetNames.includes(normalSheetName)) {
+    const ws = sheets.getItem(normalSheetName);
+    const usedRange = ws.getUsedRange();
+    usedRange.load("values");
+    await context.sync();
+
+    const rows = usedRange.values;
+    const colCount = rows[0] ? rows[0].length : 0;
+    
+    // 正常シートも異常系シートと同様の構造と仮定
+    const normalDef = {
+      dataStart: 14, colMode2: 0, colAutoNo: 1, colBrand: 3,
+      colOp1Func: 4, colOp1Stat: 9, colOp2Func: 15, colOp2Stat: 20,
+      colOp3Func: 26, colOp3Stat: 31, colPhase: 96,
+      colStart: 90, colEnd: 91, colToday: 94 // CR列（本日列）
+    };
+
+    for (let i = normalDef.dataStart; i < rows.length; i++) {
+      const row = rows[i];
+      if (cleanVal(row[normalDef.colMode2]) !== "●") continue;
+      const autoNoRaw = row[normalDef.colAutoNo];
+      if (!autoNoRaw && autoNoRaw !== 0) continue;
+      const autoNo = parseInt(autoNoRaw);
+      if (isNaN(autoNo)) continue;
+
+      const brand = cleanBrand(cleanVal(row[normalDef.colBrand]));
+      const op1Func = cleanVal(row[normalDef.colOp1Func]);
+      const op1Stat = cleanVal(row[normalDef.colOp1Stat]);
+      const op2Func = cleanVal(row[normalDef.colOp2Func]);
+      const op2Stat = cleanVal(row[normalDef.colOp2Stat]);
+      const op3Func = colCount > normalDef.colOp3Func ? cleanVal(row[normalDef.colOp3Func]) : "";
+      const op3Stat = colCount > normalDef.colOp3Stat ? cleanVal(row[normalDef.colOp3Stat]) : "";
+      let phase = colCount > normalDef.colPhase ? cleanVal(row[normalDef.colPhase]) : "";
+      if (!phase) phase = "PH1";
+      const start = colCount > normalDef.colStart ? dateStr(row[normalDef.colStart]) : "";
+      const end = colCount > normalDef.colEnd ? dateStr(row[normalDef.colEnd]) : "";
+      const todayValue = colCount > normalDef.colToday ? cleanVal(row[normalDef.colToday]) : "";
+      const isStar = todayValue === "〇";
+      const lane = getLane(start, end, "", "");
+
+      const key = `正常|${autoNo}|${brand}|${op1Func}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      creationData.push({
+        sheet: "正常", no: autoNo, brand,
+        op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
+        phase, lane, blockText: "", minorText: "",
+        isStar,
+        excelSheet: normalSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
+        colToday: normalDef.colToday, // CR列（本日列）
+      });
+    }
+  }
+
   // ─── 正常（クレ・銀聯）────────────────────────────────
   const kuSheetName = "正常（クレ・銀聯）";
   if (sheetNames.includes(kuSheetName)) {
@@ -202,6 +259,8 @@ async function readWorkbook(context) {
       let phase = cleanVal(row[20]) || "PH1";
       const start = dateStr(row[14]);
       const end   = dateStr(row[15]);
+      const todayValue = cleanVal(row[19]); // T列（本日列）
+      const isStar = todayValue === "〇"; // 本日列が〇の場合は★
       const lane  = getLane(start, end, "");
 
       const op1Func = func + (gyoumu ? `（${gyoumu}）` : "");
@@ -215,9 +274,9 @@ async function readWorkbook(context) {
         sheet: "正常（クレ・銀聯）", no: rowNum, brand,
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
-        isStar: false, // 正常（クレ・銀聯）シートは★機能なし
+        isStar: false, // 正常（クレ・銀聯）シートも★機能対応
         excelSheet: kuSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
-        colToday: -1, // 本日列なし
+        colToday: 19, // T列（本日列）
       });
       rowNum++;
     }
