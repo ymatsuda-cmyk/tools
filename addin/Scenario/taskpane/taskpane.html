@@ -1436,7 +1436,7 @@ function makeCard(d){
     +'<span class="no-badge">#'+d.no+'</span>'
     +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
     +'<span class="brand-name">'+esc(d.brand)+'</span>'
-    +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(d.sheet)+'</span>'
+    +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(formatSheetName(d.sheet))+'</span>'
     + starIcon // ★/☆アイコンをsheet-tagの右に追加
     +'</div><div class="ops">'+makeOps(d)+'</div></div>';
 }
@@ -1467,7 +1467,7 @@ function buildFilterUI(){
   te.innerHTML='<button class="tab-btn active" data-sheet="">全て</button>';
   shts.forEach(function(s){
     var b=document.createElement("button");
-    b.className="tab-btn";b.setAttribute("data-sheet",s);b.textContent=s;
+    b.className="tab-btn";b.setAttribute("data-sheet",s);b.textContent=formatSheetName(s);
     te.appendChild(b);
   });
   te.querySelectorAll(".tab-btn").forEach(function(btn){
