@@ -247,13 +247,19 @@ async function readWorkbook(context) {
 
     const rows = usedRange.values;
     const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
-    let rowNum = 1;
+    
     for (let i = 4; i < rows.length; i++) {
       const row = rows[i];
       const scenarioId = cleanVal(row[2]);
       if (!scenarioId) continue;
       const brand = cleanVal(row[10]);
       if (!brand) continue;
+
+      // B列から自動化項番を取得（カード番号として使用）
+      const autoNoFromB = cleanVal(row[1]); // B列（自動化項番）
+      if (!autoNoFromB) continue;
+      const rowNum = parseInt(autoNoFromB);
+      if (isNaN(rowNum)) continue;
 
       const gyoumu   = cleanVal(row[3]);
       const func     = cleanVal(row[4]);
@@ -273,14 +279,16 @@ async function readWorkbook(context) {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const finalRowIdx = usedRangeStartRow + i;
+      // 実際のExcel行番号（1-indexed）を計算
+      const actualExcelRow = usedRangeStartRow + i + 1;
       
       // カード#1、#2、#3のデバッグ出力
       if (rowNum <= 3) {
         console.log(`正常（クレ・銀聯）カード#${rowNum}のデバッグ情報:`);
         console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
         console.log(`  配列インデックスi: ${i} (Excel行番号: ${i + 1})`);
-        console.log(`  計算されたrowIdx: ${finalRowIdx}`);
+        console.log(`  B列の自動化項番: ${autoNoFromB}`);
+        console.log(`  実際のExcel行番号: ${actualExcelRow}`);
         console.log(`  scenarioId: ${scenarioId}, brand: ${brand}`);
         console.log(`  シート: ${kuSheetName}`);
       }
@@ -290,10 +298,9 @@ async function readWorkbook(context) {
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
         isStar, // T列から★/☆状態を取得
-        excelSheet: kuSheetName, rowIdx: finalRowIdx, colBlock: -1, colMinor: -1,
+        excelSheet: kuSheetName, rowIdx: actualExcelRow, colBlock: -1, colMinor: -1,
         colToday: 19, // T列（本日列）
       });
-      rowNum++;
     }
   }
 
