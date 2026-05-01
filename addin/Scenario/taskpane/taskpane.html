@@ -400,6 +400,17 @@ var creationData  = [];
 var bugData       = [];
 var selectedBugId = null;
 var selectedSheetFilter = "all"; // シートフィルタ状態
+
+// シート名変換関数
+function formatSheetName(sheetName) {
+  switch(sheetName) {
+    case "正常（クレ・銀聯）": return "正常（ク）";
+    case "異常（通信断）": return "通信断";
+    case "異常（電源断）": return "電源断";
+    case "異常（通常）": return "通常";
+    default: return sheetName;
+  }
+}
 var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了"];
 var todayMode = false; // ★/☆表示切り替えフラグ
 
@@ -1579,7 +1590,7 @@ function renderSummary(){
     var allDone=done===total;
     var hasBlock=b.scenarios.some(function(s){return s.isBlock;});
     var brands=[...new Set(b.scenarios.map(function(s){return s.brand;}))].join(", ");
-    var sheets=[...new Set(b.scenarios.map(function(s){return s.excelSheet||s.sheet||"不明"}))].join(", ");
+    var sheets=[...new Set(b.scenarios.map(function(s){return formatSheetName(s.excelSheet||s.sheet||"不明");}))].join(", ");
     var fc=allDone?"pf-done":(pct>0?"pf-part":"pf-none");
     var bc=allDone?"bid bid-ok":"bid bid-ng";
     var disp=allDone?b.id+"（済）":b.id;
@@ -1643,7 +1654,8 @@ function renderDetail(){
   availableSheets.forEach(function(sheet) {
     var count = bug.scenarios.filter(function(s) { return s.excelSheet === sheet; }).length;
     var activeClass = selectedSheetFilter === sheet ? ' active' : '';
-    sheetFilterHtml += '<button class="sheet-filter-btn' + activeClass + '" data-sheet="' + esc(sheet) + '">' + esc(sheet) + ' (' + count + ')</button>';
+    var displayName = formatSheetName(sheet);
+    sheetFilterHtml += '<button class="sheet-filter-btn' + activeClass + '" data-sheet="' + esc(sheet) + '">' + esc(displayName) + ' (' + count + ')</button>';
   });
   sheetFilterHtml += '</div>';
 
