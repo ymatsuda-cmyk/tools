@@ -141,6 +141,19 @@ main{padding:12px 14px;overflow-x:auto;}
 .detail-table tr:last-child td{border-bottom:none;}
 .detail-table tr:hover td{background:#f8faff;}
 .detail-table tr.row-done td{opacity:.45;}
+/* シート別背景色 */
+.sheet-normal { background: #ffebee !important; } /* 異常（通常）- 薄ピンク */
+.sheet-power { background: #e3f2fd !important; } /* 異常（電源断）- 薄青 */
+.sheet-comm { background: #e8f5e8 !important; } /* 異常（通信断）- 薄緑 */
+.sheet-tcps { background: #fffde7 !important; } /* 異常（TCPS）- 薄黄 */
+.sheet-ok { background: #f3e5f5 !important; } /* 正常 - 薄紫 */
+.sheet-ok-credit { background: #fff3e0 !important; } /* 正常（クレ・銀聯）- 薄オレンジ */
+.scenario-row:hover{background:#f0f8ff !important;}
+.scenario-row{transition:background-color 0.15s ease;}
+/* 凡例スタイル */
+.sheet-legend{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0;padding:8px;background:#f8f9fa;border-radius:4px;font-size:11px;}
+.legend-item{display:flex;align-items:center;gap:4px;}
+.legend-color{width:12px;height:12px;border-radius:2px;border:1px solid #ddd;}
 .chk-cell{text-align:center;width:26px;}
 .chk-cell input{width:13px;height:13px;cursor:pointer;accent-color:var(--accent);}
 .empty-detail{padding:24px;text-align:center;color:var(--muted);font-size:12px;}
@@ -1622,7 +1635,19 @@ function renderDetail(){
     var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"&#8212;";
     var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"&#8212;";
     var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"&#8212;";
-    rows+='<tr'+rc+'>'
+    
+    // シート別背景色クラスを決定
+    var sheetClass = "";
+    switch(s.excelSheet) {
+      case "異常（通常）": sheetClass = "sheet-normal"; break;
+      case "異常（電源断）": sheetClass = "sheet-power"; break;
+      case "異常（通信断）": sheetClass = "sheet-comm"; break;
+      case "異常（TCPS）": sheetClass = "sheet-tcps"; break;
+      case "正常": sheetClass = "sheet-ok"; break;
+      case "正常（クレ・銀聯）": sheetClass = "sheet-ok-credit"; break;
+    }
+    
+    rows+='<tr'+rc+' class="scenario-row '+sheetClass+'" style="cursor:pointer" data-si="'+si+'">'
         +'<td class="chk-cell"><input type="checkbox" data-si="'+si+'"'+chk+'></td>'
         +'<td><span class="no-badge">#'+s.no+'</span></td>'
         +'<td><strong>'+esc(s.brand)+'</strong></td>'
@@ -1639,6 +1664,14 @@ function renderDetail(){
     +'<span style="font-size:11px;color:var(--text2);font-weight:500;">'+done+'/'+total+'件解消</span>'
     +'<button class="detail-close" id="closeDetail">&#10005; 閉じる</button>'
     +'</div>'
+    +'<div class="sheet-legend">'
+    +'<div class="legend-item"><div class="legend-color sheet-normal"></div><span>異常（通常）</span></div>'
+    +'<div class="legend-item"><div class="legend-color sheet-power"></div><span>異常（電源断）</span></div>'
+    +'<div class="legend-item"><div class="legend-color sheet-comm"></div><span>異常（通信断）</span></div>'
+    +'<div class="legend-item"><div class="legend-color sheet-tcps"></div><span>異常（TCPS）</span></div>'
+    +'<div class="legend-item"><div class="legend-color sheet-ok"></div><span>正常</span></div>'
+    +'<div class="legend-item"><div class="legend-color sheet-ok-credit"></div><span>正常（クレ・銀聯）</span></div>'
+    +'</div>'
     +'<div style="overflow-x:auto;">'
     +'<table class="detail-table"><thead><tr>'
     +'<th class="chk-cell">済</th>'
@@ -1648,6 +1681,30 @@ function renderDetail(){
     +'<th>OP3機能</th><th>OP3状況</th>'
     +'<th>種別</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+  // 行クリックでExcel行選択
+  panel.querySelectorAll(".scenario-row").forEach(function(row){
+    row.addEventListener("click",function(e){
+      // チェックボックスクリック時は行選択しない
+      if(e.target.type === "checkbox") return;
+      
+      var si=parseInt(this.getAttribute("data-si"));
+      var scenario=bug.scenarios[si];
+      
+      if(typeof Excel!=="undefined" && scenario.rowIdx && scenario.excelSheet){
+        Excel.run(function(ctx){
+          var sheet=ctx.workbook.worksheets.getItem(scenario.excelSheet);
+          var range=sheet.getCell(scenario.rowIdx-1,0).getEntireRow();
+          range.select();
+          return ctx.sync();
+        }).then(function(){
+          showSaveStatus("&#10004; 行 "+scenario.rowIdx+" ("+scenario.excelSheet+") を選択しました","ok");
+        }).catch(function(e){
+          showSaveStatus("行選択エラー: "+e.message,"err");
+        });
+      }
+    });
+  });
 
   // チェックボックスイベント
   panel.querySelectorAll("input[type=checkbox]").forEach(function(chk){
