@@ -24,6 +24,22 @@ body {
   margin-right: 5px;
 }
 
+#star-toggle-btn {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  color: #f39c12;
+  transition: all 0.2s ease;
+}
+
+#star-toggle-btn:hover {
+  background: #f8f8f8;
+  border-color: #bbb;
+}
+
 /* ===== フィルタ制御ボタン ===== */
 .filter-control-buttons {
   display: flex;
