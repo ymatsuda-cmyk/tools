@@ -933,6 +933,12 @@ async function saveEdit() {
   }
 
   try {
+    // 現在の入力値をcurrentEditingScenarioに反映
+    const startDateInput = document.getElementById("startDateInput");
+    const endDateInput = document.getElementById("endDateInput");
+    currentEditingScenario.startDate = startDateInput.value;
+    currentEditingScenario.endDate = endDateInput.value;
+
     // Excelに保存
     if (typeof Excel !== "undefined") {
       await saveToExcel();
@@ -945,8 +951,15 @@ async function saveEdit() {
     );
     
     if (originalIndex >= 0) {
+      // バグテキストの更新
       creationData[originalIndex].blockText = currentEditingScenario.blockText;
       creationData[originalIndex].minorText = currentEditingScenario.minorText;
+      
+      // 日付情報の更新
+      const startDateInput = document.getElementById("startDateInput");
+      const endDateInput = document.getElementById("endDateInput");
+      creationData[originalIndex].startDate = startDateInput.value;
+      creationData[originalIndex].endDate = endDateInput.value;
       
       // レーンの再計算
       creationData[originalIndex].lane = getLane(
@@ -960,11 +973,11 @@ async function saveEdit() {
     // バグデータの更新
     updateBugDataFromScenario();
 
-    // UIを更新
-    applyFilter();
-    renderSummary();
-    closeEditModal();
+    // UI更新（Excel再読み込みなし）
+    applyFilter();    // フィルタを適用してカード表示を更新
+    renderSummary();  // サマリー情報を更新
     
+    closeEditModal();
     showSaveStatus("保存が完了しました", "ok");
 
   } catch (error) {
