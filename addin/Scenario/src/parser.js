@@ -6,7 +6,7 @@
 // ─── 列定義 ───────────────────────────────────────────
 const SHEET_DEFS = {
   "異常（通常）": {
-    dataStart: 14,   // 0-indexed row
+    dataStart: 13,   // 0-indexed row (14行目)
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
@@ -16,7 +16,7 @@ const SHEET_DEFS = {
     colStart: 90, colEnd: 91, colToday: 95, // CR列（本日列）修正：94→95
   },
   "異常（電源断）": {
-    dataStart: 14,
+    dataStart: 13,
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
@@ -26,7 +26,7 @@ const SHEET_DEFS = {
     colStart: 64, colEnd: 65, colToday: 69, // BR列（本日列）
   },
   "異常（通信断）": {
-    dataStart: 14,
+    dataStart: 13,
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
@@ -193,7 +193,7 @@ async function readWorkbook(context) {
     
     // 正常シートも異常系シートと同様の構造と仮定
     const normalDef = {
-      dataStart: 14, colMode2: 0, colAutoNo: 1, colBrand: 3,
+      dataStart: 13, colMode2: 0, colAutoNo: 1, colBrand: 3,
       colOp1Func: 4, colOp1Stat: 9, colOp2Func: 15, colOp2Stat: 20,
       colOp3Func: 26, colOp3Stat: 31, colPhase: 96,
       colStart: 90, colEnd: 91, colToday: 95 // CR列（本日列）修正：94→95
@@ -248,7 +248,7 @@ async function readWorkbook(context) {
     const rows = usedRange.values;
     const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
     let rowNum = 1;
-    for (let i = 5; i < rows.length; i++) {
+    for (let i = 4; i < rows.length; i++) {
       const row = rows[i];
       const scenarioId = cleanVal(row[2]);
       if (!scenarioId) continue;
