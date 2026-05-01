@@ -39,7 +39,7 @@ const SHEET_DEFS = {
 
 // バグシート定義
 const BUG_SHEET_DEF = {
-  sheetName: "（転記用）バグシート",
+  sheetName: "（転記用）バグ",
   dataStart: 1,    // データ開始行（0-indexed）
   colBugId: 0,     // バグID列
   colTitle: 1,     // タイトル列  
