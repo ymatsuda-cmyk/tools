@@ -255,7 +255,7 @@ main{padding:12px 14px;overflow-x:auto;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        <input type="text" id="searchInput" placeholder="ブランド・機能・処理状況で検索...">
+        <input type="text" id="searchInput" placeholder="項番・ブランド・機能・処理状況・日付で検索...">
       </div>
     </div>
     <div class="filter-row">
@@ -1434,7 +1434,7 @@ function applyFilter(){
     if(br&&d.brand!==br) return false;
     if(sh&&d.sheet!==sh) return false;
     if(q){
-      var t=[d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase].join(" ").toLowerCase();
+      var t=[d.no,d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase,d.startDate].join(" ").toLowerCase();
       if(t.indexOf(q)===-1) return false;
     }
     return true;
