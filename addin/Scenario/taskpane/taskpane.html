@@ -477,14 +477,20 @@ function formatDateForExcel(inputDateString) {
   return `${year.toString().padStart(2, '0')}/${month}/${day}`;
 }
 
-// 日付入力値をExcelのDate型に変換
+// 日付入力値をExcelのシリアル日付値に変換
 function convertToExcelDate(inputDateString) {
   if (!inputDateString) return null;
   
   const date = new Date(inputDateString);
   if (isNaN(date.getTime())) return null;
   
-  return date; // Office.jsはJavaScriptのDateオブジェクトを直接受け付ける
+  // Excelのシリアル日付値に変換（1900年1月1日からの日数）
+  const excelEpoch = new Date(1900, 0, 1);
+  const diffTime = date.getTime() - excelEpoch.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Excelの1900年閏年バグの調整（+2）
+  return diffDays + 2;
 }
 
 async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
@@ -983,6 +989,9 @@ async function saveEdit() {
     // バグデータの更新
     updateBugDataFromScenario();
 
+    // カードデータの日付更新とレーン再計算
+    updateCardDataAndLane();
+
     // UI更新（Excel再読み込みなし）
     applyFilter();    // フィルタを適用してカード表示を更新
     renderSummary();  // サマリー情報を更新
@@ -1061,6 +1070,56 @@ async function saveToExcel() {
 
     await context.sync();
   });
+}
+
+function updateCardDataAndLane() {
+  if (!currentEditingScenario) return;
+
+  // 日付入力値を取得
+  const startDateInput = document.getElementById("startDateInput");
+  const endDateInput = document.getElementById("endDateInput");
+  
+  // カードデータの日付を更新  
+  currentEditingScenario.startDate = startDateInput.value || "";
+  currentEditingScenario.endDate = endDateInput.value || "";
+
+  // レーンを再計算（parser.jsのgetLane関数と同じロジック）
+  const newLane = calculateLane(
+    currentEditingScenario.startDate, 
+    currentEditingScenario.endDate, 
+    currentEditingScenario.blockText || "", 
+    currentEditingScenario.minorText || ""
+  );
+  
+  // カードのレーンを更新
+  currentEditingScenario.lane = newLane;
+
+  // creationData内の対応するカードも更新
+  const targetCard = creationData.find(card => 
+    card.excelSheet === currentEditingScenario.excelSheet && 
+    card.rowIdx === currentEditingScenario.rowIdx
+  );
+  
+  if (targetCard) {
+    targetCard.startDate = currentEditingScenario.startDate;
+    targetCard.endDate = currentEditingScenario.endDate; 
+    targetCard.lane = newLane;
+  }
+}
+
+// parser.jsのgetLane関数と同じロジック
+function calculateLane(start, end, blockText, minorText) {
+  const hasUnresolved = (text) => {
+    if (!text) return false;
+    const bugs = text.match(/[バ課]\d+(?:（済）)?/g) || [];
+    return bugs.some(b => !b.includes("（済）"));
+  };
+  const unresolvedBlock = hasUnresolved(blockText);
+  const unresolvedMinor = hasUnresolved(minorText);
+  const unresolved = unresolvedBlock || unresolvedMinor;
+  if (!start) return unresolved ? "バグ保留" : "未着手";
+  if (!end)   return unresolved ? "バグ保留" : "対応中";
+  return unresolved ? "完了（条件付き）" : "完了";
 }
 
 function updateBugDataFromScenario() {
