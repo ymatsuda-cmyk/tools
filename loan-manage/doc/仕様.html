@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>貸借トラッカー 仕様書</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:#1c1917; --ink2:#57534e; --ink3:#a8a29e;
+  --bg:#fafaf9; --bg2:#f5f4f1; --bg3:#edecea;
+  --white:#fff; --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.13);
+  --teal:#0f766e; --teal-l:#ccfbf1;
+  --blue:#1e6fb5; --blue-l:#dbeafe;
+  --amber:#92400e; --amber-l:#fef3c7;
+  --green:#15803d; --green-l:#dcfce7;
+  --red:#b91c1c; --red-l:#fee2e2;
+  --purple:#6d28d9; --purple-l:#ede9fe;
+  --r:12px; --r-sm:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var(--ink);line-height:1.75;font-size:14px;}
+
+/* ===== LAYOUT ===== */
+.layout{display:flex;min-height:100vh;}
+.sidebar{width:220px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);padding:28px 0;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.main{flex:1;padding:48px 48px 80px;max-width:860px;}
+@media(max-width:700px){.sidebar{display:none}.main{padding:24px 18px 60px;}}
+
+/* ===== SIDEBAR ===== */
+.sb-logo{font-family:'Noto Serif JP',serif;font-size:14px;font-weight:600;padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:16px;color:var(--ink);}
+.sb-logo em{font-style:normal;color:var(--teal);}
+.sb-section{font-size:10px;font-weight:700;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;padding:10px 20px 4px;}
+.sb-link{display:block;padding:6px 20px;font-size:12px;color:var(--ink2);text-decoration:none;border-left:2px solid transparent;transition:all .12s;}
+.sb-link:hover{color:var(--teal);background:var(--teal-l);border-left-color:var(--teal);}
+.sb-link.active{color:var(--teal);font-weight:700;border-left-color:var(--teal);}
+
+/* ===== MAIN ===== */
+.page-title{font-family:'Noto Serif JP',serif;font-size:26px;font-weight:600;margin-bottom:6px;}
+.page-sub{font-size:13px;color:var(--ink3);margin-bottom:36px;}
+
+/* ===== SECTION ===== */
+.section{margin-bottom:48px;scroll-margin-top:24px;}
+.sec-title{font-family:'Noto Serif JP',serif;font-size:18px;font-weight:600;border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+.sec-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+
+/* ===== CARDS ===== */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:10px;}
+.card-title{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.09em;text-transform:uppercase;margin-bottom:12px;}
+
+/* ===== TABLE ===== */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{background:var(--bg2);font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);padding:9px 12px;border:1px solid var(--border2);text-align:left;}
+.tbl td{padding:9px 12px;border:1px solid var(--border2);color:var(--ink2);vertical-align:top;}
+.tbl tr:nth-child(even) td{background:var(--bg);}
+.tbl code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px;color:var(--teal);}
+
+/* ===== BADGE ===== */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.03em;}
+.b-teal{background:var(--teal-l);color:var(--teal);}
+.b-blue{background:var(--blue-l);color:var(--blue);}
+.b-amber{background:var(--amber-l);color:var(--amber);}
+.b-green{background:var(--green-l);color:var(--green);}
+.b-red{background:var(--red-l);color:var(--red);}
+.b-purple{background:var(--purple-l);color:var(--purple);}
+.b-gray{background:var(--bg3);color:var(--ink3);}
+
+/* ===== CODE BLOCK ===== */
+.code-wrap{position:relative;margin:10px 0;}
+.code-block{background:#1c1917;color:#d4d0cb;border-radius:var(--r-sm);padding:14px 16px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre;}
+.code-block .cm{color:#6b7280;font-style:italic;}
+.code-block .kw{color:#93c5fd;}
+.code-block .str{color:#86efac;}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#d4d0cb;font-size:11px;padding:3px 9px;border-radius:5px;cursor:pointer;font-family:inherit;}
+.copy-btn:hover{background:rgba(255,255,255,0.2);}
+
+/* ===== FLOW ===== */
+.flow{display:flex;flex-wrap:wrap;gap:0;margin:12px 0;}
+.flow-item{display:flex;align-items:center;gap:0;}
+.flow-box{background:var(--white);border:1px solid var(--border2);border-radius:var(--r-sm);padding:8px 14px;font-size:12px;font-weight:500;color:var(--ink2);}
+.flow-box.teal{background:var(--teal-l);border-color:var(--teal);color:var(--teal);font-weight:700;}
+.flow-box.blue{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
+.flow-box.amber{background:var(--amber-l);border-color:#d97706;color:var(--amber);}
+.flow-box.green{background:var(--green-l);border-color:#16a34a;color:var(--green);}
+.flow-arrow{font-size:16px;color:var(--ink3);padding:0 6px;}
+
+/* ===== GRID ===== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+@media(max-width:560px){.grid2{grid-template-columns:1fr;}}
+.mini-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;}
+.mini-card-head{font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;}
+.mini-card p{font-size:12px;color:var(--ink2);line-height:1.65;}
+
+/* ===== NOTE ===== */
+.note{border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:flex;gap:8px;align-items:flex-start;margin:10px 0;}
+.note svg{width:14px;height:14px;flex-shrink:0;margin-top:2px;}
+.note-info{background:var(--blue-l);color:var(--blue);border:1px solid #93c5fd;}
+.note-warn{background:var(--amber-l);color:var(--amber);border:1px solid #fbbf24;}
+.note-ok{background:var(--green-l);color:var(--green);border:1px solid #86efac;}
+
+/* ===== STATUS TABLE ===== */
+.status-row{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg3);font-size:12px;}
+.status-row:last-child{border-bottom:none;}
+.status-label{flex:1;color:var(--ink2);}
+.status-desc{flex:2;color:var(--ink3);}
+
+/* ===== FUNCTION LIST ===== */
+.fn-item{padding:10px 0;border-bottom:1px solid var(--bg3);display:flex;gap:12px;align-items:flex-start;}
+.fn-item:last-child{border-bottom:none;}
+.fn-name{font-family:'DM Mono',monospace;font-size:12px;color:var(--teal);font-weight:500;white-space:nowrap;min-width:200px;}
+.fn-desc{font-size:12px;color:var(--ink2);line-height:1.6;}
+
+/* ===== DIVIDER ===== */
+hr{border:none;border-top:1px solid var(--bg3);margin:32px 0;}
+
+/* ===== API ROW ===== */
+.api-row{padding:10px 0;border-bottom:1px solid var(--bg3);font-size:12px;}
+.api-row:last-child{border-bottom:none;}
+.api-action{font-family:'DM Mono',monospace;color:var(--teal);font-size:12px;font-weight:500;}
+.api-params{color:var(--ink3);margin-top:2px;}
+.api-return{color:var(--green);margin-top:2px;}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav class="sidebar">
+    <div class="sb-logo">貸借<em>トラッカー</em><br><span style="font-size:10px;font-weight:400;color:var(--ink3);font-family:'Zen Kaku Gothic New',sans-serif">仕様書 v1.0</span></div>
+    <div class="sb-section">概要</div>
+    <a class="sb-link" href="#overview">アプリ概要</a>
+    <a class="sb-link" href="#tech">技術スタック</a>
+    <div class="sb-section">画面仕様</div>
+    <a class="sb-link" href="#screen-dash">ダッシュボード</a>
+    <a class="sb-link" href="#screen-people">貸付先一覧</a>
+    <a class="sb-link" href="#screen-detail">人物詳細</a>
+    <a class="sb-link" href="#screen-repay">返済登録</a>
+    <a class="sb-link" href="#screen-chart">グラフ</a>
+    <div class="sb-section">データ仕様</div>
+    <a class="sb-link" href="#data-model">データモデル</a>
+    <a class="sb-link" href="#api">GAS API</a>
+    <div class="sb-section">処理仕様</div>
+    <a class="sb-link" href="#logic">ビジネスロジック</a>
+    <a class="sb-link" href="#state">状態管理</a>
+    <a class="sb-link" href="#sync">同期フロー</a>
+    <div class="sb-section">外部連携</div>
+    <a class="sb-link" href="#gas">Google Sheets / GAS</a>
+    <a class="sb-link" href="#line">LINE通知</a>
+    <div class="sb-section">シーケンス図</div>
+    <a class="sb-link" href="#seq-init">初回ロード・同期</a>
+    <a class="sb-link" href="#seq-addloan">貸付登録</a>
+    <a class="sb-link" href="#seq-addrepay">返済登録</a>
+    <a class="sb-link" href="#seq-webhook">Webhook・グループID取得</a>
+    <a class="sb-link" href="#seq-monthly">月次LINE通知</a>
+  </nav>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+    <div class="page-title">貸借トラッカー 仕様書</div>
+    <div class="page-sub">loan-tracker.html + code_complete.gs &nbsp;·&nbsp; 最終更新 2025年5月</div>
+
+    <!-- ===== 概要 ===== -->
+    <div class="section" id="overview">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--teal-l)">📋</div>アプリ概要</div>
+      <div class="card">
+        <p style="color:var(--ink2);margin-bottom:14px">個人間の貸付金額・返済計画・返済実績を管理するシングルページアプリケーション（SPA）。データはGoogle Sheetsに保存し、GitHub Pagesで公開できる。</p>
+        <div class="grid2">
+          <div class="mini-card"><div class="mini-card-head">対象ユーザー</div><p>個人間でお金の貸し借りを管理したい人</p></div>
+          <div class="mini-card"><div class="mini-card-head">公開方式</div><p>GitHub Pages（静的HTMLファイル1枚）</p></div>
+          <div class="mini-card"><div class="mini-card-head">データ保存先</div><p>Google Sheets（GAS Web App経由）</p></div>
+          <div class="mini-card"><div class="mini-card-head">通知機能</div><p>毎月1日にLINEグループ／個人へ自動送信</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 技術スタック ===== -->
+    <div class="section" id="tech">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--blue-l)">⚙️</div>技術スタック</div>
+      <table class="tbl">
+        <thead><tr><th>レイヤー</th><th>技術</th><th>役割</th></tr></thead>
+        <tbody>
+          <tr><td>フロントエンド</td><td>HTML / CSS / Vanilla JS</td><td>UI描画・ユーザー操作・グラフ生成（SVG）</td></tr>
+          <tr><td>データ永続化</td><td>Google Sheets</td><td>貸付・返済データの保存</td></tr>
+          <tr><td>バックエンド</td><td>Google Apps Script (GAS)</td><td>Sheets読み書き・LINE送信・定期実行</td></tr>
+          <tr><td>ホスティング</td><td>GitHub Pages</td><td>静的ファイル配信（無料）</td></tr>
+          <tr><td>通知</td><td>LINE Messaging API</td><td>毎月1日の返済レポート送信</td></tr>
+          <tr><td>設定保存</td><td>localStorage</td><td>GAS Web App URLの保存（端末ローカル）</td></tr>
+          <tr><td>フォント</td><td>Google Fonts</td><td>Noto Serif JP / Zen Kaku Gothic New / DM Mono</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== ダッシュボード ===== -->
+    <div class="section" id="screen-dash">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--teal-l)">🏠</div>画面仕様 — ダッシュボード</div>
+      <table class="tbl" style="margin-bottom:12px">
+        <thead><tr><th>要素</th><th>表示内容</th><th>算出方法</th></tr></thead>
+        <tbody>
+          <tr><td>貸付残高合計</td><td>返済中の全貸付残高の合計</td><td><code>amount - Σrepayments</code>（返済中のみ）</td></tr>
+          <tr><td>件数</td><td>残高 &gt; 0 の貸付件数</td><td><code>loans.filter(remain &gt; 0).length</code></td></tr>
+          <tr><td>返済累計</td><td>全返済の合計額</td><td>全 repayments の amount 合計</td></tr>
+          <tr><td>今月の返済予定</td><td>返済中の月々返済額の合計</td><td><code>Σ monthly</code>（残高 &gt; 0 のみ）</td></tr>
+          <tr><td>最短完済予定</td><td>最も早く完済する貸付先の完済月</td><td><code>ceil(remain / monthly)</code> ヶ月後を計算</td></tr>
+          <tr><td>返済進捗バー</td><td>全貸付の返済率をバーで表示</td><td><code>paid / amount × 100</code>（%）</td></tr>
+        </tbody>
+      </table>
+      <div class="note note-info">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="6"/><path d="M7 5v3M7 9.5v.5"/></svg>
+        GAS URL未設定の場合、黄色いバナーを表示してセットアップへ誘導する。
+      </div>
+    </div>
+
+    <!-- ===== 貸付先一覧 ===== -->
+    <div class="section" id="screen-people">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--blue-l)">👤</div>画面仕様 — 貸付先一覧</div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">人物カードの表示内容</div>
+        <table class="tbl">
+          <thead><tr><th>要素</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>アバター</td><td>名前の頭文字1文字。インデックス順に5色のカラーを循環適用</td></tr>
+            <tr><td>ステータスバッジ</td><td>下記「ステータス判定」参照</td></tr>
+            <tr><td>貸付日・月額</td><td>登録時の date と monthly を表示</td></tr>
+            <tr><td>残高</td><td><code>amount - Σrepayments.amount</code></td></tr>
+            <tr><td>進捗バー</td><td>返済率（%）をバーで表示。完済予定月も表示</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">ステータスバッジ判定ロジック</div>
+        <div class="status-row"><span class="badge b-gray">完済</span><span class="status-label">残高 ≦ 0</span><span class="status-desc">返済が完了した貸付</span></div>
+        <div class="status-row"><span class="badge b-red">要確認</span><span class="status-label">返済率 &lt; 20%</span><span class="status-desc">返済がほとんど進んでいない</span></div>
+        <div class="status-row"><span class="badge b-amber">返済中</span><span class="status-label">返済率 20〜59%</span><span class="status-desc">通常の返済進捗</span></div>
+        <div class="status-row"><span class="badge b-teal">順調</span><span class="status-label">返済率 ≥ 60%</span><span class="status-desc">返済が順調に進んでいる</span></div>
+      </div>
+    </div>
+
+    <!-- ===== 人物詳細 ===== -->
+    <div class="section" id="screen-detail">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--green-l)">📊</div>画面仕様 — 人物詳細</div>
+      <div class="card">
+        <div class="card-title">表示コンポーネント</div>
+        <table class="tbl">
+          <thead><tr><th>コンポーネント</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>情報グリッド（4枠）</td><td>貸付金額 / 残高 / 月々返済額 / 完済予定月</td></tr>
+            <tr><td>ドーナツグラフ</td><td>返済済み vs 残高の割合をSVGで描画。中央に返済率（%）表示</td></tr>
+            <tr><td>返済タイムライン</td><td>全返済履歴を日付の降順で表示。日付・金額・メモを記録</td></tr>
+            <tr><td>返済登録フォーム</td><td>詳細画面内から直接返済登録が可能。月額を初期値として表示</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note-info">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="6"/><path d="M7 5v3M7 9.5v.5"/></svg>
+        詳細画面はfixed positionのオーバーレイとして表示。左スライドアニメーションで遷移する。
+      </div>
+    </div>
+
+    <!-- ===== 返済登録 ===== -->
+    <div class="section" id="screen-repay">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--amber-l)">💴</div>画面仕様 — 返済登録</div>
+      <div class="card">
+        <div class="card-title">入力フィールドとバリデーション</div>
+        <table class="tbl">
+          <thead><tr><th>フィールド</th><th>型</th><th>必須</th><th>初期値</th><th>バリデーション</th></tr></thead>
+          <tbody>
+            <tr><td>返済先（選択）</td><td>選択式カード</td><td>◯</td><td>—</td><td>残高 &gt; 0 の貸付先のみ表示</td></tr>
+            <tr><td>返済日</td><td>date</td><td>◯</td><td>本日の日付</td><td>空欄不可</td></tr>
+            <tr><td>返済金額</td><td>number</td><td>◯</td><td>月々返済額</td><td>0以下・残高超過は登録不可</td></tr>
+            <tr><td>メモ</td><td>text</td><td>—</td><td>空欄</td><td>なし</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note-warn">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L1 13h12L7 1z"/><path d="M7 6v3M7 10.5v.5"/></svg>
+        返済金額が残高を超える場合は登録をブロックし、トーストで現在の残高を通知する。
+      </div>
+    </div>
+
+    <!-- ===== グラフ ===== -->
+    <div class="section" id="screen-chart">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--purple-l)">📈</div>画面仕様 — グラフ</div>
+      <table class="tbl">
+        <thead><tr><th>グラフ</th><th>種類</th><th>描画方法</th><th>データソース</th></tr></thead>
+        <tbody>
+          <tr><td>貸付先別残高内訳</td><td>ドーナツチャート</td><td>SVG <code>stroke-dasharray</code> を動的計算</td><td>各貸付の残高</td></tr>
+          <tr><td>月別受取返済額</td><td>棒グラフ</td><td>SVG <code>&lt;rect&gt;</code> を動的生成（直近6ヶ月）</td><td>repayments の date で月集計</td></tr>
+          <tr><td>返済進捗一覧</td><td>水平バー</td><td>CSSバー（<code>width: pct%</code>）</td><td>各貸付の返済率</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- ===== データモデル ===== -->
+    <div class="section" id="data-model">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--green-l)">🗄️</div>データモデル</div>
+
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">loansシート — 貸付マスター</div>
+        <table class="tbl">
+          <thead><tr><th>列</th><th>フィールド名</th><th>型</th><th>必須</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td><code>id</code></td><td>string</td><td>◯</td><td><code>'L' + Date.now()</code> で生成するユニークID</td></tr>
+            <tr><td>B</td><td><code>name</code></td><td>string</td><td>◯</td><td>貸付先の名前</td></tr>
+            <tr><td>C</td><td><code>amount</code></td><td>number</td><td>◯</td><td>貸付金額（元本）</td></tr>
+            <tr><td>D</td><td><code>date</code></td><td>string</td><td>◯</td><td>貸付日（YYYY-MM-DD形式）</td></tr>
+            <tr><td>E</td><td><code>monthly</code></td><td>number</td><td>—</td><td>月々の返済予定額（0の場合は未定）</td></tr>
+            <tr><td>F</td><td><code>memo</code></td><td>string</td><td>—</td><td>メモ（用途など）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">repaymentsシート — 返済履歴</div>
+        <table class="tbl">
+          <thead><tr><th>列</th><th>フィールド名</th><th>型</th><th>必須</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td><code>id</code></td><td>string</td><td>◯</td><td><code>'R' + Date.now()</code> で生成するユニークID</td></tr>
+            <tr><td>B</td><td><code>loanId</code></td><td>string</td><td>◯</td><td>loansの<code>id</code>への外部キー</td></tr>
+            <tr><td>C</td><td><code>date</code></td><td>string</td><td>◯</td><td>返済日（YYYY-MM-DD形式）</td></tr>
+            <tr><td>D</td><td><code>amount</code></td><td>number</td><td>◯</td><td>返済金額</td></tr>
+            <tr><td>E</td><td><code>memo</code></td><td>string</td><td>—</td><td>メモ（支払方法など）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== GAS API ===== -->
+    <div class="section" id="api">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--blue-l)">🔌</div>GAS API仕様</div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">エンドポイント</div>
+        <p style="color:var(--ink2);font-size:12px;margin-bottom:8px">GAS Web App URL（デプロイごとに発行）にクエリパラメータで <code>action</code> を指定して呼び出す。</p>
+        <div class="code-block">GET  {GAS_URL}?action=getLoans
+GET  {GAS_URL}?action=getRepayments&loanId=L1234567890
+GET  {GAS_URL}?action=addLoan&name=田中&amount=200000&date=2025-05-01&monthly=20000
+GET  {GAS_URL}?action=addRepayment&loanId=L123&date=2025-05-01&amount=20000</div>
+      </div>
+      <div class="card">
+        <div class="card-title">アクション一覧</div>
+        <div class="api-row">
+          <div><span class="api-action">getLoans</span> <span class="badge b-blue">GET</span></div>
+          <div class="api-params">パラメータ：なし</div>
+          <div class="api-return">レスポンス：<code>[{id, name, amount, date, monthly, memo}, ...]</code></div>
+        </div>
+        <div class="api-row">
+          <div><span class="api-action">addLoan</span> <span class="badge b-teal">WRITE</span></div>
+          <div class="api-params">パラメータ：<code>name, amount, date, monthly?, memo?</code></div>
+          <div class="api-return">レスポンス：<code>{id: 'L...'}</code></div>
+        </div>
+        <div class="api-row">
+          <div><span class="api-action">getRepayments</span> <span class="badge b-blue">GET</span></div>
+          <div class="api-params">パラメータ：<code>loanId</code></div>
+          <div class="api-return">レスポンス：<code>[{id, loanId, date, amount, memo}, ...]</code></div>
+        </div>
+        <div class="api-row">
+          <div><span class="api-action">addRepayment</span> <span class="badge b-teal">WRITE</span></div>
+          <div class="api-params">パラメータ：<code>loanId, date, amount, memo?</code></div>
+          <div class="api-return">レスポンス：<code>{id: 'R...'}</code></div>
+        </div>
+      </div>
+      <div class="note note-warn">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L1 13h12L7 1z"/><path d="M7 6v3M7 10.5v.5"/></svg>
+        GASはCORSを自動で許可するためプロキシ不要。ただしリダイレクト（302）が発生するため fetch 時に <code>redirect: 'follow'</code> を指定すること。
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ===== ビジネスロジック ===== -->
+    <div class="section" id="logic">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--amber-l)">🧮</div>ビジネスロジック</div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">主要計算関数</div>
+        <div class="fn-item">
+          <div class="fn-name">getRemain(loan)</div>
+          <div class="fn-desc"><code>amount - Σrepayments.amount</code> で残高を算出。返済履歴が0件なら元本をそのまま返す。</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">getPct(loan)</div>
+          <div class="fn-desc"><code>Math.min(100, round(paid/amount×100))</code>。返済率を0〜100の整数で返す。超過登録がある場合も100%上限でキャップ。</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">calcEnd(loan)</div>
+          <div class="fn-desc">残高 ≦ 0 → <code>'完済済み'</code>。monthly未設定 → <code>'—'</code>。それ以外は <code>ceil(remain/monthly)</code> ヶ月後の年月を <code>YYYY年M月</code> 形式で返す。</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">getStatus(loan)</div>
+          <div class="fn-desc">残高・返済率からステータスバッジ（完済 / 要確認 / 返済中 / 順調）とCSSクラスを返す。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">完済予定月の算出式</div>
+        <div class="code-wrap">
+          <div class="code-block"><span class="cm">// 残高 ÷ 月額で必要月数を切り上げ計算</span>
+<span class="kw">const</span> months = Math.ceil(remain / monthly);
+<span class="kw">const</span> d = <span class="kw">new</span> Date();
+d.setMonth(d.getMonth() + months);
+<span class="kw">return</span> <span class="str">`${d.getFullYear()}年${d.getMonth()+1}月`</span>;</div>
+        </div>
+        <div class="note note-warn" style="margin-top:8px">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L1 13h12L7 1z"/><path d="M7 6v3M7 10.5v.5"/></svg>
+          利子計算は含まない。元本÷月額の単純計算のみ。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 状態管理 ===== -->
+    <div class="section" id="state">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--purple-l)">🗃️</div>状態管理</div>
+      <div class="card">
+        <div class="card-title">グローバル変数</div>
+        <table class="tbl">
+          <thead><tr><th>変数名</th><th>型</th><th>内容</th><th>初期値</th></tr></thead>
+          <tbody>
+            <tr><td><code>loans</code></td><td><code>Array</code></td><td>全貸付データ（GASから取得またはローカル追加）</td><td><code>[]</code></td></tr>
+            <tr><td><code>repayments</code></td><td><code>Object</code></td><td>loanId をキーとした返済履歴の辞書</td><td><code>{}</code></td></tr>
+            <tr><td><code>selectedRepayIdx</code></td><td><code>number</code></td><td>返済登録画面で選択中の貸付インデックス</td><td><code>-1</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note-info" style="margin-top:10px">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="6"/><path d="M7 5v3M7 9.5v.5"/></svg>
+        データはすべてメモリ上で保持。ページリロード時にGASから再取得する。GAS未接続時はページを閉じるとデータが消える。
+      </div>
+    </div>
+
+    <!-- ===== 同期フロー ===== -->
+    <div class="section" id="sync">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--teal-l)">🔄</div>同期フロー</div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">初回ロード時</div>
+        <div class="flow">
+          <div class="flow-item"><div class="flow-box teal">DOMContentLoaded</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box">localStorage確認</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box blue">GAS URL あり</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box">syncAll() 自動実行</div></div>
+        </div>
+        <div class="flow" style="margin-top:6px">
+          <div class="flow-item"><div class="flow-box blue">GAS URL なし</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box amber">バナー表示</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box">ローカルのみで動作</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">syncAll() の処理フロー</div>
+        <div class="flow">
+          <div class="flow-item"><div class="flow-box teal">syncAll()</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box">getLoans</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box">全loanIdで並列 getRepayments</div><div class="flow-arrow">→</div></div>
+          <div class="flow-item"><div class="flow-box green">renderAll()</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--ink3);margin-top:8px">※ <code>Promise.all</code> で返済履歴を並列取得するため、貸付件数が多い場合でも効率的に同期できる。</p>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ===== Google Sheets / GAS ===== -->
+    <div class="section" id="gas">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--green-l)">📗</div>Google Sheets / GAS 連携</div>
+      <table class="tbl" style="margin-bottom:12px">
+        <thead><tr><th>設定項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>GAS実行ユーザー</td><td>自分（オーナー）</td></tr>
+          <tr><td>アクセス権限</td><td>全員（匿名アクセス可）</td></tr>
+          <tr><td>デプロイ種別</td><td>ウェブアプリ</td></tr>
+          <tr><td>URL保存先</td><td><code>localStorage['gas_url']</code>（端末ごとに設定が必要）</td></tr>
+        </tbody>
+      </table>
+      <div class="card">
+        <div class="card-title">GAS側の主要関数</div>
+        <div class="fn-item">
+          <div class="fn-name">doGet(e) / doPost(e)</div>
+          <div class="fn-desc">両メソッドともに <code>handleReq(e)</code> に委譲。LINE Webhookイベントの場合は <code>events[0].source.groupId</code> を検出してスクリプトプロパティに保存する。</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">handleReq(e)</div>
+          <div class="fn-desc"><code>action</code> パラメータで分岐し、各CRUD関数を呼び出す。エラー時は <code>{error: message}</code> を返す。</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">setMonthlyTrigger()</div>
+          <div class="fn-desc">既存の <code>sendMonthlyReport</code> トリガーを全削除してから新規作成（重複防止）。毎月1日 8:00 に設定。</div>
+        </div>
+      </div>
+      <div class="note note-warn">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L1 13h12L7 1z"/><path d="M7 6v3M7 10.5v.5"/></svg>
+        GAS Web App URLはコードに直書きしないこと。GitHubに公開する際にURLが漏洩するリスクがある。localStorageに保存するか、URLを知っている人のみがアクセスできる運用とする。
+      </div>
+    </div>
+
+    <!-- ===== LINE通知 ===== -->
+    <div class="section" id="line">
+      <div class="sec-title"><div class="sec-icon" style="background:#dcfce7">💬</div>LINE通知仕様</div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">月次レポートの送信仕様</div>
+        <table class="tbl">
+          <thead><tr><th>項目</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>実行タイミング</td><td>毎月1日 8:00（GASタイムトリガー）</td></tr>
+            <tr><td>対象貸付</td><td>残高 &gt; 0 の貸付のみ</td></tr>
+            <tr><td>集計期間</td><td>前月（実行月 - 1ヶ月）の返済データ</td></tr>
+            <tr><td>送信先</td><td>スクリプトプロパティ <code>LINE_GROUP_ID</code>（未設定時は <code>LINE_USER_ID</code>）</td></tr>
+            <tr><td>API</td><td>LINE Messaging API <code>/v2/bot/message/push</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">ステータス判定（前月返済）</div>
+        <div class="status-row"><span style="font-size:16px">✅</span><span class="status-label">前月返済額 ≥ 月額返済予定</span><span class="status-desc">予定通り返済済み</span></div>
+        <div class="status-row"><span style="font-size:16px">⚠️</span><span class="status-label">前月返済額 &gt; 0（月額未満）</span><span class="status-desc">一部返済</span></div>
+        <div class="status-row"><span style="font-size:16px">❌</span><span class="status-label">前月返済額 = 0</span><span class="status-desc">未返済</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">認証情報の管理方法</div>
+        <table class="tbl">
+          <thead><tr><th>プロパティ名</th><th>取得方法</th><th>設定方法</th></tr></thead>
+          <tbody>
+            <tr><td><code>LINE_TOKEN</code></td><td>LINE Developersでチャネル発行</td><td><code>setLineConfig()</code> を実行して保存</td></tr>
+            <tr><td><code>LINE_USER_ID</code></td><td>LINE Developersのチャネル基本設定</td><td><code>setLineConfig()</code> を実行して保存</td></tr>
+            <tr><td><code>LINE_GROUP_ID</code></td><td>LINE Webhookイベントから自動取得</td><td>ボットをグループに追加→メッセージ送信で自動保存</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note-ok">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7l3 4 7-6"/></svg>
+        トークン等はコードに直書きせず、すべてスクリプトプロパティに保存すること（GASエディタ：プロジェクトの設定 → スクリプトプロパティ で確認可能）。
+      </div>
+    </div>
+
+    <!-- ===== シーケンス図 ===== -->
+
+    <!-- 共通スタイル（SVGシーケンス図） -->
+    <style>
+    .seq-wrap{overflow-x:auto;margin:12px 0;}
+    .seq-svg{font-family:'Zen Kaku Gothic New',sans-serif;}
+    /* アクター帯 */
+    .seq-actor{font-size:11px;font-weight:700;}
+    /* メッセージラベル */
+    .seq-msg{font-size:11px;}
+    .seq-ret{font-size:10px;fill:#a8a29e;}
+    /* 活性区間 */
+    .seq-act{opacity:.9;}
+    /* 注釈ボックス */
+    .seq-note{font-size:10px;}
+    /* ループ・alt枠 */
+    .seq-frame-label{font-size:10px;font-weight:700;}
+    </style>
+
+    <!-- ① 初回ロード・同期 -->
+    <div class="section" id="seq-init">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--teal-l)">🔄</div>シーケンス図 — 初回ロード・データ同期</div>
+      <div class="card">
+        <div class="card-title">アクター：ユーザー / GitHub Pages / GAS API / Google Sheets</div>
+        <div class="seq-wrap">
+          <svg class="seq-svg" width="700" height="400" viewBox="0 0 700 400">
+            <!-- ライフライン -->
+            <line x1="70"  y1="60" x2="70"  y2="390" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="220" y1="60" x2="220" y2="390" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="400" y1="60" x2="400" y2="390" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="580" y1="60" x2="580" y2="390" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+            <!-- アクターボックス -->
+            <rect x="20"  y="18" width="100" height="34" rx="6" fill="#ccfbf1" stroke="#0f766e" stroke-width="1"/>
+            <rect x="165" y="18" width="110" height="34" rx="6" fill="#dbeafe" stroke="#1e6fb5" stroke-width="1"/>
+            <rect x="345" y="18" width="110" height="34" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/>
+            <rect x="530" y="18" width="100" height="34" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+
+            <text x="70"  y="40" text-anchor="middle" class="seq-actor" fill="#0f766e">ユーザー</text>
+            <text x="220" y="36" text-anchor="middle" class="seq-actor" fill="#1e6fb5">GitHub</text>
+            <text x="220" y="48" text-anchor="middle" class="seq-actor" fill="#1e6fb5">Pages</text>
+            <text x="400" y="36" text-anchor="middle" class="seq-actor" fill="#92400e">GAS</text>
+            <text x="400" y="48" text-anchor="middle" class="seq-actor" fill="#92400e">API</text>
+            <text x="580" y="36" text-anchor="middle" class="seq-actor" fill="#15803d">Google</text>
+            <text x="580" y="48" text-anchor="middle" class="seq-actor" fill="#15803d">Sheets</text>
+
+            <!-- 活性区間 -->
+            <rect x="66"  y="80" width="8" height="290" rx="2" fill="#0f766e" class="seq-act" opacity=".25"/>
+            <rect x="216" y="95" width="8" height="260" rx="2" fill="#1e6fb5" class="seq-act" opacity=".25"/>
+            <rect x="396" y="140" width="8" height="170" rx="2" fill="#92400e" class="seq-act" opacity=".25"/>
+            <rect x="576" y="155" width="8" height="140" rx="2" fill="#15803d" class="seq-act" opacity=".25"/>
+
+            <!-- メッセージ -->
+            <!-- 1. ユーザー → GitHub Pages -->
+            <line x1="74" y1="90" x2="215" y2="90" stroke="#1e6fb5" stroke-width="1.2" marker-end="url(#arr-blue)"/>
+            <text x="140" y="84" text-anchor="middle" class="seq-msg" fill="#1e6fb5">① URLアクセス</text>
+
+            <!-- 2. GitHub Pages → ユーザー (HTML返却) -->
+            <line x1="215" y1="110" x2="74" y2="110" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="140" y="105" text-anchor="middle" class="seq-ret">HTML/CSS/JS 配信</text>
+
+            <!-- 3. Pages → GAS (localStorage確認後) -->
+            <line x1="224" y1="145" x2="395" y2="145" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="307" y="139" text-anchor="middle" class="seq-msg" fill="#92400e">② getLoans</text>
+
+            <!-- 4. GAS → Sheets -->
+            <line x1="404" y1="162" x2="575" y2="162" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="487" y="156" text-anchor="middle" class="seq-msg" fill="#15803d">③ loansシート読取</text>
+
+            <!-- 5. Sheets → GAS -->
+            <line x1="575" y1="180" x2="404" y2="180" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="487" y="175" text-anchor="middle" class="seq-ret">loans配列</text>
+
+            <!-- 6. GAS → Pages -->
+            <line x1="395" y1="200" x2="224" y2="200" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="307" y="195" text-anchor="middle" class="seq-ret">JSON [{id,name,...}]</text>
+
+            <!-- ループ枠 -->
+            <rect x="185" y="215" width="390" height="95" rx="4" fill="none" stroke="#a8a29e" stroke-width="1" stroke-dasharray="5 3"/>
+            <rect x="185" y="215" width="75" height="16" rx="2" fill="#edecea"/>
+            <text x="222" y="227" text-anchor="middle" class="seq-frame-label" fill="#57534e">loop 各loanId</text>
+
+            <!-- 7. Pages → GAS (getRepayments) -->
+            <line x1="224" y1="242" x2="395" y2="242" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="307" y="236" text-anchor="middle" class="seq-msg" fill="#92400e">④ getRepayments(loanId)</text>
+
+            <!-- 8. GAS → Sheets -->
+            <line x1="404" y1="258" x2="575" y2="258" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="487" y="252" text-anchor="middle" class="seq-msg" fill="#15803d">repaymentsシート読取</text>
+
+            <!-- 9. Sheets → GAS → Pages -->
+            <line x1="575" y1="275" x2="404" y2="275" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <line x1="395" y1="293" x2="224" y2="293" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="487" y="270" text-anchor="middle" class="seq-ret">返済履歴配列</text>
+            <text x="307" y="288" text-anchor="middle" class="seq-ret">JSON [{id,loanId,...}]</text>
+
+            <!-- 10. renderAll() -->
+            <line x1="224" y1="330" x2="74" y2="330" stroke="#0f766e" stroke-width="1.2" marker-end="url(#arr-teal)"/>
+            <text x="147" y="324" text-anchor="middle" class="seq-msg" fill="#0f766e">⑤ renderAll()（画面描画）</text>
+
+            <!-- 矢印マーカー -->
+            <defs>
+              <marker id="arr-blue"  viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#1e6fb5" stroke-width="1.2"/></marker>
+              <marker id="arr-amber" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#92400e" stroke-width="1.2"/></marker>
+              <marker id="arr-green" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#15803d" stroke-width="1.2"/></marker>
+              <marker id="arr-teal"  viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#0f766e" stroke-width="1.2"/></marker>
+              <marker id="arr-gray"  viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#a8a29e" stroke-width="1.2"/></marker>
+              <marker id="arr-line"  viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#06c755" stroke-width="1.2"/></marker>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 貸付登録 -->
+    <div class="section" id="seq-addloan">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--blue-l)">➕</div>シーケンス図 — 貸付登録</div>
+      <div class="card">
+        <div class="card-title">アクター：ユーザー / GitHub Pages / GAS API / Google Sheets</div>
+        <div class="seq-wrap">
+          <svg class="seq-svg" width="700" height="310" viewBox="0 0 700 310">
+            <line x1="70"  y1="60" x2="70"  y2="300" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="220" y1="60" x2="220" y2="300" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="400" y1="60" x2="400" y2="300" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="580" y1="60" x2="580" y2="300" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <rect x="20"  y="18" width="100" height="34" rx="6" fill="#ccfbf1" stroke="#0f766e" stroke-width="1"/>
+            <rect x="165" y="18" width="110" height="34" rx="6" fill="#dbeafe" stroke="#1e6fb5" stroke-width="1"/>
+            <rect x="345" y="18" width="110" height="34" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/>
+            <rect x="530" y="18" width="100" height="34" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <text x="70"  y="40" text-anchor="middle" class="seq-actor" fill="#0f766e">ユーザー</text>
+            <text x="220" y="36" text-anchor="middle" class="seq-actor" fill="#1e6fb5">GitHub</text>
+            <text x="220" y="48" text-anchor="middle" class="seq-actor" fill="#1e6fb5">Pages</text>
+            <text x="400" y="36" text-anchor="middle" class="seq-actor" fill="#92400e">GAS</text>
+            <text x="400" y="48" text-anchor="middle" class="seq-actor" fill="#92400e">API</text>
+            <text x="580" y="36" text-anchor="middle" class="seq-actor" fill="#15803d">Google</text>
+            <text x="580" y="48" text-anchor="middle" class="seq-actor" fill="#15803d">Sheets</text>
+
+            <rect x="66"  y="80" width="8" height="200" rx="2" fill="#0f766e" opacity=".2"/>
+            <rect x="216" y="110" width="8" height="160" rx="2" fill="#1e6fb5" opacity=".2"/>
+            <rect x="396" y="145" width="8" height="100" rx="2" fill="#92400e" opacity=".2"/>
+            <rect x="576" y="160" width="8" height="70"  rx="2" fill="#15803d" opacity=".2"/>
+
+            <!-- 1 -->
+            <line x1="74" y1="90" x2="215" y2="90" stroke="#1e6fb5" stroke-width="1.2" marker-end="url(#arr-blue)"/>
+            <text x="143" y="84" text-anchor="middle" class="seq-msg" fill="#1e6fb5">① フォーム入力・登録ボタン押下</text>
+            <!-- 2 バリデーション -->
+            <rect x="180" y="100" width="80" height="16" rx="3" fill="#fef3c7"/>
+            <text x="220" y="112" text-anchor="middle" class="seq-note" fill="#92400e">バリデーション</text>
+            <!-- 3 -->
+            <line x1="224" y1="130" x2="395" y2="130" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="307" y="124" text-anchor="middle" class="seq-msg" fill="#92400e">② addLoan(name,amount,date,monthly,memo)</text>
+            <!-- 4 -->
+            <line x1="404" y1="152" x2="575" y2="152" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="487" y="146" text-anchor="middle" class="seq-msg" fill="#15803d">③ loansシートに appendRow</text>
+            <!-- 5 -->
+            <line x1="575" y1="175" x2="404" y2="175" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="487" y="170" text-anchor="middle" class="seq-ret">生成したid返却</text>
+            <!-- 6 -->
+            <line x1="395" y1="200" x2="224" y2="200" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="307" y="194" text-anchor="middle" class="seq-ret">{id: 'L...'}</text>
+            <!-- 7 meモリ更新 -->
+            <rect x="180" y="210" width="80" height="16" rx="3" fill="#ccfbf1"/>
+            <text x="220" y="222" text-anchor="middle" class="seq-note" fill="#0f766e">loans配列に追加</text>
+            <!-- 8 -->
+            <line x1="215" y1="248" x2="74" y2="248" stroke="#0f766e" stroke-width="1.2" marker-end="url(#arr-teal)"/>
+            <text x="143" y="242" text-anchor="middle" class="seq-msg" fill="#0f766e">④ renderAll()・トースト表示</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 返済登録 -->
+    <div class="section" id="seq-addrepay">
+      <div class="sec-title"><div class="sec-icon" style="background:var(--amber-l)">💴</div>シーケンス図 — 返済登録</div>
+      <div class="card">
+        <div class="card-title">アクター：ユーザー / GitHub Pages / GAS API / Google Sheets</div>
+        <div class="seq-wrap">
+          <svg class="seq-svg" width="700" height="330" viewBox="0 0 700 330">
+            <line x1="70"  y1="60" x2="70"  y2="320" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="220" y1="60" x2="220" y2="320" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="400" y1="60" x2="400" y2="320" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="580" y1="60" x2="580" y2="320" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <rect x="20"  y="18" width="100" height="34" rx="6" fill="#ccfbf1" stroke="#0f766e" stroke-width="1"/>
+            <rect x="165" y="18" width="110" height="34" rx="6" fill="#dbeafe" stroke="#1e6fb5" stroke-width="1"/>
+            <rect x="345" y="18" width="110" height="34" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/>
+            <rect x="530" y="18" width="100" height="34" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <text x="70"  y="40" text-anchor="middle" class="seq-actor" fill="#0f766e">ユーザー</text>
+            <text x="220" y="36" text-anchor="middle" class="seq-actor" fill="#1e6fb5">GitHub</text>
+            <text x="220" y="48" text-anchor="middle" class="seq-actor" fill="#1e6fb5">Pages</text>
+            <text x="400" y="36" text-anchor="middle" class="seq-actor" fill="#92400e">GAS</text>
+            <text x="400" y="48" text-anchor="middle" class="seq-actor" fill="#92400e">API</text>
+            <text x="580" y="36" text-anchor="middle" class="seq-actor" fill="#15803d">Google</text>
+            <text x="580" y="48" text-anchor="middle" class="seq-actor" fill="#15803d">Sheets</text>
+
+            <rect x="66"  y="80" width="8" height="220" rx="2" fill="#0f766e" opacity=".2"/>
+            <rect x="216" y="95" width="8" height="200" rx="2" fill="#1e6fb5" opacity=".2"/>
+            <rect x="396" y="145" width="8" height="115" rx="2" fill="#92400e" opacity=".2"/>
+            <rect x="576" y="160" width="8" height="80"  rx="2" fill="#15803d" opacity=".2"/>
+
+            <!-- alt枠 -->
+            <rect x="150" y="92" width="270" height="38" rx="4" fill="none" stroke="#e24b4a" stroke-width="1" stroke-dasharray="4 2"/>
+            <rect x="150" y="92" width="38" height="14" rx="2" fill="#fee2e2"/>
+            <text x="169" y="103" text-anchor="middle" class="seq-frame-label" fill="#b91c1c">alt</text>
+            <text x="290" y="108" text-anchor="middle" class="seq-note" fill="#b91c1c">残高超過の場合 → エラートースト・処理中断</text>
+
+            <!-- 1 -->
+            <line x1="74" y1="83" x2="215" y2="83" stroke="#1e6fb5" stroke-width="1.2" marker-end="url(#arr-blue)"/>
+            <text x="143" y="78" text-anchor="middle" class="seq-msg" fill="#1e6fb5">① 返済先選択・金額入力・登録ボタン</text>
+
+            <!-- 2 -->
+            <line x1="224" y1="148" x2="395" y2="148" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="307" y="142" text-anchor="middle" class="seq-msg" fill="#92400e">② addRepayment(loanId,date,amount,memo)</text>
+            <!-- 3 -->
+            <line x1="404" y1="168" x2="575" y2="168" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="487" y="162" text-anchor="middle" class="seq-msg" fill="#15803d">③ repaymentsシートに appendRow</text>
+            <!-- 4 -->
+            <line x1="575" y1="192" x2="404" y2="192" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="487" y="187" text-anchor="middle" class="seq-ret">生成したid返却</text>
+            <!-- 5 -->
+            <line x1="395" y1="215" x2="224" y2="215" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="307" y="210" text-anchor="middle" class="seq-ret">{id: 'R...'}</text>
+            <!-- 6 メモリ更新 -->
+            <rect x="180" y="224" width="80" height="16" rx="3" fill="#ccfbf1"/>
+            <text x="220" y="236" text-anchor="middle" class="seq-note" fill="#0f766e">repayments辞書に追加</text>
+            <!-- 7 -->
+            <line x1="215" y1="265" x2="74" y2="265" stroke="#0f766e" stroke-width="1.2" marker-end="url(#arr-teal)"/>
+            <text x="143" y="259" text-anchor="middle" class="seq-msg" fill="#0f766e">④ renderAll()・トースト表示</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ Webhook・グループID取得 -->
+    <div class="section" id="seq-webhook">
+      <div class="sec-title"><div class="sec-icon" style="background:#dcfce7">🔗</div>シーケンス図 — Webhook・グループID自動取得</div>
+      <div class="card">
+        <div class="card-title">アクター：ユーザー / LINE / GAS API / Google Sheets（スクリプトプロパティ）</div>
+        <div class="seq-wrap">
+          <svg class="seq-svg" width="700" height="340" viewBox="0 0 700 340">
+            <!-- ライフライン -->
+            <line x1="70"  y1="60" x2="70"  y2="330" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="220" y1="60" x2="220" y2="330" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="420" y1="60" x2="420" y2="330" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="600" y1="60" x2="600" y2="330" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <!-- アクター -->
+            <rect x="20"  y="18" width="100" height="34" rx="6" fill="#ccfbf1" stroke="#0f766e" stroke-width="1"/>
+            <rect x="162" y="18" width="116" height="34" rx="6" fill="#e0f7e9" stroke="#06c755" stroke-width="1"/>
+            <rect x="365" y="18" width="110" height="34" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/>
+            <rect x="548" y="18" width="110" height="34" rx="6" fill="#f5f4f1" stroke="#a8a29e" stroke-width="1"/>
+            <text x="70"  y="40" text-anchor="middle" class="seq-actor" fill="#0f766e">ユーザー</text>
+            <text x="220" y="36" text-anchor="middle" class="seq-actor" fill="#06c755">LINE</text>
+            <text x="220" y="48" text-anchor="middle" class="seq-actor" fill="#06c755">（グループ）</text>
+            <text x="420" y="36" text-anchor="middle" class="seq-actor" fill="#92400e">GAS</text>
+            <text x="420" y="48" text-anchor="middle" class="seq-actor" fill="#92400e">API</text>
+            <text x="603" y="36" text-anchor="middle" class="seq-actor" fill="#57534e">スクリプト</text>
+            <text x="603" y="48" text-anchor="middle" class="seq-actor" fill="#57534e">プロパティ</text>
+
+            <rect x="66"  y="80" width="8" height="220" rx="2" fill="#0f766e" opacity=".2"/>
+            <rect x="216" y="95" width="8" height="190" rx="2" fill="#06c755" opacity=".2"/>
+            <rect x="416" y="148" width="8" height="110" rx="2" fill="#92400e" opacity=".2"/>
+            <rect x="596" y="175" width="8" height="65"  rx="2" fill="#57534e" opacity=".2"/>
+
+            <!-- 事前条件 -->
+            <rect x="140" y="70" width="240" height="16" rx="3" fill="#e0f7e9"/>
+            <text x="260" y="82" text-anchor="middle" class="seq-note" fill="#065f46">【前提】ボットをグループに招待済み</text>
+
+            <!-- 1 -->
+            <line x1="74" y1="100" x2="215" y2="100" stroke="#06c755" stroke-width="1.2" marker-end="url(#arr-line)"/>
+            <text x="143" y="94" text-anchor="middle" class="seq-msg" fill="#059669">① グループ内でメッセージ送信</text>
+            <!-- 2 -->
+            <line x1="224" y1="125" x2="415" y2="125" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="317" y="119" text-anchor="middle" class="seq-msg" fill="#92400e">② Webhook POST（events[0]）</text>
+            <!-- 3 -->
+            <rect x="370" y="135" width="100" height="16" rx="3" fill="#fef3c7"/>
+            <text x="420" y="147" text-anchor="middle" class="seq-note" fill="#92400e">source.groupId を検出</text>
+            <!-- 4 -->
+            <line x1="424" y1="168" x2="595" y2="168" stroke="#57534e" stroke-width="1.2" marker-end="url(#arr-gray)"/>
+            <text x="508" y="162" text-anchor="middle" class="seq-msg" fill="#57534e">③ setProperty('LINE_GROUP_ID', groupId)</text>
+            <!-- 5 -->
+            <line x1="595" y1="190" x2="424" y2="190" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="508" y="185" text-anchor="middle" class="seq-ret">保存完了</text>
+            <!-- 6 -->
+            <line x1="415" y1="215" x2="224" y2="215" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="317" y="209" text-anchor="middle" class="seq-ret">{status:'ok'} 200レスポンス</text>
+
+            <!-- 注釈 -->
+            <rect x="60" y="240" width="290" height="34" rx="5" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>
+            <text x="205" y="255" text-anchor="middle" class="seq-note" fill="#92400e">✓ 以降の月次通知は LINE_GROUP_ID が優先使用される</text>
+            <text x="205" y="268" text-anchor="middle" class="seq-note" fill="#92400e">　 未設定の場合は LINE_USER_ID にフォールバック</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑤ 月次LINE通知 -->
+    <div class="section" id="seq-monthly">
+      <div class="sec-title"><div class="sec-icon" style="background:#e0f7e9">📅</div>シーケンス図 — 月次LINE通知（毎月1日 8:00）</div>
+      <div class="card">
+        <div class="card-title">アクター：GAS タイマートリガー / GAS API / Google Sheets / LINE Messaging API / LINE（グループ/個人）</div>
+        <div class="seq-wrap">
+          <svg class="seq-svg" width="780" height="430" viewBox="0 0 780 430">
+            <!-- ライフライン -->
+            <line x1="60"  y1="70" x2="60"  y2="420" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="185" y1="70" x2="185" y2="420" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="335" y1="70" x2="335" y2="420" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="510" y1="70" x2="510" y2="420" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <line x1="680" y1="70" x2="680" y2="420" stroke="#e2e0db" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <!-- アクター -->
+            <rect x="10"  y="22" width="100" height="38" rx="6" fill="#f5f4f1" stroke="#57534e" stroke-width="1"/>
+            <rect x="130" y="22" width="110" height="38" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/>
+            <rect x="280" y="22" width="110" height="38" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <rect x="455" y="22" width="110" height="38" rx="6" fill="#dbeafe" stroke="#1e6fb5" stroke-width="1"/>
+            <rect x="630" y="22" width="100" height="38" rx="6" fill="#e0f7e9" stroke="#06c755" stroke-width="1"/>
+            <text x="60"  y="37" text-anchor="middle" class="seq-actor" fill="#57534e">GASタイマー</text>
+            <text x="60"  y="50" text-anchor="middle" class="seq-actor" fill="#57534e">トリガー</text>
+            <text x="185" y="37" text-anchor="middle" class="seq-actor" fill="#92400e">GAS</text>
+            <text x="185" y="50" text-anchor="middle" class="seq-actor" fill="#92400e">API</text>
+            <text x="335" y="37" text-anchor="middle" class="seq-actor" fill="#15803d">Google</text>
+            <text x="335" y="50" text-anchor="middle" class="seq-actor" fill="#15803d">Sheets</text>
+            <text x="510" y="37" text-anchor="middle" class="seq-actor" fill="#1e6fb5">LINE</text>
+            <text x="510" y="50" text-anchor="middle" class="seq-actor" fill="#1e6fb5">Messaging API</text>
+            <text x="680" y="37" text-anchor="middle" class="seq-actor" fill="#06c755">LINE</text>
+            <text x="680" y="50" text-anchor="middle" class="seq-actor" fill="#06c755">グループ/個人</text>
+
+            <rect x="56"  y="82" width="8" height="310" rx="2" fill="#57534e" opacity=".2"/>
+            <rect x="181" y="96" width="8" height="280" rx="2" fill="#92400e" opacity=".2"/>
+            <rect x="331" y="118" width="8" height="150" rx="2" fill="#15803d" opacity=".2"/>
+            <rect x="506" y="310" width="8" height="55"  rx="2" fill="#1e6fb5" opacity=".2"/>
+            <rect x="676" y="340" width="8" height="30"  rx="2" fill="#06c755" opacity=".2"/>
+
+            <!-- 1 -->
+            <line x1="64" y1="92" x2="180" y2="92" stroke="#92400e" stroke-width="1.2" marker-end="url(#arr-amber)"/>
+            <text x="120" y="86" text-anchor="middle" class="seq-msg" fill="#92400e">① sendMonthlyReport() 実行</text>
+
+            <!-- ループ枠 -->
+            <rect x="165" y="105" width="270" height="155" rx="4" fill="none" stroke="#a8a29e" stroke-width="1" stroke-dasharray="5 3"/>
+            <rect x="165" y="105" width="75" height="16" rx="2" fill="#edecea"/>
+            <text x="202" y="117" text-anchor="middle" class="seq-frame-label" fill="#57534e">loop 各貸付</text>
+
+            <!-- 2 -->
+            <line x1="189" y1="132" x2="330" y2="132" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="258" y="126" text-anchor="middle" class="seq-msg" fill="#15803d">② loansシート読取</text>
+            <!-- 3 -->
+            <line x1="330" y1="152" x2="189" y2="152" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="258" y="147" text-anchor="middle" class="seq-ret">loans配列</text>
+            <!-- 4 -->
+            <line x1="189" y1="175" x2="330" y2="175" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="258" y="169" text-anchor="middle" class="seq-msg" fill="#15803d">③ repaymentsシート読取</text>
+            <!-- 5 -->
+            <line x1="330" y1="195" x2="189" y2="195" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="258" y="190" text-anchor="middle" class="seq-ret">返済履歴配列</text>
+
+            <!-- 前月フィルタ注釈 -->
+            <rect x="165" y="208" width="270" height="16" rx="3" fill="#fef9c3"/>
+            <text x="300" y="220" text-anchor="middle" class="seq-note" fill="#92400e">前月分のみフィルタ・✅⚠️❌ステータス判定</text>
+
+            <!-- 6 メッセージ構築 -->
+            <rect x="155" y="270" width="80" height="16" rx="3" fill="#fef3c7"/>
+            <text x="195" y="282" text-anchor="middle" class="seq-note" fill="#92400e">メッセージ構築</text>
+
+            <!-- 7 スクリプトプロパティ読取 -->
+            <line x1="189" y1="305" x2="330" y2="305" stroke="#15803d" stroke-width="1.2" marker-end="url(#arr-green)"/>
+            <text x="258" y="299" text-anchor="middle" class="seq-msg" fill="#15803d">④ LINE_TOKEN / LINE_GROUP_ID 読取</text>
+            <line x1="330" y1="322" x2="189" y2="322" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="258" y="317" text-anchor="middle" class="seq-ret">トークン・送信先ID</text>
+
+            <!-- 8 -->
+            <line x1="189" y1="345" x2="505" y2="345" stroke="#1e6fb5" stroke-width="1.2" marker-end="url(#arr-blue)"/>
+            <text x="345" y="339" text-anchor="middle" class="seq-msg" fill="#1e6fb5">⑤ Push Message（to: groupId or userId）</text>
+            <!-- 9 -->
+            <line x1="514" y1="365" x2="675" y2="365" stroke="#06c755" stroke-width="1.2" marker-end="url(#arr-line)"/>
+            <text x="593" y="359" text-anchor="middle" class="seq-msg" fill="#059669">⑥ メッセージ配信</text>
+            <!-- 10 -->
+            <line x1="505" y1="385" x2="189" y2="385" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-gray)"/>
+            <text x="345" y="380" text-anchor="middle" class="seq-ret">200 OK</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// アクティブナビ
+const links = document.querySelectorAll('.sb-link');
+const sections = document.querySelectorAll('.section');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const a = document.querySelector(`.sb-link[href="#${e.target.id}"]`);
+      if (a) a.classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
