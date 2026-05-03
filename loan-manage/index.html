@@ -143,15 +143,25 @@ async function apiLoad(date) {
 }
 
 async function apiSave(payload, ow) {
+  // 1. localStorageに即保存（確実）
   lsSave(payload);
   if (!GAS_URL) return { success: true };
-  // POST も貸借トラッカーと同じ方式
-  var qs = new URLSearchParams({
-    action: "save",
-    overwrite: ow ? "true" : "false",
-    data: JSON.stringify(payload)
-  }).toString();
-  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+
+  // 2. GASへはメタデータのみ送信してから、データ本体を分割送信
+  // データが大きいのでJSON文字列を圧縮して送る
+  var dataStr = JSON.stringify(payload);
+
+  // URLSearchParamsでGETパラメータに乗せると長くなりすぎるためPOST bodyで送る
+  // GASはPOSTのbodyをe.postData.contentsで受け取れる
+  var res = await fetch(GAS_URL, {
+    method: "POST",
+    redirect: "follow",
+    body: JSON.stringify({
+      action: "save",
+      overwrite: ow ? true : false,
+      data: payload
+    })
+  });
   var data = await res.json();
   return data;
 }
