@@ -118,46 +118,26 @@ function lsListDates() {
   return JSON.parse(localStorage.getItem("ainews_index")||"[]");
 }
 
-// ── GAS API ───────────────────────────────────────────────
-async function gasGet(params) {
+// ── GAS API（貸借トラッカーと完全に同じ方式）────────────
+async function gasCall(params) {
   if (!GAS_URL) throw new Error("GAS URLが未設定です");
-  var qs = Object.keys(params).map(function(k){
-    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-  }).join("&");
-  var res = await fetch(GAS_URL + "?" + qs);
-  var text = await res.text();
-  try { return JSON.parse(text); }
-  catch(e) { throw new Error("JSON parse error: " + text.slice(0,100)); }
-}
-
-async function gasPost(params, bodyData) {
-  if (!GAS_URL) throw new Error("GAS URLが未設定です");
-  var qs = Object.keys(params).map(function(k){
-    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-  }).join("&");
-  var bodyStr = Object.keys(bodyData).map(function(k){
-    return encodeURIComponent(k) + "=" + encodeURIComponent(bodyData[k]);
-  }).join("&");
-  var res = await fetch(GAS_URL + "?" + qs, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: bodyStr
-  });
-  var text = await res.text();
-  try { return JSON.parse(text); }
-  catch(e) { throw new Error("JSON parse error: " + text.slice(0,100)); }
+  var qs = new URLSearchParams(params).toString();
+  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+  var data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 async function apiList() {
   if (!GAS_URL) return { dates: lsListDates().map(function(d){ return {date:d}; }) };
-  return await gasGet({ action: "list" });
+  return await gasCall({ action: "list" });
 }
 
 async function apiLoad(date) {
   if (!GAS_URL) return { data: lsLoad(date) };
   var cached = lsLoad(date);
   if (cached) return { data: cached };
-  var data = await gasGet({ action: "load", date: date });
+  var data = await gasCall({ action: "load", date: date });
   if (data.data) lsSave(data.data);
   return data;
 }
@@ -165,10 +145,14 @@ async function apiLoad(date) {
 async function apiSave(payload, ow) {
   lsSave(payload);
   if (!GAS_URL) return { success: true };
-  var data = await gasPost(
-    { action: "save", overwrite: ow ? "true" : "false" },
-    { data: JSON.stringify(payload) }
-  );
+  // POST も貸借トラッカーと同じ方式
+  var qs = new URLSearchParams({
+    action: "save",
+    overwrite: ow ? "true" : "false",
+    data: JSON.stringify(payload)
+  }).toString();
+  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+  var data = await res.json();
   return data;
 }
 
