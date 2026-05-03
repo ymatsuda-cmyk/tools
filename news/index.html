@@ -125,14 +125,13 @@ function lsListDates() {
 // ── GAS API（貸借トラッカーと完全に同じ方式）────────────
 async function gasCall(params) {
   if (!GAS_URL) throw new Error("GAS URLが未設定です");
-  // POSTで送信（GETと同じくhandleReqで処理される）
-  var res = await fetch(GAS_URL, {
-    method: "POST",
-    redirect: "follow",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(params)
-  });
-  var data = await res.json();
+  // GETで送信（貸借トラッカーと全く同じ）
+  var qs = new URLSearchParams(params).toString();
+  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+  var text = await res.text();
+  var data;
+  try { data = JSON.parse(text); }
+  catch(e) { throw new Error("レスポンス解析失敗: " + text.slice(0,100)); }
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -243,11 +242,14 @@ function doSave(payload, ow) {
       redirect: "follow",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ action:"save", overwrite:!!ow, data:payload })
-    }).then(function(r){ return r.json(); })
-      .then(function(res){
-        if (res && res.success) {
-          set({msg:"✅ "+fmt(payload.date)+" を保存しました（Sheets同期済み）", mtyp:"ok"});
-        }
+    }).then(function(r){ return r.text(); })
+      .then(function(text){
+        try {
+          var res = JSON.parse(text);
+          if (res && res.success) {
+            set({msg:"✅ "+fmt(payload.date)+" を保存しました（Sheets同期済み）", mtyp:"ok"});
+          }
+        } catch(e) {}
       })
       .catch(function(){}); // エラーは無視
   }
