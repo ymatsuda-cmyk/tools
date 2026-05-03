@@ -184,10 +184,15 @@ var S = {
   ld:false, ldmsg:"",
   now:new Date(),
   setupMode: !GAS_URL,
-  gasInput: GAS_URL
+  gasInput: GAS_URL,
+  tabListeners: [] // イベントリスナー管理
 };
 function set(p) { Object.assign(S, p); render(); }
 setInterval(function(){ set({now:new Date()}); }, 1000);
+
+// タッデバイス検出
+var isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+var lastTouchTime = 0;
 
 // ── Init ──────────────────────────────────────────────────
 function initLoad() {
@@ -644,8 +649,10 @@ function mkHistory() {
 function render() {
   // v6 loaded - POST body fix active
   var app=document.getElementById("app");
-  app.innerHTML="";
-
+  app.innerHTML="";  
+  // イベントリスナークリア
+  S.tabListeners.forEach(function(cleanup){ cleanup(); });
+  S.tabListeners = [];
   if (S.ld) {
     app.appendChild(el("div",{cls:"ldov"},[
       el("div",{cls:"ldbx"},[
@@ -683,59 +690,77 @@ function render() {
     .map(function(t){
       var btn = el("button",{cls:"tab"+(S.tab===t.id?" on":"")}, [t.lb]);
       
-      // モバイル対応: タッチとクリックを分離
+      // モバイル対応: 改善されたタッチ処理
       var switching = false;
-      var startTime = 0;
-      var startX = 0;
-      var hasMoved = false;
+      var touchData = { startTime: 0, startX: 0, hasMoved: false };
       
-      btn.addEventListener("touchstart", function(e){
-        startTime = Date.now();
-        startX = e.touches[0].clientX;
-        hasMoved = false;
-      }, {passive: true});
-      
-      btn.addEventListener("touchmove", function(e){
-        var moveX = e.touches[0].clientX;
-        if (Math.abs(moveX - startX) > 10) {
-          hasMoved = true;
-        }
-      }, {passive: true});
-      
-      btn.addEventListener("touchend", function(e){
-        var duration = Date.now() - startTime;
-        if (!hasMoved && duration < 300 && !switching) {
-          switching = true;
-          btn.style.transform = "scale(0.95)";
-          btn.style.transition = "transform 0.1s";
-          
-          setTimeout(function(){
-            btn.style.transform = "";
-            set({tab:t.id});
-            setTimeout(function(){ switching = false; }, 100);
-          }, 100);
-        }
-      }, {passive: true});
-      
-      // PC用クリックイベント
-      btn.addEventListener("click", function(e){
-        // タッチデバイスでは無視（touchendで処理済み）
-        if (e.pointerType !== "mouse" && "ontouchstart" in window) return;
+      function handleTabSwitch() {
+        if (switching) return false;
+        switching = true;
+        btn.style.transform = "scale(0.95)";
+        btn.style.transition = "transform 0.1s";
         
-        if (!switching) {
-          switching = true;
-          btn.style.transform = "scale(0.95)";
-          setTimeout(function(){
-            btn.style.transform = "";
-            set({tab:t.id});
-            setTimeout(function(){ switching = false; }, 100);
-          }, 100);
+        setTimeout(function(){
+          btn.style.transform = "";
+          set({tab:t.id});
+          setTimeout(function(){ switching = false; }, 100);
+        }, 100);
+        return true;
+      }
+      
+      // タッチイベント
+      if (isTouchDevice) {
+        var touchStart = function(e) {
+          touchData.startTime = Date.now();
+          touchData.startX = e.touches[0].clientX;
+          touchData.hasMoved = false;
+        };
+        
+        var touchMove = function(e) {
+          var moveX = e.touches[0].clientX;
+          if (Math.abs(moveX - touchData.startX) > 10) {
+            touchData.hasMoved = true;
+          }
+        };
+        
+        var touchEnd = function(e) {
+          var duration = Date.now() - touchData.startTime;
+          if (!touchData.hasMoved && duration < 300) {
+            lastTouchTime = Date.now();
+            handleTabSwitch();
+          }
+        };
+        
+        btn.addEventListener("touchstart", touchStart, {passive: true});
+        btn.addEventListener("touchmove", touchMove, {passive: true});
+        btn.addEventListener("touchend", touchEnd, {passive: true});
+        
+        // クリーンアップ関数を登録
+        S.tabListeners.push(function() {
+          btn.removeEventListener("touchstart", touchStart);
+          btn.removeEventListener("touchmove", touchMove);
+          btn.removeEventListener("touchend", touchEnd);
+        });
+      }
+      
+      // PC/マウスイベント
+      var clickHandler = function(e) {
+        // タッチイベントの後300ms以内は無視（重複防止）
+        if (isTouchDevice && Date.now() - lastTouchTime < 300) {
+          e.preventDefault();
+          return;
         }
+        handleTabSwitch();
+      };
+      
+      btn.addEventListener("click", clickHandler);
+      S.tabListeners.push(function() {
+        btn.removeEventListener("click", clickHandler);
       });
       
       return btn;
     })
-  )
+  );
   ;
 
   app.appendChild(el("div",{cls:"hdr"},[
