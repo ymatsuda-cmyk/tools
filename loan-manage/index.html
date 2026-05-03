@@ -586,6 +586,7 @@ function render() {
   var arts=(S.data&&S.data.articles)||[];
   var hi=arts.filter(function(a){return a.impact==="高";}).length;
 
+  // 統計チップ行
   var sr=el("div",{cls:"srow"});
   if (S.data) {
     sr.appendChild(el("div",{cls:"chip"},[el("span",{cls:"chip-n",css:"color:#2563EB"},[String(arts.length)]),el("span",{cls:"chip-l"},["記事数"])]));
@@ -593,8 +594,14 @@ function render() {
     sr.appendChild(el("div",{cls:"chip"},[el("span",{cls:"chip-n",css:"color:#059669"},[String(S.dates.length)]),el("span",{cls:"chip-l"},["保存件数"])]));
     if(S.sel) sr.appendChild(el("span",{css:"font-size:11px;color:#94A3B8;font-family:'DM Mono',monospace"},[fmt(S.sel)]));
   }
-  sr.appendChild(el("button",{cls:"btn",css:"margin-left:auto;background:"+(GAS_URL?"#F0FDF4":"#FEF9C3")+";color:"+(GAS_URL?"#059669":"#D97706")+";border:1px solid "+(GAS_URL?"#BBF7D0":"#FDE68A"),onclick:openGasSetup},[(GAS_URL?"🟢 Sheets":"⚙️ Sheets設定")]));
-  sr.appendChild(el("button",{cls:"btn btn-p",css:"margin-left:4px",onclick:function(){set({paste:!S.paste,msg:""});}},["📋 JSONを貼り付け"]));
+
+  // ボタン行（別行で大きく表示）
+  var btnRow = el("div",{css:"display:flex;gap:8px;margin-bottom:8px"});
+  var sheetsBtn = el("a",{css:"flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:"+(GAS_URL?"#F0FDF4":"#FEF9C3")+";color:"+(GAS_URL?"#059669":"#D97706")+";border:2px solid "+(GAS_URL?"#BBF7D0":"#FDE68A")+";text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center"},[(GAS_URL?"🟢 Sheets連携中":"⚙️ Sheets設定")]);
+  sheetsBtn.href = "./setup.html";
+  var pasteBtn = el("button",{css:"flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:#2563EB;color:#fff;border:none"},["📋 JSONを貼り付け"]);
+  pasteBtn.addEventListener("click", function(){ set({paste:!S.paste,msg:""}); });
+  btnRow.append(sheetsBtn, pasteBtn);
 
   var tabs=el("div",{cls:"tabs"},
     [{id:"news",lb:"📰 ニュース"},{id:"global",lb:"🌍 世界情勢"},{id:"domestic",lb:"🇯🇵 国内情勢"},{id:"ideas",lb:"💡 活用アイデア"},{id:"history",lb:"📅 過去データ"}]
@@ -606,7 +613,7 @@ function render() {
       el("div",null,[el("div",{cls:"tracker"},["AI NEWS TRACKER"]),el("div",{cls:"app-title"},["AIニュース速報"])]),
       el("div",null,[el("div",{cls:"clock-t"},[ts]),el("div",{cls:"clock-d"},[ds])])
     ]),
-    sr, tabs
+    sr, btnRow, tabs
   ]));
 
   var cont=el("div",{cls:"cont"});
