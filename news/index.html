@@ -359,26 +359,80 @@ function mkArt(a) {
   bd.appendChild(el("div",{cls:"art-ft"},[bdg(cat.lb,cat.col),el("span",{css:"font-size:11px;color:#9CA3AF"},["📰 "+a.source])]));
   div.appendChild(bd);
   
-  // モバイル対応: タッチ防御機能付きトグル
-  var lastClick = 0;
-  var isToggling = false;
-  div.addEventListener("click",function(e){
-    e.preventDefault();
-    var now = Date.now();
-    if (now - lastClick < 300 || isToggling) return; // 300ms以内の連続クリックを防止
-    lastClick = now;
-    isToggling = true;
+  // 改善されたモバイル対応: 安定したトグル処理
+  var lastInteraction = 0;
+  var isProcessing = false;
+  var touchStartTime = 0;
+  var hasTouchMoved = false;
+  
+  // タッチイベント（モバイル用）
+  if (isTouchDevice) {
+    div.addEventListener("touchstart", function(e) {
+      touchStartTime = Date.now();
+      hasTouchMoved = false;
+    }, {passive: true});
     
-    setTimeout(function(){
-      var isOpen = bd.style.display === "block";
-      bd.style.display = isOpen ? "none" : "block";
-      // タッチフィードバック
+    div.addEventListener("touchmove", function(e) {
+      hasTouchMoved = true; // スクロールを検出
+    }, {passive: true});
+    
+    div.addEventListener("touchend", function(e) {
+      var now = Date.now();
+      var touchDuration = now - touchStartTime;
+      
+      // タップ判定: 移動なし、短時間、処理中でない
+      if (!hasTouchMoved && touchDuration < 500 && !isProcessing && now - lastInteraction > 100) {
+        e.preventDefault();
+        lastInteraction = now;
+        isProcessing = true;
+        
+        // 視覚フィードバック
+        div.style.transform = "scale(0.98)";
+        div.style.transition = "transform 0.1s";
+        
+        setTimeout(function(){
+          div.style.transform = "";
+          var isOpen = bd.style.display === "block";
+          bd.style.display = isOpen ? "none" : "block";
+          
+          setTimeout(function(){
+            isProcessing = false;
+          }, 200);
+        }, 100);
+      }
+    }, {passive: false});
+  }
+  
+  // クリックイベント（PC用）
+  div.addEventListener("click", function(e) {
+    var now = Date.now();
+    
+    // タッチデバイスでタッチ後200ms以内は無視（重複防止）
+    if (isTouchDevice && now - lastInteraction < 200) {
+      e.preventDefault();
+      return;
+    }
+    
+    // PC用クリック処理
+    if (!isProcessing && now - lastInteraction > 100) {
+      e.preventDefault();
+      lastInteraction = now;
+      isProcessing = true;
+      
+      // 視覚フィードバック
       div.style.transform = "scale(0.98)";
+      div.style.transition = "transform 0.1s";
+      
       setTimeout(function(){
         div.style.transform = "";
-        isToggling = false;
-      }, 150);
-    }, 50);
+        var isOpen = bd.style.display === "block";
+        bd.style.display = isOpen ? "none" : "block";
+        
+        setTimeout(function(){
+          isProcessing = false;
+        }, 200);
+      }, 100);
+    }
   });
   
   return div;
