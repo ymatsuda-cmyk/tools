@@ -32,9 +32,9 @@ body{background:#F8FAFC;color:#0F172A;min-height:100vh}
 .btn-g{background:transparent;color:#64748B;border:1px solid #E2E8F0}
 .btn-r{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
 .btn-s{background:#F0FDF4;color:#059669;border:1px solid #BBF7D0}
-.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth}
+.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .tabs::-webkit-scrollbar{display:none}
-.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:manipulation}
+.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:auto;user-select:none}
 .tab:active{transform:scale(0.95)}
 .tab.on{background:#2563EB;color:#fff;box-shadow:0 2px 4px rgba(37,99,235,0.2)}
 .cont{padding:16px 16px 48px;max-width:720px;margin:0 auto}
@@ -682,23 +682,57 @@ function render() {
     [{id:"news",lb:"📰 ニュース"},{id:"global",lb:"🌍 世界情勢"},{id:"domestic",lb:"🇯🇵 国内情勢"},{id:"ideas",lb:"💡 活用アイデア"},{id:"history",lb:"📅 過去データ"}]
     .map(function(t){
       var btn = el("button",{cls:"tab"+(S.tab===t.id?" on":"")}, [t.lb]);
-      // モバイル対応: タッチフィードバック付きタブ切り替え
+      
+      // モバイル対応: タッチとクリックを分離
       var switching = false;
+      var startTime = 0;
+      var startX = 0;
+      var hasMoved = false;
+      
+      btn.addEventListener("touchstart", function(e){
+        startTime = Date.now();
+        startX = e.touches[0].clientX;
+        hasMoved = false;
+      }, {passive: true});
+      
+      btn.addEventListener("touchmove", function(e){
+        var moveX = e.touches[0].clientX;
+        if (Math.abs(moveX - startX) > 10) {
+          hasMoved = true;
+        }
+      }, {passive: true});
+      
+      btn.addEventListener("touchend", function(e){
+        var duration = Date.now() - startTime;
+        if (!hasMoved && duration < 300 && !switching) {
+          switching = true;
+          btn.style.transform = "scale(0.95)";
+          btn.style.transition = "transform 0.1s";
+          
+          setTimeout(function(){
+            btn.style.transform = "";
+            set({tab:t.id});
+            setTimeout(function(){ switching = false; }, 100);
+          }, 100);
+        }
+      }, {passive: true});
+      
+      // PC用クリックイベント
       btn.addEventListener("click", function(e){
-        e.preventDefault();
-        if (switching) return;
-        switching = true;
+        // タッチデバイスでは無視（touchendで処理済み）
+        if (e.pointerType !== "mouse" && "ontouchstart" in window) return;
         
-        // タッチフィードバック
-        btn.style.transform = "scale(0.95)";
-        btn.style.transition = "transform 0.1s";
-        
-        setTimeout(function(){
-          btn.style.transform = "";
-          set({tab:t.id});
-          setTimeout(function(){ switching = false; }, 100);
-        }, 100);
+        if (!switching) {
+          switching = true;
+          btn.style.transform = "scale(0.95)";
+          setTimeout(function(){
+            btn.style.transform = "";
+            set({tab:t.id});
+            setTimeout(function(){ switching = false; }, 100);
+          }, 100);
+        }
       });
+      
       return btn;
     })
   )
