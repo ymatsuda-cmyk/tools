@@ -118,47 +118,57 @@ function lsListDates() {
   return JSON.parse(localStorage.getItem("ainews_index")||"[]");
 }
 
-// ── GAS API（貸借トラッカーと同じ方式）─────────────────
-async function gasCall(params) {
+// ── GAS API ───────────────────────────────────────────────
+async function gasGet(params) {
   if (!GAS_URL) throw new Error("GAS URLが未設定です");
   var qs = Object.keys(params).map(function(k){
-    return k + "=" + encodeURIComponent(params[k]);
+    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
   }).join("&");
-  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
-  var data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
+  var res = await fetch(GAS_URL + "?" + qs);
+  var text = await res.text();
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error("JSON parse error: " + text.slice(0,100)); }
+}
+
+async function gasPost(params, bodyData) {
+  if (!GAS_URL) throw new Error("GAS URLが未設定です");
+  var qs = Object.keys(params).map(function(k){
+    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+  var bodyStr = Object.keys(bodyData).map(function(k){
+    return encodeURIComponent(k) + "=" + encodeURIComponent(bodyData[k]);
+  }).join("&");
+  var res = await fetch(GAS_URL + "?" + qs, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: bodyStr
+  });
+  var text = await res.text();
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error("JSON parse error: " + text.slice(0,100)); }
 }
 
 async function apiList() {
   if (!GAS_URL) return { dates: lsListDates().map(function(d){ return {date:d}; }) };
-  var data = await gasCall({ action: "list" });
-  return data;
+  return await gasGet({ action: "list" });
 }
 
 async function apiLoad(date) {
   if (!GAS_URL) return { data: lsLoad(date) };
-  // キャッシュ優先
   var cached = lsLoad(date);
   if (cached) return { data: cached };
-  var data = await gasCall({ action: "load", date: date });
+  var data = await gasGet({ action: "load", date: date });
   if (data.data) lsSave(data.data);
   return data;
 }
 
 async function apiSave(payload, ow) {
-  // localStorageに即保存
   lsSave(payload);
   if (!GAS_URL) return { success: true };
-  // GASにも保存（貸借トラッカーと同じfetch方式）
-  var qs = "action=save&overwrite=" + (ow?"true":"false");
-  var res = await fetch(GAS_URL + "?" + qs, {
-    method: "POST",
-    redirect: "follow",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "data=" + encodeURIComponent(JSON.stringify(payload))
-  });
-  var data = await res.json();
+  var data = await gasPost(
+    { action: "save", overwrite: ow ? "true" : "false" },
+    { data: JSON.stringify(payload) }
+  );
   return data;
 }
 
