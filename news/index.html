@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AIニュース速報">
+<title>AIニュース速報</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans JP",sans-serif}
+body{background:#F8FAFC;color:#0F172A;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px}
+.hdr{background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 16px 0;position:sticky;top:0;z-index:100}
+.hdr-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.tracker{font-size:10px;letter-spacing:3px;color:#94A3B8;font-family:"DM Mono",monospace;margin-bottom:2px}
+.app-title{font-size:22px;font-weight:900;letter-spacing:-0.5px}
+.clock-t{font-size:20px;font-weight:700;color:#2563EB;font-family:"DM Mono",monospace;text-align:right}
+.clock-d{font-size:10px;color:#94A3B8;text-align:right}
+.srow{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:4px 10px}
+.chip-n{font-size:14px;font-weight:800;font-family:"DM Mono",monospace}
+.chip-l{font-size:10px;color:#94A3B8}
+.btn{border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:"Noto Sans JP",sans-serif}
+.btn-p{background:#2563EB;color:#fff}
+.btn-g{background:transparent;color:#64748B;border:1px solid #E2E8F0}
+.btn-r{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+.btn-s{background:#F0FDF4;color:#059669;border:1px solid #BBF7D0}
+.tabs{display:flex;gap:2px;overflow-x:auto}
+.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif}
+.tab.on{background:#2563EB;color:#fff}
+.cont{padding:16px 16px 48px;max-width:720px;margin:0 auto}
+.card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.art{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.art:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.art-hd{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.art-ttl{font-size:12px;font-weight:700;color:#111827;line-height:1.5;flex:1}
+.bdg{border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block}
+.art-bd{display:none;margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6}
+.art-sum{color:#4B5563;font-size:12px;line-height:1.8;margin-bottom:8px}
+.note{border-radius:8px;padding:10px 12px;margin-top:8px}
+.note-lbl{font-size:10px;font-weight:700;letter-spacing:.5px;margin-bottom:4px}
+.note-txt{font-size:12px;line-height:1.8;color:#374151}
+.art-ft{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.modal{background:#fff;border:1px solid #BFDBFE;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 12px rgba(37,99,235,.08)}
+.modal-ttl{font-size:12px;font-weight:700;color:#1E40AF;margin-bottom:6px}
+.modal-dsc{font-size:11px;color:#64748B;margin-bottom:8px;line-height:1.6}
+textarea,input[type=text]{width:100%;font-size:11px;border:1px solid #E2E8F0;border-radius:8px;padding:8px;font-family:monospace;color:#374151;outline:none}
+textarea{height:100px;resize:vertical}
+input[type=text]{height:36px;font-family:"Noto Sans JP",sans-serif}
+.modal-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.pv{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap}
+.pv-err{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:11px;color:#DC2626}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.cfm{background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+.ldov{position:fixed;inset:0;background:rgba(255,255,255,.88);z-index:300;display:flex;align-items:center;justify-content:center}
+.ldbx{background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px 32px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.1)}
+.empty{text-align:center;padding:48px 20px;background:#fff;border-radius:16px;border:1px dashed #CBD5E1}
+.htbl{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.hhd,.hrow{display:grid;grid-template-columns:1fr 52px 52px 52px 68px;padding:8px 14px;align-items:center}
+.hhd{background:#F8FAFC;font-size:10px;font-weight:700;color:#6B7280;letter-spacing:.5px;border-bottom:1px solid #E2E8F0}
+.hrow{border-bottom:1px solid #F3F4F6;font-size:13px}
+.hrow:last-child{border-bottom:none}
+.hrow.sel{background:#EFF6FF}
+.frow{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.flt{border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#64748B;font-family:"Noto Sans JP",sans-serif}
+.rhd{border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.tip{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px;margin-top:16px}
+.smsg{font-size:11px;padding:6px 10px;margin-bottom:8px;border-radius:6px}
+.mok{background:#F0FDF4;color:#059669}
+.merr{background:#FEF2F2;color:#DC2626}
+.mwrn{background:#FFFBEB;color:#D97706}
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ic{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.setup-box{background:#fff;border:2px solid #FDE68A;border-radius:16px;padding:24px;margin:20px 0;text-align:center}
+@media(max-width:480px){.ig{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── 設定 ──────────────────────────────────────────────────
+var GAS_URL = localStorage.getItem("ainews_gas_url") || "";
+
+var CATS = [
+  {id:"policy",  lb:"政策・安全保障", ic:"🏛", col:"#DC2626"},
+  {id:"model",   lb:"モデル・技術",   ic:"🧠", col:"#7C3AED"},
+  {id:"chip",    lb:"半導体・インフラ",ic:"⚡", col:"#2563EB"},
+  {id:"robot",   lb:"ロボット・物理AI",ic:"🤖", col:"#059669"},
+  {id:"cobot",   lb:"協働ロボット",   ic:"🤝", col:"#D97706"},
+  {id:"society", lb:"規制・社会",     ic:"⚖", col:"#DB2877"},
+  {id:"economy", lb:"経済・市場",     ic:"💹", col:"#0891B2"},
+  {id:"politics",lb:"政治・外交",     ic:"🌐", col:"#6D28D9"},
+];
+var IMP = {"高":"#DC2626","中":"#D97706","低":"#059669"};
+
+function fmt(s) {
+  if (!s) return "不明";
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return String(s);
+  return d.getFullYear() + "/" + pad(d.getMonth()+1) + "/" + pad(d.getDate());
+}
+function pad(n) { return n < 10 ? "0"+n : ""+n; }
+
+// ── localStorage（キャッシュ） ────────────────────────────
+function lsKey(date) { return "ainews_" + date.replace(/-/g,""); }
+function lsSave(payload) {
+  localStorage.setItem(lsKey(payload.date), JSON.stringify(payload));
+  var idx = JSON.parse(localStorage.getItem("ainews_index")||"[]");
+  if (idx.indexOf(payload.date) === -1) idx = [payload.date].concat(idx).sort().reverse();
+  localStorage.setItem("ainews_index", JSON.stringify(idx));
+}
+function lsLoad(date) {
+  var raw = localStorage.getItem(lsKey(date));
+  return raw ? JSON.parse(raw) : null;
+}
+function lsListDates() {
+  return JSON.parse(localStorage.getItem("ainews_index")||"[]");
+}
+
+// ── GAS API（貸借トラッカーと同じ方式）─────────────────
+async function gasCall(params) {
+  if (!GAS_URL) throw new Error("GAS URLが未設定です");
+  var qs = Object.keys(params).map(function(k){
+    return k + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+  var data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function apiList() {
+  if (!GAS_URL) return { dates: lsListDates().map(function(d){ return {date:d}; }) };
+  var data = await gasCall({ action: "list" });
+  return data;
+}
+
+async function apiLoad(date) {
+  if (!GAS_URL) return { data: lsLoad(date) };
+  // キャッシュ優先
+  var cached = lsLoad(date);
+  if (cached) return { data: cached };
+  var data = await gasCall({ action: "load", date: date });
+  if (data.data) lsSave(data.data);
+  return data;
+}
+
+async function apiSave(payload, ow) {
+  // localStorageに即保存
+  lsSave(payload);
+  if (!GAS_URL) return { success: true };
+  // GASにも保存（貸借トラッカーと同じfetch方式）
+  var qs = "action=save&overwrite=" + (ow?"true":"false");
+  var res = await fetch(GAS_URL + "?" + qs, {
+    method: "POST",
+    redirect: "follow",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "data=" + encodeURIComponent(JSON.stringify(payload))
+  });
+  var data = await res.json();
+  return data;
+}
+
+// ── State ─────────────────────────────────────────────────
+var S = {
+  tab:"news", data:null, dates:[], sel:null,
+  fc:"all", paste:false, ptxt:"",
+  pend:null, cfm:false,
+  msg:"", mtyp:"ok",
+  ld:false, ldmsg:"",
+  now:new Date(),
+  setupMode: !GAS_URL,
+  gasInput: GAS_URL
+};
+function set(p) { Object.assign(S, p); render(); }
+setInterval(function(){ set({now:new Date()}); }, 1000);
+
+// ── Init ──────────────────────────────────────────────────
+function initLoad() {
+  // まずlocalStorageから即表示
+  var dates = lsListDates();
+  if (dates.length) {
+    var data = lsLoad(dates[0]);
+    set({dates:dates, data:data, sel:dates[0]});
+  }
+  // GAS URL設定済みなら同期
+  if (GAS_URL) {
+    set({ld:true, ldmsg:"Sheetsからデータを読み込み中..."});
+    apiList().then(function(res) {
+      var sheetDates = (res.dates||[]).map(function(d){ return d.date; });
+      // localStorageとマージ
+      var allDates = sheetDates.slice();
+      lsListDates().forEach(function(d){ if(allDates.indexOf(d)===-1) allDates.push(d); });
+      allDates = allDates.sort().reverse();
+      if (!allDates.length) { set({ld:false}); return; }
+      set({dates:allDates});
+      // 最新データを読み込む
+      return apiLoad(allDates[0]).then(function(r) {
+        set({ld:false, data:r.data, sel:allDates[0]});
+      });
+    }).catch(function(e) {
+      set({ld:false, msg:"⚠️ Sheets同期失敗（ローカルデータを表示）: "+e.message, mtyp:"wrn"});
+    });
+  } else if (!dates.length) {
+    render();
+  }
+}
+initLoad();
+
+// ── Actions ───────────────────────────────────────────────
+function doSave(payload, ow) {
+  set({ld:true, ldmsg:"保存中..."});
+  apiSave(payload, ow).then(function() {
+    var dates = lsListDates();
+    set({ld:false, dates:dates, data:payload, sel:payload.date,
+      tab:"news", paste:false, ptxt:"", pend:null, cfm:false,
+      msg:"✅ "+fmt(payload.date)+" を保存しました"+(GAS_URL?" (Sheets連携済み)":""), mtyp:"ok"});
+  }).catch(function(e) {
+    // GAS失敗でもlocal保存は成功しているので表示は更新
+    var dates = lsListDates();
+    set({ld:false, dates:dates, data:payload, sel:payload.date,
+      tab:"news", paste:false, ptxt:"", pend:null, cfm:false,
+      msg:"✅ ローカル保存済み / ⚠️ Sheets保存失敗: "+e.message, mtyp:"wrn"});
+  });
+}
+
+function selDate(date) {
+  var cached = lsLoad(date);
+  if (cached) { set({data:cached, sel:date, tab:"news"}); return; }
+  set({ld:true, ldmsg:"データを読み込み中..."});
+  apiLoad(date).then(function(r) {
+    set({ld:false, data:r.data, sel:date, tab:"news"});
+  }).catch(function(e) {
+    set({ld:false, msg:"❌ "+e.message, mtyp:"err"});
+  });
+}
+
+function pasteAndSave() {
+  try {
+    var raw = S.ptxt.trim();
+    if (!raw) throw new Error("JSONが空です");
+    var d = JSON.parse(raw);
+    if (!d.date||!d.articles) throw new Error("date・articlesが必要です");
+    if (!d.fetchedFor) throw new Error("fetchedForが必要です");
+    // 同日確認
+    var existing = localStorage.getItem("ainews_"+d.date.replace(/-/g,""));
+    if (existing) { set({pend:d, cfm:true, paste:true}); return; }
+    doSave(d, false);
+  } catch(e) { set({msg:"❌ JSON解析エラー: "+e.message, mtyp:"err"}); }
+}
+
+function saveGasUrl() {
+  var url = S.gasInput.trim();
+  if (!url) { set({msg:"❌ URLを入力してください", mtyp:"err"}); return; }
+  GAS_URL = url;
+  localStorage.setItem("ainews_gas_url", url);
+  set({setupMode:false, msg:"✅ GAS URLを保存しました", mtyp:"ok"});
+  initLoad();
+}
+
+// ── DOM helper ────────────────────────────────────────────
+function el(tag, opts, kids) {
+  var e = document.createElement(tag);
+  if (opts) {
+    if (opts.cls) e.className = opts.cls;
+    if (opts.css) e.style.cssText = opts.css;
+    Object.keys(opts).forEach(function(k) {
+      if (k.slice(0,2)==="on") e.addEventListener(k.slice(2), opts[k]);
+    });
+  }
+  if (kids) kids.forEach(function(c) {
+    if (c==null) return;
+    e.appendChild(typeof c==="string"?document.createTextNode(c):c);
+  });
+  return e;
+}
+function bdg(txt, col) {
+  return el("span",{cls:"bdg",css:"background:"+col+"20;color:"+col+";border:1px solid "+col+"44"},[txt]);
+}
+function flt(lb, active, col, fn) {
+  return el("button",{cls:"flt",css:active?"background:"+col+";color:#fff;border-color:"+col:"",onclick:fn},[lb]);
+}
+
+// ── Article ───────────────────────────────────────────────
+function mkArt(a) {
+  var cat = CATS.find(function(c){return c.id===a.category;})||CATS[0];
+  var ic = IMP[a.impact]||"#6B7280";
+  var div = el("div",{cls:"art",css:"border-left:3px solid "+cat.col});
+  div.appendChild(el("div",{cls:"art-hd"},[
+    el("span",{cls:"art-ttl"},[cat.ic+" "+a.title]),
+    bdg("影響度"+a.impact, ic)
+  ]));
+  var bd = el("div",{cls:"art-bd"});
+  bd.appendChild(el("p",{cls:"art-sum"},[a.summary]));
+  if (a.beginnerNote) bd.appendChild(el("div",{cls:"note",css:"background:#0891B215;border:1px solid #0891B230"},[
+    el("div",{cls:"note-lbl",css:"color:#0891B2"},["🔰 初心者向け解説"]),
+    el("p",{cls:"note-txt"},[a.beginnerNote])
+  ]));
+  if (a.impactNote) bd.appendChild(el("div",{cls:"note",css:"background:#D9770615;border:1px solid #D9770630"},[
+    el("div",{cls:"note-lbl",css:"color:#D97706"},["💥 影響解説"]),
+    el("p",{cls:"note-txt"},[a.impactNote])
+  ]));
+  bd.appendChild(el("div",{cls:"art-ft"},[bdg(cat.lb,cat.col),el("span",{css:"font-size:11px;color:#9CA3AF"},["📰 "+a.source])]));
+  div.appendChild(bd);
+  div.addEventListener("click",function(){bd.style.display=bd.style.display==="block"?"none":"block";});
+  return div;
+}
+
+function mkIdea(idea) {
+  var c = idea.color||"#6B7280";
+  var card = el("div",{cls:"ic",css:"border:1px solid "+c+"33;border-top:3px solid "+c});
+  var det = el("div",{css:"display:none"});
+  det.appendChild(el("p",{css:"color:#6B7280;font-size:11px;line-height:1.7;margin:6px 0 8px"},[idea.desc]));
+  det.appendChild(el("div",{css:"display:flex;gap:4px;flex-wrap:wrap"},(idea.tags||[]).map(function(t){return bdg(t,c);})));
+  var hint = el("div",{css:"color:"+c+";font-size:10px;opacity:.7"},["タップで詳細 ▾"]);
+  card.append(
+    el("div",{css:"font-size:22px;margin-bottom:6px"},[idea.icon]),
+    el("div",{css:"font-size:12px;font-weight:700;color:#111827;line-height:1.4;margin-bottom:4px"},[idea.title]),
+    det, hint
+  );
+  card.addEventListener("click",function(){
+    var open=det.style.display==="block";
+    det.style.display=open?"none":"block";
+    hint.style.display=open?"block":"none";
+  });
+  return card;
+}
+
+function mkHrow(date, isSel, isLast) {
+  var row = el("div",{cls:"hrow"+(isSel?" sel":"")});
+  if (isLast) row.style.borderBottom="none";
+  var dc = el("div",null,[el("div",{css:"font-size:13px;font-weight:700;color:#111827"},[fmt(date)])]);
+  var cEl=el("div",{css:"text-align:center;color:#374151"},["…"]);
+  var hEl=el("div",{css:"text-align:center"},["—"]);
+  var iEl=el("div",{css:"text-align:center;color:#374151"},["…"]);
+  var sb = el("button",{cls:"btn",css:isSel?"font-size:11px;padding:4px 10px;background:#2563EB;color:#fff":"font-size:11px;padding:4px 10px;background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE",onclick:function(){selDate(date);}},[isSel?"表示中":"参照"]);
+  row.append(dc,cEl,hEl,iEl,el("div",{css:"text-align:center"},[sb]));
+  // キャッシュから統計を表示
+  var cached = localStorage.getItem("ainews_"+date.replace(/-/g,""));
+  if (cached) {
+    try {
+      var d = JSON.parse(cached);
+      var arts = d.articles||[];
+      cEl.textContent = arts.length;
+      var h = arts.filter(function(a){return a.impact==="高";}).length;
+      if (h>0){hEl.innerHTML="";hEl.appendChild(bdg(String(h),"#DC2626"));}
+      iEl.textContent = (d.ideas||[]).length;
+    } catch(e){}
+  }
+  return row;
+}
+
+// ── Modal: Paste ──────────────────────────────────────────
+function mkPaste() {
+  var pvW = el("div");
+  function upPv(txt) {
+    pvW.innerHTML="";
+    if(!txt.trim())return;
+    try{
+      var d=JSON.parse(txt.trim());
+      pvW.appendChild(el("div",{cls:"pv"},[
+        el("span",null,[fmt(d.date)+" を保存"]),
+        el("span",null,["取得対象: "+fmt(d.fetchedFor)]),
+        el("span",null,[(d.articles?d.articles.length:0)+"件"])
+      ]));
+    }catch(e){pvW.appendChild(el("div",{cls:"pv-err"},["⚠️ JSON形式エラー"]));}
+  }
+  var ta=document.createElement("textarea");
+  ta.placeholder='{"date":"2026-05-04","fetchedFor":"2026-05-03","articles":[...]}';
+  ta.value=S.ptxt;
+  ta.addEventListener("input",function(){S.ptxt=ta.value;upPv(ta.value);});
+  upPv(S.ptxt);
+  return el("div",{cls:"modal"},[
+    el("div",{cls:"modal-ttl"},["📋 ニュースJSON を貼り付けて保存"]),
+    el("div",{cls:"modal-dsc"},["Claudeに「今日のニュースをまとめて」と依頼して受け取ったJSONを貼り付けてください。"]),
+    pvW, ta,
+    el("div",{cls:"modal-btns"},[
+      el("button",{cls:"btn btn-p",onclick:pasteAndSave},["保存する"]),
+      el("button",{cls:"btn btn-g",onclick:function(){set({paste:false,ptxt:""});}},["キャンセル"])
+    ])
+  ]);
+}
+
+// ── Modal: Confirm ────────────────────────────────────────
+function mkCfm() {
+  var d=S.pend;
+  return el("div",{cls:"ov"},[
+    el("div",{cls:"cfm"},[
+      el("div",{css:"font-size:24px;text-align:center;margin-bottom:8px"},["⚠️"]),
+      el("div",{css:"font-size:14px;font-weight:700;text-align:center;margin-bottom:12px"},["同じ日付のデータが存在します"]),
+      el("div",{css:"background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:#92400E;line-height:1.7"},[
+        el("div",null,["📅 保存日: ",el("strong",null,[fmt(d.date)])]),
+        el("div",null,["🔍 取得対象: ",el("strong",null,[fmt(d.fetchedFor)])]),
+        el("div",null,["既存データを上書きしますか？"])
+      ]),
+      el("div",{css:"display:flex;gap:8px"},[
+        el("button",{cls:"btn btn-r",css:"flex:1",onclick:function(){doSave(S.pend,true);set({cfm:false,pend:null,paste:false,ptxt:""});}},["上書きする"]),
+        el("button",{cls:"btn btn-g",css:"flex:1",onclick:function(){set({cfm:false,pend:null});}},["キャンセル"])
+      ])
+    ])
+  ]);
+}
+
+// ── Modal: GAS Setup ──────────────────────────────────────
+function mkSetup() {
+  var inp = document.createElement("input");
+  inp.type="text";
+  inp.placeholder="https://script.google.com/macros/s/xxxxx/exec";
+  inp.value = S.gasInput||"";
+  inp.addEventListener("input",function(){S.gasInput=inp.value;});
+  return el("div",{cls:"setup-box"},[
+    el("div",{css:"font-size:32px;margin-bottom:12px"},["⚙️"]),
+    el("div",{css:"font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px"},["GAS URL を設定してください"]),
+    el("div",{css:"font-size:12px;color:#64748B;margin-bottom:16px;line-height:1.7"},["Google Apps ScriptのデプロイURLを入力してください。\nデータの読み書きがGoogle Sheetsに保存されます。"]),
+    inp,
+    el("div",{css:"display:flex;gap:8px;margin-top:12px;justify-content:center"},[
+      el("button",{cls:"btn btn-p",onclick:saveGasUrl},["接続する"]),
+      el("button",{cls:"btn btn-g",onclick:function(){set({setupMode:false});}},["スキップ（ローカルのみ）"])
+    ])
+  ]);
+}
+
+// ── Tab renderers ─────────────────────────────────────────
+function mkNews() {
+  if (!S.data) return el("div",{cls:"empty"},[
+    el("div",{css:"font-size:40px;margin-bottom:12px"},["🌅"]),
+    el("div",{css:"font-size:16px;font-weight:700;margin-bottom:6px"},["まだデータがありません"]),
+    el("div",{css:"font-size:13px;color:#64748B"},["📋 JSONを貼り付けから始めましょう"])
+  ]);
+  var w=document.createElement("div");
+  var sc=el("div",{cls:"card"});
+  sc.appendChild(el("div",{css:"font-size:10px;font-weight:700;color:#2563EB;letter-spacing:2px;margin-bottom:8px;font-family:'DM Mono',monospace"},["✦ EXECUTIVE SUMMARY"]));
+  sc.appendChild(el("p",{css:"font-size:13px;line-height:1.9;color:#374151"},[S.data.summary]));
+  if (S.data.trends&&S.data.trends.length) {
+    sc.appendChild(el("div",{css:"margin-top:10px;display:flex;gap:6px;flex-wrap:wrap"},
+      S.data.trends.map(function(t){return el("span",{css:"background:#EFF6FF;color:#2563EB;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600"},[t]);})));
+  }
+  w.appendChild(sc);
+  var arts=S.data.articles||[];
+  var fr=el("div",{cls:"frow"},[flt("すべて",S.fc==="all","#2563EB",function(){set({fc:"all"});})]);
+  CATS.forEach(function(c){
+    if(arts.some(function(a){return a.category===c.id;}))
+      fr.appendChild(flt(c.ic+" "+c.lb,S.fc===c.id,c.col,(function(id){return function(){set({fc:id});};})(c.id)));
+  });
+  w.appendChild(fr);
+  var fd=S.fc==="all"?arts:arts.filter(function(a){return a.category===S.fc;});
+  w.appendChild(el("div",{css:"font-size:11px;color:#94A3B8;margin-bottom:8px"},[fd.length+"件 — タップで詳細"]));
+  fd.forEach(function(a){w.appendChild(mkArt(a));});
+  return w;
+}
+
+function mkRegion(region) {
+  if (!S.data) return el("div",{cls:"empty"},[el("div",{css:"font-size:40px"},["🌅"]),el("div",{css:"font-size:13px;color:#64748B;margin-top:8px"},["データがありません"])]);
+  var meta={global:{lb:"🌍 世界情勢",col:"#0EA5E9"},domestic:{lb:"🇯🇵 国内情勢",col:"#DC2626"}};
+  var m=meta[region];
+  var arts=(S.data.articles||[]).filter(function(a){return region==="domestic"?a.region==="domestic":(a.region==="global"||!a.region);});
+  var w=document.createElement("div");
+  var hr=arts.filter(function(a){return a.impact==="高";}).length;
+  w.appendChild(el("div",{cls:"rhd",css:"background:"+m.col+"10;border:1px solid "+m.col+"30"},[
+    el("div",{css:"flex:1"},[
+      el("div",{css:"font-size:14px;font-weight:900;color:"+m.col+";margin-bottom:2px"},[m.lb]),
+      el("div",{css:"font-size:11px;color:#64748B"},[arts.length+"件"])
+    ]),
+    el("div",{css:"background:#fff;border:1px solid "+m.col+"44;border-radius:8px;padding:4px 10px;text-align:center"},[
+      el("div",{css:"font-size:16px;font-weight:800;color:"+m.col},[String(hr)]),
+      el("div",{css:"font-size:9px;color:#94A3B8"},["影響度高"])
+    ])
+  ]));
+  var uc=[];arts.forEach(function(a){if(uc.indexOf(a.category)===-1)uc.push(a.category);});
+  var fr=el("div",{cls:"frow"},[flt("すべて",S.fc==="all",m.col,function(){set({fc:"all"});})]);
+  CATS.filter(function(c){return uc.indexOf(c.id)!==-1;}).forEach(function(c){
+    fr.appendChild(flt(c.ic+" "+c.lb,S.fc===c.id,c.col,(function(id){return function(){set({fc:id});};})(c.id)));
+  });
+  w.appendChild(fr);
+  var fd=S.fc==="all"?arts:arts.filter(function(a){return a.category===S.fc;});
+  w.appendChild(el("div",{css:"font-size:11px;color:#94A3B8;margin-bottom:8px"},[fd.length+"件"]));
+  fd.forEach(function(a){w.appendChild(mkArt(a));});
+  return w;
+}
+
+function mkIdeas() {
+  if (!S.data) return el("div",{cls:"empty"},[el("div",{css:"font-size:40px"},["🌅"]),el("div",{css:"font-size:13px;color:#64748B;margin-top:8px"},["データがありません"])]);
+  var g=el("div",{cls:"ig"});
+  (S.data.ideas||[]).forEach(function(idea){g.appendChild(mkIdea(idea));});
+  return g;
+}
+
+function mkHistory() {
+  var w=document.createElement("div");
+  w.appendChild(el("div",{css:"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"},[
+    el("div",{css:"font-size:13px;font-weight:700"},["📅 保存済みデータ一覧"]),
+    el("div",{css:"display:flex;align-items:center;gap:8px"},[
+      el("span",{css:"font-size:10px;padding:2px 8px;border-radius:10px;background:"+(GAS_URL?"#F0FDF4":"#EFF6FF")+";color:"+(GAS_URL?"#059669":"#2563EB")+";font-weight:700"},[GAS_URL?"🟢 Google Sheets":"💾 ローカルのみ"]),
+      el("span",{css:"font-size:11px;color:#94A3B8"},[S.dates.length+"件保存済み"])
+    ])
+  ]));
+  if (!S.dates.length) {
+    w.appendChild(el("div",{cls:"empty"},[el("div",{css:"font-size:32px;margin-bottom:8px"},["📭"]),el("div",{css:"font-size:13px;color:#6B7280"},["まだデータがありません"])]));
+  } else {
+    var tbl=el("div",{cls:"htbl"},[
+      el("div",{cls:"hhd"},[
+        el("span",null,["日付"]),el("span",{css:"text-align:center"},["記事数"]),
+        el("span",{css:"text-align:center"},["影響高"]),el("span",{css:"text-align:center"},["アイデア"]),
+        el("span",{css:"text-align:center"},["操作"])
+      ])
+    ]);
+    S.dates.forEach(function(d,i){tbl.appendChild(mkHrow(d,S.sel===d,i===S.dates.length-1));});
+    w.appendChild(tbl);
+  }
+  // GAS URL設定変更
+  var urlInp=document.createElement("input");
+  urlInp.type="text";
+  urlInp.value=GAS_URL||"";
+  urlInp.placeholder="https://script.google.com/macros/s/xxxxx/exec";
+  urlInp.addEventListener("input",function(){S.gasInput=urlInp.value;});
+  w.appendChild(el("div",{cls:"tip",css:"margin-top:16px"},[
+    el("div",{css:"font-size:11px;font-weight:700;color:#D97706;margin-bottom:8px"},["⚙️ GAS URL設定"]),
+    urlInp,
+    el("div",{css:"display:flex;gap:8px;margin-top:8px"},[
+      el("button",{cls:"btn btn-s",css:"font-size:11px",onclick:saveGasUrl},["URLを保存"]),
+      GAS_URL?el("button",{cls:"btn btn-g",css:"font-size:11px",onclick:function(){
+        GAS_URL="";localStorage.removeItem("ainews_gas_url");
+        set({msg:"⚠️ GAS連携を解除しました",mtyp:"wrn"});
+      }},["連携を解除"]):null
+    ])
+  ]));
+  return w;
+}
+
+// ── Main render ───────────────────────────────────────────
+function render() {
+  var app=document.getElementById("app");
+  app.innerHTML="";
+
+  if (S.ld) {
+    app.appendChild(el("div",{cls:"ldov"},[
+      el("div",{cls:"ldbx"},[
+        el("div",{css:"font-size:28px;margin-bottom:8px"},["📡"]),
+        el("div",{css:"font-size:13px;font-weight:600;color:#374151"},[S.ldmsg||"読み込み中..."])
+      ])
+    ]));
+  }
+
+  var now=S.now;
+  var ts=now.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  var ds=now.toLocaleDateString("ja-JP",{year:"numeric",month:"long",day:"numeric",weekday:"short"});
+  var arts=(S.data&&S.data.articles)||[];
+  var hi=arts.filter(function(a){return a.impact==="高";}).length;
+
+  var sr=el("div",{cls:"srow"});
+  if (S.data) {
+    sr.appendChild(el("div",{cls:"chip"},[el("span",{cls:"chip-n",css:"color:#2563EB"},[String(arts.length)]),el("span",{cls:"chip-l"},["記事数"])]));
+    sr.appendChild(el("div",{cls:"chip"},[el("span",{cls:"chip-n",css:"color:#DC2626"},[String(hi)]),el("span",{cls:"chip-l"},["影響度高"])]));
+    sr.appendChild(el("div",{cls:"chip"},[el("span",{cls:"chip-n",css:"color:#059669"},[String(S.dates.length)]),el("span",{cls:"chip-l"},["保存件数"])]));
+    if(S.sel) sr.appendChild(el("span",{css:"font-size:11px;color:#94A3B8;font-family:'DM Mono',monospace"},[fmt(S.sel)]));
+  }
+  sr.appendChild(el("button",{cls:"btn btn-p",css:"margin-left:auto",onclick:function(){set({paste:!S.paste,msg:""});}},["📋 JSONを貼り付け"]));
+
+  var tabs=el("div",{cls:"tabs"},
+    [{id:"news",lb:"📰 ニュース"},{id:"global",lb:"🌍 世界情勢"},{id:"domestic",lb:"🇯🇵 国内情勢"},{id:"ideas",lb:"💡 活用アイデア"},{id:"history",lb:"📅 過去データ"}]
+    .map(function(t){return el("button",{cls:"tab"+(S.tab===t.id?" on":""),onclick:function(){set({tab:t.id});}},[t.lb]);})
+  );
+
+  app.appendChild(el("div",{cls:"hdr"},[
+    el("div",{cls:"hdr-top"},[
+      el("div",null,[el("div",{cls:"tracker"},["AI NEWS TRACKER"]),el("div",{cls:"app-title"},["AIニュース速報"])]),
+      el("div",null,[el("div",{cls:"clock-t"},[ts]),el("div",{cls:"clock-d"},[ds])])
+    ]),
+    sr, tabs
+  ]));
+
+  var cont=el("div",{cls:"cont"});
+  app.appendChild(cont);
+
+  if (S.msg) cont.appendChild(el("div",{cls:"smsg "+(S.mtyp==="ok"?"mok":S.mtyp==="err"?"merr":"mwrn")},[S.msg]));
+  if (S.setupMode) cont.appendChild(mkSetup());
+  if (S.paste) cont.appendChild(mkPaste());
+  if (S.cfm&&S.pend) app.appendChild(mkCfm());
+
+  if (!S.setupMode) {
+    if (S.tab==="news") cont.appendChild(mkNews());
+    else if (S.tab==="global"||S.tab==="domestic") cont.appendChild(mkRegion(S.tab));
+    else if (S.tab==="ideas") cont.appendChild(mkIdeas());
+    else if (S.tab==="history") cont.appendChild(mkHistory());
+  }
+}
+
+render();
+</script>
+</body>
+</html>
