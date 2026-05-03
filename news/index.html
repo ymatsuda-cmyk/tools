@@ -125,8 +125,13 @@ function lsListDates() {
 // ── GAS API（貸借トラッカーと完全に同じ方式）────────────
 async function gasCall(params) {
   if (!GAS_URL) throw new Error("GAS URLが未設定です");
-  var qs = new URLSearchParams(params).toString();
-  var res = await fetch(GAS_URL + "?" + qs, { redirect: "follow" });
+  // POSTで送信（GETと同じくhandleReqで処理される）
+  var res = await fetch(GAS_URL, {
+    method: "POST",
+    redirect: "follow",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(params)
+  });
   var data = await res.json();
   if (data.error) throw new Error(data.error);
   return data;
@@ -186,57 +191,86 @@ function initLoad() {
   if (dates.length) {
     var data = lsLoad(dates[0]);
     set({dates:dates, data:data, sel:dates[0]});
-  }
-  // GAS URL設定済みなら同期
-  if (GAS_URL) {
-    set({ld:true, ldmsg:"Sheetsからデータを読み込み中..."});
-    apiList().then(function(res) {
-      var sheetDates = (res.dates||[]).map(function(d){ return d.date; });
-      // localStorageとマージ
-      var allDates = sheetDates.slice();
-      lsListDates().forEach(function(d){ if(allDates.indexOf(d)===-1) allDates.push(d); });
-      allDates = allDates.sort().reverse();
-      if (!allDates.length) { set({ld:false}); return; }
-      set({dates:allDates});
-      // 最新データを読み込む
-      return apiLoad(allDates[0]).then(function(r) {
-        set({ld:false, data:r.data, sel:allDates[0]});
-      });
-    }).catch(function(e) {
-      set({ld:false, msg:"⚠️ Sheets同期失敗（ローカルデータを表示）: "+e.message, mtyp:"wrn"});
-    });
-  } else if (!dates.length) {
+  } else {
     render();
+  }
+
+  // GAS URL設定済みならSheetsから日付一覧を取得・マージ
+  if (GAS_URL) {
+    gasCall({action:"list"}).then(function(res) {
+      var sheetDates = (res.dates||[]).map(function(d){ return d.date; });
+      // localにないものをマージ
+      var localDates = lsListDates();
+      var merged = sheetDates.slice();
+      localDates.forEach(function(d){ if(merged.indexOf(d)===-1) merged.push(d); });
+      merged = merged.sort().reverse();
+      if (!merged.length) return;
+      // 最新がlocalにない場合はSheetsから取得
+      var latest = merged[0];
+      var cached = lsLoad(latest);
+      if (cached) {
+        set({dates:merged});
+      } else {
+        gasCall({action:"load", date:latest}).then(function(r){
+          if (r.data) {
+            lsSave(r.data);
+            set({dates:merged, data:r.data, sel:latest});
+          } else {
+            set({dates:merged});
+          }
+        }).catch(function(){});
+      }
+    }).catch(function(){
+      // GAS失敗は無視（localStorageのデータで表示済み）
+    });
   }
 }
 initLoad();
 
 // ── Actions ───────────────────────────────────────────────
 function doSave(payload, ow) {
-  set({ld:true, ldmsg:"保存中..."});
-  apiSave(payload, ow).then(function() {
-    var dates = lsListDates();
-    set({ld:false, dates:dates, data:payload, sel:payload.date,
-      tab:"news", paste:false, ptxt:"", pend:null, cfm:false,
-      msg:"✅ "+fmt(payload.date)+" を保存しました"+(GAS_URL?" (Sheets連携済み)":""), mtyp:"ok"});
-  }).catch(function(e) {
-    // GAS失敗でもlocal保存は成功しているので表示は更新
-    var dates = lsListDates();
-    set({ld:false, dates:dates, data:payload, sel:payload.date,
-      tab:"news", paste:false, ptxt:"", pend:null, cfm:false,
-      msg:"✅ ローカル保存済み / ⚠️ Sheets保存失敗: "+e.message, mtyp:"wrn"});
-  });
+  // 1. localStorageに即保存（確実・同期）
+  lsSave(payload);
+  var dates = lsListDates();
+  set({dates:dates, data:payload, sel:payload.date,
+    tab:"news", paste:false, ptxt:"", pend:null, cfm:false,
+    msg:"✅ "+fmt(payload.date)+" を保存しました", mtyp:"ok"});
+
+  // 2. GASへはバックグラウンドで非同期保存（失敗しても無視）
+  if (GAS_URL) {
+    fetch(GAS_URL, {
+      method: "POST",
+      redirect: "follow",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action:"save", overwrite:!!ow, data:payload })
+    }).then(function(r){ return r.json(); })
+      .then(function(res){
+        if (res && res.success) {
+          set({msg:"✅ "+fmt(payload.date)+" を保存しました（Sheets同期済み）", mtyp:"ok"});
+        }
+      })
+      .catch(function(){}); // エラーは無視
+  }
 }
 
 function selDate(date) {
-  var cached = lsLoad(date);
-  if (cached) { set({data:cached, sel:date, tab:"news"}); return; }
-  set({ld:true, ldmsg:"データを読み込み中..."});
-  apiLoad(date).then(function(r) {
-    set({ld:false, data:r.data, sel:date, tab:"news"});
-  }).catch(function(e) {
-    set({ld:false, msg:"❌ "+e.message, mtyp:"err"});
-  });
+  // まずlocalStorageから
+  var data = lsLoad(date);
+  if (data) { set({data:data, sel:date, tab:"news"}); return; }
+  // なければSheetsから取得
+  if (GAS_URL) {
+    set({ld:true, ldmsg:"データを読み込み中..."});
+    gasCall({action:"load", date:date}).then(function(r){
+      if (r.data) {
+        lsSave(r.data);
+        set({ld:false, data:r.data, sel:date, tab:"news"});
+      } else {
+        set({ld:false});
+      }
+    }).catch(function(e){
+      set({ld:false, msg:"❌ 読み込み失敗: "+e.message, mtyp:"err"});
+    });
+  }
 }
 
 function pasteAndSave() {
