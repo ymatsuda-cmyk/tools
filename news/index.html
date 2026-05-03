@@ -25,18 +25,22 @@ body{background:#F8FAFC;color:#0F172A;min-height:100vh}
 .chip{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:4px 10px}
 .chip-n{font-size:14px;font-weight:800;font-family:"DM Mono",monospace}
 .chip-l{font-size:10px;color:#94A3B8}
-.btn{border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:"Noto Sans JP",sans-serif}
+.btn{border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:"Noto Sans JP",sans-serif;min-height:40px;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s ease;touch-action:manipulation}
+.btn:active{transform:scale(0.95)}
 .btn-p{background:#2563EB;color:#fff}
 .btn-g{background:transparent;color:#64748B;border:1px solid #E2E8F0}
 .btn-r{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
 .btn-s{background:#F0FDF4;color:#059669;border:1px solid #BBF7D0}
-.tabs{display:flex;gap:2px;overflow-x:auto}
-.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif}
-.tab.on{background:#2563EB;color:#fff}
+.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:manipulation}
+.tab:active{transform:scale(0.95)}
+.tab.on{background:#2563EB;color:#fff;box-shadow:0 2px 4px rgba(37,99,235,0.2)}
 .cont{padding:16px 16px 48px;max-width:720px;margin:0 auto}
 .card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.art{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.art{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform 0.15s ease,box-shadow 0.15s ease;touch-action:manipulation;min-height:48px}
 .art:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.art:active{transform:scale(0.98)}
 .art-hd{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
 .art-ttl{font-size:12px;font-weight:700;color:#111827;line-height:1.5;flex:1}
 .bdg{border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block}
@@ -75,7 +79,8 @@ input[type=text]{height:36px;font-family:"Noto Sans JP",sans-serif}
 .merr{background:#FEF2F2;color:#DC2626}
 .mwrn{background:#FFFBEB;color:#D97706}
 .ig{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.ic{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.ic{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);min-height:48px;transition:transform 0.15s ease;touch-action:manipulation}
+.ic:active{transform:scale(0.98)}
 .setup-box{background:#fff;border:2px solid #FDE68A;border-radius:16px;padding:24px;margin:20px 0;text-align:center}
 @media(max-width:480px){.ig{grid-template-columns:1fr}}
 </style>
@@ -290,23 +295,8 @@ function pasteAndSave() {
 }
 
 function openGasSetup() {
-  var current = GAS_URL || "";
-  var msg = current
-    ? "現在のURL:\n" + current + "\n\n新しいURLを入力（空欄でクリア）:"
-    : "GAS デプロイURL を入力してください\n（https://script.google.com/macros/s/.../exec）:";
-  var input = prompt(msg, current);
-  if (input === null) return; // キャンセル
-  var url = input.trim();
-  if (!url) {
-    GAS_URL = "";
-    localStorage.removeItem("ainews_gas_url");
-    set({gasInput:"", msg:"⚠️ Sheets連携を解除しました", mtyp:"wrn"});
-    return;
-  }
-  GAS_URL = url;
-  localStorage.setItem("ainews_gas_url", url);
-  set({gasInput:url, msg:"✅ GAS URLを保存しました。同期します...", mtyp:"ok"});
-  initLoad();
+  // promptの代わりにモーダルを使用（モバイル対応）
+  set({setupMode: true, gasInput: GAS_URL || ""});
 }
 
 function saveGasUrl() {
@@ -362,13 +352,35 @@ function mkArt(a) {
   ]));
   bd.appendChild(el("div",{cls:"art-ft"},[bdg(cat.lb,cat.col),el("span",{css:"font-size:11px;color:#9CA3AF"},["📰 "+a.source])]));
   div.appendChild(bd);
-  div.addEventListener("click",function(){bd.style.display=bd.style.display==="block"?"none":"block";});
+  
+  // モバイル対応: タッチ防御機能付きトグル
+  var lastClick = 0;
+  var isToggling = false;
+  div.addEventListener("click",function(e){
+    e.preventDefault();
+    var now = Date.now();
+    if (now - lastClick < 300 || isToggling) return; // 300ms以内の連続クリックを防止
+    lastClick = now;
+    isToggling = true;
+    
+    setTimeout(function(){
+      var isOpen = bd.style.display === "block";
+      bd.style.display = isOpen ? "none" : "block";
+      // タッチフィードバック
+      div.style.transform = "scale(0.98)";
+      setTimeout(function(){
+        div.style.transform = "";
+        isToggling = false;
+      }, 150);
+    }, 50);
+  });
+  
   return div;
 }
 
 function mkIdea(idea) {
   var c = idea.color||"#6B7280";
-  var card = el("div",{cls:"ic",css:"border:1px solid "+c+"33;border-top:3px solid "+c});
+  var card = el("div",{cls:"ic",css:"border:1px solid "+c+"33;border-top:3px solid "+c+";transition:transform 0.15s ease;touch-action:manipulation"});
   var det = el("div",{css:"display:none"});
   det.appendChild(el("p",{css:"color:#6B7280;font-size:11px;line-height:1.7;margin:6px 0 8px"},[idea.desc]));
   det.appendChild(el("div",{css:"display:flex;gap:4px;flex-wrap:wrap"},(idea.tags||[]).map(function(t){return bdg(t,c);})));
@@ -378,10 +390,26 @@ function mkIdea(idea) {
     el("div",{css:"font-size:12px;font-weight:700;color:#111827;line-height:1.4;margin-bottom:4px"},[idea.title]),
     det, hint
   );
-  card.addEventListener("click",function(){
-    var open=det.style.display==="block";
-    det.style.display=open?"none":"block";
-    hint.style.display=open?"block":"none";
+  
+  // モバイル対応: タッチ防御機能付きトグル
+  var lastClick = 0;
+  var isToggling = false;
+  card.addEventListener("click",function(e){
+    e.preventDefault();
+    var now = Date.now();
+    if (now - lastClick < 300 || isToggling) return;
+    lastClick = now;
+    isToggling = true;
+    
+    // タッチフィードバック
+    card.style.transform = "scale(0.98)";
+    setTimeout(function(){
+      card.style.transform = "";
+      var open=det.style.display==="block";
+      det.style.display=open?"none":"block";
+      hint.style.display=open?"block":"none";
+      setTimeout(function(){ isToggling = false; }, 100);
+    }, 150);
   });
   return card;
 }
@@ -643,15 +671,36 @@ function render() {
 
   // ボタン行（別行で大きく表示）
   var btnRow = el("div",{css:"display:flex;gap:8px;margin-bottom:8px"});
-  var sheetsBtn = el("a",{css:"flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:"+(GAS_URL?"#F0FDF4":"#FEF9C3")+";color:"+(GAS_URL?"#059669":"#D97706")+";border:2px solid "+(GAS_URL?"#BBF7D0":"#FDE68A")+";text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center"},[(GAS_URL?"🟢 Sheets連携中":"⚙️ Sheets設定")]);
-  sheetsBtn.href = "./setup.html";
+  var sheetsBtn = el("button",{css:"flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:"+(GAS_URL?"#F0FDF4":"#FEF9C3")+";color:"+(GAS_URL?"#059669":"#D97706")+";border:2px solid "+(GAS_URL?"#BBF7D0":"#FDE68A")+";text-align:center;display:flex;align-items:center;justify-content:center"},[(GAS_URL?"🟢 Sheets連携中":"⚙️ Sheets設定")]);
+  sheetsBtn.addEventListener("click", function(){ openGasSetup(); });
   var pasteBtn = el("button",{css:"flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:#2563EB;color:#fff;border:none"},["📋 JSONを貼り付け"]);
   pasteBtn.addEventListener("click", function(){ set({paste:!S.paste,msg:""}); });
   btnRow.append(sheetsBtn, pasteBtn);
 
   var tabs=el("div",{cls:"tabs"},
     [{id:"news",lb:"📰 ニュース"},{id:"global",lb:"🌍 世界情勢"},{id:"domestic",lb:"🇯🇵 国内情勢"},{id:"ideas",lb:"💡 活用アイデア"},{id:"history",lb:"📅 過去データ"}]
-    .map(function(t){return el("button",{cls:"tab"+(S.tab===t.id?" on":""),onclick:function(){set({tab:t.id});}},[t.lb]);})
+    .map(function(t){
+      var btn = el("button",{cls:"tab"+(S.tab===t.id?" on":"")}, [t.lb]);
+      // モバイル対応: タッチフィードバック付きタブ切り替え
+      var switching = false;
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        if (switching) return;
+        switching = true;
+        
+        // タッチフィードバック
+        btn.style.transform = "scale(0.95)";
+        btn.style.transition = "transform 0.1s";
+        
+        setTimeout(function(){
+          btn.style.transform = "";
+          set({tab:t.id});
+          setTimeout(function(){ switching = false; }, 100);
+        }, 100);
+      });
+      return btn;
+    })
+  )
   );
 
   app.appendChild(el("div",{cls:"hdr"},[
@@ -666,7 +715,8 @@ function render() {
   app.appendChild(cont);
 
   if (S.msg) cont.appendChild(el("div",{cls:"smsg "+(S.mtyp==="ok"?"mok":S.mtyp==="err"?"merr":"mwrn")},[S.msg]));
-  // setupMode is now handled by prompt()
+  // GAS設定モーダル（モバイル対応）
+  if (S.setupMode) app.appendChild(mkSetupOverlay());
   if (S.paste) cont.appendChild(mkPaste());
   if (S.cfm&&S.pend) app.appendChild(mkCfm());
 
