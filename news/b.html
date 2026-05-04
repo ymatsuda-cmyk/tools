@@ -1153,8 +1153,11 @@
             }
             
             // 接続テストを実行
+            console.log('GAS接続テストを開始します:', url);
             testGasConnection(url, function(success, message) {
+                console.log('接続テスト結果:', success, message);
                 if (success) {
+                    errorEl.textContent = '';  // エラーメッセージをクリア
                     State.gasUrl = url;
                     localStorage.setItem('ainews_gas_url', url);
                     document.getElementById('disconnectGas').style.display = 'block';
@@ -1165,6 +1168,7 @@
                     // 既存データとの同期を試行
                     syncWithGas();
                 } else {
+                    console.error('接続テスト失敗:', message);
                     errorEl.textContent = message;
                 }
             });
@@ -1835,26 +1839,43 @@
 
         // 手動同期機能
         function manualSync() {
+            console.log('手動同期開始 - State.gasUrl:', State.gasUrl);
+            
             if (!State.gasUrl) {
+                console.warn('GAS URLが設定されていません');
                 showToast('GAS URLが設定されていません。Sheets設定からURLを設定してください', 'warning');
                 return;
             }
             
             // 同期ボタンを一時的に無効化
             var syncBtn = document.getElementById('syncBtn');
+            if (!syncBtn) {
+                console.error('同期ボタンが見つかりません');
+                return;
+            }
+            
             var originalText = syncBtn.innerHTML;
             syncBtn.disabled = true;
             syncBtn.innerHTML = '<span>🔄</span> 同期中...';
             
-            console.log('手動同期開始');
+            console.log('手動同期実行中...');
             showToast('同期を開始しました...', 'success');
             
-            syncWithGas();
+            try {
+                syncWithGas();
+                console.log('syncWithGas()実行完了');
+            } catch (error) {
+                console.error('syncWithGas()実行エラー:', error);
+                showToast('同期エラー: ' + error.message, 'error');
+            }
             
             // 3秒後にボタンを再有効化
             setTimeout(function() {
-                syncBtn.disabled = false;
-                syncBtn.innerHTML = originalText;
+                if (syncBtn) {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = originalText;
+                    console.log('同期ボタン再有効化');
+                }
             }, 3000);
         }
         function testGasConnection(url, callback) {
@@ -1881,13 +1902,20 @@
             })
             .then(function(result) {
                 console.log('GASテスト結果:', result);
+                console.log('result.ping:', result.ping);
+                console.log('result.status:', result.status);
+                console.log('result.message:', result.message);
+                console.log('result.result:', result.result);
+                
                 // 様々なレスポンス形式に対応
                 if (result.status === 'ok' || 
                     result.message === 'GAS is working' || 
                     result.ping === 'ok' ||
                     result.result === 'success') {
+                    console.log('✅ GAS接続テスト成功');
                     callback(true, 'GAS連携成功');
                 } else {
+                    console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
                     callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
                 }
             })
