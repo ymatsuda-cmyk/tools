@@ -1881,42 +1881,57 @@
         function testGasConnection(url, callback) {
             console.log('GAS接続テスト開始:', url);
             
-            // タイムアウト設定（10秒）
+            // タイムアウト設定（15秒に延長）
             var controller = new AbortController();
             var timeoutId = setTimeout(function() {
+                console.log('GAS接続テストタイムアウト（15秒）');
                 controller.abort();
-            }, 10000);
+            }, 15000);
             
             fetch(url + '?action=test', {
                 method: 'GET',
-                signal: controller.signal
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
             })
             .then(function(response) {
                 clearTimeout(timeoutId);
                 console.log('GASテストレスポンスステータス:', response.status);
+                console.log('GASテストレスポンスヘッダ:', response.headers);
                 
                 if (!response.ok) {
                     throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
                 }
-                return response.json();
-            })
-            .then(function(result) {
-                console.log('GASテスト結果:', result);
-                console.log('result.ping:', result.ping);
-                console.log('result.status:', result.status);
-                console.log('result.message:', result.message);
-                console.log('result.result:', result.result);
                 
-                // 様々なレスポンス形式に対応
-                if (result.status === 'ok' || 
-                    result.message === 'GAS is working' || 
-                    result.ping === 'ok' ||
-                    result.result === 'success') {
-                    console.log('✅ GAS接続テスト成功');
-                    callback(true, 'GAS連携成功');
-                } else {
-                    console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
-                    callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
+                return response.text();  // まずテキストとして取得
+            })
+            .then(function(text) {
+                console.log('GASテストレスポンステキスト:', text);
+                
+                try {
+                    var result = JSON.parse(text);
+                    console.log('GASテスト結果:', result);
+                    console.log('result.ping:', result.ping);
+                    console.log('result.status:', result.status);
+                    console.log('result.message:', result.message);
+                    console.log('result.result:', result.result);
+                    
+                    // 様々なレスポンス形式に対応
+                    if (result.status === 'ok' || 
+                        result.message === 'GAS is working' || 
+                        result.ping === 'ok' ||
+                        result.result === 'success') {
+                        console.log('✅ GAS接続テスト成功');
+                        callback(true, 'GAS連携成功');
+                    } else {
+                        console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
+                        callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
+                    }
+                } catch (parseError) {
+                    console.error('JSON解析エラー:', parseError, 'レスポンス:', text);
+                    callback(false, 'GASレスポンスの解析に失敗しました: ' + text.substring(0, 100));
                 }
             })
             .catch(function(error) {
@@ -1924,7 +1939,7 @@
                 console.error('GAS接続エラー:', error);
                 
                 if (error.name === 'AbortError') {
-                    callback(false, '接続タイムアウト（10秒）。URLを確認してください');
+                    callback(false, '接続タイムアウト（15秒）。URLを確認してください');
                 } else if (error.message.includes('CORS')) {
                     callback(false, 'CORSエラー。GASスクリプトのアクセス許可設定を確認してください');
                 } else if (error.message.includes('Failed to fetch')) {
