@@ -1730,6 +1730,8 @@
                 .then(function(result) {
                     console.log('GASからのレスポンス:', result);
                     console.log('dates配列の内容:', result.dates);
+                    console.log('dates配列の型:', typeof result.dates);
+                    console.log('dates配列の長さ:', result.dates ? result.dates.length : 'undefined');
                     
                     if (result.error) {
                         throw new Error('GASエラー: ' + result.error);
@@ -1740,42 +1742,54 @@
                         
                         // ローカルにないデータをGASから取得
                         result.dates.forEach(function(item, index) {
-                            console.log('日付アイテム[' + index + ']:', item);
+                            console.log('📅 日付アイテム[' + index + ']:', item);
+                            console.log('📅 アイテムの型:', typeof item);
                             
                             // 日付の形式を正規化
                             var date;
                             if (typeof item === 'string') {
                                 date = item;
-                            } else if (item.date) {
+                                console.log('📅 文字列として処理:', date);
+                            } else if (item && item.date) {
                                 date = item.date;
-                            } else if (typeof item === 'object' && item.toString) {
-                                date = item.toString();
+                                console.log('📅 オブジェクトのdateプロパティ:', date);
+                            } else if (typeof item === 'object' && item !== null) {
+                                // オブジェクトの場合、可能性のあるプロパティをチェック
+                                date = item.date || item.Date || item.DATE || item.dateString || item.value || item.toString();
+                                console.log('📅 オブジェクトから抽出:', date);
                             } else {
-                                console.warn('不明な日付形式:', item);
+                                console.warn('📅 不明な日付形式をスキップ:', item);
+                                return;
+                            }
+                            
+                            if (!date) {
+                                console.warn('📅 日付が空のためスキップ:', item);
                                 return;
                             }
                             
                             // 日付を YYYY-MM-DD 形式に変換
                             var formattedDate = formatDateForGas(date);
-                            console.log('元の日付:', date, '→ 変換後:', formattedDate);
+                            console.log('📅 元の日付:', date, '→ 変換後:', formattedDate);
                             
                             if (!formattedDate) {
-                                console.warn('日付変換に失敗:', date);
+                                console.warn('📅 日付変換に失敗:', date);
                                 return;
                             }
                             
                             var dateKey = formattedDate.replace(/-/g, '');
+                            var localData = localStorage.getItem('ainews_' + dateKey);
                             
-                            if (!localStorage.getItem('ainews_' + dateKey)) {
-                                console.log('新しいデータをGASから取得:', formattedDate);
+                            if (!localData) {
+                                console.log('📥 新しいデータをGASから取得:', formattedDate);
                                 loadFromGas(formattedDate);
                             } else {
-                                console.log('ローカルに存在済み:', formattedDate);
+                                console.log('📁 ローカルに存在済み:', formattedDate, '(サイズ:', localData.length, 'chars)');
                             }
                         });
                         showToast('Sheetsから' + result.dates.length + '件のデータを確認しました', 'success');
                     } else {
-                        console.log('dates配列が空またはundefined');
+                        console.log('❌ dates配列が空またはundefined');
+                        console.log('レスポンス全体:', JSON.stringify(result, null, 2));
                         showToast('Sheetsにデータがありません', 'warning');
                     }
                 })
@@ -1825,51 +1839,150 @@
             if (!State.gasUrl) return;
             
             console.log('GASからデータ読み込み開始:', date);
-            console.log('GASリクエストURL:', State.gasUrl + '?action=load&date=' + date);
             
-            fetch(State.gasUrl + '?action=load&date=' + encodeURIComponent(date))
+            // 複数の日付フォーマットを試行
+            var dateFormats = [
+                date,  // 元の形式
+                formatDateForGas(date),  // YYYY-MM-DD形式
+                date.replace(/-/g, ''),  // YYYYMMDD形式
+                new Date(date).toISOString().split('T')[0]  // ISO日付形式
+            ];
+            
+            console.log('試行する日付フォーマット:', dateFormats);
+            
+            // 最初の有効な日付フォーマットを使用
+            var finalDate = dateFormats.find(function(d) { return d && d !== 'null' && d !== 'undefined'; });
+            
+            console.log('最終的な日付:', finalDate);
+            console.log('GASリクエストURL:', State.gasUrl + '?action=load&date=' + encodeURIComponent(finalDate));
+            
+            fetch(State.gasUrl + '?action=load&date=' + encodeURIComponent(finalDate), {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
                 .then(function(response) {
                     console.log('GASロードレスポンスステータス:', response.status);
+                    console.log('GASロードレスポンスヘッダ:', response.headers);
+                    console.log('GASロードURL:', response.url);
+                    
                     if (!response.ok) {
                         throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
                     }
-                    return response.json();
+                    
+                    // まずテキストとして取得してログ出力
+                    return response.text();
                 })
-                .then(function(result) {
-                    console.log('GASからのデータ:', result);
-                    console.log('result.data:', result.data);
-                    console.log('result.error:', result.error);
+                .then(function(textResponse) {
+                    console.log('GAS生レスポンステキスト:', textResponse);
+                    console.log('レスポンス長:', textResponse.length, 'characters');
                     
-                    if (result.error) {
-                        throw new Error('GASエラー: ' + result.error);
-                    }
-                    
-                    if (result.data && (Array.isArray(result.data) || typeof result.data === 'object')) {
-                        console.log('データサイズ:', JSON.stringify(result.data).length, 'characters');
+                    try {
+                        var result = JSON.parse(textResponse);
+                        console.log('GASからのデータ(パース後):', result);
+                        console.log('result.data:', result.data);
+                        console.log('result.error:', result.error);
                         
-                        var dateKey = date.replace(/-/g, '');
-                        localStorage.setItem('ainews_' + dateKey, JSON.stringify(result.data));
-                        
-                        if (!State.savedDates.includes(date)) {
-                            State.savedDates.unshift(date);
-                            State.savedDates.sort().reverse();
-                            localStorage.setItem('ainews_index', JSON.stringify(State.savedDates));
+                        if (result.error) {
+                            throw new Error('GASエラー: ' + result.error);
                         }
                         
-                        renderHistory();
-                        updateStatsChips();
-                        console.log('✅ データ正常に取得完了:', date);
-                        showToast('データを取得しました: ' + date, 'success');
-                    } else {
-                        console.warn('❌ データが空またはnullです:', date);
-                        console.log('レスポンス全体:', JSON.stringify(result));
-                        showToast('データが見つかりません: ' + date, 'warning');
+                        // データの詳細チェック
+                        console.log('データ型:', typeof result.data);
+                        console.log('データがnull:', result.data === null);
+                        console.log('データがundefined:', result.data === undefined);
+                        console.log('データが空文字列:', result.data === '');
+                        console.log('データが空オブジェクト:', result.data && Object.keys(result.data).length === 0);
+                        
+                        if (result.data && result.data !== null && result.data !== undefined && result.data !== '') {
+                            console.log('✅ 有効なデータを検出');
+                            console.log('データサイズ:', JSON.stringify(result.data).length, 'characters');
+                            
+                            var dateKey = finalDate.replace(/-/g, '');
+                            localStorage.setItem('ainews_' + dateKey, JSON.stringify(result.data));
+                            
+                            if (!State.savedDates.includes(finalDate)) {
+                                State.savedDates.unshift(finalDate);
+                                State.savedDates.sort().reverse();
+                                localStorage.setItem('ainews_index', JSON.stringify(State.savedDates));
+                            }
+                            
+                            renderHistory();
+                            updateStatsChips();
+                            console.log('✅ データ正常に取得完了:', finalDate);
+                            showToast('データを取得しました: ' + finalDate, 'success');
+                        } else {
+                            console.warn('❌ データが空またはnullです');
+                            console.log('受信したデータ:', result.data);
+                            console.log('レスポンス全体:', JSON.stringify(result));
+                            
+                            // GAS側にデバッグ情報をリクエスト
+                            console.log('🔍 GAS側デバッグ情報をリクエスト');
+                            fetch(State.gasUrl + '?action=debug&date=' + encodeURIComponent(finalDate))
+                                .then(function(debugResponse) { return debugResponse.text(); })
+                                .then(function(debugText) { 
+                                    console.log('🔍 GASデバッグレスポンス:', debugText); 
+                                })
+                                .catch(function(debugError) { 
+                                    console.log('🔍 GASデバッグリクエスト失敗:', debugError); 
+                                });
+                                
+                            showToast('データが見つかりません: ' + finalDate + ' (GAS側にデータがない可能性)', 'warning');
+                        }
+                    } catch (parseError) {
+                        console.error('❌ JSON解析エラー:', parseError);
+                        console.log('解析失敗テキスト:', textResponse);
+                        showToast('GASレスポンスの解析に失敗: ' + textResponse.substring(0, 100), 'error');
                     }
                 })
                 .catch(function(error) {
-                    console.error('GASロードエラー(' + date + '):', error);
-                    showToast('データ読み込みエラー(' + date + '): ' + error.message, 'error');
+                    console.error('GASロードエラー(' + finalDate + '):', error);
+                    console.log('エラー詳細:', error.message, error.stack);
+                    showToast('データ読み込みエラー(' + finalDate + '): ' + error.message, 'error');
                 });
+        }
+        
+        // GAS日付フォーマットテスト関数
+        function testGasDateFormats(testDate) {
+            if (!State.gasUrl) {
+                console.log('GAS URLが設定されていません');
+                return;
+            }
+            
+            var formats = [
+                testDate,  // 元の形式
+                formatDateForGas(testDate),  // YYYY-MM-DD
+                testDate.replace(/-/g, ''),  // YYYYMMDD
+                new Date().toISOString().split('T')[0],  // 今日のISO形式
+                '2026-05-04',  // 固定日付
+                '20260504'     // 固定日付(数字のみ)
+            ];
+            
+            console.log('🧪 GAS日付フォーマットテスト開始');
+            
+            formats.forEach(function(format, index) {
+                if (format && format !== 'null') {
+                    console.log('🧪 テスト[' + index + '] 日付フォーマット:', format);
+                    
+                    fetch(State.gasUrl + '?action=load&date=' + encodeURIComponent(format))
+                        .then(function(response) { return response.text(); })
+                        .then(function(text) {
+                            try {
+                                var result = JSON.parse(text);
+                                var hasData = result.data && result.data !== null && result.data !== undefined;
+                                console.log('🧪 テスト[' + index + '] 結果:', format, '→', hasData ? '✅データあり' : '❌データなし', result.data ? '(' + JSON.stringify(result.data).substring(0, 50) + '...)' : '');
+                            } catch (e) {
+                                console.log('🧪 テスト[' + index + '] 解析エラー:', format, text.substring(0, 100));
+                            }
+                        })
+                        .catch(function(error) {
+                            console.log('🧪 テスト[' + index + '] リクエストエラー:', format, error.message);
+                        });
+                }
+            });
+        }
         }
 
         function syncToGas(data) {
@@ -1938,6 +2051,10 @@
             console.log('手動同期実行中...');
             showToast('同期を開始しました...', 'success');
             
+            // デバッグ: 日付フォーマットテスト実行
+            console.log('🧪 日付フォーマットテストを実行');
+            testGasDateFormats('2026-05-04');
+            
             try {
                 syncWithGas();
                 console.log('syncWithGas()実行完了');
@@ -1946,14 +2063,14 @@
                 showToast('同期エラー: ' + error.message, 'error');
             }
             
-            // 3秒後にボタンを再有効化
+            // 5秒後にボタンを再有効化（テスト時間を考慮して延長）
             setTimeout(function() {
                 if (syncBtn) {
                     syncBtn.disabled = false;
                     syncBtn.innerHTML = originalText;
                     console.log('同期ボタン再有効化');
                 }
-            }, 3000);
+            }, 5000);
         }
         function testGasConnection(url, callback) {
             console.log('GAS接続テスト開始:', url);
