@@ -1881,7 +1881,11 @@
             })
             .then(function(result) {
                 console.log('GASテスト結果:', result);
-                if (result.status === 'ok' || result.message === 'GAS is working') {
+                // 様々なレスポンス形式に対応
+                if (result.status === 'ok' || 
+                    result.message === 'GAS is working' || 
+                    result.ping === 'ok' ||
+                    result.result === 'success') {
                     callback(true, 'GAS連携成功');
                 } else {
                     callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
@@ -1951,18 +1955,18 @@
             showToast('予期しないエラーが発生しました', 'error');
         });
 
-        // PWA関連
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch(function(registrationError) {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
-        }
+        // PWA関連 - ServiceWorker無効化（sw.jsファイル不在のため）
+        // if ('serviceWorker' in navigator) {
+        //     window.addEventListener('load', function() {
+        //         navigator.serviceWorker.register('/sw.js')
+        //             .then(function(registration) {
+        //                 console.log('SW registered: ', registration);
+        //             })
+        //             .catch(function(registrationError) {
+        //                 console.log('SW registration failed: ', registrationError);
+        //             });
+        //     });
+        // }
 
     </script>
 </body>
