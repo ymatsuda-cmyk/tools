@@ -32,14 +32,14 @@ body{background:#F8FAFC;color:#0F172A;min-height:100vh}
 .btn-g{background:transparent;color:#64748B;border:1px solid #E2E8F0}
 .btn-r{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
 .btn-s{background:#F0FDF4;color:#059669;border:1px solid #BBF7D0}
-.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
 .tabs::-webkit-scrollbar{display:none}
-.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:auto;user-select:none}
+.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:manipulation;user-select:none}
 .tab:active{transform:scale(0.95)}
 .tab.on{background:#2563EB;color:#fff;box-shadow:0 2px 4px rgba(37,99,235,0.2)}
 .cont{padding:16px 16px 48px;max-width:720px;margin:0 auto}
 .card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.art{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform 0.15s ease,box-shadow 0.15s ease;touch-action:manipulation;min-height:48px}
+.art{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform 0.15s ease,box-shadow 0.15s ease;touch-action:manipulation;min-height:48px;user-select:none}
 .art:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}
 .art:active{transform:scale(0.98)}
 .art-hd{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
@@ -80,7 +80,7 @@ input[type=text]{height:36px;font-family:"Noto Sans JP",sans-serif}
 .merr{background:#FEF2F2;color:#DC2626}
 .mwrn{background:#FFFBEB;color:#D97706}
 .ig{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.ic{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);min-height:48px;transition:transform 0.15s ease;touch-action:manipulation}
+.ic{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);min-height:48px;transition:transform 0.15s ease;touch-action:manipulation;user-select:none}
 .ic:active{transform:scale(0.98)}
 .setup-box{background:#fff;border:2px solid #FDE68A;border-radius:16px;padding:24px;margin:20px 0;text-align:center}
 @media(max-width:480px){.ig{grid-template-columns:1fr}}
@@ -190,9 +190,6 @@ var S = {
 function set(p) { Object.assign(S, p); render(); }
 setInterval(function(){ set({now:new Date()}); }, 1000);
 
-// タッデバイス検出
-var isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-var lastTouchTime = 0;
 
 // ── Init ──────────────────────────────────────────────────
 function initLoad() {
@@ -359,80 +356,32 @@ function mkArt(a) {
   bd.appendChild(el("div",{cls:"art-ft"},[bdg(cat.lb,cat.col),el("span",{css:"font-size:11px;color:#9CA3AF"},["📰 "+a.source])]));
   div.appendChild(bd);
   
-  // 改善されたモバイル対応: 安定したトグル処理
-  var lastInteraction = 0;
-  var isProcessing = false;
-  var touchStartTime = 0;
-  var hasTouchMoved = false;
+  // シンプルで確実なクリック処理
+  var lastClick = 0;
+  var isToggling = false;
   
-  // タッチイベント（モバイル用）
-  if (isTouchDevice) {
-    div.addEventListener("touchstart", function(e) {
-      touchStartTime = Date.now();
-      hasTouchMoved = false;
-    }, {passive: true});
+  function toggleArticle() {
+    var now = Date.now();
+    if (isToggling || now - lastClick < 250) return;
     
-    div.addEventListener("touchmove", function(e) {
-      hasTouchMoved = true; // スクロールを検出
-    }, {passive: true});
+    lastClick = now;
+    isToggling = true;
     
-    div.addEventListener("touchend", function(e) {
-      var now = Date.now();
-      var touchDuration = now - touchStartTime;
-      
-      // タップ判定: 移動なし、短時間、処理中でない
-      if (!hasTouchMoved && touchDuration < 500 && !isProcessing && now - lastInteraction > 100) {
-        e.preventDefault();
-        lastInteraction = now;
-        isProcessing = true;
-        
-        // 視覚フィードバック
-        div.style.transform = "scale(0.98)";
-        div.style.transition = "transform 0.1s";
-        
-        setTimeout(function(){
-          div.style.transform = "";
-          var isOpen = bd.style.display === "block";
-          bd.style.display = isOpen ? "none" : "block";
-          
-          setTimeout(function(){
-            isProcessing = false;
-          }, 200);
-        }, 100);
-      }
-    }, {passive: false});
+    // 視覚フィードバック
+    div.style.transform = "scale(0.98)";
+    
+    setTimeout(function(){
+      div.style.transform = "";
+      var isOpen = bd.style.display === "block";
+      bd.style.display = isOpen ? "none" : "block";
+      isToggling = false;
+    }, 150);
   }
   
-  // クリックイベント（PC用）
-  div.addEventListener("click", function(e) {
-    var now = Date.now();
-    
-    // タッチデバイスでタッチ後200ms以内は無視（重複防止）
-    if (isTouchDevice && now - lastInteraction < 200) {
-      e.preventDefault();
-      return;
-    }
-    
-    // PC用クリック処理
-    if (!isProcessing && now - lastInteraction > 100) {
-      e.preventDefault();
-      lastInteraction = now;
-      isProcessing = true;
-      
-      // 視覚フィードバック
-      div.style.transform = "scale(0.98)";
-      div.style.transition = "transform 0.1s";
-      
-      setTimeout(function(){
-        div.style.transform = "";
-        var isOpen = bd.style.display === "block";
-        bd.style.display = isOpen ? "none" : "block";
-        
-        setTimeout(function(){
-          isProcessing = false;
-        }, 200);
-      }, 100);
-    }
+  // 統一されたクリック/タップ処理
+  div.addEventListener("click", function(e){
+    e.preventDefault();
+    toggleArticle();
   });
   
   return div;
@@ -451,25 +400,33 @@ function mkIdea(idea) {
     det, hint
   );
   
-  // モバイル対応: タッチ防御機能付きトグル
+  // シンプルで確実なクリック処理
   var lastClick = 0;
   var isToggling = false;
-  card.addEventListener("click",function(e){
-    e.preventDefault();
+  
+  function toggleIdea() {
     var now = Date.now();
-    if (now - lastClick < 300 || isToggling) return;
+    if (isToggling || now - lastClick < 250) return;
+    
     lastClick = now;
     isToggling = true;
     
-    // タッチフィードバック
+    // 視覚フィードバック
     card.style.transform = "scale(0.98)";
+    
     setTimeout(function(){
       card.style.transform = "";
-      var open=det.style.display==="block";
-      det.style.display=open?"none":"block";
-      hint.style.display=open?"block":"none";
-      setTimeout(function(){ isToggling = false; }, 100);
+      var open = det.style.display === "block";
+      det.style.display = open ? "none" : "block";
+      hint.style.display = open ? "block" : "none";
+      isToggling = false;
     }, 150);
+  }
+  
+  // 統一されたクリック/タップ処理
+  card.addEventListener("click", function(e){
+    e.preventDefault();
+    toggleIdea();
   });
   return card;
 }
@@ -744,70 +701,37 @@ function render() {
     .map(function(t){
       var btn = el("button",{cls:"tab"+(S.tab===t.id?" on":"")}, [t.lb]);
       
-      // モバイル対応: 改善されたタッチ処理
+      // シンプルで確実なタブ切り替え
+      var lastClick = 0;
       var switching = false;
-      var touchData = { startTime: 0, startX: 0, hasMoved: false };
       
-      function handleTabSwitch() {
-        if (switching) return false;
+      function switchTab() {
+        var now = Date.now();
+        if (switching || now - lastClick < 200) return;
+        
+        lastClick = now;
         switching = true;
+        
+        // 視覚フィードバック
         btn.style.transform = "scale(0.95)";
         btn.style.transition = "transform 0.1s";
         
         setTimeout(function(){
           btn.style.transform = "";
           set({tab:t.id});
-          setTimeout(function(){ switching = false; }, 100);
+          switching = false;
         }, 100);
-        return true;
       }
       
-      // タッチイベント
-      if (isTouchDevice) {
-        var touchStart = function(e) {
-          touchData.startTime = Date.now();
-          touchData.startX = e.touches[0].clientX;
-          touchData.hasMoved = false;
-        };
-        
-        var touchMove = function(e) {
-          var moveX = e.touches[0].clientX;
-          if (Math.abs(moveX - touchData.startX) > 10) {
-            touchData.hasMoved = true;
-          }
-        };
-        
-        var touchEnd = function(e) {
-          var duration = Date.now() - touchData.startTime;
-          if (!touchData.hasMoved && duration < 300) {
-            lastTouchTime = Date.now();
-            handleTabSwitch();
-          }
-        };
-        
-        btn.addEventListener("touchstart", touchStart, {passive: true});
-        btn.addEventListener("touchmove", touchMove, {passive: true});
-        btn.addEventListener("touchend", touchEnd, {passive: true});
-        
-        // クリーンアップ関数を登録
-        S.tabListeners.push(function() {
-          btn.removeEventListener("touchstart", touchStart);
-          btn.removeEventListener("touchmove", touchMove);
-          btn.removeEventListener("touchend", touchEnd);
-        });
-      }
-      
-      // PC/マウスイベント
+      // 統一されたクリック/タップ処理
       var clickHandler = function(e) {
-        // タッチイベントの後300ms以内は無視（重複防止）
-        if (isTouchDevice && Date.now() - lastTouchTime < 300) {
-          e.preventDefault();
-          return;
-        }
-        handleTabSwitch();
+        e.preventDefault();
+        switchTab();
       };
       
       btn.addEventListener("click", clickHandler);
+      
+      // クリーンアップ関数を登録
       S.tabListeners.push(function() {
         btn.removeEventListener("click", clickHandler);
       });
