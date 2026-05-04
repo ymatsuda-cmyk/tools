@@ -1718,17 +1718,14 @@
             
             console.log('GAS同期開始:', State.gasUrl);
             
-            // GASから日付一覧を取得
-            fetch(State.gasUrl + '?action=list')
-                .then(function(response) {
-                    console.log('GASレスポンスステータス:', response.status);
-                    if (!response.ok) {
-                        throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(function(result) {
-                    console.log('GASからのレスポンス:', result);
+            // JSONP方式でGASから日付一覧を取得
+            var callbackName = 'gasSyncCallback_' + Date.now();
+            
+            window[callbackName] = function(result) {
+                console.log('GASからのレスポンス (JSONP):', result);
+                delete window[callbackName];
+                
+                try {
                     console.log('dates配列の内容:', result.dates);
                     console.log('dates配列の型:', typeof result.dates);
                     console.log('dates配列の長さ:', result.dates ? result.dates.length : 'undefined');
@@ -1792,11 +1789,34 @@
                         console.log('レスポンス全体:', JSON.stringify(result, null, 2));
                         showToast('Sheetsにデータがありません', 'warning');
                     }
-                })
-                .catch(function(error) {
+                } catch (error) {
                     console.error('GAS同期エラー:', error);
                     showToast('Sheets連携エラー: ' + error.message, 'error');
-                });
+                }
+            };
+            
+            // エラーハンドリング用タイムアウト
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('Sheets連携タイムアウト', 'error');
+                }
+            }, 10000);
+            
+            // JSONPリクエスト
+            var script = document.createElement('script');
+            script.src = State.gasUrl + '?action=list&callback=' + callbackName;
+            script.onerror = function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('GASへの接続に失敗しました', 'error');
+                }
+            };
+            
+            document.head.appendChild(script);
+            setTimeout(function() {
+                if (script.parentNode) script.parentNode.removeChild(script);
+            }, 1000);
         }
 
         // 日付を YYYY-MM-DD 形式に変換する関数
@@ -1840,7 +1860,7 @@
             
             console.log('GASからデータ読み込み開始:', date);
             
-            // GAS側の日付形式に合わせて複数パターンを生成
+            // JSONP方式で複数の日付フォーマットを順次試行
             var dateObj = new Date(date);
             var dateFormats = [
                 date,  // 元の形式 (YYYY-MM-DD)
@@ -1851,7 +1871,7 @@
                 dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0')  // 確実なYYYY-MM-DD
             ];
             
-            console.log('🔄 複数日付フォーマットで順次試行:', dateFormats);
+            console.log('🔄 JSONP方式で複数日付フォーマットを順次試行:', dateFormats);
             
             // 順番に試行する関数
             function tryNextFormat(formatIndex) {
@@ -1864,28 +1884,14 @@
                 var currentFormat = dateFormats[formatIndex];
                 console.log('🧪 フォーマット[' + formatIndex + '] 試行:', currentFormat);
                 
-                var requestUrl = State.gasUrl + '?action=load&date=' + encodeURIComponent(currentFormat);
-                console.log('🔗 リクエストURL:', requestUrl);
+                // JSONP方式でのリクエスト
+                var callbackName = 'gasLoadCallback_' + Date.now() + '_' + formatIndex;
                 
-                fetch(requestUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(function(response) {
-                    if (!response.ok) {
-                        throw new Error('HTTPエラー: ' + response.status);
-                    }
-                    return response.text();
-                })
-                .then(function(textResponse) {
-                    console.log('📥 フォーマット[' + formatIndex + '] レスポンス:', textResponse.substring(0, 200));
+                window[callbackName] = function(result) {
+                    console.log('📥 フォーマット[' + formatIndex + '] レスポンス:', result);
+                    delete window[callbackName];
                     
                     try {
-                        var result = JSON.parse(textResponse);
-                        
                         // データが存在するかチェック
                         if (result.data && result.data !== null && result.data !== undefined && 
                             (typeof result.data === 'object' || Array.isArray(result.data)) &&
@@ -1914,15 +1920,41 @@
                             tryNextFormat(formatIndex + 1);
                         }
                         
-                    } catch (parseError) {
-                        console.error('❌ フォーマット[' + formatIndex + '] JSON解析エラー:', parseError);
+                    } catch (error) {
+                        console.error('❌ フォーマット[' + formatIndex + '] 処理エラー:', error);
                         tryNextFormat(formatIndex + 1);
                     }
-                })
-                .catch(function(error) {
-                    console.error('❌ フォーマット[' + formatIndex + '] リクエストエラー:', error);
-                    tryNextFormat(formatIndex + 1);
-                });
+                };
+                
+                // エラー時のタイムアウト
+                var timeoutId = setTimeout(function() {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        console.log('❌ フォーマット[' + formatIndex + '] タイムアウト:', currentFormat);
+                        tryNextFormat(formatIndex + 1);
+                    }
+                }, 5000);
+                
+                // スクリプトタグでJSONPリクエスト
+                var script = document.createElement('script');
+                script.src = State.gasUrl + '?action=load&date=' + encodeURIComponent(currentFormat) + '&callback=' + callbackName;
+                script.onerror = function() {
+                    clearTimeout(timeoutId);
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        console.error('❌ フォーマット[' + formatIndex + '] スクリプトエラー:', currentFormat);
+                        tryNextFormat(formatIndex + 1);
+                    }
+                };
+                
+                document.head.appendChild(script);
+                
+                // クリーンアップ
+                setTimeout(function() {
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                }, 1000);
             }
             
             // 最初のフォーマットから開始
@@ -2015,73 +2047,53 @@
         function testGasConnection(url, callback) {
             console.log('GAS接続テスト開始:', url);
             
-            // タイムアウト設定（15秒に延長）
-            var controller = new AbortController();
+            // JSONP方式での接続テスト
+            var callbackName = 'gasTestCallback_' + Date.now();
+            
+            // コールバック関数をグローバルに登録
+            window[callbackName] = function(result) {
+                console.log('GASテスト結果 (JSONP):', result);
+                delete window[callbackName];
+                
+                if (result.status === 'ok' || 
+                    result.message === 'GAS is working' || 
+                    result.ping === 'ok' ||
+                    result.result === 'success') {
+                    console.log('✅ GAS接続テスト成功');
+                    callback(true, 'GAS連携成功');
+                } else {
+                    console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
+                    callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
+                }
+            };
+            
+            // エラーハンドリング用タイムアウト
             var timeoutId = setTimeout(function() {
-                console.log('GAS接続テストタイムアウト（15秒）');
-                controller.abort();
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    callback(false, 'GAS接続タイムアウト（15秒）');
+                }
             }, 15000);
             
-            fetch(url + '?action=test', {
-                method: 'GET',
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(function(response) {
+            // スクリプトタグでJSONPリクエスト
+            var script = document.createElement('script');
+            script.src = url + '?action=test&callback=' + callbackName;
+            script.onerror = function() {
                 clearTimeout(timeoutId);
-                console.log('GASテストレスポンスステータス:', response.status);
-                console.log('GASテストレスポンスヘッダ:', response.headers);
-                
-                if (!response.ok) {
-                    throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    callback(false, 'GAS接続エラー: スクリプト読み込み失敗');
                 }
-                
-                return response.text();  // まずテキストとして取得
-            })
-            .then(function(text) {
-                console.log('GASテストレスポンステキスト:', text);
-                
-                try {
-                    var result = JSON.parse(text);
-                    console.log('GASテスト結果:', result);
-                    console.log('result.ping:', result.ping);
-                    console.log('result.status:', result.status);
-                    console.log('result.message:', result.message);
-                    console.log('result.result:', result.result);
-                    
-                    // 様々なレスポンス形式に対応
-                    if (result.status === 'ok' || 
-                        result.message === 'GAS is working' || 
-                        result.ping === 'ok' ||
-                        result.result === 'success') {
-                        console.log('✅ GAS接続テスト成功');
-                        callback(true, 'GAS連携成功');
-                    } else {
-                        console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
-                        callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
-                    }
-                } catch (parseError) {
-                    console.error('JSON解析エラー:', parseError, 'レスポンス:', text);
-                    callback(false, 'GASレスポンスの解析に失敗しました: ' + text.substring(0, 100));
+            };
+            
+            document.head.appendChild(script);
+            
+            // 使用後にスクリプトタグを削除
+            setTimeout(function() {
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
                 }
-            })
-            .catch(function(error) {
-                clearTimeout(timeoutId);
-                console.error('GAS接続エラー:', error);
-                
-                if (error.name === 'AbortError') {
-                    callback(false, '接続タイムアウト（15秒）。URLを確認してください');
-                } else if (error.message.includes('CORS')) {
-                    callback(false, 'CORSエラー。GASスクリプトのアクセス許可設定を確認してください');
-                } else if (error.message.includes('Failed to fetch')) {
-                    callback(false, 'ネットワークエラー。インターネット接続とURLを確認してください');
-                } else {
-                    callback(false, '接続エラー: ' + error.message);
-                }
-            });
+            }, 1000);
         }
         function createElement(tag, props, children) {
             var element = document.createElement(tag);
