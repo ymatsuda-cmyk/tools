@@ -888,7 +888,21 @@
                             ℹ️ <strong>トラブルシューティング:</strong><br>
                             ・ GASスクリプトのアクセス権限を「すべてのユーザー」に設定<br>
                             ・ URLは /macros/s/.../exec で終わる形式<br>
-                            ・ F12でコンソールを確認してエラー詳細をチェック
+                            ・ F12でコンソールを確認してエラー詳細をチェック<br>
+                            <br>
+                            🔧 <strong>GAS側でJSONP対応が必要:</strong><br>
+                            <div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px;border-radius:4px;font-family:monospace;font-size:10px;">
+                            function doGet(e) {<br>
+                            &nbsp;&nbsp;var callback = e.parameter.callback;<br>
+                            &nbsp;&nbsp;var result = {ping: 'ok'};<br>
+                            &nbsp;&nbsp;if (callback) {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;return ContentService.createTextOutput(<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;callback + '(' + JSON.stringify(result) + ');'<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;).setMimeType(ContentService.MimeType.JAVASCRIPT);<br>
+                            &nbsp;&nbsp;}<br>
+                            &nbsp;&nbsp;return ContentService.createTextOutput(JSON.stringify(result));<br>
+                            }
+                            </div>
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
@@ -1154,6 +1168,9 @@
             
             // 接続テストを実行
             console.log('GAS接続テストを開始します:', url);
+            errorEl.style.color = '#64748B';
+            errorEl.innerHTML = '🔍 接続テスト中... (JSONP方式)';
+            
             testGasConnection(url, function(success, message) {
                 console.log('接続テスト結果:', success, message);
                 if (success) {
@@ -1169,7 +1186,15 @@
                     syncWithGas();
                 } else {
                     console.error('接続テスト失敗:', message);
-                    errorEl.textContent = message;
+                    errorEl.style.color = '#DC2626';
+                    
+                    if (message.includes('JSONP対応が必要')) {
+                        errorEl.innerHTML = '❌ ' + message + '<br><small style="color:#64748B;">👇 上記のGASコード例を参考にしてください</small>';
+                    } else if (message.includes('スクリプト読み込み失敗')) {
+                        errorEl.innerHTML = '❌ GAS URLまたはJSONP対応に問題があります。<br><small style="color:#64748B;">1. URL形式を確認 2. GASにJSONP対応コードを追加</small>';
+                    } else {
+                        errorEl.innerHTML = '❌ ' + message + '<br><small style="color:#64748B;">F12でコンソールの詳細を確認してください</small>';
+                    }
                 }
             });
         }
@@ -2067,19 +2092,28 @@
         }
         function testGasConnection(url, callback) {
             console.log('GAS接続テスト開始:', url);
+            console.log('🔧 接続方式: JSONP (CORS回避)');
             
             // JSONP方式での接続テスト
             var callbackName = 'gasTestCallback_' + Date.now();
+            var timeoutId;
+            var scriptElement;
             
             // コールバック関数をグローバルに登録
             window[callbackName] = function(result) {
-                console.log('GASテスト結果 (JSONP):', result);
+                clearTimeout(timeoutId);
+                console.log('✅ GASテスト結果 (JSONP成功):', result);
+                
+                // スクリプトタグを削除
+                if (scriptElement && scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
                 delete window[callbackName];
                 
-                if (result.status === 'ok' || 
+                if (result && (result.status === 'ok' || 
                     result.message === 'GAS is working' || 
                     result.ping === 'ok' ||
-                    result.result === 'success') {
+                    result.result === 'success')) {
                     console.log('✅ GAS接続テスト成功');
                     callback(true, 'GAS連携成功');
                 } else {
@@ -2089,7 +2123,11 @@
             };
             
             // エラーハンドリング用タイムアウト
-            var timeoutId = setTimeout(function() {
+            timeoutId = setTimeout(function() {
+                console.error('❌ GAS接続タイムアウト（15秒）');
+                if (scriptElement && scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
                 if (window[callbackName]) {
                     delete window[callbackName];
                     callback(false, 'GAS接続タイムアウト（15秒）');
@@ -2097,24 +2135,57 @@
             }, 15000);
             
             // スクリプトタグでJSONPリクエスト
-            var script = document.createElement('script');
-            script.src = url + '?action=test&callback=' + callbackName;
-            script.onerror = function() {
+            scriptElement = document.createElement('script');
+            var testUrl = url + '?action=test&callback=' + callbackName;
+            console.log('📡 JSONPリクエストURL:', testUrl);
+            
+            scriptElement.src = testUrl;
+            scriptElement.onerror = function(error) {
                 clearTimeout(timeoutId);
+                console.error('❌ スクリプト読み込みエラー:', error);
+                console.error('❌ URL:', testUrl);
+                console.error('❌ 可能な原因:');
+                console.error('   1. GAS URLが正しくない');
+                console.error('   2. GAS側でJSONP対応がされていない');
+                console.error('   3. GASスクリプトが実行権限がない');
+                
+                if (scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
                 if (window[callbackName]) {
                     delete window[callbackName];
-                    callback(false, 'GAS接続エラー: スクリプト読み込み失敗');
+                    // フォールバック：通常のfetchで再試行
+                    console.log('🔄 フォールバック: 通常のfetchで再試行');
+                    tryFallbackFetch(url, callback);
                 }
             };
             
-            document.head.appendChild(script);
+            document.head.appendChild(scriptElement);
+        }
+        
+        // フォールバック関数（CORS問題があっても情報収集のため）
+        function tryFallbackFetch(url, callback) {
+            console.log('🔄 フォールバック fetch 試行:', url);
             
-            // 使用後にスクリプトタグを削除
-            setTimeout(function() {
-                if (script.parentNode) {
-                    script.parentNode.removeChild(script);
+            fetch(url + '?action=test', {
+                method: 'GET',
+                mode: 'no-cors'  // CORSを無視
+            })
+            .then(function(response) {
+                console.log('📡 フォールバック レスポンス:', response);
+                // no-corsモードではレスポンス内容を読めないが、到達確認はできる
+                if (response.type === 'opaque') {
+                    console.log('✅ GASに到達確認（no-corsモード）');
+                    callback(false, 'GASに到達しましたが、JSONP対応が必要です。GAS側でcallbackパラメータを処理するコードを追加してください。');
+                } else {
+                    console.log('❌ 予期しないレスポンス type:', response.type);
+                    callback(false, 'GAS接続に問題があります');
                 }
-            }, 1000);
+            })
+            .catch(function(error) {
+                console.error('❌ フォールバック fetch エラー:', error);
+                callback(false, 'GAS接続エラー: URL確認またはGAS側の設定を確認してください。詳細: ' + error.message);
+            });
         }
         function createElement(tag, props, children) {
             var element = document.createElement(tag);
