@@ -803,6 +803,10 @@
                 <span>📋</span>
                 JSONを貼り付け
             </button>
+            <button class="btn btn-success" id="syncBtn" style="display: none;">
+                <span>🔄</span>
+                同期
+            </button>
         </div>
 
         <!-- タブナビゲーション -->
@@ -1019,6 +1023,11 @@
             document.getElementById('pasteBtn').addEventListener('click', function() {
                 showModal('pasteModal');
             });
+            
+            // 同期ボタン
+            document.getElementById('syncBtn').addEventListener('click', function() {
+                manualSync();
+            });
 
             // モーダルクローズ
             document.querySelectorAll('.close-btn, .modal').forEach(function(el) {
@@ -1108,13 +1117,16 @@
             var gasUrlInput = document.getElementById('gasUrlInput');
             var disconnectBtn = document.getElementById('disconnectGas');
             var testBtn = document.getElementById('testGasConnection');
+            var syncBtn = document.getElementById('syncBtn');
             
             if (State.gasUrl) {
                 gasUrlInput.value = State.gasUrl;
                 disconnectBtn.style.display = 'block';
                 if (testBtn) testBtn.style.display = 'block';
+                syncBtn.style.display = 'block';
             } else {
                 if (testBtn) testBtn.style.display = 'none';
+                syncBtn.style.display = 'none';
             }
         }
 
@@ -1166,6 +1178,9 @@
             
             var testBtn = document.getElementById('testGasConnection');
             if (testBtn) testBtn.style.display = 'none';
+            
+            var syncBtn = document.getElementById('syncBtn');
+            syncBtn.style.display = 'none';
             
             hideModals();
             showToast('Sheets連携を解除しました', 'warning');
@@ -1818,7 +1833,30 @@
             });
         }
 
-        // GAS接続テスト機能
+        // 手動同期機能
+        function manualSync() {
+            if (!State.gasUrl) {
+                showToast('GAS URLが設定されていません。Sheets設定からURLを設定してください', 'warning');
+                return;
+            }
+            
+            // 同期ボタンを一時的に無効化
+            var syncBtn = document.getElementById('syncBtn');
+            var originalText = syncBtn.innerHTML;
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span>🔄</span> 同期中...';
+            
+            console.log('手動同期開始');
+            showToast('同期を開始しました...', 'success');
+            
+            syncWithGas();
+            
+            // 3秒後にボタンを再有効化
+            setTimeout(function() {
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = originalText;
+            }, 3000);
+        }
         function testGasConnection(url, callback) {
             console.log('GAS接続テスト開始:', url);
             
