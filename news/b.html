@@ -1966,46 +1966,67 @@
             
             console.log('GASへのデータ保存開始:', data.date);
             
-            var payload = {
-                action: 'save',
-                overwrite: true,
-                data: data
+            // JSONP方式でのデータ保存
+            var callbackName = 'gasSaveCallback_' + Date.now();
+            
+            window[callbackName] = function(result) {
+                console.log('GAS保存結果 (JSONP):', result);
+                delete window[callbackName];
+                
+                try {
+                    if (result.error) {
+                        throw new Error('GASエラー: ' + result.error);
+                    }
+                    if (result.success) {
+                        showToast('Sheetsに同期しました', 'success');
+                    } else {
+                        showToast('Sheets同期に失敗しました', 'warning');
+                    }
+                } catch (error) {
+                    console.error('GAS同期エラー:', error);
+                    showToast('Sheets同期エラー: ' + error.message, 'error');
+                }
             };
             
-            fetch(State.gasUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain'
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(function(response) {
-                console.log('GAS保存レスポンスステータス:', response.status);
-                if (!response.ok) {
-                    throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+            // エラー用タイムアウト
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('Sheets保存タイムアウト', 'error');
                 }
-                return response.json();
-            })
-            .then(function(result) {
-                console.log('GAS保存結果:', result);
-                if (result.error) {
-                    throw new Error('GASエラー: ' + result.error);
+            }, 15000);
+            
+            try {
+                // データをJSONエンコードしてGETパラメータとして送信
+                var encodedData = encodeURIComponent(JSON.stringify(data));
+                var script = document.createElement('script');
+                script.src = State.gasUrl + '?action=save&overwrite=true&data=' + encodedData + '&callback=' + callbackName;
+                
+                script.onerror = function() {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        showToast('GASへの保存に失敗しました', 'error');
+                    }
+                };
+                
+                document.head.appendChild(script);
+                setTimeout(function() {
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }, 2000);
+                
+            } catch (error) {
+                console.error('データエンコードエラー:', error);
+                showToast('データの準備に失敗しました: ' + error.message, 'error');
+                if (window[callbackName]) {
+                    delete window[callbackName];
                 }
-                if (result.success) {
-                    showToast('Sheetsに同期しました', 'success');
-                } else {
-                    showToast('Sheets同期に失敗しました', 'warning');
-                }
-            })
-            .catch(function(error) {
-                console.error('GAS同期エラー:', error);
-                showToast('Sheets同期エラー: ' + error.message, 'error');
-            });
+            }
         }
 
         // 手動同期機能
         function manualSync() {
-            console.log('手動同期開始 - State.gasUrl:', State.gasUrl);
+            console.log('🚀 手動同期開始 - State.gasUrl:', State.gasUrl);
+            console.log('🔧 現在の通信方式: JSONP (CORS回避)');
             
             if (!State.gasUrl) {
                 console.warn('GAS URLが設定されていません');
@@ -2024,8 +2045,8 @@
             syncBtn.disabled = true;
             syncBtn.innerHTML = '<span>🔄</span> 同期中...';
             
-            console.log('🚀 手動同期実行中...');
-            showToast('同期を開始しました...', 'success');
+            console.log('🚀 JSONP方式で手動同期実行中...');
+            showToast('JSONP方式で同期を開始しました...', 'success');
             
             try {
                 syncWithGas();
