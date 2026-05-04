@@ -1729,22 +1729,53 @@
                 })
                 .then(function(result) {
                     console.log('GASからのレスポンス:', result);
+                    console.log('dates配列の内容:', result.dates);
+                    
                     if (result.error) {
                         throw new Error('GASエラー: ' + result.error);
                     }
-                    if (result.dates) {
+                    
+                    if (result.dates && result.dates.length > 0) {
+                        console.log('処理する日付数:', result.dates.length);
+                        
                         // ローカルにないデータをGASから取得
-                        result.dates.forEach(function(item) {
-                            var date = item.date;
-                            var dateKey = date.replace(/-/g, '');
+                        result.dates.forEach(function(item, index) {
+                            console.log('日付アイテム[' + index + ']:', item);
+                            
+                            // 日付の形式を正規化
+                            var date;
+                            if (typeof item === 'string') {
+                                date = item;
+                            } else if (item.date) {
+                                date = item.date;
+                            } else if (typeof item === 'object' && item.toString) {
+                                date = item.toString();
+                            } else {
+                                console.warn('不明な日付形式:', item);
+                                return;
+                            }
+                            
+                            // 日付を YYYY-MM-DD 形式に変換
+                            var formattedDate = formatDateForGas(date);
+                            console.log('元の日付:', date, '→ 変換後:', formattedDate);
+                            
+                            if (!formattedDate) {
+                                console.warn('日付変換に失敗:', date);
+                                return;
+                            }
+                            
+                            var dateKey = formattedDate.replace(/-/g, '');
                             
                             if (!localStorage.getItem('ainews_' + dateKey)) {
-                                console.log('新しいデータをGASから取得:', date);
-                                loadFromGas(date);
+                                console.log('新しいデータをGASから取得:', formattedDate);
+                                loadFromGas(formattedDate);
+                            } else {
+                                console.log('ローカルに存在済み:', formattedDate);
                             }
                         });
                         showToast('Sheetsから' + result.dates.length + '件のデータを確認しました', 'success');
                     } else {
+                        console.log('dates配列が空またはundefined');
                         showToast('Sheetsにデータがありません', 'warning');
                     }
                 })
@@ -1754,12 +1785,49 @@
                 });
         }
 
+        // 日付を YYYY-MM-DD 形式に変換する関数
+        function formatDateForGas(dateInput) {
+            try {
+                var date;
+                
+                // 既に YYYY-MM-DD 形式の場合
+                if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+                    return dateInput;
+                }
+                
+                // Date オブジェクトまたは文字列から Date オブジェクトを作成
+                if (dateInput instanceof Date) {
+                    date = dateInput;
+                } else {
+                    date = new Date(dateInput);
+                }
+                
+                // 無効な日付の場合
+                if (isNaN(date.getTime())) {
+                    console.error('無効な日付:', dateInput);
+                    return null;
+                }
+                
+                // YYYY-MM-DD 形式で返す
+                var year = date.getFullYear();
+                var month = String(date.getMonth() + 1).padStart(2, '0');
+                var day = String(date.getDate()).padStart(2, '0');
+                
+                return year + '-' + month + '-' + day;
+                
+            } catch (error) {
+                console.error('日付変換エラー:', error, dateInput);
+                return null;
+            }
+        }
+        
         function loadFromGas(date) {
             if (!State.gasUrl) return;
             
             console.log('GASからデータ読み込み開始:', date);
+            console.log('GASリクエストURL:', State.gasUrl + '?action=load&date=' + date);
             
-            fetch(State.gasUrl + '?action=load&date=' + date)
+            fetch(State.gasUrl + '?action=load&date=' + encodeURIComponent(date))
                 .then(function(response) {
                     console.log('GASロードレスポンスステータス:', response.status);
                     if (!response.ok) {
@@ -1769,10 +1837,16 @@
                 })
                 .then(function(result) {
                     console.log('GASからのデータ:', result);
+                    console.log('result.data:', result.data);
+                    console.log('result.error:', result.error);
+                    
                     if (result.error) {
                         throw new Error('GASエラー: ' + result.error);
                     }
-                    if (result.data) {
+                    
+                    if (result.data && (Array.isArray(result.data) || typeof result.data === 'object')) {
+                        console.log('データサイズ:', JSON.stringify(result.data).length, 'characters');
+                        
                         var dateKey = date.replace(/-/g, '');
                         localStorage.setItem('ainews_' + dateKey, JSON.stringify(result.data));
                         
@@ -1784,9 +1858,12 @@
                         
                         renderHistory();
                         updateStatsChips();
-                        console.log('データ正常に取得完了:', date);
+                        console.log('✅ データ正常に取得完了:', date);
+                        showToast('データを取得しました: ' + date, 'success');
                     } else {
-                        console.warn('データが空です:', date);
+                        console.warn('❌ データが空またはnullです:', date);
+                        console.log('レスポンス全体:', JSON.stringify(result));
+                        showToast('データが見つかりません: ' + date, 'warning');
                     }
                 })
                 .catch(function(error) {
