@@ -878,12 +878,21 @@
                     <div class="form-group">
                         <label class="form-label">GAS デプロイURL</label>
                         <input type="url" class="form-input" id="gasUrlInput" 
-                               placeholder="https://script.google.com/macros/s/...">
+                               placeholder="https://script.google.com/macros/s/.../exec">
                         <div class="error-message" id="gasUrlError"></div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 8px; line-height: 1.5;">
+                            ℹ️ <strong>トラブルシューティング:</strong><br>
+                            ・ GASスクリプトのアクセス権限を「すべてのユーザー」に設定<br>
+                            ・ URLは /macros/s/.../exec で終わる形式<br>
+                            ・ F12でコンソールを確認してエラー詳細をチェック
+                        </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button class="btn btn-success" id="saveGasUrl">
                             保存して接続
+                        </button>
+                        <button class="btn btn-secondary" id="testGasConnection" style="display: none;">
+                            接続テスト
                         </button>
                         <button class="btn btn-secondary" id="disconnectGas" style="display: none;">
                             連携解除
@@ -1023,6 +1032,19 @@
             // GAS設定
             document.getElementById('saveGasUrl').addEventListener('click', saveGasUrl);
             document.getElementById('disconnectGas').addEventListener('click', disconnectGas);
+            
+            // 接続テストボタン
+            if (document.getElementById('testGasConnection')) {
+                document.getElementById('testGasConnection').addEventListener('click', function() {
+                    if (State.gasUrl) {
+                        testGasConnection(State.gasUrl, function(success, message) {
+                            showToast(message, success ? 'success' : 'error');
+                        });
+                    } else {
+                        showToast('まずGAS URLを設定してください', 'warning');
+                    }
+                });
+            }
 
             // JSON処理
             document.getElementById('jsonTextarea').addEventListener('input', validateJson);
@@ -1085,10 +1107,14 @@
         function setupGasUI() {
             var gasUrlInput = document.getElementById('gasUrlInput');
             var disconnectBtn = document.getElementById('disconnectGas');
+            var testBtn = document.getElementById('testGasConnection');
             
             if (State.gasUrl) {
                 gasUrlInput.value = State.gasUrl;
                 disconnectBtn.style.display = 'block';
+                if (testBtn) testBtn.style.display = 'block';
+            } else {
+                if (testBtn) testBtn.style.display = 'none';
             }
         }
 
@@ -1108,15 +1134,28 @@
                 return;
             }
             
-            State.gasUrl = url;
-            localStorage.setItem('ainews_gas_url', url);
-            document.getElementById('disconnectGas').style.display = 'block';
+            // URLの形式をさらに厳密にチェック
+            if (!url.includes('/macros/s/') || !url.includes('/exec')) {
+                errorEl.textContent = 'GASデプロイURLの形式が正しくありません。/macros/s/.../exec の形式で入力してください';
+                return;
+            }
             
-            hideModals();
-            showToast('Sheets連携を設定しました', 'success');
-            
-            // 既存データとの同期を試行
-            syncWithGas();
+            // 接続テストを実行
+            testGasConnection(url, function(success, message) {
+                if (success) {
+                    State.gasUrl = url;
+                    localStorage.setItem('ainews_gas_url', url);
+                    document.getElementById('disconnectGas').style.display = 'block';
+                    
+                    hideModals();
+                    showToast('Sheets連携を設定しました', 'success');
+                    
+                    // 既存データとの同期を試行
+                    syncWithGas();
+                } else {
+                    errorEl.textContent = message;
+                }
+            });
         }
 
         function disconnectGas() {
@@ -1124,6 +1163,9 @@
             localStorage.removeItem('ainews_gas_url');
             document.getElementById('gasUrlInput').value = '';
             document.getElementById('disconnectGas').style.display = 'none';
+            
+            var testBtn = document.getElementById('testGasConnection');
+            if (testBtn) testBtn.style.display = 'none';
             
             hideModals();
             showToast('Sheets連携を解除しました', 'warning');
@@ -1655,10 +1697,22 @@
         function syncWithGas() {
             if (!State.gasUrl) return;
             
+            console.log('GAS同期開始:', State.gasUrl);
+            
             // GASから日付一覧を取得
             fetch(State.gasUrl + '?action=list')
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    console.log('GASレスポンスステータス:', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+                    }
+                    return response.json();
+                })
                 .then(function(result) {
+                    console.log('GASからのレスポンス:', result);
+                    if (result.error) {
+                        throw new Error('GASエラー: ' + result.error);
+                    }
                     if (result.dates) {
                         // ローカルにないデータをGASから取得
                         result.dates.forEach(function(item) {
@@ -1666,22 +1720,39 @@
                             var dateKey = date.replace(/-/g, '');
                             
                             if (!localStorage.getItem('ainews_' + dateKey)) {
+                                console.log('新しいデータをGASから取得:', date);
                                 loadFromGas(date);
                             }
                         });
+                        showToast('Sheetsから' + result.dates.length + '件のデータを確認しました', 'success');
+                    } else {
+                        showToast('Sheetsにデータがありません', 'warning');
                     }
                 })
                 .catch(function(error) {
-                    console.log('GAS同期エラー:', error);
+                    console.error('GAS同期エラー:', error);
+                    showToast('Sheets連携エラー: ' + error.message, 'error');
                 });
         }
 
         function loadFromGas(date) {
             if (!State.gasUrl) return;
             
+            console.log('GASからデータ読み込み開始:', date);
+            
             fetch(State.gasUrl + '?action=load&date=' + date)
-                .then(function(response) { return response.json(); })
+                .then(function(response) {
+                    console.log('GASロードレスポンスステータス:', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+                    }
+                    return response.json();
+                })
                 .then(function(result) {
+                    console.log('GASからのデータ:', result);
+                    if (result.error) {
+                        throw new Error('GASエラー: ' + result.error);
+                    }
                     if (result.data) {
                         var dateKey = date.replace(/-/g, '');
                         localStorage.setItem('ainews_' + dateKey, JSON.stringify(result.data));
@@ -1694,15 +1765,21 @@
                         
                         renderHistory();
                         updateStatsChips();
+                        console.log('データ正常に取得完了:', date);
+                    } else {
+                        console.warn('データが空です:', date);
                     }
                 })
                 .catch(function(error) {
-                    console.log('GASロードエラー:', error);
+                    console.error('GASロードエラー(' + date + '):', error);
+                    showToast('データ読み込みエラー(' + date + '): ' + error.message, 'error');
                 });
         }
 
         function syncToGas(data) {
             if (!State.gasUrl) return;
+            
+            console.log('GASへのデータ保存開始:', data.date);
             
             var payload = {
                 action: 'save',
@@ -1717,8 +1794,18 @@
                 },
                 body: JSON.stringify(payload)
             })
-            .then(function(response) { return response.json(); })
+            .then(function(response) {
+                console.log('GAS保存レスポンスステータス:', response.status);
+                if (!response.ok) {
+                    throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
             .then(function(result) {
+                console.log('GAS保存結果:', result);
+                if (result.error) {
+                    throw new Error('GASエラー: ' + result.error);
+                }
                 if (result.success) {
                     showToast('Sheetsに同期しました', 'success');
                 } else {
@@ -1726,12 +1813,57 @@
                 }
             })
             .catch(function(error) {
-                console.log('GAS同期エラー:', error);
-                showToast('Sheets同期でエラーが発生しました', 'warning');
+                console.error('GAS同期エラー:', error);
+                showToast('Sheets同期エラー: ' + error.message, 'error');
             });
         }
 
-        // ユーティリティ関数
+        // GAS接続テスト機能
+        function testGasConnection(url, callback) {
+            console.log('GAS接続テスト開始:', url);
+            
+            // タイムアウト設定（10秒）
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function() {
+                controller.abort();
+            }, 10000);
+            
+            fetch(url + '?action=test', {
+                method: 'GET',
+                signal: controller.signal
+            })
+            .then(function(response) {
+                clearTimeout(timeoutId);
+                console.log('GASテストレスポンスステータス:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error('HTTPエラー: ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(function(result) {
+                console.log('GASテスト結果:', result);
+                if (result.status === 'ok' || result.message === 'GAS is working') {
+                    callback(true, 'GAS連携成功');
+                } else {
+                    callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
+                }
+            })
+            .catch(function(error) {
+                clearTimeout(timeoutId);
+                console.error('GAS接続エラー:', error);
+                
+                if (error.name === 'AbortError') {
+                    callback(false, '接続タイムアウト（10秒）。URLを確認してください');
+                } else if (error.message.includes('CORS')) {
+                    callback(false, 'CORSエラー。GASスクリプトのアクセス許可設定を確認してください');
+                } else if (error.message.includes('Failed to fetch')) {
+                    callback(false, 'ネットワークエラー。インターネット接続とURLを確認してください');
+                } else {
+                    callback(false, '接続エラー: ' + error.message);
+                }
+            });
+        }
         function createElement(tag, props, children) {
             var element = document.createElement(tag);
             
