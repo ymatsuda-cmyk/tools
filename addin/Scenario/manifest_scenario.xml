@@ -5,9 +5,9 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
 
-  <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
+  <Id>f4a8b12c-7d3e-4f9a-8b2c-1e5d7c9a8b4f</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>ライターム</ProviderName>
+  <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="シナリオ一覧"/>
   <Description DefaultValue="シナリオの作成状況とバグ影響を管理するアドイン"/>

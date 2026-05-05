@@ -7,7 +7,7 @@
 
   <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Kanban</ProviderName>
+  <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
   <DisplayName DefaultValue="Excel Kanban"/>
