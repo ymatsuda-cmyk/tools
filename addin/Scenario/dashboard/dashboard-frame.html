@@ -212,41 +212,96 @@
             return `${year}${month}${day}`;
         }
 
-        // ファイル存在チェック
+        // ファイル存在チェック（タイムアウト付き）
         async function checkFileExists(dateString) {
             try {
-                const response = await fetch(`./${dateString}.html`, { method: 'HEAD' });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒タイムアウト
+                
+                const response = await fetch(`./${dateString}.html`, { 
+                    method: 'HEAD',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
                 return response.ok;
             } catch (error) {
                 return false;
             }
         }
 
-        // 利用可能な日付を動的に検索
-        async function loadAvailableDates() {
-            const availableDates = [];
+        // 日付配列を生成（当日～過去60日）
+        function generateDateRange() {
+            const dates = [];
             const today = new Date();
-            const endDate = new Date(today);
-            endDate.setDate(endDate.getDate() + 30); // 未来30日まで
             
-            const startDate = new Date(today);
-            startDate.setDate(startDate.getDate() - 90); // 過去90日まで
-            
-            console.log('ダッシュボードファイル検索中...');
-            
-            // 日付範囲でファイル存在をチェック
-            for (let d = new Date(endDate); d >= startDate; d.setDate(d.getDate() - 1)) {
-                const dateString = formatDateString(d);
-                const exists = await checkFileExists(dateString);
-                
-                if (exists) {
-                    availableDates.push(dateString);
-                    console.log(`発見: ${dateString}.html`);
-                }
+            for (let i = 0; i <= 60; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                dates.push(formatDateString(date));
             }
             
-            console.log(`合計 ${availableDates.length} 件のダッシュボードファイルを検出`);
-            return availableDates.sort().reverse(); // 新しい日付順
+            return dates; // 新しい日付順（当日から過去へ）
+        }
+
+        // バッチ処理でファイル存在を非同期チェック
+        async function checkFilesInBatches(dateList, batchSize = 5) {
+            const foundDates = [];
+            const totalDates = dateList.length;
+            
+            for (let i = 0; i < totalDates; i += batchSize) {
+                const batch = dateList.slice(i, i + batchSize);
+                const progress = Math.round(((i + batchSize) / totalDates) * 100);
+                
+                // プログレス更新
+                updateLoadingProgress(progress, i + batchSize, totalDates);
+                
+                // バッチで並列チェック
+                const results = await Promise.allSettled(
+                    batch.map(async (dateString) => {
+                        const exists = await checkFileExists(dateString);
+                        return { dateString, exists };
+                    })
+                );
+                
+                // 結果を集計
+                results.forEach(result => {
+                    if (result.status === 'fulfilled' && result.value.exists) {
+                        foundDates.push(result.value.dateString);
+                        console.log(`発見: ${result.value.dateString}.html`);
+                    }
+                });
+                
+                // 小さな遅延でUIをブロックしない
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            return foundDates;
+        }
+
+        // プログレス表示更新
+        function updateLoadingProgress(percentage, checked, total) {
+            const loadingEl = document.getElementById('loading');
+            loadingEl.innerHTML = `
+                <div>📊 ダッシュボードファイルを検索中...</div>
+                <div style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
+                    ${checked}/${total} 件チェック済み (${Math.min(percentage, 100)}%)
+                </div>
+                <div style="width: 200px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto; overflow: hidden;">
+                    <div style="width: ${Math.min(percentage, 100)}%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
+                </div>
+            `;
+        }
+
+        // 利用可能な日付を動的に検索（最適化版）
+        async function loadAvailableDates() {
+            console.log('ダッシュボードファイル検索開始（当日～過去60日）');
+            
+            const dateList = generateDateRange();
+            const foundDates = await checkFilesInBatches(dateList, 5);
+            
+            console.log(`検索完了: ${foundDates.length}件のダッシュボードファイルを発見`);
+            return foundDates; // 既に新しい順でソート済み
         }
 
         // 利用可能な日付を初期化
@@ -256,14 +311,16 @@
                 
                 if (dashboardDates.length > 0) {
                     currentDate = dashboardDates[0]; // 最新日付を初期選択
+                    console.log(`初期日付: ${currentDate}`);
                 } else {
                     console.warn('利用可能なダッシュボードファイルが見つかりません');
                 }
             } catch (error) {
                 console.error('日付初期化エラー:', error);
                 // フォールバック: 既知の日付を使用
-                dashboardDates = ['20260501', '20260430', '20260428', '20260427'];
+                dashboardDates = ['20260505', '20260504', '20260503', '20260502', '20260501'].filter((date, index) => index < 5);
                 currentDate = dashboardDates[0];
+                console.log('フォールバックモード: 既知日付を使用');
             }
         }
 
@@ -341,8 +398,13 @@
 
         // 初期化
         async function initialize() {
-            // ローディング表示
-            document.getElementById('loading').textContent = '📊 利用可能なダッシュボードを検索中...';
+            // 初期ローディング表示
+            document.getElementById('loading').innerHTML = `
+                <div>📊 ダッシュボードシステムを初期化中...</div>
+                <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
+                    当日～過去60日のファイルを検索します
+                </div>
+            `;
             
             await initializeDates();
             buildDateDropdown();
@@ -354,7 +416,8 @@
                 document.getElementById('loading').innerHTML = `
                     <div class="error-message">
                         📊 利用可能なダッシュボードファイルがありません<br>
-                        <small>dashboard フォルダにYYYYMMDD.html形式のファイルを配置してください</small>
+                        <small>dashboard フォルダに YYYYMMDD.html 形式のファイルを配置してください<br>
+                        （検索範囲: 当日～過去60日）</small>
                     </div>`;
             }
         }
@@ -371,25 +434,41 @@
 
             // 更新ボタンイベント
             document.getElementById('refreshBtn').addEventListener('click', async function() {
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<span>🔄</span>更新中...';
+                
                 console.log('ダッシュボードリストを更新中...');
-                document.getElementById('loading').textContent = '📊 ダッシュボードリストを更新中...';
                 document.getElementById('dashboardFrame').style.display = 'none';
                 
-                await initializeDates();
-                buildDateDropdown();
-                
-                if (currentDate) {
-                    document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
-                    loadDashboard(currentDate);
-                } else if (dashboardDates.length > 0) {
-                    // 現在の日付が無くなった場合は最新を選択
-                    selectDate(dashboardDates[0]);
-                } else {
+                try {
+                    await initializeDates();
+                    buildDateDropdown();
+                    
+                    if (currentDate) {
+                        document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                        loadDashboard(currentDate);
+                    } else if (dashboardDates.length > 0) {
+                        // 現在の日付が無くなった場合は最新を選択
+                        selectDate(dashboardDates[0]);
+                    } else {
+                        document.getElementById('loading').innerHTML = `
+                            <div class="error-message">
+                                📊 利用可能なダッシュボードファイルがありません<br>
+                                <small>dashboard フォルダに YYYYMMDD.html 形式のファイルを配置してください<br>
+                                （検索範囲: 当日～過去60日）</small>
+                            </div>`;
+                    }
+                } catch (error) {
+                    console.error('更新エラー:', error);
                     document.getElementById('loading').innerHTML = `
                         <div class="error-message">
-                            📊 利用可能なダッシュボードファイルがありません<br>
-                            <small>dashboard フォルダにYYYYMMDD.html形式のファイルを配置してください</small>
+                            ⚠️ 更新中にエラーが発生しました<br>
+                            <small>しばらく待ってから再度お試しください</small>
                         </div>`;
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>🔄</span>更新';
                 }
             });
 
