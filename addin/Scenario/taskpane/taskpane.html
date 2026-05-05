@@ -1997,17 +1997,11 @@ function loadDashboard(date) {
 
 // ダッシュボードを別画面で開く
 function openDashboardInNewWindow() {
-  // 日付データを初期化
-  if (dashboardDates.length === 0) {
-    dashboardDates = ['20260501', '20260430', '20260428', '20260427'].sort().reverse();
-  }
+  // ダッシュボードフレームを新しいウィンドウで開く
+  const frameUrl = '../dashboard/dashboard-frame.html';
   
-  // 最新の日付を取得
-  const latestDate = dashboardDates[0] || '20260501';
-  const dashboardPath = `../dashboard/${latestDate}.html`;
-  
-  // 新しいウィンドウでダッシュボードを開く
-  const newWindow = window.open(dashboardPath, 'dashboard', 
+  // 新しいウィンドウでダッシュボードフレームを開く
+  const newWindow = window.open(frameUrl, 'dashboard', 
     'width=1200,height=800,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no');
   
   if (!newWindow) {
