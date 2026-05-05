@@ -166,6 +166,7 @@
         let currentDate = null;
         let isSearching = false;
         let hasDisplayedFirst = false;
+        let currentLoadedDate = null; // 現在読み込み済みの日付を記録
         
         // 既知のダッシュボードファイル（ローカルファイル用）
         const KNOWN_DASHBOARD_FILES = [
@@ -215,12 +216,7 @@
                 hasDisplayedFirst = true;
                 document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
                 loadDashboard(currentDate);
-                console.log(`ダッシュボードを表示: ${currentDate}`);
-            }
-            
-            return dashboardDates.length;
-        }
-
+                    console.log(`初回ダッシュボード表示: ${currentDate}`);
         // 日付配列を生成（当日～過去60日）
         function generateDateRange() {
             const dates = [];
@@ -464,6 +460,11 @@
 
         // 日付選択
         function selectDate(date) {
+            if (currentDate === date && currentLoadedDate === date) {
+                console.log(`既に読み込み済み: ${date}`);
+                return; // 既に同じ日付が読み込み済みの場合はスキップ
+            }
+            
             currentDate = date;
             document.getElementById('selectedDate').textContent = formatDisplayDate(date);
             loadDashboard(date);
@@ -475,8 +476,17 @@
 
             if (!date) {
                 frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
+                currentLoadedDate = null;
                 return;
             }
+
+            // 既に同じ日付が読み込み済みの場合はスキップ
+            if (currentLoadedDate === date) {
+                return;
+            }
+
+            console.log(`ダッシュボード読み込み開始: ${date}`);
+            currentLoadedDate = date;
 
             // ローディング表示
             frame.innerHTML = '<div class="dashboard-loading" style="display:flex;">📊 ダッシュボード読み込み中...</div>';
@@ -490,26 +500,45 @@
             iframe.style.width = '100%';
             iframe.style.height = '100%';
             iframe.style.border = 'none';
-            iframe.style.display = 'none'; // 最初は非表示
+            iframe.style.display = 'none';
 
+            // イベントリスナーを一度だけ設定
             iframe.onload = function() {
-                // 読み込み完了時にiframeを表示し、ローディングを非表示
+                // 既に別の日付が読み込み開始されている場合は無視
+                if (currentLoadedDate !== date) {
+                    return;
+                }
+                
                 frame.innerHTML = '';
                 frame.appendChild(iframe);
                 iframe.style.display = 'block';
                 console.log(`ダッシュボード読み込み完了: ${date}`);
+                
+                // イベントリスナーをクリア
+                iframe.onload = null;
+                iframe.onerror = null;
             };
 
             iframe.onerror = function() {
+                // 既に別の日付が読み込み開始されている場合は無視
+                if (currentLoadedDate !== date) {
+                    return;
+                }
+                
                 frame.innerHTML = `
                     <div class="dashboard-loading" style="color:var(--accent-red);display:flex;">
                         ⚠️ ダッシュボード読み込みエラー<br>
                         <small>ファイル ${date}.html が見つかりません</small>
                     </div>`;
                 console.error(`ダッシュボード読み込みエラー: ${date}.html`);
+                currentLoadedDate = null;
+                
+                // イベントリスナーをクリア
+                iframe.onload = null;
+                iframe.onerror = null;
             };
 
-            // iframeを先にDOMに追加（非表示状態で）
+            // iframeをDOMに追加
             frame.appendChild(iframe);
         }
 
