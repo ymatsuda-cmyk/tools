@@ -1879,22 +1879,18 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
 
 // ─── ビュー切り替え ───────────────────────────────────
 function switchView(view){
-  var isDash=view==="dashboard";
   var isCr=view==="creation";
   var isBug=view==="bug";
   
-  document.getElementById("tabDashboard").classList.toggle("active",isDash);
   document.getElementById("tabCreation").classList.toggle("active",isCr);
   document.getElementById("tabBug").classList.toggle("active",isBug);
   
   document.getElementById("creationFilters").style.display=isCr?"":"none";
-  document.getElementById("dashboardView").style.display=isDash?"block":"none";
+  document.getElementById("dashboardView").style.display="none";
   document.getElementById("creationView").style.display=isCr?"block":"none";
   document.getElementById("bugView").style.display=isBug?"block":"none";
   
-  if(isDash){
-    initDashboard();
-  } else if(isCr){
+  if(isCr){
     applyFilter();
   } else if(isBug){
     renderBugView();
@@ -1999,7 +1995,27 @@ function loadDashboard(date) {
   frame.appendChild(iframe);
 }
 
-// ダッシュボード初期化
+// ダッシュボードを別画面で開く
+function openDashboardInNewWindow() {
+  // 日付データを初期化
+  if (dashboardDates.length === 0) {
+    dashboardDates = ['20260501', '20260430', '20260428', '20260427'].sort().reverse();
+  }
+  
+  // 最新の日付を取得
+  const latestDate = dashboardDates[0] || '20260501';
+  const dashboardPath = `../dashboard/${latestDate}.html`;
+  
+  // 新しいウィンドウでダッシュボードを開く
+  const newWindow = window.open(dashboardPath, 'dashboard', 
+    'width=1200,height=800,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no');
+  
+  if (!newWindow) {
+    alert('ポップアップがブロックされています。ブラウザの設定を確認してください。');
+  }
+}
+
+// ダッシュボード初期化（タブ内表示用）
 async function initDashboard() {
   await loadDashboardDates();
   buildDateDropdown();
@@ -2060,7 +2076,7 @@ async function loadData(){
 }
 
 function onReady(){
-  document.getElementById("tabDashboard").addEventListener("click",function(){switchView("dashboard");});
+  document.getElementById("tabDashboard").addEventListener("click",function(){openDashboardInNewWindow();});
   document.getElementById("tabCreation").addEventListener("click",function(){switchView("creation");});
   document.getElementById("tabBug").addEventListener("click",function(){switchView("bug");});
   document.getElementById("searchInput").addEventListener("input", function() {
