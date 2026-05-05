@@ -27,6 +27,9 @@ h1{font-size:14px;font-weight:700;}
 .reload-btn{background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;font-weight:600;}
 .reload-btn:hover{opacity:.85;}
 .reload-btn:disabled{opacity:.5;cursor:default;}
+.external-btn{background:#3b82f6;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;font-weight:600;}
+.external-btn:hover{opacity:.85;}
+.external-btn:disabled{opacity:.5;cursor:default;}}
 
 #star-toggle-btn{background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;padding:4px 8px;color:#f39c12;transition:all 0.2s ease;margin-left:6px;}
 #star-toggle-btn:hover{background:#f8f8f8;border-color:#bbb;}
@@ -264,11 +267,10 @@ main{padding:12px 14px;overflow-x:auto;}
 
 <header>
   <div class="header-top">
-    <div class="logo">&#128203;</div>
-    <h1>シナリオ一覧</h1>
     <div class="header-right">
       <span class="count-badge" id="countBadge">---</span>
       <button class="reload-btn" id="reloadBtn">&#8635; 読込</button>
+      <button class="external-btn" id="externalBtn">🔗 外部</button>
     </div>
   </div>
   <div id="demoBanner" class="demo-banner">
@@ -276,7 +278,7 @@ main{padding:12px 14px;overflow-x:auto;}
     <span class="note">実データはExcelで開いてください</span>
   </div>
   <div class="view-tabs">
-    <button class="view-tab" id="tabDashboard">📊 ダッシュボード</button>
+    <button class="view-tab" id="tabDashboard">ダッシュボード</button>
     <button class="view-tab active" id="tabCreation">作成状況</button>
     <button class="view-tab" id="tabBug">バグ影響</button>
   </div>
@@ -1995,6 +1997,36 @@ function loadDashboard(date) {
   frame.appendChild(iframe);
 }
 
+// 外部ウィンドウでtaskpane.htmlを開く
+function openTaskpaneInNewWindow() {
+  const currentUrl = window.location.href;
+  
+  // 新しいウィンドウでtaskpane.htmlを開く
+  const newWindow = window.open(currentUrl, 'taskpane-external', 
+    'width=800,height=900,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no');
+  
+  if (!newWindow) {
+    alert('ポップアップがブロックされています。ブラウザの設定を確認してください。');
+  } else {
+    console.log('タスクペインを外部ウィンドウで開きました');
+  }
+}
+
+// 外部ウィンドウでtaskpane.htmlを開く
+function openTaskpaneInNewWindow() {
+  const currentUrl = window.location.href;
+  
+  // 新しいウィンドウでtaskpane.htmlを開く
+  const newWindow = window.open(currentUrl, 'taskpane-external', 
+    'width=800,height=900,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no');
+  
+  if (!newWindow) {
+    alert('ポップアップがブロックされています。ブラウザの設定を確認してください。');
+  } else {
+    console.log('タスクペインを外部ウィンドウで開きました');
+  }
+}
+
 // ダッシュボードを別画面で開く
 function openDashboardInNewWindow() {
   // ダッシュボードフレームを新しいウィンドウで開く
@@ -2087,6 +2119,11 @@ function onReady(){
   });
   document.getElementById("reloadBtn").addEventListener("click",function(){
     if(typeof Excel!=="undefined") loadData();
+  });
+  
+  // 外部ボタンイベント
+  document.getElementById("externalBtn").addEventListener("click", function(){
+    openTaskpaneInNewWindow();
   });
 
   // モーダル関連イベント
