@@ -166,21 +166,6 @@
         let currentDate = null;
         let isSearching = false;
         let hasDisplayedFirst = false;
-        
-        // 既知のダッシュボードファイル（ローカルファイル用）
-        const KNOWN_DASHBOARD_FILES = [
-            '20260501', '20260430', '20260428', '20260427'
-        ];
-        
-        // 日付を手動で追加するための関数（将来の拡張用）
-        function addCustomDate(dateString) {
-            if (dateString.length === 8 && !dashboardDates.includes(dateString)) {
-                dashboardDates.push(dateString);
-                dashboardDates.sort().reverse();
-                buildDateDropdown();
-                console.log(`カスタム日付を追加: ${dateString}`);
-            }
-        }
 
         // 日付文字列をDateオブジェクトに変換
         function parseDate(dateString) {
@@ -199,26 +184,22 @@
             return `${year}${month}${day}`;
         }
 
-        // ローカルファイル用：既知ファイルを初期化
-        function initializeKnownFiles() {
-            console.log('ローカルファイルモード: 既知ファイルを使用');
-            console.log(`利用可能ファイル: ${KNOWN_DASHBOARD_FILES.join(', ')}`);
-            
-            dashboardDates = [...KNOWN_DASHBOARD_FILES].sort().reverse();
-            currentDate = dashboardDates[0];
-            
-            // ドロップダウンを構築
-            buildDateDropdown();
-            
-            // 最初のファイルを表示
-            if (!hasDisplayedFirst && currentDate) {
-                hasDisplayedFirst = true;
-                document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
-                loadDashboard(currentDate);
-                console.log(`ダッシュボードを表示: ${currentDate}`);
+        // ファイル存在チェック（タイムアウト付き）
+        async function checkFileExists(dateString) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒タイムアウト
+                
+                const response = await fetch(`./${dateString}.html`, { 
+                    method: 'HEAD',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                return response.ok;
+            } catch (error) {
+                return false;
             }
-            
-            return dashboardDates.length;
         }
 
         // 日付配列を生成（当日～過去60日）
@@ -231,9 +212,6 @@
                 date.setDate(date.getDate() - i);
                 dates.push(formatDateString(date));
             }
-            
-            console.log(`検索対象日付範囲: ${dates[dates.length-1]} ～ ${dates[0]} (${dates.length}日間)`);
-            console.log(`最初の10日: ${dates.slice(0, 10).join(', ')}`);
             
             return dates; // 新しい日付順（当日から過去へ）
         }
@@ -361,45 +339,26 @@
             return foundDates; // 既に新しい順でソート済み
         }
 
-        // 利用可能な日付を初期化（ローカルファイル用）
+        // 利用可能な日付を初期化
         async function initializeDates() {
             try {
-                console.log('ダッシュボード初期化開始');
-                console.log('現在のフォルダパス:', window.location.href);
+                await loadAvailableDates();
                 
-                // CORS制限があるため、ローカルファイルでは既知ファイルを使用
-                if (window.location.protocol === 'file:') {
-                    console.log('ローカルファイル環境です。CORS制限のため、既知ファイルを使用します。');
-                    const fileCount = initializeKnownFiles();
-                    
-                    if (fileCount > 0) {
-                        console.log(`${fileCount}件のダッシュボードファイルを初期化完了`);
-                        return;
+                if (dashboardDates.length > 0) {
+                    if (!currentDate) {
+                        currentDate = dashboardDates[0]; // 最新日付を初期選択
                     }
+                    console.log(`初期日付: ${currentDate}`);
+                } else {
+                    console.warn('利用可能なダッシュボードファイルが見つかりません');
                 }
-                
-                // HTTP環境でのみファイル検索を実行（将来の拡張用）
-                console.log('HTTP環境: ファイル検索を実行します');
-                // ここで将来的にファイル検索機能を実装可能
-                
-                // フォールバック: 既知ファイルを使用
-                console.log('フォールバック: 既知ファイルを使用');
-                initializeKnownFiles();
-                
             } catch (error) {
                 console.error('日付初期化エラー:', error);
-                
-                // 緊急フォールバック
-                console.log('緊急フォールバック: ミニマルファイルセットを使用');
-                dashboardDates = ['20260501', '20260430'];
+                // フォールバック: 既知の日付を使用
+                dashboardDates = ['20260505', '20260504', '20260503', '20260502', '20260501'].filter((date, index) => index < 5);
                 currentDate = dashboardDates[0];
                 buildDateDropdown();
-                
-                if (!hasDisplayedFirst) {
-                    hasDisplayedFirst = true;
-                    document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
-                    loadDashboard(currentDate);
-                }
+                console.log('フォールバックモード: 既知日付を使用');
             }
         }
 
@@ -472,59 +431,53 @@
         // ダッシュボード読み込み
         function loadDashboard(date) {
             const frame = document.getElementById('dashboardFrame');
+            const loading = document.getElementById('loading');
 
             if (!date) {
-                frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
+                loading.textContent = '📅 日付を選択してください';
+                loading.style.display = 'block';
+                frame.style.display = 'none';
                 return;
             }
 
             // ローディング表示
-            frame.innerHTML = '<div class="dashboard-loading" style="display:flex;">📊 ダッシュボード読み込み中...</div>';
+            loading.textContent = '📊 ダッシュボード読み込み中...';
+            loading.style.display = 'block';
+            frame.style.display = 'none';
 
             // ダッシュボードファイルのパス
             const dashboardPath = `./${date}.html`;
 
-            // iframeでダッシュボードを表示
-            const iframe = document.createElement('iframe');
-            iframe.src = dashboardPath;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.style.display = 'none'; // 最初は非表示
+            // iframeでダッシュボードを読み込み
+            frame.src = dashboardPath;
 
-            iframe.onload = function() {
-                // 読み込み完了時にiframeを表示し、ローディングを非表示
-                frame.innerHTML = '';
-                frame.appendChild(iframe);
-                iframe.style.display = 'block';
-                console.log(`ダッシュボード読み込み完了: ${date}`);
+            frame.onload = function() {
+                loading.style.display = 'none';
+                frame.style.display = 'block';
             };
 
-            iframe.onerror = function() {
-                frame.innerHTML = `
-                    <div class="dashboard-loading" style="color:var(--accent-red);display:flex;">
-                        ⚠️ ダッシュボード読み込みエラー<br>
+            frame.onerror = function() {
+                loading.innerHTML = `
+                    <div class="error-message">
+                        ❌ ダッシュボード読み込みエラー<br>
                         <small>ファイル ${date}.html が見つかりません</small>
                     </div>`;
-                console.error(`ダッシュボード読み込みエラー: ${date}.html`);
+                frame.style.display = 'none';
             };
-
-            // iframeを先にDOMに追加（非表示状態で）
-            frame.appendChild(iframe);
         }
 
         // 初期化
         async function initialize() {
             // 初期ローディング表示
-            const loadingEl = document.getElementById('loading');
-            loadingEl.innerHTML = `
+            document.getElementById('loading').innerHTML = `
                 <div>📊 ダッシュボードシステムを初期化中...</div>
                 <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
-                    ローカルファイル環境で初期化しています
+                    当日～過去60日のファイルを検索します
                 </div>
             `;
             
             await initializeDates();
+            // buildDateDropdown() は loadAvailableDates 内で動的に呼び出される
 
             if (!hasDisplayedFirst && dashboardDates.length > 0) {
                 // 初期化時にファイルが見つかったが表示されていない場合
@@ -533,11 +486,11 @@
                 document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
                 loadDashboard(currentDate);
             } else if (!hasDisplayedFirst) {
-                loadingEl.innerHTML = `
+                document.getElementById('loading').innerHTML = `
                     <div class="error-message">
-                        📊 ダッシュボードファイルが設定されていません<br>
-                        <small>ローカルファイル環境ではCORS制限のため、既知ファイルのみ使用可能です<br>
-                        対応ファイル: ${KNOWN_DASHBOARD_FILES.join(', ')}</small>
+                        📊 利用可能なダッシュボードファイルがありません<br>
+                        <small>dashboard フォルダに YYYYMMDD.html 形式のファイルを配置してください<br>
+                        （検索範囲: 当日～過去60日）</small>
                     </div>`;
             }
         }
