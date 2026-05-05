@@ -37,7 +37,7 @@
             padding: 16px 20px;
             display: flex;
             align-items: center;
-            justify-content: between;
+            justify-content: space-between;
             gap: 16px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
@@ -107,29 +107,6 @@
             background: #059669;
         }
 
-        .refresh-btn {
-            padding: 8px 12px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: background 0.2s;
-        }
-
-        .refresh-btn:hover {
-            background: var(--primary-light);
-        }
-
-        .refresh-btn:disabled {
-            background: var(--text-secondary);
-            cursor: not-allowed;
-        }
-
         .dashboard-content {
             height: calc(100vh - 70px);
             position: relative;
@@ -166,10 +143,7 @@
 </head>
 <body>
     <div class="dashboard-header">
-        <div class="dashboard-title">
-            <span>📊</span>
-            ダッシュボード
-        </div>
+
         <div class="date-selector">
             <div class="date-input" id="dateInput">
                 <span id="selectedDate">日付選択</span>
@@ -177,10 +151,6 @@
             </div>
             <div class="date-dropdown" id="dateDropdown"></div>
         </div>
-        <button class="refresh-btn" id="refreshBtn">
-            <span>🔄</span>
-            更新
-        </button>
     </div>
 
     <div class="dashboard-content">
@@ -533,46 +503,6 @@
             document.getElementById('dateInput').addEventListener('click', function() {
                 const dropdown = document.getElementById('dateDropdown');
                 dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-            });
-
-            // 更新ボタンイベント
-            document.getElementById('refreshBtn').addEventListener('click', async function() {
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<span>🔄</span>更新中...';
-                
-                console.log('ダッシュボードリストを更新中...');
-                document.getElementById('dashboardFrame').style.display = 'none';
-                
-                try {
-                    await initializeDates();
-                    buildDateDropdown();
-                    
-                    if (currentDate) {
-                        document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
-                        loadDashboard(currentDate);
-                    } else if (dashboardDates.length > 0) {
-                        // 現在の日付が無くなった場合は最新を選択
-                        selectDate(dashboardDates[0]);
-                    } else {
-                        document.getElementById('loading').innerHTML = `
-                            <div class="error-message">
-                                📊 利用可能なダッシュボードファイルがありません<br>
-                                <small>dashboard フォルダに YYYYMMDD.html 形式のファイルを配置してください<br>
-                                （検索範囲: 当日～過去60日）</small>
-                            </div>`;
-                    }
-                } catch (error) {
-                    console.error('更新エラー:', error);
-                    document.getElementById('loading').innerHTML = `
-                        <div class="error-message">
-                            ⚠️ 更新中にエラーが発生しました<br>
-                            <small>しばらく待ってから再度お試しください</small>
-                        </div>`;
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = '<span>🔄</span>更新';
-                }
             });
 
             // クリック外しでドロップダウンを閉じる
