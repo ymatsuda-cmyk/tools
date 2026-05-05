@@ -1960,15 +1960,14 @@ function selectDashboardDate(date) {
 // ダッシュボード読み込み
 function loadDashboard(date) {
   const frame = document.getElementById('dashboardFrame');
-  const loading = document.getElementById('dashboardLoading');
   
   if (!date) {
     frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
     return;
   }
   
-  frame.innerHTML = '';
-  loading.style.display = 'flex';
+  // ローディング表示
+  frame.innerHTML = '<div class="dashboard-loading" style="display:flex;">📊 ダッシュボード読み込み中...</div>';
   
   // dashboardフォルダから該当日付のHTMLファイルを読み込み
   const dashboardPath = `../dashboard/${date}.html`;
@@ -1979,20 +1978,24 @@ function loadDashboard(date) {
   iframe.style.width = '100%';
   iframe.style.height = '100%';
   iframe.style.border = 'none';
+  iframe.style.display = 'none'; // 最初は非表示
   
   iframe.onload = function() {
-    loading.style.display = 'none';
+    // 読み込み完了時にiframeを表示し、ローディングを非表示
+    frame.innerHTML = '';
+    frame.appendChild(iframe);
+    iframe.style.display = 'block';
   };
   
   iframe.onerror = function() {
-    loading.style.display = 'none';
     frame.innerHTML = `
-      <div class="dashboard-loading" style="color:var(--accent-red);">
+      <div class="dashboard-loading" style="color:var(--accent-red);display:flex;">
         ❌ ダッシュボード読み込みエラー<br>
         <small>ファイル ${date}.html が見つかりません</small>
       </div>`;
   };
   
+  // iframeを先にDOMに追加（非表示状態で）
   frame.appendChild(iframe);
 }
 
