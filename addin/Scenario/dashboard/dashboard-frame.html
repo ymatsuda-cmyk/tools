@@ -187,17 +187,23 @@
         // ファイル存在チェック（タイムアウト付き）
         async function checkFileExists(dateString) {
             try {
+                const filePath = `./${dateString}.html`;
+                console.log(`ファイルチェック: ${filePath}`);
+                
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒タイムアウト
                 
-                const response = await fetch(`./${dateString}.html`, { 
+                const response = await fetch(filePath, { 
                     method: 'HEAD',
                     signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
-                return response.ok;
+                const exists = response.ok;
+                console.log(`${filePath}: ${exists ? '✓ 存在' : '✗ 不存在'} (status: ${response.status})`);
+                return exists;
             } catch (error) {
+                console.log(`${dateString}.html: ✗ エラー (${error.message})`);
                 return false;
             }
         }
@@ -212,6 +218,9 @@
                 date.setDate(date.getDate() - i);
                 dates.push(formatDateString(date));
             }
+            
+            console.log(`検索対象日付範囲: ${dates[dates.length-1]} ～ ${dates[0]} (${dates.length}日間)`);
+            console.log(`最初の10日: ${dates.slice(0, 10).join(', ')}`);
             
             return dates; // 新しい日付順（当日から過去へ）
         }
@@ -342,6 +351,48 @@
         // 利用可能な日付を初期化
         async function initializeDates() {
             try {
+                console.log('ダッシュボード初期化開始');
+                console.log('現在のフォルダパス:', window.location.href);
+                
+                // 既知のファイルを直接チェックしてデバッグ
+                const knownFiles = ['20260501', '20260430', '20260428', '20260427'];
+                console.log('既知ファイルの直接チェック:');
+                let foundKnownFiles = [];
+                
+                for (const file of knownFiles) {
+                    const exists = await checkFileExists(file);
+                    console.log(`  ${file}.html: ${exists ? '✓' : '✗'}`);
+                    if (exists) {
+                        foundKnownFiles.push(file);
+                    }
+                }
+                
+                // 既知ファイルが見つかった場合は即座に使用
+                if (foundKnownFiles.length > 0) {
+                    console.log(`既知ファイル ${foundKnownFiles.length} 件を即座に使用`);
+                    dashboardDates = foundKnownFiles.sort().reverse();
+                    currentDate = dashboardDates[0];
+                    
+                    // ドロップダウンを構築
+                    buildDateDropdown();
+                    
+                    // 最初のファイルを表示
+                    if (!hasDisplayedFirst) {
+                        hasDisplayedFirst = true;
+                        document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                        loadDashboard(currentDate);
+                    }
+                    
+                    // バックグラウンドで全体検索を実行
+                    console.log('バックグラウンドで全体検索を開始...');
+                    loadAvailableDates().then(() => {
+                        console.log('バックグラウンド検索完了');
+                    });
+                    
+                    return;
+                }
+                
+                // 既知ファイルが見つからない場合は通常検索
                 await loadAvailableDates();
                 
                 if (dashboardDates.length > 0) {
@@ -354,11 +405,17 @@
                 }
             } catch (error) {
                 console.error('日付初期化エラー:', error);
-                // フォールバック: 既知の日付を使用
-                dashboardDates = ['20260505', '20260504', '20260503', '20260502', '20260501'].filter((date, index) => index < 5);
+                // フォールバック: 既知の日付を使用（ファイル存在確認なし）
+                console.log('フォールバックモード: 既知日付を直接使用');
+                dashboardDates = ['20260501', '20260430', '20260428', '20260427'];
                 currentDate = dashboardDates[0];
                 buildDateDropdown();
-                console.log('フォールバックモード: 既知日付を使用');
+                
+                if (!hasDisplayedFirst) {
+                    hasDisplayedFirst = true;
+                    document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                    loadDashboard(currentDate);
+                }
             }
         }
 
