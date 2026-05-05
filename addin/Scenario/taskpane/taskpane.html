@@ -275,8 +275,8 @@ main{padding:12px 14px;overflow-x:auto;}
   </div>
   <div class="view-tabs">
     <button class="view-tab" id="tabDashboard">ダッシュボード</button>
-    <button class="view-tab active" id="tabCreation">作成状況</button>
-    <button class="view-tab" id="tabBug">バグ影響</button>
+    <button class="view-tab active" id="tabCreation">シナリオ作成状況</button>
+    <button class="view-tab" id="tabBug">バグ解消確認</button>
   </div>
   <div class="filters" id="creationFilters">
     <div class="filter-row">
@@ -329,7 +329,7 @@ main{padding:12px 14px;overflow-x:auto;}
     <div class="board" id="board"></div>
   </div>
 
-  <!-- バグ影響ビュー -->
+  <!-- バグ解消確認ビュー -->
   <div id="bugView">
     <div class="section-label">バグ一覧 &#9658; クリックで詳細を表示</div>
     <table class="summary-table" id="summaryTable">
@@ -1616,7 +1616,7 @@ function applyFilter(){
   document.getElementById("board").innerHTML=html;
 }
 
-// ─── バグ影響：サマリー ───────────────────────────────
+// ─── バグ解消確認：サマリー ───────────────────────────────
 function renderSummary(){
   var tbody=document.getElementById("summaryBody");
   var rows="";
@@ -1661,7 +1661,7 @@ function renderSummary(){
   });
 }
 
-// ─── バグ影響：詳細パネル ─────────────────────────────
+// ─── バグ解消確認：詳細パネル ─────────────────────────────
 function renderDetail(){
   var panel=document.getElementById("detailPanel");
   if(!selectedBugId){
