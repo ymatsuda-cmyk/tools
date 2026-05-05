@@ -38,9 +38,30 @@ h1{font-size:14px;font-weight:700;}
 .view-tabs{display:flex;gap:0;margin-bottom:8px;}
 .view-tab{flex:1;padding:5px 0;background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:12px;font-family:"Noto Sans JP",sans-serif;cursor:pointer;transition:all .15s;text-align:center;}
 .view-tab:first-child{border-radius:6px 0 0 6px;}
-.view-tab:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.view-tab:last-child{border-radius:0 6px 6px 0;}
+.view-tab:not(:first-child):not(:last-child){border-left:none;}
+.view-tab:not(:first-child){border-left:none;}
 .view-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
 .view-tab:not(.active):hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
+
+/* ── DASHBOARD ── */
+.dashboard-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;}
+.dashboard-controls label{font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap;}
+.date-selector{position:relative;}
+.date-input{padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:11px;background:#f8f9fb;cursor:pointer;min-width:100px;font-family:"JetBrains Mono",monospace;}
+.date-input:hover,.date-input:focus{border-color:var(--accent);background:#fff;}
+.refresh-dashboard{background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;}
+.refresh-dashboard:hover{opacity:.85;}
+.dashboard-frame{width:100%;height:calc(100vh - 200px);border:1px solid var(--border);border-radius:6px;background:#fff;overflow:hidden;position:relative;}
+.dashboard-frame iframe{width:100%;height:100%;border:none;}
+.dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%;font-size:14px;color:var(--text-secondary);flex-direction:column;gap:10px;}
+.dashboard-loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-size:12px;}
+.date-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:4px;box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;z-index:1000;display:none;}
+.date-option{padding:6px 8px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);font-family:"JetBrains Mono",monospace;}
+.date-option:last-child{border-bottom:none;}
+.date-option:hover{background:var(--accent-light);}
+.date-option.latest{background:#f0fdf4;color:#15803d;font-weight:600;}
+.date-option.latest::after{content:" 📊";}
 
 /* ── FILTERS ── */
 .filters{display:flex;flex-direction:column;gap:5px;}
@@ -255,6 +276,7 @@ main{padding:12px 14px;overflow-x:auto;}
     <span class="note">実データはExcelで開いてください</span>
   </div>
   <div class="view-tabs">
+    <button class="view-tab" id="tabDashboard">📊 ダッシュボード</button>
     <button class="view-tab active" id="tabCreation">作成状況</button>
     <button class="view-tab" id="tabBug">バグ影響</button>
   </div>
@@ -286,6 +308,23 @@ main{padding:12px 14px;overflow-x:auto;}
 <div id="errorMsg"></div>
 
 <main id="mainContent" style="display:none;">
+
+  <!-- ダッシュボードビュー -->
+  <div id="dashboardView" style="display:none;">
+    <div class="dashboard-controls">
+      <label>📅 日付選択:</label>
+      <div class="date-selector">
+        <input type="text" class="date-input" id="dateInput" readonly placeholder="日付を選択...">
+        <div class="date-dropdown" id="dateDropdown"></div>
+      </div>
+      <button class="refresh-dashboard" id="refreshDashboard">🔄 更新</button>
+    </div>
+    <div class="dashboard-frame" id="dashboardFrame">
+      <div class="dashboard-loading" id="dashboardLoading">
+        📊 ダッシュボードを読み込んでいます...
+      </div>
+    </div>
+  </div>
 
   <!-- 作成状況ビュー -->
   <div id="creationView">
@@ -1840,13 +1879,135 @@ async function writeBugResolution(context, bugId, isResolved, scenario) {
 
 // ─── ビュー切り替え ───────────────────────────────────
 function switchView(view){
+  var isDash=view==="dashboard";
   var isCr=view==="creation";
+  var isBug=view==="bug";
+  
+  document.getElementById("tabDashboard").classList.toggle("active",isDash);
   document.getElementById("tabCreation").classList.toggle("active",isCr);
-  document.getElementById("tabBug").classList.toggle("active",!isCr);
+  document.getElementById("tabBug").classList.toggle("active",isBug);
+  
   document.getElementById("creationFilters").style.display=isCr?"":"none";
-  document.getElementById("creationView").style.display=isCr?"":"none";
-  document.getElementById("bugView").style.display=isCr?"none":"block";
-  if(isCr){applyFilter();}else{renderBugView();}
+  document.getElementById("dashboardView").style.display=isDash?"block":"none";
+  document.getElementById("creationView").style.display=isCr?"block":"none";
+  document.getElementById("bugView").style.display=isBug?"block":"none";
+  
+  if(isDash){
+    initDashboard();
+  } else if(isCr){
+    applyFilter();
+  } else if(isBug){
+    renderBugView();
+  }
+}
+
+// ─── ダッシュボード機能 ───────────────────────────────
+var dashboardDates = [];
+var currentDashboardDate = null;
+
+// 利用可能な日付を取得
+async function loadDashboardDates() {
+  try {
+    // 実際の環境では、dashboardフォルダのファイル一覧を取得する
+    // 今回はサンプルデータとして固定値を使用
+    dashboardDates = [
+      '20260501', '20260430', '20260428', '20260427'
+    ].sort().reverse(); // 新しい日付順
+    
+    if (dashboardDates.length > 0) {
+      currentDashboardDate = dashboardDates[0]; // 最新日付を初期選択
+    }
+  } catch (error) {
+    console.error('ダッシュボード日付取得エラー:', error);
+    dashboardDates = [];
+  }
+}
+
+// 日付をYYYY/MM/DD形式に変換
+function formatDisplayDate(dateString) {
+  if (!dateString || dateString.length !== 8) return dateString;
+  const year = dateString.substring(0, 4);
+  const month = dateString.substring(4, 6);
+  const day = dateString.substring(6, 8);
+  return `${year}/${month}/${day}`;
+}
+
+// 日付ドロップダウンを構築
+function buildDateDropdown() {
+  const dropdown = document.getElementById('dateDropdown');
+  dropdown.innerHTML = '';
+  
+  dashboardDates.forEach((date, index) => {
+    const option = document.createElement('div');
+    option.className = 'date-option' + (index === 0 ? ' latest' : '');
+    option.textContent = formatDisplayDate(date);
+    option.setAttribute('data-date', date);
+    option.addEventListener('click', () => {
+      selectDashboardDate(date);
+      dropdown.style.display = 'none';
+    });
+    dropdown.appendChild(option);
+  });
+}
+
+// 日付選択
+function selectDashboardDate(date) {
+  currentDashboardDate = date;
+  document.getElementById('dateInput').value = formatDisplayDate(date);
+  loadDashboard(date);
+}
+
+// ダッシュボード読み込み
+function loadDashboard(date) {
+  const frame = document.getElementById('dashboardFrame');
+  const loading = document.getElementById('dashboardLoading');
+  
+  if (!date) {
+    frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
+    return;
+  }
+  
+  frame.innerHTML = '';
+  loading.style.display = 'flex';
+  
+  // dashboardフォルダから該当日付のHTMLファイルを読み込み
+  const dashboardPath = `../dashboard/${date}.html`;
+  
+  // iframeでダッシュボードを表示
+  const iframe = document.createElement('iframe');
+  iframe.src = dashboardPath;
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  
+  iframe.onload = function() {
+    loading.style.display = 'none';
+  };
+  
+  iframe.onerror = function() {
+    loading.style.display = 'none';
+    frame.innerHTML = `
+      <div class="dashboard-loading" style="color:var(--accent-red);">
+        ❌ ダッシュボード読み込みエラー<br>
+        <small>ファイル ${date}.html が見つかりません</small>
+      </div>`;
+  };
+  
+  frame.appendChild(iframe);
+}
+
+// ダッシュボード初期化
+async function initDashboard() {
+  await loadDashboardDates();
+  buildDateDropdown();
+  
+  if (currentDashboardDate) {
+    document.getElementById('dateInput').value = formatDisplayDate(currentDashboardDate);
+    loadDashboard(currentDashboardDate);
+  } else {
+    document.getElementById('dashboardFrame').innerHTML = 
+      '<div class="dashboard-loading">📊 利用可能なダッシュボードがありません</div>';
+  }
 }
 
 // ─── デモ / Excel 起動 ───────────────────────────────
@@ -1896,6 +2057,7 @@ async function loadData(){
 }
 
 function onReady(){
+  document.getElementById("tabDashboard").addEventListener("click",function(){switchView("dashboard");});
   document.getElementById("tabCreation").addEventListener("click",function(){switchView("creation");});
   document.getElementById("tabBug").addEventListener("click",function(){switchView("bug");});
   document.getElementById("searchInput").addEventListener("input", function() {
@@ -1927,6 +2089,28 @@ function onReady(){
 
   // 本日モード設定を復元
   restoreTodayMode();
+
+  // ダッシュボード日付選択イベント
+  document.getElementById("dateInput").addEventListener("click", function() {
+    const dropdown = document.getElementById("dateDropdown");
+    dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
+  });
+
+  // ダッシュボード更新ボタン
+  document.getElementById("refreshDashboard").addEventListener("click", function() {
+    if (currentDashboardDate) {
+      loadDashboard(currentDashboardDate);
+    }
+  });
+
+  // クリック外しでドロップダウンを閉じる
+  document.addEventListener("click", function(e) {
+    const dateInput = document.getElementById("dateInput");
+    const dropdown = document.getElementById("dateDropdown");
+    if (!dateInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = "none";
+    }
+  });
 
   // Office.onReady()を最初に呼び出し、その中で初期化処理を実行
   if(typeof Office!=="undefined"){
