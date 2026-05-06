@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-news-v2';
+const CACHE_NAME = 'ai-news-v3';
 const ASSETS = [
     './',
     './index.html',
@@ -33,7 +33,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     event.respondWith(
         caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
+            return response || fetch(event.request).catch((err) => {
+                console.warn('Fetch failed for:', event.request.url, err);
+                // Return a fallback or just let it fail without an uncaught promise
+                return new Response('Network error occurred', { status: 408, statusText: 'Network error' });
+            });
         })
     );
 });
