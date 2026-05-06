@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AI News Reader</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI News">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- iOS Style Header -->
+        <header class="glass-header">
+            <div class="header-content">
+                <div class="date-info">
+                    <span id="display-date">2026年5月5日</span>
+                    <h1>AI Daily Brief</h1>
+                </div>
+                <button id="settings-btn" class="icon-btn">⚙️</button>
+            </div>
+            
+            <!-- Date Selector Tabs -->
+            <div class="date-tabs" id="date-tabs">
+                <!-- Dynamically filled -->
+            </div>
+        </header>
+
+        <main id="news-content">
+            <!-- News Summary -->
+            <section id="daily-summary" class="summary-card glass">
+                <div class="loader"></div>
+            </section>
+
+            <!-- Trends List -->
+            <section id="trends-section">
+                <h2>Key Trends</h2>
+                <ul id="trends-list" class="trends-list"></ul>
+            </section>
+
+            <!-- Articles List -->
+            <section id="articles-section">
+                <h2>Latest Articles</h2>
+                <div id="articles-list" class="articles-grid"></div>
+            </section>
+        </main>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-content glass">
+                <h3>Settings</h3>
+                <div class="input-group">
+                    <label for="gas-url">Google Apps Script URL:</label>
+                    <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+                </div>
+                <div class="input-group">
+                    <button id="save-settings" class="primary-btn">Save & Reload</button>
+                    <button id="import-local" class="secondary-btn">Import local JSON</button>
+                </div>
+                <button id="close-settings" class="close-btn">Close</button>
+            </div>
+        </div>
+        
+        <!-- Toast Notification -->
+        <div id="toast" class="toast">Settings Saved</div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js');
+            });
+        }
+    </script>
+</body>
+</html>
