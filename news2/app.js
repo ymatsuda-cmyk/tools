@@ -49,6 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.newsData[data.date] = data;
                 saveToLocal(data.date, data);
                 
+                // Update state and UI tabs
+                state.currentDate = data.date;
+                setupDateTabs(); 
+                
                 // If GAS URL exists, also sync to sheets
                 if (state.gasUrl) {
                     syncToSheets(data);
@@ -58,7 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Imported Successfully');
             }
         } catch (e) {
-            alert('Could not find local ai-news.json. Please make sure it is in the /json/ folder relative to this app.');
+            console.error('Import failed:', e);
+            alert('Could not find local ai-news.json or file is invalid. Path: ./json/ai-news.json');
         }
     };
 

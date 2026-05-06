@@ -1,11 +1,12 @@
-const CACHE_NAME = 'ai-news-v3';
+const CACHE_NAME = 'ai-news-v4';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
     './manifest.json',
-    './icon-192.png'
+    './icon-192.png',
+    './json/ai-news.json'
 ];
 
 self.addEventListener('install', (event) => {
