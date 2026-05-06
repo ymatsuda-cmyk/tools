@@ -142,7 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Articles
         const articles = Array.isArray(data.articles) ? data.articles : [];
-        articlesList.innerHTML = articles.map(a => `
+        articlesList.innerHTML = articles.map(a => {
+            if (!a) return '';
+            return `
             <div class="article-card">
                 <div class="article-header">
                     <span class="category-tag">${a.category || 'General'}</span>
@@ -164,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="font-size: 11px; color: var(--text-secondary); margin-top: 15px;">Source: ${a.source || 'Unknown'}</div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
 
         if (articles.length === 0 && trends.length === 0 && !data.summary) {
             renderEmpty();
