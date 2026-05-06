@@ -105,15 +105,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.gasUrl) {
             try {
                 const res = await fetch(`${state.gasUrl}?date=${date}`);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
                 const data = await res.json();
                 if (data && !data.error) {
                     state.newsData[date] = data;
                     saveToLocal(date, data);
                     renderNews(data);
                     return;
+                } else if (data && data.error) {
+                    console.warn('GAS returned error:', data.error);
                 }
             } catch (e) {
-                console.error('GAS Fetch failed', e);
+                console.error('GAS Fetch failed:', e.message || e);
             }
         }
 
@@ -121,38 +126,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderNews(data) {
-        displayDate.textContent = formatDate(data.date);
+        if (!data) {
+            renderEmpty();
+            return;
+        }
+
+        displayDate.textContent = data.date ? formatDate(data.date) : 'Unknown Date';
         
         // Summary
-        summarySection.innerHTML = `<p>${data.summary}</p>`;
+        summarySection.innerHTML = `<p>${data.summary || 'No summary available.'}</p>`;
         
         // Trends
-        trendsList.innerHTML = data.trends.map(t => `<li>${t}</li>`).join('');
+        const trends = Array.isArray(data.trends) ? data.trends : [];
+        trendsList.innerHTML = trends.map(t => `<li>${t}</li>`).join('');
         
         // Articles
-        articlesList.innerHTML = data.articles.map(a => `
+        const articles = Array.isArray(data.articles) ? data.articles : [];
+        articlesList.innerHTML = articles.map(a => `
             <div class="article-card">
                 <div class="article-header">
-                    <span class="category-tag">${a.category}</span>
+                    <span class="category-tag">${a.category || 'General'}</span>
                     <span class="impact-badge impact-${a.impact === '高' ? 'high' : a.impact === '中' ? 'med' : 'low'}">
-                        Impact: ${a.impact}
+                        Impact: ${a.impact || 'Unknown'}
                     </span>
                 </div>
                 <div class="article-body">
-                    <h3>${a.title}</h3>
-                    <p>${a.summary}</p>
+                    <h3>${a.title || 'Untitled'}</h3>
+                    <p>${a.summary || ''}</p>
                     <div class="expandable-section">
                         <span class="section-label">Beginner Note</span>
-                        <div class="section-content">${a.beginnerNote}</div>
+                        <div class="section-content">${a.beginnerNote || ''}</div>
                     </div>
                     <div class="expandable-section">
                         <span class="section-label">Impact Note</span>
-                        <div class="section-content">${a.impactNote}</div>
+                        <div class="section-content">${a.impactNote || ''}</div>
                     </div>
-                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 15px;">Source: ${a.source}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 15px;">Source: ${a.source || 'Unknown'}</div>
                 </div>
             </div>
         `).join('');
+
+        if (articles.length === 0 && trends.length === 0 && !data.summary) {
+            renderEmpty();
+        }
     }
 
     function renderLoader() {
