@@ -3,505 +3,91 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>気になる記事 | AI Dashboard</title>
+<title>気になる記事 | web</title>
 <style>
   :root {
-    --bg: #0A0E1A;
-    --surface: #111827;
-    --surface2: #1A2235;
-    --border: #1E293B;
-    --accent: #3B82F6;
-    --accent2: #10B981;
-    --accent3: #F59E0B;
-    --text: #F1F5F9;
-    --text2: #94A3B8;
-    --text3: #64748B;
-    --tag-bg: #1E293B;
-    --danger: #EF4444;
-    --radius: 12px;
-    --font: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    --bg:#0A0E1A;--surface:#111827;--surface2:#1A2235;--border:#1E293B;
+    --accent:#3B82F6;--accent2:#10B981;--text:#F1F5F9;--text2:#94A3B8;--text3:#64748B;
+    --radius:12px;--font:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font);
-    min-height: 100vh;
-    padding: 0;
-  }
-
-  /* ヘッダー */
-  .header {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 20px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(12px);
-  }
-
-  .header-inner {
-    max-width: 900px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .header-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .header-title .icon {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, var(--accent), #6366F1);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    transition: all 0.15s;
-    text-decoration: none;
-    font-family: var(--font);
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-  .btn-primary:hover { background: #2563EB; transform: translateY(-1px); }
-
-  .btn-secondary {
-    background: var(--surface2);
-    color: var(--text2);
-    border: 1px solid var(--border);
-  }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-  .btn-sm {
-    padding: 5px 10px;
-    font-size: 12px;
-  }
-
-  /* メインコンテンツ */
-  .main {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-
-  /* フィルターバー */
-  .filter-bar {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-    align-items: center;
-  }
-
-  .filter-label {
-    font-size: 12px;
-    color: var(--text3);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .filter-chip {
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text2);
-    transition: all 0.15s;
-  }
-  .filter-chip:hover, .filter-chip.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-  }
-
-  /* 記事グリッド */
-  .articles-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  /* 記事カード */
-  .article-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .article-card::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 3px;
-    background: var(--accent);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .article-card:hover {
-    border-color: #2D3F5E;
-    transform: translateX(2px);
-  }
-  .article-card:hover::before { opacity: 1; }
-
-  .card-top {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-
-  .card-favicon {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    background: var(--surface2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    color: var(--text3);
-    overflow: hidden;
-    margin-top: 2px;
-  }
-  .card-favicon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .card-title-wrap { flex: 1; }
-
-  .card-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.4;
-    margin-bottom: 4px;
-    text-decoration: none;
-  }
-  .card-title:hover { color: var(--accent); }
-
-  .card-meta {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .card-domain {
-    font-size: 11px;
-    color: var(--text3);
-  }
-
-  .card-date {
-    font-size: 11px;
-    color: var(--text3);
-  }
-
-  .card-summary {
-    font-size: 13px;
-    color: var(--text2);
-    line-height: 1.6;
-    margin-bottom: 10px;
-  }
-
-  .card-tags {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-  }
-
-  .card-tag {
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    background: var(--tag-bg);
-    color: var(--text3);
-    border: 1px solid var(--border);
-  }
-
-  /* 展開セクション */
-  .card-expand-btn {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text3);
-    cursor: pointer;
-    background: none;
-    border: none;
-    font-family: var(--font);
-    padding: 0;
-    transition: color 0.15s;
-  }
-  .card-expand-btn:hover { color: var(--accent); }
-  .card-expand-btn .chevron { transition: transform 0.2s; }
-  .card-expand-btn.open .chevron { transform: rotate(180deg); }
-
-  .card-expanded {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    display: none;
-  }
-  .card-expanded.show { display: block; }
-
-  .expand-section {
-    margin-bottom: 10px;
-  }
-  .expand-section-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text3);
-    margin-bottom: 4px;
-  }
-  .expand-section-body {
-    font-size: 13px;
-    color: var(--text2);
-    line-height: 1.6;
-  }
-
-  .card-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    align-items: center;
-  }
-
-  /* 状態バッジ */
-  .status-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .status-unread { background: #1D4ED820; color: #60A5FA; border: 1px solid #1D4ED840; }
-  .status-summarized { background: #05966920; color: #34D399; border: 1px solid #05966940; }
-  .status-reading { background: #D9770620; color: #FBBF24; border: 1px solid #D9770640; }
-
-  /* 空状態 */
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text3);
-  }
-  .empty-state .big-icon { font-size: 48px; margin-bottom: 16px; }
-  .empty-state h3 { font-size: 18px; color: var(--text2); margin-bottom: 8px; }
-  .empty-state p { font-size: 14px; line-height: 1.6; max-width: 300px; margin: 0 auto; }
-
-  /* URL追加モーダル */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    z-index: 200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .modal-overlay.show { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
-    width: 100%;
-    max-width: 480px;
-    animation: slideUp 0.2s ease;
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  .modal-title {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .form-group { margin-bottom: 14px; }
-
-  .form-label {
-    display: block;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text3);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
-  }
-
-  .form-input, .form-select, .form-textarea {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 14px;
-    color: var(--text);
-    font-family: var(--font);
-    transition: border-color 0.15s;
-    outline: none;
-  }
-  .form-input:focus, .form-select:focus, .form-textarea:focus {
-    border-color: var(--accent);
-  }
-  .form-input::placeholder { color: var(--text3); }
-  .form-textarea { resize: vertical; min-height: 80px; }
-  .form-select option { background: var(--surface2); }
-
-  .modal-footer {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 20px;
-  }
-
-  /* セットアップパネル */
-  .setup-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-
-  .setup-panel h3 {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .setup-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .setup-row .form-input { flex: 1; }
-
-  /* ローディング */
-  .loading-spinner {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* 件数バッジ */
-  .count-badge {
-    background: var(--surface2);
-    color: var(--text3);
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 8px;
-    margin-left: 4px;
-  }
-
-  /* トースト通知 */
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #1E293B;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 13px;
-    color: var(--text);
-    z-index: 300;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    animation: toastIn 0.2s ease;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  }
-  @keyframes toastIn {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  /* レスポンシブ */
-  @media (max-width: 640px) {
-    .header-title span { display: none; }
-    .main { padding: 12px; }
-    .filter-bar { gap: 6px; }
-    .btn { padding: 7px 10px; font-size: 12px; }
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+  .header{background:#0F172A;border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:100}
+  .header-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .header-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--text);text-decoration:none}
+  .header-title .icon{width:30px;height:30px;background:linear-gradient(135deg,#3B82F6,#6366F1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .header-actions{display:flex;gap:8px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:var(--font)}
+  .btn-primary{background:var(--accent);color:white}.btn-primary:hover{background:#2563EB}
+  .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .main{max-width:860px;margin:0 auto;padding:20px}
+  .setup-banner{background:#1E293B;border:1px solid #334155;border-radius:var(--radius);padding:16px 20px;margin-bottom:20px}
+  .setup-banner h3{font-size:14px;font-weight:700;margin-bottom:12px}
+  .setup-row{display:flex;gap:8px;margin-bottom:8px}
+  .setup-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none}
+  .setup-input:focus{border-color:var(--accent)}
+  .setup-note{font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5}
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .filter-label{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .filter-chip{padding:4px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s}
+  .filter-chip:hover,.filter-chip.active{background:var(--accent);border-color:var(--accent);color:white}
+  .stats-bar{display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--text3)}
+  .stats-bar strong{color:var(--text2)}
+  .articles-grid{display:flex;flex-direction:column;gap:10px}
+  .article-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:all .15s;position:relative;overflow:hidden}
+  .article-card.done-card{opacity:.5}
+  .article-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s}
+  .article-card:hover::before{opacity:1}
+  .card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+  .card-favicon{width:18px;height:18px;border-radius:3px;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3);overflow:hidden;margin-top:3px}
+  .card-favicon img{width:100%;height:100%;object-fit:cover}
+  .card-title-wrap{flex:1;min-width:0}
+  .card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.4;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-title:hover{color:var(--accent)}
+  .card-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:3px}
+  .card-domain,.card-date{font-size:11px;color:var(--text3)}
+  .card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+  .card-tag{padding:1px 7px;border-radius:8px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+  .card-summary{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px;background:#0F172A;border-left:2px solid var(--accent2);padding:8px 12px;border-radius:0 6px 6px 0}
+  .card-summary-label{font-size:10px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .card-kaisetsu{font-size:13px;color:var(--text2);line-height:1.6;background:#0F172A;border-left:2px solid #F59E0B;padding:8px 12px;border-radius:0 6px 6px 0}
+  .card-kaisetsu-label{font-size:10px;font-weight:700;color:#F59E0B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .card-expand-btn{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text3);cursor:pointer;background:none;border:none;font-family:var(--font);padding:0;transition:color .15s;margin-bottom:6px}
+  .card-expand-btn:hover{color:var(--accent)}
+  .card-expand-btn .chevron{transition:transform .2s;display:inline-block}
+  .card-expand-btn.open .chevron{transform:rotate(180deg)}
+  .card-expanded{display:none}
+  .card-expanded.show{display:block}
+  .card-actions{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
+  .done-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#05966920;color:#34D399;border:1px solid #05966940}
+  .undone-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#1D4ED820;color:#60A5FA;border:1px solid #1D4ED840}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:460px;animation:slideUp .2s ease}
+  @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .modal-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .form-group{margin-bottom:12px}
+  .form-label{display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .form-input,.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s}
+  .form-input:focus,.form-select:focus{border-color:var(--accent)}
+  .form-input::placeholder{color:var(--text3)}
+  .form-select option{background:#1A2235}
+  .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text3)}
+  .empty-state .icon{font-size:44px;margin-bottom:14px}
+  .empty-state h3{font-size:16px;color:var(--text2);margin-bottom:8px}
+  .empty-state p{font-size:13px;line-height:1.6;max-width:280px;margin:0 auto}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:20px;right:20px;background:#1E293B;border:1px solid var(--border);border-radius:10px;padding:11px 16px;font-size:13px;color:var(--text);z-index:300;display:flex;align-items:center;gap:8px;animation:toastIn .2s ease;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+  @keyframes toastIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @media(max-width:600px){.main{padding:12px}.header-title span{display:none}}
 </style>
 </head>
 <body>
-
-<!-- ヘッダー -->
 <header class="header">
   <div class="header-inner">
     <a href="index.html" class="header-title">
@@ -509,534 +95,256 @@
       <span>気になる記事</span>
     </a>
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm" onclick="toggleSetup()">⚙️ 設定</button>
-      <button class="btn btn-primary" onclick="openAddModal()">＋ 追加</button>
-      <button class="btn btn-secondary btn-sm" id="syncBtn" onclick="syncFromNotion()">🔄 同期</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleSetup()">⚙️</button>
+      <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncArticles()">🔄 同期</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">＋ 追加</button>
     </div>
   </div>
 </header>
 
-<!-- セットアップパネル -->
 <div class="main">
-  <div id="setupPanel" class="setup-panel" style="display:none">
-    <h3>⚙️ Notion API 設定</h3>
+  <div id="setupBanner" class="setup-banner" style="display:none">
+    <h3>⚙️ GAS URL 設定</h3>
     <div class="setup-row">
-      <input type="password" class="form-input" id="notionToken" placeholder="Notion Integration Token (secret_...)" />
-      <button class="btn btn-secondary btn-sm" onclick="saveConfig()">保存</button>
+      <input type="text" class="setup-input" id="gasUrlInput" placeholder="https://script.google.com/macros/s/..." />
+      <button class="btn btn-primary btn-sm" onclick="saveGasUrl()">保存</button>
     </div>
-    <div class="setup-row">
-      <input type="text" class="form-input" id="notionDbId" placeholder="データベースID (32桁の英数字)" />
-    </div>
-    <p style="font-size:12px;color:var(--text3);margin-top:8px">
-      💡 Notionで「気になる記事」データベースを作成 → インテグレーションをDBに接続 → TokenとDB IDを入力
-    </p>
+    <p class="setup-note">bookmarks-gas-code.js をGASにデプロイして、ウェブアプリURLを入力してください。<br>Notion TokenとDB IDはGASコード内に直接記載します（URLは公開しない）。</p>
   </div>
 
-  <!-- フィルターバー -->
+  <div class="stats-bar" id="statsBar" style="display:none">
+    <span>📚 合計 <strong id="totalCount">0</strong> 件</span>
+    <span>📥 未読 <strong id="unreadCount">0</strong> 件</span>
+    <span>✅ 済 <strong id="doneCount">0</strong> 件</span>
+  </div>
+
   <div class="filter-bar">
-    <span class="filter-label">タグ：</span>
-    <button class="filter-chip active" onclick="filterTag(this, '')" data-tag="">すべて<span class="count-badge" id="countAll">0</span></button>
-    <button class="filter-chip" onclick="filterTag(this, 'AI')" data-tag="AI">AI</button>
-    <button class="filter-chip" onclick="filterTag(this, 'ロボット')" data-tag="ロボット">ロボット</button>
-    <button class="filter-chip" onclick="filterTag(this, 'ビジネス')" data-tag="ビジネス">ビジネス</button>
-    <button class="filter-chip" onclick="filterTag(this, '技術')" data-tag="技術">技術</button>
-    <button class="filter-chip" onclick="filterTag(this, '政策')" data-tag="政策">政策</button>
-    <button class="filter-chip" onclick="filterTag(this, '未読')" data-tag="__unread">未読のみ</button>
+    <span class="filter-label">表示：</span>
+    <button class="filter-chip active" onclick="setFilter(this,'all')">すべて</button>
+    <button class="filter-chip" onclick="setFilter(this,'unread')">📥 未読のみ</button>
+    <button class="filter-chip" onclick="setFilter(this,'summarized')">📝 要約済み</button>
+    <button class="filter-chip" onclick="setFilter(this,'done')">☑️ 済のみ</button>
   </div>
 
-  <!-- 記事一覧 -->
-  <div class="articles-grid" id="articlesGrid">
-    <!-- JS で描画 -->
-  </div>
+  <div class="articles-grid" id="articlesGrid"></div>
 </div>
 
-<!-- URL追加モーダル -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-title">🔖 記事を追加</div>
-
     <div class="form-group">
       <label class="form-label">URL *</label>
-      <input type="url" class="form-input" id="inputUrl" placeholder="https://..." oninput="onUrlChange()" />
+      <input type="url" class="form-input" id="inUrl" placeholder="https://" />
     </div>
-
     <div class="form-group">
       <label class="form-label">タイトル *</label>
-      <input type="text" class="form-input" id="inputTitle" placeholder="記事タイトル" />
+      <input type="text" class="form-input" id="inTitle" placeholder="記事タイトル" />
     </div>
-
-    <div class="form-group">
-      <label class="form-label">メモ（任意）</label>
-      <textarea class="form-textarea" id="inputMemo" placeholder="気になった理由や感想..."></textarea>
-    </div>
-
     <div class="form-group">
       <label class="form-label">タグ（カンマ区切り）</label>
-      <input type="text" class="form-input" id="inputTags" placeholder="AI, ロボット, ビジネス" />
+      <input type="text" class="form-input" id="inTags" placeholder="AI, ビジネス, 技術" />
     </div>
-
     <div class="form-group">
-      <label class="form-label">状態</label>
-      <select class="form-select" id="inputStatus">
-        <option value="未読">📥 未読</option>
-        <option value="読書中">📖 読書中</option>
-        <option value="要約済み">✅ 要約済み</option>
+      <label class="form-label">分類</label>
+      <select class="form-select" id="inBunrui">
+        <option value="">選択なし</option>
+        <option>AI</option><option>ロボット</option><option>ビジネス</option>
+        <option>技術</option><option>政策</option><option>その他</option>
       </select>
     </div>
-
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeAddModal()">キャンセル</button>
+      <button class="btn btn-ghost" onclick="closeAddModal()">キャンセル</button>
       <button class="btn btn-primary" id="saveBtn" onclick="saveArticle()">💾 保存</button>
     </div>
   </div>
 </div>
 
 <script>
-// ============================================================
-// 設定
-// ============================================================
-const CORS_PROXY = 'https://api.allorigins.win/get?url='; // Notion APIは直接アクセス可
+var GAS_URL = localStorage.getItem('bm_gas_url') || '';
+var articles = [];
+var currentFilter = 'all';
 
-let CONFIG = {
-  notionToken: '',
-  notionDbId: '',
-};
-
-let articles = [];
-let currentTagFilter = '';
-
-// ============================================================
-// 初期化
-// ============================================================
 window.onload = function() {
-  loadConfig();
-  loadLocalArticles();
-  renderArticles();
-
-  // URLパラメータからの自動入力（iPhone共有シート対応）
-  const params = new URLSearchParams(location.search);
-  const sharedUrl = params.get('url') || params.get('text');
-  const sharedTitle = params.get('title');
-  if (sharedUrl) {
-    document.getElementById('inputUrl').value = sharedUrl;
-    if (sharedTitle) document.getElementById('inputTitle').value = sharedTitle;
+  if (GAS_URL) {
+    document.getElementById('gasUrlInput').value = GAS_URL;
+    syncArticles();
+  } else {
+    document.getElementById('setupBanner').style.display = 'block';
+    renderEmpty('⚙️ 右上の設定ボタンからGAS URLを入力してください');
+  }
+  var params = new URLSearchParams(location.search);
+  var su = params.get('url') || params.get('text');
+  var st = params.get('title');
+  if (su) {
+    document.getElementById('inUrl').value = su;
+    if (st) document.getElementById('inTitle').value = st;
     openAddModal();
   }
 };
 
-// ============================================================
-// 設定の保存/読み込み
-// ============================================================
-function loadConfig() {
-  try {
-    const saved = localStorage.getItem('bm_config');
-    if (saved) CONFIG = { ...CONFIG, ...JSON.parse(saved) };
-    if (CONFIG.notionToken) document.getElementById('notionToken').value = CONFIG.notionToken;
-    if (CONFIG.notionDbId) document.getElementById('notionDbId').value = CONFIG.notionDbId;
-  } catch(e) {}
-}
-
-function saveConfig() {
-  CONFIG.notionToken = document.getElementById('notionToken').value.trim();
-  CONFIG.notionDbId = document.getElementById('notionDbId').value.trim();
-  localStorage.setItem('bm_config', JSON.stringify(CONFIG));
-  showToast('✅ 設定を保存しました');
-  toggleSetup();
-}
-
-// ============================================================
-// ローカルストレージ
-// ============================================================
-function loadLocalArticles() {
-  try {
-    const saved = localStorage.getItem('bm_articles');
-    if (saved) articles = JSON.parse(saved);
-  } catch(e) { articles = []; }
-}
-
-function saveLocalArticles() {
-  localStorage.setItem('bm_articles', JSON.stringify(articles));
-}
-
-// ============================================================
-// Notion API
-// ============================================================
-async function notionFetch(path, method = 'GET', body = null) {
-  if (!CONFIG.notionToken) throw new Error('Notion Token が設定されていません');
-
-  const opts = {
-    method,
-    headers: {
-      'Authorization': `Bearer ${CONFIG.notionToken}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-    }
-  };
-  if (body) opts.body = JSON.stringify(body);
-
-  const res = await fetch(`https://api.notion.com/v1${path}`, opts);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Notion API error: ${res.status}`);
-  }
-  return res.json();
-}
-
-// Notionから記事一覧を同期
-async function syncFromNotion() {
-  if (!CONFIG.notionToken || !CONFIG.notionDbId) {
-    showToast('⚠️ 先に設定からNotion Token と DB IDを入力してください');
-    toggleSetup();
-    return;
-  }
-
-  const btn = document.getElementById('syncBtn');
-  btn.innerHTML = '<span class="loading-spinner"></span>';
+async function syncArticles() {
+  if (!GAS_URL) { toggleSetup(); return; }
+  var btn = document.getElementById('syncBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
   btn.disabled = true;
-
   try {
-    const data = await notionFetch(`/databases/${CONFIG.notionDbId}/query`, 'POST', {
-      sorts: [{ property: '登録日', direction: 'descending' }],
-      page_size: 100
-    });
-
-    const notionArticles = data.results.map(page => pageToArticle(page));
-
-    // ローカルにないものをマージ
-    const localIds = new Set(articles.filter(a => a.notionId).map(a => a.notionId));
-    const newOnes = notionArticles.filter(a => !localIds.has(a.notionId));
-
-    // Notionにあるものを更新
-    articles = articles.map(a => {
-      if (!a.notionId) return a;
-      const updated = notionArticles.find(n => n.notionId === a.notionId);
-      return updated || a;
-    });
-
-    articles = [...newOnes, ...articles];
-    saveLocalArticles();
+    var res = await fetch(GAS_URL + '?action=getBookmarks', { redirect: 'follow' });
+    var json = await res.json();
+    if (json.error) throw new Error(json.error);
+    articles = json.articles || [];
+    saveLocal();
     renderArticles();
-    showToast(`✅ ${notionArticles.length}件を同期しました`);
+    updateStats();
+    showToast('✅ ' + articles.length + '件を同期しました');
   } catch(e) {
-    showToast('❌ 同期エラー: ' + e.message);
-    console.error(e);
+    loadLocal();
+    renderArticles();
+    updateStats();
+    showToast('⚠️ 同期失敗: ' + e.message + '（キャッシュ表示）');
   }
-
   btn.innerHTML = '🔄 同期';
   btn.disabled = false;
 }
 
-function pageToArticle(page) {
-  const props = page.properties;
-  const getText = (prop) => prop?.rich_text?.[0]?.plain_text || prop?.title?.[0]?.plain_text || '';
-  const getSelect = (prop) => prop?.select?.name || '';
-  const getMultiSelect = (prop) => (prop?.multi_select || []).map(s => s.name);
-  const getUrl = (prop) => prop?.url || '';
-  const getDate = (prop) => prop?.date?.start || '';
-
-  return {
-    id: page.id,
-    notionId: page.id,
-    title: getText(props['タイトル'] || props['Name'] || props['名前']),
-    url: getUrl(props['URL']),
-    summary: getText(props['要約']),
-    memo: getText(props['メモ']),
-    tags: getMultiSelect(props['タグ']),
-    status: getSelect(props['状態']) || '未読',
-    addedAt: getDate(props['登録日']) || page.created_time?.slice(0,10) || '',
-    domain: '',
-  };
-}
-
-// Notionにページを追加
-async function addToNotion(article) {
-  if (!CONFIG.notionToken || !CONFIG.notionDbId) return null;
-
-  const body = {
-    parent: { database_id: CONFIG.notionDbId },
-    properties: {
-      'タイトル': { title: [{ text: { content: article.title } }] },
-      'URL': { url: article.url },
-      'メモ': { rich_text: [{ text: { content: article.memo || '' } }] },
-      'タグ': { multi_select: article.tags.map(t => ({ name: t })) },
-      '状態': { select: { name: article.status } },
-      '登録日': { date: { start: article.addedAt } },
-    }
-  };
-
-  try {
-    const page = await notionFetch('/pages', 'POST', body);
-    return page.id;
-  } catch(e) {
-    console.error('Notion add failed:', e);
-    return null;
-  }
-}
-
-// ============================================================
-// 記事の追加・保存
-// ============================================================
 async function saveArticle() {
-  const url = document.getElementById('inputUrl').value.trim();
-  const title = document.getElementById('inputTitle').value.trim();
-  const memo = document.getElementById('inputMemo').value.trim();
-  const tagsRaw = document.getElementById('inputTags').value.trim();
-  const status = document.getElementById('inputStatus').value;
-
+  var url = document.getElementById('inUrl').value.trim();
+  var title = document.getElementById('inTitle').value.trim();
+  var tags = document.getElementById('inTags').value.trim();
+  var bunrui = document.getElementById('inBunrui').value;
   if (!url || !title) { showToast('⚠️ URLとタイトルは必須です'); return; }
-
-  const btn = document.getElementById('saveBtn');
-  btn.innerHTML = '<span class="loading-spinner"></span> 保存中';
+  if (!GAS_URL) { showToast('⚠️ GAS URLを設定してください'); toggleSetup(); return; }
+  var btn = document.getElementById('saveBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
   btn.disabled = true;
-
-  const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const today = new Date().toISOString().slice(0, 10);
-
-  const article = {
-    id: Date.now().toString(),
-    notionId: null,
-    title,
-    url,
-    memo,
-    tags,
-    status,
-    summary: '',
-    addedAt: today,
-    domain: getDomain(url),
-  };
-
-  // Notionに保存（設定済みの場合）
-  if (CONFIG.notionToken && CONFIG.notionDbId) {
-    try {
-      const notionId = await addToNotion(article);
-      if (notionId) article.notionId = notionId;
-      showToast('✅ Notionに保存しました');
-    } catch(e) {
-      showToast('⚠️ Notion保存失敗 → ローカルに保存');
-    }
-  } else {
-    showToast('✅ ローカルに保存しました（Notion未設定）');
+  var data = { title, url, tags: tags ? tags.split(',').map(t=>t.trim()).filter(Boolean) : [], bunrui };
+  try {
+    var res = await fetch(GAS_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'addBookmark', data })
+    });
+    var json = await res.json();
+    if (json.error) throw new Error(json.error);
+    showToast('✅ Notionに保存しました');
+    closeAddModal();
+    await syncArticles();
+  } catch(e) {
+    showToast('❌ 保存失敗: ' + e.message);
   }
-
-  articles.unshift(article);
-  saveLocalArticles();
-  renderArticles();
-  closeAddModal();
-
   btn.innerHTML = '💾 保存';
   btn.disabled = false;
 }
 
-// ============================================================
-// レンダリング
-// ============================================================
-function renderArticles() {
-  const grid = document.getElementById('articlesGrid');
-  let filtered = articles;
-
-  if (currentTagFilter === '__unread') {
-    filtered = articles.filter(a => a.status === '未読');
-  } else if (currentTagFilter) {
-    filtered = articles.filter(a => a.tags.includes(currentTagFilter));
+async function toggleDone(notionId, current) {
+  if (!GAS_URL) return;
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'updateBookmark', pageId: notionId, data: { done: !current } })
+    });
+    var a = articles.find(a => a.notionId === notionId);
+    if (a) a.done = !current;
+    saveLocal();
+    renderArticles();
+    updateStats();
+    showToast(current ? '↩️ 未読に戻しました' : '✅ 済にしました');
+  } catch(e) {
+    showToast('❌ 更新失敗: ' + e.message);
   }
+}
 
-  document.getElementById('countAll').textContent = articles.length;
-
+function renderArticles() {
+  var grid = document.getElementById('articlesGrid');
+  var filtered = getFiltered();
+  document.getElementById('statsBar').style.display = articles.length ? 'flex' : 'none';
   if (filtered.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state">
-        <div class="big-icon">🔖</div>
-        <h3>記事がありません</h3>
-        <p>「＋ 追加」ボタンかiPhoneの共有シートから気になる記事を登録しましょう</p>
-      </div>
-    `;
+    grid.innerHTML = '<div class="empty-state"><div class="icon">🔖</div><h3>記事がありません</h3><p>「＋ 追加」から気になる記事を登録しましょう</p></div>';
     return;
   }
+  grid.innerHTML = filtered.map((a,i) => renderCard(a,i)).join('');
+}
 
-  grid.innerHTML = filtered.map((a, i) => renderCard(a, i)).join('');
+function renderEmpty(msg) {
+  document.getElementById('articlesGrid').innerHTML = '<div class="empty-state"><div class="icon">🔖</div><h3>' + msg + '</h3></div>';
 }
 
 function renderCard(a, i) {
-  const domain = a.domain || getDomain(a.url);
-  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : '';
-  const statusClass = a.status === '未読' ? 'status-unread' : a.status === '要約済み' ? 'status-summarized' : 'status-reading';
-  const statusLabel = a.status === '未読' ? '📥 未読' : a.status === '要約済み' ? '✅ 要約済み' : '📖 読書中';
-
-  const tagsHtml = a.tags.length
-    ? a.tags.map(t => `<span class="card-tag">${t}</span>`).join('')
-    : '';
-
-  const hasExtra = a.summary || a.memo;
-
-  return `
-    <div class="article-card">
-      <div class="card-top">
-        <div class="card-favicon">
-          ${faviconUrl ? `<img src="${faviconUrl}" onerror="this.style.display='none'">` : '🔗'}
-        </div>
-        <div class="card-title-wrap">
-          <a class="card-title" href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml(a.title)}</a>
-          <div class="card-meta">
-            ${domain ? `<span class="card-domain">${escHtml(domain)}</span>` : ''}
-            <span class="card-date">${fmtDate(a.addedAt)}</span>
-            <span class="status-badge ${statusClass}">${statusLabel}</span>
-            ${a.notionId ? '<span style="font-size:10px;color:var(--text3)">📘 Notion</span>' : ''}
-          </div>
-        </div>
-      </div>
-
-      ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ''}
-
-      ${a.summary ? `<div class="card-summary">${escHtml(a.summary)}</div>` : ''}
-
-      ${hasExtra ? `
-        <button class="card-expand-btn" id="expBtn-${i}" onclick="toggleExpand(${i})">
-          <span class="chevron">▼</span> 詳細を表示
-        </button>
-        <div class="card-expanded" id="expBody-${i}">
-          ${a.memo ? `
-            <div class="expand-section">
-              <div class="expand-section-label">💬 メモ</div>
-              <div class="expand-section-body">${escHtml(a.memo)}</div>
-            </div>
-          ` : ''}
-        </div>
-      ` : ''}
-
-      <div class="card-actions">
-        <a class="btn btn-secondary btn-sm" href="${escHtml(a.url)}" target="_blank" rel="noopener">🔗 開く</a>
-        <button class="btn btn-secondary btn-sm" onclick="deleteArticle('${escHtml(a.id)}')">🗑️</button>
-        <div style="flex:1"></div>
-        ${a.notionId ? '' : `<button class="btn btn-secondary btn-sm" onclick="pushToNotion('${escHtml(a.id)}')">📘 Notionへ</button>`}
-      </div>
-    </div>
-  `;
+  var domain = a.domain || getDomain(a.url);
+  var favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32' : '';
+  var tagsHtml = (a.tags||[]).map(t => '<span class="card-tag">' + esc(t) + '</span>').join('');
+  var bunruiHtml = a.bunrui ? '<span class="card-tag" style="border-color:#3B82F640;color:#60A5FA">' + esc(a.bunrui) + '</span>' : '';
+  var doneLabel = a.done ? '<span class="done-badge">✅ 済</span>' : '<span class="undone-badge">📥 未読</span>';
+  return '<div class="article-card ' + (a.done?'done-card':'') + '">'
+    + '<div class="card-top">'
+    + '<div class="card-favicon">' + (favicon ? '<img src="' + favicon + '" onerror="this.style.display=\'none\'">' : '🔗') + '</div>'
+    + '<div class="card-title-wrap">'
+    + '<a class="card-title" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.title) + '">' + esc(a.title) + '</a>'
+    + '<div class="card-meta">'
+    + (domain ? '<span class="card-domain">' + esc(domain) + '</span>' : '')
+    + '<span class="card-date">' + fmtDate(a.addedAt) + '</span>'
+    + doneLabel
+    + '</div></div></div>'
+    + ((tagsHtml||bunruiHtml) ? '<div class="card-tags">' + bunruiHtml + tagsHtml + '</div>' : '')
+    + (a.summary ? '<div class="card-summary"><div class="card-summary-label">📝 要約</div>' + esc(a.summary) + '</div>' : '')
+    + (a.kaisetsu ? '<button class="card-expand-btn" id="eb-' + i + '" onclick="toggleExpand(' + i + ')"><span class="chevron">▼</span> 初心者向け解説を見る</button>'
+      + '<div class="card-expanded" id="ex-' + i + '"><div class="card-kaisetsu"><div class="card-kaisetsu-label">💡 解説</div>' + esc(a.kaisetsu) + '</div></div>' : '')
+    + '<div class="card-actions">'
+    + '<a class="btn btn-ghost btn-sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">🔗 開く</a>'
+    + '<button class="btn btn-ghost btn-sm" onclick="toggleDone(\'' + esc(a.notionId) + '\',' + a.done + ')">' + (a.done ? '↩️ 未読に戻す' : '✅ 済にする') + '</button>'
+    + '</div></div>';
 }
 
 function toggleExpand(i) {
-  const btn = document.getElementById(`expBtn-${i}`);
-  const body = document.getElementById(`expBody-${i}`);
-  btn.classList.toggle('open');
+  var btn = document.getElementById('eb-' + i);
+  var body = document.getElementById('ex-' + i);
+  var open = btn.classList.toggle('open');
   body.classList.toggle('show');
-  btn.querySelector('.chevron').textContent = btn.classList.contains('open') ? '▲' : '▼';
-  btn.innerHTML = btn.innerHTML.replace(/詳細を(表示|閉じる)/, btn.classList.contains('open') ? '詳細を閉じる' : '詳細を表示');
+  btn.innerHTML = '<span class="chevron">' + (open?'▲':'▼') + '</span> ' + (open?'解説を閉じる':'初心者向け解説を見る');
 }
 
-// ============================================================
-// フィルター
-// ============================================================
-function filterTag(el, tag) {
+function getFiltered() {
+  if (currentFilter === 'unread') return articles.filter(a => !a.done);
+  if (currentFilter === 'done') return articles.filter(a => a.done);
+  if (currentFilter === 'summarized') return articles.filter(a => a.summary || a.kaisetsu);
+  return articles;
+}
+function setFilter(el, f) {
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
-  currentTagFilter = tag;
+  currentFilter = f;
   renderArticles();
 }
-
-// ============================================================
-// 削除
-// ============================================================
-function deleteArticle(id) {
-  if (!confirm('この記事を削除しますか？')) return;
-  articles = articles.filter(a => a.id !== id);
-  saveLocalArticles();
-  renderArticles();
-  showToast('🗑️ 削除しました');
+function updateStats() {
+  document.getElementById('totalCount').textContent = articles.length;
+  document.getElementById('unreadCount').textContent = articles.filter(a=>!a.done).length;
+  document.getElementById('doneCount').textContent = articles.filter(a=>a.done).length;
 }
-
-// ============================================================
-// Notionへ個別プッシュ
-// ============================================================
-async function pushToNotion(id) {
-  if (!CONFIG.notionToken || !CONFIG.notionDbId) {
-    showToast('⚠️ Notion設定が必要です');
-    toggleSetup();
-    return;
-  }
-  const article = articles.find(a => a.id === id);
-  if (!article) return;
-
-  try {
-    const notionId = await addToNotion(article);
-    if (notionId) {
-      article.notionId = notionId;
-      saveLocalArticles();
-      renderArticles();
-      showToast('✅ Notionに保存しました');
-    }
-  } catch(e) {
-    showToast('❌ Notion保存失敗: ' + e.message);
-  }
-}
-
-// ============================================================
-// モーダル
-// ============================================================
-function openAddModal() {
-  document.getElementById('addModal').classList.add('show');
-  setTimeout(() => document.getElementById('inputUrl').focus(), 100);
-}
-
+function openAddModal() { document.getElementById('addModal').classList.add('show'); }
 function closeAddModal() {
   document.getElementById('addModal').classList.remove('show');
-  ['inputUrl','inputTitle','inputMemo','inputTags'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('inputStatus').value = '未読';
+  ['inUrl','inTitle','inTags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inBunrui').value = '';
 }
-
-function onUrlChange() {
-  const url = document.getElementById('inputUrl').value.trim();
-  const titleInput = document.getElementById('inputTitle');
-  if (url && !titleInput.value) {
-    try {
-      const domain = new URL(url).hostname.replace('www.', '');
-      titleInput.placeholder = `${domain} の記事`;
-    } catch(e) {}
-  }
-}
-
-// ============================================================
-// セットアップ
-// ============================================================
+document.getElementById('addModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddModal(); });
 function toggleSetup() {
-  const panel = document.getElementById('setupPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  var el = document.getElementById('setupBanner');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
-
-// ============================================================
-// ユーティリティ
-// ============================================================
-function getDomain(url) {
-  try { return new URL(url).hostname.replace('www.', ''); }
-  catch(e) { return ''; }
+function saveGasUrl() {
+  GAS_URL = document.getElementById('gasUrlInput').value.trim();
+  if (!GAS_URL) { showToast('⚠️ URLを入力してください'); return; }
+  localStorage.setItem('bm_gas_url', GAS_URL);
+  showToast('✅ 保存しました');
+  toggleSetup();
+  syncArticles();
 }
-
-function fmtDate(s) {
-  if (!s) return '';
-  try {
-    const d = new Date(s);
-    return `${d.getMonth()+1}/${d.getDate()}`;
-  } catch(e) { return s; }
-}
-
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function showToast(msg, duration = 3000) {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), duration);
-}
-
-// モーダル外クリックで閉じる
-document.getElementById('addModal').addEventListener('click', function(e) {
-  if (e.target === this) closeAddModal();
-});
+function saveLocal() { try { localStorage.setItem('bm_cache', JSON.stringify(articles)); } catch(e){} }
+function loadLocal() { try { articles = JSON.parse(localStorage.getItem('bm_cache')||'[]'); } catch(e){ articles=[]; } }
+function getDomain(url) { try { return new URL(url).hostname.replace('www.',''); } catch(e){ return ''; } }
+function fmtDate(s) { if(!s) return ''; try { var d=new Date(s); return (d.getMonth()+1)+'/'+(d.getDate()); } catch(e){ return s; } }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToast(msg,ms=3000) { var o=document.querySelector('.toast');if(o)o.remove();var el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),ms); }
 </script>
 </body>
 </html>
