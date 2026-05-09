@@ -108,6 +108,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .notion-acc{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
 .notion-acc.open{max-height:600px;opacity:1;padding:14px 20px 16px 76px}
 
+/* ===== お気に入り・既読 ===== */
+.fav-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;transition:transform .15s;flex-shrink:0}
+.fav-btn:hover{transform:scale(1.2)}
+.fav-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;background:#fef9c3;color:#854d0e;border:1px solid #fde68a}
+.read-dim .art-title{color:var(--text3)}
+.read-dim .art-favicon{opacity:.5}
+
 /* ===== 空・ローディング ===== */
 .empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .empty .icon{font-size:36px;margin-bottom:10px}
@@ -225,9 +232,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
     <div id="tab-personal" style="display:none">
       <div class="subbar">
         <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて</button>
+        <button class="chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り</button>
         <button class="chip" onclick="setPersonalFilter(this,'unread')">未読</button>
-        <button class="chip" onclick="setPersonalFilter(this,'summarized')">要約済み</button>
-        <button class="chip" onclick="setPersonalFilter(this,'done')">済</button>
         <div class="subbar-right">
           <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
           <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
@@ -298,6 +304,8 @@ var openPersonalIdx = -1;
 var regionFilter = 'all';
 var catFilter = 'all';
 var personalFilter = 'all';
+var favIds  = new Set(JSON.parse(localStorage.getItem('p_favs')||'[]'));
+var readIds = new Set(JSON.parse(localStorage.getItem('p_reads')||'[]'));
 var curTab = 'news';
 var curDate = '';           // 選択中の日付
 
@@ -528,10 +536,7 @@ async function syncPersonal(){
 }
 
 function renderPersonal(){
-  var list=personalArts;
-  if(personalFilter==='unread')     list=list.filter(a=>!a.done);
-  if(personalFilter==='done')       list=list.filter(a=>a.done);
-  if(personalFilter==='summarized') list=list.filter(a=>a.summary||a.kaisetsu);
+  var list=getPersonalFiltered();
   document.getElementById('personalCount').textContent=list.length+'件';
   var el=document.getElementById('notionList');
   if(!list.length){
@@ -542,42 +547,91 @@ function renderPersonal(){
 }
 
 function renderPersonalItem(a,i){
-  var isOpen=openPersonalIdx===i;
-  var domain=getDomain(a.url);
-  var favicon=domain?'https://www.google.com/s2/favicons?domain='+domain+'&sz=64':'';
-  var emoji=domainEmoji(domain);
-  var tags=(a.tags||[]).map(t=>`<span style="font-size:10px;padding:1px 6px;border-radius:5px;background:#f0ede8;color:var(--text2);border:1px solid var(--border)">${esc(t)}</span>`).join('');
+  var isOpen  = openPersonalIdx===i;
+  var isRead  = readIds.has(a.notionId);
+  var isFav   = favIds.has(a.notionId);
+  var domain  = getDomain(a.url);
+  var favicon = domain?'https://www.google.com/s2/favicons?domain='+domain+'&sz=64':'';
+  var emoji   = domainEmoji(domain);
+  var tags    = (a.tags||[]).map(function(t){return '<span style="font-size:10px;padding:1px 6px;border-radius:5px;background:#f0ede8;color:var(--text2);border:1px solid var(--border)">'+esc(t)+'</span>';}).join('');
 
-  return `<div class="notion-row${isOpen?' open-row':''}${a.done?' done-row':''}" onclick="togglePersonal(${i})">
-  <div class="art-favicon">${favicon ? '<img src="'+favicon+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">' : emoji}</div>
-  <div class="art-body">
-    <div class="art-title">${esc(a.title||a.url)}</div>
-    <div class="art-meta">
-      <span class="meta-date">${fmtDate(a.addedAt)}</span>
-      ${domain?`<span class="meta-sep">·</span><span class="meta-src">${esc(domain)}</span>`:''}
-      ${a.done?'<span style="font-size:10px;font-weight:700;color:#16a34a">✅</span>':''}
-    </div>
-    ${tags?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${tags}</div>`:''}
-  </div>
-  <span class="art-chevron" style="font-size:10px;color:var(--text3);transition:transform .2s;${isOpen?'transform:rotate(180deg)':''}">▼</span>
-</div>
-<div class="notion-acc${isOpen?' open':''}">
-  ${a.summary?`<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">${esc(a.summary)}</div></div>`:''}
-  ${a.kaisetsu?`<div class="acc-note-box"><div class="acc-lbl amber">💡 解説</div><div class="acc-text">${esc(a.kaisetsu)}</div></div>`:''}
-  ${a.katsuyo?`<div class="acc-impact-box"><div class="acc-lbl green">🚀 活用アイデア</div><div class="acc-text">${esc(a.katsuyo)}</div></div>`:''}
-  ${!a.summary&&!a.kaisetsu?'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px">要約未生成（web-summarizerスキルで処理してください）</div>':''}
-  <div class="acc-actions">
-    <a class="acc-link" href="${esc(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 開く</a>
-    <button class="acc-link" style="cursor:pointer;background:transparent" onclick="toggleDone('${esc(a.notionId)}',${a.done},event)">${a.done?'↩️ 未読':'✅ 済にする'}</button>
-  </div>
-</div>`;
+  // タイトル：nameカラム優先、URLそのままのものはURLを表示
+  var displayTitle = (a.title && a.title.trim() && !a.title.startsWith('http'))
+    ? a.title : (a.url||'');
+
+  var html = '';
+  // カード行
+  html += '<div class="notion-row'+(isOpen?' open-row':'')+(isRead&&!isOpen?' read-dim':'')+'" onclick="togglePersonal('+i+')">';
+  html += '<div class="art-favicon">'+(favicon?'<img src="'+favicon+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">':emoji)+'</div>';
+  html += '<div class="art-body">';
+  html += '<div class="art-title">'+(isFav?'<span style="color:#f59e0b;margin-right:3px">⭐</span>':'')+esc(displayTitle)+'</div>';
+  html += '<div class="art-meta">';
+  html += '<span class="meta-date">'+fmtDate(a.addedAt)+'</span>';
+  if(domain) html += '<span class="meta-sep">·</span><span class="meta-src">'+esc(domain)+'</span>';
+  if(isRead&&!isOpen) html += '<span style="font-size:10px;color:var(--text3);margin-left:4px">既読</span>';
+  html += '</div>';
+  if(tags) html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+tags+'</div>';
+  html += '</div>';
+  html += '<span class="art-chevron" style="font-size:10px;color:var(--text3);transition:transform .2s;'+(isOpen?'transform:rotate(180deg)':'')+'">▼</span>';
+  html += '</div>';
+
+  // アコーディオン
+  html += '<div class="notion-acc'+(isOpen?' open':'')+'">';
+  // 本文URL
+  html += '<div style="margin-bottom:10px;padding:8px 12px;background:#f8f7f4;border-radius:7px;border:1px solid var(--border)">';
+  html += '<div class="acc-lbl" style="color:var(--text3);margin-bottom:4px">🔗 元記事</div>';
+  html += '<a href="'+esc(a.url)+'" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);word-break:break-all" onclick="event.stopPropagation()">'+esc(a.url)+'</a>';
+  html += '</div>';
+  // 要約
+  if(a.summary) html += '<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">'+esc(a.summary)+'</div></div>';
+  // 解説
+  if(a.kaisetsu) html += '<div class="acc-note-box"><div class="acc-lbl amber">💡 解説</div><div class="acc-text">'+esc(a.kaisetsu)+'</div></div>';
+  // 活用
+  if(a.katsuyo) html += '<div class="acc-impact-box"><div class="acc-lbl green">🚀 活用アイデア</div><div class="acc-text">'+esc(a.katsuyo)+'</div></div>';
+  if(!a.summary&&!a.kaisetsu) html += '<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px">要約未生成（web-summarizerスキルで処理してください）</div>';
+  // アクション
+  html += '<div class="acc-actions">';
+  html += '<button class="fav-btn" onclick="toggleFav(\''+esc(a.notionId)+'\',event)" title="お気に入り">'+(isFav?'⭐':'☆')+'</button>';
+  html += '<a class="acc-link" href="'+esc(a.url)+'" target="_blank" rel="noopener" onclick="markRead(\''+esc(a.notionId)+'\');event.stopPropagation()">🔗 開く</a>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
-function togglePersonal(i){ openPersonalIdx=openPersonalIdx===i?-1:i; renderPersonal(); }
+function togglePersonal(i){
+  openPersonalIdx = openPersonalIdx===i ? -1 : i;
+  // 開いたら既読にする
+  if(openPersonalIdx !== -1){
+    var list = getPersonalFiltered();
+    if(list[i]) markRead(list[i].notionId);
+  }
+  renderPersonal();
+}
 
 function setPersonalFilter(el,f){
   document.querySelectorAll('#tab-personal .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active'); personalFilter=f; openPersonalIdx=-1; renderPersonal();
+}
+function getPersonalFiltered(){
+  var list=personalArts;
+  if(personalFilter==='fav')    list=list.filter(a=>favIds.has(a.notionId));
+  if(personalFilter==='unread') list=list.filter(a=>!readIds.has(a.notionId));
+  return list;
+}
+
+function toggleFav(id,e){
+  e&&e.stopPropagation();
+  if(favIds.has(id)) favIds.delete(id);
+  else favIds.add(id);
+  localStorage.setItem('p_favs', JSON.stringify([...favIds]));
+  renderPersonal();
+  showToast(favIds.has(id)?'⭐ お気に入りに追加':'☆ お気に入りを解除');
+}
+
+function markRead(id){
+  if(!id) return;
+  readIds.add(id);
+  localStorage.setItem('p_reads', JSON.stringify([...readIds]));
 }
 
 async function toggleDone(id,cur,e){
