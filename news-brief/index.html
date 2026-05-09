@@ -304,8 +304,9 @@ var openPersonalIdx = -1;
 var regionFilter = 'all';
 var catFilter = 'all';
 var personalFilter = 'all';
-var favIds  = new Set(JSON.parse(localStorage.getItem('p_favs')||'[]'));
-var readIds = new Set(JSON.parse(localStorage.getItem('p_reads')||'[]'));
+var favIds     = new Set(JSON.parse(localStorage.getItem('p_favs')||'[]'));
+var readIds    = new Set(JSON.parse(localStorage.getItem('p_reads')||'[]'));
+var syncedDates = JSON.parse(localStorage.getItem('p_synced_dates')||'{}'); // {date: count}
 var curTab = 'news';
 var curDate = '';           // 選択中の日付
 
@@ -524,14 +525,64 @@ async function syncPersonal(){
   if(!GAS_URL){ toggleSetup(); return; }
   var btn=document.getElementById('syncBtn');
   btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+
   try{
-    var res=await fetch(GAS_URL+'?action=getBookmarks',{redirect:'follow'});
-    var json=await res.json();
+    // Step1: Notionにある登録日一覧を取得
+    var res = await fetch(GAS_URL+'?action=getDates',{redirect:'follow'});
+    var json = await res.json();
     if(json.error) throw new Error(json.error);
-    personalArts=json.articles||[];
-    saveLocal(); renderPersonal();
-    showToast('✅ '+personalArts.length+'件を同期');
-  }catch(e){ loadLocal(); renderPersonal(); showToast('⚠️ キャッシュ表示: '+e.message); }
+
+    var remoteDates = json.dates || {}; // {"2026-05-09":3, ...}
+    var newDates = [];
+
+    // Step2: 未同期の日付を検出
+    Object.keys(remoteDates).forEach(function(date){
+      var remoteCount = remoteDates[date];
+      var localCount  = syncedDates[date] || 0;
+      // 件数が変わっていたら再取得対象
+      if(localCount !== remoteCount) newDates.push(date);
+    });
+
+    if(newDates.length === 0){
+      showToast('✅ 最新です（新規なし）');
+      btn.innerHTML='🔄'; btn.disabled=false;
+      renderPersonal();
+      return;
+    }
+
+    // Step3: 未同期日付の記事を取得してマージ
+    var addedCount = 0;
+    for(var i=0; i<newDates.length; i++){
+      var date = newDates[i];
+      var r2 = await fetch(GAS_URL+'?action=getBookmarksByDate&date='+date,{redirect:'follow'});
+      var j2 = await r2.json();
+      if(j2.error) continue;
+
+      var newArts = j2.articles||[];
+      // 既存から同日付分を除去して新データで差し替え
+      personalArts = personalArts.filter(function(a){ return a.addedAt !== date; });
+      personalArts = newArts.concat(personalArts);
+
+      // 同期済みに記録
+      syncedDates[date] = remoteDates[date];
+      addedCount += newArts.length;
+    }
+
+    // 日付降順でソート
+    personalArts.sort(function(a,b){ return b.addedAt.localeCompare(a.addedAt); });
+
+    // お気に入りをNotionデータで更新
+    favIds = new Set(personalArts.filter(function(a){return a.fav;}).map(function(a){return a.notionId;}));
+    localStorage.setItem('p_favs', JSON.stringify([...favIds]));
+    localStorage.setItem('p_synced_dates', JSON.stringify(syncedDates));
+    saveLocal();
+    renderPersonal();
+    showToast('✅ '+newDates.length+'日分・'+addedCount+'件を同期');
+
+  }catch(e){
+    loadLocal(); renderPersonal();
+    showToast('⚠️ キャッシュ表示: '+e.message);
+  }
   btn.innerHTML='🔄'; btn.disabled=false;
 }
 
@@ -577,14 +628,7 @@ function renderPersonalItem(a,i){
 
   // アコーディオン
   html += '<div class="notion-acc'+(isOpen?' open':'')+'">';
-  // 本文テキスト（Notionページのblocks本文）
-  if(a.content && a.content.trim()){
-    html += '<div style="margin-bottom:10px;padding:10px 12px;background:#f8f7f4;border-radius:7px;border:1px solid var(--border)">';
-    html += '<div class="acc-lbl" style="color:var(--text3);margin-bottom:6px">📄 本文</div>';
-    html += '<div style="font-size:13px;color:var(--text2);line-height:1.75;white-space:pre-line">'+esc(a.content)+'</div>';
-    html += '<a href="'+esc(a.url)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--accent)" onclick="event.stopPropagation()">続きを読む →</a>';
-    html += '</div>';
-  }
+
   // 要約
   if(a.summary) html += '<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">'+esc(a.summary)+'</div></div>';
   // 解説
@@ -622,13 +666,22 @@ function getPersonalFiltered(){
   return list;
 }
 
-function toggleFav(id,e){
+async function toggleFav(id,e){
   e&&e.stopPropagation();
-  if(favIds.has(id)) favIds.delete(id);
-  else favIds.add(id);
+  var newVal = !favIds.has(id);
+  // ローカル即時反映
+  if(newVal) favIds.add(id);
+  else favIds.delete(id);
   localStorage.setItem('p_favs', JSON.stringify([...favIds]));
   renderPersonal();
-  showToast(favIds.has(id)?'⭐ お気に入りに追加':'☆ お気に入りを解除');
+  showToast(newVal?'⭐ お気に入りに追加':'☆ お気に入りを解除');
+  // Notionに反映
+  if(GAS_URL){
+    try{
+      await fetch(GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'updateBookmark',pageId:id,data:{fav:newVal}})});
+    }catch(e){ showToast('⚠️ Notion反映失敗'); }
+  }
 }
 
 function markRead(id){
