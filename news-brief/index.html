@@ -16,7 +16,7 @@
   --hdr:52px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column}
 
 /* ヘッダー */
 .hdr{height:var(--hdr);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 20px;flex-shrink:0}
@@ -35,8 +35,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .btn-log:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
 
 /* ボディ */
-.body{display:flex;flex:1;overflow:hidden}
-.main{flex:1;overflow-y:auto;background:var(--surface)}
+.body{display:flex;flex:1;min-height:0}
+.main{flex:1;overflow-y:auto;background:var(--surface);min-height:0}
 .main::-webkit-scrollbar{width:4px}.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
 /* サブバー */
@@ -78,8 +78,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .art-row.open-row .art-chevron{transform:rotate(180deg)}
 
 /* アコーディオン */
-.art-acc{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
-.art-acc.open{max-height:600px;opacity:1;padding:14px 20px 16px 76px}
+.art-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
+.art-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
 .acc-summary-box{border-left:3px solid var(--accent);padding-left:12px;margin-bottom:10px}
 .acc-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);margin-bottom:3px}
 .acc-lbl.blue{color:var(--accent)}.acc-lbl.amber{color:var(--amber)}.acc-lbl.green{color:var(--accent2)}
@@ -105,8 +105,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .notion-row{display:flex;gap:14px;padding:13px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;align-items:flex-start}
 .notion-row:hover{background:#faf9f7}
 .notion-row.open-row{background:var(--accent-bg)}
-.notion-acc{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
-.notion-acc.open{max-height:600px;opacity:1;padding:14px 20px 16px 76px}
+.notion-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
+.notion-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
 .fav-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;transition:transform .15s;flex-shrink:0}
 .fav-btn:hover{transform:scale(1.2)}
 .read-dim .art-title{color:var(--text3)}
@@ -179,19 +179,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh
 .cat-politics{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
 .cat-other{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
 
-@media(max-width:640px){.logo span{display:none}.hdr{padding:0 12px}}
+@media(max-width:640px){
+  .logo span{display:none}
+  .hdr{padding:0 12px}
+  body{height:auto;overflow:auto}
+  .body{flex-direction:column;overflow:visible}
+  .main{overflow-y:visible;min-height:auto}
+}
 </style>
 </head>
 <body>
 
 <header class="hdr">
+  <a href="../" class="logo"><div class="logo-dot">📰</div><span>AI News Hub</span></a>
   <nav class="tabs">
     <button class="tab active" onclick="switchTab('news',this)">ニュース</button>
     <button class="tab" onclick="switchTab('ideas',this)">活用</button>
     <button class="tab" onclick="switchTab('personal',this)">パーソナル</button>
   </nav>
   <div class="hdr-right">
-    <button class="btn-log" onclick="toggleDrawer()">履歴</button>
+    <button class="btn-log" onclick="toggleDrawer()">📅 履歴</button>
     <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
     <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
     <button class="btn btn-ghost" onclick="openJsonModal()">📋</button>
