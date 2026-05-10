@@ -191,14 +191,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 <body>
 
 <header class="hdr">
-  <a href="../" class="logo"><div class="logo-dot">📰</div><span>AI News Hub</span></a>
   <nav class="tabs">
     <button class="tab active" onclick="switchTab('news',this)">ニュース</button>
     <button class="tab" onclick="switchTab('ideas',this)">活用</button>
     <button class="tab" onclick="switchTab('personal',this)">パーソナル</button>
   </nav>
   <div class="hdr-right">
-    <button class="btn-log" onclick="toggleDrawer()">📅 履歴</button>
+    <button class="btn-log" onclick="toggleDrawer()">📅</button>
     <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
     <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
     <button class="btn btn-ghost" onclick="openJsonModal()">📋</button>
