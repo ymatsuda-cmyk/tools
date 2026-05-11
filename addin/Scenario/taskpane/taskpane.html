@@ -93,10 +93,20 @@ select:focus{border-color:var(--accent);background-color:#fff;}
 .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 
 /* ── MAIN ── */
-main{padding:12px 14px;overflow-x:auto;}
+main{
+  padding:12px 14px;
+  overflow-x:auto;
+  overflow-y:visible;
+}
 
 /* ── BOARD (作成状況) ── */
-.board{display:flex;gap:10px;min-width:max-content;align-items:flex-start;}
+.board{
+  display:flex;
+  gap:10px;
+  min-width:max-content;
+  align-items:flex-start;
+  overflow:visible;
+}
 .lane{width:240px;flex-shrink:0;}
 .lane-header{
   display:flex;
@@ -108,8 +118,8 @@ main{padding:12px 14px;overflow-x:auto;}
   margin-bottom:6px;
   border-bottom:2px solid transparent;
   position:sticky;
-  top:120px; /* header+tabs+filters分の高さに調整 */
-  z-index:10;
+  top:148px; /* header(48)+tabs(36)+filters(64)想定で調整 */
+  z-index:101;
   background:#fff;
 }
 .lane-count{margin-left:auto;font-size:10px;font-family:"JetBrains Mono",monospace;}
