@@ -80,11 +80,16 @@ function getLane(start, end, blockText, minorText) {
   };
   const unresolvedBlock = hasUnresolved(blockText);
   const unresolvedMinor = hasUnresolved(minorText);
-  
+
+  // 実施完了日に「削除」という文字列が入っている場合は削除レーン
+  if (typeof end === "string" && end.trim() === "削除") {
+    return "削除";
+  }
+
   // バグ保留判定（完了阻害課題で判定）
   if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
   if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
-  
+
   // 完了判定（軽微な課題で完了条件付きを判定）
   if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
   return unresolvedMinor ? "完了（条件付き）" : "完了";
