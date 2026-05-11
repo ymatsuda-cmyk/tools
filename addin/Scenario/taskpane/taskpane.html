@@ -1686,14 +1686,13 @@ var bugStatusFilter = ["確認", "完了"];
 
 function renderBugStatusFilter() {
   var statuses = ["未対応", "対応中", "確認", "完了", "検討中", "対応済み", "解消済み"];
-  var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;">';
-  html += '<span style="font-size:11px;font-weight:600;color:var(--muted);">ステータス:</span>';
+  var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;align-items:center;">';
+  html += '<span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:6px;">ステータス:</span>';
   statuses.forEach(function(st) {
-    var checked = bugStatusFilter.includes(st) ? "checked" : "";
-    html += `<label style="font-size:11px;margin-right:8px;"><input type="checkbox" class="bug-status-filter" value="${st}" ${checked}>${st}</label>`;
+    var active = bugStatusFilter.includes(st) ? "active" : "";
+    html += `<button type="button" class="status-toggle-btn ${active}" data-status="${st}" style="font-size:11px;padding:3px 10px;margin-right:4px;border-radius:12px;border:1px solid #d0d5dd;background:${active?"#2563eb":"#f8f9fb"};color:${active?"#fff":"#475569"};font-weight:${active?700:500};cursor:pointer;">${st}</button>`;
   });
   html += '</div>';
-  var container = document.getElementById("bugView");
   var summaryTable = document.getElementById("summaryTable");
   if (!document.getElementById("bugStatusFilterRow")) {
     summaryTable.insertAdjacentHTML("beforebegin", html);
@@ -1701,10 +1700,16 @@ function renderBugStatusFilter() {
     document.getElementById("bugStatusFilterRow").outerHTML = html;
   }
   // イベント登録
-  document.querySelectorAll(".bug-status-filter").forEach(function(chk) {
-    chk.addEventListener("change", function() {
-      var checked = Array.from(document.querySelectorAll(".bug-status-filter:checked")).map(e => e.value);
-      bugStatusFilter = checked.length ? checked : ["確認", "完了"];
+  document.querySelectorAll(".status-toggle-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var st = this.getAttribute("data-status");
+      if (bugStatusFilter.includes(st)) {
+        // 最低1つは必ずON
+        if (bugStatusFilter.length === 1) return;
+        bugStatusFilter = bugStatusFilter.filter(s => s !== st);
+      } else {
+        bugStatusFilter.push(st);
+      }
       renderSummary();
     });
   });
