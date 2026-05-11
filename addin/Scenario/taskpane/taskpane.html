@@ -113,7 +113,7 @@ main{
   display: flex;
   flex-direction: column;
   height: 70vh; /* 必要に応じて調整 */
-  background: #fff;
+  background: #eeeeee;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,.03);
 }
@@ -805,18 +805,17 @@ function displayBugList(containerId, bugText, bugType) {
   let html = "";
   bugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
-    console.log(`Bug ${bug.id}:`, sheetBug); // デバッグ用
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
     const statusClass = bug.resolved ? "closed" : "open";
     const statusText = bug.resolved ? "解消済み" : (status || "未解消");
-    
     // 追加・削除判定
     const isAdded = !originalIds.includes(bug.id); // 元のリストにない = 新規追加
     const statusSuffix = isAdded ? ' added' : '';
-
+    // 「確認」「完了」以外はチェックボックスをdisabled
+    const canCheck = status === "確認" || status === "完了";
     html += `<div class="bug-item${statusSuffix}">
-      <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} 
+      <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} ${(canCheck ? '' : 'disabled')} 
              onchange="updateBugStatus('${bug.id}', this.checked, '${bugType}')">
       <span class="bug-id">${bug.id}</span>
       <span class="bug-title">${esc(title)}</span>
@@ -1682,7 +1681,37 @@ function applyFilter(){
 }
 
 // ─── バグ解消確認：サマリー ───────────────────────────────
+// ステータスフィルタの状態
+var bugStatusFilter = ["確認", "完了"];
+
+function renderBugStatusFilter() {
+  var statuses = ["未対応", "対応中", "確認", "完了", "検討中", "対応済み", "解消済み"];
+  var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;">';
+  html += '<span style="font-size:11px;font-weight:600;color:var(--muted);">ステータス:</span>';
+  statuses.forEach(function(st) {
+    var checked = bugStatusFilter.includes(st) ? "checked" : "";
+    html += `<label style="font-size:11px;margin-right:8px;"><input type="checkbox" class="bug-status-filter" value="${st}" ${checked}>${st}</label>`;
+  });
+  html += '</div>';
+  var container = document.getElementById("bugView");
+  var summaryTable = document.getElementById("summaryTable");
+  if (!document.getElementById("bugStatusFilterRow")) {
+    summaryTable.insertAdjacentHTML("beforebegin", html);
+  } else {
+    document.getElementById("bugStatusFilterRow").outerHTML = html;
+  }
+  // イベント登録
+  document.querySelectorAll(".bug-status-filter").forEach(function(chk) {
+    chk.addEventListener("change", function() {
+      var checked = Array.from(document.querySelectorAll(".bug-status-filter:checked")).map(e => e.value);
+      bugStatusFilter = checked.length ? checked : ["確認", "完了"];
+      renderSummary();
+    });
+  });
+}
+
 function renderSummary(){
+  renderBugStatusFilter();
   var tbody=document.getElementById("summaryBody");
   var rows="";
   bugData.forEach(function(b){
@@ -1701,6 +1730,8 @@ function renderSummary(){
     var title=b.title || "";
     var ty=hasBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
     var sel=selectedBugId===b.id;
+    // ステータスフィルタ適用
+    if (!bugStatusFilter.includes(st)) return;
     rows+='<tr data-bugid="'+b.id+'"'+(sel?' class="selected"':'')+'>'
         +'<td><span class="'+bc+'">'+esc(disp)+'</span></td>'
         +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">'+esc(title)+'</td>'
@@ -1771,9 +1802,11 @@ function renderDetail(){
     var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"－";
     var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"－";
     var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"－";
-    
+    // バグstatus取得
+    var bugStatus = bug.status || "";
+    var canCheck = bugStatus === "確認" || bugStatus === "完了";
     rows+='<tr'+rc+' class="scenario-row" style="cursor:pointer" data-si="'+originalIndex+'">'
-        +'<td class="chk-cell"><input type="checkbox" data-si="'+originalIndex+'"'+chk+'></td>'
+        +'<td class="chk-cell"><input type="checkbox" data-si="'+originalIndex+'"'+chk+(canCheck?'':' disabled')+'></td>'
         +'<td><span class="no-badge">#'+s.no+'</span></td>'
         +'<td><strong>'+esc(s.brand)+'</strong></td>'
         +'<td>'+esc(s.op1Func||"－")+'</td><td>'+o1s+'</td>'
