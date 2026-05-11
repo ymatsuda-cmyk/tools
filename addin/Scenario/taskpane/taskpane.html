@@ -1250,18 +1250,9 @@ function calculateLane(start, end, blockText, minorText) {
   const unresolvedBlock = hasUnresolved(blockText);
   const unresolvedMinor = hasUnresolved(minorText);
 
-  // 削除レーン判定: 完了日が「削除」や空文字列以外から空欄になった場合
-  if (start && (end === null || end === undefined || end === "")) {
-    // 完了日が削除された場合
-    // ただし、未着手や対応中のものは除外（完了日が元々空欄のものは既存ロジックで）
-    // ここでは「完了」や「完了（条件付き）」から完了日が消えた場合を想定
-    // 既存ロジックで対応中になるものは除外
-    // ここで「削除」レーンに振り分け
-    if (window && window._wasComplete && window._wasComplete()) {
-      return "削除";
-    }
-    // 通常の対応中ロジック
-    return unresolvedBlock ? "バグ保留" : "対応中";
+  // 実施完了日に「削除」という文字列が入っている場合は削除レーン
+  if (typeof end === "string" && end.trim() === "削除") {
+    return "削除";
   }
 
   // バグ保留判定（完了阻害課題で判定）
