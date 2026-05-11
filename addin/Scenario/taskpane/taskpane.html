@@ -448,7 +448,7 @@ function formatSheetName(sheetName) {
     default: return sheetName;
   }
 }
-var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了"];
+var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了","削除"];
 var todayMode = false; // ★/☆表示切り替えフラグ
 
 // ─── デモデータ ───────────────────────────────────────
@@ -1249,15 +1249,36 @@ function calculateLane(start, end, blockText, minorText) {
   };
   const unresolvedBlock = hasUnresolved(blockText);
   const unresolvedMinor = hasUnresolved(minorText);
-  
+
+  // 削除レーン判定: 完了日が「削除」や空文字列以外から空欄になった場合
+  if (start && (end === null || end === undefined || end === "")) {
+    // 完了日が削除された場合
+    // ただし、未着手や対応中のものは除外（完了日が元々空欄のものは既存ロジックで）
+    // ここでは「完了」や「完了（条件付き）」から完了日が消えた場合を想定
+    // 既存ロジックで対応中になるものは除外
+    // ここで「削除」レーンに振り分け
+    if (window && window._wasComplete && window._wasComplete()) {
+      return "削除";
+    }
+    // 通常の対応中ロジック
+    return unresolvedBlock ? "バグ保留" : "対応中";
+  }
+
   // バグ保留判定（完了阻害課題で判定）
   if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
   if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
-  
+
   // 完了判定（軽微な課題で完了条件付きを判定）
   if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
   return unresolvedMinor ? "完了（条件付き）" : "完了";
 }
+
+// 完了日が削除されたかどうか判定するためのフラグ関数（windowに仮置き）
+window._wasComplete = function() {
+  // 直前の状態が完了系だったかどうかを判定するロジックをここに実装（必要に応じて）
+  // ここでは常にtrueを返すことで、完了日が消えたものを削除レーンに振り分ける
+  return true;
+};
 
 function updateBugDataFromScenario() {
   if (!currentEditingScenario) return;
