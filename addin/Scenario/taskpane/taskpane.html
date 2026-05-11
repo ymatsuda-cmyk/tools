@@ -84,7 +84,20 @@ main{padding:12px 14px;overflow-x:auto;}
 /* ── BOARD (作成状況) ── */
 .board{display:flex;gap:10px;min-width:max-content;align-items:flex-start;}
 .lane{width:240px;flex-shrink:0;}
-.lane-header{display:flex;align-items:center;padding:6px 10px;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;margin-bottom:6px;border-bottom:2px solid transparent;}
+.lane-header{
+  display:flex;
+  align-items:center;
+  padding:6px 10px;
+  border-radius:6px 6px 0 0;
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:6px;
+  border-bottom:2px solid transparent;
+  position:sticky;
+  top:54px; /* ヘッダーやフィルター分の高さに調整 */
+  z-index:10;
+  background:#fff;
+}
 .lane-count{margin-left:auto;font-size:10px;font-family:"JetBrains Mono",monospace;}
 .lane[data-lane="未着手"] .lane-header{background:#f8f9fb;border-color:#94a3b8;color:#475569;}
 .lane[data-lane="バグ保留"] .lane-header{background:#fff7ed;border-color:#f97316;color:#c2410c;}
