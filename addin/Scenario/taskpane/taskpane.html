@@ -18,7 +18,21 @@
 body{font-family:"Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
 
 /* ── HEADER ── */
-header{background:#fff;border-bottom:1px solid var(--border);padding:10px 14px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+header{
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  padding:10px 14px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.view-tabs {
+  position:sticky;
+  top:48px; /* headerの高さ分 */
+  z-index:99;
+  background:#fff;
+}
 .header-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
 h1{font-size:14px;font-weight:700;}
@@ -94,7 +108,7 @@ main{padding:12px 14px;overflow-x:auto;}
   margin-bottom:6px;
   border-bottom:2px solid transparent;
   position:sticky;
-  top:54px; /* ヘッダーやフィルター分の高さに調整 */
+  top:120px; /* header+tabs+filters分の高さに調整 */
   z-index:10;
   background:#fff;
 }
