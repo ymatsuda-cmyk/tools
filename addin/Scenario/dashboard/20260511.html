@@ -686,7 +686,7 @@ body {
 //  MOCK DATA（アドインから生成する際はここをJSON置換）
 // ============================================================
 const DASHBOARD_DATA = {
-  "generatedDate": "2026-05-01",
+  "generatedDate": "2026-05-11",
   "ph1": {
     "startDate": "2026-03-09",
     "endDate": "2026-06-14",
@@ -710,18 +710,18 @@ const DASHBOARD_DATA = {
       {
         "name": "異常(通常):電子マネー",
         "total": 108,
-        "planDone": 87,
-        "actualDone": 48,
+        "planDone": 101,
+        "actualDone": 74,
         "planEndDate": "2026-05-12",
-        "predictEndDate": "2026-05-22"
+        "predictEndDate": "2026-05-19"
       },
       {
         "name": "異常(電断):電子マネー",
         "total": 155,
-        "planDone": 48,
-        "actualDone": 18,
+        "planDone": 59,
+        "actualDone": 22,
         "planEndDate": "2026-05-22",
-        "predictEndDate": "2026-07-21"
+        "predictEndDate": "2026-07-23"
       },
       {
         "name": "異常(通断):電子マネー",
@@ -992,12 +992,12 @@ const DASHBOARD_DATA = {
         null,
         null,
         null,
+        282.0,
+        282.0,
+        270.0,
         null,
         null,
-        null,
-        null,
-        null,
-        null,
+        252.0,
         null,
         null,
         null,
@@ -1295,12 +1295,12 @@ const DASHBOARD_DATA = {
           null,
           null,
           null,
+          0.0,
+          0.0,
+          0.0,
           null,
           null,
-          null,
-          null,
-          null,
-          null,
+          0.0,
           null,
           null,
           null,
@@ -1597,12 +1597,12 @@ const DASHBOARD_DATA = {
           null,
           null,
           null,
+          0.0,
+          0.0,
+          0.0,
           null,
           null,
-          null,
-          null,
-          null,
-          null,
+          0.0,
           null,
           null,
           null,
@@ -1899,12 +1899,12 @@ const DASHBOARD_DATA = {
           null,
           null,
           null,
+          60.0,
+          60.0,
+          48.0,
           null,
           null,
-          null,
-          null,
-          null,
-          null,
+          34.0,
           null,
           null,
           null,
@@ -2201,12 +2201,12 @@ const DASHBOARD_DATA = {
           null,
           null,
           null,
+          137.0,
+          137.0,
+          137.0,
           null,
           null,
-          null,
-          null,
-          null,
-          null,
+          133.0,
           null,
           null,
           null,
@@ -2503,12 +2503,12 @@ const DASHBOARD_DATA = {
           null,
           null,
           null,
+          85.0,
+          85.0,
+          85.0,
           null,
           null,
-          null,
-          null,
-          null,
-          null,
+          85.0,
           null,
           null,
           null,
@@ -4788,7 +4788,7 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-019",
-      "status": "解析中",
+      "status": "確認中",
       "title": "レシート情報が途切れる",
       "date": "4/30",
       "category": "シナリオ定義（通常）",
@@ -4796,7 +4796,7 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-020",
-      "status": "解析中",
+      "status": "完了",
       "title": "電源断復帰後の再取得取引情報で端末番号などが返ってこない",
       "date": "4/30",
       "category": "シナリオ定義（電源断）",
@@ -4804,7 +4804,7 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-021",
-      "status": "解析中",
+      "status": "確認中",
       "title": "RPAツール実行時にcmdから「’scrcpy’が見つかりません。」エラーが表示される。",
       "date": "4/30",
       "category": "その他",
@@ -4812,7 +4812,7 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-022",
-      "status": "修正中",
+      "status": "完了",
       "title": "電源断復帰後の取引情報の再取得でレシート情報の文字がサニタイズされる",
       "date": "4/30",
       "category": "シナリオ定義（電源断）",
@@ -4820,7 +4820,7 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-023",
-      "status": "新規",
+      "status": "解析中",
       "title": "電源断復帰後の取引情報の再取得で、結果コードの期待値が想定外",
       "date": "5/1",
       "category": "シナリオ定義（電源断）",
@@ -4828,9 +4828,25 @@ const DASHBOARD_DATA = {
     },
     {
       "id": "B-024",
-      "status": "新規",
+      "status": "確認中",
       "title": "RPAでセルの読み取りに失敗することがある",
       "date": "5/1",
+      "category": "シナリオ定義（電源断）",
+      "severity": "中"
+    },
+    {
+      "id": "B-025",
+      "status": "確認中",
+      "title": "Edy売上→リトライ異常終了の処理が完了しない",
+      "date": "5/8",
+      "category": "シナリオ定義（通常）",
+      "severity": "中"
+    },
+    {
+      "id": "B-026",
+      "status": "新規",
+      "title": "【#23と重複のため取り下げ】",
+      "date": "5/11",
       "category": "シナリオ定義（電源断）",
       "severity": "中"
     }
@@ -4846,7 +4862,9 @@ const DASHBOARD_DATA = {
       "4/26",
       "4/27",
       "4/30",
-      "5/1"
+      "5/1",
+      "5/8",
+      "5/11"
     ],
     "counts": [
       1,
@@ -4858,7 +4876,9 @@ const DASHBOARD_DATA = {
       15,
       18,
       22,
-      24
+      24,
+      25,
+      26
     ]
   }
 };
