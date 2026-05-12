@@ -1166,8 +1166,10 @@ async function saveEdit() {
     currentEditingScenario.endDate = endDateInput.value;
 
     // Excelに保存
+      console.log("loadRealTimeScenarioData called", sheetName, rowIdx, scenario, typeof Excel);
     if (typeof Excel !== "undefined") {
-      await saveToExcel();
+       console.log("Excel API is undefined", sheetName, rowIdx);
+       return;
     }
 
     // 元データを更新
