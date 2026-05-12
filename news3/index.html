@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>気になる記事 | web</title>
+<style>
+  :root {
+    --bg:#0A0E1A;--surface:#111827;--surface2:#1A2235;--border:#1E293B;
+    --accent:#3B82F6;--accent2:#10B981;--text:#F1F5F9;--text2:#94A3B8;--text3:#64748B;
+    --radius:12px;--font:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+  .header{background:#0F172A;border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:100}
+  .header-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .header-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--text);text-decoration:none}
+  .header-title .icon{width:30px;height:30px;background:linear-gradient(135deg,#3B82F6,#6366F1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .header-actions{display:flex;gap:8px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:var(--font)}
+  .btn-primary{background:var(--accent);color:white}.btn-primary:hover{background:#2563EB}
+  .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .main{max-width:860px;margin:0 auto;padding:20px}
+  .setup-banner{background:#1E293B;border:1px solid #334155;border-radius:var(--radius);padding:16px 20px;margin-bottom:20px}
+  .setup-banner h3{font-size:14px;font-weight:700;margin-bottom:12px}
+  .setup-row{display:flex;gap:8px;margin-bottom:8px}
+  .setup-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none}
+  .setup-input:focus{border-color:var(--accent)}
+  .setup-note{font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5}
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .filter-label{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .filter-chip{padding:4px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s}
+  .filter-chip:hover,.filter-chip.active{background:var(--accent);border-color:var(--accent);color:white}
+  .stats-bar{display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--text3)}
+  .stats-bar strong{color:var(--text2)}
+  .articles-grid{display:flex;flex-direction:column;gap:10px}
+  .article-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:all .15s;position:relative;overflow:hidden}
+  .article-card.done-card{opacity:.5}
+  .article-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s}
+  .article-card:hover::before{opacity:1}
+  .card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+  .card-favicon{width:18px;height:18px;border-radius:3px;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3);overflow:hidden;margin-top:3px}
+  .card-favicon img{width:100%;height:100%;object-fit:cover}
+  .card-title-wrap{flex:1;min-width:0}
+  .card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.4;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-title:hover{color:var(--accent)}
+  .card-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:3px}
+  .card-domain,.card-date{font-size:11px;color:var(--text3)}
+  .card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+  .card-tag{padding:1px 7px;border-radius:8px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+  .card-summary{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px;background:#0F172A;border-left:2px solid var(--accent2);padding:8px 12px;border-radius:0 6px 6px 0}
+  .card-summary-label{font-size:10px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .card-kaisetsu{font-size:13px;color:var(--text2);line-height:1.6;background:#0F172A;border-left:2px solid #F59E0B;padding:8px 12px;border-radius:0 6px 6px 0}
+  .card-kaisetsu-label{font-size:10px;font-weight:700;color:#F59E0B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .card-expand-btn{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text3);cursor:pointer;background:none;border:none;font-family:var(--font);padding:0;transition:color .15s;margin-bottom:6px}
+  .card-expand-btn:hover{color:var(--accent)}
+  .card-expand-btn .chevron{transition:transform .2s;display:inline-block}
+  .card-expand-btn.open .chevron{transform:rotate(180deg)}
+  .card-expanded{display:none}
+  .card-expanded.show{display:block}
+  .card-actions{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
+  .done-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#05966920;color:#34D399;border:1px solid #05966940}
+  .undone-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#1D4ED820;color:#60A5FA;border:1px solid #1D4ED840}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:460px;animation:slideUp .2s ease}
+  @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .modal-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .form-group{margin-bottom:12px}
+  .form-label{display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .form-input,.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s}
+  .form-input:focus,.form-select:focus{border-color:var(--accent)}
+  .form-input::placeholder{color:var(--text3)}
+  .form-select option{background:#1A2235}
+  .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text3)}
+  .empty-state .icon{font-size:44px;margin-bottom:14px}
+  .empty-state h3{font-size:16px;color:var(--text2);margin-bottom:8px}
+  .empty-state p{font-size:13px;line-height:1.6;max-width:280px;margin:0 auto}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:20px;right:20px;background:#1E293B;border:1px solid var(--border);border-radius:10px;padding:11px 16px;font-size:13px;color:var(--text);z-index:300;display:flex;align-items:center;gap:8px;animation:toastIn .2s ease;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+  @keyframes toastIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @media(max-width:600px){.main{padding:12px}.header-title span{display:none}}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <a href="index.html" class="header-title">
+      <div class="icon">🔖</div>
+      <span>気になる記事</span>
+    </a>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" onclick="toggleSetup()">⚙️</button>
+      <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncArticles()">🔄 同期</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">＋ 追加</button>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="setupBanner" class="setup-banner" style="display:none">
+    <h3>⚙️ GAS URL 設定</h3>
+    <div class="setup-row">
+      <input type="text" class="setup-input" id="gasUrlInput" placeholder="https://script.google.com/macros/s/..." />
+      <button class="btn btn-primary btn-sm" onclick="saveGasUrl()">保存</button>
+    </div>
+    <p class="setup-note">bookmarks-gas-code.js をGASにデプロイして、ウェブアプリURLを入力してください。<br>Notion TokenとDB IDはGASコード内に直接記載します（URLは公開しない）。</p>
+  </div>
+
+  <div class="stats-bar" id="statsBar" style="display:none">
+    <span>📚 合計 <strong id="totalCount">0</strong> 件</span>
+    <span>📥 未読 <strong id="unreadCount">0</strong> 件</span>
+    <span>✅ 済 <strong id="doneCount">0</strong> 件</span>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-label">表示：</span>
+    <button class="filter-chip active" onclick="setFilter(this,'all')">すべて</button>
+    <button class="filter-chip" onclick="setFilter(this,'unread')">📥 未読のみ</button>
+    <button class="filter-chip" onclick="setFilter(this,'summarized')">📝 要約済み</button>
+    <button class="filter-chip" onclick="setFilter(this,'done')">☑️ 済のみ</button>
+  </div>
+
+  <div class="articles-grid" id="articlesGrid"></div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">🔖 記事を追加</div>
+    <div class="form-group">
+      <label class="form-label">URL *</label>
+      <input type="url" class="form-input" id="inUrl" placeholder="https://" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">タイトル *</label>
+      <input type="text" class="form-input" id="inTitle" placeholder="記事タイトル" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">タグ（カンマ区切り）</label>
+      <input type="text" class="form-input" id="inTags" placeholder="AI, ビジネス, 技術" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">分類</label>
+      <select class="form-select" id="inBunrui">
+        <option value="">選択なし</option>
+        <option>AI</option><option>ロボット</option><option>ビジネス</option>
+        <option>技術</option><option>政策</option><option>その他</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddModal()">キャンセル</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveArticle()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var GAS_URL = localStorage.getItem('bm_gas_url') || '';
+var articles = [];
+var currentFilter = 'all';
+
+window.onload = function() {
+  if (GAS_URL) {
+    document.getElementById('gasUrlInput').value = GAS_URL;
+    syncArticles();
+  } else {
+    document.getElementById('setupBanner').style.display = 'block';
+    renderEmpty('⚙️ 右上の設定ボタンからGAS URLを入力してください');
+  }
+  var params = new URLSearchParams(location.search);
+  var su = params.get('url') || params.get('text');
+  var st = params.get('title');
+  if (su) {
+    document.getElementById('inUrl').value = su;
+    if (st) document.getElementById('inTitle').value = st;
+    openAddModal();
+  }
+};
+
+async function syncArticles() {
+  if (!GAS_URL) { toggleSetup(); return; }
+  var btn = document.getElementById('syncBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  try {
+    var res = await fetch(GAS_URL + '?action=getBookmarks', { redirect: 'follow' });
+    var json = await res.json();
+    if (json.error) throw new Error(json.error);
+    articles = json.articles || [];
+    saveLocal();
+    renderArticles();
+    updateStats();
+    showToast('✅ ' + articles.length + '件を同期しました');
+  } catch(e) {
+    loadLocal();
+    renderArticles();
+    updateStats();
+    showToast('⚠️ 同期失敗: ' + e.message + '（キャッシュ表示）');
+  }
+  btn.innerHTML = '🔄 同期';
+  btn.disabled = false;
+}
+
+async function saveArticle() {
+  var url = document.getElementById('inUrl').value.trim();
+  var title = document.getElementById('inTitle').value.trim();
+  var tags = document.getElementById('inTags').value.trim();
+  var bunrui = document.getElementById('inBunrui').value;
+  if (!url || !title) { showToast('⚠️ URLとタイトルは必須です'); return; }
+  if (!GAS_URL) { showToast('⚠️ GAS URLを設定してください'); toggleSetup(); return; }
+  var btn = document.getElementById('saveBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  var data = { title, url, tags: tags ? tags.split(',').map(t=>t.trim()).filter(Boolean) : [], bunrui };
+  try {
+    var res = await fetch(GAS_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'addBookmark', data })
+    });
+    var json = await res.json();
+    if (json.error) throw new Error(json.error);
+    showToast('✅ Notionに保存しました');
+    closeAddModal();
+    await syncArticles();
+  } catch(e) {
+    showToast('❌ 保存失敗: ' + e.message);
+  }
+  btn.innerHTML = '💾 保存';
+  btn.disabled = false;
+}
+
+async function toggleDone(notionId, current) {
+  if (!GAS_URL) return;
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'updateBookmark', pageId: notionId, data: { done: !current } })
+    });
+    var a = articles.find(a => a.notionId === notionId);
+    if (a) a.done = !current;
+    saveLocal();
+    renderArticles();
+    updateStats();
+    showToast(current ? '↩️ 未読に戻しました' : '✅ 済にしました');
+  } catch(e) {
+    showToast('❌ 更新失敗: ' + e.message);
+  }
+}
+
+function renderArticles() {
+  var grid = document.getElementById('articlesGrid');
+  var filtered = getFiltered();
+  document.getElementById('statsBar').style.display = articles.length ? 'flex' : 'none';
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">🔖</div><h3>記事がありません</h3><p>「＋ 追加」から気になる記事を登録しましょう</p></div>';
+    return;
+  }
+  grid.innerHTML = filtered.map((a,i) => renderCard(a,i)).join('');
+}
+
+function renderEmpty(msg) {
+  document.getElementById('articlesGrid').innerHTML = '<div class="empty-state"><div class="icon">🔖</div><h3>' + msg + '</h3></div>';
+}
+
+function renderCard(a, i) {
+  var domain = a.domain || getDomain(a.url);
+  var favicon = domain ? 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32' : '';
+  var tagsHtml = (a.tags||[]).map(t => '<span class="card-tag">' + esc(t) + '</span>').join('');
+  var bunruiHtml = a.bunrui ? '<span class="card-tag" style="border-color:#3B82F640;color:#60A5FA">' + esc(a.bunrui) + '</span>' : '';
+  var doneLabel = a.done ? '<span class="done-badge">✅ 済</span>' : '<span class="undone-badge">📥 未読</span>';
+  return '<div class="article-card ' + (a.done?'done-card':'') + '">'
+    + '<div class="card-top">'
+    + '<div class="card-favicon">' + (favicon ? '<img src="' + favicon + '" onerror="this.style.display=\'none\'">' : '🔗') + '</div>'
+    + '<div class="card-title-wrap">'
+    + '<a class="card-title" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.title) + '">' + esc(a.title) + '</a>'
+    + '<div class="card-meta">'
+    + (domain ? '<span class="card-domain">' + esc(domain) + '</span>' : '')
+    + '<span class="card-date">' + fmtDate(a.addedAt) + '</span>'
+    + doneLabel
+    + '</div></div></div>'
+    + ((tagsHtml||bunruiHtml) ? '<div class="card-tags">' + bunruiHtml + tagsHtml + '</div>' : '')
+    + (a.summary ? '<div class="card-summary"><div class="card-summary-label">📝 要約</div>' + esc(a.summary) + '</div>' : '')
+    + (a.kaisetsu ? '<button class="card-expand-btn" id="eb-' + i + '" onclick="toggleExpand(' + i + ')"><span class="chevron">▼</span> 初心者向け解説を見る</button>'
+      + '<div class="card-expanded" id="ex-' + i + '"><div class="card-kaisetsu"><div class="card-kaisetsu-label">💡 解説</div>' + esc(a.kaisetsu) + '</div></div>' : '')
+    + '<div class="card-actions">'
+    + '<a class="btn btn-ghost btn-sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">🔗 開く</a>'
+    + '<button class="btn btn-ghost btn-sm" onclick="toggleDone(\'' + esc(a.notionId) + '\',' + a.done + ')">' + (a.done ? '↩️ 未読に戻す' : '✅ 済にする') + '</button>'
+    + '</div></div>';
+}
+
+function toggleExpand(i) {
+  var btn = document.getElementById('eb-' + i);
+  var body = document.getElementById('ex-' + i);
+  var open = btn.classList.toggle('open');
+  body.classList.toggle('show');
+  btn.innerHTML = '<span class="chevron">' + (open?'▲':'▼') + '</span> ' + (open?'解説を閉じる':'初心者向け解説を見る');
+}
+
+function getFiltered() {
+  if (currentFilter === 'unread') return articles.filter(a => !a.done);
+  if (currentFilter === 'done') return articles.filter(a => a.done);
+  if (currentFilter === 'summarized') return articles.filter(a => a.summary || a.kaisetsu);
+  return articles;
+}
+function setFilter(el, f) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = f;
+  renderArticles();
+}
+function updateStats() {
+  document.getElementById('totalCount').textContent = articles.length;
+  document.getElementById('unreadCount').textContent = articles.filter(a=>!a.done).length;
+  document.getElementById('doneCount').textContent = articles.filter(a=>a.done).length;
+}
+function openAddModal() { document.getElementById('addModal').classList.add('show'); }
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('show');
+  ['inUrl','inTitle','inTags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inBunrui').value = '';
+}
+document.getElementById('addModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddModal(); });
+function toggleSetup() {
+  var el = document.getElementById('setupBanner');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+function saveGasUrl() {
+  GAS_URL = document.getElementById('gasUrlInput').value.trim();
+  if (!GAS_URL) { showToast('⚠️ URLを入力してください'); return; }
+  localStorage.setItem('bm_gas_url', GAS_URL);
+  showToast('✅ 保存しました');
+  toggleSetup();
+  syncArticles();
+}
+function saveLocal() { try { localStorage.setItem('bm_cache', JSON.stringify(articles)); } catch(e){} }
+function loadLocal() { try { articles = JSON.parse(localStorage.getItem('bm_cache')||'[]'); } catch(e){ articles=[]; } }
+function getDomain(url) { try { return new URL(url).hostname.replace('www.',''); } catch(e){ return ''; } }
+function fmtDate(s) { if(!s) return ''; try { var d=new Date(s); return (d.getMonth()+1)+'/'+(d.getDate()); } catch(e){ return s; } }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToast(msg,ms=3000) { var o=document.querySelector('.toast');if(o)o.remove();var el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),ms); }
+</script>
+</body>
+</html>

@@ -6,10 +6,10 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <!-- ★ ID は新規GUIDに置き換えてください -->
-  <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
+  <!-- ★ バグ管理アドイン専用のユニークID -->
+  <Id>b3f8c2e1-9a7d-4c5b-8f3e-2d1a9c7b5e8f</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>YourCompany</ProviderName>
+  <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="バグ管理"/>
   <Description DefaultValue="バグシートを一覧/カンバンで管理するアドイン"/>

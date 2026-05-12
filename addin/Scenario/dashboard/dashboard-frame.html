@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダッシュボード - シナリオ管理</title>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --primary-light: #3388dd;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --background: #f9fafb;
+            --surface: #ffffff;
+            --border: #e5e7eb;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .dashboard-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .dashboard-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .date-selector {
+            position: relative;
+        }
+
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .date-input:hover {
+            border-color: var(--primary-light);
+        }
+
+        .date-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .date-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .date-option:hover {
+            background: var(--background);
+        }
+
+        .date-option.latest {
+            background: var(--accent-green);
+            color: white;
+            font-weight: 500;
+        }
+
+        .date-option.latest:hover {
+            background: #059669;
+        }
+
+        .dashboard-content {
+            height: calc(100vh - 70px);
+            position: relative;
+        }
+
+        .dashboard-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--surface);
+        }
+
+        .dashboard-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .error-message {
+            color: var(--accent-red);
+            font-size: 14px;
+            padding: 20px;
+            text-align: center;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+
+        <div class="date-selector">
+            <div class="date-input" id="dateInput">
+                <span id="selectedDate">日付選択</span>
+                <span>▼</span>
+            </div>
+            <div class="date-dropdown" id="dateDropdown"></div>
+        </div>
+    </div>
+
+    <div class="dashboard-content">
+        <div class="dashboard-loading" id="loading">
+            📊 ダッシュボードを読み込んでいます...
+        </div>
+        <iframe class="dashboard-frame" id="dashboardFrame" style="display:none;"></iframe>
+    </div>
+
+    <script>
+        // ダッシュボード日付管理
+        let dashboardDates = [];
+        let currentDate = null;
+        let isSearching = false;
+        let hasDisplayedFirst = false;
+        let currentLoadedDate = null; // 現在読み込み済みの日付を記録
+        
+        // 既知のダッシュボードファイル（ローカルファイル用）
+        const KNOWN_DASHBOARD_FILES = [
+            '20260501', '20260430', '20260428', '20260427'
+        ];
+        
+        // 日付を手動で追加するための関数（将来の拡張用）
+        function addCustomDate(dateString) {
+            if (dateString.length === 8 && !dashboardDates.includes(dateString)) {
+                dashboardDates.push(dateString);
+                dashboardDates.sort().reverse();
+                buildDateDropdown();
+                console.log(`カスタム日付を追加: ${dateString}`);
+            }
+        }
+
+        // 日付文字列をDateオブジェクトに変換
+        function parseDate(dateString) {
+            if (!dateString || dateString.length !== 8) return null;
+            const year = parseInt(dateString.substring(0, 4));
+            const month = parseInt(dateString.substring(4, 6)) - 1; // 月は0ベース
+            const day = parseInt(dateString.substring(6, 8));
+            return new Date(year, month, day);
+        }
+
+        // Dateオブジェクトを日付文字列に変換
+        function formatDateString(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
+        // ローカルファイル用：既知ファイルを初期化
+        function initializeKnownFiles() {
+            console.log('ローカルファイルモード: 既知ファイルを使用');
+            console.log(`利用可能ファイル: ${KNOWN_DASHBOARD_FILES.join(', ')}`);
+            
+            dashboardDates = [...KNOWN_DASHBOARD_FILES].sort().reverse();
+            currentDate = dashboardDates[0];
+            
+            // ドロップダウンを構築
+            buildDateDropdown();
+            
+            // 最初のファイルを表示
+            if (!hasDisplayedFirst && currentDate) {
+                hasDisplayedFirst = true;
+                document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                loadDashboard(currentDate);
+                    console.log(`初回ダッシュボード表示: ${currentDate}`);
+        // 日付配列を生成（当日～過去60日）
+        function generateDateRange() {
+            const dates = [];
+            const today = new Date();
+            
+            for (let i = 0; i <= 60; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                dates.push(formatDateString(date));
+            }
+            
+            console.log(`検索対象日付範囲: ${dates[dates.length-1]} ～ ${dates[0]} (${dates.length}日間)`);
+            console.log(`最初の10日: ${dates.slice(0, 10).join(', ')}`);
+            
+            return dates; // 新しい日付順（当日から過去へ）
+        }
+
+        // バッチ処理でファイル存在を非同期チェック（即座表示対応）
+        async function checkFilesInBatches(dateList, batchSize = 5) {
+            const foundDates = [];
+            const totalDates = dateList.length;
+            hasDisplayedFirst = false;
+            
+            for (let i = 0; i < totalDates; i += batchSize) {
+                const batch = dateList.slice(i, i + batchSize);
+                const progress = Math.round(((i + batchSize) / totalDates) * 100);
+                
+                // プログレス更新
+                updateLoadingProgress(progress, i + batchSize, totalDates, foundDates.length);
+                
+                // バッチで並列チェック
+                const results = await Promise.allSettled(
+                    batch.map(async (dateString) => {
+                        const exists = await checkFileExists(dateString);
+                        return { dateString, exists };
+                    })
+                );
+                
+                // 結果を集計し、見つかったら即座追加
+                for (const result of results) {
+                    if (result.status === 'fulfilled' && result.value.exists) {
+                        const date = result.value.dateString;
+                        foundDates.push(date);
+                        dashboardDates.push(date);
+                        
+                        // 日付順でソート
+                        dashboardDates.sort().reverse();
+                        
+                        // ドロップダウンに即座追加
+                        const isLatest = dashboardDates[0] === date;
+                        addDateToDropdown(date, isLatest);
+                        
+                        console.log(`発見: ${date}.html`);
+                        
+                        // 最初のファイルを即座表示
+                        if (!hasDisplayedFirst) {
+                            hasDisplayedFirst = true;
+                            currentDate = dashboardDates[0]; // 最新日付を選択
+                            document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                            loadDashboard(currentDate);
+                            console.log(`最初のダッシュボードを表示: ${currentDate}`);
+                        }
+                        
+                        // 最新日付が更新された場合
+                        else if (currentDate !== dashboardDates[0]) {
+                            currentDate = dashboardDates[0];
+                            document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                            // 既に表示中の場合は自動更新しない（ユーザーが選択中の可能性）
+                        }
+                    }
+                }
+                
+                // 小さな遅延でUIをブロックしない
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            return foundDates;
+        }
+
+        // プログレス表示更新
+        function updateLoadingProgress(percentage, checked, total, found = 0) {
+            const loadingEl = document.getElementById('loading');
+            
+            if (!hasDisplayedFirst && found === 0) {
+                // まだファイルが見つかっていない場合
+                loadingEl.innerHTML = `
+                    <div>🔍 ダッシュボードファイルを検索中...</div>
+                    <div style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
+                        ${checked}/${total} 件チェック済み (${Math.min(percentage, 100)}%)
+                    </div>
+                    <div style="width: 200px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto; overflow: hidden;">
+                        <div style="width: ${Math.min(percentage, 100)}%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
+                    </div>
+                `;
+            } else {
+                // ファイルが見つかって表示中の場合
+                loadingEl.innerHTML = `
+                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.9); padding: 8px 12px; border-radius: 4px; font-size: 12px; color: var(--text-secondary); box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        🔍 ${found}件発見 ・ ${checked}/${total} チェック済み
+                    </div>
+                `;
+            }
+        }
+
+        // 利用可能な日付を動的に検索（最適化版）
+        async function loadAvailableDates() {
+            console.log('ダッシュボードファイル検索開始（当日～過去60日）');
+            isSearching = true;
+            
+            // 既存のリストをクリア
+            dashboardDates = [];
+            document.getElementById('dateDropdown').innerHTML = '';
+            
+            const dateList = generateDateRange();
+            const foundDates = await checkFilesInBatches(dateList, 5);
+            
+            isSearching = false;
+            console.log(`検索完了: ${foundDates.length}件のダッシュボードファイルを発見`);
+            
+            // 検索完了後の状態更新
+            if (foundDates.length > 0 && hasDisplayedFirst) {
+                // 検索完了メッセージをコンパクトに表示
+                const loadingEl = document.getElementById('loading');
+                loadingEl.innerHTML = `
+                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(16, 185, 129, 0.9); color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        ✓ ${foundDates.length}件検出完了
+                    </div>
+                `;
+                
+                // 3秒後にメッセージを消去
+                setTimeout(() => {
+                    if (loadingEl.innerHTML.includes('検出完了')) {
+                        loadingEl.style.display = 'none';
+                    }
+                }, 3000);
+            }
+            
+            return foundDates; // 既に新しい順でソート済み
+        }
+
+        // 利用可能な日付を初期化（ローカルファイル用）
+        async function initializeDates() {
+            try {
+                console.log('ダッシュボード初期化開始');
+                console.log('現在のフォルダパス:', window.location.href);
+                
+                // CORS制限があるため、ローカルファイルでは既知ファイルを使用
+                if (window.location.protocol === 'file:') {
+                    console.log('ローカルファイル環境です。CORS制限のため、既知ファイルを使用します。');
+                    const fileCount = initializeKnownFiles();
+                    
+                    if (fileCount > 0) {
+                        console.log(`${fileCount}件のダッシュボードファイルを初期化完了`);
+                        return;
+                    }
+                }
+                
+                // HTTP環境でのみファイル検索を実行（将来の拡張用）
+                console.log('HTTP環境: ファイル検索を実行します');
+                // ここで将来的にファイル検索機能を実装可能
+                
+                // フォールバック: 既知ファイルを使用
+                console.log('フォールバック: 既知ファイルを使用');
+                initializeKnownFiles();
+                
+            } catch (error) {
+                console.error('日付初期化エラー:', error);
+                
+                // 緊急フォールバック
+                console.log('緊急フォールバック: ミニマルファイルセットを使用');
+                dashboardDates = ['20260501', '20260430'];
+                currentDate = dashboardDates[0];
+                buildDateDropdown();
+                
+                if (!hasDisplayedFirst) {
+                    hasDisplayedFirst = true;
+                    document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                    loadDashboard(currentDate);
+                }
+            }
+        }
+
+        // 日付をYYYY/MM/DD形式に変換
+        function formatDisplayDate(dateString) {
+            if (!dateString || dateString.length !== 8) return dateString;
+            const year = dateString.substring(0, 4);
+            const month = dateString.substring(4, 6);
+            const day = dateString.substring(6, 8);
+            return `${year}/${month}/${day}`;
+        }
+
+        // 日付ドロップダウンを構築
+        function buildDateDropdown() {
+            const dropdown = document.getElementById('dateDropdown');
+            dropdown.innerHTML = '';
+
+            dashboardDates.forEach((date, index) => {
+                addDateToDropdown(date, index === 0);
+            });
+        }
+
+        // 日付をドロップダウンに動的追加
+        function addDateToDropdown(date, isLatest = false) {
+            const dropdown = document.getElementById('dateDropdown');
+            
+            // 既に存在するかチェック
+            if (dropdown.querySelector(`[data-date="${date}"]`)) {
+                return;
+            }
+            
+            const option = document.createElement('div');
+            option.className = 'date-option' + (isLatest ? ' latest' : '');
+            option.textContent = formatDisplayDate(date);
+            option.setAttribute('data-date', date);
+            option.addEventListener('click', () => {
+                selectDate(date);
+                dropdown.style.display = 'none';
+            });
+            
+            // 日付順で挿入位置を決定
+            const existingOptions = Array.from(dropdown.children);
+            let insertIndex = 0;
+            
+            for (let i = 0; i < existingOptions.length; i++) {
+                const existingDate = existingOptions[i].getAttribute('data-date');
+                if (date > existingDate) {
+                    insertIndex = i;
+                    break;
+                }
+                insertIndex = i + 1;
+            }
+            
+            if (insertIndex >= dropdown.children.length) {
+                dropdown.appendChild(option);
+            } else {
+                dropdown.insertBefore(option, dropdown.children[insertIndex]);
+            }
+            
+            console.log(`ドロップダウンに追加: ${date}`);
+        }
+
+        // 日付選択
+        function selectDate(date) {
+            if (currentDate === date && currentLoadedDate === date) {
+                console.log(`既に読み込み済み: ${date}`);
+                return; // 既に同じ日付が読み込み済みの場合はスキップ
+            }
+            
+            currentDate = date;
+            document.getElementById('selectedDate').textContent = formatDisplayDate(date);
+            loadDashboard(date);
+        }
+
+        // ダッシュボード読み込み
+        function loadDashboard(date) {
+            const frame = document.getElementById('dashboardFrame');
+
+            if (!date) {
+                frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
+                currentLoadedDate = null;
+                return;
+            }
+
+            // 既に同じ日付が読み込み済みの場合はスキップ
+            if (currentLoadedDate === date) {
+                return;
+            }
+
+            console.log(`ダッシュボード読み込み開始: ${date}`);
+            currentLoadedDate = date;
+
+            // ローディング表示
+            frame.innerHTML = '<div class="dashboard-loading" style="display:flex;">📊 ダッシュボード読み込み中...</div>';
+
+            // ダッシュボードファイルのパス
+            const dashboardPath = `./${date}.html`;
+
+            // iframeでダッシュボードを表示
+            const iframe = document.createElement('iframe');
+            iframe.src = dashboardPath;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.display = 'none';
+
+            // イベントリスナーを一度だけ設定
+            iframe.onload = function() {
+                // 既に別の日付が読み込み開始されている場合は無視
+                if (currentLoadedDate !== date) {
+                    return;
+                }
+                
+                frame.innerHTML = '';
+                frame.appendChild(iframe);
+                iframe.style.display = 'block';
+                console.log(`ダッシュボード読み込み完了: ${date}`);
+                
+                // イベントリスナーをクリア
+                iframe.onload = null;
+                iframe.onerror = null;
+            };
+
+            iframe.onerror = function() {
+                // 既に別の日付が読み込み開始されている場合は無視
+                if (currentLoadedDate !== date) {
+                    return;
+                }
+                
+                frame.innerHTML = `
+                    <div class="dashboard-loading" style="color:var(--accent-red);display:flex;">
+                        ⚠️ ダッシュボード読み込みエラー<br>
+                        <small>ファイル ${date}.html が見つかりません</small>
+                    </div>`;
+                console.error(`ダッシュボード読み込みエラー: ${date}.html`);
+                currentLoadedDate = null;
+                
+                // イベントリスナーをクリア
+                iframe.onload = null;
+                iframe.onerror = null;
+            };
+
+            // iframeをDOMに追加
+            frame.appendChild(iframe);
+        }
+
+        // 初期化
+        async function initialize() {
+            // 初期ローディング表示
+            const loadingEl = document.getElementById('loading');
+            loadingEl.innerHTML = `
+                <div>📊 ダッシュボードシステムを初期化中...</div>
+                <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
+                    ローカルファイル環境で初期化しています
+                </div>
+            `;
+            
+            await initializeDates();
+
+            if (!hasDisplayedFirst && dashboardDates.length > 0) {
+                // 初期化時にファイルが見つかったが表示されていない場合
+                hasDisplayedFirst = true;
+                currentDate = dashboardDates[0];
+                document.getElementById('selectedDate').textContent = formatDisplayDate(currentDate);
+                loadDashboard(currentDate);
+            } else if (!hasDisplayedFirst) {
+                loadingEl.innerHTML = `
+                    <div class="error-message">
+                        📊 ダッシュボードファイルが設定されていません<br>
+                        <small>ローカルファイル環境ではCORS制限のため、既知ファイルのみ使用可能です<br>
+                        対応ファイル: ${KNOWN_DASHBOARD_FILES.join(', ')}</small>
+                    </div>`;
+            }
+        }
+
+        // イベントリスナー設定
+        document.addEventListener('DOMContentLoaded', function() {
+            initialize();
+
+            // 日付選択イベント
+            document.getElementById('dateInput').addEventListener('click', function() {
+                const dropdown = document.getElementById('dateDropdown');
+                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            });
+
+            // クリック外しでドロップダウンを閉じる
+            document.addEventListener('click', function(e) {
+                const dateInput = document.getElementById('dateInput');
+                const dropdown = document.getElementById('dateDropdown');
+                if (!dateInput.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

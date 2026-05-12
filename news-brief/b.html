@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>AIニュース速報</title>
+    
+    <!-- フォント読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;AIニュース速報&quot;,&quot;short_name&quot;:&quot;AINews&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;theme_color&quot;:&quot;#2563EB&quot;,&quot;background_color&quot;:&quot;#F8FAFC&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%232563EB'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>📰</text></svg>&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}">
+
+    <style>
+        /* ベース */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Noto Sans JP", sans-serif;
+        }
+        
+        body {
+            background: #F8FAFC;
+            color: #0F172A;
+            min-height: 100vh;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 2px;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ヘッダー */
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 14px 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .app-title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .clock {
+            text-align: right;
+        }
+        
+        .clock {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2563EB;
+            font-family: "DM Mono", monospace;
+        }
+
+        /* 統計チップ */
+        .stats-chips {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #94A3B8;
+        }
+
+        /* アクションボタン */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 0 16px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: "Noto Sans JP", sans-serif;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease;
+            touch-action: manipulation;
+            user-select: none;
+            flex: 1;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn {
+            background: #2563EB;
+            color: #fff;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: #64748B;
+            border: 1px solid #E2E8F0;
+        }
+        
+        .btn-success {
+            background: #F0FDF4;
+            color: #059669;
+            border: 1px solid #BBF7D0;
+        }
+
+        /* タブナビゲーション */
+        .tab-nav {
+            display: flex;
+            gap: 2px;
+            overflow-x: auto;
+            padding: 0 18px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        
+        .tab-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: #64748B;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            padding: 10px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: "Noto Sans JP", sans-serif;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        
+        .tab-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .tab-btn.active {
+            background: #2563EB;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+
+        /* コンテンツエリア */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 16px 16px 48px;
+            max-width: 720px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* サマリーセクション */
+        .summary-section {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .summary-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2563EB;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-text {
+            line-height: 1.6;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .trends {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .trend-tag {
+            background: #2563EB;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* カテゴリフィルター */
+        .category-filter {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            border-radius: 20px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #E2E8F0;
+            background: #fff;
+            color: #64748B;
+            font-family: "Noto Sans JP", sans-serif;
+            transition: all 0.15s ease;
+            user-select: none;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .filter-btn.active {
+            color: #fff;
+            border-color: currentColor;
+            background: #2563EB;
+        }
+
+        /* 記事カード */
+        .articles-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .article-card {
+            background: #fff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            touch-action: manipulation;
+            min-height: 48px;
+            user-select: none;
+            border-left: 3px solid #E5E7EB;
+        }
+        
+        .article-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+        }
+        
+        .article-card:active {
+            transform: scale(0.98);
+        }
+
+        .article-card.policy { border-left-color: #DC2626; }
+        .article-card.model { border-left-color: #7C3AED; }
+        .article-card.chip { border-left-color: #2563EB; }
+        .article-card.robot { border-left-color: #059669; }
+        .article-card.cobot { border-left-color: #D97706; }
+        .article-card.society { border-left-color: #DB2877; }
+        .article-card.economy { border-left-color: #0891B2; }
+        .article-card.politics { border-left-color: #6D28D9; }
+
+        .article-header {
+            padding-bottom: 0;
+        }
+
+        .article-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .article-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+            display: inline-block;
+            color: white;
+        }
+
+        .badge.impact-高 { background: #DC2626; }
+        .badge.impact-中 { background: #D97706; }
+        .badge.impact-低 { background: #059669; }
+
+        .badge.category {
+            color: #0F172A;
+            background: #F1F5F9;
+        }
+
+        .badge.source {
+            background: #64748B;
+        }
+
+        .article-summary {
+            color: #4B5563;
+            font-size: 12px;
+            line-height: 1.8;
+            margin-bottom: 8px;
+            display: none;
+        }
+
+        .article-notes {
+            background: #F8FAFC;
+            border-top: 1px solid #F3F4F6;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .note-section {
+            margin-bottom: 12px;
+        }
+
+        .note-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .note-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            color: #2563EB;
+        }
+
+        .note-text {
+            font-size: 12px;
+            line-height: 1.8;
+            color: #374151;
+        }
+
+        .article-card.expanded .article-summary,
+        .article-card.expanded .article-notes {
+            display: block;
+        }
+
+        /* アイデアグリッド */
+        .ideas-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .idea-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 14px 12px;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            min-height: 48px;
+            transition: transform 0.15s ease;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        
+        .idea-card:active {
+            transform: scale(0.98);
+        }
+
+        .idea-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .idea-icon {
+            font-size: 24px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: #F1F5F9;
+        }
+
+        .idea-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.4;
+        }
+
+        .idea-desc {
+            color: #4B5563;
+            font-size: 12px;
+            line-height: 1.8;
+            margin-bottom: 8px;
+            display: none;
+        }
+
+        .idea-card.expanded .idea-desc {
+            display: block;
+        }
+
+        .idea-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .idea-tag {
+            background: #E2E8F0;
+            color: #475569;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        /* 履歴テーブル */
+        .history-table {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .history-header {
+            background: #2563EB;
+            color: white;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .history-row {
+            display: grid;
+            grid-template-columns: 1fr 60px 60px 60px;
+            gap: 12px;
+            padding: 8px 14px;
+            align-items: center;
+            border-bottom: 1px solid #F3F4F6;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .history-row:last-child {
+            border-bottom: none;
+        }
+        
+        .history-row:active {
+            background: #F8FAFC;
+        }
+
+        .history-date {
+            font-weight: 600;
+        }
+
+        .history-stat {
+            text-align: center;
+            font-family: "DM Mono", monospace;
+            font-weight: 500;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .close-btn:active {
+            background: #F1F5F9;
+        }
+
+        .modal-body {
+            padding: 0;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #0F172A;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            font-size: 12px;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: "Noto Sans JP", sans-serif;
+            color: #374151;
+            outline: none;
+            min-height: 44px;
+        }
+        
+        .form-input:focus,
+        .form-textarea:focus {
+            border-color: #2563EB;
+        }
+
+        .form-textarea {
+            height: 120px;
+            font-family: "DM Mono", monospace;
+            font-size: 11px;
+            resize: vertical;
+        }
+
+        .preview-section {
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 16px;
+            font-size: 11px;
+        }
+
+        .preview-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2563EB;
+        }
+
+        .preview-content {
+            font-family: "DM Mono", monospace;
+            font-size: 11px;
+            color: #374151;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .error-message {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-top: 4px;
+            font-size: 11px;
+            color: #DC2626;
+        }
+
+        /* メッセージトースト */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast {
+            background: #F0FDF4;
+            color: #059669;
+        }
+
+        .toast.error {
+            background: #FEF2F2;
+            color: #DC2626;
+        }
+
+        .toast.warning {
+            background: #FFFBEB;
+            color: #D97706;
+        }
+
+        /* 空状態 */
+        .empty-state {
+            text-align: center;
+            padding: 48px 20px;
+            background: #fff;
+            border-radius: 16px;
+            border: 1px dashed #CBD5E1;
+        }
+
+        .empty-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            color: #64748B;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 640px) {
+            .header {
+                padding: 10px 12px 0;
+            }
+            
+            .app-title {
+                font-size: 18px;
+            }
+            
+            .clock {
+                font-size: 16px;
+            }
+            
+            .action-buttons {
+                padding: 0 12px;
+                gap: 6px;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .tab-nav {
+                padding: 0 12px;
+            }
+            
+            .tab-btn {
+                padding: 12px 16px;
+                font-size: 11px;
+            }
+            
+            .content {
+                padding: 12px;
+            }
+            
+            .ideas-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .history-row {
+                grid-template-columns: 1fr 50px 50px 50px;
+                gap: 8px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-top">
+                <h1 class="app-title">
+                    <span>📰</span>
+                    AIニュース速報
+                </h1>
+                <div class="clock" id="clock"></div>
+            </div>
+            <div class="stats-chips" id="statsChips"></div>
+        </header>
+
+        <!-- アクションボタン -->
+        <div class="action-buttons">
+            <button class="btn btn-secondary" id="sheetsBtn">
+                <span>⚙️</span>
+                Sheets設定
+            </button>
+            <button class="btn" id="pasteBtn">
+                <span>📋</span>
+                JSONを貼り付け
+            </button>
+            <button class="btn btn-success" id="syncBtn" style="display: none;">
+                <span>🔄</span>
+                同期
+            </button>
+        </div>
+
+        <!-- タブナビゲーション -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="news">📰 ニュース</button>
+            <button class="tab-btn" data-tab="global">🌍 世界情勢</button>
+            <button class="tab-btn" data-tab="domestic">🇯🇵 国内情勢</button>
+            <button class="tab-btn" data-tab="ideas">💡 活用アイデア</button>
+            <button class="tab-btn" data-tab="history">📅 過去データ</button>
+        </nav>
+
+        <!-- コンテンツエリア -->
+        <main class="content">
+            <!-- ニュースタブ -->
+            <div class="tab-content active" id="newsTab">
+                <div id="summarySection"></div>
+                <div class="category-filter" id="categoryFilter"></div>
+                <div class="articles-grid" id="articlesGrid"></div>
+                <div class="empty-state" id="newsEmpty" style="display: none;">
+                    <div class="empty-icon">📰</div>
+                    <div class="empty-title">ニュースデータがありません</div>
+                    <div class="empty-desc">JSONを貼り付けてニュースを追加してください</div>
+                </div>
+            </div>
+
+            <!-- 世界情勢タブ -->
+            <div class="tab-content" id="globalTab">
+                <div class="articles-grid" id="globalGrid"></div>
+                <div class="empty-state" id="globalEmpty" style="display: none;">
+                    <div class="empty-icon">🌍</div>
+                    <div class="empty-title">世界情勢データがありません</div>
+                    <div class="empty-desc">グローバルニュースを追加してください</div>
+                </div>
+            </div>
+
+            <!-- 国内情勢タブ -->
+            <div class="tab-content" id="domesticTab">
+                <div class="articles-grid" id="domesticGrid"></div>
+                <div class="empty-state" id="domesticEmpty" style="display: none;">
+                    <div class="empty-icon">🇯🇵</div>
+                    <div class="empty-title">国内情勢データがありません</div>
+                    <div class="empty-desc">国内ニュースを追加してください</div>
+                </div>
+            </div>
+
+            <!-- 活用アイデアタブ -->
+            <div class="tab-content" id="ideasTab">
+                <div class="ideas-grid" id="ideasGrid"></div>
+                <div class="empty-state" id="ideasEmpty" style="display: none;">
+                    <div class="empty-icon">💡</div>
+                    <div class="empty-title">活用アイデアがありません</div>
+                    <div class="empty-desc">アイデアを追加してください</div>
+                </div>
+            </div>
+
+            <!-- 過去データタブ -->
+            <div class="tab-content" id="historyTab">
+                <div class="history-table" id="historyTable">
+                    <div class="history-header">保存済みデータ</div>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Sheets設定モーダル -->
+        <div class="modal" id="sheetsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Google Sheets連携設定</h2>
+                    <button class="close-btn" id="closeSheetsModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">GAS デプロイURL</label>
+                        <input type="url" class="form-input" id="gasUrlInput" 
+                               placeholder="https://script.google.com/macros/s/.../exec">
+                        <div class="error-message" id="gasUrlError"></div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 8px; line-height: 1.5;">
+                            ℹ️ <strong>トラブルシューティング:</strong><br>
+                            ・ GASスクリプトのアクセス権限を「すべてのユーザー」に設定<br>
+                            ・ URLは /macros/s/.../exec で終わる形式<br>
+                            ・ F12でコンソールを確認してエラー詳細をチェック<br>
+                            <br>
+                            🔧 <strong>GAS側でJSONP対応が必要:</strong><br>
+                            <div style="background:#f8f9fa;border:1px solid #e9ecef;padding:8px;border-radius:4px;font-family:monospace;font-size:10px;">
+                            function doGet(e) {<br>
+                            &nbsp;&nbsp;var callback = e.parameter.callback;<br>
+                            &nbsp;&nbsp;var result = {ping: 'ok'};<br>
+                            &nbsp;&nbsp;if (callback) {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;return ContentService.createTextOutput(<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;callback + '(' + JSON.stringify(result) + ');'<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;).setMimeType(ContentService.MimeType.JAVASCRIPT);<br>
+                            &nbsp;&nbsp;}<br>
+                            &nbsp;&nbsp;return ContentService.createTextOutput(JSON.stringify(result));<br>
+                            }
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" id="saveGasUrl">
+                            保存して接続
+                        </button>
+                        <button class="btn btn-secondary" id="testGasConnection" style="display: none;">
+                            接続テスト
+                        </button>
+                        <button class="btn btn-secondary" id="disconnectGas" style="display: none;">
+                            連携解除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON貼り付けモーダル -->
+        <div class="modal" id="pasteModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">ニュースデータを追加</h2>
+                    <button class="close-btn" id="closePasteModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">JSONデータ</label>
+                        <textarea class="form-textarea" id="jsonTextarea" 
+                                placeholder="Claudeが生成したJSONデータをここに貼り付けてください..."></textarea>
+                        <div class="error-message" id="jsonError"></div>
+                    </div>
+                    
+                    <div class="preview-section" id="jsonPreview" style="display: none;">
+                        <div class="preview-title">プレビュー</div>
+                        <div class="preview-content" id="previewContent"></div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button class="btn btn-success" id="saveJsonBtn" disabled>
+                            保存する
+                        </button>
+                        <button class="btn btn-secondary" id="clearJsonBtn">
+                            クリア
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 上書き確認モーダル -->
+        <div class="modal" id="overwriteModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">⚠️ データが既に存在します</h2>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 20px;">この日付のデータが既に存在します。上書きしますか？</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" id="confirmOverwrite">
+                            上書きする
+                        </button>
+                        <button class="btn btn-secondary" id="cancelOverwrite">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- トーストメッセージ -->
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        // グローバル状態
+        var State = {
+            currentData: null,
+            currentDate: null,
+            activeTab: 'news',
+            activeFilter: 'all',
+            savedDates: [],
+            gasUrl: null,
+            pendingData: null
+        };
+
+        // カテゴリ定義
+        var CATEGORIES = {
+            'policy': { label: '政策・安全保障', icon: '🏛', color: '#DC2626' },
+            'model': { label: 'モデル・技術', icon: '🧠', color: '#7C3AED' },
+            'chip': { label: '半導体・インフラ', icon: '⚡', color: '#2563EB' },
+            'robot': { label: 'ロボット・物理AI', icon: '🤖', color: '#059669' },
+            'cobot': { label: '協働ロボット', icon: '🤝', color: '#D97706' },
+            'society': { label: '規制・社会', icon: '⚖', color: '#DB2877' },
+            'economy': { label: '経済・市場', icon: '💹', color: '#0891B2' },
+            'politics': { label: '政治・外交', icon: '🌐', color: '#6D28D9' }
+        };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            updateClock();
+            setInterval(updateClock, 1000);
+        });
+
+        function initializeApp() {
+            // ローカルストレージから設定を読み込み
+            State.gasUrl = localStorage.getItem('ainews_gas_url');
+            State.savedDates = JSON.parse(localStorage.getItem('ainews_index') || '[]');
+            
+            // UI初期化
+            setupGasUI();
+            setupCategoryFilter();
+            loadLatestData();
+            updateStatsChips();
+            renderHistory();
+        }
+
+        function setupEventListeners() {
+            // タブ切り替え
+            document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    switchTab(this.dataset.tab);
+                });
+            });
+
+            // モーダル制御
+            document.getElementById('sheetsBtn').addEventListener('click', function() {
+                showModal('sheetsModal');
+            });
+            
+            document.getElementById('pasteBtn').addEventListener('click', function() {
+                showModal('pasteModal');
+            });
+            
+            // 同期ボタン
+            document.getElementById('syncBtn').addEventListener('click', function() {
+                manualSync();
+            });
+
+            // モーダルクローズ
+            document.querySelectorAll('.close-btn, .modal').forEach(function(el) {
+                el.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        hideModals();
+                    }
+                });
+            });
+
+            // GAS設定
+            document.getElementById('saveGasUrl').addEventListener('click', saveGasUrl);
+            document.getElementById('disconnectGas').addEventListener('click', disconnectGas);
+            
+            // 接続テストボタン
+            if (document.getElementById('testGasConnection')) {
+                document.getElementById('testGasConnection').addEventListener('click', function() {
+                    if (State.gasUrl) {
+                        testGasConnection(State.gasUrl, function(success, message) {
+                            showToast(message, success ? 'success' : 'error');
+                        });
+                    } else {
+                        showToast('まずGAS URLを設定してください', 'warning');
+                    }
+                });
+            }
+
+            // JSON処理
+            document.getElementById('jsonTextarea').addEventListener('input', validateJson);
+            document.getElementById('saveJsonBtn').addEventListener('click', saveJsonData);
+            document.getElementById('clearJsonBtn').addEventListener('click', clearJsonInput);
+
+            // 上書き確認
+            document.getElementById('confirmOverwrite').addEventListener('click', confirmOverwrite);
+            document.getElementById('cancelOverwrite').addEventListener('click', cancelOverwrite);
+        }
+
+        function updateClock() {
+            var now = new Date();
+            var timeStr = now.toLocaleTimeString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('clock').textContent = timeStr;
+        }
+
+        function showModal(modalId) {
+            hideModals();
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function hideModals() {
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.classList.remove('active');
+            });
+        }
+
+        function showToast(message, type) {
+            var toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast' + (type ? ' ' + type : '');
+            toast.classList.add('show');
+            
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function switchTab(tabName) {
+            // タブボタンの状態更新
+            document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            document.querySelector('[data-tab="' + tabName + '"]').classList.add('active');
+
+            // コンテンツの切り替え
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            State.activeTab = tabName;
+        }
+
+        function setupGasUI() {
+            var gasUrlInput = document.getElementById('gasUrlInput');
+            var disconnectBtn = document.getElementById('disconnectGas');
+            var testBtn = document.getElementById('testGasConnection');
+            var syncBtn = document.getElementById('syncBtn');
+            
+            if (State.gasUrl) {
+                gasUrlInput.value = State.gasUrl;
+                disconnectBtn.style.display = 'block';
+                if (testBtn) testBtn.style.display = 'block';
+                syncBtn.style.display = 'block';
+            } else {
+                if (testBtn) testBtn.style.display = 'none';
+                syncBtn.style.display = 'none';
+            }
+        }
+
+        function saveGasUrl() {
+            var url = document.getElementById('gasUrlInput').value.trim();
+            var errorEl = document.getElementById('gasUrlError');
+            
+            errorEl.textContent = '';
+            
+            if (!url) {
+                errorEl.textContent = 'URLを入力してください';
+                return;
+            }
+            
+            if (!url.includes('script.google.com')) {
+                errorEl.textContent = 'Google Apps ScriptのURLを入力してください';
+                return;
+            }
+            
+            // URLの形式をさらに厳密にチェック
+            if (!url.includes('/macros/s/') || !url.includes('/exec')) {
+                errorEl.textContent = 'GASデプロイURLの形式が正しくありません。/macros/s/.../exec の形式で入力してください';
+                return;
+            }
+            
+            // 接続テストを実行
+            console.log('GAS接続テストを開始します:', url);
+            errorEl.style.color = '#64748B';
+            errorEl.innerHTML = '🔍 接続テスト中... (JSONP方式)';
+            
+            testGasConnection(url, function(success, message) {
+                console.log('接続テスト結果:', success, message);
+                if (success) {
+                    errorEl.textContent = '';  // エラーメッセージをクリア
+                    State.gasUrl = url;
+                    localStorage.setItem('ainews_gas_url', url);
+                    document.getElementById('disconnectGas').style.display = 'block';
+                    
+                    hideModals();
+                    showToast('Sheets連携を設定しました', 'success');
+                    
+                    // 既存データとの同期を試行
+                    syncWithGas();
+                } else {
+                    console.error('接続テスト失敗:', message);
+                    errorEl.style.color = '#DC2626';
+                    
+                    if (message.includes('JSONP対応が必要')) {
+                        errorEl.innerHTML = '❌ ' + message + '<br><small style="color:#64748B;">👇 上記のGASコード例を参考にしてください</small>';
+                    } else if (message.includes('スクリプト読み込み失敗')) {
+                        errorEl.innerHTML = '❌ GAS URLまたはJSONP対応に問題があります。<br><small style="color:#64748B;">1. URL形式を確認 2. GASにJSONP対応コードを追加</small>';
+                    } else {
+                        errorEl.innerHTML = '❌ ' + message + '<br><small style="color:#64748B;">F12でコンソールの詳細を確認してください</small>';
+                    }
+                }
+            });
+        }
+
+        function disconnectGas() {
+            State.gasUrl = null;
+            localStorage.removeItem('ainews_gas_url');
+            document.getElementById('gasUrlInput').value = '';
+            document.getElementById('disconnectGas').style.display = 'none';
+            
+            var testBtn = document.getElementById('testGasConnection');
+            if (testBtn) testBtn.style.display = 'none';
+            
+            var syncBtn = document.getElementById('syncBtn');
+            syncBtn.style.display = 'none';
+            
+            hideModals();
+            showToast('Sheets連携を解除しました', 'warning');
+        }
+
+        function setupCategoryFilter() {
+            var filterContainer = document.getElementById('categoryFilter');
+            
+            // 全て表示ボタン
+            var allBtn = createElement('button', {
+                className: 'filter-btn active',
+                onclick: function() { filterByCategory('all'); }
+            }, ['📰', ' 全て']);
+            filterContainer.appendChild(allBtn);
+
+            // カテゴリ別ボタン
+            Object.keys(CATEGORIES).forEach(function(catId) {
+                var cat = CATEGORIES[catId];
+                var btn = createElement('button', {
+                    className: 'filter-btn',
+                    onclick: function() { filterByCategory(catId); }
+                }, [cat.icon, ' ', cat.label]);
+                filterContainer.appendChild(btn);
+            });
+        }
+
+        function filterByCategory(categoryId) {
+            State.activeFilter = categoryId;
+            
+            // フィルターボタンの状態更新
+            document.querySelectorAll('.filter-btn').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 記事の再レンダリング
+            renderArticles();
+        }
+
+        function validateJson() {
+            var textarea = document.getElementById('jsonTextarea');
+            var errorEl = document.getElementById('jsonError');
+            var previewEl = document.getElementById('jsonPreview');
+            var saveBtn = document.getElementById('saveJsonBtn');
+            var previewContent = document.getElementById('previewContent');
+            
+            errorEl.textContent = '';
+            previewEl.style.display = 'none';
+            saveBtn.disabled = true;
+            
+            var jsonText = textarea.value.trim();
+            if (!jsonText) return;
+            
+            try {
+                var data = JSON.parse(jsonText);
+                
+                // 基本的な構造をチェック
+                if (!data.date || !data.articles) {
+                    throw new Error('必須フィールド (date, articles) が不足しています');
+                }
+                
+                // プレビュー表示
+                var preview = {
+                    date: data.date,
+                    articles: data.articles.length + '件',
+                    ideas: (data.ideas || []).length + '件',
+                    summary: data.summary ? '有り' : '無し',
+                    trends: (data.trends || []).length + '個'
+                };
+                
+                previewContent.textContent = JSON.stringify(preview, null, 2);
+                previewEl.style.display = 'block';
+                saveBtn.disabled = false;
+                
+            } catch (error) {
+                errorEl.textContent = 'JSON形式が正しくありません: ' + error.message;
+            }
+        }
+
+        function saveJsonData() {
+            var jsonText = document.getElementById('jsonTextarea').value.trim();
+            
+            try {
+                var data = JSON.parse(jsonText);
+                var dateKey = data.date.replace(/-/g, '');
+                
+                // 既存データチェック
+                if (localStorage.getItem('ainews_' + dateKey)) {
+                    State.pendingData = data;
+                    hideModals();
+                    showModal('overwriteModal');
+                    return;
+                }
+                
+                // 新規保存
+                saveData(data);
+                
+            } catch (error) {
+                showToast('データの保存に失敗しました', 'error');
+            }
+        }
+
+        function saveData(data) {
+            var dateKey = data.date.replace(/-/g, '');
+            
+            // ローカルストレージに保存
+            localStorage.setItem('ainews_' + dateKey, JSON.stringify(data));
+            
+            // インデックス更新
+            if (!State.savedDates.includes(data.date)) {
+                State.savedDates.unshift(data.date);
+                localStorage.setItem('ainews_index', JSON.stringify(State.savedDates));
+            }
+            
+            // 現在のデータを更新
+            State.currentData = data;
+            State.currentDate = data.date;
+            
+            // UI更新
+            renderAllContent();
+            updateStatsChips();
+            renderHistory();
+            
+            // GAS同期
+            if (State.gasUrl) {
+                syncToGas(data);
+            }
+            
+            hideModals();
+            clearJsonInput();
+            switchTab('news');
+            showToast('データを保存しました', 'success');
+        }
+
+        function confirmOverwrite() {
+            if (State.pendingData) {
+                saveData(State.pendingData);
+                State.pendingData = null;
+            }
+            hideModals();
+        }
+
+        function cancelOverwrite() {
+            State.pendingData = null;
+            hideModals();
+        }
+
+        function clearJsonInput() {
+            document.getElementById('jsonTextarea').value = '';
+            document.getElementById('jsonError').textContent = '';
+            document.getElementById('jsonPreview').style.display = 'none';
+            document.getElementById('saveJsonBtn').disabled = true;
+        }
+
+        function loadLatestData() {
+            if (State.savedDates.length === 0) return;
+            
+            var latestDate = State.savedDates[0];
+            loadDataByDate(latestDate);
+        }
+
+        function loadDataByDate(date) {
+            var dateKey = date.replace(/-/g, '');
+            var dataStr = localStorage.getItem('ainews_' + dateKey);
+            
+            if (dataStr) {
+                State.currentData = JSON.parse(dataStr);
+                State.currentDate = date;
+                renderAllContent();
+                updateStatsChips();
+            }
+        }
+
+        function renderAllContent() {
+            if (!State.currentData) return;
+            
+            renderSummary();
+            renderArticles();
+            renderGlobalArticles();
+            renderDomesticArticles();
+            renderIdeas();
+        }
+
+        function renderSummary() {
+            var summaryContainer = document.getElementById('summarySection');
+            var data = State.currentData;
+            
+            if (!data.summary && !data.trends) {
+                summaryContainer.innerHTML = '';
+                return;
+            }
+            
+            var section = createElement('div', { className: 'summary-section' });
+            
+            if (data.summary) {
+                var title = createElement('div', { className: 'summary-title' }, ['📋', ' エグゼクティブサマリー']);
+                var text = createElement('div', { className: 'summary-text' }, [data.summary]);
+                section.appendChild(title);
+                section.appendChild(text);
+            }
+            
+            if (data.trends && data.trends.length > 0) {
+                var trendsTitle = createElement('div', { className: 'summary-title' }, ['🔥', ' トレンドキーワード']);
+                var trendsContainer = createElement('div', { className: 'trends' });
+                
+                data.trends.forEach(function(trend) {
+                    var tag = createElement('span', { className: 'trend-tag' }, [trend]);
+                    trendsContainer.appendChild(tag);
+                });
+                
+                section.appendChild(trendsTitle);
+                section.appendChild(trendsContainer);
+            }
+            
+            summaryContainer.innerHTML = '';
+            summaryContainer.appendChild(section);
+        }
+
+        function renderArticles() {
+            var container = document.getElementById('articlesGrid');
+            var emptyState = document.getElementById('newsEmpty');
+            
+            if (!State.currentData || !State.currentData.articles) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            var articles = State.currentData.articles;
+            
+            // フィルタリング
+            if (State.activeFilter !== 'all') {
+                articles = articles.filter(function(article) {
+                    return article.category === State.activeFilter;
+                });
+            }
+            
+            container.innerHTML = '';
+            
+            if (articles.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            articles.forEach(function(article) {
+                var card = createArticleCard(article);
+                container.appendChild(card);
+            });
+        }
+
+        function renderGlobalArticles() {
+            var container = document.getElementById('globalGrid');
+            var emptyState = document.getElementById('globalEmpty');
+            
+            if (!State.currentData || !State.currentData.articles) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            var articles = State.currentData.articles.filter(function(article) {
+                return article.region === 'global';
+            });
+            
+            container.innerHTML = '';
+            
+            if (articles.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            articles.forEach(function(article) {
+                var card = createArticleCard(article);
+                container.appendChild(card);
+            });
+        }
+
+        function renderDomesticArticles() {
+            var container = document.getElementById('domesticGrid');
+            var emptyState = document.getElementById('domesticEmpty');
+            
+            if (!State.currentData || !State.currentData.articles) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            var articles = State.currentData.articles.filter(function(article) {
+                return article.region === 'domestic';
+            });
+            
+            container.innerHTML = '';
+            
+            if (articles.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            articles.forEach(function(article) {
+                var card = createArticleCard(article);
+                container.appendChild(card);
+            });
+        }
+
+        function createArticleCard(article) {
+            var card = createElement('div', {
+                className: 'article-card ' + article.category,
+                onclick: function() { toggleArticle(this); }
+            });
+            
+            var header = createElement('div', { className: 'article-header' });
+            
+            var title = createElement('div', { className: 'article-title' }, [article.title]);
+            header.appendChild(title);
+            
+            var badges = createElement('div', { className: 'article-badges' });
+            
+            // 影響度バッジ
+            if (article.impact) {
+                var impactBadge = createElement('span', {
+                    className: 'badge impact-' + article.impact
+                }, [article.impact]);
+                badges.appendChild(impactBadge);
+            }
+            
+            // カテゴリバッジ
+            var category = CATEGORIES[article.category];
+            if (category) {
+                var catBadge = createElement('span', {
+                    className: 'badge category'
+                }, [category.icon, ' ', category.label]);
+                badges.appendChild(catBadge);
+            }
+            
+            // 情報源バッジ
+            if (article.source) {
+                var sourceBadge = createElement('span', {
+                    className: 'badge source'
+                }, [article.source]);
+                badges.appendChild(sourceBadge);
+            }
+            
+            header.appendChild(badges);
+            card.appendChild(header);
+            
+            // 要約セクション
+            if (article.summary) {
+                var summary = createElement('div', {
+                    className: 'article-summary'
+                }, [article.summary]);
+                card.appendChild(summary);
+            }
+            
+            // ノートセクション
+            if (article.beginnerNote || article.impactNote) {
+                var notes = createElement('div', { className: 'article-notes' });
+                
+                if (article.beginnerNote) {
+                    var beginnerSection = createElement('div', { className: 'note-section' });
+                    var beginnerTitle = createElement('div', { className: 'note-title' }, ['📚 初心者向け解説']);
+                    var beginnerText = createElement('div', { className: 'note-text' }, [article.beginnerNote]);
+                    beginnerSection.appendChild(beginnerTitle);
+                    beginnerSection.appendChild(beginnerText);
+                    notes.appendChild(beginnerSection);
+                }
+                
+                if (article.impactNote) {
+                    var impactSection = createElement('div', { className: 'note-section' });
+                    var impactTitle = createElement('div', { className: 'note-title' }, ['💥 影響解説']);
+                    var impactText = createElement('div', { className: 'note-text' }, [article.impactNote]);
+                    impactSection.appendChild(impactTitle);
+                    impactSection.appendChild(impactText);
+                    notes.appendChild(impactSection);
+                }
+                
+                card.appendChild(notes);
+            }
+            
+            return card;
+        }
+
+        function toggleArticle(cardElement) {
+            cardElement.classList.toggle('expanded');
+        }
+
+        function renderIdeas() {
+            var container = document.getElementById('ideasGrid');
+            var emptyState = document.getElementById('ideasEmpty');
+            
+            if (!State.currentData || !State.currentData.ideas) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            var ideas = State.currentData.ideas;
+            
+            container.innerHTML = '';
+            
+            if (ideas.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            ideas.forEach(function(idea) {
+                var card = createIdeaCard(idea);
+                container.appendChild(card);
+            });
+        }
+
+        function createIdeaCard(idea) {
+            var card = createElement('div', {
+                className: 'idea-card',
+                onclick: function() { this.classList.toggle('expanded'); }
+            });
+            
+            var header = createElement('div', { className: 'idea-header' });
+            
+            var icon = createElement('div', {
+                className: 'idea-icon',
+                style: idea.color ? 'background-color: ' + idea.color + '20; color: ' + idea.color : ''
+            }, [idea.icon || '💡']);
+            
+            var title = createElement('div', { className: 'idea-title' }, [idea.title]);
+            
+            header.appendChild(icon);
+            header.appendChild(title);
+            card.appendChild(header);
+            
+            if (idea.desc) {
+                var desc = createElement('div', { className: 'idea-desc' }, [idea.desc]);
+                card.appendChild(desc);
+            }
+            
+            if (idea.tags && idea.tags.length > 0) {
+                var tags = createElement('div', { className: 'idea-tags' });
+                idea.tags.forEach(function(tag) {
+                    var tagEl = createElement('span', { className: 'idea-tag' }, [tag]);
+                    tags.appendChild(tagEl);
+                });
+                card.appendChild(tags);
+            }
+            
+            return card;
+        }
+
+        function renderHistory() {
+            var container = document.getElementById('historyList');
+            container.innerHTML = '';
+            
+            State.savedDates.forEach(function(date) {
+                var dateKey = date.replace(/-/g, '');
+                var dataStr = localStorage.getItem('ainews_' + dateKey);
+                
+                if (dataStr) {
+                    var data = JSON.parse(dataStr);
+                    var row = createHistoryRow(date, data);
+                    container.appendChild(row);
+                }
+            });
+        }
+
+        function createHistoryRow(date, data) {
+            var row = createElement('div', {
+                className: 'history-row',
+                onclick: function() {
+                    loadDataByDate(date);
+                    switchTab('news');
+                }
+            });
+            
+            var dateEl = createElement('div', { className: 'history-date' }, [date]);
+            var articlesCount = createElement('div', { className: 'history-stat' }, [
+                (data.articles || []).length.toString()
+            ]);
+            var highImpactCount = createElement('div', { className: 'history-stat' }, [
+                (data.articles || []).filter(function(a) { return a.impact === '高'; }).length.toString()
+            ]);
+            var ideasCount = createElement('div', { className: 'history-stat' }, [
+                (data.ideas || []).length.toString()
+            ]);
+            
+            row.appendChild(dateEl);
+            row.appendChild(articlesCount);
+            row.appendChild(highImpactCount);
+            row.appendChild(ideasCount);
+            
+            return row;
+        }
+
+        function updateStatsChips() {
+            var container = document.getElementById('statsChips');
+            container.innerHTML = '';
+            
+            if (State.currentData) {
+                var articlesCount = (State.currentData.articles || []).length;
+                var highImpactCount = (State.currentData.articles || []).filter(function(a) { 
+                    return a.impact === '高'; 
+                }).length;
+                var ideasCount = (State.currentData.ideas || []).length;
+                
+                var chips = [
+                    '📰 ' + articlesCount + '件',
+                    '🔥 影響度高 ' + highImpactCount + '件',
+                    '💡 アイデア ' + ideasCount + '件'
+                ];
+                
+                chips.forEach(function(chipText) {
+                    var chip = createElement('div', { className: 'stat-chip' }, [chipText]);
+                    container.appendChild(chip);
+                });
+            }
+            
+            // 保存件数
+            var savedChip = createElement('div', { className: 'stat-chip' }, [
+                '💾 ' + State.savedDates.length + '日分保存'
+            ]);
+            container.appendChild(savedChip);
+        }
+
+        function syncWithGas() {
+            if (!State.gasUrl) return;
+            
+            console.log('GAS同期開始:', State.gasUrl);
+            
+            // JSONP方式でGASから日付一覧を取得
+            var callbackName = 'gasSyncCallback_' + Date.now();
+            
+            window[callbackName] = function(result) {
+                console.log('GASからのレスポンス (JSONP):', result);
+                delete window[callbackName];
+                
+                try {
+                    console.log('dates配列の内容:', result.dates);
+                    console.log('dates配列の型:', typeof result.dates);
+                    console.log('dates配列の長さ:', result.dates ? result.dates.length : 'undefined');
+                    
+                    if (result.error) {
+                        throw new Error('GASエラー: ' + result.error);
+                    }
+                    
+                    if (result.dates && result.dates.length > 0) {
+                        console.log('処理する日付数:', result.dates.length);
+                        
+                        // ローカルにないデータをGASから取得
+                        result.dates.forEach(function(item, index) {
+                            console.log('📅 日付アイテム[' + index + ']:', item);
+                            console.log('📅 アイテムの型:', typeof item);
+                            
+                            // 日付の形式を正規化
+                            var date;
+                            if (typeof item === 'string') {
+                                date = item;
+                                console.log('📅 文字列として処理:', date);
+                            } else if (item && item.date) {
+                                date = item.date;
+                                console.log('📅 オブジェクトのdateプロパティ:', date);
+                            } else if (typeof item === 'object' && item !== null) {
+                                // オブジェクトの場合、可能性のあるプロパティをチェック
+                                date = item.date || item.Date || item.DATE || item.dateString || item.value || item.toString();
+                                console.log('📅 オブジェクトから抽出:', date);
+                            } else {
+                                console.warn('📅 不明な日付形式をスキップ:', item);
+                                return;
+                            }
+                            
+                            if (!date) {
+                                console.warn('📅 日付が空のためスキップ:', item);
+                                return;
+                            }
+                            
+                            // 日付を YYYY-MM-DD 形式に変換
+                            var formattedDate = formatDateForGas(date);
+                            console.log('📅 元の日付:', date, '→ 変換後:', formattedDate);
+                            
+                            if (!formattedDate) {
+                                console.warn('📅 日付変換に失敗:', date);
+                                return;
+                            }
+                            
+                            var dateKey = formattedDate.replace(/-/g, '');
+                            var localData = localStorage.getItem('ainews_' + dateKey);
+                            
+                            if (!localData) {
+                                console.log('📥 新しいデータをGASから取得:', formattedDate);
+                                loadFromGas(formattedDate);
+                            } else {
+                                console.log('📁 ローカルに存在済み:', formattedDate, '(サイズ:', localData.length, 'chars)');
+                            }
+                        });
+                        showToast('Sheetsから' + result.dates.length + '件のデータを確認しました', 'success');
+                    } else {
+                        console.log('❌ dates配列が空またはundefined');
+                        console.log('レスポンス全体:', JSON.stringify(result, null, 2));
+                        showToast('Sheetsにデータがありません', 'warning');
+                    }
+                } catch (error) {
+                    console.error('GAS同期エラー:', error);
+                    showToast('Sheets連携エラー: ' + error.message, 'error');
+                }
+            };
+            
+            // エラーハンドリング用タイムアウト
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('Sheets連携タイムアウト', 'error');
+                }
+            }, 10000);
+            
+            // JSONPリクエスト
+            var script = document.createElement('script');
+            script.src = State.gasUrl + '?action=list&callback=' + callbackName;
+            script.onerror = function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('GASへの接続に失敗しました', 'error');
+                }
+            };
+            
+            document.head.appendChild(script);
+            setTimeout(function() {
+                if (script.parentNode) script.parentNode.removeChild(script);
+            }, 1000);
+        }
+
+        // 日付を YYYY-MM-DD 形式に変換する関数
+        function formatDateForGas(dateInput) {
+            try {
+                var date;
+                
+                // 既に YYYY-MM-DD 形式の場合
+                if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+                    return dateInput;
+                }
+                
+                // Date オブジェクトまたは文字列から Date オブジェクトを作成
+                if (dateInput instanceof Date) {
+                    date = dateInput;
+                } else {
+                    date = new Date(dateInput);
+                }
+                
+                // 無効な日付の場合
+                if (isNaN(date.getTime())) {
+                    console.error('無効な日付:', dateInput);
+                    return null;
+                }
+                
+                // YYYY-MM-DD 形式で返す
+                var year = date.getFullYear();
+                var month = String(date.getMonth() + 1).padStart(2, '0');
+                var day = String(date.getDate()).padStart(2, '0');
+                
+                return year + '-' + month + '-' + day;
+                
+            } catch (error) {
+                console.error('日付変換エラー:', error, dateInput);
+                return null;
+            }
+        }
+        
+        function loadFromGas(date) {
+            if (!State.gasUrl) return;
+            
+            console.log('GASからデータ読み込み開始:', date);
+            
+            // JSONP方式で複数の日付フォーマットを順次試行
+            var dateObj = new Date(date);
+            var dateFormats = [
+                date,  // 元の形式 (YYYY-MM-DD)
+                dateObj.toString(),  // "Sun May 03 2026 00:00:00 GMT+0900 (日本標準時)"
+                dateObj.toDateString(),  // "Sun May 03 2026"
+                dateObj.toISOString().split('T')[0],  // "2026-05-03"
+                date.replace(/-/g, ''),  // "20260503"
+                dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0')  // 確実なYYYY-MM-DD
+            ];
+            
+            console.log('🔄 JSONP方式で複数日付フォーマットを順次試行:', dateFormats);
+            
+            // 順番に試行する関数
+            function tryNextFormat(formatIndex) {
+                if (formatIndex >= dateFormats.length) {
+                    console.error('❌ 全ての日付フォーマットで失敗:', date);
+                    showToast('データ取得失敗: ' + date + ' (形式不一致)', 'error');
+                    return;
+                }
+                
+                var currentFormat = dateFormats[formatIndex];
+                console.log('🧪 フォーマット[' + formatIndex + '] 試行:', currentFormat);
+                
+                // JSONP方式でのリクエスト
+                var callbackName = 'gasLoadCallback_' + Date.now() + '_' + formatIndex;
+                
+                window[callbackName] = function(result) {
+                    console.log('📥 フォーマット[' + formatIndex + '] レスポンス:', result);
+                    delete window[callbackName];
+                    
+                    try {
+                        // データが存在するかチェック
+                        if (result.data && result.data !== null && result.data !== undefined && 
+                            (typeof result.data === 'object' || Array.isArray(result.data)) &&
+                            JSON.stringify(result.data) !== '{}' && JSON.stringify(result.data) !== '[]') {
+                            
+                            console.log('✅ フォーマット[' + formatIndex + '] 成功:', currentFormat);
+                            console.log('📊 データサイズ:', JSON.stringify(result.data).length, 'characters');
+                            
+                            // データを保存
+                            var dateKey = date.replace(/-/g, '');
+                            localStorage.setItem('ainews_' + dateKey, JSON.stringify(result.data));
+                            
+                            if (!State.savedDates.includes(date)) {
+                                State.savedDates.unshift(date);
+                                State.savedDates.sort().reverse();
+                                localStorage.setItem('ainews_index', JSON.stringify(State.savedDates));
+                            }
+                            
+                            renderHistory();
+                            updateStatsChips();
+                            showToast('✅ データ取得成功: ' + date + ' (形式: ' + formatIndex + ')', 'success');
+                            
+                        } else {
+                            console.log('❌ フォーマット[' + formatIndex + '] データなし:', currentFormat);
+                            // 次のフォーマットを試行
+                            tryNextFormat(formatIndex + 1);
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ フォーマット[' + formatIndex + '] 処理エラー:', error);
+                        tryNextFormat(formatIndex + 1);
+                    }
+                };
+                
+                // エラー時のタイムアウト
+                var timeoutId = setTimeout(function() {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        console.log('❌ フォーマット[' + formatIndex + '] タイムアウト:', currentFormat);
+                        tryNextFormat(formatIndex + 1);
+                    }
+                }, 5000);
+                
+                // スクリプトタグでJSONPリクエスト
+                var script = document.createElement('script');
+                script.src = State.gasUrl + '?action=load&date=' + encodeURIComponent(currentFormat) + '&callback=' + callbackName;
+                script.onerror = function() {
+                    clearTimeout(timeoutId);
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        console.error('❌ フォーマット[' + formatIndex + '] スクリプトエラー:', currentFormat);
+                        tryNextFormat(formatIndex + 1);
+                    }
+                };
+                
+                document.head.appendChild(script);
+                
+                // クリーンアップ
+                setTimeout(function() {
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                }, 1000);
+            }
+            
+            // 最初のフォーマットから開始
+            tryNextFormat(0);
+        }
+
+        function syncToGas(data) {
+            if (!State.gasUrl) return;
+            
+            console.log('GASへのデータ保存開始:', data.date);
+            
+            // JSONP方式でのデータ保存
+            var callbackName = 'gasSaveCallback_' + Date.now();
+            
+            window[callbackName] = function(result) {
+                console.log('GAS保存結果 (JSONP):', result);
+                delete window[callbackName];
+                
+                try {
+                    if (result.error) {
+                        throw new Error('GASエラー: ' + result.error);
+                    }
+                    if (result.success) {
+                        showToast('Sheetsに同期しました', 'success');
+                    } else {
+                        showToast('Sheets同期に失敗しました', 'warning');
+                    }
+                } catch (error) {
+                    console.error('GAS同期エラー:', error);
+                    showToast('Sheets同期エラー: ' + error.message, 'error');
+                }
+            };
+            
+            // エラー用タイムアウト
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    showToast('Sheets保存タイムアウト', 'error');
+                }
+            }, 15000);
+            
+            try {
+                // データをJSONエンコードしてGETパラメータとして送信
+                var encodedData = encodeURIComponent(JSON.stringify(data));
+                var script = document.createElement('script');
+                script.src = State.gasUrl + '?action=save&overwrite=true&data=' + encodedData + '&callback=' + callbackName;
+                
+                script.onerror = function() {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                        showToast('GASへの保存に失敗しました', 'error');
+                    }
+                };
+                
+                document.head.appendChild(script);
+                setTimeout(function() {
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }, 2000);
+                
+            } catch (error) {
+                console.error('データエンコードエラー:', error);
+                showToast('データの準備に失敗しました: ' + error.message, 'error');
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                }
+            }
+        }
+
+        // 手動同期機能
+        function manualSync() {
+            console.log('🚀 手動同期開始 - State.gasUrl:', State.gasUrl);
+            console.log('🔧 現在の通信方式: JSONP (CORS回避)');
+            
+            if (!State.gasUrl) {
+                console.warn('GAS URLが設定されていません');
+                showToast('GAS URLが設定されていません。Sheets設定からURLを設定してください', 'warning');
+                return;
+            }
+            
+            // 同期ボタンを一時的に無効化
+            var syncBtn = document.getElementById('syncBtn');
+            if (!syncBtn) {
+                console.error('同期ボタンが見つかりません');
+                return;
+            }
+            
+            var originalText = syncBtn.innerHTML;
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span>🔄</span> 同期中...';
+            
+            console.log('🚀 JSONP方式で手動同期実行中...');
+            showToast('JSONP方式で同期を開始しました...', 'success');
+            
+            try {
+                syncWithGas();
+                console.log('✅ syncWithGas()実行完了');
+            } catch (error) {
+                console.error('❌ syncWithGas()実行エラー:', error);
+                showToast('同期エラー: ' + error.message, 'error');
+            }
+            
+            // 8秒後にボタンを再有効化（複数フォーマット試行時間を考慮）
+            setTimeout(function() {
+                if (syncBtn) {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = originalText;
+                    console.log('🔄 同期ボタン再有効化');
+                }
+            }, 8000);
+        }
+        function testGasConnection(url, callback) {
+            console.log('GAS接続テスト開始:', url);
+            console.log('🔧 接続方式: JSONP (CORS回避)');
+            
+            // JSONP方式での接続テスト
+            var callbackName = 'gasTestCallback_' + Date.now();
+            var timeoutId;
+            var scriptElement;
+            
+            // コールバック関数をグローバルに登録
+            window[callbackName] = function(result) {
+                clearTimeout(timeoutId);
+                console.log('✅ GASテスト結果 (JSONP成功):', result);
+                
+                // スクリプトタグを削除
+                if (scriptElement && scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
+                delete window[callbackName];
+                
+                if (result && (result.status === 'ok' || 
+                    result.message === 'GAS is working' || 
+                    result.ping === 'ok' ||
+                    result.result === 'success')) {
+                    console.log('✅ GAS接続テスト成功');
+                    callback(true, 'GAS連携成功');
+                } else {
+                    console.log('❌ GAS接続テスト失敗 - 予期しないレスポンス');
+                    callback(false, 'GASサーバーから予期しないレスポンス: ' + JSON.stringify(result));
+                }
+            };
+            
+            // エラーハンドリング用タイムアウト
+            timeoutId = setTimeout(function() {
+                console.error('❌ GAS接続タイムアウト（15秒）');
+                if (scriptElement && scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    callback(false, 'GAS接続タイムアウト（15秒）');
+                }
+            }, 15000);
+            
+            // スクリプトタグでJSONPリクエスト
+            scriptElement = document.createElement('script');
+            var testUrl = url + '?action=test&callback=' + callbackName;
+            console.log('📡 JSONPリクエストURL:', testUrl);
+            
+            scriptElement.src = testUrl;
+            scriptElement.onerror = function(error) {
+                clearTimeout(timeoutId);
+                console.error('❌ スクリプト読み込みエラー:', error);
+                console.error('❌ URL:', testUrl);
+                console.error('❌ 可能な原因:');
+                console.error('   1. GAS URLが正しくない');
+                console.error('   2. GAS側でJSONP対応がされていない');
+                console.error('   3. GASスクリプトが実行権限がない');
+                
+                if (scriptElement.parentNode) {
+                    scriptElement.parentNode.removeChild(scriptElement);
+                }
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    // フォールバック：通常のfetchで再試行
+                    console.log('🔄 フォールバック: 通常のfetchで再試行');
+                    tryFallbackFetch(url, callback);
+                }
+            };
+            
+            document.head.appendChild(scriptElement);
+        }
+        
+        // フォールバック関数（CORS問題があっても情報収集のため）
+        function tryFallbackFetch(url, callback) {
+            console.log('🔄 フォールバック fetch 試行:', url);
+            
+            fetch(url + '?action=test', {
+                method: 'GET',
+                mode: 'no-cors'  // CORSを無視
+            })
+            .then(function(response) {
+                console.log('📡 フォールバック レスポンス:', response);
+                // no-corsモードではレスポンス内容を読めないが、到達確認はできる
+                if (response.type === 'opaque') {
+                    console.log('✅ GASに到達確認（no-corsモード）');
+                    callback(false, 'GASに到達しましたが、JSONP対応が必要です。GAS側でcallbackパラメータを処理するコードを追加してください。');
+                } else {
+                    console.log('❌ 予期しないレスポンス type:', response.type);
+                    callback(false, 'GAS接続に問題があります');
+                }
+            })
+            .catch(function(error) {
+                console.error('❌ フォールバック fetch エラー:', error);
+                callback(false, 'GAS接続エラー: URL確認またはGAS側の設定を確認してください。詳細: ' + error.message);
+            });
+        }
+        function createElement(tag, props, children) {
+            var element = document.createElement(tag);
+            
+            if (props) {
+                Object.keys(props).forEach(function(key) {
+                    if (key === 'className') {
+                        element.className = props[key];
+                    } else if (key === 'onclick') {
+                        element.addEventListener('click', props[key]);
+                    } else if (key === 'style') {
+                        element.style.cssText = props[key];
+                    } else {
+                        element.setAttribute(key, props[key]);
+                    }
+                });
+            }
+            
+            if (children) {
+                children.forEach(function(child) {
+                    if (typeof child === 'string') {
+                        element.appendChild(document.createTextNode(child));
+                    } else {
+                        element.appendChild(child);
+                    }
+                });
+            }
+            
+            return element;
+        }
+
+        // デバウンス機能
+        function debounce(func, wait) {
+            var timeout;
+            return function() {
+                var context = this;
+                var args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(function() {
+                    func.apply(context, args);
+                }, wait);
+            };
+        }
+
+        // エラーハンドリング
+        window.addEventListener('error', function(e) {
+            console.error('アプリケーションエラー:', e.error);
+            showToast('予期しないエラーが発生しました', 'error');
+        });
+
+        // PWA関連 - ServiceWorker無効化（sw.jsファイル不在のため）
+        // if ('serviceWorker' in navigator) {
+        //     window.addEventListener('load', function() {
+        //         navigator.serviceWorker.register('/sw.js')
+        //             .then(function(registration) {
+        //                 console.log('SW registered: ', registration);
+        //             })
+        //             .catch(function(registrationError) {
+        //                 console.log('SW registration failed: ', registrationError);
+        //             });
+        //     });
+        // }
+
+    </script>
+</body>
+</html>

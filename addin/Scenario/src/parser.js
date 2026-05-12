@@ -6,35 +6,44 @@
 // ─── 列定義 ───────────────────────────────────────────
 const SHEET_DEFS = {
   "異常（通常）": {
-    dataStart: 14,   // 0-indexed row
+    dataStart: 13,   // 0-indexed row (14行目)
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
     colOp3Func: 26, colOp3Stat: 31,
     colCh: 85,
     colPhase: 96, colBlock: 87, colMinor: 88,
-    colStart: 90, colEnd: 91,
+    colStart: 90, colEnd: 91, colToday: 95, // CR列（本日列）修正：94→95
   },
   "異常（電源断）": {
-    dataStart: 14,
+    dataStart: 13,
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 70, colBlock: 61, colMinor: 62,
-    colStart: 64, colEnd: 65,
+    colStart: 64, colEnd: 65, colToday: 69, // BR列（本日列）
   },
   "異常（通信断）": {
-    dataStart: 14,
+    dataStart: 13,
     colMode2: 0, colAutoNo: 1, colBrand: 3,
     colOp1Func: 4, colOp1Stat: 9,
     colOp2Func: 15, colOp2Stat: 20,
     colOp3Func: 26, colOp3Stat: 31,
     colCh: -1,
     colPhase: 89, colBlock: 80, colMinor: 81,
-    colStart: 83, colEnd: 84,
+    colStart: 83, colEnd: 84, colToday: 88, // CK列（本日列）
   },
+};
+
+// バグシート定義
+const BUG_SHEET_DEF = {
+  sheetName: "（転記用）バグ",
+  dataStart: 1,    // データ開始行（0-indexed）
+  colBugId: 0,     // バグID列
+  colTitle: 1,     // タイトル列  
+  colStatus: 2,    // 状況列
 };
 
 // ─── ユーティリティ ───────────────────────────────────
@@ -71,10 +80,19 @@ function getLane(start, end, blockText, minorText) {
   };
   const unresolvedBlock = hasUnresolved(blockText);
   const unresolvedMinor = hasUnresolved(minorText);
-  const unresolved = unresolvedBlock || unresolvedMinor;
-  if (!start) return unresolved ? "バグ保留" : "未着手";
-  if (!end)   return unresolved ? "バグ保留" : "対応中";
-  return unresolved ? "完了（条件付き）" : "完了";
+
+  // 実施完了日に「削除」という文字列が入っている場合は削除レーン
+  if (typeof end === "string" && end.trim() === "削除") {
+    return "削除";
+  }
+
+  // バグ保留判定（完了阻害課題で判定）
+  if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
+  if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
+
+  // 完了判定（軽微な課題で完了条件付きを判定）
+  if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
+  return unresolvedMinor ? "完了（条件付き）" : "完了";
 }
 
 // ─── メイン読み取り関数 ───────────────────────────────
@@ -99,10 +117,11 @@ async function readWorkbook(context) {
 
     const ws = sheets.getItem(sheetName);
     const usedRange = ws.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const rows = usedRange.values;
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
     const colCount = rows[0] ? rows[0].length : 0;
 
     for (let i = def.dataStart; i < rows.length; i++) {
@@ -138,20 +157,27 @@ async function readWorkbook(context) {
       const minorText = colCount > def.colMinor ? cleanVal(row[def.colMinor]) : "";
       const start = colCount > def.colStart ? dateStr(row[def.colStart]) : "";
       const end   = colCount > def.colEnd   ? dateStr(row[def.colEnd])   : "";
+      const todayValue = colCount > def.colToday ? cleanVal(row[def.colToday]) : "";
+      const isStar = todayValue === "〇"; // 本日列が〇の場合は★
       const lane  = getLane(start, end, blockText, minorText);
 
       const key = `${sheetLabel}|${autoNo}|${brand}|${op1Func}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
+      // 実際のExcel行番号（1-indexed）を正確に計算
+      const actualExcelRow = usedRangeStartRow + i + 1;
+
       creationData.push({
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
         phase, lane, blockText, minorText,
+        isStar, // 本日列の★/☆状態
         excelSheet: sheetName,  // Excelへの書き戻しに使用
-        rowIdx: i,              // 0-indexed row in usedRange
+        rowIdx: actualExcelRow,  // 実際のExcel行番号（1-indexed）
         colBlock: def.colBlock,
         colMinor: def.colMinor,
+        colToday: def.colToday, // 本日列のインデックス
       });
 
       // バグ影響データ収集
@@ -165,7 +191,7 @@ async function readWorkbook(context) {
             isBlock: colType === "block",
             resolved,
             excelSheet: sheetName,
-            rowIdx: i,
+            rowIdx: actualExcelRow,  // 実際のExcel行番号（1-indexed）
             colBlock: def.colBlock,
             colMinor: def.colMinor,
           });
@@ -174,22 +200,112 @@ async function readWorkbook(context) {
     }
   }
 
+  // ─── 正常シート ─────────────────────────────────────
+  const normalSheetName = "正常";
+  if (sheetNames.includes(normalSheetName)) {
+    const ws = sheets.getItem(normalSheetName);
+    const usedRange = ws.getUsedRange();
+    usedRange.load(["values", "rowIndex"]);
+    await context.sync();
+
+    const rows = usedRange.values;
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
+    const colCount = rows[0] ? rows[0].length : 0;
+    
+    // 正常シートも異常系シートと同様の構造と仮定
+    const normalDef = {
+      dataStart: 13, colMode2: 0, colAutoNo: 1, colBrand: 3,
+      colOp1Func: 4, colOp1Stat: 9, colOp2Func: 15, colOp2Stat: 20,
+      colOp3Func: 26, colOp3Stat: 31, colPhase: 96,
+      colStart: 90, colEnd: 91, colToday: 95 // CR列（本日列）修正：94→95
+    };
+
+    for (let i = normalDef.dataStart; i < rows.length; i++) {
+      const row = rows[i];
+      if (cleanVal(row[normalDef.colMode2]) !== "●") continue;
+      const autoNoRaw = row[normalDef.colAutoNo];
+      if (!autoNoRaw && autoNoRaw !== 0) continue;
+      const autoNo = parseInt(autoNoRaw);
+      if (isNaN(autoNo)) continue;
+
+      const brand = cleanBrand(cleanVal(row[normalDef.colBrand]));
+      const op1Func = cleanVal(row[normalDef.colOp1Func]);
+      const op1Stat = cleanVal(row[normalDef.colOp1Stat]);
+      const op2Func = cleanVal(row[normalDef.colOp2Func]);
+      const op2Stat = cleanVal(row[normalDef.colOp2Stat]);
+      const op3Func = colCount > normalDef.colOp3Func ? cleanVal(row[normalDef.colOp3Func]) : "";
+      const op3Stat = colCount > normalDef.colOp3Stat ? cleanVal(row[normalDef.colOp3Stat]) : "";
+      let phase = colCount > normalDef.colPhase ? cleanVal(row[normalDef.colPhase]) : "";
+      if (!phase) phase = "PH1";
+      const start = colCount > normalDef.colStart ? dateStr(row[normalDef.colStart]) : "";
+      const end = colCount > normalDef.colEnd ? dateStr(row[normalDef.colEnd]) : "";
+      const todayValue = colCount > normalDef.colToday ? cleanVal(row[normalDef.colToday]) : "";
+      const isStar = todayValue === "〇";
+      const lane = getLane(start, end, "", "");
+
+      const key = `正常|${autoNo}|${brand}|${op1Func}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // 実際のExcel行番号（1-indexed）を正確に計算
+      const actualExcelRow = usedRangeStartRow + i + 1;
+
+      creationData.push({
+        sheet: "正常", no: autoNo, brand,
+        op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
+        phase, lane, blockText: "", minorText: "",
+        isStar,
+        excelSheet: normalSheetName, rowIdx: actualExcelRow, colBlock: -1, colMinor: -1,
+        colToday: normalDef.colToday, // CR列（本日列）
+      });
+    }
+  }
+
   // ─── 正常（クレ・銀聯）────────────────────────────────
   const kuSheetName = "正常（クレ・銀聯）";
   if (sheetNames.includes(kuSheetName)) {
     const ws = sheets.getItem(kuSheetName);
     const usedRange = ws.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const rows = usedRange.values;
-    let rowNum = 1;
-    for (let i = 5; i < rows.length; i++) {
+    const usedRangeStartRow = usedRange.rowIndex; // usedRangeの開始行番号
+    
+    for (let i = 4; i < rows.length; i++) {
       const row = rows[i];
+      
+      // 行のデバッグ情報を詳細に出力
+      console.log(`正常（クレ・銀聯）行${i + 1}の処理:`, {
+        scenarioId: cleanVal(row[2]),
+        autoNoFromB: cleanVal(row[1]),
+        brand: cleanVal(row[10]),
+        func: cleanVal(row[4]),
+        rowData: row
+      });
+      
       const scenarioId = cleanVal(row[2]);
-      if (!scenarioId) continue;
+      if (!scenarioId) {
+        console.log(`行${i + 1}: scenarioIdが空のためスキップ`);
+        continue;
+      }
       const brand = cleanVal(row[10]);
-      if (!brand) continue;
+      if (!brand) {
+        console.log(`行${i + 1}: brandが空のためスキップ`);
+        continue;
+      }
+
+      // B列から自動化項番を取得（カード番号として使用）
+      const autoNoFromB = cleanVal(row[1]); // B列（自動化項番）
+      if (!autoNoFromB) {
+        console.log(`行${i + 1}: B列の自動化項番が空のためスキップ`);
+        continue;
+      }
+      const rowNum = parseInt(autoNoFromB);
+      if (isNaN(rowNum)) {
+        console.log(`行${i + 1}: B列の自動化項番が数値でないためスキップ`);
+        continue;
+      }
 
       const gyoumu   = cleanVal(row[3]);
       const func     = cleanVal(row[4]);
@@ -198,24 +314,98 @@ async function readWorkbook(context) {
       let phase = cleanVal(row[20]) || "PH1";
       const start = dateStr(row[14]);
       const end   = dateStr(row[15]);
-      const lane  = getLane(start, end, "");
+      const todayValue = cleanVal(row[19]); // T列（本日列）
+      const isStar = todayValue === "〇"; // 本日列が〇の場合は★
+      const lane  = getLane(start, end, "", "");
 
       const op1Func = func + (gyoumu ? `（${gyoumu}）` : "");
       const op1Stat = [haraiKu, signPin].filter(Boolean).join("　");
 
-      const key = `正常（クレ・銀聯）|${scenarioId}|${brand}|${op1Func}`;
-      if (seen.has(key)) continue;
+      // B列の自動化項番をキーに含めて重複を防ぐ
+      const key = `正常（クレ・銀聯）|${autoNoFromB}|${brand}|${op1Func}`;
+      if (seen.has(key)) {
+        console.log(`行${i + 1}: 重複キー "${key}" のためスキップ`);
+        continue;
+      }
       seen.add(key);
+
+      // 実際のExcel行番号（1-indexed）を計算
+      const actualExcelRow = usedRangeStartRow + i + 1;
+      
+      // 全データのデバッグ出力（カード#3の問題を調査）
+      console.log(`正常（クレ・銀聯）カード#${rowNum}のデータ:`);
+      console.log(`  usedRangeStartRow: ${usedRangeStartRow}`);
+      console.log(`  配列インデックスi: ${i} (Excel行番号: ${i + 1})`);
+      console.log(`  B列の自動化項番: ${autoNoFromB}`);
+      console.log(`  実際のExcel行番号: ${actualExcelRow}`);
+      console.log(`  scenarioId: ${scenarioId}, brand: ${brand}`);
+      console.log(`  op1Func: ${op1Func}, op1Stat: ${op1Stat}`);
+      console.log(`  key: ${key}`);
+      console.log(`  シート: ${kuSheetName}`);
 
       creationData.push({
         sheet: "正常（クレ・銀聯）", no: rowNum, brand,
         op1Func, op1Stat, op2Func: "", op2Stat: "", op3Func: "", op3Stat: "",
         phase, lane, blockText: "", minorText: "",
-        excelSheet: kuSheetName, rowIdx: i, colBlock: -1, colMinor: -1,
+        isStar, // T列から★/☆状態を取得
+        excelSheet: kuSheetName, rowIdx: actualExcelRow, colBlock: -1, colMinor: -1,
+        colToday: 19, // T列（本日列）
       });
-      rowNum++;
+      
+      console.log(`カード#${rowNum}をcreationDataに追加しました`);
     }
   }
+
+  // ─── バグシート読み取り ─────────────────────────────────
+  const bugSheetMap = {};  // bugId -> {title, status}
+  
+  console.log("利用可能シート:", sheetNames);
+  console.log("バグシートを探しています:", BUG_SHEET_DEF.sheetName);
+  
+  if (sheetNames.includes(BUG_SHEET_DEF.sheetName)) {
+    try {
+      console.log("バグシートが見つかりました。読み取り開始...");
+      const bugSheet = sheets.getItem(BUG_SHEET_DEF.sheetName);
+      const bugUsedRange = bugSheet.getUsedRange();
+      bugUsedRange.load(["values"]);
+      await context.sync();
+
+      const bugRows = bugUsedRange.values;
+      console.log("バグシート行数:", bugRows.length);
+      console.log("最初の5行:", bugRows.slice(0, Math.min(5, bugRows.length)));
+      
+      for (let i = BUG_SHEET_DEF.dataStart; i < bugRows.length; i++) {
+        const row = bugRows[i];
+        
+        const bugIdRaw = cleanVal(row[BUG_SHEET_DEF.colBugId]);
+        const title = cleanVal(row[BUG_SHEET_DEF.colTitle]);
+        const status = cleanVal(row[BUG_SHEET_DEF.colStatus]);
+        
+        console.log(`行${i + 1}: ID="${bugIdRaw}", タイトル="${title}", ステータス="${status}"`);
+        
+        if (bugIdRaw) {
+          // バグIDから数字部分を抽出（例：「9」「バ9」「ID:9」→「9」）
+          const numberMatch = bugIdRaw.match(/(\d+)/);
+          if (numberMatch) {
+            const bugNumber = numberMatch[1];
+            // 「バ」+数字の形式でキーを作成
+            const standardBugId = `バ${bugNumber}`;
+            bugSheetMap[standardBugId] = { title, status };
+            console.log(`✓ バグシート読み取り: ${bugIdRaw} → ${standardBugId} (タイトル:"${title}", ステータス:"${status}")`);
+          } else {
+            console.log(`⚠ バグID "${bugIdRaw}" から数字を抽出できませんでした`);
+          }
+        }
+      }
+      
+      console.log("バグシートデータ読み取り完了:", Object.keys(bugSheetMap).length, "件");
+    } catch (error) {
+      console.warn("バグシートの読み取りに失敗:", error.message);
+    }
+  }
+
+  console.log("バグシートデータ読み取り完了:", Object.keys(bugSheetMap).length, "件");
+  console.log("バグシートマップ内容:", bugSheetMap);
 
   // bugMapをbugDataに変換
   const bugData = Object.values(bugMap)
@@ -232,11 +422,21 @@ async function readWorkbook(context) {
       }
       return prefixA.localeCompare(prefixB);
     })
-    .map(b => ({
-      id: b.id,
-      resolved: b.scenarios.every(s => s.resolved),
-      scenarios: b.scenarios,
-    }));
+    .map(b => {
+      const bugSheetData = bugSheetMap[b.id] || {};
+      console.log(`バグ${b.id}にバグシートデータを適用:`, {
+        found: !!bugSheetMap[b.id],
+        title: bugSheetData.title || "なし",
+        status: bugSheetData.status || "なし"
+      });
+      return {
+        id: b.id,
+        title: bugSheetData.title || "",
+        status: bugSheetData.status || "",
+        resolved: b.scenarios.every(s => s.resolved),
+        scenarios: b.scenarios,
+      };
+    });
 
   return { creationData, bugData };
 }

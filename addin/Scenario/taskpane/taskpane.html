@@ -18,7 +18,21 @@
 body{font-family:"Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
 
 /* ── HEADER ── */
-header{background:#fff;border-bottom:1px solid var(--border);padding:10px 14px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+header{
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  padding:10px 14px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.view-tabs {
+  position:sticky;
+  top:48px; /* headerの高さ分 */
+  z-index:99;
+  background:#fff;
+}
 .header-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .logo{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
 h1{font-size:14px;font-weight:700;}
@@ -27,6 +41,10 @@ h1{font-size:14px;font-weight:700;}
 .reload-btn{background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:"Noto Sans JP",sans-serif;font-weight:600;}
 .reload-btn:hover{opacity:.85;}
 .reload-btn:disabled{opacity:.5;cursor:default;}
+
+#star-toggle-btn{background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;padding:4px 8px;color:#f39c12;transition:all 0.2s ease;margin-left:6px;}
+#star-toggle-btn:hover{background:#f8f8f8;border-color:#bbb;}
+
 .demo-banner{background:var(--warn-bg);border:1px solid #fde68a;border-radius:6px;padding:5px 10px;margin-bottom:8px;font-size:11px;color:#92400e;display:none;align-items:center;gap:6px;}
 .demo-banner .note{margin-left:auto;color:#b45309;font-weight:600;}
 
@@ -34,9 +52,30 @@ h1{font-size:14px;font-weight:700;}
 .view-tabs{display:flex;gap:0;margin-bottom:8px;}
 .view-tab{flex:1;padding:5px 0;background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:12px;font-family:"Noto Sans JP",sans-serif;cursor:pointer;transition:all .15s;text-align:center;}
 .view-tab:first-child{border-radius:6px 0 0 6px;}
-.view-tab:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.view-tab:last-child{border-radius:0 6px 6px 0;}
+.view-tab:not(:first-child):not(:last-child){border-left:none;}
+.view-tab:not(:first-child){border-left:none;}
 .view-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
 .view-tab:not(.active):hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
+
+/* ── DASHBOARD ── */
+.dashboard-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;}
+.dashboard-controls label{font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap;}
+.date-selector{position:relative;}
+.date-input{padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:11px;background:#f8f9fb;cursor:pointer;min-width:100px;font-family:"JetBrains Mono",monospace;}
+.date-input:hover,.date-input:focus{border-color:var(--accent);background:#fff;}
+.refresh-dashboard{background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;}
+.refresh-dashboard:hover{opacity:.85;}
+.dashboard-frame{width:100%;height:calc(100vh - 200px);border:1px solid var(--border);border-radius:6px;background:#fff;overflow:hidden;position:relative;}
+.dashboard-frame iframe{width:100%;height:100%;border:none;}
+.dashboard-loading{display:flex;align-items:center;justify-content:center;height:100%;font-size:14px;color:var(--text-secondary);flex-direction:column;gap:10px;}
+.dashboard-loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-size:12px;}
+.date-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:4px;box-shadow:var(--shadow-md);max-height:200px;overflow-y:auto;z-index:1000;display:none;}
+.date-option{padding:6px 8px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);font-family:"JetBrains Mono",monospace;}
+.date-option:last-child{border-bottom:none;}
+.date-option:hover{background:var(--accent-light);}
+.date-option.latest{background:#f0fdf4;color:#15803d;font-weight:600;}
+.date-option.latest::after{content:" 📊";}
 
 /* ── FILTERS ── */
 .filters{display:flex;flex-direction:column;gap:5px;}
@@ -54,19 +93,58 @@ select:focus{border-color:var(--accent);background-color:#fff;}
 .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 
 /* ── MAIN ── */
-main{padding:12px 14px;overflow-x:auto;}
+main{
+  padding:12px 14px;
+  overflow-x:auto;
+  overflow-y:visible;
+}
 
 /* ── BOARD (作成状況) ── */
-.board{display:flex;gap:10px;min-width:max-content;align-items:flex-start;}
-.lane{width:240px;flex-shrink:0;}
-.lane-header{display:flex;align-items:center;padding:6px 10px;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;margin-bottom:6px;border-bottom:2px solid transparent;}
+.board{
+  display:flex;
+  gap:10px;
+  min-width:max-content;
+  align-items:flex-start;
+  overflow:visible;
+}
+.lane {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 70vh; /* 必要に応じて調整 */
+  background: #eeeeee;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.03);
+}
+.lane-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 2px solid transparent;
+  background: #fff;
+  position: relative;
+  z-index: 2;
+  margin-bottom: 0;
+}
 .lane-count{margin-left:auto;font-size:10px;font-family:"JetBrains Mono",monospace;}
 .lane[data-lane="未着手"] .lane-header{background:#f8f9fb;border-color:#94a3b8;color:#475569;}
 .lane[data-lane="バグ保留"] .lane-header{background:#fff7ed;border-color:#f97316;color:#c2410c;}
 .lane[data-lane="対応中"] .lane-header{background:var(--accent-light);border-color:var(--accent);color:#1d4ed8;}
 .lane[data-lane="完了（条件付き）"] .lane-header{background:#fefce8;border-color:#ca8a04;color:#92400e;}
 .lane[data-lane="完了"] .lane-header{background:#f0fdf4;border-color:var(--ok);color:#15803d;}
-.lane-body{display:flex;flex-direction:column;gap:6px;min-height:40px;}
+.lane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 40px;
+  overflow-y: auto;
+  flex: 1 1 0%;
+  padding-bottom: 8px;
+}
 .lane-empty{color:var(--muted);font-size:11px;text-align:center;padding:16px 0;}
 .card{width:228px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;position:relative;overflow:hidden;flex-shrink:0;transition:box-shadow .15s;}
 .card:hover{box-shadow:0 2px 10px rgba(37,99,235,.12);border-color:#bfdbfe;}
@@ -137,6 +215,15 @@ main{padding:12px 14px;overflow-x:auto;}
 .detail-table tr:last-child td{border-bottom:none;}
 .detail-table tr:hover td{background:#f8faff;}
 .detail-table tr.row-done td{opacity:.45;}
+.scenario-row:hover{background:#f0f8ff !important;}
+.scenario-row{transition:background-color 0.15s ease;}
+/* シートフィルタボタンスタイル */
+.sheet-filter-bar{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;padding:6px;background:#f8f9fa;border-radius:4px;}
+.sheet-filter-btn{padding:4px 8px;border:1px solid #ddd;background:#fff;font-size:10px;border-radius:3px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.sheet-filter-btn:hover{background:#e3f2fd;}
+.sheet-filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.sheet-filter-btn.disabled{opacity:0.5;cursor:not-allowed;}
+.sheet-name{font-size:10px;color:var(--text2);font-weight:500;}
 .chk-cell{text-align:center;width:26px;}
 .chk-cell input{width:13px;height:13px;cursor:pointer;accent-color:var(--accent);}
 .empty-detail{padding:24px;text-align:center;color:var(--muted);font-size:12px;}
@@ -161,6 +248,17 @@ main{padding:12px 14px;overflow-x:auto;}
 .edit-section{flex:1;}
 .scenario-info{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-bottom:12px;}
 .scenario-info h4{margin:0 0 6px 0;font-size:12px;color:var(--accent);}
+.sheet-info{margin-top:8px;padding:6px 0;font-size:11px;}
+.sheet-name{color:#374151;font-weight:500;}
+
+/* 日付入力セクション */
+.date-section{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;margin-bottom:12px;}
+.date-section h4{margin:0 0 8px 0;font-size:12px;color:#334155;font-weight:600;}
+.date-inputs{display:flex;gap:12px;flex-wrap:wrap;}
+.date-input-group{flex:1;min-width:140px;}
+.date-input-group label{display:block;font-size:11px;color:#475569;margin-bottom:4px;font-weight:500;}
+.date-input{width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;background-color:#fff;}
+.date-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,0.1);}
 .bug-section{margin-bottom:16px;}
 .bug-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .bug-section h5{font-size:11px;font-weight:600;color:var(--text2);margin:0;text-transform:uppercase;letter-spacing:.06em;}
@@ -204,6 +302,12 @@ main{padding:12px 14px;overflow-x:auto;}
 .selectable-bug.disabled .bug-id{color:#999;}
 .selectable-bug.disabled .bug-title{color:#999;}
 .selectable-bug.disabled .bug-status{color:#999;}
+/* ★/☆ スターアイコン */
+.star-icon{cursor:pointer;user-select:none;font-size:16px;margin-left:8px;color:#ccc;transition:color 0.15s,transform 0.15s;}
+.star-icon.filled{color:#ffd700;}
+.star-icon:hover{transform:scale(1.2);opacity:0.8;}
+/* ★カードの背景色 */
+.card.starred{background:#e6f3ff !important;border-color:#9cced7 !important;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
@@ -213,8 +317,6 @@ main{padding:12px 14px;overflow-x:auto;}
 
 <header>
   <div class="header-top">
-    <div class="logo">&#128203;</div>
-    <h1>シナリオ一覧</h1>
     <div class="header-right">
       <span class="count-badge" id="countBadge">---</span>
       <button class="reload-btn" id="reloadBtn">&#8635; 読込</button>
@@ -225,8 +327,9 @@ main{padding:12px 14px;overflow-x:auto;}
     <span class="note">実データはExcelで開いてください</span>
   </div>
   <div class="view-tabs">
-    <button class="view-tab active" id="tabCreation">作成状況</button>
-    <button class="view-tab" id="tabBug">バグ影響</button>
+    <button class="view-tab" id="tabDashboard">ダッシュボード</button>
+    <button class="view-tab active" id="tabCreation">シナリオ作成状況</button>
+    <button class="view-tab" id="tabBug">バグ解消確認</button>
   </div>
   <div class="filters" id="creationFilters">
     <div class="filter-row">
@@ -234,7 +337,7 @@ main{padding:12px 14px;overflow-x:auto;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        <input type="text" id="searchInput" placeholder="ブランド・機能・処理状況で検索...">
+        <input type="text" id="searchInput" placeholder="項番・ブランド・機能・処理状況・日付で検索...">
       </div>
     </div>
     <div class="filter-row">
@@ -247,7 +350,7 @@ main{padding:12px 14px;overflow-x:auto;}
     </div>
     <div class="sheet-tabs" id="sheetTabs">
       <button class="tab-btn active" data-sheet="">全て</button>
-<button class="tab-btn" data-sheet="正常">正常</button><button class="tab-btn" data-sheet="正常（クレ・銀聯）">正常（クレ・銀聯）</button><button class="tab-btn" data-sheet="異常（通常）">異常（通常）</button>
+<button class="tab-btn" data-sheet="正常">正常</button><button class="tab-btn" data-sheet="正常（クレ・銀聯）">正常(ク)</button><button class="tab-btn" data-sheet="異常（通常）">通常</button>
     </div>
   </div>
 </header>
@@ -257,23 +360,41 @@ main{padding:12px 14px;overflow-x:auto;}
 
 <main id="mainContent" style="display:none;">
 
+  <!-- ダッシュボードビュー -->
+  <div id="dashboardView" style="display:none;">
+    <div class="dashboard-controls">
+      <label>📅 日付選択:</label>
+      <div class="date-selector">
+        <input type="text" class="date-input" id="dateInput" readonly placeholder="日付を選択...">
+        <div class="date-dropdown" id="dateDropdown"></div>
+      </div>
+      <button class="refresh-dashboard" id="refreshDashboard">🔄 更新</button>
+    </div>
+    <div class="dashboard-frame" id="dashboardFrame">
+      <div class="dashboard-loading" id="dashboardLoading">
+        📊 ダッシュボードを読み込んでいます...
+      </div>
+    </div>
+  </div>
+
   <!-- 作成状況ビュー -->
   <div id="creationView">
     <div class="board" id="board"></div>
   </div>
 
-  <!-- バグ影響ビュー -->
+  <!-- バグ解消確認ビュー -->
   <div id="bugView">
     <div class="section-label">バグ一覧 &#9658; クリックで詳細を表示</div>
     <table class="summary-table" id="summaryTable">
       <thead>
         <tr>
           <th>バグID</th>
+          <th>タイトル</th>
           <th>ステータス</th>
           <th>種別</th>
           <th>影響件数</th>
           <th>解消率</th>
-          <th>影響ブランド</th>
+          <th>影響シート</th>
         </tr>
       </thead>
       <tbody id="summaryBody"></tbody>
@@ -299,6 +420,20 @@ main{padding:12px 14px;overflow-x:auto;}
         <div class="scenario-info">
           <h4>シナリオ情報</h4>
           <div id="scenarioDetails"></div>
+          <div class="sheet-info" id="sheetInfo"></div>
+        </div>
+        <div class="date-section">
+          <h4>実施日程</h4>
+          <div class="date-inputs">
+            <div class="date-input-group">
+              <label for="startDateInput">実施開始日:</label>
+              <input type="date" id="startDateInput" class="date-input" />
+            </div>
+            <div class="date-input-group">
+              <label for="endDateInput">実施完了日:</label>
+              <input type="date" id="endDateInput" class="date-input" />
+            </div>
+          </div>
         </div>
         <div class="bug-section">
           <div class="bug-section-header">
@@ -354,11 +489,24 @@ main{padding:12px 14px;overflow-x:auto;}
 var creationData  = [];
 var bugData       = [];
 var selectedBugId = null;
-var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了"];
+var selectedSheetFilter = "all"; // シートフィルタ状態
+
+// シート名変換関数
+function formatSheetName(sheetName) {
+  switch(sheetName) {
+    case "正常（クレ・銀聯）": return "正常（ク）";
+    case "異常（通信断）": return "通信断";
+    case "異常（電源断）": return "電源断";
+    case "異常（通常）": return "通常";
+    default: return sheetName;
+  }
+}
+var LANES = ["未着手","バグ保留","対応中","完了（条件付き）","完了","削除"];
+var todayMode = false; // ★/☆表示切り替えフラグ
 
 // ─── デモデータ ───────────────────────────────────────
-var DEMO_CREATION = [{"sheet":"異常（通常）","no":12,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":13,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"中止押下","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ9,バ16,バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","phase":"PH1","lane":"バグ保留","blockText":"バ17","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":2,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"33:リトライ","op2Stat":"正常終了","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":57,"brand":"iD","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":59,"brand":"iD","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":55,"brand":"iD","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":56,"brand":"iD","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":81,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":83,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":87,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":91,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","phase":"PH1","lane":"対応中","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":67,"brand":"交通系IC","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":68,"brand":"交通系IC","op1Func":"02:取消","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":136,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"-","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常","no":137,"brand":"QUICPay","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":150,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":151,"brand":"WAON","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":213,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"異常（通常）","no":214,"brand":"nanaco","op1Func":"01:売上","op1Stat":"処理未了","op2Func":"-","op2Stat":"中止押下","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":1,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"一括　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":2,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"分割　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":57,"brand":"銀聯","op1Func":"売上（銀聯（MS JIS1））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1},{"sheet":"正常（クレ・銀聯）","no":58,"brand":"銀聯","op1Func":"売上（銀聯（IC））","op1Stat":"一括　PIN","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1}];
-var DEMO_BUGS     = [{"id":"バ9","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":58,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]},{"id":"バ16","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":43,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]}];
+var DEMO_CREATION = [{"sheet":"異常（通常）","no":12,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":true,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（通常）","no":13,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"中止押下","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通常）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"異常（電源断）","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"電源断","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":true,"excelSheet":"異常（電源断）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":69},{"sheet":"異常（通信断）","no":1,"brand":"iD","op1Func":"01:売上","op1Stat":"通信断","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"異常（通信断）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":88},{"sheet":"正常","no":1,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"正常終了","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":false,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常","no":2,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了中止","op2Func":"33:リトライ","op2Stat":"正常終了","op3Func":"","op3Stat":"","phase":"PH1","lane":"完了","blockText":"","minorText":"","isStar":true,"excelSheet":"正常","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":94},{"sheet":"正常（クレ・銀聯）","no":1,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"一括　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":false,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":19},{"sheet":"正常（クレ・銀聯）","no":2,"brand":"クレジット","op1Func":"売上（クレジット（MS））","op1Stat":"分割　サイン","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","phase":"PH2","lane":"未着手","blockText":"","minorText":"","isStar":true,"excelSheet":"正常（クレ・銀聯）","rowIdx":0,"colBlock":-1,"colMinor":-1,"colToday":19}];
+var DEMO_BUGS     = [{"id":"バ9","title":"処理未了タイムアウトエラー","status":"修正中","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":30,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"タイムアウト","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":58,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]},{"id":"バ16","title":"強制残高照会関連エラー","status":"検証中","resolved":false,"scenarios":[{"sheet":"異常（通常）","no":15,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"","op2Stat":"","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":31,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":17,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":36,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":18,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":37,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":19,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"33:リトライ","op2Stat":"異常終了","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":38,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":20,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"タイムアウト","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":42,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":21,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"中止","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":43,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":23,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"処理未了タイムアウト","op2Func":"34:強制残高照会","op2Stat":"上記以外の異常終了","op3Func":"","op3Stat":"","isBlock":true,"resolved":false,"excelSheet":"異常（通常）","rowIdx":45,"colBlock":87,"colMinor":-1},{"sheet":"異常（通常）","no":28,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"","op3Stat":"","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":53,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":31,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"中止","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":59,"colBlock":-1,"colMinor":88},{"sheet":"異常（通常）","no":32,"brand":"楽天Edy","op1Func":"01:売上","op1Stat":"残高不足","op2Func":"30:現金併用","op2Stat":"処理未了タイムアウト","op3Func":"33:リトライ","op3Stat":"異常終了","isBlock":false,"resolved":false,"excelSheet":"異常（通常）","rowIdx":60,"colBlock":-1,"colMinor":88}]}];
 
 // ─── カードクリック・編集モーダル ─────────────────────
 var currentEditingScenario = null;
@@ -405,27 +553,106 @@ async function openEditModal(rowIdx, sheetName, cardElement) {
   }
 }
 
+// 日付フォーマット関数
+function formatDateForInput(excelDateValue) {
+  if (!excelDateValue) return "";
+  
+  let date;
+  if (typeof excelDateValue === "number") {
+    // Excelシリアル日付からJavaScript Dateに変換
+    date = new Date((excelDateValue - 25569) * 86400 * 1000);
+  } else if (typeof excelDateValue === "string") {
+    date = new Date(excelDateValue);
+  } else if (excelDateValue instanceof Date) {
+    date = excelDateValue;
+  } else {
+    return "";
+  }
+  
+  if (isNaN(date.getTime())) return "";
+  
+  // yyyy-mm-dd形式で返す（HTML5 date input用）
+  return date.toISOString().split('T')[0];
+}
+
+function formatDateForExcel(inputDateString) {
+  if (!inputDateString) return "";
+  
+  const date = new Date(inputDateString);
+  if (isNaN(date.getTime())) return "";
+  
+  // yy/mm/dd形式でフォーマット
+  const year = date.getFullYear() % 100; // 2桁年
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  
+  return `${year.toString().padStart(2, '0')}/${month}/${day}`;
+}
+
+// 日付入力値をExcelのシリアル日付値に変換
+function convertToExcelDate(inputDateString) {
+  if (!inputDateString) return null;
+  
+  const date = new Date(inputDateString);
+  if (isNaN(date.getTime())) return null;
+  
+  // Excelのシリアル日付値に変換（1900年1月1日からの日数）
+  const excelEpoch = new Date(1900, 0, 1);
+  const diffTime = date.getTime() - excelEpoch.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Excelの1900年閏年バグの調整（+2）
+  return diffDays + 2;
+}
+
 async function loadRealTimeScenarioData(sheetName, rowIdx, scenario) {
   if (typeof Excel === "undefined") return;
 
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
     const usedRange = sheet.getUsedRange();
-    usedRange.load("values");
+    usedRange.load(["values", "rowIndex"]);
     await context.sync();
 
     const values = usedRange.values;
-    if (rowIdx < values.length) {
-      const row = values[rowIdx];
+    // rowIdxは実際のExcel行番号（1-indexed）、usedRangeの配列インデックス（0-indexed）に変換
+    const arrayIndex = rowIdx - 1 - usedRange.rowIndex;
+    if (arrayIndex >= 0 && arrayIndex < values.length) {
+      const row = values[arrayIndex];
       
       // シート定義から列インデックスを取得
-      const sheetDef = SHEET_DEFS[sheetName];
+      let sheetDef = SHEET_DEFS[sheetName];
+      
+      // 正常シートと正常（クレ・銀聯）シートの特別処理
+      if (sheetName === "正常") {
+        sheetDef = {
+          colBlock: -1, colMinor: -1,
+          colStart: 90, colEnd: 91
+        };
+      } else if (sheetName === "正常（クレ・銀聯）") {
+        sheetDef = {
+          colBlock: -1, colMinor: -1,
+          colStart: 14, colEnd: 15
+        };
+      }
+      
       if (sheetDef) {
+        // バグテキストの更新
         if (sheetDef.colBlock >= 0 && row.length > sheetDef.colBlock) {
           scenario.blockText = String(row[sheetDef.colBlock] || "").trim();
         }
         if (sheetDef.colMinor >= 0 && row.length > sheetDef.colMinor) {
           scenario.minorText = String(row[sheetDef.colMinor] || "").trim();
+        }
+        
+        // 日付の読み込み（yy/mm/dd形式に変換）
+        if (sheetDef.colStart >= 0 && row.length > sheetDef.colStart) {
+          const startDateValue = row[sheetDef.colStart];
+          scenario.startDate = formatDateForInput(startDateValue);
+        }
+        if (sheetDef.colEnd >= 0 && row.length > sheetDef.colEnd) {
+          const endDateValue = row[sheetDef.colEnd];
+          scenario.endDate = formatDateForInput(endDateValue);
         }
       }
     }
@@ -437,7 +664,8 @@ async function selectExcelRow(sheetName, rowIdx) {
   
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
-    const range = sheet.getRangeByIndexes(rowIdx, 0, 1, 100); // 行全体を選択
+    // rowIdxは実際のExcel行番号（1-indexed）なので、0-indexedに変換
+    const range = sheet.getRangeByIndexes(rowIdx - 1, 0, 1, 100); // 行全体を選択
     range.select();
     await context.sync();
   });
@@ -525,11 +753,30 @@ function showEditModal(scenario) {
   let opsHtml = ops.map((op, i) => `<div>操作${i+1}: ${op}</div>`).join("");
 
   document.getElementById("scenarioDetails").innerHTML =
-    `<strong>#${scenario.no} ${sheetType} ${scenario.brand}</strong><br>${opsHtml}`;
+    `<strong>#${scenario.no} ${scenario.brand}</strong><br>${opsHtml}`;
+  
+  // シート情報を追加
+  document.getElementById("sheetInfo").innerHTML = 
+    `<div class="sheet-name"><strong>シート:</strong> ${sheetType}</div>`;
+
+  // 日付情報を設定
+  const startDateInput = document.getElementById("startDateInput");
+  const endDateInput = document.getElementById("endDateInput");
+  
+  // Excelから取得した日付を表示
+  startDateInput.value = scenario.startDate || "";
+  endDateInput.value = scenario.endDate || "";
 
   // バグリストを表示
   displayBugList("blockBugList", scenario.blockText, "完了阻害");
   displayBugList("minorBugList", scenario.minorText, "軽微");
+
+  // 実施完了日の入力可/不可を設定
+  updateEndDateInputState();
+
+  // 実施開始日変更時のイベントリスナーを追加
+  startDateInput.addEventListener("input", updateEndDateInputState);
+  startDateInput.addEventListener("change", updateEndDateInputState);
 
   // モーダルを表示
   document.getElementById("editModal").style.display = "flex";
@@ -558,18 +805,17 @@ function displayBugList(containerId, bugText, bugType) {
   let html = "";
   bugIds.forEach((bug, index) => {
     const sheetBug = bugSheetData[bug.id];
-    console.log(`Bug ${bug.id}:`, sheetBug); // デバッグ用
     const title = sheetBug ? sheetBug.title : "詳細情報なし";
     const status = sheetBug ? sheetBug.status : "不明";
     const statusClass = bug.resolved ? "closed" : "open";
     const statusText = bug.resolved ? "解消済み" : (status || "未解消");
-    
     // 追加・削除判定
     const isAdded = !originalIds.includes(bug.id); // 元のリストにない = 新規追加
     const statusSuffix = isAdded ? ' added' : '';
-
+    // 「確認」「完了」以外はチェックボックスをdisabled
+    const canCheck = status === "確認" || status === "完了";
     html += `<div class="bug-item${statusSuffix}">
-      <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} 
+      <input type="checkbox" class="bug-checkbox" data-bug-id="${bug.id}" ${bug.resolved ? "checked" : ""} ${(canCheck ? '' : 'disabled')} 
              onchange="updateBugStatus('${bug.id}', this.checked, '${bugType}')">
       <span class="bug-id">${bug.id}</span>
       <span class="bug-title">${esc(title)}</span>
@@ -600,6 +846,51 @@ function displayBugList(containerId, bugText, bugType) {
   });
 
   container.innerHTML = html;
+  
+  // 実施完了日の入力状態を更新
+  if (containerId === "blockBugList") {
+    updateEndDateInputState();
+  }
+}
+
+// 完了阻害課題の状況に基づいて実施完了日フィールドの有効/無効を制御
+function updateEndDateInputState() {
+  const endDateInput = document.getElementById("endDateInput");
+  const startDateInput = document.getElementById("startDateInput");
+  if (!endDateInput || !startDateInput || !currentEditingScenario) return;
+  
+  // 完了阻害課題に未解決バグがあるかチェック
+  const hasUnresolvedBlock = hasUnresolvedBugs(currentEditingScenario.blockText || "");
+  
+  // 実施開始日が空欄かチェック
+  const hasNoStartDate = !startDateInput.value.trim();
+  
+  if (hasUnresolvedBlock || hasNoStartDate) {
+    // 完了阻害課題があるか実施開始日が空欄の場合は実施完了日を無効化
+    endDateInput.disabled = true;
+    endDateInput.value = ""; // 既存の値をクリア
+    endDateInput.style.backgroundColor = "#f5f5f5";
+    
+    if (hasUnresolvedBlock && hasNoStartDate) {
+      endDateInput.title = "完了阻害となる課題があり、実施開始日も未入力のため入力できません";
+    } else if (hasUnresolvedBlock) {
+      endDateInput.title = "完了阻害となる課題があるため入力できません";
+    } else {
+      endDateInput.title = "実施開始日を先に入力してください";
+    }
+  } else {
+    // 完了阻害課題がなく実施開始日が入力済みの場合は実施完了日を有効化
+    endDateInput.disabled = false;
+    endDateInput.style.backgroundColor = "";
+    endDateInput.title = "";
+  }
+}
+
+// 未解決バグの有無をチェック
+function hasUnresolvedBugs(bugText) {
+  if (!bugText) return false;
+  const bugs = bugText.match(/[バ課]\d+(?:（済）)?/g) || [];
+  return bugs.some(b => !b.includes("（済）"));
 }
 
 function showBugSelector(bugType) {
@@ -734,6 +1025,11 @@ function addSelectedBugs() {
   const containerId = currentEditingBugType === 'block' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, currentEditingBugType === 'block' ? '完了阻害' : '軽微');
   
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (currentEditingBugType === 'block') {
+    updateEndDateInputState();
+  }
+  
   closeBugSelector();
   showSaveStatus(`${selectedBugIds.length}件のバグを追加しました`, "ok");
 }
@@ -774,6 +1070,11 @@ function removeBug(bugId, bugType) {
   const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, bugType);
   
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (bugType === '完了阻害') {
+    updateEndDateInputState();
+  }
+  
   showSaveStatus(`${bugId} を削除しました`, "ok");
 }
 
@@ -796,10 +1097,22 @@ function restoreBug(bugId, bugType) {
   const containerId = bugType === '完了阻害' ? 'blockBugList' : 'minorBugList';
   displayBugList(containerId, newText, bugType);
   
+  // 完了阻害課題の場合は実施完了日の入力状態を更新
+  if (bugType === '完了阻害') {
+    updateEndDateInputState();
+  }
+  
   showSaveStatus(`${bugId} を復元しました`, "ok");
 }
 
 function closeEditModal() {
+  // イベントリスナーを削除
+  const startDateInput = document.getElementById("startDateInput");
+  if (startDateInput) {
+    startDateInput.removeEventListener("input", updateEndDateInputState);
+    startDateInput.removeEventListener("change", updateEndDateInputState);
+  }
+  
   document.getElementById("editModal").style.display = "none";
   currentEditingScenario = null;
   originalScenarioData = null;
@@ -821,6 +1134,12 @@ async function saveEdit() {
   }
 
   try {
+    // 現在の入力値をcurrentEditingScenarioに反映
+    const startDateInput = document.getElementById("startDateInput");
+    const endDateInput = document.getElementById("endDateInput");
+    currentEditingScenario.startDate = startDateInput.value;
+    currentEditingScenario.endDate = endDateInput.value;
+
     // Excelに保存
     if (typeof Excel !== "undefined") {
       await saveToExcel();
@@ -833,8 +1152,15 @@ async function saveEdit() {
     );
     
     if (originalIndex >= 0) {
+      // バグテキストの更新
       creationData[originalIndex].blockText = currentEditingScenario.blockText;
       creationData[originalIndex].minorText = currentEditingScenario.minorText;
+      
+      // 日付情報の更新
+      const startDateInput = document.getElementById("startDateInput");
+      const endDateInput = document.getElementById("endDateInput");
+      creationData[originalIndex].startDate = startDateInput.value;
+      creationData[originalIndex].endDate = endDateInput.value;
       
       // レーンの再計算
       creationData[originalIndex].lane = getLane(
@@ -848,11 +1174,14 @@ async function saveEdit() {
     // バグデータの更新
     updateBugDataFromScenario();
 
-    // UIを更新
-    applyFilter();
-    renderSummary();
-    closeEditModal();
+    // カードデータの日付更新とレーン再計算
+    updateCardDataAndLane();
+
+    // UI更新（Excel再読み込みなし）
+    applyFilter();    // フィルタを適用してカード表示を更新
+    renderSummary();  // サマリー情報を更新
     
+    closeEditModal();
     showSaveStatus("保存が完了しました", "ok");
 
   } catch (error) {
@@ -869,24 +1198,130 @@ async function saveToExcel() {
     const rowIdx = currentEditingScenario.rowIdx;
     
     // シート定義から列インデックスを取得
-    const sheetDef = SHEET_DEFS[currentEditingScenario.excelSheet];
+    let sheetDef = SHEET_DEFS[currentEditingScenario.excelSheet];
+    
+    // 正常シートと正常（クレ・銀聯）シートの特別処理
+    if (currentEditingScenario.excelSheet === "正常") {
+      sheetDef = {
+        colBlock: -1, colMinor: -1,
+        colStart: 90, colEnd: 91
+      };
+    } else if (currentEditingScenario.excelSheet === "正常（クレ・銀聯）") {
+      sheetDef = {
+        colBlock: -1, colMinor: -1,
+        colStart: 14, colEnd: 15
+      };
+    }
+    
     if (!sheetDef) return;
 
     // 完了阻害となる課題を保存
     if (sheetDef.colBlock >= 0) {
-      const blockCell = sheet.getCell(rowIdx, sheetDef.colBlock);
+      const blockCell = sheet.getCell(rowIdx - 1, sheetDef.colBlock);
       blockCell.values = [[currentEditingScenario.blockText || ""]];
     }
 
     // 軽微な課題を保存
     if (sheetDef.colMinor >= 0) {
-      const minorCell = sheet.getCell(rowIdx, sheetDef.colMinor);
+      const minorCell = sheet.getCell(rowIdx - 1, sheetDef.colMinor);
       minorCell.values = [[currentEditingScenario.minorText || ""]];
+    }
+
+    // 実施開始日を保存
+    if (sheetDef.colStart >= 0) {
+      const startDateCell = sheet.getCell(rowIdx - 1, sheetDef.colStart);
+      const startDateInput = document.getElementById("startDateInput");
+      const startDate = convertToExcelDate(startDateInput.value);
+      if (startDate) {
+        startDateCell.values = [[startDate]]; // 日付型として設定
+        startDateCell.numberFormat = [["m/d"]]; // m/d形式で表示
+      } else {
+        startDateCell.values = [[""]]; // 空の場合は空文字
+      }
+    }
+
+    // 実施完了日を保存
+    if (sheetDef.colEnd >= 0) {
+      const endDateCell = sheet.getCell(rowIdx - 1, sheetDef.colEnd);
+      const endDateInput = document.getElementById("endDateInput");
+      const endDate = convertToExcelDate(endDateInput.value);
+      if (endDate) {
+        endDateCell.values = [[endDate]]; // 日付型として設定
+        endDateCell.numberFormat = [["m/d"]]; // m/d形式で表示
+      } else {
+        endDateCell.values = [[""]]; // 空の場合は空文字
+      }
     }
 
     await context.sync();
   });
 }
+
+function updateCardDataAndLane() {
+  if (!currentEditingScenario) return;
+
+  // 日付入力値を取得
+  const startDateInput = document.getElementById("startDateInput");
+  const endDateInput = document.getElementById("endDateInput");
+  
+  // カードデータの日付を更新  
+  currentEditingScenario.startDate = startDateInput.value || "";
+  currentEditingScenario.endDate = endDateInput.value || "";
+
+  // レーンを再計算（parser.jsのgetLane関数と同じロジック）
+  const newLane = calculateLane(
+    currentEditingScenario.startDate, 
+    currentEditingScenario.endDate, 
+    currentEditingScenario.blockText || "", 
+    currentEditingScenario.minorText || ""
+  );
+  
+  // カードのレーンを更新
+  currentEditingScenario.lane = newLane;
+
+  // creationData内の対応するカードも更新
+  const targetCard = creationData.find(card => 
+    card.excelSheet === currentEditingScenario.excelSheet && 
+    card.rowIdx === currentEditingScenario.rowIdx
+  );
+  
+  if (targetCard) {
+    targetCard.startDate = currentEditingScenario.startDate;
+    targetCard.endDate = currentEditingScenario.endDate; 
+    targetCard.lane = newLane;
+  }
+}
+
+// parser.jsのgetLane関数と同じロジック
+function calculateLane(start, end, blockText, minorText) {
+  const hasUnresolved = (text) => {
+    if (!text) return false;
+    const bugs = text.match(/[バ課]\d+(?:（済）)?/g) || [];
+    return bugs.some(b => !b.includes("（済）"));
+  };
+  const unresolvedBlock = hasUnresolved(blockText);
+  const unresolvedMinor = hasUnresolved(minorText);
+
+  // 実施完了日に「削除」という文字列が入っている場合は削除レーン
+  if (typeof end === "string" && end.trim() === "削除") {
+    return "削除";
+  }
+
+  // バグ保留判定（完了阻害課題で判定）
+  if (!start) return unresolvedBlock ? "バグ保留" : "未着手";
+  if (!end)   return unresolvedBlock ? "バグ保留" : "対応中";
+
+  // 完了判定（軽微な課題で完了条件付きを判定）
+  if (unresolvedBlock) return "バグ保留";  // 完了阻害が優先
+  return unresolvedMinor ? "完了（条件付き）" : "完了";
+}
+
+// 完了日が削除されたかどうか判定するためのフラグ関数（windowに仮置き）
+window._wasComplete = function() {
+  // 直前の状態が完了系だったかどうかを判定するロジックをここに実装（必要に応じて）
+  // ここでは常にtrueを返すことで、完了日が消えたものを削除レーンに振り分ける
+  return true;
+};
 
 function updateBugDataFromScenario() {
   if (!currentEditingScenario) return;
@@ -969,6 +1404,11 @@ async function updateBugStatus(bugId, isResolved, bugType) {
     displayBugList(containerId, currentEditingScenario[fieldName], bugType);
     
     showSaveStatus(`${bugId} を${isResolved ? "解消済み" : "未解消"}に更新`, "ok");
+    
+    // 完了阻害課題の場合は実施完了日の入力状態を更新
+    if (bugType === "完了阻害") {
+      updateEndDateInputState();
+    }
 
   } catch (error) {
     console.error("バグ状況更新エラー:", error);
@@ -1000,6 +1440,56 @@ function updateBugTextStatus(originalText, bugId, isResolved) {
 // ─── ユーティリティ ───────────────────────────────────
 function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+// ★/☆の切り替え処理
+async function toggleStar(event, excelSheet, rowIdx) {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  try {
+    // 対応するシナリオデータを見つける
+    const scenario = creationData.find(d => d.excelSheet === excelSheet && d.rowIdx === rowIdx);
+    if (!scenario) {
+      showSaveStatus("シナリオデータが見つかりません", "err");
+      return;
+    }
+    
+    // 異常（通常）シート以外は処理しない
+    if (scenario.colToday < 0) {
+      showSaveStatus("この機能はこのシートでは利用できません", "warn");
+      return;
+    }
+    
+    // スター状態を切り替え
+    const newStarState = !scenario.isStar;
+    const todayValue = newStarState ? "〇" : "";
+    
+    // Excelの本日列を更新
+    if (typeof Excel !== "undefined") {
+      await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(excelSheet);
+        // rowIdxは実際のExcel行番号（1-indexed）なので、0-indexedに変換
+        const todayCell = sheet.getCell(rowIdx - 1, scenario.colToday);
+        todayCell.values = [[todayValue]];
+        await context.sync();
+      });
+    }
+    
+    // データモデルを更新
+    scenario.isStar = newStarState;
+    
+    // UI を更新（カード全体を再描画）
+    applyFilter(); // フィルタを再適用してカード表示を更新（★カードが先頭に来るように）
+    
+    const symbol = newStarState ? '★' : '☆';
+    const action = newStarState ? '本日実施タスクに設定' : '本日実施タスクから解除';
+    showSaveStatus(`${action}しました ${symbol}`, "ok");
+    
+  } catch (error) {
+    console.error("スター切り替えエラー:", error);
+    showSaveStatus("更新エラー: " + error.message, "err");
+  }
+}
+
 function sheetTagClass(sheet){
   var m={"異常（通常）":"st-a","異常（電源断）":"st-b","異常（通信断）":"st-c","正常（クレ・銀聯）":"st-d","正常":"st-e"};
   return "sheet-tag "+(m[sheet]||"st-e");
@@ -1028,14 +1518,27 @@ function makeOps(d){
 
 function makeCard(d){
   const cardId = `card-${d.excelSheet}-${d.rowIdx}`;
-  return '<div class="card" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" '
+  
+  // ★/☆アイコンの作成（本日列がある全シート対象）
+  let starIcon = '';
+  if (d.colToday >= 0) {
+    const starSymbol = d.isStar ? '★' : '☆';
+    const starClass = d.isStar ? 'star-icon filled' : 'star-icon';
+    starIcon = `<span class="${starClass}" onclick="toggleStar(event, '${d.excelSheet}', ${d.rowIdx})">${starSymbol}</span>`;
+  }
+  
+  // ★カードの場合はstarredクラスを追加
+  const cardClass = d.isStar ? 'card starred' : 'card';
+  
+  return '<div class="'+cardClass+'" data-sheet="'+esc(d.sheet)+'" id="'+cardId+'" '
     +'onclick="selectExcelRow(\''+d.excelSheet+'\', '+d.rowIdx+')" '
     +'oncontextmenu="openEditModal('+d.rowIdx+', \''+d.excelSheet+'\', this); return false;">'
     +'<div class="card-header">'
     +'<span class="no-badge">#'+d.no+'</span>'
     +'<span class="phase-badge phase-'+d.phase+'">'+d.phase+'</span>'
     +'<span class="brand-name">'+esc(d.brand)+'</span>'
-    +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(d.sheet)+'</span>'
+    +'<span class="'+sheetTagClass(d.sheet)+'">'+esc(formatSheetName(d.sheet))+'</span>'
+    + starIcon // ★/☆アイコンをsheet-tagの右に追加
     +'</div><div class="ops">'+makeOps(d)+'</div></div>';
 }
 
@@ -1065,15 +1568,63 @@ function buildFilterUI(){
   te.innerHTML='<button class="tab-btn active" data-sheet="">全て</button>';
   shts.forEach(function(s){
     var b=document.createElement("button");
-    b.className="tab-btn";b.setAttribute("data-sheet",s);b.textContent=s;
+    b.className="tab-btn";b.setAttribute("data-sheet",s);b.textContent=formatSheetName(s);
     te.appendChild(b);
   });
   te.querySelectorAll(".tab-btn").forEach(function(btn){
     btn.addEventListener("click",function(){
       te.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active");});
-      btn.classList.add("active");applyFilter();
+      btn.classList.add("active");
+      applyFilter();
+      saveFilterSettings();
     });
   });
+}
+
+// ─── フィルタ設定の保存・復元 ─────────────────────────
+function saveFilterSettings() {
+  try {
+    const settings = {
+      searchInput: document.getElementById("searchInput").value,
+      phaseFilter: document.getElementById("phaseFilter").value,
+      brandFilter: document.getElementById("brandFilter").value,
+      activeSheet: document.querySelector("#sheetTabs .tab-btn.active")?.getAttribute("data-sheet") || ""
+    };
+    localStorage.setItem('kanban-filter-settings', JSON.stringify(settings));
+  } catch (error) {
+    console.log("フィルタ設定の保存に失敗:", error);
+  }
+}
+
+function loadFilterSettings() {
+  try {
+    const saved = localStorage.getItem('kanban-filter-settings');
+    if (!saved) return;
+    
+    const settings = JSON.parse(saved);
+    
+    // フィルタ値を復元
+    if (settings.searchInput !== undefined) {
+      document.getElementById("searchInput").value = settings.searchInput;
+    }
+    if (settings.phaseFilter !== undefined) {
+      document.getElementById("phaseFilter").value = settings.phaseFilter;
+    }
+    if (settings.brandFilter !== undefined) {
+      document.getElementById("brandFilter").value = settings.brandFilter;
+    }
+    
+    // アクティブシートタブを復元
+    if (settings.activeSheet) {
+      const targetTab = document.querySelector(`#sheetTabs .tab-btn[data-sheet="${settings.activeSheet}"]`);
+      if (targetTab) {
+        document.querySelectorAll('#sheetTabs .tab-btn').forEach(tab => tab.classList.remove('active'));
+        targetTab.classList.add('active');
+      }
+    }
+  } catch (error) {
+    console.log("フィルタ設定の復元に失敗:", error);
+  }
 }
 
 // ─── 作成状況ビュー ───────────────────────────────────
@@ -1089,10 +1640,30 @@ function applyFilter(){
     if(br&&d.brand!==br) return false;
     if(sh&&d.sheet!==sh) return false;
     if(q){
-      var t=[d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase].join(" ").toLowerCase();
+      // 日付を検索しやすい形式に変換
+      const formatDateForSearch = (dateStr) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `${month}/${day} ${month.toString().padStart(2,'0')}/${day.toString().padStart(2,'0')}`;
+      };
+      
+      const searchableStartDate = formatDateForSearch(d.startDate);
+      var t=[d.no,d.brand,d.op1Func,d.op1Stat,d.op2Func,d.op2Stat,d.op3Func,d.op3Stat,d.phase,searchableStartDate].join(" ").toLowerCase();
       if(t.indexOf(q)===-1) return false;
     }
     return true;
+  });
+  
+  // ★カードを先頭に表示するためのソート
+  f.sort(function(a, b) {
+    // ★カード（isStar=true）を先頭に
+    if (a.isStar && !b.isStar) return -1;
+    if (!a.isStar && b.isStar) return 1;
+    // 同じ★状態の場合は元の順序を維持
+    return 0;
   });
 
   document.getElementById("countBadge").textContent=f.length+" 件";
@@ -1102,15 +1673,50 @@ function applyFilter(){
     html+='<div class="lane" data-lane="'+lane+'">'
         +'<div class="lane-header"><span>'+lane+'</span><span class="lane-count">'+cards.length+'件</span></div>'
         +'<div class="lane-body">';
-    if(cards.length===0){html+='<div class="lane-empty">&#8212;</div>';}
+    if(cards.length===0){html+='<div class="lane-empty">－</div>';}
     else{cards.forEach(function(d){html+=makeCard(d);});}
     html+='</div></div>';
   });
   document.getElementById("board").innerHTML=html;
 }
 
-// ─── バグ影響：サマリー ───────────────────────────────
+// ─── バグ解消確認：サマリー ───────────────────────────────
+// ステータスフィルタの状態
+var bugStatusFilter = ["確認", "完了"];
+
+function renderBugStatusFilter() {
+  var statuses = ["未対応", "対応中", "確認", "完了", "検討中", "対応済み", "解消済み"];
+  var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;align-items:center;">';
+  html += '<span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:6px;">ステータス:</span>';
+  statuses.forEach(function(st) {
+    var active = bugStatusFilter.includes(st) ? "active" : "";
+    html += `<button type="button" class="status-toggle-btn ${active}" data-status="${st}" style="font-size:11px;padding:3px 10px;margin-right:4px;border-radius:12px;border:1px solid #d0d5dd;background:${active?"#2563eb":"#f8f9fb"};color:${active?"#fff":"#475569"};font-weight:${active?700:500};cursor:pointer;">${st}</button>`;
+  });
+  html += '</div>';
+  var summaryTable = document.getElementById("summaryTable");
+  if (!document.getElementById("bugStatusFilterRow")) {
+    summaryTable.insertAdjacentHTML("beforebegin", html);
+  } else {
+    document.getElementById("bugStatusFilterRow").outerHTML = html;
+  }
+  // イベント登録
+  document.querySelectorAll(".status-toggle-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var st = this.getAttribute("data-status");
+      if (bugStatusFilter.includes(st)) {
+        // 最低1つは必ずON
+        if (bugStatusFilter.length === 1) return;
+        bugStatusFilter = bugStatusFilter.filter(s => s !== st);
+      } else {
+        bugStatusFilter.push(st);
+      }
+      renderSummary();
+    });
+  });
+}
+
 function renderSummary(){
+  renderBugStatusFilter();
   var tbody=document.getElementById("summaryBody");
   var rows="";
   bugData.forEach(function(b){
@@ -1120,23 +1726,28 @@ function renderSummary(){
     var allDone=done===total;
     var hasBlock=b.scenarios.some(function(s){return s.isBlock;});
     var brands=[...new Set(b.scenarios.map(function(s){return s.brand;}))].join(", ");
+    var sheets=[...new Set(b.scenarios.map(function(s){return formatSheetName(s.excelSheet||s.sheet||"不明");}))].join(", ");
     var fc=allDone?"pf-done":(pct>0?"pf-part":"pf-none");
     var bc=allDone?"bid bid-ok":"bid bid-ng";
     var disp=allDone?b.id+"（済）":b.id;
     var sc=allDone?"st-bok":"st-bng";
-    var st=allDone?"全解消済み":"未解消";
+    var st=b.status || (allDone?"解消済み":"未解消");
+    var title=b.title || "";
     var ty=hasBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
     var sel=selectedBugId===b.id;
+    // ステータスフィルタ適用
+    if (!bugStatusFilter.includes(st)) return;
     rows+='<tr data-bugid="'+b.id+'"'+(sel?' class="selected"':'')+'>'
         +'<td><span class="'+bc+'">'+esc(disp)+'</span></td>'
-        +'<td><span class="'+sc+'">'+st+'</span></td>'
+        +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">'+esc(title)+'</td>'
+        +'<td><span class="'+sc+'">'+esc(st)+'</span></td>'
         +'<td>'+ty+'</td>'
         +'<td style="font-family:JetBrains Mono,monospace;font-weight:600;font-size:11px;">'+done+' / '+total+'</td>'
         +'<td><div class="prog-wrap">'
         +'<div class="prog-bar"><div class="prog-fill '+fc+'" style="width:'+pct+'%"></div></div>'
         +'<span class="prog-pct">'+pct+'%</span>'
         +'</div></td>'
-        +'<td style="font-size:11px;color:var(--text2);">'+esc(brands)+'</td>'
+        +'<td style="font-size:11px;color:var(--text2);">'+esc(sheets)+'</td>'
         +'</tr>';
   });
   tbody.innerHTML=rows;
@@ -1144,13 +1755,14 @@ function renderSummary(){
     tr.addEventListener("click",function(){
       var id=this.getAttribute("data-bugid");
       selectedBugId=(selectedBugId===id)?null:id;
+      selectedSheetFilter = "all"; // シートフィルタをリセット
       renderSummary();
       renderDetail();
     });
   });
 }
 
-// ─── バグ影響：詳細パネル ─────────────────────────────
+// ─── バグ解消確認：詳細パネル ─────────────────────────────
 function renderDetail(){
   var panel=document.getElementById("detailPanel");
   if(!selectedBugId){
@@ -1160,27 +1772,51 @@ function renderDetail(){
   var bug=bugData.find(function(b){return b.id===selectedBugId;});
   if(!bug){panel.innerHTML="";return;}
 
-  var total=bug.scenarios.length;
-  var done=bug.scenarios.filter(function(s){return s.resolved;}).length;
+  // シートフィルタ適用
+  var filteredScenarios = selectedSheetFilter === "all" 
+    ? bug.scenarios 
+    : bug.scenarios.filter(function(s) { return s.excelSheet === selectedSheetFilter; });
+
+  var total=filteredScenarios.length;
+  var done=filteredScenarios.filter(function(s){return s.resolved;}).length;
   var allDone=done===total;
   var bc=allDone?"bid bid-ok":"bid bid-ng";
   var disp=allDone?bug.id+"（済）":bug.id;
 
+  // 利用可能シート一覧を取得
+  var availableSheets = [...new Set(bug.scenarios.map(function(s) { return s.excelSheet; }))].sort();
+  
+  // シートフィルタボタンHTML生成
+  var sheetFilterHtml = '<div class="sheet-filter-bar">';
+  sheetFilterHtml += '<button class="sheet-filter-btn' + (selectedSheetFilter === "all" ? ' active' : '') + '" data-sheet="all">全て (' + bug.scenarios.length + ')</button>';
+  availableSheets.forEach(function(sheet) {
+    var count = bug.scenarios.filter(function(s) { return s.excelSheet === sheet; }).length;
+    var activeClass = selectedSheetFilter === sheet ? ' active' : '';
+    var displayName = formatSheetName(sheet);
+    sheetFilterHtml += '<button class="sheet-filter-btn' + activeClass + '" data-sheet="' + esc(sheet) + '">' + esc(displayName) + ' (' + count + ')</button>';
+  });
+  sheetFilterHtml += '</div>';
+
   var rows="";
-  bug.scenarios.forEach(function(s,si){
+  filteredScenarios.forEach(function(s,si){
+    // 元のインデックスを保持（チェックボックス用）
+    var originalIndex = bug.scenarios.indexOf(s);
     var rc=s.resolved?' class="row-done"':"";
     var chk=s.resolved?" checked":"";
     var ty=s.isBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
-    var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"&#8212;";
-    var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"&#8212;";
-    var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"&#8212;";
-    rows+='<tr'+rc+'>'
-        +'<td class="chk-cell"><input type="checkbox" data-si="'+si+'"'+chk+'></td>'
+    var o1s=s.op1Stat?'<span class="'+statClass(s.op1Stat)+'">'+esc(s.op1Stat)+'</span>':"－";
+    var o2s=s.op2Stat?'<span class="'+statClass(s.op2Stat)+'">'+esc(s.op2Stat)+'</span>':"－";
+    var o3s=s.op3Stat?'<span class="'+statClass(s.op3Stat)+'">'+esc(s.op3Stat)+'</span>':"－";
+    // バグstatus取得
+    var bugStatus = bug.status || "";
+    var canCheck = bugStatus === "確認" || bugStatus === "完了";
+    rows+='<tr'+rc+' class="scenario-row" style="cursor:pointer" data-si="'+originalIndex+'">'
+        +'<td class="chk-cell"><input type="checkbox" data-si="'+originalIndex+'"'+chk+(canCheck?'':' disabled')+'></td>'
         +'<td><span class="no-badge">#'+s.no+'</span></td>'
         +'<td><strong>'+esc(s.brand)+'</strong></td>'
-        +'<td>'+esc(s.op1Func||"&#8212;")+'</td><td>'+o1s+'</td>'
-        +'<td>'+esc(s.op2Func||"&#8212;")+'</td><td>'+o2s+'</td>'
-        +'<td>'+esc(s.op3Func||"&#8212;")+'</td><td>'+o3s+'</td>'
+        +'<td>'+esc(s.op1Func||"－")+'</td><td>'+o1s+'</td>'
+        +'<td>'+esc(s.op2Func||"－")+'</td><td>'+o2s+'</td>'
+        +'<td>'+esc(s.op3Func||"－")+'</td><td>'+o3s+'</td>'
         +'<td>'+ty+'</td>'
         +'</tr>';
   });
@@ -1191,6 +1827,7 @@ function renderDetail(){
     +'<span style="font-size:11px;color:var(--text2);font-weight:500;">'+done+'/'+total+'件解消</span>'
     +'<button class="detail-close" id="closeDetail">&#10005; 閉じる</button>'
     +'</div>'
+    + sheetFilterHtml
     +'<div style="overflow-x:auto;">'
     +'<table class="detail-table"><thead><tr>'
     +'<th class="chk-cell">済</th>'
@@ -1201,23 +1838,64 @@ function renderDetail(){
     +'<th>種別</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 
+  // シートフィルタボタンイベント
+  panel.querySelectorAll(".sheet-filter-btn").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      selectedSheetFilter = this.getAttribute("data-sheet");
+      renderDetail(); // 再描画
+    });
+  });
+
+  // 行クリックでExcel行選択
+  panel.querySelectorAll(".scenario-row").forEach(function(row){
+    row.addEventListener("click",function(e){
+      // チェックボックスクリック時は行選択しない
+      if(e.target.type === "checkbox") return;
+      
+      var si=parseInt(this.getAttribute("data-si"));
+      var scenario=bug.scenarios[si];
+      
+      if(typeof Excel!=="undefined" && scenario.rowIdx && scenario.excelSheet){
+        Excel.run(function(ctx){
+          var sheet=ctx.workbook.worksheets.getItem(scenario.excelSheet);
+          var range=sheet.getCell(scenario.rowIdx-1,0).getEntireRow();
+          range.select();
+          return ctx.sync();
+        }).then(function(){
+          showSaveStatus("&#10004; 行 "+scenario.rowIdx+" ("+scenario.excelSheet+") を選択しました","ok");
+        }).catch(function(e){
+          showSaveStatus("行選択エラー: "+e.message,"err");
+        });
+      }
+    });
+  });
+
   // チェックボックスイベント
   panel.querySelectorAll("input[type=checkbox]").forEach(function(chk){
     chk.addEventListener("change",function(){
+      console.log("Checkbox changed:", this.checked, "for bug scenario index:", this.getAttribute("data-si"));
+      
       var si=parseInt(this.getAttribute("data-si"));
+      
+      console.log("Scenario info before update:", bug.scenarios[si]);
+      
       bug.scenarios[si].resolved=this.checked;
       bug.resolved=bug.scenarios.every(function(s){return s.resolved;});
 
       if(typeof Excel!=="undefined"){
+        console.log("Excel is available, calling writeBugResolution...");
         Excel.run(function(ctx){
-          return writeBugResolution(ctx,bug.id,this.checked,[bug.scenarios[si]]);
+          return writeBugResolution(ctx,bug.id,this.checked,bug.scenarios[si]);
         }.bind(this)).then(function(){
+          console.log("writeBugResolution succeeded");
           showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" を"+(bug.scenarios[si].resolved?"済み":"未解消")+"に更新","ok");
         }).catch(function(e){
+          console.error("writeBugResolution failed:", e);
           bug.scenarios[si].resolved=!bug.scenarios[si].resolved;
           showSaveStatus("保存エラー: "+e.message,"err");
         });
       } else {
+        console.log("Excel not available, demo mode");
         showSaveStatus((bug.scenarios[si].resolved?"&#10003; ":"&#8617; ")+bug.id+" #"+bug.scenarios[si].no+" ["+(bug.scenarios[si].resolved?"済み":"未解消")+"] (デモ)","ok");
       }
       renderSummary();
@@ -1227,6 +1905,7 @@ function renderDetail(){
 
   document.getElementById("closeDetail").addEventListener("click",function(){
     selectedBugId=null;
+    selectedSheetFilter = "all"; // シートフィルタをリセット
     renderSummary();
     renderDetail();
   });
@@ -1238,15 +1917,211 @@ function renderBugView(){
   renderDetail();
 }
 
+// バグ解消状態をExcelに更新
+async function writeBugResolution(context, bugId, isResolved, scenario) {
+  console.log("writeBugResolution called:", { bugId, isResolved, scenario });
+  
+  if (!scenario.excelSheet || scenario.rowIdx === undefined) {
+    throw new Error("シナリオ情報が不完全です");
+  }
+
+  const sheet = context.workbook.worksheets.getItem(scenario.excelSheet);
+  const targetColumn = scenario.isBlock ? scenario.colBlock : scenario.colMinor;
+  
+  console.log("Target info:", { 
+    excelSheet: scenario.excelSheet, 
+    rowIdx: scenario.rowIdx, 
+    targetColumn, 
+    isBlock: scenario.isBlock 
+  });
+  
+  if (targetColumn < 0) {
+    throw new Error("対象列が設定されていません");
+  }
+
+  // 現在のセル値を取得
+  const targetCell = sheet.getCell(scenario.rowIdx - 1, targetColumn);
+  targetCell.load("values");
+  await context.sync();
+
+  const currentText = targetCell.values[0][0] || "";
+  console.log("Current cell text:", currentText);
+  
+  // バグIDの状態を更新
+  let newText;
+  if (isResolved) {
+    // 未解消 → 解消済みに変更
+    if (currentText.includes(bugId + "（済）")) {
+      newText = currentText; // 既に済みマーク付き
+    } else if (currentText.includes(bugId)) {
+      newText = currentText.replace(bugId, bugId + "（済）");
+    } else {
+      throw new Error(`バグID ${bugId} がセル「${currentText}」に見つかりません（行:${scenario.rowIdx}, 列:${targetColumn}）`);
+    }
+  } else {
+    // 解消済み → 未解消に変更
+    if (currentText.includes(bugId + "（済）")) {
+      newText = currentText.replace(bugId + "（済）", bugId);
+    } else if (currentText.includes(bugId)) {
+      newText = currentText; // 既に未解消状態
+    } else {
+      throw new Error(`バグID ${bugId} がセル「${currentText}」に見つかりません（行:${scenario.rowIdx}, 列:${targetColumn}）`);
+    }
+  }
+
+  console.log("Text change:", { from: currentText, to: newText });
+
+  // セルに新しい値を設定
+  targetCell.values = [[newText]];
+  await context.sync();
+  
+  console.log("Update completed successfully");
+}
+
 // ─── ビュー切り替え ───────────────────────────────────
 function switchView(view){
   var isCr=view==="creation";
+  var isBug=view==="bug";
+  
   document.getElementById("tabCreation").classList.toggle("active",isCr);
-  document.getElementById("tabBug").classList.toggle("active",!isCr);
+  document.getElementById("tabBug").classList.toggle("active",isBug);
+  
   document.getElementById("creationFilters").style.display=isCr?"":"none";
-  document.getElementById("creationView").style.display=isCr?"":"none";
-  document.getElementById("bugView").style.display=isCr?"none":"block";
-  if(isCr){applyFilter();}else{renderBugView();}
+  document.getElementById("dashboardView").style.display="none";
+  document.getElementById("creationView").style.display=isCr?"block":"none";
+  document.getElementById("bugView").style.display=isBug?"block":"none";
+  
+  if(isCr){
+    applyFilter();
+  } else if(isBug){
+    renderBugView();
+  }
+}
+
+// ─── ダッシュボード機能 ───────────────────────────────
+var dashboardDates = [];
+var currentDashboardDate = null;
+
+// 利用可能な日付を取得
+async function loadDashboardDates() {
+  try {
+    // 実際の環境では、dashboardフォルダのファイル一覧を取得する
+    // 今回はサンプルデータとして固定値を使用
+    dashboardDates = [
+      '20260501', '20260430', '20260428', '20260427'
+    ].sort().reverse(); // 新しい日付順
+    
+    if (dashboardDates.length > 0) {
+      currentDashboardDate = dashboardDates[0]; // 最新日付を初期選択
+    }
+  } catch (error) {
+    console.error('ダッシュボード日付取得エラー:', error);
+    dashboardDates = [];
+  }
+}
+
+// 日付をYYYY/MM/DD形式に変換
+function formatDisplayDate(dateString) {
+  if (!dateString || dateString.length !== 8) return dateString;
+  const year = dateString.substring(0, 4);
+  const month = dateString.substring(4, 6);
+  const day = dateString.substring(6, 8);
+  return `${year}/${month}/${day}`;
+}
+
+// 日付ドロップダウンを構築
+function buildDateDropdown() {
+  const dropdown = document.getElementById('dateDropdown');
+  dropdown.innerHTML = '';
+  
+  dashboardDates.forEach((date, index) => {
+    const option = document.createElement('div');
+    option.className = 'date-option' + (index === 0 ? ' latest' : '');
+    option.textContent = formatDisplayDate(date);
+    option.setAttribute('data-date', date);
+    option.addEventListener('click', () => {
+      selectDashboardDate(date);
+      dropdown.style.display = 'none';
+    });
+    dropdown.appendChild(option);
+  });
+}
+
+// 日付選択
+function selectDashboardDate(date) {
+  currentDashboardDate = date;
+  document.getElementById('dateInput').value = formatDisplayDate(date);
+  loadDashboard(date);
+}
+
+// ダッシュボード読み込み
+function loadDashboard(date) {
+  const frame = document.getElementById('dashboardFrame');
+  
+  if (!date) {
+    frame.innerHTML = '<div class="dashboard-loading">📅 日付を選択してください</div>';
+    return;
+  }
+  
+  // ローディング表示
+  frame.innerHTML = '<div class="dashboard-loading" style="display:flex;">📊 ダッシュボード読み込み中...</div>';
+  
+  // dashboardフォルダから該当日付のHTMLファイルを読み込み
+  const dashboardPath = `../dashboard/${date}.html`;
+  
+  // iframeでダッシュボードを表示
+  const iframe = document.createElement('iframe');
+  iframe.src = dashboardPath;
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  iframe.style.display = 'none'; // 最初は非表示
+  
+  iframe.onload = function() {
+    // 読み込み完了時にiframeを表示し、ローディングを非表示
+    frame.innerHTML = '';
+    frame.appendChild(iframe);
+    iframe.style.display = 'block';
+  };
+  
+  iframe.onerror = function() {
+    frame.innerHTML = `
+      <div class="dashboard-loading" style="color:var(--accent-red);display:flex;">
+        ❌ ダッシュボード読み込みエラー<br>
+        <small>ファイル ${date}.html が見つかりません</small>
+      </div>`;
+  };
+  
+  // iframeを先にDOMに追加（非表示状態で）
+  frame.appendChild(iframe);
+}
+
+// ダッシュボードを別画面で開く
+function openDashboardInNewWindow() {
+  // ダッシュボードフレームを新しいウィンドウで開く
+  const frameUrl = '../dashboard/dashboard-frame.html';
+  
+  // 新しいウィンドウでダッシュボードフレームを開く
+  const newWindow = window.open(frameUrl, 'dashboard', 
+    'width=1200,height=800,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no');
+  
+  if (!newWindow) {
+    alert('ポップアップがブロックされています。ブラウザの設定を確認してください。');
+  }
+}
+
+// ダッシュボード初期化（タブ内表示用）
+async function initDashboard() {
+  await loadDashboardDates();
+  buildDateDropdown();
+  
+  if (currentDashboardDate) {
+    document.getElementById('dateInput').value = formatDisplayDate(currentDashboardDate);
+    loadDashboard(currentDashboardDate);
+  } else {
+    document.getElementById('dashboardFrame').innerHTML = 
+      '<div class="dashboard-loading">📊 利用可能なダッシュボードがありません</div>';
+  }
 }
 
 // ─── デモ / Excel 起動 ───────────────────────────────
@@ -1265,6 +2140,11 @@ function startWithDemo(){
   rb.textContent="&#9654; デモ";
   rb.style.background="#94a3b8";
   rb.disabled=true;
+  
+  // フィルタ設定を復元
+  loadFilterSettings();
+  // 復元した設定でフィルタを適用
+  applyFilter();
 }
 
 async function loadData(){
@@ -1281,16 +2161,31 @@ async function loadData(){
     buildFilterUI();
     switchView("creation");
     document.getElementById("mainContent").style.display="";
+    
+    // フィルタ設定を復元
+    loadFilterSettings();
+    // 復元した設定でフィルタを適用
+    applyFilter();
   }catch(e){showError("読み込みエラー: "+e.message);}
   finally{showLoading(false);document.getElementById("reloadBtn").disabled=false;}
 }
 
 function onReady(){
+  document.getElementById("tabDashboard").addEventListener("click",function(){openDashboardInNewWindow();});
   document.getElementById("tabCreation").addEventListener("click",function(){switchView("creation");});
   document.getElementById("tabBug").addEventListener("click",function(){switchView("bug");});
-  document.getElementById("searchInput").addEventListener("input",applyFilter);
-  document.getElementById("phaseFilter").addEventListener("change",applyFilter);
-  document.getElementById("brandFilter").addEventListener("change",applyFilter);
+  document.getElementById("searchInput").addEventListener("input", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
+  document.getElementById("phaseFilter").addEventListener("change", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
+  document.getElementById("brandFilter").addEventListener("change", function() {
+    applyFilter();
+    saveFilterSettings();
+  });
   document.getElementById("reloadBtn").addEventListener("click",function(){
     if(typeof Excel!=="undefined") loadData();
   });
@@ -1306,6 +2201,31 @@ function onReady(){
     if (e.target === this) closeBugSelector(); // 背景クリックで閉じる
   });
 
+  // 本日モード設定を復元
+  restoreTodayMode();
+
+  // ダッシュボード日付選択イベント
+  document.getElementById("dateInput").addEventListener("click", function() {
+    const dropdown = document.getElementById("dateDropdown");
+    dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
+  });
+
+  // ダッシュボード更新ボタン
+  document.getElementById("refreshDashboard").addEventListener("click", function() {
+    if (currentDashboardDate) {
+      loadDashboard(currentDashboardDate);
+    }
+  });
+
+  // クリック外しでドロップダウンを閉じる
+  document.addEventListener("click", function(e) {
+    const dateInput = document.getElementById("dateInput");
+    const dropdown = document.getElementById("dateDropdown");
+    if (!dateInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = "none";
+    }
+  });
+
   // Office.onReady()を最初に呼び出し、その中で初期化処理を実行
   if(typeof Office!=="undefined"){
     Office.onReady(function(info){
@@ -1318,6 +2238,85 @@ function onReady(){
   } else {
     startWithDemo();
   }
+}
+
+// ===== 分類名称変換 =====
+function convertClassificationName(classification) {
+  if (!classification) return classification;
+  
+  const nameMap = {
+    '正常（クレ・銀聯）': '正常(ク)',
+    '異常（通常）': '通常',
+    '異常（電源断）': '電断',
+    '異常（通信断）': '通断'
+  };
+  
+  return nameMap[classification] || classification;
+}
+
+// ===== 本日モード設定 =====
+function restoreTodayMode() {
+  const saved = localStorage.getItem('scenario-today-mode');
+  if (saved !== null) {
+    todayMode = saved === 'true';
+    updateTodayModeButton();
+  }
+}
+
+function updateTodayModeButton() {
+  const btn = document.getElementById('star-toggle-btn');
+  if (btn) {
+    btn.textContent = todayMode ? '★' : '☆';
+    btn.title = todayMode ? '本日列を空欄にする' : '本日列を〇にする';
+  }
+}
+
+function saveTodayMode() {
+  localStorage.setItem('scenario-today-mode', todayMode.toString());
+}
+
+async function toggleTodayMode() {
+  todayMode = !todayMode;
+  saveTodayMode();
+  updateTodayModeButton();
+  
+  // 本日列を一括更新（実装はExcel構造に応じて調整が必要）
+  if (typeof Excel !== "undefined") {
+    try {
+      await updateAllTodayColumns();
+    } catch (e) {
+      console.warn("本日列の更新でエラーが発生しました:", e);
+      showSaveStatus("本日列の更新でエラーが発生しました", "err");
+    }
+  }
+}
+
+async function updateAllTodayColumns() {
+  const targetValue = todayMode ? '〇' : '';
+  
+  // シナリオアプリケーション用の実装
+  // 各シートでCR列（本日列）を更新
+  const sheets = ['正常', '正常（クレ・銀聯）', '異常（通常）', '異常（電源断）', '異常（通信断）'];
+  
+  await Excel.run(async (ctx) => {
+    for (const sheetName of sheets) {
+      try {
+        const sheet = ctx.workbook.worksheets.getItem(sheetName);
+        
+        for (const item of creationData) {
+          if (item.excelSheet === sheetName && item.rowIdx) {
+            // CR列に値を設定
+            const cell = sheet.getRange(`CR${item.rowIdx}`);
+            cell.values = [[targetValue]];
+          }
+        }
+      } catch (sheetError) {
+        console.warn(`シート ${sheetName} の更新でエラー:`, sheetError);
+      }
+    }
+    
+    await ctx.sync();
+  });
 }
 
 if(document.readyState==="loading"){

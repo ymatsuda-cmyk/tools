@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>返済管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:    #1c1917;
+  --ink2:   #57534e;
+  --ink3:   #a8a29e;
+  --bg:     #fafaf9;
+  --bg2:    #f5f4f1;
+  --bg3:    #edecea;
+  --white:  #ffffff;
+  --border: rgba(0,0,0,0.08);
+  --border2:rgba(0,0,0,0.14);
+  --blue:   #1e6fb5;
+  --blue-l: #dbeafe;
+  --teal:   #0f766e;
+  --teal-l: #ccfbf1;
+  --amber:  #92400e;
+  --amber-l:#fef3c7;
+  --red:    #b91c1c;
+  --red-l:  #fee2e2;
+  --green:  #15803d;
+  --green-l:#dcfce7;
+  --r:      14px;
+  --r-sm:   8px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body {
+  font-family:'Zen Kaku Gothic New',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+}
+
+/* ===== LAYOUT ===== */
+.app { display:flex; flex-direction:column; min-height:100vh; max-width:520px; margin:0 auto; }
+
+/* ===== HEADER ===== */
+.header {
+  padding:20px 20px 0;
+  background:var(--white);
+  border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.logo {
+  font-family:'Noto Serif JP',serif;
+  font-size:18px; font-weight:600;
+  letter-spacing:0.04em; color:var(--ink);
+}
+.logo em { font-style:normal; color:var(--teal); }
+.sync-btn {
+  display:flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:20px;
+  background:var(--bg2); border:1px solid var(--border2);
+  font-family:inherit; font-size:11px; font-weight:500; color:var(--ink2);
+  cursor:pointer; transition:all .15s;
+}
+.sync-btn:hover { background:var(--bg3); }
+.sync-btn svg { width:12px; height:12px; }
+.sync-btn.loading svg { animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ===== TABS ===== */
+.tabs { display:flex; }
+.tab {
+  flex:1; padding:10px 0; background:none; border:none;
+  font-family:inherit; font-size:12px; font-weight:500; color:var(--ink3);
+  cursor:pointer; border-bottom:2px solid transparent;
+  transition:all .15s; letter-spacing:0.03em;
+}
+.tab.active { color:var(--teal); border-bottom-color:var(--teal); }
+
+/* ===== PAGES ===== */
+.page { display:none; padding:16px; flex:1; }
+.page.active { display:block; }
+
+/* ===== GAS CONFIG BANNER ===== */
+.config-banner {
+  background:var(--amber-l); border:1px solid #d97706;
+  border-radius:var(--r-sm); padding:12px 14px;
+  font-size:12px; color:var(--amber); margin-bottom:14px;
+  display:flex; gap:10px; align-items:flex-start;
+}
+.config-banner svg { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
+.config-banner a { color:var(--amber); font-weight:700; cursor:pointer; }
+
+/* ===== SUMMARY ===== */
+.summary-card {
+  background:var(--teal); color:white;
+  border-radius:var(--r); padding:18px 20px;
+  margin-bottom:12px; position:relative; overflow:hidden;
+}
+.summary-card::after {
+  content:''; position:absolute;
+  top:-40px; right:-40px;
+  width:140px; height:140px; border-radius:50%;
+  background:rgba(255,255,255,0.06);
+}
+.s-label { font-size:11px; opacity:.75; margin-bottom:4px; letter-spacing:0.06em; }
+.s-amount { font-family:'DM Mono',monospace; font-size:28px; font-weight:500; letter-spacing:-1px; margin-bottom:10px; }
+.s-meta { display:flex; gap:16px; font-size:11px; opacity:.8; }
+
+.stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.stat {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:12px;
+}
+.stat-l { font-size:10px; color:var(--ink3); margin-bottom:4px; }
+.stat-v { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; }
+.stat-v.g { color:var(--teal); }
+
+/* ===== SECTION TITLE ===== */
+.sec { font-size:10px; font-weight:700; color:var(--ink3); letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px; }
+
+/* ===== PERSON CARD ===== */
+.person-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px 16px;
+  margin-bottom:8px; cursor:pointer;
+  transition:all .15s; box-shadow:var(--shadow);
+}
+.person-card:hover { border-color:var(--teal); transform:translateY(-1px); }
+.pc-top { display:flex; gap:10px; align-items:flex-start; }
+.avatar {
+  width:38px; height:38px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:700;
+}
+.av-blue { background:var(--blue-l); color:var(--blue); }
+.av-teal { background:var(--teal-l); color:var(--teal); }
+.av-amber{ background:var(--amber-l); color:var(--amber); }
+.av-red  { background:var(--red-l); color:var(--red); }
+.av-green{ background:var(--green-l); color:var(--green); }
+.pc-info { flex:1; min-width:0; }
+.pc-name { font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.pc-sub  { font-size:11px; color:var(--ink3); margin-top:2px; }
+.badge {
+  font-size:9px; font-weight:700; padding:2px 6px;
+  border-radius:20px; letter-spacing:0.04em;
+}
+.b-active{ background:var(--teal-l);  color:var(--teal); }
+.b-warn  { background:var(--amber-l); color:var(--amber); }
+.b-done  { background:var(--bg3);     color:var(--ink3); }
+.b-late  { background:var(--red-l);   color:var(--red); }
+.pc-right { text-align:right; flex-shrink:0; }
+.pc-remain{ font-family:'DM Mono',monospace; font-size:15px; font-weight:500; }
+.pc-rlabel{ font-size:10px; color:var(--ink3); }
+.prog-wrap{ margin-top:10px; }
+.prog-track{ height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+.prog-fill { height:100%; border-radius:3px; background:var(--teal); transition:width .5s; }
+.prog-meta { display:flex; justify-content:space-between; font-size:10px; color:var(--ink3); margin-top:3px; }
+
+/* ===== EMPTY STATE ===== */
+.empty { text-align:center; padding:40px 20px; color:var(--ink3); font-size:12px; }
+.empty-icon { width:48px; height:48px; margin:0 auto 10px; opacity:.3; }
+
+/* ===== ADD BTN ===== */
+.add-btn {
+  width:100%; padding:12px; margin-top:4px;
+  background:none; border:1.5px dashed var(--border2);
+  border-radius:var(--r); font-family:inherit;
+  font-size:13px; color:var(--ink3); cursor:pointer;
+  transition:all .15s;
+}
+.add-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-l); }
+
+/* ===== DETAIL VIEW ===== */
+.detail-view { display:none; position:fixed; inset:0; background:var(--bg); z-index:200; overflow-y:auto; max-width:520px; margin:0 auto; }
+.detail-view.open { display:block; animation:slideIn .2s ease; }
+@keyframes slideIn { from { transform:translateX(20px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+.detail-header {
+  background:var(--white); padding:16px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:12px;
+  position:sticky; top:0; z-index:10;
+}
+.back-btn {
+  background:none; border:none; cursor:pointer;
+  color:var(--ink2); padding:4px; display:flex;
+}
+.detail-avatar {
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; font-weight:700; flex-shrink:0;
+}
+.detail-name { font-size:16px; font-weight:700; }
+.detail-sub  { font-size:11px; color:var(--ink3); }
+.detail-body { padding:16px; }
+
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.info-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:12px;
+}
+.info-l { font-size:10px; color:var(--ink3); margin-bottom:3px; }
+.info-v { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; }
+.info-v.teal { color:var(--teal); }
+.info-v.red  { color:var(--red); }
+
+/* Donut */
+.donut-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px; margin-bottom:14px;
+  display:flex; gap:16px; align-items:center;
+}
+.legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink2); margin-bottom:6px; }
+.legend-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* Timeline */
+.timeline-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px; margin-bottom:14px;
+}
+.tl-list { padding-left:14px; border-left:2px solid var(--bg3); margin-top:8px; }
+.tl-item { position:relative; padding:6px 0 10px 14px; }
+.tl-dot  { position:absolute; left:-8px; top:10px; width:10px; height:10px; border-radius:50%; background:var(--teal); border:2px solid var(--white); }
+.tl-dot.pending { background:var(--bg3); }
+.tl-date { font-size:10px; color:var(--ink3); }
+.tl-amt  { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; }
+.tl-note { font-size:11px; color:var(--ink3); }
+
+.repay-form-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px; margin-bottom:14px;
+}
+
+/* ===== FORM ===== */
+.form-group { margin-bottom:12px; }
+.form-label { font-size:11px; font-weight:700; color:var(--ink2); margin-bottom:5px; display:block; letter-spacing:0.04em; }
+.form-input {
+  width:100%; padding:10px 12px;
+  border:1.5px solid var(--border2); border-radius:var(--r-sm);
+  font-family:inherit; font-size:14px; background:var(--bg2);
+  color:var(--ink); outline:none; transition:border-color .15s;
+}
+.form-input:focus { border-color:var(--teal); background:var(--white); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.btn-primary {
+  width:100%; padding:12px; background:var(--teal); color:white;
+  border:none; border-radius:var(--r-sm);
+  font-family:inherit; font-size:14px; font-weight:700;
+  cursor:pointer; transition:opacity .15s; margin-top:4px;
+}
+.btn-primary:hover { opacity:.88; }
+.btn-primary:disabled { opacity:.5; cursor:default; }
+.btn-ghost {
+  width:100%; padding:10px; background:none;
+  border:1px solid var(--border2); border-radius:var(--r-sm);
+  font-family:inherit; font-size:13px; color:var(--ink2);
+  cursor:pointer; margin-top:6px;
+}
+
+/* ===== MODAL ===== */
+.overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:300;
+  display:none; align-items:flex-end; justify-content:center;
+}
+.overlay.open { display:flex; }
+.modal {
+  background:var(--white); border-radius:20px 20px 0 0;
+  padding:22px 20px 40px; width:100%; max-width:520px;
+  animation:slideUp .22s ease;
+}
+@keyframes slideUp { from { transform:translateY(30px); opacity:0; } }
+.modal-title {
+  font-family:'Noto Serif JP',serif;
+  font-size:16px; font-weight:600;
+  margin-bottom:18px; display:flex; justify-content:space-between; align-items:center;
+}
+.modal-close {
+  background:var(--bg2); border:none; width:26px; height:26px;
+  border-radius:50%; cursor:pointer; font-size:14px;
+  color:var(--ink2); display:flex; align-items:center; justify-content:center;
+}
+
+/* ===== GAS SETUP MODAL ===== */
+.setup-step {
+  background:var(--bg2); border-radius:var(--r-sm);
+  padding:10px 12px; margin-bottom:8px;
+  font-size:12px; color:var(--ink2); line-height:1.7;
+}
+.setup-step strong { color:var(--teal); }
+.code-block {
+  background:var(--ink); color:#a3e635;
+  border-radius:6px; padding:8px 12px;
+  font-family:'DM Mono',monospace; font-size:11px;
+  margin:6px 0; word-break:break-all; line-height:1.6;
+}
+
+/* ===== TOAST ===== */
+.toast {
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:white;
+  padding:10px 18px; border-radius:20px; font-size:13px;
+  opacity:0; transition:all .3s; z-index:999; white-space:nowrap;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ===== CHART PAGE ===== */
+.chart-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--r); padding:14px; margin-bottom:12px;
+}
+.chart-title { font-size:12px; font-weight:700; color:var(--ink2); margin-bottom:12px; }
+
+/* ===== REPAY PAGE ===== */
+.repay-pick {
+  background:var(--white); border:1.5px solid var(--border);
+  border-radius:var(--r); padding:13px 15px;
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:8px; cursor:pointer; transition:all .15s;
+}
+.repay-pick:hover,.repay-pick.sel { border-color:var(--teal); background:var(--teal-l); }
+.rp-name  { flex:1; font-size:13px; font-weight:500; }
+.rp-remain{ font-family:'DM Mono',monospace; font-size:12px; color:var(--ink3); }
+</style>
+</head>
+<body>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== MAIN APP ===== -->
+<div class="app">
+  <div class="header">
+    <div class="header-row">
+      <div class="logo">貸借<em>トラッカー</em></div>
+      <button class="sync-btn" id="syncBtn" onclick="syncAll()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/>
+          <path d="M13.5 2.5v3h-3"/>
+        </svg>
+        同期
+      </button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="showPage('dash',this)">ダッシュボード</button>
+      <button class="tab" onclick="showPage('people',this)">貸付先</button>
+      <button class="tab" onclick="showPage('repay',this)">返済登録</button>
+      <button class="tab" onclick="showPage('chart',this)">グラフ</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dash">
+    <div style="height:14px"></div>
+    <div id="dash-banner"></div>
+    <div class="summary-card">
+      <div class="s-label">貸付残高 合計</div>
+      <div class="s-amount" id="total-remain">¥ 0</div>
+      <div class="s-meta">
+        <span id="d-count">0件</span>
+        <span id="d-paid">返済累計 ¥0</span>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-l">今月の返済予定</div><div class="stat-v g" id="d-month">¥ 0</div></div>
+      <div class="stat"><div class="stat-l">最短完済予定</div><div class="stat-v" id="d-nearest" style="font-size:13px">—</div></div>
+    </div>
+    <div class="sec">返済進捗</div>
+    <div id="dash-progress"></div>
+  </div>
+
+  <!-- PEOPLE -->
+  <div class="page" id="page-people">
+    <div style="height:14px"></div>
+    <div class="sec">貸付先一覧</div>
+    <div id="people-list"></div>
+    <button class="add-btn" onclick="openAddLoan()">＋ 新規貸付を登録</button>
+  </div>
+
+  <!-- REPAY -->
+  <div class="page" id="page-repay">
+    <div style="height:14px"></div>
+    <div class="sec">誰の返済を登録？</div>
+    <div id="repay-picks"></div>
+    <div id="repay-form" style="display:none">
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-top:12px">
+        <div class="sec" style="margin-bottom:10px">返済内容を入力</div>
+        <div class="form-group">
+          <label class="form-label">返済日</label>
+          <input type="date" class="form-input" id="r-date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">返済金額</label>
+          <input type="number" class="form-input" id="r-amt" placeholder="例：30000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">メモ（任意）</label>
+          <input type="text" class="form-input" id="r-memo" placeholder="例：現金手渡し">
+        </div>
+        <button class="btn-primary" id="r-submit" onclick="submitRepay()">返済を登録する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="page" id="page-chart">
+    <div style="height:14px"></div>
+    <div class="chart-card">
+      <div class="chart-title">貸付先別 残高内訳</div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <svg id="donut-svg" width="110" height="110" viewBox="0 0 110 110"></svg>
+        <div id="donut-legend" style="flex:1"></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">月別 受取返済額（直近6ヶ月）</div>
+      <svg id="bar-chart" width="100%" height="110" viewBox="0 0 320 110" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">返済進捗一覧</div>
+      <div id="chart-prog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETAIL VIEW ===== -->
+<div class="detail-view" id="detail-view">
+  <div class="detail-header">
+    <button class="back-btn" onclick="closeDetail()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4L6 10l6 6"/></svg>
+    </button>
+    <div class="detail-avatar" id="d-avatar"></div>
+    <div><div class="detail-name" id="d-name"></div><div class="detail-sub" id="d-sub"></div></div>
+  </div>
+  <div class="detail-body" id="d-body"></div>
+</div>
+
+<!-- ===== ADD LOAN MODAL ===== -->
+<div class="overlay" id="add-overlay">
+  <div class="modal">
+    <div class="modal-title">
+      新規貸付を登録
+      <button class="modal-close" onclick="closeAdd()">✕</button>
+    </div>
+    <div class="form-group"><label class="form-label">貸付先の名前</label><input type="text" class="form-input" id="a-name" placeholder="例：田中 太郎"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">貸付金額</label><input type="number" class="form-input" id="a-amt" placeholder="例：200000"></div>
+      <div class="form-group"><label class="form-label">貸付日</label><input type="date" class="form-input" id="a-date"></div>
+    </div>
+    <div class="form-group"><label class="form-label">月々の返済予定額</label><input type="number" class="form-input" id="a-monthly" placeholder="例：20000"></div>
+    <div class="form-group"><label class="form-label">メモ（任意）</label><input type="text" class="form-input" id="a-memo" placeholder="例：引越し費用"></div>
+    <button class="btn-primary" id="a-submit" onclick="submitAddLoan()">登録する</button>
+    <button class="btn-ghost" onclick="closeAdd()">キャンセル</button>
+  </div>
+</div>
+
+<!-- ===== GAS SETUP MODAL ===== -->
+<div class="overlay" id="setup-overlay">
+  <div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-title">
+      Google Sheets 連携設定
+      <button class="modal-close" onclick="closeSetup()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">GAS Web App URL</label>
+      <input type="url" class="form-input" id="gas-url" placeholder="https://script.google.com/macros/s/..." oninput="saveGasUrl(this.value)">
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px">設定手順は下記を参照してください</div>
+    </div>
+    <div class="sec">設定手順</div>
+    <div class="setup-step">① <strong>Google スプレッドシートを新規作成</strong><br>シート名を <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">loans</code> と <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">repayments</code> の2枚にする</div>
+    <div class="setup-step">② <strong>拡張機能 → Apps Script</strong> を開き、下記コードを貼り付けて保存</div>
+    <div class="code-block" id="gas-code-display"></div>
+    <div class="setup-step">③ <strong>デプロイ → 新しいデプロイ</strong><br>種類：ウェブアプリ／実行：自分／アクセス：全員　で「デプロイ」</div>
+    <div class="setup-step">④ 表示された <strong>ウェブアプリURL</strong> を上のフォームに貼り付けて完了</div>
+    <button class="btn-primary" onclick="closeSetup();renderAll()">設定完了</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  CONFIG
+// ============================================================
+const GAS_CODE = `const SS = SpreadsheetApp.getActiveSpreadsheet();
+
+function doGet(e) {
+  return handleReq(e);
+}
+function doPost(e) {
+  return handleReq(e);
+}
+
+function handleReq(e) {
+  const p = e.parameter || {};
+  const b = e.postData ? JSON.parse(e.postData.contents||'{}') : {};
+  const params = Object.assign({}, p, b);
+  const action = params.action;
+  let result;
+  try {
+    if (action === 'getLoans')     result = getLoans();
+    else if (action === 'addLoan') result = addLoan(params);
+    else if (action === 'getRepayments') result = getRepayments(params.loanId);
+    else if (action === 'addRepayment')  result = addRepayment(params);
+    else result = { error: 'unknown action' };
+  } catch(err) {
+    result = { error: err.message };
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getLoans() {
+  const sh = SS.getSheetByName('loans');
+  const rows = sh.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  return rows.slice(1).map(r => ({
+    id: r[0], name: r[1], amount: r[2], date: r[3],
+    monthly: r[4], memo: r[5]
+  }));
+}
+
+function addLoan(p) {
+  const sh = SS.getSheetByName('loans');
+  const id = 'L' + Date.now();
+  sh.appendRow([id, p.name, Number(p.amount), p.date, Number(p.monthly)||0, p.memo||'']);
+  return { id };
+}
+
+function getRepayments(loanId) {
+  const sh = SS.getSheetByName('repayments');
+  const rows = sh.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  return rows.slice(1)
+    .filter(r => r[1] === loanId)
+    .map(r => ({ id: r[0], loanId: r[1], date: r[2], amount: r[3], memo: r[4] }));
+}
+
+function addRepayment(p) {
+  const sh = SS.getSheetByName('repayments');
+  const id = 'R' + Date.now();
+  sh.appendRow([id, p.loanId, p.date, Number(p.amount), p.memo||'']);
+  return { id };
+}`;
+
+// ============================================================
+//  STATE
+// ============================================================
+let loans = [];
+let repayments = {};
+let selectedRepayIdx = -1;
+const COLORS = ['#0f766e','#1e6fb5','#92400e','#b91c1c','#15803d','#7c3aed'];
+const AV_CLS  = ['av-teal','av-blue','av-amber','av-red','av-green'];
+
+function getGasUrl() { return localStorage.getItem('gas_url') || ''; }
+function saveGasUrl(v) { localStorage.setItem('gas_url', v); }
+
+// ============================================================
+//  GAS API
+// ============================================================
+async function gasCall(params) {
+  const url = getGasUrl();
+  if (!url) throw new Error('GAS URLが未設定です');
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(url + '?' + qs, { redirect: 'follow' });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ============================================================
+//  SYNC
+// ============================================================
+async function syncAll() {
+  const btn = document.getElementById('syncBtn');
+  btn.classList.add('loading');
+  try {
+    const url = getGasUrl();
+    if (!url) { showToast('GAS URLを設定してください'); openSetup(); return; }
+    loans = await gasCall({ action: 'getLoans' });
+    repayments = {};
+    await Promise.all(loans.map(async l => {
+      repayments[l.id] = await gasCall({ action: 'getRepayments', loanId: l.id });
+    }));
+    renderAll();
+    showToast('同期完了！');
+  } catch(e) {
+    showToast('エラー: ' + e.message);
+  } finally {
+    btn.classList.remove('loading');
+  }
+}
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function getRepays(loanId) { return repayments[loanId] || []; }
+function getRemain(l) {
+  const paid = getRepays(l.id).reduce((s,r) => s + Number(r.amount), 0);
+  return Number(l.amount) - paid;
+}
+function getPct(l) {
+  const paid = Number(l.amount) - getRemain(l);
+  return Math.min(100, Math.round(paid / Number(l.amount) * 100));
+}
+function calcEnd(l) {
+  const rem = getRemain(l);
+  if (rem <= 0) return '完済済み';
+  if (!l.monthly || Number(l.monthly) <= 0) return '—';
+  const months = Math.ceil(rem / Number(l.monthly));
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.getFullYear() + '年' + (d.getMonth()+1) + '月';
+}
+function avClass(i) { return AV_CLS[i % AV_CLS.length]; }
+function initial(name) { return name ? name.charAt(0) : '?'; }
+function fmtYen(n) { return '¥' + Number(n).toLocaleString(); }
+function getStatus(l) {
+  const rem = getRemain(l);
+  if (rem <= 0) return { cls:'b-done', label:'完済' };
+  const pct = getPct(l);
+  if (pct < 20) return { cls:'b-late', label:'要確認' };
+  if (pct < 60) return { cls:'b-warn', label:'返済中' };
+  return { cls:'b-active', label:'順調' };
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+function renderAll() {
+  renderBanner();
+  renderDash();
+  renderPeople();
+  renderRepayPicks();
+  renderChart();
+}
+
+function renderBanner() {
+  const el = document.getElementById('dash-banner');
+  if (!getGasUrl()) {
+    el.innerHTML = `<div class="config-banner">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11v.5"/></svg>
+      <div>Google Sheets未連携です。<a onclick="openSetup()">設定する</a>とデータがシートに保存されます。未設定でもローカルで動作します。</div>
+    </div>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function renderDash() {
+  const active = loans.filter(l => getRemain(l) > 0);
+  const totalRemain = active.reduce((s,l) => s + getRemain(l), 0);
+  const totalPaid   = loans.reduce((s,l) => s + getRepays(l.id).reduce((r,p) => r+Number(p.amount),0), 0);
+  const monthPlan   = active.reduce((s,l) => s + (Number(l.monthly)||0), 0);
+  document.getElementById('total-remain').textContent = fmtYen(totalRemain);
+  document.getElementById('d-count').textContent = active.length + '件貸付中';
+  document.getElementById('d-paid').textContent = '返済累計 ' + fmtYen(totalPaid);
+  document.getElementById('d-month').textContent = fmtYen(monthPlan);
+  const ends = active.map(l => calcEnd(l)).filter(e => e !== '—' && e !== '完済済み');
+  document.getElementById('d-nearest').textContent = ends.length ? ends[0] : '—';
+
+  const el = document.getElementById('dash-progress');
+  if (!loans.length) { el.innerHTML = '<div class="empty"><div>データなし</div></div>'; return; }
+  el.innerHTML = loans.map((l,i) => {
+    const pct = getPct(l);
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:4px">
+        <span>${l.name}</span><span>${pct}% 返済済み</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderPeople() {
+  const el = document.getElementById('people-list');
+  if (!loans.length) {
+    el.innerHTML = '<div class="empty"><svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="24" cy="16" r="8"/><path d="M8 40c0-8.8 7.2-16 16-16s16 7.2 16 16"/></svg><div>まだ貸付先がありません</div></div>';
+    return;
+  }
+  el.innerHTML = loans.map((l,i) => {
+    const rem = getRemain(l);
+    const pct = getPct(l);
+    const st  = getStatus(l);
+    return `<div class="person-card" onclick="openDetail(${i})">
+      <div class="pc-top">
+        <div class="avatar ${avClass(i)}">${initial(l.name)}</div>
+        <div class="pc-info">
+          <div class="pc-name">${l.name} <span class="badge ${st.cls}">${st.label}</span></div>
+          <div class="pc-sub">${l.date} 貸付 · 月${fmtYen(l.monthly||0)}</div>
+        </div>
+        <div class="pc-right">
+          <div class="pc-remain">${fmtYen(rem)}</div>
+          <div class="pc-rlabel">残高</div>
+        </div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
+        <div class="prog-meta"><span>${pct}% 返済済み</span><span>完済予定：${calcEnd(l)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRepayPicks() {
+  const el = document.getElementById('repay-picks');
+  const active = loans.filter(l => getRemain(l) > 0);
+  if (!active.length) { el.innerHTML = '<div class="empty"><div>貸付先がありません</div></div>'; return; }
+  el.innerHTML = active.map(l => {
+    const i = loans.indexOf(l);
+    return `<div class="repay-pick" id="rp-${i}" onclick="selectRepay(${i})">
+      <div class="avatar ${avClass(i)}" style="width:34px;height:34px;font-size:12px">${initial(l.name)}</div>
+      <div class="rp-name">${l.name}</div>
+      <div class="rp-remain">残 ${fmtYen(getRemain(l))}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('repay-form').style.display = 'none';
+  selectedRepayIdx = -1;
+}
+
+function selectRepay(idx) {
+  document.querySelectorAll('.repay-pick').forEach(e => e.classList.remove('sel'));
+  const el = document.getElementById('rp-' + idx);
+  if (el) el.classList.add('sel');
+  selectedRepayIdx = idx;
+  document.getElementById('repay-form').style.display = 'block';
+  document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('r-amt').value = loans[idx].monthly || '';
+  document.getElementById('r-memo').value = '';
+}
+
+// ============================================================
+//  CHART
+// ============================================================
+function renderChart() {
+  renderDonut();
+  renderBarChart();
+  renderChartProg();
+}
+
+function renderDonut() {
+  const svg = document.getElementById('donut-svg');
+  const leg = document.getElementById('donut-legend');
+  const active = loans.filter(l => getRemain(l) > 0);
+  if (!active.length) {
+    svg.innerHTML = '<circle cx="55" cy="55" r="40" fill="none" stroke="#e7e5e4" stroke-width="16"/><text x="55" y="59" text-anchor="middle" font-size="11" fill="#a8a29e">なし</text>';
+    leg.innerHTML = '';
+    return;
+  }
+  const total = active.reduce((s,l) => s + getRemain(l), 0);
+  const r=40, cx=55, cy=55, circ=2*Math.PI*r;
+  let paths = '<circle cx="55" cy="55" r="40" fill="none" stroke="#f5f4f1" stroke-width="16"/>';
+  let offset = 0;
+  let legendHtml = '';
+  active.forEach((l,i) => {
+    const rem = getRemain(l);
+    const pct = rem / total;
+    const dash = pct * circ;
+    const color = COLORS[i % COLORS.length];
+    paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="16" stroke-dasharray="${dash.toFixed(1)} ${(circ-dash).toFixed(1)}" stroke-dashoffset="${(-offset + circ*0.25).toFixed(1)}"/>`;
+    offset += dash;
+    legendHtml += `<div class="legend-item"><div class="legend-dot" style="background:${color}"></div><span>${l.name}　${fmtYen(rem)}</span></div>`;
+  });
+  paths += `<text x="55" y="51" text-anchor="middle" font-size="10" fill="#a8a29e">残高</text>`;
+  paths += `<text x="55" y="65" text-anchor="middle" font-size="12" font-weight="600" fill="#1c1917">${Math.round(total/10000)}万</text>`;
+  svg.innerHTML = paths;
+  leg.innerHTML = legendHtml;
+}
+
+function renderBarChart() {
+  const svg = document.getElementById('bar-chart');
+  const months = [];
+  for (let i=5;i>=0;i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i);
+    months.push({label:(d.getMonth()+1)+'月',y:d.getFullYear(),m:d.getMonth()+1,total:0});
+  }
+  loans.forEach(l => getRepays(l.id).forEach(r => {
+    const d = new Date(r.date);
+    const mo = months.find(m => m.y===d.getFullYear() && m.m===d.getMonth()+1);
+    if (mo) mo.total += Number(r.amount);
+  }));
+  const maxV = Math.max(...months.map(m=>m.total), 1);
+  const W=320,H=90,bW=36,gap=(W-bW*6)/5,padB=18;
+  let c='';
+  months.forEach((m,i) => {
+    const x=i*(bW+gap);
+    const bH=m.total>0?Math.max(6,(m.total/maxV)*(H-padB-8)):0;
+    const y=H-padB-bH;
+    c+=`<rect x="${x}" y="${y}" width="${bW}" height="${bH}" rx="4" fill="${m.total>0?COLORS[0]:'#e7e5e4'}"/>`;
+    if(m.total>0) c+=`<text x="${x+bW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="#57534e">${Math.round(m.total/1000)}k</text>`;
+    c+=`<text x="${x+bW/2}" y="${H-3}" text-anchor="middle" font-size="10" fill="#a8a29e">${m.label}</text>`;
+  });
+  svg.innerHTML = c||'<text x="160" y="55" text-anchor="middle" font-size="12" fill="#a8a29e">データなし</text>';
+}
+
+function renderChartProg() {
+  const el = document.getElementById('chart-prog');
+  if (!loans.length) { el.innerHTML = '<div style="font-size:12px;color:var(--ink3)">データなし</div>'; return; }
+  el.innerHTML = loans.map((l,i) => {
+    const pct = getPct(l);
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:3px">
+        <span>${l.name}</span><span style="font-family:'DM Mono',monospace">${pct}%</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+//  DETAIL
+// ============================================================
+function openDetail(idx) {
+  const l = loans[idx];
+  const i = idx;
+  const av = document.getElementById('d-avatar');
+  av.className = 'detail-avatar ' + avClass(i);
+  av.textContent = initial(l.name);
+  document.getElementById('d-name').textContent = l.name + ' さん';
+  document.getElementById('d-sub').textContent = l.date + ' 〜 完済予定 ' + calcEnd(l);
+
+  const rem = getRemain(l);
+  const pct = getPct(l);
+  const paid = Number(l.amount) - rem;
+  const reps = getRepays(l.id).slice().sort((a,b) => a.date < b.date ? 1 : -1);
+  const color = COLORS[i % COLORS.length];
+
+  const circ = 2*Math.PI*36;
+  const dash = (pct/100)*circ;
+
+  const timeline = reps.length
+    ? reps.map(r => `<div class="tl-item"><div class="tl-dot"></div>
+        <div class="tl-date">${r.date}</div>
+        <div class="tl-amt">¥${Number(r.amount).toLocaleString()} 返済</div>
+        ${r.memo?`<div class="tl-note">${r.memo}</div>`:''}
+      </div>`).join('')
+    : '<div style="font-size:12px;color:var(--ink3);padding:8px 0">返済履歴なし</div>';
+
+  document.getElementById('d-body').innerHTML = `
+    <div class="info-grid">
+      <div class="info-card"><div class="info-l">貸付金額</div><div class="info-v">${fmtYen(l.amount)}</div></div>
+      <div class="info-card"><div class="info-l">残高</div><div class="info-v red">${fmtYen(rem)}</div></div>
+      <div class="info-card"><div class="info-l">月々返済</div><div class="info-v teal">${fmtYen(l.monthly||0)}</div></div>
+      <div class="info-card"><div class="info-l">完済予定</div><div class="info-v teal" style="font-size:13px">${calcEnd(l)}</div></div>
+    </div>
+    <div class="donut-card">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="36" fill="none" stroke="#f5f4f1" stroke-width="14"/>
+        <circle cx="45" cy="45" r="36" fill="none" stroke="${color}" stroke-width="14"
+          stroke-dasharray="${dash.toFixed(1)} ${(circ-dash).toFixed(1)}" stroke-dashoffset="${(circ*0.25).toFixed(1)}" stroke-linecap="round"/>
+        <text x="45" y="41" text-anchor="middle" font-size="9" fill="#a8a29e">返済済み</text>
+        <text x="45" y="55" text-anchor="middle" font-size="14" font-weight="600" fill="#1c1917">${pct}%</text>
+      </svg>
+      <div>
+        <div class="legend-item"><div class="legend-dot" style="background:${color}"></div><span>返済済 ${fmtYen(paid)}</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e7e5e4"></div><span>残高 ${fmtYen(rem)}</span></div>
+        ${l.memo?`<div style="font-size:11px;color:var(--ink3);margin-top:6px">${l.memo}</div>`:''}
+      </div>
+    </div>
+    <div class="timeline-card">
+      <div class="sec">返済タイムライン</div>
+      <div class="tl-list">${timeline}</div>
+    </div>
+    <div class="repay-form-card">
+      <div class="sec" style="margin-bottom:10px">返済を登録する</div>
+      <div class="form-group"><label class="form-label">返済日</label><input type="date" class="form-input" id="d-r-date" value="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">返済金額</label><input type="number" class="form-input" id="d-r-amt" value="${l.monthly||''}"></div>
+        <div class="form-group"><label class="form-label">メモ</label><input type="text" class="form-input" id="d-r-memo" placeholder="任意"></div>
+      </div>
+      <button class="btn-primary" onclick="submitRepayFromDetail(${i})">登録する</button>
+    </div>`;
+
+  document.getElementById('detail-view').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-view').classList.remove('open');
+}
+
+// ============================================================
+//  SUBMIT ACTIONS
+// ============================================================
+async function submitAddLoan() {
+  const name    = document.getElementById('a-name').value.trim();
+  const amount  = parseInt(document.getElementById('a-amt').value);
+  const date    = document.getElementById('a-date').value;
+  const monthly = parseInt(document.getElementById('a-monthly').value) || 0;
+  const memo    = document.getElementById('a-memo').value.trim();
+  if (!name || !amount || !date) return showToast('名前・金額・日付は必須です');
+
+  const btn = document.getElementById('a-submit');
+  btn.disabled = true; btn.textContent = '登録中...';
+
+  try {
+    if (getGasUrl()) {
+      const res = await gasCall({ action:'addLoan', name, amount, date, monthly, memo });
+      loans.push({ id: res.id, name, amount, date, monthly, memo });
+      repayments[res.id] = [];
+    } else {
+      const id = 'L' + Date.now();
+      loans.push({ id, name, amount, date, monthly, memo });
+      repayments[id] = [];
+    }
+    closeAdd(); renderAll();
+    showToast('貸付を登録しました');
+  } catch(e) { showToast('エラー: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '登録する'; }
+}
+
+async function submitRepay() {
+  if (selectedRepayIdx < 0) return showToast('対象を選択してください');
+  const l      = loans[selectedRepayIdx];
+  const date   = document.getElementById('r-date').value;
+  const amount = parseInt(document.getElementById('r-amt').value);
+  const memo   = document.getElementById('r-memo').value.trim();
+  if (!date || !amount) return showToast('日付と金額を入力してください');
+  if (amount > getRemain(l)) return showToast('残高を超えています（残高: ' + fmtYen(getRemain(l)) + '）');
+
+  const btn = document.getElementById('r-submit');
+  btn.disabled = true; btn.textContent = '登録中...';
+  await doAddRepayment(l.id, date, amount, memo);
+  btn.disabled = false; btn.textContent = '返済を登録する';
+  renderRepayPicks();
+}
+
+async function submitRepayFromDetail(idx) {
+  const l      = loans[idx];
+  const date   = document.getElementById('d-r-date').value;
+  const amount = parseInt(document.getElementById('d-r-amt').value);
+  const memo   = document.getElementById('d-r-memo').value.trim();
+  if (!date || !amount) return showToast('日付と金額を入力してください');
+  if (amount > getRemain(l)) return showToast('残高を超えています');
+  await doAddRepayment(l.id, date, amount, memo);
+  openDetail(idx);
+}
+
+async function doAddRepayment(loanId, date, amount, memo) {
+  try {
+    if (getGasUrl()) {
+      const res = await gasCall({ action:'addRepayment', loanId, date, amount, memo });
+      if (!repayments[loanId]) repayments[loanId] = [];
+      repayments[loanId].push({ id: res.id, loanId, date, amount, memo });
+    } else {
+      if (!repayments[loanId]) repayments[loanId] = [];
+      repayments[loanId].push({ id:'R'+Date.now(), loanId, date, amount, memo });
+    }
+    renderAll();
+    showToast('返済を登録しました');
+  } catch(e) { showToast('エラー: ' + e.message); }
+}
+
+// ============================================================
+//  UI UTILS
+// ============================================================
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  renderAll();
+}
+
+function openAddLoan() {
+  document.getElementById('a-name').value='';
+  document.getElementById('a-amt').value='';
+  document.getElementById('a-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('a-monthly').value='';
+  document.getElementById('a-memo').value='';
+  document.getElementById('add-overlay').classList.add('open');
+}
+function closeAdd() { document.getElementById('add-overlay').classList.remove('open'); }
+
+function openSetup() {
+  document.getElementById('gas-url').value = getGasUrl();
+  document.getElementById('gas-code-display').textContent = GAS_CODE;
+  document.getElementById('setup-overlay').classList.add('open');
+}
+function closeSetup() { document.getElementById('setup-overlay').classList.remove('open'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  renderAll();
+  // GAS URL設定済みなら自動同期
+  if (getGasUrl()) syncAll();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AIニュース速報">
+<title>AIニュース速報</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ベース */
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans JP",sans-serif}
+body{background:#F8FAFC;color:#0F172A;min-height:100vh}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px}
+
+/* ヘッダー */
+.header{background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 16px 0;position:sticky;top:0;z-index:100}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.tracker{font-size:10px;letter-spacing:3px;color:#94A3B8;font-family:"DM Mono",monospace;margin-bottom:2px}
+.app-title{font-size:22px;font-weight:900;letter-spacing:-0.5px}
+.clock{text-align:right}
+.clock-time{font-size:20px;font-weight:700;color:#2563EB;font-family:"DM Mono",monospace}
+.clock-date{font-size:10px;color:#94A3B8}
+
+/* 統計チップ */
+.stats-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:4px 10px}
+.chip-number{font-size:14px;font-weight:800;font-family:"DM Mono",monospace}
+.chip-label{font-size:10px;color:#94A3B8}
+
+/* ボタン */
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:inline-flex;align-items:center;justify-content:center;transition:transform 0.15s ease;touch-action:manipulation;user-select:none}
+.btn:active{transform:scale(0.95)}
+.btn-primary{background:#2563EB;color:#fff}
+.btn-secondary{background:transparent;color:#64748B;border:1px solid #E2E8F0}
+.btn-success{background:#F0FDF4;color:#059669;border:1px solid #BBF7D0}
+.btn-warning{background:#FEF9C3;color:#D97706;border:1px solid #FDE68A}
+
+/* ボタン行 */
+.button-row{display:flex;gap:8px;margin-bottom:8px}
+.button-row .btn{flex:1}
+
+/* タブ */
+.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 2px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:transparent;color:#64748B;border:none;border-radius:6px 6px 0 0;padding:10px 16px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:"Noto Sans JP",sans-serif;min-height:44px;display:flex;align-items:center;transition:all 0.2s ease;touch-action:manipulation;user-select:none}
+.tab:active{transform:scale(0.95)}
+.tab.active{background:#2563EB;color:#fff;box-shadow:0 2px 4px rgba(37,99,235,0.2)}
+
+/* メインコンテンツ */
+.content{padding:16px 16px 48px;max-width:720px;margin:0 auto}
+
+/* カード */
+.card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+
+/* 記事 */
+.article{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform 0.15s ease,box-shadow 0.15s ease;touch-action:manipulation;min-height:48px;user-select:none}
+.article:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.article:active{transform:scale(0.98)}
+.article-header{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.article-title{font-size:12px;font-weight:700;color:#111827;line-height:1.5;flex:1}
+.article-details{display:none;margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6}
+.article-summary{color:#4B5563;font-size:12px;line-height:1.8;margin-bottom:8px}
+.article-footer{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* バッジ */
+.badge{border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block}
+
+/* ノート */
+.note{border-radius:8px;padding:10px 12px;margin-top:8px}
+.note-label{font-size:10px;font-weight:700;letter-spacing:.5px;margin-bottom:4px}
+.note-text{font-size:12px;line-height:1.8;color:#374151}
+
+/* フィルター */
+.filter-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.filter{border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#64748B;font-family:"Noto Sans JP",sans-serif;transition:all 0.15s ease;user-select:none}
+.filter:active{transform:scale(0.95)}
+.filter.active{color:#fff;border-color:currentColor}
+
+/* アイデアグリッド */
+.ideas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.idea-card{background:#fff;border-radius:10px;padding:14px 12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);min-height:48px;transition:transform 0.15s ease;touch-action:manipulation;user-select:none}
+.idea-card:active{transform:scale(0.98)}
+.idea-details{display:none}
+
+/* 履歴テーブル */
+.history-table{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden}
+.history-header{display:grid;grid-template-columns:1fr 52px 52px 52px 68px;padding:8px 14px;align-items:center;background:#F8FAFC;font-size:10px;font-weight:700;color:#6B7280;letter-spacing:.5px;border-bottom:1px solid #E2E8F0}
+.history-row{display:grid;grid-template-columns:1fr 52px 52px 52px 68px;padding:8px 14px;align-items:center;border-bottom:1px solid #F3F4F6;font-size:13px}
+.history-row:last-child{border-bottom:none}
+.history-row.selected{background:#EFF6FF}
+
+/* モーダル */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:16px;padding:24px;max-width:400px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+.modal-title{font-size:15px;font-weight:700;text-align:center;margin-bottom:16px}
+.modal-description{font-size:11px;color:#64748B;text-align:center;margin-bottom:16px;line-height:1.6}
+.modal-buttons{display:flex;gap:8px;margin-top:16px}
+.modal-buttons .btn{flex:1}
+
+/* フォーム */
+.form-input{width:100%;font-size:12px;border:1px solid #E2E8F0;border-radius:8px;padding:10px;font-family:"Noto Sans JP",sans-serif;color:#374151;outline:none;min-height:44px}
+.form-input:focus{border-color:#2563EB}
+.form-textarea{width:100%;height:120px;font-size:11px;border:1px solid #E2E8F0;border-radius:8px;padding:8px;font-family:monospace;color:#374151;outline:none;resize:vertical}
+.form-textarea:focus{border-color:#2563EB}
+
+/* メッセージ */
+.message{font-size:11px;padding:8px 12px;margin-bottom:8px;border-radius:6px}
+.message.success{background:#F0FDF4;color:#059669}
+.message.error{background:#FEF2F2;color:#DC2626}
+.message.warning{background:#FFFBEB;color:#D97706}
+
+/* 空状態 */
+.empty{text-align:center;padding:48px 20px;background:#fff;border-radius:16px;border:1px dashed #CBD5E1}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.empty-description{font-size:13px;color:#64748B}
+
+/* プレビュー */
+.preview{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap}
+.preview-error{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:11px;color:#DC2626}
+
+/* ローディング */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.88);z-index:300;display:flex;align-items:center;justify-content:center}
+.loading-content{background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px 32px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.1)}
+
+/* レスポンシブ */
+@media(max-width:480px){
+  .ideas-grid{grid-template-columns:1fr}
+  .button-row{flex-direction:column}
+  .button-row .btn{margin-bottom:4px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// === 設定・定数 ===
+var GAS_URL = localStorage.getItem("ainews_gas_url") || "";
+
+var CATEGORIES = [
+  {id:"policy",  label:"政策・安全保障", icon:"🏛", color:"#DC2626"},
+  {id:"model",   label:"モデル・技術",   icon:"🧠", color:"#7C3AED"},
+  {id:"chip",    label:"半導体・インフラ", icon:"⚡", color:"#2563EB"},
+  {id:"robot",   label:"ロボット・物理AI", icon:"🤖", color:"#059669"},
+  {id:"cobot",   label:"協働ロボット",   icon:"🤝", color:"#D97706"},
+  {id:"society", label:"規制・社会",     icon:"⚖", color:"#DB2877"},
+  {id:"economy", label:"経済・市場",     icon:"💹", color:"#0891B2"},
+  {id:"politics",label:"政治・外交",     icon:"🌐", color:"#6D28D9"},
+];
+
+var IMPACT_COLORS = {"高":"#DC2626","中":"#D97706","低":"#059669"};
+
+var TABS = [
+  {id:"news", label:"📰 ニュース"},
+  {id:"global", label:"🌍 世界情勢"},
+  {id:"domestic", label:"🇯🇵 国内情勢"},
+  {id:"ideas", label:"💡 活用アイデア"},
+  {id:"history", label:"📅 過去データ"}
+];
+
+// === アプリケーション状態 ===
+var State = {
+  currentTab: "news",
+  currentData: null,
+  availableDates: [],
+  selectedDate: null,
+  categoryFilter: "all",
+  
+  // モーダル状態
+  showPasteModal: false,
+  showGasModal: false,
+  showConfirmModal: false,
+  pasteText: "",
+  gasInput: GAS_URL,
+  pendingData: null,
+  
+  // UI状態  
+  message: "",
+  messageType: "success",
+  loading: false,
+  loadingMessage: "",
+  
+  // 現在時刻
+  currentTime: new Date()
+};
+
+// === ユーティリティ関数 ===
+function formatDate(dateStr) {
+  if (!dateStr) return "不明";
+  var date = new Date(dateStr);
+  if (isNaN(date.getTime())) return String(dateStr);
+  return date.getFullYear() + "/" + 
+         String(date.getMonth() + 1).padStart(2, "0") + "/" + 
+         String(date.getDate()).padStart(2, "0");
+}
+
+function debounce(func, wait) {
+  var timeout;
+  return function() {
+    var context = this;
+    var args = arguments;
+    clearTimeout(timeout);
+    timeout = setTimeout(function() {
+      func.apply(context, args);
+    }, wait);
+  };
+}
+
+// === ローカルストレージ管理 ===
+function getStorageKey(date) {
+  return "ainews_" + date.replace(/-/g, "");
+}
+
+function saveToStorage(data) {
+  localStorage.setItem(getStorageKey(data.date), JSON.stringify(data));
+  
+  var index = JSON.parse(localStorage.getItem("ainews_index") || "[]");
+  if (index.indexOf(data.date) === -1) {
+    index = [data.date].concat(index).sort().reverse();
+    localStorage.setItem("ainews_index", JSON.stringify(index));
+  }
+}
+
+function loadFromStorage(date) {
+  var raw = localStorage.getItem(getStorageKey(date));
+  return raw ? JSON.parse(raw) : null;
+}
+
+function getStoredDates() {
+  return JSON.parse(localStorage.getItem("ainews_index") || "[]");
+}
+
+// === API通信 ===
+async function callGasApi(params) {
+  if (!GAS_URL) throw new Error("GAS URLが未設定です");
+  
+  var queryString = new URLSearchParams(params).toString();
+  var response = await fetch(GAS_URL + "?" + queryString, {redirect: "follow"});
+  var text = await response.text();
+  
+  var data;
+  try {
+    data = JSON.parse(text);
+  } catch(e) {
+    throw new Error("レスポンス解析失敗: " + text.slice(0, 100));
+  }
+  
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function fetchDateList() {
+  if (!GAS_URL) {
+    return {dates: getStoredDates().map(function(d) { return {date: d}; })};
+  }
+  return await callGasApi({action: "list"});
+}
+
+async function fetchData(date) {
+  // まずローカルから確認
+  var cached = loadFromStorage(date);
+  if (cached) return {data: cached};
+  
+  // GASから取得
+  if (!GAS_URL) return {data: null};
+  
+  var result = await callGasApi({action: "load", date: date});
+  if (result.data) {
+    saveToStorage(result.data);
+  }
+  return result;
+}
+
+async function saveData(data, overwrite) {
+  // ローカルに即座保存
+  saveToStorage(data);
+  
+  if (!GAS_URL) return {success: true};
+  
+  // GASに保存
+  var response = await fetch(GAS_URL, {
+    method: "POST",
+    redirect: "follow",
+    headers: {"Content-Type": "text/plain"},
+    body: JSON.stringify({
+      action: "save",
+      overwrite: !!overwrite,
+      data: data
+    })
+  });
+  
+  return await response.json();
+}
+
+// === DOM作成ヘルパー ===
+function createElement(tag, attributes, children) {
+  var element = document.createElement(tag);
+  
+  if (attributes) {
+    Object.keys(attributes).forEach(function(key) {
+      if (key === "className") {
+        element.className = attributes[key];
+      } else if (key === "onclick") {
+        element.addEventListener("click", attributes[key]);
+      } else if (key.startsWith("data-")) {
+        element.setAttribute(key, attributes[key]);
+      } else {
+        element[key] = attributes[key];
+      }
+    });
+  }
+  
+  if (children) {
+    children.forEach(function(child) {
+      if (typeof child === "string") {
+        element.appendChild(document.createTextNode(child));
+      } else if (child) {
+        element.appendChild(child);
+      }
+    });
+  }
+  
+  return element;
+}
+
+function createBadge(text, color) {
+  return createElement("span", {
+    className: "badge",
+    style: "background: " + color + "20; color: " + color + "; border: 1px solid " + color + "44;"
+  }, [text]);
+}
+
+function createButton(text, className, clickHandler) {
+  var button = createElement("button", {
+    className: "btn " + className
+  }, [text]);
+  
+  if (clickHandler) {
+    button.addEventListener('click', clickHandler);
+  }
+  
+  return button;
+}
+
+// === コンポーネント生成 ===
+function createArticle(article) {
+  var category = CATEGORIES.find(function(c) { return c.id === article.category; }) || CATEGORIES[0];
+  var impactColor = IMPACT_COLORS[article.impact] || "#6B7280";
+  
+  var articleEl = createElement("div", {
+    className: "article",
+    style: "border-left: 3px solid " + category.color
+  });
+  
+  var header = createElement("div", {className: "article-header"}, [
+    createElement("span", {className: "article-title"}, [category.icon + " " + article.title]),
+    createBadge("影響度" + article.impact, impactColor)
+  ]);
+  
+  var details = createElement("div", {className: "article-details"});
+  details.appendChild(createElement("p", {className: "article-summary"}, [article.summary]));
+  
+  if (article.beginnerNote) {
+    var beginnerNote = createElement("div", {
+      className: "note",
+      style: "background: #0891B215; border: 1px solid #0891B230;"
+    }, [
+      createElement("div", {
+        className: "note-label",
+        style: "color: #0891B2;"
+      }, ["🔰 初心者向け解説"]),
+      createElement("p", {className: "note-text"}, [article.beginnerNote])
+    ]);
+    details.appendChild(beginnerNote);
+  }
+  
+  if (article.impactNote) {
+    var impactNote = createElement("div", {
+      className: "note", 
+      style: "background: #D9770615; border: 1px solid #D9770630;"
+    }, [
+      createElement("div", {
+        className: "note-label",
+        style: "color: #D97706;"
+      }, ["💥 影響解説"]),
+      createElement("p", {className: "note-text"}, [article.impactNote])
+    ]);
+    details.appendChild(impactNote);
+  }
+  
+  var footer = createElement("div", {className: "article-footer"}, [
+    createBadge(category.label, category.color),
+    createElement("span", {style: "font-size: 11px; color: #9CA3AF;"}, ["📰 " + article.source])
+  ]);
+  details.appendChild(footer);
+  
+  articleEl.appendChild(header);
+  articleEl.appendChild(details);
+  
+  // クリックイベント（シンプル版）
+  articleEl.addEventListener("click", function(e) {
+    e.preventDefault();
+    toggleElement(details);
+  });
+  
+  return articleEl;
+}
+
+function createIdeaCard(idea) {
+  var color = idea.color || "#6B7280";
+  
+  var card = createElement("div", {
+    className: "idea-card",
+    style: "border: 1px solid " + color + "33; border-top: 3px solid " + color + ";"
+  });
+  
+  var details = createElement("div", {className: "idea-details"});
+  details.appendChild(createElement("p", {
+    style: "color: #6B7280; font-size: 11px; line-height: 1.7; margin: 6px 0 8px;"
+  }, [idea.desc]));
+  
+  if (idea.tags && idea.tags.length) {
+    var tagsContainer = createElement("div", {style: "display: flex; gap: 4px; flex-wrap: wrap;"});
+    idea.tags.forEach(function(tag) {
+      tagsContainer.appendChild(createBadge(tag, color));
+    });
+    details.appendChild(tagsContainer);
+  }
+  
+  var hint = createElement("div", {
+    style: "color: " + color + "; font-size: 10px; opacity: .7;"
+  }, ["タップで詳細 ▾"]);
+  
+  card.appendChild(createElement("div", {style: "font-size: 22px; margin-bottom: 6px;"}, [idea.icon]));
+  card.appendChild(createElement("div", {
+    style: "font-size: 12px; font-weight: 700; color: #111827; line-height: 1.4; margin-bottom: 4px;"
+  }, [idea.title]));
+  card.appendChild(details);
+  card.appendChild(hint);
+  
+  // クリックイベント（シンプル版）
+  card.addEventListener("click", function(e) {
+    e.preventDefault();
+    toggleElement(details);
+    hint.style.display = details.style.display === "block" ? "none" : "block";
+  });
+  
+  return card;
+}
+
+function createHistoryRow(date, isSelected) {
+  var row = createElement("div", {
+    className: "history-row" + (isSelected ? " selected" : "")
+  });
+  
+  var dateCell = createElement("div", {}, [
+    createElement("div", {style: "font-size: 13px; font-weight: 700; color: #111827;"}, [formatDate(date)])
+  ]);
+  
+  var countCell = createElement("div", {style: "text-align: center; color: #374151;"}, ["…"]);
+  var highCell = createElement("div", {style: "text-align: center;"}, ["—"]);
+  var ideasCell = createElement("div", {style: "text-align: center; color: #374151;"}, ["…"]);
+  
+  var actionCell = createElement("div", {style: "text-align: center;"});
+  var button = createButton(isSelected ? "表示中" : "参照", 
+    isSelected ? "btn-primary" : "btn-secondary",
+    function() { selectDate(date); }
+  );
+  button.style.fontSize = "11px";
+  button.style.padding = "4px 10px";
+  actionCell.appendChild(button);
+  
+  row.appendChild(dateCell);
+  row.appendChild(countCell);
+  row.appendChild(highCell);
+  row.appendChild(ideasCell);
+  row.appendChild(actionCell);
+  
+  // キャッシュから統計を表示
+  var cached = loadFromStorage(date);
+  if (cached) {
+    try {
+      var articles = cached.articles || [];
+      countCell.textContent = articles.length;
+      
+      var highCount = articles.filter(function(a) { return a.impact === "高"; }).length;
+      if (highCount > 0) {
+        highCell.innerHTML = "";
+        highCell.appendChild(createBadge(String(highCount), "#DC2626"));
+      }
+      
+      ideasCell.textContent = (cached.ideas || []).length;
+    } catch(e) {}
+  }
+  
+  return row;
+}
+
+// === モーダル生成 ===
+function createPasteModal() {
+  var previewContainer = createElement("div");
+  
+  function updatePreview(text) {
+    previewContainer.innerHTML = "";
+    if (!text.trim()) return;
+    
+    try {
+      var data = JSON.parse(text.trim());
+      var preview = createElement("div", {className: "preview"}, [
+        createElement("span", {}, [formatDate(data.date) + " を保存"]),
+        createElement("span", {}, ["取得対象: " + formatDate(data.fetchedFor)]),
+        createElement("span", {}, [(data.articles ? data.articles.length : 0) + "件"])
+      ]);
+      previewContainer.appendChild(preview);
+    } catch(e) {
+      previewContainer.appendChild(createElement("div", {className: "preview-error"}, ["⚠️ JSON形式エラー"]));
+    }
+  }
+  
+  var textarea = createElement("textarea", {
+    className: "form-textarea",
+    placeholder: '{"date":"2026-05-04","fetchedFor":"2026-05-03","articles":[...]}',
+    value: State.pasteText
+  });
+  
+  textarea.addEventListener("input", function() {
+    State.pasteText = textarea.value;
+    updatePreview(textarea.value);
+  });
+  
+  updatePreview(State.pasteText);
+  
+  var modal = createElement("div", {className: "modal"}, [
+    createElement("div", {className: "modal-title"}, ["📋 ニュースJSON を貼り付けて保存"]),
+    createElement("div", {className: "modal-description"}, [
+      "Claudeに「今日のニュースをまとめて」と依頼して受け取ったJSONを貼り付けてください。"
+    ]),
+    previewContainer,
+    textarea,
+    createElement("div", {className: "modal-buttons"}, [
+      createButton("保存する", "btn-primary", processPasteData),
+      createButton("キャンセル", "btn-secondary", function() {
+        setState({showPasteModal: false, pasteText: ""});
+      })
+    ])
+  ]);
+  
+  return createElement("div", {className: "modal-overlay"}, [modal]);
+}
+
+function createGasModal() {
+  var input = createElement("input", {
+    type: "text",
+    className: "form-input",
+    placeholder: "https://script.google.com/macros/s/xxxxx/exec",
+    value: State.gasInput || ""
+  });
+  
+  input.addEventListener("input", function() {
+    State.gasInput = input.value;
+  });
+  
+  var buttons = [
+    createButton("保存して接続", "btn-primary", function() {
+      var url = State.gasInput.trim();
+      if (!url) {
+        setState({message: "❌ URLを入力してください", messageType: "error"});
+        return;
+      }
+      GAS_URL = url;
+      localStorage.setItem("ainews_gas_url", url);
+      setState({
+        showGasModal: false,
+        gasInput: url,
+        message: "✅ GAS URLを保存しました",
+        messageType: "success"
+      });
+      initialize();
+    }),
+    createButton("閉じる", "btn-secondary", function() {
+      setState({showGasModal: false});
+    })
+  ];
+  
+  if (GAS_URL) {
+    buttons.splice(1, 0, createButton("連携を解除", "btn-warning", function() {
+      GAS_URL = "";
+      localStorage.removeItem("ainews_gas_url");
+      setState({
+        showGasModal: false,
+        gasInput: "",
+        message: "⚠️ Sheets連携を解除しました",
+        messageType: "warning"
+      });
+    }));
+  }
+  
+  var modal = createElement("div", {className: "modal"}, [
+    createElement("div", {className: "modal-title"}, ["⚙️ Google Sheets 連携設定"]),
+    createElement("div", {className: "modal-description"}, [
+      "GASのデプロイURL（/execで終わるURL）を入力してください"
+    ]),
+    GAS_URL ? createElement("div", {
+      style: "font-size: 11px; color: #059669; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; word-break: break-all;"
+    }, ["現在: " + GAS_URL]) : null,
+    input,
+    createElement("div", {className: "modal-buttons"}, buttons)
+  ]);
+  
+  return createElement("div", {className: "modal-overlay"}, [modal]);
+}
+
+function createConfirmModal() {
+  var data = State.pendingData;
+  if (!data) return null;
+  
+  var modal = createElement("div", {className: "modal"}, [
+    createElement("div", {style: "font-size: 24px; text-align: center; margin-bottom: 8px;"}, ["⚠️"]),
+    createElement("div", {style: "font-size: 14px; font-weight: 700; text-align: center; margin-bottom: 12px;"}, [
+      "同じ日付のデータが存在します"
+    ]),
+    createElement("div", {
+      style: "background: #FEF9C3; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; font-size: 12px; color: #92400E; line-height: 1.7;"
+    }, [
+      createElement("div", {}, ["📅 保存日: ", createElement("strong", {}, [formatDate(data.date)])]),
+      createElement("div", {}, ["🔍 取得対象: ", createElement("strong", {}, [formatDate(data.fetchedFor)])]),
+      createElement("div", {}, ["既存データを上書きしますか？"])
+    ]),
+    createElement("div", {className: "modal-buttons"}, [
+      createButton("上書きする", "btn-warning", function() {
+        executeDataSave(State.pendingData, true);
+      }),
+      createButton("キャンセル", "btn-secondary", function() {
+        setState({showConfirmModal: false, pendingData: null});
+      })
+    ])
+  ]);
+  
+  return createElement("div", {className: "modal-overlay"}, [modal]);
+}
+
+// === タブ内容生成 ===
+function renderNewsTab() {
+  if (!State.currentData) {
+    return createElement("div", {className: "empty"}, [
+      createElement("div", {className: "empty-icon"}, ["🌅"]),
+      createElement("div", {className: "empty-title"}, ["まだデータがありません"]),
+      createElement("div", {className: "empty-description"}, ["📋 JSONを貼り付けから始めましょう"])
+    ]);
+  }
+  
+  var container = createElement("div");
+  
+  // エグゼクティブサマリー
+  var summaryCard = createElement("div", {className: "card"}, [
+    createElement("div", {
+      style: "font-size: 10px; font-weight: 700; color: #2563EB; letter-spacing: 2px; margin-bottom: 8px; font-family: 'DM Mono', monospace;"
+    }, ["✦ EXECUTIVE SUMMARY"]),
+    createElement("p", {
+      style: "font-size: 13px; line-height: 1.9; color: #374151;"
+    }, [State.currentData.summary])
+  ]);
+  
+  if (State.currentData.trends && State.currentData.trends.length) {
+    var trendsContainer = createElement("div", {style: "margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;"});
+    State.currentData.trends.forEach(function(trend) {
+      trendsContainer.appendChild(createElement("span", {
+        style: "background: #EFF6FF; color: #2563EB; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600;"
+      }, [trend]));
+    });
+    summaryCard.appendChild(trendsContainer);
+  }
+  
+  container.appendChild(summaryCard);
+  
+  // カテゴリフィルター
+  var articles = State.currentData.articles || [];
+  var filterRow = createElement("div", {className: "filter-row"});
+  
+  var allFilter = createElement("button", {
+    className: "filter" + (State.categoryFilter === "all" ? " active" : ""),
+    style: State.categoryFilter === "all" ? "background: #2563EB; color: #fff; border-color: #2563EB;" : ""
+  }, ["すべて"]);
+  allFilter.addEventListener('click', function() { filterByCategory("all"); });
+  filterRow.appendChild(allFilter);
+  
+  CATEGORIES.forEach(function(category) {
+    if (articles.some(function(a) { return a.category === category.id; })) {
+      var filter = createElement("button", {
+        className: "filter" + (State.categoryFilter === category.id ? " active" : ""),
+        style: State.categoryFilter === category.id ? 
+               "background: " + category.color + "; color: #fff; border-color: " + category.color + ";" : ""
+      }, [category.icon + " " + category.label]);
+      filter.addEventListener('click', function() { filterByCategory(category.id); });
+      filterRow.appendChild(filter);
+    }
+  });
+  
+  container.appendChild(filterRow);
+  
+  // フィルタリングされた記事
+  var filteredArticles = State.categoryFilter === "all" ? 
+    articles : articles.filter(function(a) { return a.category === State.categoryFilter; });
+  
+  container.appendChild(createElement("div", {
+    style: "font-size: 11px; color: #94A3B8; margin-bottom: 8px;"
+  }, [filteredArticles.length + "件 — タップで詳細"]));
+  
+  filteredArticles.forEach(function(article) {
+    container.appendChild(createArticle(article));
+  });
+  
+  return container;
+}
+
+function renderRegionTab(region) {
+  if (!State.currentData) {
+    return createElement("div", {className: "empty"}, [
+      createElement("div", {className: "empty-icon"}, ["🌅"]),
+      createElement("div", {className: "empty-description"}, ["データがありません"])
+    ]);
+  }
+  
+  var meta = {
+    global: {label: "🌍 世界情勢", color: "#0EA5E9"},
+    domestic: {label: "🇯🇵 国内情勢", color: "#DC2626"}
+  };
+  
+  var regionMeta = meta[region];
+  var articles = (State.currentData.articles || []).filter(function(a) {
+    return region === "domestic" ? a.region === "domestic" : (a.region === "global" || !a.region);
+  });
+  
+  var container = createElement("div");
+  
+  // 地域ヘッダー
+  var highImpactCount = articles.filter(function(a) { return a.impact === "高"; }).length;
+  var header = createElement("div", {
+    style: "background: " + regionMeta.color + "10; border: 1px solid " + regionMeta.color + "30; border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;"
+  }, [
+    createElement("div", {style: "flex: 1;"}, [
+      createElement("div", {
+        style: "font-size: 14px; font-weight: 900; color: " + regionMeta.color + "; margin-bottom: 2px;"
+      }, [regionMeta.label]),
+      createElement("div", {style: "font-size: 11px; color: #64748B;"}, [articles.length + "件"])
+    ]),
+    createElement("div", {
+      style: "background: #fff; border: 1px solid " + regionMeta.color + "44; border-radius: 8px; padding: 4px 10px; text-align: center;"
+    }, [
+      createElement("div", {
+        style: "font-size: 16px; font-weight: 800; color: " + regionMeta.color + ";"
+      }, [String(highImpactCount)]),
+      createElement("div", {style: "font-size: 9px; color: #94A3B8;"}, ["影響度高"])
+    ])
+  ]);
+  
+  container.appendChild(header);
+  
+  // カテゴリフィルター
+  var usedCategories = [];
+  articles.forEach(function(a) {
+    if (usedCategories.indexOf(a.category) === -1) usedCategories.push(a.category);
+  });
+  
+  var filterRow = createElement("div", {className: "filter-row"});
+  var allFilter = createElement("button", {
+    className: "filter" + (State.categoryFilter === "all" ? " active" : ""),
+    style: State.categoryFilter === "all" ? 
+           "background: " + regionMeta.color + "; color: #fff; border-color: " + regionMeta.color + ";" : ""
+  }, ["すべて"]);
+  allFilter.addEventListener('click', function() { filterByCategory("all"); });
+  filterRow.appendChild(allFilter);
+  
+  CATEGORIES.filter(function(c) { return usedCategories.indexOf(c.id) !== -1; }).forEach(function(category) {
+    var filter = createElement("button", {
+      className: "filter" + (State.categoryFilter === category.id ? " active" : ""),
+      style: State.categoryFilter === category.id ? 
+             "background: " + category.color + "; color: #fff; border-color: " + category.color + ";" : ""
+    }, [category.icon + " " + category.label]);
+    filter.addEventListener('click', function() { filterByCategory(category.id); });
+    filterRow.appendChild(filter);
+  });
+  
+  container.appendChild(filterRow);
+  
+  // フィルタリングされた記事
+  var filteredArticles = State.categoryFilter === "all" ? 
+    articles : articles.filter(function(a) { return a.category === State.categoryFilter; });
+  
+  container.appendChild(createElement("div", {
+    style: "font-size: 11px; color: #94A3B8; margin-bottom: 8px;"
+  }, [filteredArticles.length + "件"]));
+  
+  filteredArticles.forEach(function(article) {
+    container.appendChild(createArticle(article));
+  });
+  
+  return container;
+}
+
+function renderIdeasTab() {
+  if (!State.currentData || !State.currentData.ideas) {
+    return createElement("div", {className: "empty"}, [
+      createElement("div", {className: "empty-icon"}, ["🌅"]),
+      createElement("div", {className: "empty-description"}, ["データがありません"])
+    ]);
+  }
+  
+  var grid = createElement("div", {className: "ideas-grid"});
+  State.currentData.ideas.forEach(function(idea) {
+    grid.appendChild(createIdeaCard(idea));
+  });
+  
+  return grid;
+}
+
+function renderHistoryTab() {
+  var container = createElement("div");
+  
+  // ヘッダー
+  container.appendChild(createElement("div", {
+    style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"
+  }, [
+    createElement("div", {style: "font-size: 13px; font-weight: 700;"}, ["📅 保存済みデータ一覧"]),
+    createElement("div", {style: "display: flex; align-items: center; gap: 8px;"}, [
+      createElement("span", {
+        style: "font-size: 10px; padding: 2px 8px; border-radius: 10px; background: " + 
+               (GAS_URL ? "#F0FDF4" : "#EFF6FF") + "; color: " + (GAS_URL ? "#059669" : "#2563EB") + 
+               "; font-weight: 700;"
+      }, [GAS_URL ? "🟢 Google Sheets" : "💾 ローカルのみ"]),
+      createElement("span", {style: "font-size: 11px; color: #94A3B8;"}, [State.availableDates.length + "件保存済み"])
+    ])
+  ]));
+  
+  if (!State.availableDates.length) {
+    container.appendChild(createElement("div", {className: "empty"}, [
+      createElement("div", {style: "font-size: 32px; margin-bottom: 8px;"}, ["📭"]),
+      createElement("div", {style: "font-size: 13px; color: #6B7280;"}, ["まだデータがありません"])
+    ]));
+  } else {
+    // テーブル
+    var table = createElement("div", {className: "history-table"});
+    
+    table.appendChild(createElement("div", {className: "history-header"}, [
+      createElement("span", {}, ["日付"]),
+      createElement("span", {style: "text-align: center;"}, ["記事数"]),
+      createElement("span", {style: "text-align: center;"}, ["影響高"]),
+      createElement("span", {style: "text-align: center;"}, ["アイデア"]),
+      createElement("span", {style: "text-align: center;"}, ["操作"])
+    ]));
+    
+    State.availableDates.forEach(function(date) {
+      table.appendChild(createHistoryRow(date, State.selectedDate === date));
+    });
+    
+    container.appendChild(table);
+  }
+  
+  return container;
+}
+
+// === アクション ===
+function setState(updates) {
+  Object.assign(State, updates);
+  render();
+}
+
+function selectTab(tabId) {
+  setState({currentTab: tabId});
+}
+
+function selectDate(date) {
+  setState({loading: true, loadingMessage: "データを読み込み中..."});
+  
+  fetchData(date).then(function(result) {
+    setState({
+      loading: false,
+      currentData: result.data,
+      selectedDate: date,
+      currentTab: "news",
+      categoryFilter: "all"
+    });
+  }).catch(function(error) {
+    setState({
+      loading: false,
+      message: "❌ 読み込み失敗: " + error.message,
+      messageType: "error"
+    });
+  });
+}
+
+function processPasteData() {
+  try {
+    var text = State.pasteText.trim();
+    if (!text) throw new Error("JSONが空です");
+    
+    var data = JSON.parse(text);
+    if (!data.date || !data.articles) throw new Error("date・articlesが必要です");
+    if (!data.fetchedFor) throw new Error("fetchedForが必要です");
+    
+    // 重複チェック
+    var existing = loadFromStorage(data.date);
+    if (existing) {
+      setState({
+        pendingData: data,
+        showConfirmModal: true,
+        showPasteModal: false
+      });
+    } else {
+      executeDataSave(data, false);
+    }
+  } catch(error) {
+    setState({
+      message: "❌ JSON解析エラー: " + error.message,
+      messageType: "error"
+    });
+  }
+}
+
+function executeDataSave(data, overwrite) {
+  setState({loading: true, loadingMessage: "保存中..."});
+  
+  saveData(data, overwrite).then(function(result) {
+    var dates = getStoredDates();
+    setState({
+      loading: false,
+      showPasteModal: false,
+      showConfirmModal: false,
+      pendingData: null,
+      pasteText: "",
+      availableDates: dates,
+      currentData: data,
+      selectedDate: data.date,
+      currentTab: "news",
+      categoryFilter: "all",
+      message: "✅ " + formatDate(data.date) + " を保存しました",
+      messageType: "success"
+    });
+  }).catch(function(error) {
+    setState({
+      loading: false,
+      message: "❌ 保存失敗: " + error.message,
+      messageType: "error"
+    });
+  });
+}
+
+// === メインレンダリング ===
+function render() {
+  var app = document.getElementById("app");
+  app.innerHTML = "";
+  
+  // ローディング表示
+  if (State.loading) {
+    app.appendChild(createElement("div", {className: "loading-overlay"}, [
+      createElement("div", {className: "loading-content"}, [
+        createElement("div", {style: "font-size: 28px; margin-bottom: 8px;"}, ["📡"]),
+        createElement("div", {style: "font-size: 13px; font-weight: 600; color: #374151;"}, [
+          State.loadingMessage || "読み込み中..."
+        ])
+      ])
+    ]));
+    return;
+  }
+  
+  // 時刻表示
+  var timeStr = State.currentTime.toLocaleTimeString("ja-JP", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+  var dateStr = State.currentTime.toLocaleDateString("ja-JP", {
+    year: "numeric", month: "long", day: "numeric", weekday: "short"
+  });
+  
+  // 統計
+  var articles = (State.currentData && State.currentData.articles) || [];
+  var highImpactCount = articles.filter(function(a) { return a.impact === "高"; }).length;
+  
+  // ヘッダー
+  var header = createElement("div", {className: "header"});
+  
+  var headerTop = createElement("div", {className: "header-top"}, [
+    createElement("div", {}, [
+      createElement("div", {className: "tracker"}, ["AI NEWS TRACKER"]),
+      createElement("div", {className: "app-title"}, ["AIニュース速報"])
+    ]),
+    createElement("div", {className: "clock"}, [
+      createElement("div", {className: "clock-time"}, [timeStr]),
+      createElement("div", {className: "clock-date"}, [dateStr])
+    ])
+  ]);
+  
+  // 統計チップ
+  var statsRow = createElement("div", {className: "stats-row"});
+  if (State.currentData) {
+    statsRow.appendChild(createElement("div", {className: "chip"}, [
+      createElement("span", {className: "chip-number", style: "color: #2563EB;"}, [String(articles.length)]),
+      createElement("span", {className: "chip-label"}, ["記事数"])
+    ]));
+    
+    statsRow.appendChild(createElement("div", {className: "chip"}, [
+      createElement("span", {className: "chip-number", style: "color: #DC2626;"}, [String(highImpactCount)]),
+      createElement("span", {className: "chip-label"}, ["影響度高"])
+    ]));
+    
+    statsRow.appendChild(createElement("div", {className: "chip"}, [
+      createElement("span", {className: "chip-number", style: "color: #059669;"}, [String(State.availableDates.length)]),
+      createElement("span", {className: "chip-label"}, ["保存件数"])
+    ]));
+    
+    if (State.selectedDate) {
+      statsRow.appendChild(createElement("span", {
+        style: "font-size: 11px; color: #94A3B8; font-family: 'DM Mono', monospace;"
+      }, [formatDate(State.selectedDate)]));
+    }
+  }
+  
+  // ボタン行
+  var buttonRow = createElement("div", {className: "button-row"}, [
+    createButton(
+      GAS_URL ? "🟢 Sheets連携中" : "⚙️ Sheets設定",
+      GAS_URL ? "btn-success" : "btn-warning",
+      function() { setState({showGasModal: true}); }
+    ),
+    createButton("📋 JSONを貼り付け", "btn-primary", function() {
+      setState({showPasteModal: true, message: ""});
+    })
+  ]);
+  
+  // タブ
+  var tabs = createElement("div", {className: "tabs"});
+  TABS.forEach(function(tab) {
+    var tabEl = createElement("button", {
+      className: "tab" + (State.currentTab === tab.id ? " active" : "")
+    }, [tab.label]);
+    
+    // タブクリック処理（シンプル実装）
+    tabEl.addEventListener("click", function(e) {
+      e.preventDefault();
+      switchTab(tab.id);
+    });
+    
+    tabs.appendChild(tabEl);
+  });
+  
+  header.appendChild(headerTop);
+  header.appendChild(statsRow);
+  header.appendChild(buttonRow);
+  header.appendChild(tabs);
+  
+  app.appendChild(header);
+  
+  // メインコンテンツ
+  var content = createElement("div", {className: "content"});
+  
+  // メッセージ表示
+  if (State.message) {
+    content.appendChild(createElement("div", {
+      className: "message " + State.messageType
+    }, [State.message]));
+  }
+  
+  // タブ内容
+  var tabContent;
+  switch (State.currentTab) {
+    case "news":
+      tabContent = renderNewsTab();
+      break;
+    case "global":
+      tabContent = renderRegionTab("global");
+      break;
+    case "domestic":
+      tabContent = renderRegionTab("domestic");
+      break;
+    case "ideas":
+      tabContent = renderIdeasTab();
+      break;
+    case "history":
+      tabContent = renderHistoryTab();
+      break;
+    default:
+      tabContent = createElement("div", {}, ["不明なタブです"]);
+  }
+  
+  content.appendChild(tabContent);
+  app.appendChild(content);
+  
+  // モーダル表示
+  if (State.showPasteModal) {
+    app.appendChild(createPasteModal());
+  }
+  
+  if (State.showGasModal) {
+    app.appendChild(createGasModal());
+  }
+  
+  if (State.showConfirmModal && State.pendingData) {
+    app.appendChild(createConfirmModal());
+  }
+}
+
+// === 初期化 ===
+function initialize() {
+  // ローカルデータから即座表示
+  var dates = getStoredDates();
+  if (dates.length) {
+    var latestData = loadFromStorage(dates[0]);
+    setState({
+      availableDates: dates,
+      currentData: latestData,
+      selectedDate: dates[0]
+    });
+  } else {
+    setState({availableDates: []});
+  }
+  
+  // GAS連携時は背景で同期
+  if (GAS_URL) {
+    fetchDateList().then(function(result) {
+      var sheetDates = (result.dates || []).map(function(d) { return d.date; });
+      var localDates = getStoredDates();
+      
+      // マージ
+      var mergedDates = sheetDates.slice();
+      localDates.forEach(function(d) {
+        if (mergedDates.indexOf(d) === -1) mergedDates.push(d);
+      });
+      mergedDates = mergedDates.sort().reverse();
+      
+      setState({availableDates: mergedDates});
+      
+      // 最新データがローカルにない場合は取得
+      if (mergedDates.length && !loadFromStorage(mergedDates[0])) {
+        selectDate(mergedDates[0]);
+      }
+    }).catch(function(error) {
+      console.warn("GAS同期失敗:", error);
+    });
+  }
+}
+
+// === ユーティリティ関数 ===
+function toggleElement(element) {
+  var isOpen = element.style.display === "block";
+  element.style.display = isOpen ? "none" : "block";
+}
+
+function showModal(modalId) {
+  hideModals();
+  var modal = document.getElementById(modalId);
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+function hideModals() {
+  document.querySelectorAll('.modal').forEach(function(modal) {
+    modal.style.display = 'none';
+  });
+}
+
+function switchTab(tabName) {
+  setState({activeTab: tabName});
+}
+
+function filterByCategory(categoryId) {
+  setState({categoryFilter: categoryId});
+}
+
+// === アプリケーション開始 ===
+document.addEventListener("DOMContentLoaded", function() {
+  initializeApp();
+  setupEventListeners();
+  
+  // 時計更新
+  setInterval(function() {
+    setState({currentTime: new Date()});
+  }, 1000);
+});
+
+function initializeApp() {
+  initialize();
+}
+
+function setupEventListeners() {
+  // タブ切り替え
+  document.querySelectorAll('.tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      switchTab(this.dataset.tab);
+    });
+  });
+  
+  // モーダル制御
+  if (document.getElementById('pasteBtn')) {
+    document.getElementById('pasteBtn').addEventListener('click', function() {
+      showModal('pasteModal');
+    });
+  }
+  
+  if (document.getElementById('gasBtn')) {
+    document.getElementById('gasBtn').addEventListener('click', function() {
+      showModal('gasModal');
+    });
+  }
+  
+  // モーダルクローズ
+  document.querySelectorAll('.modal').forEach(function(modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        hideModals();
+      }
+    });
+  });
+  
+  document.querySelectorAll('.close-modal').forEach(function(btn) {
+    btn.addEventListener('click', hideModals);
+  });
+}
+
+function showModal(modalId) {
+  hideModals();
+  var modal = document.getElementById(modalId);
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+function hideModals() {
+  document.querySelectorAll('.modal').forEach(function(modal) {
+    modal.style.display = 'none';
+  });
+}
+
+function switchTab(tabName) {
+  setState({activeTab: tabName});
+}
+
+function filterByCategory(categoryId) {
+  setState({categoryFilter: categoryId});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI News Hub</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
+
+:root {
+  --bg:#f7f6f3; --surface:#fff; --border:#e5e2d9; --border2:#cdc9be;
+  --accent:#1a56db; --accent-bg:#eef3fd; --accent2:#059669;
+  --amber:#d97706; --red:#dc2626; --purple:#7c3aed;
+  --text:#18181b; --text2:#52525b; --text3:#a1a1aa;
+  --font:'Noto Sans JP',sans-serif; --mono:'DM Mono',monospace;
+  --hdr:52px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column}
+
+/* ヘッダー */
+.hdr{height:var(--hdr);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 20px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:var(--text);text-decoration:none;padding-right:20px;border-right:1px solid var(--border);white-space:nowrap}
+.logo-dot{width:26px;height:26px;border-radius:6px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.tabs{display:flex;align-items:stretch;padding-left:4px}
+.tab{display:flex;align-items:center;gap:6px;padding:0 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border:none;background:transparent;font-family:var(--font);border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);font-weight:700}
+.hdr-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:var(--font);transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#1446bf}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-log{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s;background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-log:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+
+/* ボディ */
+.body{display:flex;flex:1;min-height:0}
+.main{flex:1;overflow-y:auto;background:var(--surface);min-height:0}
+.main::-webkit-scrollbar{width:4px}.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* サブバー */
+.subbar{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chip{padding:3px 10px;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);transition:all .15s}
+.chip:hover,.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.cat-chip{background:#f0ede8;border-color:var(--border2);color:var(--text2)}
+.chip.cat-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.subbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.count-lbl{font-size:11px;color:var(--text3);font-family:var(--mono)}
+
+/* デイリーサマリー */
+.daily-summary{padding:16px 20px;border-bottom:1px solid var(--border);background:#fafaf8}
+.ds-date{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.ds-loading{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);font-family:var(--mono);padding:12px 0}
+.ds-text{font-size:13px;color:var(--text2);line-height:1.75}
+.ds-trends{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ds-trend{font-size:11px;padding:3px 9px;border-radius:12px;background:var(--accent-bg);color:var(--accent);border:1px solid #c7d9fb;font-weight:600;line-height:1.4}
+
+/* 記事リスト */
+.art-list{padding:0}
+.art-row{display:flex;gap:14px;padding:13px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;align-items:flex-start}
+.art-row:hover{background:#faf9f7}
+.art-row.open-row{background:var(--accent-bg)}
+.art-favicon{width:42px;height:42px;border-radius:50%;flex-shrink:0;overflow:hidden;background:#f0ede8;display:flex;align-items:center;justify-content:center;font-size:19px;border:1px solid var(--border)}
+.art-favicon img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.art-body{flex:1;min-width:0}
+.art-title{font-size:14px;font-weight:700;line-height:1.45;margin-bottom:4px;color:var(--text)}
+.art-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.meta-date{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.meta-sep{font-size:10px;color:var(--border2)}
+.meta-src{font-size:11px;color:var(--text3)}
+.meta-cat{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px}
+.meta-impact{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;font-family:var(--mono)}
+.impact-高{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.impact-中{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.impact-低{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.art-chevron{font-size:10px;color:var(--text3);transition:transform .2s;flex-shrink:0;margin-top:2px}
+.art-row.open-row .art-chevron{transform:rotate(180deg)}
+
+/* アコーディオン */
+.art-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
+.art-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
+.acc-summary-box{border-left:3px solid var(--accent);padding-left:12px;margin-bottom:10px}
+.acc-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);margin-bottom:3px}
+.acc-lbl.blue{color:var(--accent)}.acc-lbl.amber{color:var(--amber)}.acc-lbl.green{color:var(--accent2)}
+.acc-text{font-size:13px;color:var(--text2);line-height:1.75}
+.acc-note-box{border-left:3px solid var(--amber);padding-left:12px;margin-bottom:10px}
+.acc-impact-box{border-left:3px solid var(--accent2);padding-left:12px;margin-bottom:12px}
+.acc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.acc-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);transition:all .15s}
+.acc-link:hover{background:var(--accent-bg);border-color:var(--accent)}
+.acc-src{font-size:11px;color:var(--text3);font-family:var(--mono)}
+
+/* アイデア */
+.idea-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:20px}
+.idea-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;border-top-width:3px}
+.idea-icon{font-size:24px;margin-bottom:8px}
+.idea-title{font-size:14px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.idea-desc{font-size:13px;color:var(--text2);line-height:1.65}
+.idea-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.idea-tag{font-size:10px;padding:2px 7px;border-radius:8px;background:#f0ede8;color:var(--text2);border:1px solid var(--border)}
+
+/* パーソナル */
+.notion-list{padding:0}
+.notion-row{display:flex;gap:14px;padding:13px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;align-items:flex-start}
+.notion-row:hover{background:#faf9f7}
+.notion-row.open-row{background:var(--accent-bg)}
+.notion-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
+.notion-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
+.fav-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;transition:transform .15s;flex-shrink:0}
+.fav-btn:hover{transform:scale(1.2)}
+.read-dim .art-title{color:var(--text3)}
+.read-dim .art-favicon{opacity:.5}
+
+/* 空・ローディング */
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty .icon{font-size:36px;margin-bottom:10px}
+.empty h3{font-size:15px;color:var(--text2);margin-bottom:5px}
+.empty p{font-size:12px;line-height:1.6;max-width:260px;margin:0 auto}
+
+/* ドロワー */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);backdrop-filter:blur(2px);z-index:150;opacity:0;pointer-events:none;transition:opacity .25s ease}
+.drawer-overlay.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:240px;background:var(--surface);border-right:1px solid var(--border);z-index:160;overflow-y:auto;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer::-webkit-scrollbar{width:3px}.drawer::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.drawer-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.drawer-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono)}
+.drawer-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;line-height:1;padding:2px;transition:color .15s}
+.drawer-close:hover{color:var(--text)}
+
+/* タイムライン */
+.tl{padding:8px 10px}
+.tl-month-lbl{font-size:10px;font-weight:700;color:var(--text3);font-family:var(--mono);padding:8px 4px 4px;letter-spacing:.05em}
+.tl-entry{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;transition:background .1s;text-decoration:none;color:inherit}
+.tl-entry:hover{background:var(--bg)}
+.tl-entry.active{background:var(--accent-bg)}
+.tl-entry.loading{opacity:.5;cursor:default;pointer-events:none}
+.tl-dot{width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .15s}
+.tl-entry.active .tl-dot,.tl-entry.loaded .tl-dot{background:var(--accent)}
+.tl-entry.remote .tl-dot{background:#a5b4fc}
+.tl-entry.active.remote .tl-dot{background:var(--accent)}
+.tl-info{flex:1;min-width:0}
+.tl-date{font-size:13px;color:var(--text);font-family:var(--mono);font-weight:500}
+.tl-entry.active .tl-date{color:var(--accent);font-weight:700}
+.tl-label{font-size:10px;color:var(--text3)}
+.tl-cnt{font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap}
+
+/* モーダル */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-ov.show{display:flex}
+.modal{background:var(--surface);border-radius:14px;padding:22px;width:100%;max-width:560px;border:1px solid var(--border);animation:fadeUp .2s ease;max-height:90vh;display:flex;flex-direction:column}
+@keyframes fadeUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:12px}
+.modal textarea{flex:1;min-height:200px;resize:vertical;border:1px solid var(--border2);border-radius:8px;padding:10px;font-size:12px;font-family:var(--mono);background:var(--bg);color:var(--text);outline:none;transition:border-color .15s;line-height:1.5}
+.modal textarea:focus{border-color:var(--accent)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.setup-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.setup-ov.show{display:flex}
+.setup-box{background:var(--surface);border-radius:14px;padding:22px;width:100%;max-width:420px;border:1px solid var(--border);animation:fadeUp .2s ease}
+.setup-title{font-size:15px;font-weight:700;margin-bottom:12px}
+.setup-row{display:flex;gap:8px;margin-bottom:8px}
+.setup-input{flex:1;border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);outline:none;transition:border-color .15s;color:var(--text)}
+.setup-input:focus{border-color:var(--accent)}
+.setup-note{font-size:11px;color:var(--text3);line-height:1.5;margin-top:6px}
+
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+.spinner-w{border:2px solid rgba(255,255,255,.3);border-top-color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:18px;right:18px;background:#18181b;border-radius:9px;padding:10px 16px;font-size:13px;color:#fff;z-index:300;box-shadow:0 8px 32px rgba(0,0,0,.2);animation:fadeUp .2s ease}
+
+/* カテゴリ */
+.cat-policy{background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe}
+.cat-model{background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd}
+.cat-chip{background:#fef9c3;color:#854d0e;border:1px solid #fef08a}
+.cat-robot,.cat-cobot{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.cat-society{background:#fce7f3;color:#9d174d;border:1px solid #fbcfe8}
+.cat-economy{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.cat-politics{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.cat-other{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
+
+@media(max-width:640px){
+  .logo span{display:none}
+  .hdr{padding:0 12px}
+  body{height:auto;overflow:auto}
+  .body{flex-direction:column;overflow:visible}
+  .main{overflow-y:visible;min-height:auto}
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('news',this)">ニュース</button>
+    <button class="tab" onclick="switchTab('ideas',this)">活用</button>
+    <button class="tab" onclick="switchTab('personal',this)">パーソナル</button>
+  </nav>
+  <div class="hdr-right">
+    <button class="btn-log" onclick="toggleDrawer()">📅</button>
+    <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
+    <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
+    <button class="btn btn-ghost" onclick="openJsonModal()">📋</button>
+  </div>
+</header>
+
+<div class="body">
+  <div class="main" id="mainArea">
+
+    <!-- ニュース -->
+    <div id="tab-news">
+      <div class="subbar">
+        <button class="chip active" onclick="setRegion(this,'all')">すべて</button>
+        <button class="chip" onclick="setRegion(this,'global')">🌍 グローバル</button>
+        <button class="chip" onclick="setRegion(this,'domestic')">🇯🇵 国内</button>
+        <span style="color:var(--border2);font-size:12px;margin:0 2px">|</span>
+        <button class="chip cat-chip active" onclick="setCat(this,'all')">全て</button>
+        <button class="chip cat-chip" onclick="setCat(this,'policy')">政策</button>
+        <button class="chip cat-chip" onclick="setCat(this,'model')">モデル</button>
+        <button class="chip cat-chip" onclick="setCat(this,'chip')">チップ</button>
+        <button class="chip cat-chip" onclick="setCat(this,'robot')">ロボット</button>
+        <button class="chip cat-chip" onclick="setCat(this,'cobot')">協働ロボ</button>
+        <button class="chip cat-chip" onclick="setCat(this,'economy')">経済</button>
+        <button class="chip cat-chip" onclick="setCat(this,'politics')">政治</button>
+        <div class="subbar-right"><span class="count-lbl" id="newsCount">— 件</span></div>
+      </div>
+      <div id="newsSummary"></div>
+      <div class="art-list" id="newsList"></div>
+    </div>
+
+    <!-- 活用アイデア -->
+    <div id="tab-ideas" style="display:none">
+      <div class="subbar"><span style="font-size:13px;color:var(--text2);font-weight:600">💡 活用アイデア</span><div class="subbar-right"><span class="count-lbl" id="ideaCount">— 件</span></div></div>
+      <div class="idea-grid" id="ideaGrid"></div>
+    </div>
+
+    <!-- パーソナル -->
+    <div id="tab-personal" style="display:none">
+      <div class="subbar">
+        <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて</button>
+        <button class="chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り</button>
+        <button class="chip" onclick="setPersonalFilter(this,'unread')">未読</button>
+        <div class="subbar-right">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
+          <span class="count-lbl" id="personalCount">— 件</span>
+        </div>
+      </div>
+      <div class="notion-list" id="notionList"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ドロワー -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">過去ログ</span>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="tl" id="tl"></div>
+</div>
+
+<!-- JSON投入モーダル -->
+<div class="modal-ov" id="jsonModal">
+  <div class="modal">
+    <div class="modal-title">📋 ニュースJSON を手動投入</div>
+    <textarea id="jsonInput" placeholder='{"date":"2026-05-09","articles":[...],"ideas":[]}'></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeJsonModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="loadJson()">読み込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notion追加モーダル -->
+<div class="modal-ov" id="notionAddModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔖 記事を追加</div>
+    <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-family:var(--mono)">URL *</label><input type="url" id="nUrl" style="width:100%;border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);outline:none;color:var(--text)" placeholder="https://"></div>
+    <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-family:var(--mono)">タイトル *</label><input type="text" id="nTitle" style="width:100%;border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);outline:none;color:var(--text)" placeholder="記事タイトル"></div>
+    <div style="margin-bottom:10px"><label style="display:block;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-family:var(--mono)">タグ</label><input type="text" id="nTags" style="width:100%;border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;font-family:var(--font);background:var(--bg);outline:none;color:var(--text)" placeholder="AI, ビジネス"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeNotionAddModal()">キャンセル</button>
+      <button class="btn btn-primary" id="nSaveBtn" onclick="saveNotionArticle()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- セットアップ -->
+<div class="setup-ov" id="setupOv">
+  <div class="setup-box">
+    <div class="setup-title">⚙️ 設定</div>
+    <div class="setup-row">
+      <input type="text" class="setup-input" id="gasUrlInput" placeholder="GAS URL（パーソナル用）">
+      <button class="btn btn-primary" onclick="saveGasUrl()">保存</button>
+    </div>
+    <p class="setup-note">ニュースは <code>data/yyyymmdd.json</code> から自動取得します。</p>
+    <div style="margin-top:12px;text-align:right"><button class="btn btn-ghost" onclick="toggleSetup()">閉じる</button></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// 設定
+// ================================================================
+var DATA_BASE = 'https://ymatsuda-cmyk.github.io/tools/news-brief/data/';
+var GAS_URL   = localStorage.getItem('bm_gas_url') || '';
+
+// ================================================================
+// 状態
+// ================================================================
+var newsData   = {};
+var allDates   = {};      // ローカルに読み込み済みの {date: data}
+var remoteIndex= [];      // data/index.json から取得した日付リスト ['2026-05-09',...]
+var personalArts = [];
+var openNewsIdx = -1, openPersonalIdx = -1;
+var regionFilter = 'all', catFilter = 'all', personalFilter = 'all';
+var personalDateFilter = '';
+var curTab  = 'news';
+var curDate = '';
+var favIds  = new Set(JSON.parse(localStorage.getItem('p_favs')  || '[]'));
+var readIds = new Set(JSON.parse(localStorage.getItem('p_reads') || '[]'));
+var syncedDates = JSON.parse(localStorage.getItem('p_synced_dates') || '{}');
+
+var CAT_LABEL = {policy:'政策',model:'モデル',chip:'チップ',robot:'ロボット',cobot:'協働ロボ',society:'社会',economy:'経済',politics:'政治'};
+var CAT_CLASS = {policy:'cat-policy',model:'cat-model',chip:'cat-chip',robot:'cat-robot',cobot:'cat-cobot',society:'cat-society',economy:'cat-economy',politics:'cat-politics'};
+
+// ================================================================
+// 初期化
+// ================================================================
+window.onload = async function(){
+  if(GAS_URL) document.getElementById('gasUrlInput').value = GAS_URL;
+  // ローカルキャッシュ復元
+  try{ var c=localStorage.getItem('news_all_dates'); if(c) allDates=JSON.parse(c); }catch(e){}
+  if(GAS_URL){ loadLocal(); renderPersonal(); }
+
+  // リモートのインデックスを取得して最新を表示
+  await fetchRemoteIndex();
+};
+
+// ================================================================
+// リモートindex.json を取得して日付リストを構築
+// ================================================================
+async function fetchRemoteIndex(){
+  // ローディング表示
+  document.getElementById('newsSummary').innerHTML =
+    '<div class="ds-loading"><span class="spinner"></span> 最新ニュースを読み込み中...</div>';
+
+  try{
+    // data/index.json に日付リストが入っている想定
+    // 例: ["2026-05-09","2026-05-08","2026-05-07"]
+    var res = await fetch(DATA_BASE + 'index.json', {cache:'no-cache'});
+    if(!res.ok) throw new Error('index.json not found');
+    remoteIndex = await res.json();
+  } catch(e){
+    // index.json がない場合は今日の日付で試みる
+    remoteIndex = [todayStr()];
+  }
+
+  // 最新日付を自動ロード
+  if(remoteIndex.length > 0){
+    await loadDateFromRemote(remoteIndex[0]);
+  } else {
+    // ローカルキャッシュがあればそちら
+    var localDates = Object.keys(allDates).sort((a,b)=>b.localeCompare(a));
+    if(localDates.length) loadDate(localDates[0]);
+    else renderNewsEmpty('データが見つかりません');
+  }
+
+  buildTimeline();
+}
+
+// ================================================================
+// リモートから特定日付のJSONを取得
+// ================================================================
+async function loadDateFromRemote(date){
+  // すでにローカルキャッシュにあればそちらを使う
+  if(allDates[date]){
+    loadDate(date);
+    return;
+  }
+
+  // ドロワー内のエントリをローディング状態に
+  setTlEntryLoading(date, true);
+
+  try{
+    var filename = date.replace(/-/g,'') + '.json'; // "20260509.json"
+    var res = await fetch(DATA_BASE + filename, {cache:'no-cache'});
+    if(!res.ok) throw new Error(res.status);
+    var data = await res.json();
+    // dateフィールドがなければ補完
+    if(!data.date) data.date = date;
+    allDates[date] = data;
+    saveAllDates();
+    loadDate(date);
+  } catch(e){
+    showToast('⚠️ ' + date + ' のデータを取得できませんでした');
+    renderNewsEmpty(date + ' のデータが見つかりません');
+  }
+
+  setTlEntryLoading(date, false);
+  buildTimeline();
+}
+
+function setTlEntryLoading(date, isLoading){
+  var el = document.querySelector('.tl-entry[data-date="'+date+'"]');
+  if(!el) return;
+  if(isLoading) el.classList.add('loading');
+  else el.classList.remove('loading');
+}
+
+// ================================================================
+// 日付選択（ローカルキャッシュから）
+// ================================================================
+function loadDate(date){
+  curDate  = date;
+  newsData = allDates[date] || {};
+  openNewsIdx = -1;
+  buildTimeline();
+  renderNewsSummary();
+  renderNewsList();
+  if(curTab === 'ideas') renderIdeas();
+}
+
+// ================================================================
+// タイムライン構築
+// ================================================================
+function buildTimeline(){
+  var tl = document.getElementById('tl');
+
+  // ローカル済みとリモートインデックスをマージして全日付リスト作成
+  var localDates  = Object.keys(allDates);
+  var allDateSet  = new Set([...remoteIndex, ...localDates]);
+  var sortedDates = Array.from(allDateSet).sort((a,b)=>b.localeCompare(a));
+
+  if(!sortedDates.length){
+    tl.innerHTML = '<div style="padding:12px 14px;font-size:11px;color:var(--text3)">データなし</div>';
+    return;
+  }
+
+  // 月ごとグループ
+  var byMonth = {};
+  sortedDates.forEach(function(d){
+    var m = d.slice(0,7);
+    if(!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(d);
+  });
+
+  var html = '';
+  Object.keys(byMonth).sort((a,b)=>b.localeCompare(a)).forEach(function(m){
+    var parts = m.split('-');
+    html += '<div class="tl-month-lbl">'+parts[0]+'年'+parseInt(parts[1])+'月</div>';
+    byMonth[m].forEach(function(d){
+      var isLoaded  = !!allDates[d];
+      var isActive  = curDate === d;
+      var isRemote  = remoteIndex.includes(d);
+      var cnt       = isLoaded ? (allDates[d].articles||[]).length : '';
+      var label     = d.slice(5).replace('-','/');
+      var cls = 'tl-entry'
+        + (isActive  ? ' active'  : '')
+        + (isLoaded  ? ' loaded'  : '')
+        + (isRemote && !isLoaded ? ' remote' : '');
+      var cntHtml = cnt !== '' ? '<div class="tl-cnt">'+cnt+'件</div>' : '';
+      var badge = !isLoaded && isRemote
+        ? '<div class="tl-cnt" style="color:var(--accent)">未取得</div>'
+        : cntHtml;
+
+      html += '<div class="'+cls+'" data-date="'+d+'" onclick="onTlClick(\''+d+'\')">'
+        + '<div class="tl-dot"></div>'
+        + '<div class="tl-info"><div class="tl-date">'+label+'</div></div>'
+        + badge
+        + '</div>';
+    });
+  });
+
+  tl.innerHTML = html;
+}
+
+async function onTlClick(date){
+  closeDrawer();
+  if(allDates[date]){
+    loadDate(date);
+  } else {
+    await loadDateFromRemote(date);
+  }
+}
+
+// ================================================================
+// JSON手動投入
+// ================================================================
+function openJsonModal(){ document.getElementById('jsonModal').classList.add('show'); }
+function closeJsonModal(){ document.getElementById('jsonModal').classList.remove('show'); }
+
+function loadJson(){
+  var raw = document.getElementById('jsonInput').value.trim();
+  try{
+    var data = JSON.parse(raw);
+    if(!data.date){ showToast('❌ dateフィールドが必要です'); return; }
+    allDates[data.date] = data;
+    // remoteIndexにも追加（ドロワーに表示）
+    if(!remoteIndex.includes(data.date)) remoteIndex.push(data.date);
+    saveAllDates();
+    buildTimeline();
+    loadDate(data.date);
+    closeJsonModal();
+    document.getElementById('jsonInput').value = '';
+    showToast('✅ ' + data.date + ' を読み込みました（'+(data.articles||[]).length+'件）');
+  }catch(e){ showToast('❌ JSON解析エラー: '+e.message); }
+}
+
+function saveAllDates(){
+  try{ localStorage.setItem('news_all_dates', JSON.stringify(allDates)); }catch(e){}
+}
+
+// ================================================================
+// ニュース描画
+// ================================================================
+function renderNewsSummary(){
+  var el = document.getElementById('newsSummary');
+  if(!newsData.date){ el.innerHTML=''; return; }
+  var trends = (newsData.trends||[]).map(t=>'<span class="ds-trend">'+esc(t)+'</span>').join('');
+  el.innerHTML = '<div class="daily-summary">'
+    + '<div class="ds-date">'+ newsData.date +' のサマリー</div>'
+    + '<div class="ds-text">'+esc(newsData.summary||'')+'</div>'
+    + (trends ? '<div class="ds-trends">'+trends+'</div>' : '')
+    + '</div>';
+}
+
+function getNewsFiltered(){
+  var arts = newsData.articles||[];
+  if(regionFilter!=='all') arts=arts.filter(a=>a.region===regionFilter);
+  if(catFilter!=='all')    arts=arts.filter(a=>a.category===catFilter);
+  return arts;
+}
+
+function renderNewsList(){
+  var list = getNewsFiltered();
+  document.getElementById('newsCount').textContent = list.length+'件';
+  var el = document.getElementById('newsList');
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="icon">📰</div><h3>記事がありません</h3></div>'; return; }
+  el.innerHTML = list.map((a,i)=>renderNewsItem(a,i)).join('');
+}
+
+function renderNewsItem(a,i){
+  var isOpen   = openNewsIdx===i;
+  var catLabel = CAT_LABEL[a.category]||a.category||'';
+  var catCls   = CAT_CLASS[a.category]||'cat-other';
+  var impCls   = 'impact-'+(a.impact||'低');
+  var rIcon    = a.region==='global'?'🌍':'🇯🇵';
+  var fav      = a.source ? 'https://www.google.com/s2/favicons?domain='+srcDomain(a.source)+'&sz=64' : '';
+  var emoji    = catEmoji(a.category);
+
+  return '<div class="art-row'+(isOpen?' open-row':'')+'" onclick="toggleNews('+i+')">'
+    +'<div class="art-favicon">'+(fav?'<img src="'+fav+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">':emoji)+'</div>'
+    +'<div class="art-body">'
+      +'<div class="art-title">'+esc(a.title)+'</div>'
+      +'<div class="art-meta">'
+        +'<span class="meta-date">'+rIcon+'</span>'
+        +(catLabel?'<span class="meta-cat '+catCls+'">'+catLabel+'</span>':'')
+        +'<span class="meta-impact '+impCls+'">影響:'+esc(a.impact||'低')+'</span>'
+        +(a.source?'<span class="meta-sep">·</span><span class="meta-src">'+esc(a.source)+'</span>':'')
+      +'</div>'
+    +'</div>'
+    +'<span class="art-chevron">▼</span>'
+  +'</div>'
+  +'<div class="art-acc'+(isOpen?' open':'')+'">'
+    +'<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">'+esc(a.summary||'')+'</div></div>'
+    +(a.beginnerNote?'<div class="acc-note-box"><div class="acc-lbl amber">💡 初心者向け解説</div><div class="acc-text">'+esc(a.beginnerNote)+'</div></div>':'')
+    +(a.impactNote?'<div class="acc-impact-box"><div class="acc-lbl green">📈 インパクト</div><div class="acc-text">'+esc(a.impactNote)+'</div></div>':'')
+    +(a.source?'<div class="acc-actions"><span class="acc-src">出典: '+esc(a.source)+'</span></div>':'')
+  +'</div>';
+}
+
+function toggleNews(i){
+  openNewsIdx = openNewsIdx===i ? -1 : i;
+  renderNewsList();
+  if(openNewsIdx!==-1) setTimeout(()=>{
+    var rows=document.querySelectorAll('#newsList .art-row');
+    if(rows[i]) rows[i].scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
+}
+
+function renderNewsEmpty(msg){
+  document.getElementById('newsList').innerHTML='<div class="empty"><div class="icon">📰</div><h3>'+esc(msg)+'</h3></div>';
+  document.getElementById('newsSummary').innerHTML='';
+  document.getElementById('newsCount').textContent='0件';
+}
+
+// ================================================================
+// フィルター
+// ================================================================
+function setRegion(el,r){
+  document.querySelectorAll('.subbar .chip:not(.cat-chip)').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); regionFilter=r; openNewsIdx=-1; renderNewsList();
+}
+function setCat(el,c){
+  document.querySelectorAll('.subbar .cat-chip').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active'); catFilter=c; openNewsIdx=-1; renderNewsList();
+}
+
+// ================================================================
+// 活用アイデア
+// ================================================================
+function renderIdeas(){
+  var ideas = newsData.ideas||[];
+  document.getElementById('ideaCount').textContent = ideas.length+'件';
+  var el = document.getElementById('ideaGrid');
+  if(!ideas.length){ el.innerHTML='<div class="empty"><div class="icon">💡</div><h3>アイデアがありません</h3></div>'; return; }
+  el.innerHTML = ideas.map(idea=>
+    '<div class="idea-card" style="border-top-color:'+(idea.color||'var(--accent)')+'">'+
+    '<div class="idea-icon">'+(idea.icon||'💡')+'</div>'+
+    '<div class="idea-title">'+esc(idea.title)+'</div>'+
+    '<div class="idea-desc">'+esc(idea.desc)+'</div>'+
+    ((idea.tags||[]).length?'<div class="idea-tags">'+idea.tags.map(t=>'<span class="idea-tag">'+esc(t)+'</span>').join('')+'</div>':'')+
+    '</div>'
+  ).join('');
+}
+
+// ================================================================
+// パーソナル
+// ================================================================
+async function syncPersonal(){
+  if(!GAS_URL){ toggleSetup(); return; }
+  var btn=document.getElementById('syncBtn');
+  btn.innerHTML='<span class="spinner spinner-w"></span>'; btn.disabled=true;
+  try{
+    var res = await fetch(GAS_URL+'?action=getDates',{redirect:'follow'});
+    var json = await res.json();
+    if(json.error) throw new Error(json.error);
+    var remoteDates = json.dates||{};
+    var newDates = Object.keys(remoteDates).filter(function(date){
+      return (syncedDates[date]||0) !== remoteDates[date];
+    });
+    if(!newDates.length){
+      showToast('✅ 最新です');
+      btn.innerHTML='🔄'; btn.disabled=false;
+      renderPersonal(); return;
+    }
+    var addedCount=0;
+    for(var i=0;i<newDates.length;i++){
+      var date=newDates[i];
+      var r2=await fetch(GAS_URL+'?action=getBookmarksByDate&date='+date,{redirect:'follow'});
+      var j2=await r2.json();
+      if(j2.error) continue;
+      personalArts=personalArts.filter(function(a){return a.addedAt!==date;});
+      personalArts=j2.articles.concat(personalArts);
+      syncedDates[date]=remoteDates[date];
+      addedCount+=j2.articles.length;
+    }
+    personalArts.sort(function(a,b){return b.addedAt.localeCompare(a.addedAt);});
+    favIds=new Set(personalArts.filter(function(a){return a.fav;}).map(function(a){return a.notionId;}));
+    localStorage.setItem('p_favs',JSON.stringify([...favIds]));
+    localStorage.setItem('p_synced_dates',JSON.stringify(syncedDates));
+    saveLocal(); renderPersonal();
+    showToast('✅ '+newDates.length+'日分・'+addedCount+'件を同期');
+  }catch(e){ loadLocal(); renderPersonal(); showToast('⚠️ '+e.message); }
+  btn.innerHTML='🔄'; btn.disabled=false;
+}
+
+function renderPersonal(){
+  var list=getPersonalFiltered();
+  document.getElementById('personalCount').textContent=list.length+'件';
+  var el=document.getElementById('notionList');
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="icon">🔖</div><h3>記事がありません</h3><p>「＋ 追加」から登録するか🔄で同期してください</p></div>'; return; }
+  el.innerHTML=list.map((a,i)=>renderPersonalItem(a,i)).join('');
+}
+
+function renderPersonalItem(a,i){
+  var isOpen=openPersonalIdx===i, isRead=readIds.has(a.notionId), isFav=favIds.has(a.notionId);
+  var domain=getDomain(a.url);
+  var fav=domain?'https://www.google.com/s2/favicons?domain='+domain+'&sz=64':'';
+  var emoji=domainEmoji(domain);
+  var tags=(a.tags||[]).map(t=>'<span style="font-size:10px;padding:1px 6px;border-radius:5px;background:#f0ede8;color:var(--text2);border:1px solid var(--border)">'+esc(t)+'</span>').join('');
+  var title=(a.title&&a.title.trim()&&!a.title.startsWith('http'))?a.title:(a.url||'');
+  var h='';
+  h+='<div class="notion-row'+(isOpen?' open-row':'')+(isRead&&!isOpen?' read-dim':'')+'" onclick="togglePersonal('+i+')">';
+  h+='<div class="art-favicon">'+(fav?'<img src="'+fav+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">':emoji)+'</div>';
+  h+='<div class="art-body">';
+  h+='<div class="art-title">'+(isFav?'<span style="color:#f59e0b;margin-right:3px">⭐</span>':'')+esc(title)+'</div>';
+  h+='<div class="art-meta"><span class="meta-date">'+fmtDate(a.addedAt)+'</span>'+(domain?'<span class="meta-sep">·</span><span class="meta-src">'+esc(domain)+'</span>':'')+(isRead&&!isOpen?'<span style="font-size:10px;color:var(--text3);margin-left:4px">既読</span>':'')+'</div>';
+  if(tags) h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+tags+'</div>';
+  h+='</div><span class="art-chevron" style="font-size:10px;color:var(--text3);transition:transform .2s;'+(isOpen?'transform:rotate(180deg)':'')+'">▼</span></div>';
+  h+='<div class="notion-acc'+(isOpen?' open':'')+'">';
+  if(a.summary) h+='<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">'+esc(a.summary)+'</div></div>';
+  if(a.kaisetsu) h+='<div class="acc-note-box"><div class="acc-lbl amber">💡 解説</div><div class="acc-text">'+esc(a.kaisetsu)+'</div></div>';
+  if(a.katsuyo) h+='<div class="acc-impact-box"><div class="acc-lbl green">🚀 活用アイデア</div><div class="acc-text">'+esc(a.katsuyo)+'</div></div>';
+  if(!a.summary&&!a.kaisetsu) h+='<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px">要約未生成</div>';
+  h+='<div class="acc-actions"><button class="fav-btn" onclick="toggleFav(\''+esc(a.notionId)+'\',event)">'+(isFav?'⭐':'☆')+'</button>';
+  h+='<a class="acc-link" href="'+esc(a.url)+'" target="_blank" rel="noopener" onclick="markRead(\''+esc(a.notionId)+'\');event.stopPropagation()">🔗 開く</a></div>';
+  h+='</div>';
+  return h;
+}
+
+function togglePersonal(i){
+  openPersonalIdx=openPersonalIdx===i?-1:i;
+  if(openPersonalIdx!==-1){ var list=getPersonalFiltered(); if(list[i]) markRead(list[i].notionId); }
+  renderPersonal();
+}
+function setPersonalFilter(el,f){
+  document.querySelectorAll('#tab-personal .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); personalFilter=f; openPersonalIdx=-1; renderPersonal();
+}
+function getPersonalFiltered(){
+  var list=personalArts;
+  if(personalDateFilter) list=list.filter(a=>a.addedAt===personalDateFilter);
+  if(personalFilter==='fav')    list=list.filter(a=>favIds.has(a.notionId));
+  if(personalFilter==='unread') list=list.filter(a=>!readIds.has(a.notionId));
+  return list;
+}
+async function toggleFav(id,e){
+  e&&e.stopPropagation();
+  var v=!favIds.has(id);
+  if(v) favIds.add(id); else favIds.delete(id);
+  localStorage.setItem('p_favs',JSON.stringify([...favIds]));
+  renderPersonal();
+  showToast(v?'⭐ お気に入り追加':'☆ 解除');
+  if(GAS_URL){ try{ await fetch(GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'updateBookmark',pageId:id,data:{fav:v}})}); }catch(e){} }
+}
+function markRead(id){ if(!id) return; readIds.add(id); localStorage.setItem('p_reads',JSON.stringify([...readIds])); }
+function openNotionAddModal(){ document.getElementById('notionAddModal').classList.add('show'); }
+function closeNotionAddModal(){ document.getElementById('notionAddModal').classList.remove('show'); ['nUrl','nTitle','nTags'].forEach(id=>document.getElementById(id).value=''); }
+document.getElementById('notionAddModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNotionAddModal();});
+async function saveNotionArticle(){
+  var url=document.getElementById('nUrl').value.trim(), title=document.getElementById('nTitle').value.trim(), tags=document.getElementById('nTags').value.trim();
+  if(!url||!title){ showToast('⚠️ URLとタイトルは必須'); return; }
+  if(!GAS_URL){ showToast('⚠️ GAS URLを設定してください'); toggleSetup(); return; }
+  var btn=document.getElementById('nSaveBtn'); btn.innerHTML='<span class="spinner spinner-w"></span>'; btn.disabled=true;
+  try{
+    var res=await fetch(GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addBookmark',data:{title,url,tags:tags?tags.split(',').map(t=>t.trim()).filter(Boolean):[]}})});
+    var json=await res.json(); if(json.error) throw new Error(json.error);
+    showToast('✅ 保存しました'); closeNotionAddModal(); await syncPersonal();
+  }catch(e){ showToast('❌ '+e.message); }
+  btn.innerHTML='💾 保存'; btn.disabled=false;
+}
+
+// ================================================================
+// タブ・ドロワー
+// ================================================================
+function switchTab(tab,el){
+  ['news','ideas','personal'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); curTab=tab; closeDrawer();
+  if(tab==='ideas') renderIdeas();
+  if(tab==='personal'){ if(GAS_URL) syncPersonal(); else renderPersonal(); }
+}
+function toggleDrawer(){
+  var d=document.getElementById('drawer'), o=document.getElementById('drawerOverlay');
+  if(d.classList.contains('open')){ closeDrawer(); }
+  else { buildTimeline(); d.classList.add('open'); o.classList.add('open'); }
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+// ================================================================
+// セットアップ・キャッシュ
+// ================================================================
+function toggleSetup(){ document.getElementById('setupOv').classList.toggle('show'); }
+document.getElementById('setupOv').addEventListener('click',e=>{if(e.target===e.currentTarget)toggleSetup();});
+function saveGasUrl(){ GAS_URL=document.getElementById('gasUrlInput').value.trim(); if(!GAS_URL){showToast('⚠️ URLを入力');return;} localStorage.setItem('bm_gas_url',GAS_URL); showToast('✅ 保存しました'); toggleSetup(); }
+function saveLocal(){ try{localStorage.setItem('bm_personal',JSON.stringify(personalArts));}catch(e){} }
+function loadLocal(){ try{personalArts=JSON.parse(localStorage.getItem('bm_personal')||'[]');}catch(e){personalArts=[];} }
+
+// ================================================================
+// ユーティリティ
+// ================================================================
+function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function getDomain(url){ try{return new URL(url).hostname.replace('www.','');}catch(e){return '';} }
+function srcDomain(src){ try{var m=src.match(/[\w-]+\.\w+/);return m?m[0]:'';}catch(e){return '';} }
+function catEmoji(c){ return {policy:'🏛️',model:'🤖',chip:'💻',robot:'🦾',cobot:'🤝',society:'👥',economy:'📈',politics:'🌐'}[c]||'📰'; }
+function domainEmoji(d){ if(!d)return'🔗'; if(d.includes('qiita'))return'📝'; if(d.includes('zenn'))return'📘'; if(d.includes('note'))return'📓'; if(d.includes('github'))return'🐙'; return'🌐'; }
+function fmtDate(s){ if(!s)return''; try{var d=new Date(s);return(d.getMonth()+1)+'/'+(d.getDate());}catch(e){return s;} }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToast(msg,ms=3000){ var o=document.querySelector('.toast');if(o)o.remove();var el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),ms); }
+</script>
+</body>
+</html>

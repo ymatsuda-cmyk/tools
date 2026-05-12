@@ -5,11 +5,11 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
 
-  <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
+  <Id>f4a8b12c-7d3e-4f9a-8b2c-1e5d7c9a8b4f</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>ライターム</ProviderName>
+  <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
-  <DisplayName DefaultValue="シナリオ一覧"/>
+  <DisplayName DefaultValue="シナリオ作成"/>
   <Description DefaultValue="シナリオの作成状況とバグ影響を管理するアドイン"/>
   <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/Scenario/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/Scenario/assets/icon-80.png"/>
@@ -83,7 +83,7 @@
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="シナリオ一覧アドインへようこそ"/>
         <bt:String id="CommandsGroup.Label" DefaultValue="シナリオ管理"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="シナリオ一覧"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="シナリオ作成"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="シナリオの作成状況とバグ影響を確認できます"/>
