@@ -1,3 +1,12 @@
+// 電源断時ステータス取得ユーティリティ
+function getPoweroffStatus(row, cols) {
+  for (let i = 0; i < cols.length; i++) {
+    if (row.length > cols[i] && String(row[cols[i]]).trim() === "●") {
+      return String(i);
+    }
+  }
+  return "";
+}
 /**
  * parser.js
  * Excelシートからシナリオデータを読み取るモジュール
@@ -168,6 +177,10 @@ async function readWorkbook(context) {
       // 実際のExcel行番号（1-indexed）を正確に計算
       const actualExcelRow = usedRangeStartRow + i + 1;
 
+      // 電源断時ステータス
+      const op1Poweroff = getPoweroffStatus(row, [5,6,7,8]);
+      const op2Poweroff = getPoweroffStatus(row, [16,17,18,19]);
+      const op3Poweroff = getPoweroffStatus(row, [27,28,29,30]);
       creationData.push({
         sheet: sheetLabel, no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
@@ -178,6 +191,7 @@ async function readWorkbook(context) {
         colBlock: def.colBlock,
         colMinor: def.colMinor,
         colToday: def.colToday, // 本日列のインデックス
+        op1Poweroff, op2Poweroff, op3Poweroff
       });
 
       // バグ影響データ収集
@@ -250,6 +264,10 @@ async function readWorkbook(context) {
       // 実際のExcel行番号（1-indexed）を正確に計算
       const actualExcelRow = usedRangeStartRow + i + 1;
 
+      // 電源断時ステータス
+      const op1Poweroff = getPoweroffStatus(row, [5,6,7,8]);
+      const op2Poweroff = getPoweroffStatus(row, [16,17,18,19]);
+      const op3Poweroff = getPoweroffStatus(row, [27,28,29,30]);
       creationData.push({
         sheet: "正常", no: autoNo, brand,
         op1Func, op1Stat, op2Func, op2Stat, op3Func, op3Stat,
@@ -257,6 +275,7 @@ async function readWorkbook(context) {
         isStar,
         excelSheet: normalSheetName, rowIdx: actualExcelRow, colBlock: -1, colMinor: -1,
         colToday: normalDef.colToday, // CR列（本日列）
+        op1Poweroff, op2Poweroff, op3Poweroff
       });
     }
   }
