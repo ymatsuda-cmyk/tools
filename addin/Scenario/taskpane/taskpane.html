@@ -557,7 +557,6 @@ async function openEditModal(rowIdx, sheetName, cardElement) {
     showEditModal(currentEditingScenario);
 
   } catch (error) {
-    console.error("編集モーダル表示エラー:", error);
     showSaveStatus("モーダル表示エラー: " + error.message, "err");
   }
 }
@@ -703,7 +702,6 @@ async function loadBugSheetData() {
   if (Object.keys(bugSheetData).length > 0) return; // キャッシュがあれば使用
 
   if (typeof Excel === "undefined") {
-    console.log("デモモード：バグシートデータを初期化");
     // デモモードでbugSheetDataが空の場合は再初期化
     initDemoBugSheetData();
     return;
@@ -720,7 +718,6 @@ async function loadBugSheetData() {
     );
 
     if (bugSheetNames.length === 0) {
-      console.log("バグシートが見つかりません");
       return;
     }
 
@@ -758,7 +755,7 @@ async function loadBugSheetData() {
           status: status
         };
         
-        console.log(`登録: ${bugIdBa}, ${bugIdKa} → ${title}`);
+        // 登録ログ削除
       }
     }
   });
@@ -1213,7 +1210,6 @@ async function saveEdit() {
     showSaveStatus("保存が完了しました", "ok");
 
   } catch (error) {
-    console.error("保存エラー:", error);
     showSaveStatus("保存エラー: " + error.message, "err");
   }
 }
@@ -1439,7 +1435,6 @@ async function updateBugStatus(bugId, isResolved, bugType) {
     }
 
   } catch (error) {
-    console.error("バグ状況更新エラー:", error);
     showSaveStatus("更新エラー: " + error.message, "err");
   }
 }
@@ -1513,7 +1508,6 @@ async function toggleStar(event, excelSheet, rowIdx) {
     showSaveStatus(`${action}しました ${symbol}`, "ok");
     
   } catch (error) {
-    console.error("スター切り替えエラー:", error);
     showSaveStatus("更新エラー: " + error.message, "err");
   }
 }
@@ -1631,7 +1625,7 @@ function saveFilterSettings() {
     };
     localStorage.setItem('kanban-filter-settings', JSON.stringify(settings));
   } catch (error) {
-    console.log("フィルタ設定の保存に失敗:", error);
+    // ログ削除
   }
 }
 
@@ -1662,7 +1656,7 @@ function loadFilterSettings() {
       }
     }
   } catch (error) {
-    console.log("フィルタ設定の復元に失敗:", error);
+    // ログ削除
   }
 }
 
