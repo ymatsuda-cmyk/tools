@@ -1554,6 +1554,12 @@ function makeOps(d){
 }
 
 function makeCard(d){
+    // 電源断時ステータスのデバッグ出力
+    console.log('makeCard', d.no, {
+      op1Poweroff: d.op1Poweroff,
+      op2Poweroff: d.op2Poweroff,
+      op3Poweroff: d.op3Poweroff
+    });
   const cardId = `card-${d.excelSheet}-${d.rowIdx}`;
   
   // ★/☆アイコンの作成（本日列がある全シート対象）
