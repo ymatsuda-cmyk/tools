@@ -766,15 +766,23 @@ function showEditModal(scenario) {
   // シナリオ種別（シート名）を明記
   let sheetType = scenario.excelSheet || scenario.sheet || "";
   // 操作情報を組み立て
+  // 電源断時ステータス絵文字付与用
+  function getPoweroffEmoji(val) {
+    const emojiMap = {"0": "0⃣", "1": "1⃣", "2": "2⃣", "3": "3⃣", 0: "0⃣", 1: "1⃣", 2: "2⃣", 3: "3⃣"};
+    return (val !== undefined && val !== null && val !== "" && emojiMap[val]) ? emojiMap[val] : "";
+  }
   let ops = [];
   if (scenario.op1Func || scenario.op1Stat) {
-    ops.push(`${scenario.op1Func}${scenario.op1Func && scenario.op1Stat ? " → " : ""}${scenario.op1Stat}`);
+    const emoji = getPoweroffEmoji(scenario.op1Poweroff);
+    ops.push(`${scenario.op1Func}${scenario.op1Func && scenario.op1Stat ? " → " : ""}${scenario.op1Stat}${emoji}`);
   }
   if (scenario.op2Func || scenario.op2Stat) {
-    ops.push(`${scenario.op2Func}${scenario.op2Func && scenario.op2Stat ? " → " : ""}${scenario.op2Stat}`);
+    const emoji = getPoweroffEmoji(scenario.op2Poweroff);
+    ops.push(`${scenario.op2Func}${scenario.op2Func && scenario.op2Stat ? " → " : ""}${scenario.op2Stat}${emoji}`);
   }
   if (scenario.op3Func || scenario.op3Stat) {
-    ops.push(`${scenario.op3Func}${scenario.op3Func && scenario.op3Stat ? " → " : ""}${scenario.op3Stat}`);
+    const emoji = getPoweroffEmoji(scenario.op3Poweroff);
+    ops.push(`${scenario.op3Func}${scenario.op3Func && scenario.op3Stat ? " → " : ""}${scenario.op3Stat}${emoji}`);
   }
   let opsHtml = ops.map((op, i) => `<div>操作${i+1}: ${op}</div>`).join("");
 
