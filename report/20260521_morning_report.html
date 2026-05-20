@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>朝会レポート 20260519 前営業日 / 20260520 本日</title>
+  <title>朝会レポート 20260520 前営業日 / 20260521 本日</title>
   <style>
     /* ─── Base ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -287,8 +287,8 @@
 
 <header class="header">
   <div class="header-dot"></div>
-  <div class="header-title">🌅 朝会レポート</div>
-  <div class="header-date">20260519 前営業日 / 20260520 本日</div>
+  <div class="header-title">朝会レポート</div>
+  <div class="header-date">20260520 前営業日 / 20260521 本日</div>
 </header>
 
 <div class="tabs-wrapper">
@@ -306,11 +306,11 @@
     <button class="btn-expand-all" onclick="expandAll('panel-wbs')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-wbs')">すべて閉じる</button>
   </div>
-  <h1>WBS作業状況 2026-05-19</h1>
+  <h1>WBS作業状況 2026-05-20</h1>
 <br>
-<p>実行日時: 2026-05-20 03:00:01</p>
+<p>実行日時: 2026-05-21 02:00:01</p>
 <br>
-<p>対象日: 2026-05-19  該当: 1件</p>
+<p>対象日: 2026-05-20  該当: 1件</p>
 <br>
 <hr>
 <br>
@@ -318,14 +318,20 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">No.1 高橋 ／ 【自動】シナリオ定義作成（電断：１２９件）対応中</span>
+            <span class="toggle-title">No.1 政次 ／ 全量実行（正常・通常：１３５件）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<p>25　　　／12　  　 ／76　　　 ／40  　　 ／129　　←5/19</p>
-<p>バ#37起票、即日対応(確認状態）。消化件数：定時時点で12。</p>
-<p>suicaの感度が良すぎて決済の寸止めが失敗し残高がずれ、</p>
-<p>再実施で時間を要したため</p>
+<p>Edy,iD,交通系ICの全量実行完了</p>
+<p>↓NG率</p>
+<p>Edy　2%NG（残1件）</p>
+<p>交通系IC　67%NG　→期待値の処理通番の修正が出来ていないため件数が多く見えてます</p>
+<p>iD　0%</p>
+<p>NGやバグ確認を明日実施</p>
+<p>現状の判明分→再実施3件</p>
+<p>3(シナリオ一覧の決済金額の誤り修正後に再実施)</p>
+<p>131(操作ミス)</p>
+<p>132(想定外の画面が出ているため再実施。131が影響している可能性があるため再実施)</p>
 <br>
           </div>
         </div>
@@ -337,12 +343,12 @@
     <button class="btn-expand-all" onclick="expandAll('panel-teams')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-teams')">すべて閉じる</button>
   </div>
-  <h1>Teams状況確認 2026-05-19</h1>
-<p>実行日時: 2026-05-20 03:00:00</p>
-<p>対象日: 2026-05-19</p>
+  <h1>Teams状況確認 2026-05-20</h1>
+<p>実行日時: 2026-05-21 03:00:00</p>
+<p>対象日: 2026-05-20</p>
 <hr>
 <br>
-<h2>📋 昨日（2026-05-19）Teams 状況整理</h2>
+<h2>📋 昨日（2026-05-20）Teams 状況整理</h2>
 <br>
 <hr>
 <br>
@@ -350,22 +356,12 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">🔧 シナリオ定義書修正・バグ#37対応</span>
+            <span class="toggle-title">🏌 ゴルフ予約（5/22）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>バグ#37 起票・確認依頼</strong>（高橋 貴幸 → 伊藤 滉貴、08:07）</li>
-<p>  高橋が伊藤にバグ#37を起票したと連絡、確認を依頼した。</p>
-<br>
-<li class="indent-0"><strong>交通系IC 処理未了タイムアウト 期待値確認</strong>（伊藤 滉貴 → 高橋 貴幸、08:14）</li>
-<p>  交通系ICの処理未了タイムアウト時の期待値はT03が正しいと確認。シナリオ定義書側の修正が必要と判明。</p>
-<br>
-<li class="indent-0"><strong>シナリオ定義書への結果コード反映作業</strong>（高橋 貴幸・伊藤 滉貴、08:20〜09:25）</li>
-<li class="indent-1">伊藤がシナリオ一覧の修正を行い、シナリオ定義書へ取り込む方針を高橋と調整。</li>
-<li class="indent-1">ブランドを交通系ICのみに絞り、N列・Y列の結果コードを値貼り付けで反映する形で合意。</li>
-<li class="indent-1">セル結合（11行目）が邪魔になることが判明し、高橋が結合を解除して対応。</li>
-<li class="indent-1">高橋がシナリオ定義書への反映を完了。別紙フォルダに比較結果を保管。</li>
-<li class="indent-1">バグ#37のバグ票を「確認」ステータスへ進めた。</li>
+<li class="indent-0"><strong>東松苑ゴルフ倶楽部の予約完了</strong>（松田 祐弥 / 21:38）</li>
+<p>  5/22のゴルフ場を予約。1組目スタート07:58、OUTコース、セルフ・乗用カート・昼食付。料金：¥13,010/人（税込）。松田自身は確認中とのこと。</p>
 <br>
 <hr>
 <br>
@@ -375,12 +371,12 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">⚡ PowerAutomate ライセンス期限</span>
+            <span class="toggle-title">💰 4月分売上集計結果</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>ライセンス期限（5/25）の共有</strong>（松田 祐弥、06:34）</li>
-<p>  PowerAutomateのライセンス期限が5/25（今週月曜）であることを全体へ周知。改修が発生した場合は手作業による反映となる見込み。本日の朝会でチームの意見を確認する予定。</p>
+<li class="indent-0"><strong>ファイル格納のご連絡</strong>（白石 直正 / 21:32）</li>
+<p>  4月分の売上集計結果を報告。売上高：269,768千円（累計：2,414,961千円）。ただし、282,000円（税抜）の請求がお客様からの支払確定に含まれていない状態で現在問い合わせ中。回答次第で修正・再報告の可能性あり。</p>
 <br>
 <hr>
 <br>
@@ -390,12 +386,12 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">📦 荷物の受け取り通知</span>
+            <span class="toggle-title">⚙️ 自動化・AI推進（内部メモ）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>ゆうパック着荷のお知らせ</strong>（高橋 貴幸 → 松田 祐弥、01:45）</li>
-<p>  松田宛のゆうパックが馬場オフィスに届き、普段の席に置いた旨を高橋が連絡。松田は受領を確認。</p>
+<li class="indent-0"><strong>自動化・AI方針の整理メモ</strong>（松田 祐弥 / 19:02）</li>
+<p>  バグ状況（通断・電断まで自動化済）、AIへの切り替えを検討中。今後の方針についてSharePointリンクあり（大川と話した内容の共有）。GMOもちのものの可視化・休み予定・バグ解消確認はいずれも完了。バグ解消確認でバグIDを表示する条件について確認事項あり。</p>
 <br>
 <hr>
 <br>
@@ -405,12 +401,122 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">📢 朝会アナウンス</span>
+            <span class="toggle-title">🤖 RPAツール可視化・バグ対応</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>本日の朝会は10:15開始</strong>（松田 祐弥、01:09）</li>
-<p>  チームへ朝会の開始時刻を告知した。</p>
+<li class="indent-0"><strong>RPA全体実行の可視化レビュー依頼</strong>（松田 祐弥・伊藤 滉貴・高橋 貴幸 / 12:05〜14:28）</li>
+<p>  松田がRPA全体実行を可視化した資料（RPA全体実行可視化.mhtml）を共有し、フィードバックを依頼。</p>
+<li class="indent-1">伊藤：「実行フェーズ（時系列）の実行内容や成果物は見て違和感ありました。他は良い感じです。」</li>
+<li class="indent-1">高橋：「全体としてはそれほど違和感はありません」</li>
+<br>
+<li class="indent-0"><strong>バグ#38 クローズ処理完了</strong>（高橋 貴幸・伊藤 滉貴 / 11:55〜13:21）</li>
+<p>  交通系ICリトライのステータス2〜3が短かった件（バグ#38）は、テストの操作ミスとして修正不要でクローズ。伊藤が完了処理を実施。</p>
+<br>
+<li class="indent-0"><strong>アドイン「シナリオ作成」バグ修正</strong>（松田 祐弥 / 14:35）</li>
+<p>  バグ#36がバグ一覧に抽出されない不具合（状態が「解析」「修正」の場合に抽出できない）を修正・展開済み。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📅 SIGNPOSTとの打合せ調整</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<li class="indent-0"><strong>5/27 打合せ日程確認</strong>（松田 祐弥・高谷 翔 / 15:12〜16:57）</li>
+<p>  SIGNPOSTの件で5/27にガーデンでの打合せ。松田は16:30〜17:00を希望。</p>
+<p>  「この時間帯以外であれば、高谷の方で聞いてもらえれば」として高谷にRTM代表での返信を依頼済み。</p>
+<p>  高谷は会議室（ガーデン）への参加が確認できており、リモートでの参加も追加希望。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📋 Power Automate ライセンス更新</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<li class="indent-0"><strong>6/23更新期限のライセンス確認</strong>（杉山 圭一・松田 祐弥 / 15:30〜15:32）</li>
+<p>  Power Automateの年間契約が6/23で更新を迎える件。松田が「ライセンスは継続したい。明日（5/21）中山さんに確認して延長有無を伝える」と回答。杉山が承諾。</p>
+<p>  ※中山から「今日は打合せが難しい、また明日（5/21）に」との連絡あり（松田と1on1チャット）。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🏢 CTC体制変更（6/1〜）</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<li class="indent-0"><strong>体制変更のご依頼</strong>（髙橋 龍介 / 15:02）</li>
+<p>  2026/6/1〜の体制変更。「CTC(髙橋(龍)) 2026/6/1〜」</p>
+<p>  構成：112 髙橋 龍介（PL）→ 107 山田 秀樹（TL）→ BP 本間 春香。関係者（杉山 圭一・晝間 智明）に通知済み。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🎁 ゴルフ景品の引き渡し</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<li class="indent-0"><strong>景品（ギフトカード）の受け渡し</strong>（松田 祐弥・大隅 佑和 / 17:16〜17:24）</li>
+<p>  八幡さんからのゴルフ景品（ギフトカード）を松田が預かり中。大隅に本社来訪時に受け取りを依頼。大隅は「もうちょいで着きます」と返信。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📞 受電メモ（Fondesk経由 / Workflows）</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<table>
+<tr><th>時刻</th><th>発信者</th><th>内容</th><th>状況</th></tr>
+<tbody>
+<tr><td>17:39</td><td>イングリウッド イワタ</td><td>新卒採用の件、また改めてご連絡するとのこと</td><td>待機</td></tr>
+<tr><td>16:11</td><td>次世代モビリティ技術展 フジムラ</td><td>代表へ招待状を郵送済み、また改めてご連絡とのこと</td><td>待機</td></tr>
+<tr><td>15:31</td><td>株式会社ネコ トオヤマ</td><td>AI開発SES企業、営業人員情報交換希望。また改めてご連絡とのこと</td><td>待機</td></tr>
+<tr><th>14:38</th><th>マイナビニュース カシワギ</th><th>記事情報提供のお電話、また改めてとのこと</th><th>待機</th></tr>
+<tr><th>14:31</th><th>ブレクサテクノロジー カワカミ</th><th>IT人材紹介SES、折り返し連絡を希望</th><th><strong>折り返し要</strong></th></tr>
+<tr><th>14:05</th><th>株式会社ワイズ カワベ</th><th>マネーフォワード資料送付の確認、また改めてとのこと（以前にも連絡あり）</th><th>待機</th></tr>
+</tbody></table>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">👤 アカウント管理</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<li class="indent-0"><strong>アカウント再アクティブ化</strong>（鍋倉 真桜・澤田 直樹 / 12:58〜13:00）</li>
+<p>  460の鍋倉さんからアカウント再アクティブ化の依頼→澤田が対応済み。メールにて通知済み。</p>
 <br>
 <hr>
 <br>
@@ -427,10 +533,14 @@
 <table>
 <tr><th>優先</th><th>担当</th><th>アクション</th><th>期限</th></tr>
 <tbody>
-<tr><td>🔴 高</td><td>松田 祐弥（議題提示）／チーム全員</td><td>PowerAutomateライセンス期限（5/25）への対応方針を朝会で決定する</td><td>本日朝会（5/20）</td></tr>
-<tr><td>🟡 中</td><td>伊藤 滉貴</td><td>バグ#37の「確認」ステータスを確認し、次のアクション（承認・差し戻し等）を実施する</td><td>今週中</td></tr>
-<tr><td>🟡 中</td><td>高橋 貴幸</td><td>通信断シナリオのシナリオ定義書修正（高橋自身が担当と発言）の完了を確認する</td><td>今週中</td></tr>
-<tr><th>🟢 低</th><th>松田 祐弥</th><th>馬場オフィスに届いたゆうパックを受け取る</th><th>随時</th></tr>
+<tr><td>🔴 高</td><td>松田</td><td>Power Automateライセンス継続可否を中山に確認し、杉山に延長有無を伝える</td><td>本日（5/21）中</td></tr>
+<tr><td>🔴 高</td><td>高谷</td><td>SIGNPOSTの5/27打合せ日程（16:30〜17:00希望）をRTM代表として返信する</td><td>早急</td></tr>
+<tr><td>🟡 中</td><td>白石</td><td>4月分売上集計：282,000円（税抜）の問い合わせ結果を確認し、必要に応じて修正・再報告</td><td>回答次第</td></tr>
+<tr><th>🟡 中</th><th>松田</th><th>大隅にゴルフ景品（ギフトカード）を本社来訪時に渡す</th><th>次回来社時</th></tr>
+<tr><th>🟡 中</th><th>松田</th><th>RPAツール可視化：伊藤から指摘のあった「実行フェーズ（時系列）」の内容・成果物を確認・修正</th><th>今週中</th></tr>
+<tr><th>🟡 中</th><th>杉山/晝間</th><th>CTC体制変更（6/1〜）の手続き対応（髙橋 龍介PL体制）</th><th>6/1まで</th></tr>
+<tr><th>🟢 低</th><th>担当者</th><th>ブレクサテクノロジー カワカミへの折り返し連絡</th><th>随時</th></tr>
+<tr><th>🟢 低</th><th>松田</th><th>バグ解消確認でバグIDを表示する条件を明確化する</th><th>随時</th></tr>
 </tbody></table>
 <br>
           </div>
@@ -443,18 +553,52 @@
     <button class="btn-expand-all" onclick="expandAll('panel-bug')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-bug')">すべて閉じる</button>
   </div>
-  <p><!-- FILE NOT FOUND: /Volumes/SanDisk/30_app/claude/状況取得/out/20260519_bug.md --></p>
+  <h1>バグ作業状況 2026-05-20</h1>
+<br>
+<p>実行日時: 2026-05-21 02:00:01</p>
+<br>
+<p>対象日: 2026-05-20  新規: 0件 / 更新: 1件</p>
+<br>
+<hr>
+<br>
+<h2>新規バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+<hr>
+<br>
+<h2>更新バグ</h2>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.1 [38] 処理未了タイムアウト後のリトライで、交通系ICをかざしてステータス２から３に進むのが速すぎて２で電断されなかった</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>担当者</strong>: 伊藤</li>
+<br>
+<p><strong>原因欄</strong></p>
+<p>5/20 高橋　「ステータス２と３のログの出力時刻が3秒空いているので、この間で電源断が行われなかったことが問題。スマート電源の反応速度上で限界だとしても、カード操作として3秒以上はかざさなければよい」との指摘により、対応なし。</p>
+<br>
+<p><strong>対応内容欄</strong></p>
+<p>5/20 高橋　　修正なし</p>
+<p>運用として「3秒以上カードをかざさない」</p>
+<br>
+          </div>
+        </div>
 </div>
 
 <!-- Schedule (常時表示) -->
 <div id="panel-schedule" class="tab-panel" role="tabpanel">
   
         <div class="section section--open">
-          <div class="section-header-plain">休み・不在スケジュール（2026年05月20日以降）</div>
+          <div class="section-header-plain">休み・不在スケジュール（2026年05月21日以降）</div>
           <div class="section-body">
             <br>
 <li class="indent-0">📅 <strong>05/22（金）</strong> 松田（不）</li>
 <li class="indent-0">📅 <strong>05/29（金）</strong> 松田（不）</li>
+<li class="indent-0">📅 <strong>06/01（月）</strong> 伊藤（年）</li>
 <li class="indent-0">📅 <strong>07/01（水）</strong> 伊藤（健）</li>
 <br>
           </div>
