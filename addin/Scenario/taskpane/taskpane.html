@@ -1685,7 +1685,7 @@ function applyFilter(){
 var bugStatusFilter = ["確認", "完了"];
 
 function renderBugStatusFilter() {
-  var statuses = ["未対応", "対応中", "確認", "完了", "検討中", "対応済み", "解消済み"];
+  var statuses = ["未対応", "解析", "対応中", "確認", "完了"];
   var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;align-items:center;">';
   html += '<span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:6px;">ステータス:</span>';
   statuses.forEach(function(st) {
