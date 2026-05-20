@@ -1736,7 +1736,7 @@ function applyFilter(){
 var bugStatusFilter = ["確認", "完了"];
 
 function renderBugStatusFilter() {
-  var statuses = ["未対応", "解析", "対応中", "確認", "完了"];
+  var statuses = ["新規", "解析", "修正", "確認", "完了"];
   var html = '<div class="filter-row" id="bugStatusFilterRow" style="margin-bottom:8px;gap:8px;align-items:center;">';
   html += '<span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:6px;">ステータス:</span>';
   statuses.forEach(function(st) {
@@ -1782,7 +1782,8 @@ function renderSummary(){
     var bc=allDone?"bid bid-ok":"bid bid-ng";
     var disp=allDone?b.id+"（済）":b.id;
     var sc=allDone?"st-bok":"st-bng";
-    var st=b.status || (allDone?"解消済み":"未解消");
+    var stRaw=b.status || (allDone?"解消済み":"未解消");
+    var st=(stRaw==="修正中")?"修正":stRaw;
     var title=b.title || "";
     var ty=hasBlock?'<span class="b-block">完了阻害</span>':'<span class="b-minor">軽微</span>';
     var sel=selectedBugId===b.id;

@@ -1,0 +1,8 @@
+﻿{
+  "ok": false,
+  "error": {
+    "code": "AUTH_MISSING",
+    "message": "No auth token. Run `plaud auth login`.",
+    "retryable": false
+  }
+}
