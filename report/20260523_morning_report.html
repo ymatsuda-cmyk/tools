@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>朝会レポート 20260522 前営業日 / 20260523 本日</title>
+  <style>
+    /* ─── Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --accent:    #4f8ef7;
+      --accent2:   #7c5fe6;
+      --text:      #d4d8f0;
+      --text-muted:#7b82a8;
+      --green:     #3ecf8e;
+      --yellow:    #f5c842;
+      --red:       #f06060;
+      --radius:    10px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      --font-body: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, #1a1d27 0%, #12152a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 12px var(--accent); }
+      50%      { opacity:.6; box-shadow: 0 0 4px var(--accent); }
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #fff;
+    }
+    .header-date {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ─── Tabs ─── */
+    .tabs-wrapper {
+      padding: 20px 28px 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: var(--radius) var(--radius) 0 0;
+      transition: color .2s, border-color .2s, background .2s;
+      letter-spacing: .03em;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--surface);
+    }
+    .tab-label-wbs      { --c: var(--accent);  }
+    .tab-label-teams    { --c: var(--green);   }
+    .tab-label-bug      { --c: var(--red);     }
+    .tab-label-schedule { --c: var(--yellow);  }
+    .tab-btn.active.tab-label-teams    { color: var(--green);  border-bottom-color: var(--green);  }
+    .tab-btn.active.tab-label-bug      { color: var(--red);    border-bottom-color: var(--red);    }
+    .tab-btn.active.tab-label-schedule { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+    /* ─── Tab Panels ─── */
+    .tab-panel {
+      display: none;
+      padding: 24px 28px 40px;
+      animation: fadeIn .25s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    /* ─── Section (collapsible) ─── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .section-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      transition: background .15s;
+    }
+    .section-toggle:hover {
+      background: var(--surface2);
+    }
+    .toggle-icon {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+    .section-toggle[aria-expanded="true"] .toggle-icon {
+      transform: rotate(90deg);
+    }
+    .toggle-title {
+      flex: 1;
+    }
+
+    .section-body {
+      padding: 0 18px 16px 40px;
+      border-top: 1px solid var(--border);
+    }
+    .section-body--top {
+      padding: 12px 18px 14px;
+      border-top: none;
+    }
+    .section-body.collapsed {
+      display: none;
+    }
+
+    /* ─── Schedule (non-collapsible) ─── */
+    .section--open .section-header-plain {
+      padding: 14px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--yellow);
+      border-bottom: 1px solid var(--border);
+    }
+    .section--open .section-body {
+      padding: 14px 18px 16px;
+      border-top: none;
+    }
+
+    /* ─── Markdown 要素 ─── */
+    h1,h2,h3,h4 {
+      margin: 14px 0 6px;
+      line-height: 1.4;
+    }
+    h1 { font-size: 16px; color: #fff; }
+    h2 { font-size: 15px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom:4px; }
+    h3 { font-size: 14px; color: var(--text); }
+    h4 { font-size: 13px; color: var(--text-muted); }
+
+    p { margin: 6px 0; }
+    br { display: block; margin: 3px 0; content: ''; }
+
+    li {
+      margin: 3px 0 3px 18px;
+      list-style: disc;
+    }
+    li.indent-1 { margin-left: 34px; list-style: circle; }
+    li.indent-2 { margin-left: 50px; list-style: square; }
+    li.numbered { list-style: decimal; }
+
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #a9d1ff;
+    }
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 12px;
+      color: #c8d8ff;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+    }
+    tr:nth-child(even) td {
+      background: rgba(255,255,255,.02);
+    }
+
+    strong { color: #fff; }
+    em     { color: var(--text-muted); font-style: normal; }
+    a      { color: var(--accent); text-decoration: none; }
+    a:hover{ text-decoration: underline; }
+    hr     { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ─── Toolbar ─── */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn-expand-all {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-expand-all:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ─── Empty ─── */
+    .empty-notice {
+      color: var(--text-muted);
+      padding: 20px;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-dot"></div>
+  <div class="header-title">朝会レポート</div>
+  <div class="header-date">20260522 前営業日 / 20260523 本日</div>
+</header>
+
+<div class="tabs-wrapper">
+  <div class="tabs" role="tablist">
+    <button class="tab-btn tab-label-wbs active"      onclick="switchTab('wbs',this)"      role="tab">📋 WBS</button>
+    <button class="tab-btn tab-label-teams"           onclick="switchTab('teams',this)"    role="tab">💬 Teams</button>
+    <button class="tab-btn tab-label-bug"             onclick="switchTab('bug',this)"      role="tab">🐛 Bug</button>
+    <button class="tab-btn tab-label-schedule"        onclick="switchTab('schedule',this)" role="tab">📅 Schedule</button>
+  </div>
+</div>
+
+<!-- WBS -->
+<div id="panel-wbs" class="tab-panel active" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-wbs')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-wbs')">すべて閉じる</button>
+  </div>
+  <h1>WBS作業状況 2026-05-22</h1>
+<br>
+<p>実行日時: 2026-05-23 02:00:01</p>
+<br>
+<p>対象日: 2026-05-22  該当: 2件</p>
+<br>
+<hr>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.1 政次 ／ 全量実行（正常・通常：１３５件）保留</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<p>○実施内容</p>
+<p>再実施44件：21日分の再実施を行った結果で余分な処理（重複行）があることが判明→削除したことで処理通番のズレが発生したため再実施を行った。実施完了</p>
+<p>再修正2件（自動化項番116,118の送信電文修正）：再実施44件の結果、想定外の画面が発生したため確認したところセルの参照先のズレが発覚→AIにRV依頼し対象を特定→修正、再実施完了</p>
+<p>再実施11件：バグ30に紐づけていた画面遷移IDのNGを再確認した結果、一部は期待値の誤りであることが判明。期待値を修正し再実施。内7件完了</p>
+<p>○残分</p>
+<p>4件の再実施（98,116,118,121）</p>
+<p>バグ30によるものの画面遷移IDのNG（自動化項番2,6,7,26）</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.2 高橋 ／ 【自動】シナリオ定義作成（電断：１２９件）対応中</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<p>バ#40~41起票。#40対応済/確認ステータス</p>
+<p>チャージ起点シナリオ連発でありながら#10再発なし</p>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Teams -->
+<div id="panel-teams" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-teams')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-teams')">すべて閉じる</button>
+  </div>
+  <h1>Teams状況確認 2026-05-22</h1>
+<p>実行日時: 2026-05-23 03:00:00</p>
+<p>対象日: 2026-05-22</p>
+<hr>
+<br>
+<h2>📋 昨日（2026-05-22）Teams 状況整理</h2>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🎉 チーム目標達成のお知らせ</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>㊗️チーム目標達成🎉</strong>（中森 圭二 / 06:48）</li>
+<p>  チームの目標達成を祝うメッセージが投稿された。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🐛 バグ起票・シナリオ修正（プロジェクト作業）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>バグ#40 起票</strong>（高橋 貴幸 / 02:52）</li>
+<p>  バグ票運用以前に既に見つかっていたバグだが、横並びになっていないため起票。伊藤 滉貴に対してそのまま修正を依頼。</p>
+<br>
+<li class="indent-0"><strong>シナリオ一覧原本の修正調整</strong>（高橋 貴幸 ↔ 伊藤 滉貴 / 02:59〜04:04）</li>
+<p>  電源断・通信断の処理状況修正のためシナリオ一覧原本に手を入れてよいか確認 → 伊藤 滉貴が了承。高橋 貴幸がインプット配下の原本およびシナリオ定義書（成果物配下）を修正済み。通信断シートは対象箇所なし。政次 郁実の担当分（通信断定義書）は未作成のため成果物が最新との確認もとれた。</p>
+<br>
+<li class="indent-0"><strong>バグ#41 起票</strong>（高橋 貴幸 / 09:29）</li>
+<p>  チャージ取消のレシート情報で取引金額が「実測：マイナス、期待値：プラス」と不一致。証跡あり。</p>
+<br>
+<li class="indent-0"><strong>バグ#42 起票</strong>（高橋 貴幸 / 09:47）</li>
+<p>  バグ#41 と証跡を共通化。伊藤 滉貴に報告済み。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📅 個別FB日程調整</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>個別FBの日程確認</strong>（堀井 渚生 / 08:06）</li>
+<p>  新入社員の堀井 渚生からメッセージ。Outlookで空き日程に予定を仮置き済み。</p>
+<li class="indent-1">候補: <strong>5月25日（月）11:00〜11:30</strong></li>
+<li class="indent-1">対面 or オンラインどちらがよいか確認を求めている。</li>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📝 基本合意書・スケジュール調整</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>基本合意書草案の送付・スケジュール調整</strong>（中山 真一 / 07:41）</li>
+<p>  中山様に対して①基本合意書の草案（別添）を送付。既合意内容のため確認・認識齟齬があれば指摘を依頼。スケジュールは6月終盤で仮置き。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🏢 オフィス清掃のお知らせ</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>来週26日（火）本社清掃</strong>（山下 梨奈 / 06:10）</li>
+<p>  5月26日（火）9:00より清掃業者が入るため、全員クリアデスク対応を依頼。</p>
+<li class="indent-1">机上の整理（私物・書類を片付け、机上を空に）</li>
+<li class="indent-1">床上の整理（掃除機使用のため床・絨毯上に物を置かない）</li>
+<li class="indent-1">セキュリティに関する注意事項あり</li>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🚃 遅刻連絡</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>10:15着の連絡</strong>（政次 郁実 / 00:36）</li>
+<p>  10時15分着になる旨を連絡。</p>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">✅ 今後のアクション一覧</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<table>
+<tr><th>優先</th><th>担当</th><th>アクション</th><th>期限</th></tr>
+<tbody>
+<tr><td>🔴 高</td><td>松田 祐弥</td><td>堀井 渚生の個別FB（5/25 月 11:00〜11:30）の確認・対面/オンライン回答</td><td>5/25（月）まで</td></tr>
+<tr><td>🔴 高</td><td>全員</td><td>5/26（火）9:00本社清掃に備えてクリアデスク対応</td><td>5/25（月）中</td></tr>
+<tr><td>🟡 中</td><td>松田 祐弥</td><td>中山様から受領した基本合意書草案の内容確認・認識齟齬があれば指摘</td><td>今週中</td></tr>
+<tr><th>🟡 中</th><th>伊藤 滉貴</th><th>バグ#41・#42 の対応・修正状況の確認</th><th>今週中</th></tr>
+<tr><th>🟢 低</th><th>高橋 貴幸</th><th>シナリオ一覧・定義書の修正内容を関係者に展開・最終確認</th><th>随時</th></tr>
+</tbody></table>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Bug -->
+<div id="panel-bug" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-bug')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-bug')">すべて閉じる</button>
+  </div>
+  <h1>バグ作業状況 2026-05-22</h1>
+<br>
+<p>実行日時: 2026-05-23 02:00:01</p>
+<br>
+<p>対象日: 2026-05-22  新規: 0件 / 更新: 1件</p>
+<br>
+<hr>
+<br>
+<h2>新規バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+<hr>
+<br>
+<h2>更新バグ</h2>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.1 [40] シナリオ定義書の受信電文期待値で「No.27カード番号」が異常カードを照射できない</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>担当者</strong>: 伊藤</li>
+<br>
+<p><strong>原因欄</strong></p>
+<p>5/22 事象に記載の通り。「処理状況」列が "上記以外の異常終了" だったこと。</p>
+<p>"異常終了"であれば数式は想定通りの動きとなる。</p>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Schedule (常時表示) -->
+<div id="panel-schedule" class="tab-panel" role="tabpanel">
+  
+        <div class="section section--open">
+          <div class="section-header-plain">休み・不在スケジュール（2026年05月23日以降）</div>
+          <div class="section-body">
+            <br>
+<li class="indent-0">📅 <strong>05/25（月）</strong> 政次（年）</li>
+<li class="indent-0">📅 <strong>05/29（金）</strong> 松田（不）</li>
+<li class="indent-0">📅 <strong>06/01（月）</strong> 伊藤（年）</li>
+<li class="indent-0">📅 <strong>07/01（水）</strong> 伊藤（健）</li>
+<br>
+          </div>
+        </div>
+</div>
+
+<script>
+  // ── タブ切り替え ──────────────────────────────────────
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── セクション開閉 ────────────────────────────────────
+  function toggleSection(btn) {
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', !expanded);
+    btn.nextElementSibling.classList.toggle('collapsed');
+  }
+
+  // ── 一括開閉 ─────────────────────────────────────────
+  function expandAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.nextElementSibling.classList.remove('collapsed');
+    });
+  }
+  function collapseAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.nextElementSibling.classList.add('collapsed');
+    });
+  }
+</script>
+</body>
+</html>
