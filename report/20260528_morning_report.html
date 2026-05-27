@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>朝会レポート 20260526 前営業日 / 20260527 本日</title>
+  <title>朝会レポート 20260527 前営業日 / 20260528 本日</title>
   <style>
     /* ─── Base ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -288,7 +288,7 @@
 <header class="header">
   <div class="header-dot"></div>
   <div class="header-title">朝会レポート</div>
-  <div class="header-date">20260526 前営業日 / 20260527 本日</div>
+  <div class="header-date">20260527 前営業日 / 20260528 本日</div>
 </header>
 
 <div class="tabs-wrapper">
@@ -306,11 +306,11 @@
     <button class="btn-expand-all" onclick="expandAll('panel-wbs')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-wbs')">すべて閉じる</button>
   </div>
-  <h1>WBS作業状況 2026-05-26</h1>
+  <h1>WBS作業状況 2026-05-27</h1>
 <br>
-<p>実行日時: 2026-05-27 07:34:10</p>
+<p>実行日時: 2026-05-28 02:00:01</p>
 <br>
-<p>対象日: 2026-05-26  該当: 2件</p>
+<p>対象日: 2026-05-27  該当: 1件</p>
 <br>
 <hr>
 <br>
@@ -318,24 +318,14 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">No.1 政次 ／ 全量実行（正常・通常：１３５件）完了</span>
+            <span class="toggle-title">No.1 政次 ／ 【手作業】シナリオ定義作成（通断：２１件）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<p>残分の実行完了NG0件</p>
-<br>
-          </div>
-        </div>
-
-        <div class="section">
-          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
-            <span class="toggle-icon">▶</span>
-            <span class="toggle-title">No.2 高橋 ／ 【自動】シナリオ定義作成（電断：１２９件）対応中</span>
-          </button>
-          <div class="section-body collapsed">
-            <br>
-<p>条件付き書式の掃除→定義を全抽出(定義数2.5万)うち正常分およそ1070、</p>
-<p>残りは破損状態。正常分を正規化中。</p>
+<p>バグ確認対応と実行エラーのため進捗なし</p>
+<p>バグ#30の複数回再実行、バグ#45の起票</p>
+<p>通信断の実行時にエラーが起きたためバグ#46起票</p>
+<p>10件中4件がうまく実行出来ていないため再現すれば起票予定</p>
 <br>
           </div>
         </div>
@@ -347,12 +337,14 @@
     <button class="btn-expand-all" onclick="expandAll('panel-teams')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-teams')">すべて閉じる</button>
   </div>
-  <h1>Teams状況確認 2026-05-26</h1>
-<p>実行日時: 2026-05-27 17:17:00</p>
-<p>対象日: 2026-05-26</p>
+  <h1>Teams状況確認 2026-05-27</h1>
+<p>実行日時: 2026-05-28 03:00:00</p>
+<p>対象日: 2026-05-27</p>
 <hr>
 <br>
-<h2>📋 昨日（2026-05-26）Teams 状況整理</h2>
+<h2>📋 昨日（2026-05-27）Teams 状況整理</h2>
+<br>
+<p>取得件数: 17件</p>
 <br>
 <hr>
 <br>
@@ -360,21 +352,30 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">🔧 GMO自動化プロジェクト（開発チャット）</span>
+            <span class="toggle-title">🐛 バグ対応・テスト進捗（テストプロジェクトチャット）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>朝会・作業指示</strong>（政次 郁実 → 伊藤 滉貴）</li>
-<p>  シナリオ定義書の「通常」シナリオは午前中に、「通信断」シナリオは午後に対応するよう指示。成果物パスは <code>div_コンサルティング事業部 - 10-案件/202502_GMO自動化/40_開発/80_成果物</code>。</p>
+<li class="indent-0"><strong>朝会のアナウンス</strong>（松田　祐弥）</li>
+<p>  朝会は10:15から実施。高橋さんから10時頃になる旨の連絡あり。</p>
 <br>
-<li class="indent-0"><strong>シナリオ定義書「通常」対応完了</strong>（伊藤 滉貴 → 政次 郁実）</li>
-<p>  午前中の指示に対し、シナリオ定義書の「通常」について対応完了と報告。</p>
+<li class="indent-0"><strong>バグ41対応：通信断シナリオ定義書</strong>（伊藤　滉貴 → 政次　郁実）</li>
+<p>  通信断のシナリオ定義書についてバグ41の対応を実施・報告。</p>
 <br>
-<li class="indent-0"><strong>バグ#43 起票・対応開始</strong>（高橋 貴幸 → 伊藤 滉貴）</li>
-<p>  条件付き書式の掃除の件をバグ#43として起票。高橋さんが「対応中」ステータスで対応中。</p>
+<li class="indent-0"><strong>バグ43（条件付き書式整理）の対応完了時期の確認</strong>（伊藤　滉貴 → 高橋　貴幸）</li>
+<p>  バグ36対応時に条件付き書式へ影響が出る可能性があるため、バグ43の修正完了時期を質問。返答なし（未解決）。</p>
 <br>
-<li class="indent-0"><strong>松田さん直帰連絡</strong>（松田 祐弥）</li>
-<p>  17:07頃「今日は本社に寄らずに直帰します」と連絡。</p>
+<li class="indent-0"><strong>バグ36の対応進捗</strong>（高橋　貴幸）</li>
+<p>  電断分の対応結果確認を本日（5/27）中に完了予定、電断以外への横展開は翌日（5/28）見込みと報告。</p>
+<br>
+<li class="indent-0"><strong>バグ表への起票と横並び対応</strong>（松田　祐弥）</li>
+<p>  前日の朝会で話があった「バグ表を切って横並び対応する件」がまだ未対応である旨を確認・指摘。</p>
+<br>
+<li class="indent-0"><strong>バグ30の対応</strong>（政次　郁実 → 伊藤　滉貴 / 伊藤　滉貴）</li>
+<p>  政次さんがバグ30を更新・ご確認依頼。伊藤さんがログと動画を取得し、GMO側へ連携する予定と返答。</p>
+<br>
+<li class="indent-0"><strong>バグ45の対応確認</strong>（伊藤　滉貴）</li>
+<p>  バグ票を「確認まで」に更新。処理未了対応後の結果を期待値として設定する方針（RPAツールの修正なし）。</p>
 <br>
 <hr>
 <br>
@@ -384,18 +385,12 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">👥 人員・契約調整チャット</span>
+            <span class="toggle-title">📋 ISMSセルフチェック</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<li class="indent-0"><strong>今村さん延長・更新条件確認</strong>（高谷 翔 → 松田 祐弥／八幡 匡志）</li>
-<p>  山口さんより「今村さんは1ヶ月更新にしたい、7月延長は問題なし」との回答。松田さんは「7月末まで延長ということで了解」と返信済み。</p>
-<br>
-<li class="indent-0"><strong>伊藤さん延長期間の確認→回答</strong>（松田 祐弥 ↔ 飛鳥井 雅史）</li>
-<p>  松田さんから伊藤さんの延長期間を確認。飛鳥井さんより「伊藤さんは9月末まで延長でお願いします」と回答。</p>
-<br>
-<li class="indent-0"><strong>佐久間氏の件 回答待ち</strong>（高谷 翔 → 八幡 匡志）</li>
-<p>  土居さんに確認したところ「水曜のSIGNPOSTとの打ち合わせ結果をもって回答したい」とのこと。回答待ち状態。</p>
+<li class="indent-0"><strong>ISMSセルフチェック期限対応</strong>（松田　祐弥 → チーム全員、政次　郁実が完了報告）</li>
+<p>  松田さんが「今日（5/27）期限のISMSセルフチェックを対応してほしい」と連絡。政次さんが記載してクローズした旨を返答。</p>
 <br>
 <hr>
 <br>
@@ -405,11 +400,24 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">🚃 現地待ち合わせ（中山 真一 ↔ 松田 祐弥）</span>
+            <span class="toggle-title">👥 佐久間さん・土居さん関連プロジェクト（別チャット）</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<p>中山さんが45分着予定と連絡。松田さんから「少し遅れます、48分着」と返信。その後「現地待ち合わせしよ」で合流確認。（JR利用）</p>
+<li class="indent-0"><strong>佐久間さんの状況と今日の打合せ</strong>（松田　祐弥 → 高谷 翔）</li>
+<p>  松田さんが高谷さんに、佐久間さんのその後の対応状況と今日の打合せ主旨（改善できているか・継続できそうかの観点か）を確認。</p>
+<br>
+<li class="indent-0"><strong>打合せの背景・土居さんとのやり取り状況</strong>（高谷 翔）</li>
+<p>  メールには「今後の進め方について認識合わせ」とあり、改善できなければ打ち切りの可能性も示唆。佐久間さんの現況：EVM作成を優先対応中で高稼働、進捗資料作成・メンバの勤怠実績入力チェックも実施中とのこと。</p>
+<br>
+<li class="indent-0"><strong>土居さんのグチが減ったとの観察</strong>（高谷 翔）</li>
+<p>  改善できたのか、単に忙しいだけなのかという所感を共有。</p>
+<br>
+<li class="indent-0"><strong>アテンドの手配</strong>（高谷 翔 → 松田　祐弥）</li>
+<p>  ガーデン現地のアテンドは佐藤さんに依頼済み。到着したら連絡するよう依頼。</p>
+<br>
+<li class="indent-0"><strong>土居さんと佐久間さんの関係性について</strong>（松田　祐弥 の所感）</li>
+<p>  「R8にいない人を除外してほしい」という土居さんの指示に対し、佐久間さんが確認の質問をしたところ、土居さんから「指示しないと動けないのか」という趣旨のやり取りになっている。関係性の悪化を懸念。</p>
 <br>
 <hr>
 <br>
@@ -419,11 +427,12 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">🏕️ レクリエーション情報（ミーティングチャット）</span>
+            <span class="toggle-title">🚇 出社・移動連絡</span>
           </button>
           <div class="section-body collapsed">
             <br>
-<p>杉山 圭一さんが健保（ITS）補助対象のキャンプ場リンクを共有。</p>
+<li class="indent-0"><strong>政次　郁実</strong></li>
+<p>  本日AMテレで午後から出社。14時頃着の見込み（電車遅延のため別ルート）。</p>
 <br>
 <hr>
 <br>
@@ -440,11 +449,12 @@
 <table>
 <tr><th>優先</th><th>担当</th><th>アクション</th><th>期限</th></tr>
 <tbody>
-<tr><td>🔴 高</td><td>松田 祐弥</td><td>佐久間氏の件：本日（水曜）のSIGNPOSTとの打ち合わせ結果を確認し回答する</td><td>本日5/27（水）</td></tr>
-<tr><td>🟡 中</td><td>松田 祐弥</td><td>伊藤さん9月末延長の件：飛鳥井さんへの正式承諾・手続き対応</td><td>今週中</td></tr>
-<tr><td>🟡 中</td><td>高橋 貴幸</td><td>バグ#43（条件付き書式の掃除）対応・完了報告</td><td>今週中</td></tr>
-<tr><th>🟡 中</th><th>伊藤 滉貴</th><th>シナリオ定義書「通信断」の対応（午後指示分・完了確認）</th><th>継続確認</th></tr>
-<tr><th>🟢 低</th><th>松田 祐弥</th><th>今村さん1ヶ月更新の正式手続き確認</th><th>随時</th></tr>
+<tr><td>🔴 高</td><td>高橋　貴幸</td><td>バグ36：電断以外への横展開対応・結果確認</td><td>本日（5/28）見込み</td></tr>
+<tr><td>🔴 高</td><td>伊藤　滉貴</td><td>バグ30：GMO側へ連携実施</td><td>本日中</td></tr>
+<tr><td>🟡 中</td><td>高橋　貴幸</td><td>バグ43（条件付き書式整理）の修正完了時期を回答</td><td>早急に</td></tr>
+<tr><th>🟡 中</th><th>担当未定</th><th>バグ表への起票と横並び対応（前日の朝会決定事項・未対応）</th><th>早急に</th></tr>
+<tr><th>🟡 中</th><th>高谷 翔・松田</th><th>佐久間さんプロジェクト：打合せ結果を踏まえた今後の方針確認</th><th>今週中</th></tr>
+<tr><th>🟢 低</th><th>チーム全員</th><th>ISMSセルフチェック（政次さんは完了済み、他メンバーの状況を確認）</th><th>随時</th></tr>
 </tbody></table>
 <br>
           </div>
@@ -457,11 +467,11 @@
     <button class="btn-expand-all" onclick="expandAll('panel-bug')">すべて開く</button>
     <button class="btn-expand-all" onclick="collapseAll('panel-bug')">すべて閉じる</button>
   </div>
-  <h1>バグ作業状況 2026-05-26</h1>
+  <h1>バグ作業状況 2026-05-27</h1>
 <br>
-<p>実行日時: 2026-05-27 07:35:09</p>
+<p>実行日時: 2026-05-28 02:00:01</p>
 <br>
-<p>対象日: 2026-05-26  新規: 0件 / 更新: 3件</p>
+<p>対象日: 2026-05-27  新規: 0件 / 更新: 3件</p>
 <br>
 <hr>
 <br>
@@ -477,16 +487,17 @@
         <div class="section">
           <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
             <span class="toggle-icon">▶</span>
-            <span class="toggle-title">No.1 [27] RPAツール実行後、Excel読み込みが続きシナリオ実行が出来ない</span>
+            <span class="toggle-title">No.1 [10] 端末不具合（フリーズ）（課56）</span>
           </button>
           <div class="section-body collapsed">
-            <li class="indent-0"><strong>担当者</strong>: 政次</li>
+            <li class="indent-0"><strong>担当者</strong>: GMO</li>
 <br>
 <p><strong>原因欄</strong></p>
-<p>5/26 朝会</p>
-<p>現時点で再発していない。</p>
-<p>5/20伊藤</p>
-<p>クローズでよい？</p>
+<p>5/27 朝会</p>
+<p>昨日のRPA実行（チャージ２回）を実施しており、2回ともフリーズ。</p>
+<p>画面録画はしていない。</p>
+<p>チャージで発生する模様。確実に発生するものではない。</p>
+<p>→ＲＰＡツールで取得しているため、探してみること</p>
 <br>
           </div>
         </div>
@@ -497,11 +508,12 @@
             <span class="toggle-title">No.2 [30] 画面遷移IDが時々異なる値になる</span>
           </button>
           <div class="section-body collapsed">
-            <li class="indent-0"><strong>担当者</strong>: 政次</li>
+            <li class="indent-0"><strong>担当者</strong>: 伊藤</li>
 <br>
 <p><strong>原因欄</strong></p>
-<p>5/26 朝会</p>
-<p>本日、解消確認を行う予定のため、再現するかどうか含め確認を行う。</p>
+<p>5/27 伊藤</p>
+<p>以下証跡について、動画とログを取得できたので、GMO側に報告する。</p>
+<p>20260527162156</p>
 <br>
           </div>
         </div>
@@ -515,12 +527,9 @@
             <li class="indent-0"><strong>担当者</strong>: 伊藤</li>
 <br>
 <p><strong>原因欄</strong></p>
-<p>5/26 朝会</p>
-<p>全量実行時にレシート長がずれているか要確認。</p>
-<p>0519_伊藤</p>
-<p>バグ#1が原因でbyte長もずれている。</p>
-<p>できれば#1が発生しない前提（新しい方）を期待値としたい。</p>
-<p>（レシートbyte長がアプリのアップデート等で理由なく変化するのはあまりよろしくない）</p>
+<p>5/27 伊藤</p>
+<p>全量実行分では差分は確認できなかったので、リグレッションテスト分（渋谷側）で確認。</p>
+<p>byte数変化していたので、レシート情報byte長の期待値の修正が必要。</p>
 <br>
           </div>
         </div>
@@ -530,7 +539,7 @@
 <div id="panel-schedule" class="tab-panel" role="tabpanel">
   
         <div class="section section--open">
-          <div class="section-header-plain">休み・不在スケジュール（2026年05月27日以降）</div>
+          <div class="section-header-plain">休み・不在スケジュール（2026年05月28日以降）</div>
           <div class="section-body">
             <br>
 <li class="indent-0">📅 <strong>05/29（金）</strong> 松田（不）</li>
