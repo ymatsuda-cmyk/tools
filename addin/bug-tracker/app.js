@@ -59,6 +59,12 @@
   let ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
   const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
 
+  function withGmoMember(memberList) {
+    const list = Array.isArray(memberList) ? memberList.slice() : [];
+    if (!list.includes('GMO')) list.push('GMO');
+    return list;
+  }
+
   const state = {
     bugs: [],
     view: 'status',  // 'assignee' または 'status'
@@ -126,7 +132,7 @@
         '完了': '完了'
       };
       // E3セルから担当者リストと登録者リストを取得（デモモード）
-      const memberList = ['政次','高橋','伊藤','松田'];
+      const memberList = withGmoMember(['政次','高橋','伊藤','松田']);
       ASSIGNEE_ORDER = ['(未割当)', ...memberList];
       REPORTER_LIST = [...memberList];
       PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
@@ -169,11 +175,11 @@
       // E3セル：担当者・登録者リスト（/区切り）
       const memberConfig = configValues[2]; // E3 (E列は4番目なので2ベース)
       if (memberConfig && typeof memberConfig === 'string') {
-        const memberList = memberConfig.split('/').map(s => s.trim()).filter(s => s);
+        const memberList = withGmoMember(memberConfig.split('/').map(s => s.trim()).filter(s => s));
         ASSIGNEE_ORDER = ['(未割当)', ...memberList];
         REPORTER_LIST = [...memberList];
       } else {
-        const defaultMembers = ['政次','高橋','伊藤','松田'];
+        const defaultMembers = withGmoMember(['政次','高橋','伊藤','松田']);
         ASSIGNEE_ORDER = ['(未割当)', ...defaultMembers];
         REPORTER_LIST = [...defaultMembers];
       }

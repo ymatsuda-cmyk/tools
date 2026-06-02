@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260520_4bd6c80";
+const APP_VERSION = "rev_20260602_subcategory";
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
@@ -9,6 +9,7 @@ let currentTask = null;
 
 let selectedUser = null;
 let selectedCategory = null;
+let selectedSubCategory = null;
 let selectedPeriod = "all";
 let showHeld = true; // 保留表示フラグ
 
@@ -466,6 +467,7 @@ function restoreSavedFilters() {
       
       selectedUser = filters.user || null;
       selectedCategory = filters.category || null;
+      selectedSubCategory = filters.subCategory || null;
       selectedPeriod = filters.period || "all";
       
       console.log('Restored filters:', filters);
@@ -484,6 +486,7 @@ function saveFilters() {
     const filterData = {
       user: selectedUser,
       category: selectedCategory,
+      subCategory: selectedSubCategory,
       period: selectedPeriod,
       timestamp: Date.now()
     };
@@ -606,6 +609,7 @@ function getStatus(t) {
 function renderFilters() {
   renderUserFilter();
   renderCategoryFilter();
+  renderSubCategoryFilter();
 }
 
 function renderUserFilter() {
@@ -653,9 +657,54 @@ function renderCategoryFilter() {
 
     b.onclick = () => {
       selectedCategory = (selectedCategory === c) ? null : c;
+      selectedSubCategory = null; // 大分類変更時は小分類をリセット
       saveFilters(); // フィルタ設定を保存
       renderBoard();
       renderFilters();
+    };
+
+    el.appendChild(b);
+  });
+}
+
+function renderSubCategoryFilter() {
+  const section = document.getElementById("sub-category-section");
+  const el = document.getElementById("sub-category-filters");
+  if (!section || !el) return;
+
+  // 大分類未選択なら小分類エリアを非表示
+  if (!selectedCategory) {
+    section.style.display = "none";
+    return;
+  }
+
+  const subCats = [...new Set(
+    allTasks
+      .filter(t => t.category === selectedCategory)
+      .map(t => t.classification)
+      .filter(v => v && v !== "#" && v.toString().trim() !== "")
+  )];
+
+  // 小分類がなければエリアを非表示
+  if (subCats.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  el.innerHTML = "";
+
+  subCats.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = s;
+
+    if (selectedSubCategory === s) b.classList.add("active");
+
+    b.onclick = () => {
+      selectedSubCategory = (selectedSubCategory === s) ? null : s;
+      saveFilters();
+      renderBoard();
+      renderSubCategoryFilter();
     };
 
     el.appendChild(b);
@@ -1274,8 +1323,11 @@ function isMatch(t) {
   // 担当者
   if (selectedUser && t.user !== selectedUser) return false;
 
-  // 分類
+  // 分類（大分類）
   if (selectedCategory && t.category !== selectedCategory) return false;
+
+  // 小分類
+  if (selectedSubCategory && t.classification !== selectedSubCategory) return false;
 
   // ★ 本日フィルタ：スター付きのみ表示
   if (selectedPeriod === "today") {
