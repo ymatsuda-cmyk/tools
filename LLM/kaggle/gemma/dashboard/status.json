@@ -1,0 +1,19 @@
+{
+  "status": "stopped",
+  "started_at": null,
+  "stopped_at": null,
+  "tunnel_url": null,
+  "gpu": "Tesla T4",
+  "model": "gemma4:12b-it-q4_K_M",
+  "kernel": null,
+  "notebook_id": "ymatsuda2025/kaggle-ollama",
+  "weekly_hours": 0,
+  "monthly": {
+    "2026-01": 4.5,
+    "2026-02": 8.2,
+    "2026-03": 12.1,
+    "2026-04": 6.7,
+    "2026-05": 9.3,
+    "2026-06": 0.0
+  }
+}

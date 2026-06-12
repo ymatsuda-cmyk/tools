@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaggle GPU Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6F8;
+    --card: #FFFFFF;
+    --border: #E2E5EA;
+    --active: #0D8A5E;
+    --stopped: #D93045;
+    --warn: #C47B00;
+    --muted: #6B7280;
+    --text: #111827;
+    --subtext: #9CA3AF;
+    --active-glow: rgba(13,138,94,0.08);
+    --stopped-glow: rgba(217,48,69,0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── Header ─── */
+  header {
+    max-width: 720px;
+    margin: 0 auto 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-left h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .header-left p {
+    font-size: 11px;
+    color: var(--subtext);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .last-updated {
+    font-size: 11px;
+    color: var(--subtext);
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+  }
+
+  /* ─── Cards ─── */
+  .container { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    transition: border-color 0.3s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  /* ─── Status Card ─── */
+  .status-card.running {
+    border-color: var(--active);
+    box-shadow: 0 0 24px var(--active-glow), inset 0 0 24px var(--active-glow);
+  }
+  .status-card.stopped {
+    border-color: var(--border);
+  }
+
+  .status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .status-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--subtext);
+    margin-bottom: 8px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status-badge.running {
+    background: rgba(0,255,136,0.1);
+    color: var(--active);
+    border: 1px solid rgba(0,255,136,0.3);
+  }
+  .status-badge.stopped {
+    background: rgba(255,68,85,0.08);
+    color: var(--stopped);
+    border: 1px solid rgba(255,68,85,0.2);
+  }
+  .status-badge.loading {
+    background: rgba(240,165,0,0.08);
+    color: var(--warn);
+    border: 1px solid rgba(240,165,0,0.2);
+  }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--active);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* Uptime counter */
+  .uptime-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--active);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    margin: 4px 0 4px;
+  }
+  .uptime-display.stopped { color: var(--subtext); }
+  .uptime-sub {
+    font-size: 11px;
+    color: var(--subtext);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.06em;
+  }
+
+  /* Meta info */
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .meta-item { }
+  .meta-key {
+    font-size: 10px;
+    color: var(--subtext);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .meta-val {
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Tunnel URL */
+  .tunnel-url {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: #F9FAFB;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .tunnel-url a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--active);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tunnel-url a:hover { text-decoration: underline; }
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--subtext);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { border-color: var(--muted); color: var(--text); }
+
+  /* ─── Action buttons ─── */
+  .action-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-start {
+    background: var(--active);
+    color: #0D1117;
+    border: none;
+  }
+  .btn-start:hover:not(:disabled) {
+    background: #00cc6e;
+    box-shadow: 0 0 20px rgba(0,255,136,0.3);
+  }
+  .btn-stop {
+    background: transparent;
+    color: var(--stopped);
+    border: 1px solid var(--stopped);
+  }
+  .btn-stop:hover:not(:disabled) {
+    background: rgba(255,68,85,0.08);
+    box-shadow: 0 0 20px rgba(255,68,85,0.15);
+  }
+  .btn-refresh {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    flex: 0 0 auto;
+    width: 44px;
+    padding: 12px;
+  }
+  .btn-refresh:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+  .btn-refresh.spinning svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Monthly card ─── */
+  .monthly-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+  }
+  .monthly-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--subtext);
+  }
+  .monthly-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .monthly-total span {
+    font-size: 13px;
+    color: var(--subtext);
+    font-weight: 400;
+  }
+
+  /* Bar chart */
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--subtext);
+    width: 32px;
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--active);
+    border-radius: 3px;
+    transition: width 0.6s ease;
+    opacity: 0.7;
+  }
+  .bar-fill.current { opacity: 1; }
+  .bar-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--subtext);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .quota-info {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .quota-label { font-size: 11px; color: var(--subtext); }
+  .quota-bar-wrap { flex: 1; margin: 0 16px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .quota-bar-fill { height: 100%; background: var(--warn); border-radius: 2px; transition: width 0.6s; }
+  .quota-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--warn); }
+
+  /* ─── Token config ─── */
+  .token-card details summary {
+    font-size: 12px;
+    color: var(--subtext);
+    cursor: pointer;
+    user-select: none;
+    letter-spacing: 0.06em;
+  }
+  .token-card details summary:hover { color: var(--text); }
+  .token-fields {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .field-label { font-size: 11px; color: var(--subtext); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
+  .field-input {
+    width: 100%;
+    padding: 9px 12px;
+    background: #F9FAFB;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field-input:focus { border-color: var(--active); }
+  .token-help {
+    font-size: 11px;
+    color: var(--subtext);
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  .token-help a { color: var(--active); text-decoration: none; }
+  .token-help a:hover { text-decoration: underline; }
+
+  /* ─── Log ─── */
+  .log-card .log-label {
+    font-size: 11px;
+    color: var(--subtext);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .log-list {
+    max-height: 140px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-entry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--subtext);
+    display: flex;
+    gap: 10px;
+  }
+  .log-time { color: var(--subtext); flex-shrink: 0; }
+  .log-msg.ok { color: var(--active); }
+  .log-msg.err { color: var(--stopped); }
+  .log-msg.info { color: var(--text); }
+
+  /* ─── Toast ─── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: transform 0.3s ease;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 480px) {
+    .uptime-display { font-size: 32px; }
+    .meta-grid { grid-template-columns: 1fr; }
+    .monthly-total { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Kaggle GPU Dashboard</h1>
+    <p id="notebookId">── / ──</p>
+  </div>
+  <div class="last-updated">
+    Updated<br><span id="lastUpdatedTime">──</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Status card -->
+  <div class="card status-card stopped" id="statusCard">
+    <div class="status-header">
+      <div>
+        <div class="status-label">Session Status</div>
+        <div class="status-badge stopped" id="statusBadge">
+          <span>● STOPPED</span>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="status-label">Current Session</div>
+        <div class="uptime-display stopped mono" id="uptimeDisplay">──:──:──</div>
+        <div class="uptime-sub" id="uptimeSub">NOT RUNNING</div>
+      </div>
+    </div>
+
+    <!-- Tunnel URL (hidden when stopped) -->
+    <div class="tunnel-url" id="tunnelRow" style="display:none">
+      <a id="tunnelLink" href="#" target="_blank">──</a>
+      <button class="copy-btn" onclick="copyTunnel()">Copy</button>
+    </div>
+
+    <!-- Meta -->
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-key">GPU</div>
+        <div class="meta-val" id="metaGpu">──</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-key">Model</div>
+        <div class="meta-val" id="metaModel">──</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-key">Started At</div>
+        <div class="meta-val" id="metaStarted">──</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-key">Kernel</div>
+        <div class="meta-val" id="metaKernel">──</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="btn btn-start" id="btnStart" onclick="triggerAction('start')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Start Session
+      </button>
+      <button class="btn btn-stop" id="btnStop" onclick="triggerAction('stop')" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+        Stop Session
+      </button>
+      <button class="btn btn-refresh" id="btnRefresh" onclick="loadStatus()" title="Refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Monthly usage card -->
+  <div class="card">
+    <div class="monthly-header">
+      <div class="monthly-title">Monthly Usage</div>
+      <div class="monthly-total mono" id="monthlyTotal">0.0 <span>h / 30h</span></div>
+    </div>
+    <div class="bar-chart" id="barChart">
+      <!-- Rendered by JS -->
+    </div>
+    <div class="quota-info">
+      <span class="quota-label">Weekly quota</span>
+      <div class="quota-bar-wrap"><div class="quota-bar-fill" id="quotaFill" style="width:0%"></div></div>
+      <span class="quota-pct" id="quotaPct">0%</span>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="card token-card">
+    <details>
+      <summary>⚙ Settings — GitHub token &amp; repository</summary>
+      <div class="token-fields">
+        <div>
+          <div class="field-label">GITHUB_TOKEN (repo + actions scope)</div>
+          <input class="field-input" type="password" id="inputToken" placeholder="ghp_xxxxxxxxxxxx" oninput="saveSettings()">
+        </div>
+        <div>
+          <div class="field-label">Repository (owner/repo)</div>
+          <input class="field-input" type="text" id="inputRepo" placeholder="ymatsuda2025/kaggle-gpu" oninput="saveSettings()">
+        </div>
+        <div>
+          <div class="field-label">Branch</div>
+          <input class="field-input" type="text" id="inputBranch" placeholder="main" oninput="saveSettings()">
+        </div>
+      </div>
+      <p class="token-help">
+        Token is saved to <code>localStorage</code> in your browser only — never sent anywhere except GitHub API.<br>
+        Create a token: <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a> → scopes: <code>repo</code>, <code>workflow</code>
+      </p>
+    </details>
+  </div>
+
+  <!-- Log -->
+  <div class="card log-card">
+    <div class="log-label">Activity Log</div>
+    <div class="log-list" id="logList">
+      <div class="log-entry"><span class="log-time">──:──:──</span><span class="log-msg">Waiting for status...</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const STATUS_URL = './status.json'; // Relative path in same GitHub Pages repo
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentStatus = null;
+let uptimeInterval = null;
+let sessionStartEpoch = null;
+
+// ─── Settings persistence ─────────────────────────────────────────────────────
+function saveSettings() {
+  localStorage.setItem('gh_token', document.getElementById('inputToken').value.trim());
+  localStorage.setItem('gh_repo',  document.getElementById('inputRepo').value.trim());
+  localStorage.setItem('gh_branch',document.getElementById('inputBranch').value.trim());
+}
+function loadSettings() {
+  document.getElementById('inputToken').value  = localStorage.getItem('gh_token')  || '';
+  document.getElementById('inputRepo').value   = localStorage.getItem('gh_repo')   || '';
+  document.getElementById('inputBranch').value = localStorage.getItem('gh_branch') || 'main';
+}
+function getSettings() {
+  return {
+    token:  localStorage.getItem('gh_token')  || '',
+    repo:   localStorage.getItem('gh_repo')   || '',
+    branch: localStorage.getItem('gh_branch') || 'main',
+  };
+}
+
+// ─── Log ──────────────────────────────────────────────────────────────────────
+function addLog(msg, type='info') {
+  const list = document.getElementById('logList');
+  const now = new Date().toLocaleTimeString('ja-JP', {hour12: false});
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  list.prepend(entry);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── Uptime counter ───────────────────────────────────────────────────────────
+function startUptimeCounter(startedAt) {
+  if (uptimeInterval) clearInterval(uptimeInterval);
+  sessionStartEpoch = new Date(startedAt).getTime();
+  function tick() {
+    const diff = Math.floor((Date.now() - sessionStartEpoch) / 1000);
+    const h = Math.floor(diff / 3600).toString().padStart(2, '0');
+    const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+    const s = (diff % 60).toString().padStart(2, '0');
+    document.getElementById('uptimeDisplay').textContent = `${h}:${m}:${s}`;
+  }
+  tick();
+  uptimeInterval = setInterval(tick, 1000);
+}
+function stopUptimeCounter() {
+  if (uptimeInterval) clearInterval(uptimeInterval);
+  uptimeInterval = null;
+  document.getElementById('uptimeDisplay').textContent = '──:──:──';
+}
+
+// ─── Render status ────────────────────────────────────────────────────────────
+function renderStatus(data) {
+  currentStatus = data;
+  const running = data.status === 'running';
+
+  // Card glow
+  const card = document.getElementById('statusCard');
+  card.classList.toggle('running', running);
+  card.classList.toggle('stopped', !running);
+
+  // Badge
+  const badge = document.getElementById('statusBadge');
+  badge.className = `status-badge ${running ? 'running' : 'stopped'}`;
+  badge.innerHTML = running
+    ? '<span class="pulse"></span><span>RUNNING</span>'
+    : '<span>● STOPPED</span>';
+
+  // Uptime display
+  const uptimeEl = document.getElementById('uptimeDisplay');
+  uptimeEl.classList.toggle('stopped', !running);
+  document.getElementById('uptimeSub').textContent = running ? 'SESSION UPTIME' : 'NOT RUNNING';
+
+  if (running && data.started_at) {
+    startUptimeCounter(data.started_at);
+  } else {
+    stopUptimeCounter();
+  }
+
+  // Tunnel URL
+  const tunnelRow = document.getElementById('tunnelRow');
+  if (running && data.tunnel_url) {
+    tunnelRow.style.display = 'flex';
+    const link = document.getElementById('tunnelLink');
+    link.href = data.tunnel_url;
+    link.textContent = data.tunnel_url;
+  } else {
+    tunnelRow.style.display = 'none';
+  }
+
+  // Meta
+  document.getElementById('metaGpu').textContent    = data.gpu     || '──';
+  document.getElementById('metaModel').textContent  = data.model   || '──';
+  document.getElementById('metaKernel').textContent = data.kernel  || '──';
+  document.getElementById('metaStarted').textContent = data.started_at
+    ? new Date(data.started_at).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+    : '──';
+  document.getElementById('notebookId').textContent = data.notebook_id || '── / ──';
+
+  // Buttons
+  document.getElementById('btnStart').disabled = running;
+  document.getElementById('btnStop').disabled  = !running;
+
+  // Last updated
+  document.getElementById('lastUpdatedTime').textContent =
+    new Date().toLocaleTimeString('ja-JP', {hour12:false});
+
+  // Monthly chart
+  renderMonthly(data.monthly || {});
+}
+
+// ─── Monthly bar chart ────────────────────────────────────────────────────────
+function renderMonthly(monthly) {
+  const now = new Date();
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // Build last 6 months
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${d.getMonth()+1}月`;
+    months.push({ key, label, hours: monthly[key] || 0 });
+  }
+
+  const thisMonth = months.find(m => m.key === thisMonthKey);
+  const totalHours = thisMonth ? thisMonth.hours : 0;
+
+  // Add current running session if applicable
+  let displayTotal = totalHours;
+  if (currentStatus?.status === 'running' && currentStatus?.started_at) {
+    const runningHours = (Date.now() - new Date(currentStatus.started_at).getTime()) / 3600000;
+    displayTotal += runningHours;
+  }
+
+  document.getElementById('monthlyTotal').innerHTML =
+    `${displayTotal.toFixed(1)} <span>h / 30h</span>`;
+
+  const maxHours = Math.max(...months.map(m => m.hours), displayTotal, 1);
+  const chart = document.getElementById('barChart');
+  chart.innerHTML = months.map(m => {
+    const isCurrent = m.key === thisMonthKey;
+    const hrs = isCurrent ? displayTotal : m.hours;
+    const pct = Math.min((hrs / 30) * 100, 100);
+    return `
+      <div class="bar-row">
+        <div class="bar-label">${m.label}</div>
+        <div class="bar-track"><div class="bar-fill ${isCurrent ? 'current' : ''}" style="width:${pct}%"></div></div>
+        <div class="bar-val">${hrs.toFixed(1)}h</div>
+      </div>`;
+  }).join('');
+
+  // Weekly quota (30h/week)
+  const weekHours = currentStatus?.weekly_hours || 0;
+  const quotaPct = Math.min((weekHours / 30) * 100, 100);
+  document.getElementById('quotaFill').style.width = `${quotaPct}%`;
+  document.getElementById('quotaPct').textContent = `${quotaPct.toFixed(0)}%`;
+}
+
+// ─── Load status.json ──────────────────────────────────────────────────────────
+async function loadStatus() {
+  const btn = document.getElementById('btnRefresh');
+  btn.classList.add('spinning');
+  try {
+    const res = await fetch(`${STATUS_URL}?t=${Date.now()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderStatus(data);
+    addLog('Status refreshed', 'ok');
+  } catch (e) {
+    addLog(`Failed to load status: ${e.message}`, 'err');
+    // Render blank state
+    renderStatus({ status: 'unknown', monthly: {}, weekly_hours: 0 });
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ─── Trigger GitHub Actions ────────────────────────────────────────────────────
+async function triggerAction(action) {
+  const { token, repo, branch } = getSettings();
+  if (!token) {
+    showToast('⚠ GitHub tokenを設定してください');
+    document.querySelector('details').setAttribute('open', '');
+    return;
+  }
+  if (!repo) {
+    showToast('⚠ Repositoryを設定してください');
+    document.querySelector('details').setAttribute('open', '');
+    return;
+  }
+
+  const workflowFile = action === 'start' ? 'kaggle-start.yml' : 'kaggle-stop.yml';
+  const url = `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`;
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled  = true;
+  addLog(`Triggering ${action}...`, 'info');
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: branch }),
+    });
+
+    if (res.status === 204) {
+      addLog(`✓ ${action} workflow triggered`, 'ok');
+      showToast(`✓ ${action === 'start' ? '起動' : '停止'}リクエストを送信しました`);
+      // Poll for status change
+      setTimeout(() => pollStatusChange(action), 8000);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `HTTP ${res.status}`);
+    }
+  } catch (e) {
+    addLog(`✗ Trigger failed: ${e.message}`, 'err');
+    showToast(`✗ エラー: ${e.message}`);
+    loadStatus();
+  }
+}
+
+// ─── Poll until status changes ─────────────────────────────────────────────────
+async function pollStatusChange(expectedAction, attempts=0) {
+  if (attempts > 20) { loadStatus(); return; }
+  const expected = expectedAction === 'start' ? 'running' : 'stopped';
+  try {
+    const res = await fetch(`${STATUS_URL}?t=${Date.now()}`);
+    const data = await res.json();
+    if (data.status === expected) {
+      renderStatus(data);
+      addLog(`✓ Session ${expected}`, 'ok');
+      showToast(`✓ ${expected === 'running' ? '起動しました！' : '停止しました'}`);
+    } else {
+      setTimeout(() => pollStatusChange(expectedAction, attempts+1), 10000);
+    }
+  } catch {
+    setTimeout(() => pollStatusChange(expectedAction, attempts+1), 10000);
+  }
+}
+
+// ─── Copy tunnel URL ──────────────────────────────────────────────────────────
+function copyTunnel() {
+  const url = document.getElementById('tunnelLink').textContent;
+  navigator.clipboard.writeText(url).then(() => showToast('✓ コピーしました'));
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadSettings();
+loadStatus();
+setInterval(loadStatus, 60000); // Auto-refresh every 60s
+</script>
+</body>
+</html>

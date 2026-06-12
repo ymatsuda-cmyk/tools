@@ -1,0 +1,101 @@
+name: Kaggle GPU Start
+
+on:
+  workflow_dispatch:
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install kaggle requests
+
+      - name: Configure Kaggle credentials
+        run: |
+          mkdir -p ~/.kaggle
+          echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_KEY }}"}' > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
+      - name: Trigger Kaggle Notebook
+        id: trigger
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KERNEL_SLUG: ${{ secrets.KAGGLE_KERNEL_SLUG }}
+        run: |
+          python - <<'EOF'
+          import requests, os, json, time
+
+          username = os.environ["KAGGLE_USERNAME"]
+          kernel   = os.environ["KERNEL_SLUG"]
+          headers  = {"Content-Type": "application/json"}
+
+          # Read kaggle credentials for auth
+          with open(os.path.expanduser("~/.kaggle/kaggle.json")) as f:
+              creds = json.load(f)
+          auth = (creds["username"], creds["key"])
+
+          # Push (start) the kernel
+          url = f"https://www.kaggle.com/api/v1/kernels/push"
+          payload = {
+              "kernel_push_request": {
+                  "parent_id": f"{username}/{kernel}",
+                  "title": kernel,
+                  "new_title": kernel,
+                  "language": "python",
+                  "enable_gpu": True,
+                  "enable_internet": True,
+                  "docker_image_pinning_type": "original",
+              }
+          }
+          r = requests.post(url, auth=auth, json=payload)
+          print(f"Push status: {r.status_code}")
+          print(r.text[:500])
+          r.raise_for_status()
+          print("::set-output name=triggered::true")
+          EOF
+
+      - name: Update status.json - running
+        run: |
+          python - <<'EOF'
+          import json, datetime, os
+
+          path = "docs/status.json"
+          with open(path) as f:
+              data = json.load(f)
+
+          now = datetime.datetime.utcnow().isoformat() + "Z"
+          data["status"] = "running"
+          data["started_at"] = now
+          data["stopped_at"] = None
+          data["kernel"] = os.environ.get("KAGGLE_KERNEL_SLUG", "")
+          # tunnel_url will be updated by the notebook itself via a separate step
+          # or set a known static URL if using Cloudflare Tunnel with fixed domain
+          data["tunnel_url"] = os.environ.get("TUNNEL_URL", None)
+
+          with open(path, "w") as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+
+          print("status.json updated → running")
+          EOF
+        env:
+          KAGGLE_KERNEL_SLUG: ${{ secrets.KAGGLE_KERNEL_SLUG }}
+          TUNNEL_URL: ${{ secrets.TUNNEL_URL }}
+
+      - name: Commit status.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/status.json
+          git commit -m "status: running [skip ci]" || echo "No changes"
+          git push

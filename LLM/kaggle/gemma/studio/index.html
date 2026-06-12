@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemma Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2330;
+    --border:    #30363d;
+    --accent:    #7ee787;
+    --accent2:   #58a6ff;
+    --accent3:   #f78166;
+    --accent4:   #d2a8ff;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --code-bg:   #0d1117;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .conn-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .conn-badge:hover { border-color: var(--accent2); }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent3);
+  }
+  .dot.connected { background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Layout ── */
+  .app { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 57px); }
+
+  /* ── Sidebar ── */
+  nav {
+    width: 200px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 0;
+    gap: 2px;
+    overflow-y: auto;
+  }
+  .nav-section {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 12px 16px 4px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    border-left-color: var(--accent);
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  /* ── Main ── */
+  main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* ── Panel ── */
+  .panel { display: none; flex: 1; flex-direction: column; height: 100%; }
+  .panel.active { display: flex; }
+
+  /* ── Config Panel ── */
+  .config-wrap {
+    padding: 32px;
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .config-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .config-subtitle { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .field-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .field-input:focus { border-color: var(--accent2); }
+  .field-hint { font-size: 11px; color: var(--muted); }
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d1117;
+  }
+  .btn-primary:hover { background: #a0f5aa; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent2); }
+  .btn-danger {
+    background: transparent;
+    color: var(--accent3);
+    border: 1px solid var(--accent3);
+  }
+  .status-msg {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+  }
+  .status-msg.ok { background: #132b16; border: 1px solid var(--accent); color: var(--accent); display: block; }
+  .status-msg.err { background: #2b1316; border: 1px solid var(--accent3); color: var(--accent3); display: block; }
+  .btn-row { display: flex; gap: 10px; }
+
+  /* ── Chat ── */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .chat-input-bar {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--surface);
+  }
+  .chat-textarea {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    resize: none;
+    outline: none;
+    min-height: 46px;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+  .chat-textarea:focus { border-color: var(--accent2); }
+  .send-btn {
+    padding: 11px 16px;
+    background: var(--accent2);
+    color: #0d1117;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #79beff; }
+  .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .msg { display: flex; gap: 12px; }
+  .msg-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 2px;
+  }
+  .msg.user .msg-avatar { background: var(--accent2); color: #0d1117; }
+  .msg.ai .msg-avatar { background: var(--accent); color: #0d1117; }
+  .msg-body { flex: 1; }
+  .msg-role {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 4px;
+  }
+  .msg-text {
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user .msg-text {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 0 8px 8px 8px;
+    padding: 10px 14px;
+  }
+  .msg.ai .msg-text { color: var(--text); }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    margin: 8px 0;
+  }
+  code { font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── System Prompt Selector ── */
+  .sys-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .sys-label { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
+  .mode-chip {
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .mode-chip:hover { border-color: var(--accent2); color: var(--text); }
+  .mode-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(126,231,135,0.08); }
+
+  /* ── Data Panel ── */
+  .data-wrap { padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+  .data-header { display: flex; align-items: center; justify-content: space-between; }
+  .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .data-input-area {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .data-textarea {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+    min-height: 140px;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .data-textarea:focus { border-color: var(--accent2); }
+  .output-format-row { display: flex; gap: 8px; align-items: center; }
+  .fmt-btn {
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    transition: all 0.15s;
+  }
+  .fmt-btn:hover, .fmt-btn.active { border-color: var(--accent4); color: var(--accent4); background: rgba(210,168,255,0.08); }
+  .result-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+  }
+  .result-box.visible { display: block; }
+  .result-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .dl-btn {
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .dl-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Prompt Library Panel ── */
+  .lib-wrap { padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .prompt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .prompt-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .prompt-card:hover { border-color: var(--accent2); transform: translateY(-1px); }
+  .prompt-card-tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 3px;
+    width: fit-content;
+  }
+  .tag-code { background: rgba(88,166,255,0.15); color: var(--accent2); }
+  .tag-data { background: rgba(210,168,255,0.15); color: var(--accent4); }
+  .tag-write { background: rgba(126,231,135,0.15); color: var(--accent); }
+  .tag-idea { background: rgba(247,129,102,0.15); color: var(--accent3); }
+  .prompt-card-title { font-size: 14px; font-weight: 500; }
+  .prompt-card-preview { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ── Loading ── */
+  .typing {
+    display: none;
+    gap: 4px;
+    padding: 8px 0;
+    align-items: center;
+  }
+  .typing.show { display: flex; }
+  .typing-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: blink 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-icon { font-size: 40px; }
+  .empty-title { font-size: 16px; font-weight: 500; color: var(--text); }
+
+  /* ── Ideas Panel ── */
+  .ideas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 24px 32px; overflow-y: auto; }
+  .idea-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .idea-card:hover { border-color: var(--accent); }
+  .idea-icon { font-size: 28px; }
+  .idea-title { font-size: 15px; font-weight: 600; }
+  .idea-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .idea-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .idea-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  select.field-input { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Gemma<span>/</span>Studio</div>
+  <div class="conn-badge" onclick="showPanel('config')">
+    <div class="dot" id="dot"></div>
+    <span id="connText">未接続</span>
+  </div>
+</header>
+
+<div class="app">
+  <nav>
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" onclick="showPanel('chat')" data-panel="chat">
+      <span class="nav-icon">💬</span>チャット
+    </div>
+    <div class="nav-item" onclick="showPanel('data')" data-panel="data">
+      <span class="nav-icon">📊</span>データ分析
+    </div>
+    <div class="nav-item" onclick="showPanel('library')" data-panel="library">
+      <span class="nav-icon">📚</span>プロンプト集
+    </div>
+    <div class="nav-section">Explore</div>
+    <div class="nav-item" onclick="showPanel('ideas')" data-panel="ideas">
+      <span class="nav-icon">💡</span>活用アイデア
+    </div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-item" onclick="showPanel('config')" data-panel="config">
+      <span class="nav-icon">⚙️</span>接続設定
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ===== CHAT ===== -->
+    <div class="panel active" id="panel-chat">
+      <div class="sys-bar">
+        <span class="sys-label">モード:</span>
+        <div class="mode-chip active" onclick="setMode(this,'general')" data-mode="general">汎用</div>
+        <div class="mode-chip" onclick="setMode(this,'code')" data-mode="code">コーディング</div>
+        <div class="mode-chip" onclick="setMode(this,'review')" data-mode="review">コードレビュー</div>
+        <div class="mode-chip" onclick="setMode(this,'obsidian')" data-mode="obsidian">Obsidian整理</div>
+        <div class="mode-chip" onclick="setMode(this,'debug')" data-mode="debug">デバッグ</div>
+        <div class="mode-chip" onclick="setMode(this,'explain')" data-mode="explain">概念解説</div>
+      </div>
+      <div class="chat-area" id="chatArea">
+        <div class="empty-state" id="chatEmpty">
+          <div class="empty-icon">🤖</div>
+          <div class="empty-title">Gemma と話す</div>
+          <div>KaggleのGemmaに接続してチャットを始めましょう。<br>まず右上の接続設定でURLを入力してください。</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <textarea class="chat-textarea" id="chatInput" placeholder="メッセージを入力... (Shift+Enter で改行)" rows="1"
+          onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendChat()">↑</button>
+      </div>
+    </div>
+
+    <!-- ===== DATA ANALYSIS ===== -->
+    <div class="panel" id="panel-data">
+      <div class="data-wrap">
+        <div class="data-header">
+          <div class="panel-title">データ分析</div>
+        </div>
+        <div class="data-input-area">
+          <div class="field-label">分析タスク</div>
+          <select class="field-input" id="analysisType">
+            <option value="summarize">データ要約・統計</option>
+            <option value="pattern">パターン・傾向分析</option>
+            <option value="compare">比較分析</option>
+            <option value="insight">インサイト抽出</option>
+            <option value="clean">データクレンジング提案</option>
+            <option value="custom">カスタム質問</option>
+          </select>
+          <div class="field-label">データを貼り付け (CSV / JSON / テキスト)</div>
+          <textarea class="data-textarea" id="dataInput" placeholder="ここにデータを貼り付けてください...
+
+例:
+月,売上,件数
+1月,1200000,45
+2月,980000,38
+3月,1450000,52"></textarea>
+          <div class="field-label">カスタム指示（任意）</div>
+          <textarea class="data-textarea" id="customInstruction" style="min-height:60px" placeholder="例: 前月比を計算して、減少月を特定してください"></textarea>
+          <div class="output-format-row">
+            <span class="sys-label">出力形式:</span>
+            <button class="fmt-btn active" onclick="setFmt(this,'markdown')" data-fmt="markdown">Markdown</button>
+            <button class="fmt-btn" onclick="setFmt(this,'html')" data-fmt="html">HTML</button>
+            <button class="fmt-btn" onclick="setFmt(this,'csv')" data-fmt="csv">CSV</button>
+            <button class="fmt-btn" onclick="setFmt(this,'json')" data-fmt="json">JSON</button>
+            <button class="fmt-btn" onclick="setFmt(this,'plain')" data-fmt="plain">Plain</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runAnalysis()">分析実行</button>
+            <button class="btn btn-secondary" onclick="clearData()">クリア</button>
+          </div>
+        </div>
+        <div class="typing" id="dataTyping">
+          <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px">分析中...</span>
+        </div>
+        <div class="result-box" id="dataResult"></div>
+        <div class="result-actions" id="resultActions" style="display:none">
+          <button class="dl-btn" onclick="downloadResult('md')">⬇ .md</button>
+          <button class="dl-btn" onclick="downloadResult('html')">⬇ .html</button>
+          <button class="dl-btn" onclick="downloadResult('csv')">⬇ .csv</button>
+          <button class="dl-btn" onclick="downloadResult('txt')">⬇ .txt</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PROMPT LIBRARY ===== -->
+    <div class="panel" id="panel-library">
+      <div class="lib-wrap">
+        <div class="panel-title">プロンプト集</div>
+        <div style="font-size:13px;color:var(--muted)">カードをクリックするとチャットに送信</div>
+        <div class="prompt-grid" id="promptGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== IDEAS ===== -->
+    <div class="panel" id="panel-ideas">
+      <div class="ideas-grid" id="ideasGrid"></div>
+    </div>
+
+    <!-- ===== CONFIG ===== -->
+    <div class="panel" id="panel-config">
+      <div class="config-wrap">
+        <div>
+          <div class="config-title">接続設定</div>
+          <div class="config-subtitle">Kaggle で起動した Ollama のエンドポイントを設定します</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">エンドポイント URL</div>
+          <input class="field-input" id="endpointUrl" type="text"
+            placeholder="https://xxxx.trycloudflare.com" />
+          <div class="field-hint">Cloudflare Tunnel / ngrok のパブリック URL</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">モデル名</div>
+          <input class="field-input" id="modelName" type="text"
+            value="gemma4:12b-it-q4_K_M" />
+          <div class="field-hint">例: gemma4:12b-it-q4_K_M / gemma4:26b-it-q4_K_M</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">ngrok ヘッダー（ngrok 使用時のみ）</div>
+          <input class="field-input" id="ngrokHeader" type="text"
+            placeholder="true (ngrok使用時に入力)" />
+          <div class="field-hint">ngrok の 403 回避用。Cloudflare Tunnel 使用時は空白でOK</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Temperature</div>
+          <input class="field-input" id="temperature" type="number" value="0.7" step="0.1" min="0" max="2" />
+        </div>
+        <div id="statusMsg" class="status-msg"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveConfig()">保存 & 接続テスト</button>
+          <button class="btn btn-secondary" onclick="testConnection()">テストのみ</button>
+          <button class="btn btn-danger" onclick="clearConfig()">リセット</button>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;color:var(--muted);line-height:1.8;font-family:'IBM Plex Mono',monospace;">
+          <div style="color:var(--accent);margin-bottom:8px;font-weight:600"># Kaggle Notebook での起動手順</div>
+          <div>1. Notebookを起動 → GPU T4×2 を選択</div>
+          <div>2. Ollama + Gemmaモデルを起動</div>
+          <div>3. Cloudflare Tunnel でURLを発行</div>
+          <div>4. 上のフォームにURLを貼り付けて保存</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ──
+let cfg = {
+  url: '',
+  model: 'gemma4:12b-it-q4_K_M',
+  ngrok: '',
+  temperature: 0.7
+};
+let chatHistory = [];
+let currentMode = 'general';
+let currentFmt = 'markdown';
+let lastResult = '';
+
+// ── System Prompts ──
+const systemPrompts = {
+  general: 'あなたは優秀なAIアシスタントです。日本語で簡潔かつ正確に回答してください。',
+  code: 'あなたは優秀なソフトウェアエンジニアです。コードを書く際は必ずコードブロックを使用し、コメントを日本語で記載してください。実装の意図と注意点も簡潔に説明してください。',
+  review: 'あなたは経験豊富なコードレビュアーです。提出されたコードのバグ、パフォーマンス問題、セキュリティリスク、可読性の改善点を指摘してください。改善案のコードも提示してください。',
+  obsidian: 'あなたはObsidianのナレッジマネジメント専門家です。提供された情報を整理し、Obsidianのマークダウン形式（見出し、箇条書き、タグ、内部リンク[[]]）で構造化してください。',
+  debug: 'あなたはデバッグの専門家です。エラーメッセージやコードを分析し、原因の仮説を列挙した後、最も可能性の高い原因と修正方法を示してください。',
+  explain: 'あなたは優秀な教育者です。技術的な概念を分かりやすく説明してください。具体的な例え話や図解（テキストベース）を使い、初心者にも理解できるように解説してください。'
+};
+
+// ── Prompt Library ──
+const prompts = [
+  { tag: 'code', tagClass: 'tag-code', title: 'Pythonスクリプト生成', text: '以下の仕様でPythonスクリプトを書いてください:\n\n[仕様を記入]' },
+  { tag: 'code', tagClass: 'tag-code', title: 'SQL クエリ最適化', text: '以下のSQLクエリを最適化してください。実行計画の改善点も説明してください:\n\n```sql\n[クエリを貼り付け]\n```' },
+  { tag: 'code', tagClass: 'tag-code', title: 'APIエンドポイント設計', text: 'RESTful APIを設計してください。エンドポイント一覧、リクエスト/レスポンス形式、エラーハンドリングを含めてください。対象: [機能を記入]' },
+  { tag: 'code', tagClass: 'tag-code', title: 'コード説明', text: '以下のコードを詳しく説明してください。各部分の役割と全体の処理フローを教えてください:\n\n```\n[コードを貼り付け]\n```' },
+  { tag: 'data', tagClass: 'tag-data', title: 'データ要約', text: '以下のデータを分析して、主要な統計情報（平均、中央値、最大・最小、標準偏差）と傾向をまとめてください:\n\n[データを貼り付け]' },
+  { tag: 'data', tagClass: 'tag-data', title: '異常値検出', text: '以下のデータセットから異常値や外れ値を特定し、その原因として考えられることを列挙してください:\n\n[データを貼り付け]' },
+  { tag: 'write', tagClass: 'tag-write', title: 'Obsidianノート作成', text: '以下の情報をObsidianのノート形式に整理してください。適切なタグ(#tag)と内部リンク([[ページ名]])を付けてください:\n\n[情報を記入]' },
+  { tag: 'write', tagClass: 'tag-write', title: '議事録整形', text: '以下のメモや会話を議事録形式に整理してください。決定事項、アクションアイテム、議論内容に分類してください:\n\n[メモを貼り付け]' },
+  { tag: 'write', tagClass: 'tag-write', title: 'ドキュメント作成', text: '以下の機能についてのREADME/ドキュメントをMarkdown形式で作成してください:\n\n機能名: [名前]\n概要: [説明]\n使い方: [記入]' },
+  { tag: 'idea', tagClass: 'tag-idea', title: 'アイデアブレスト', text: '以下のテーマについて10個のアイデアを生成してください。実現可能性より創造性を優先してください:\n\nテーマ: [記入]' },
+  { tag: 'idea', tagClass: 'tag-idea', title: 'SWOT分析', text: '以下についてSWOT分析を行ってください（強み・弱み・機会・脅威）:\n\n対象: [記入]' },
+  { tag: 'idea', tagClass: 'tag-idea', title: '学習ロードマップ', text: '以下のスキルを習得するための学習ロードマップを作成してください。初心者〜上級者の段階別に:\n\nスキル: [記入]' },
+];
+
+// ── Ideas ──
+const ideas = [
+  {
+    icon: '🧑‍💻', title: 'Vibe Coding',
+    desc: 'Cline拡張と連携してAI駆動の開発。設計書からコード生成、リファクタリング、テスト作成まで自律的に実行。',
+    tags: ['VSCode', 'Cline', 'Python', 'JS']
+  },
+  {
+    icon: '📓', title: 'Obsidian Copilot',
+    desc: '日々のメモ・読書ノート・作業記録を自動でタグ付け・リンク生成。Obsidianのグラフビューが豊かになる。',
+    tags: ['Obsidian', 'Markdown', 'PKM']
+  },
+  {
+    icon: '📊', title: 'ローカルデータ分析',
+    desc: 'CSVやJSONデータを貼り付けてAIが要約・可視化コード生成・インサイト抽出。外部サービス不要。',
+    tags: ['CSV', 'JSON', 'Python', 'pandas']
+  },
+  {
+    icon: '🔍', title: 'コードレビュー自動化',
+    desc: 'PRのdiffを貼り付けてバグ・セキュリティ・パフォーマンス問題を一括チェック。CIへの組み込みも可。',
+    tags: ['Git', 'CI/CD', 'Security']
+  },
+  {
+    icon: '📝', title: 'ドキュメント生成',
+    desc: 'ソースコードからREADME・API仕様書・設計書を自動生成。コメントからJSDoc/Sphinxも。',
+    tags: ['README', 'API Docs', 'Sphinx']
+  },
+  {
+    icon: '🌐', title: '多言語翻訳・ローカライズ',
+    desc: 'コード内のメッセージ・UIテキストを一括翻訳。技術文書の日英変換にも。ニュアンス調整付き。',
+    tags: ['i18n', 'l10n', 'Translation']
+  },
+  {
+    icon: '🤖', title: 'バッチ自動処理',
+    desc: 'Kaggle Python APIと組み合わせてcronで定期起動。モデル起動→処理→結果保存を全自動化。',
+    tags: ['cron', 'Automation', 'API']
+  },
+  {
+    icon: '🧪', title: 'テストケース生成',
+    desc: '関数やクラスを渡すと境界値・異常系を含むテストコードを自動生成。pytest/Jest対応。',
+    tags: ['pytest', 'Jest', 'TDD']
+  },
+  {
+    icon: '📅', title: '週次レポート生成',
+    desc: 'GitログやタスクリストをGemmaに渡して週次作業サマリーを自動生成。Notionやメール送信まで。',
+    tags: ['Report', 'Notion', 'Obsidian']
+  },
+  {
+    icon: '🔧', title: 'エラーログ解析',
+    desc: 'アプリのエラーログをGemmaが自動分類・原因特定・修正候補提示。監視ツールとの連携も。',
+    tags: ['Logging', 'Debug', 'Ops']
+  },
+];
+
+// ── Init ──
+function init() {
+  const saved = localStorage.getItem('gemma_cfg');
+  if (saved) {
+    cfg = { ...cfg, ...JSON.parse(saved) };
+    document.getElementById('endpointUrl').value = cfg.url || '';
+    document.getElementById('modelName').value = cfg.model || 'gemma4:12b-it-q4_K_M';
+    document.getElementById('ngrokHeader').value = cfg.ngrok || '';
+    document.getElementById('temperature').value = cfg.temperature || 0.7;
+    if (cfg.url) updateConnState(null);
+  }
+  renderPromptLibrary();
+  renderIdeas();
+}
+
+function renderPromptLibrary() {
+  const grid = document.getElementById('promptGrid');
+  grid.innerHTML = prompts.map((p, i) => `
+    <div class="prompt-card" onclick="usePrompt(${i})">
+      <span class="prompt-card-tag ${p.tagClass}">${p.tag}</span>
+      <div class="prompt-card-title">${p.title}</div>
+      <div class="prompt-card-preview">${p.text.substring(0, 80)}...</div>
+    </div>
+  `).join('');
+}
+
+function renderIdeas() {
+  const grid = document.getElementById('ideasGrid');
+  grid.innerHTML = ideas.map((d, i) => `
+    <div class="idea-card" onclick="useIdea(${i})">
+      <div class="idea-icon">${d.icon}</div>
+      <div class="idea-title">${d.title}</div>
+      <div class="idea-desc">${d.desc}</div>
+      <div class="idea-tags">${d.tags.map(t => `<span class="idea-tag">${t}</span>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+// ── Navigation ──
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelector(`[data-panel="${name}"]`)?.classList.add('active');
+}
+
+// ── Config ──
+function saveConfig() {
+  cfg.url = document.getElementById('endpointUrl').value.trim().replace(/\/$/, '');
+  cfg.model = document.getElementById('modelName').value.trim();
+  cfg.ngrok = document.getElementById('ngrokHeader').value.trim();
+  cfg.temperature = parseFloat(document.getElementById('temperature').value);
+  localStorage.setItem('gemma_cfg', JSON.stringify(cfg));
+  testConnection();
+}
+
+function clearConfig() {
+  localStorage.removeItem('gemma_cfg');
+  cfg = { url:'', model:'gemma4:12b-it-q4_K_M', ngrok:'', temperature:0.7 };
+  document.getElementById('endpointUrl').value = '';
+  document.getElementById('modelName').value = 'gemma4:12b-it-q4_K_M';
+  document.getElementById('ngrokHeader').value = '';
+  updateConnState(false);
+  showStatus('リセットしました', false);
+}
+
+async function testConnection() {
+  const url = document.getElementById('endpointUrl').value.trim().replace(/\/$/, '');
+  if (!url) { showStatus('URLを入力してください', true); return; }
+  showStatus('接続テスト中...', false);
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (document.getElementById('ngrokHeader').value.trim())
+      headers['ngrok-skip-browser-warning'] = 'true';
+    const res = await fetch(`${url}/api/tags`, { headers });
+    const data = await res.json();
+    const models = (data.models || []).map(m => m.name).join(', ');
+    showStatus(`✓ 接続成功！ 利用可能モデル: ${models || '取得中'}`, false);
+    cfg.url = url;
+    updateConnState(true);
+  } catch(e) {
+    showStatus(`✗ 接続失敗: ${e.message}`, true);
+    updateConnState(false);
+  }
+}
+
+function showStatus(msg, isErr) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg ' + (isErr ? 'err' : 'ok');
+}
+
+function updateConnState(connected) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('connText');
+  if (connected === null) {
+    dot.className = 'dot'; dot.style.background = '#e3b341';
+    txt.textContent = '設定済';
+    return;
+  }
+  dot.className = connected ? 'dot connected' : 'dot';
+  txt.textContent = connected ? '接続済' : '未接続';
+}
+
+// ── Chat ──
+function setMode(el, mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !cfg.url) {
+    if (!cfg.url) { showPanel('config'); return; }
+    return;
+  }
+  input.value = '';
+
+  document.getElementById('chatEmpty').style.display = 'none';
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  const typing = appendTyping();
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (cfg.ngrok) headers['ngrok-skip-browser-warning'] = 'true';
+
+    const body = {
+      model: cfg.model,
+      messages: [
+        { role: 'system', content: systemPrompts[currentMode] },
+        ...chatHistory
+      ],
+      stream: false,
+      options: { temperature: cfg.temperature }
+    };
+
+    const res = await fetch(`${cfg.url}/api/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    const reply = data.message?.content || '（応答なし）';
+    typing.remove();
+    appendMsg('ai', reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    typing.remove();
+    appendMsg('ai', `エラー: ${e.message}\n\n接続設定を確認してください。`);
+  }
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function appendMsg(role, text) {
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const formatted = role === 'ai' ? formatAI(text) : escHtml(text);
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'user' ? 'U' : 'G'}</div>
+    <div class="msg-body">
+      <div class="msg-role">${role === 'user' ? 'You' : 'Gemma'}</div>
+      <div class="msg-text">${formatted}</div>
+    </div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function appendTyping() {
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = `
+    <div class="msg-avatar">G</div>
+    <div class="msg-body">
+      <div class="msg-role">Gemma</div>
+      <div class="typing show"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+    </div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function formatAI(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Data Analysis ──
+function setFmt(el, fmt) {
+  currentFmt = fmt;
+  document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function runAnalysis() {
+  const data = document.getElementById('dataInput').value.trim();
+  if (!data) { alert('データを入力してください'); return; }
+  if (!cfg.url) { showPanel('config'); return; }
+
+  const type = document.getElementById('analysisType').value;
+  const custom = document.getElementById('customInstruction').value.trim();
+  const fmt = currentFmt;
+
+  const fmtInstr = {
+    markdown: 'Markdown形式（見出し・表・箇条書き）で出力してください。',
+    html: '完全なHTMLテーブルと見出しを含むHTMLスニペットとして出力してください。',
+    csv: 'CSVファイルとして出力できる形式（ヘッダー行+データ行）で出力してください。',
+    json: 'JSON形式で出力してください。',
+    plain: 'プレーンテキストで出力してください。'
+  };
+
+  const taskInstr = {
+    summarize: '統計サマリー（件数、平均、中央値、最大・最小、標準偏差）を算出してください。',
+    pattern: 'データのパターンと時系列・カテゴリ別の傾向を分析してください。',
+    compare: 'カテゴリや期間を比較し、差異と要因を分析してください。',
+    insight: 'ビジネス的に重要なインサイトをトップ5で抽出してください。',
+    clean: 'データの品質問題（欠損値・外れ値・フォーマット不整合）を特定し改善提案をしてください。',
+    custom: ''
+  };
+
+  const prompt = `以下のデータを分析してください。\n\nタスク: ${taskInstr[type]}\n${custom ? '追加指示: ' + custom + '\n' : ''}\n出力形式: ${fmtInstr[fmt]}\n\nデータ:\n${data}`;
+
+  document.getElementById('dataTyping').className = 'typing show';
+  document.getElementById('dataResult').className = 'result-box';
+  document.getElementById('resultActions').style.display = 'none';
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.ngrok) headers['ngrok-skip-browser-warning'] = 'true';
+    const res = await fetch(`${cfg.url}/api/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: 'あなたはデータアナリストです。指示された形式で正確に出力してください。前置きや後書きは不要です。' },
+          { role: 'user', content: prompt }
+        ],
+        stream: false,
+        options: { temperature: 0.3 }
+      })
+    });
+    const d = await res.json();
+    lastResult = d.message?.content || '';
+    document.getElementById('dataResult').textContent = lastResult;
+    document.getElementById('dataResult').className = 'result-box visible';
+    document.getElementById('resultActions').style.display = 'flex';
+  } catch(e) {
+    lastResult = `エラー: ${e.message}`;
+    document.getElementById('dataResult').textContent = lastResult;
+    document.getElementById('dataResult').className = 'result-box visible';
+  }
+  document.getElementById('dataTyping').className = 'typing';
+}
+
+function clearData() {
+  document.getElementById('dataInput').value = '';
+  document.getElementById('customInstruction').value = '';
+  document.getElementById('dataResult').className = 'result-box';
+  document.getElementById('resultActions').style.display = 'none';
+  lastResult = '';
+}
+
+function downloadResult(ext) {
+  if (!lastResult) return;
+  let content = lastResult;
+  let mime = 'text/plain';
+  if (ext === 'html') {
+    content = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Analysis Result</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px 12px}th{background:#f5f5f5}</style></head><body>${lastResult.replace(/\n/g,'<br>')}</body></html>`;
+    mime = 'text/html';
+  } else if (ext === 'md') { mime = 'text/markdown'; ext = 'md'; }
+  else if (ext === 'csv') { mime = 'text/csv'; }
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `analysis_${Date.now()}.${ext}`;
+  a.click();
+}
+
+// ── Prompt Library ──
+function usePrompt(i) {
+  showPanel('chat');
+  const p = prompts[i];
+  document.getElementById('chatInput').value = p.text;
+  document.getElementById('chatInput').focus();
+}
+
+function useIdea(i) {
+  showPanel('chat');
+  const idea = ideas[i];
+  document.getElementById('chatInput').value = `「${idea.title}」について教えてください。Kaggle上のGemmaをどのように活用できますか？具体的な実装例も示してください。`;
+  document.getElementById('chatInput').focus();
+}
+
+init();
+</script>
+</body>
+</html>

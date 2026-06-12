@@ -1,0 +1,95 @@
+name: Kaggle GPU Stop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Configure Kaggle credentials
+        run: |
+          mkdir -p ~/.kaggle
+          echo '{"username":"${{ secrets.KAGGLE_USERNAME }}","key":"${{ secrets.KAGGLE_KEY }}"}' > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
+      - name: Stop Kaggle Notebook (cancel running kernel)
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KERNEL_SLUG: ${{ secrets.KAGGLE_KERNEL_SLUG }}
+        run: |
+          python - <<'EOF'
+          import requests, os, json
+
+          with open(os.path.expanduser("~/.kaggle/kaggle.json")) as f:
+              creds = json.load(f)
+          auth = (creds["username"], creds["key"])
+
+          username = os.environ["KAGGLE_USERNAME"]
+          kernel   = os.environ["KAGGLE_KERNEL_SLUG"]
+
+          # Cancel/stop the kernel run
+          url = f"https://www.kaggle.com/api/v1/kernels/{username}/{kernel}/stop"
+          r = requests.post(url, auth=auth)
+          print(f"Stop status: {r.status_code} - {r.text[:200]}")
+          # 200 or 404 (already stopped) are both acceptable
+          EOF
+
+      - name: Update status.json - stopped + accumulate hours
+        run: |
+          python - <<'EOF'
+          import json, datetime, os
+
+          path = "docs/status.json"
+          with open(path) as f:
+              data = json.load(f)
+
+          now = datetime.datetime.utcnow()
+          now_iso = now.isoformat() + "Z"
+
+          # Calculate session duration
+          session_hours = 0.0
+          if data.get("started_at"):
+              started = datetime.datetime.fromisoformat(data["started_at"].replace("Z",""))
+              session_hours = (now - started).total_seconds() / 3600
+
+          # Accumulate to monthly
+          month_key = now.strftime("%Y-%m")
+          monthly = data.get("monthly", {})
+          monthly[month_key] = round(monthly.get(month_key, 0) + session_hours, 2)
+
+          # Accumulate weekly (simple rolling — Kaggle resets weekly)
+          data["weekly_hours"] = round(data.get("weekly_hours", 0) + session_hours, 2)
+
+          data["status"]     = "stopped"
+          data["stopped_at"] = now_iso
+          data["tunnel_url"] = None
+          data["monthly"]    = monthly
+
+          with open(path, "w") as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+
+          print(f"Session: {session_hours:.2f}h → monthly[{month_key}]={monthly[month_key]:.2f}h")
+          EOF
+
+      - name: Commit status.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/status.json
+          git commit -m "status: stopped + hours accumulated [skip ci]" || echo "No changes"
+          git push
