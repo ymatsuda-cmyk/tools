@@ -70,7 +70,7 @@ jobs:
           python - <<'EOF'
           import json, datetime, os
 
-          path = "docs/status.json"
+          path = "tools/LLM/kaggle/gemma/dashboard/status.json"
           with open(path) as f:
               data = json.load(f)
 
