@@ -385,22 +385,11 @@
     });
   }
 
-  // ── 停止 ──
+  // ── 停止（KaggleのUIを開く）──
   function stopNotebook() {
-    if (!confirm('Notebookを停止しますか？')) return;
-    showError('');
-    log('停止リクエストを送信しています…', 'warn');
-    setLoading(true);
-    formPost('stop', function(data) {
-      setLoading(false);
-      if (data && data.success) {
-        log('停止リクエスト送信完了', 'ok');
-        updateStatus('cancelAcknowledged', null);
-      } else {
-        log('送信失敗', 'err');
-        showError('送信に失敗しました');
-      }
-    });
+    if (!confirm('KaggleのページでNotebookを停止しますか？\n（Kaggleのページが開くので、そこでセッションを停止してください）')) return;
+    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
+    log('Kaggleのページを開きました。セッションを停止してください。', 'warn');
   }
 
   // ── 自動更新 ──
