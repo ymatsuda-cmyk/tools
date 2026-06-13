@@ -49,7 +49,7 @@
       border-radius: 12px;
       padding: 1.5rem;
       width: 100%;
-      max-width: 460px;
+      max-width: 480px;
     }
     .field-label {
       font-size: 0.68rem;
@@ -75,9 +75,16 @@
     }
     .field-input:focus { border-color: var(--accent); }
 
+    /* 4列メトリクス */
     .metrics-row {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .metrics-row-sub {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 0.5rem;
       margin-bottom: 1.25rem;
     }
@@ -104,6 +111,49 @@
     }
     .metric-value.running { color: var(--success); }
     .metric-value.warn    { color: var(--warning); }
+    .metric-value.danger  { color: var(--danger);  }
+
+    /* 週間プログレスバー */
+    .weekly-bar-wrap {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .weekly-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.45rem;
+    }
+    .weekly-bar-label {
+      font-size: 0.62rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .weekly-bar-nums {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+    }
+    .weekly-bar-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .weekly-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: var(--success);
+      transition: width 0.4s ease, background 0.3s;
+      width: 0%;
+    }
+    .weekly-bar-fill.warn   { background: var(--warning); }
+    .weekly-bar-fill.danger { background: var(--danger);  }
 
     .status-row {
       display: flex;
@@ -121,13 +171,12 @@
       border-radius: 50%;
       background: var(--muted);
       flex-shrink: 0;
-      transition: background 0.3s;
     }
     .dot.running  { background: var(--success); box-shadow: 0 0 5px rgba(46,125,69,0.4); animation: pulse 2s infinite; }
     .dot.queued   { background: var(--warning); }
     .dot.complete { background: var(--accent); }
     .dot.error    { background: var(--danger); }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
     .status-text { flex: 1; }
     .status-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
@@ -164,7 +213,7 @@
     }
     .btn:active  { transform: scale(0.97); }
     .btn:disabled { opacity: 0.35; cursor: not-allowed; }
-    .btn-start  { background: var(--success);   color: #000; }
+    .btn-start  { background: var(--success); color: #fff; }
     .btn-status { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
     .btn-stop   { background: transparent; color: var(--danger); border-color: var(--danger); }
     .btn-start:hover:not(:disabled)  { opacity: 0.85; }
@@ -184,7 +233,6 @@
       max-height: 160px;
       overflow-y: auto;
     }
-    .le { margin-bottom: 0.15rem; }
     .le.ok   { color: var(--success); }
     .le.err  { color: var(--danger);  }
     .le.info { color: var(--accent);  }
@@ -216,14 +264,34 @@
     placeholder="https://script.google.com/macros/s/xxxxxx/exec"
     spellcheck="false" />
 
+  <!-- セッション時間 -->
   <div class="metrics-row">
     <div class="metric-card">
-      <div class="metric-label">実行時間</div>
+      <div class="metric-label">実行時間（今回）</div>
       <div class="metric-value" id="elapsedValue">--:--:--</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">残り時間</div>
+      <div class="metric-label">残り（9h上限）</div>
       <div class="metric-value" id="remainValue">--:--:--</div>
+    </div>
+  </div>
+
+  <!-- 週間使用時間 -->
+  <div class="weekly-bar-wrap">
+    <div class="weekly-bar-header">
+      <span class="weekly-bar-label">今週の使用時間（週30h上限）</span>
+      <span class="weekly-bar-nums" id="weeklyNums">-- / 30h</span>
+    </div>
+    <div class="weekly-bar-track">
+      <div class="weekly-bar-fill" id="weeklyFill"></div>
+    </div>
+  </div>
+
+  <!-- GPU -->
+  <div class="metrics-row-sub">
+    <div class="metric-card">
+      <div class="metric-label">今週の残り時間</div>
+      <div class="metric-value" id="weeklyRemainValue">--h --m</div>
     </div>
     <div class="metric-card">
       <div class="metric-label">GPU使用率</div>
@@ -268,29 +336,36 @@
   var cdTimer      = null;
   var elapsedTimer = null;
   var sessionStartTime = null;
-  var KAGGLE_LIMIT_SEC = 9 * 3600;
+  var SESSION_LIMIT_SEC = 9 * 3600;
+  var WEEKLY_LIMIT_MIN  = 30 * 60;
 
+  // ── 時間フォーマット ──
   function pad(n) { return String(n).padStart(2, '0'); }
-  function fmtElapsed(totalSec) {
+  function fmtHMS(totalSec) {
     var h = Math.floor(totalSec / 3600);
     var m = Math.floor((totalSec % 3600) / 60);
     var s = totalSec % 60;
     return pad(h) + ':' + pad(m) + ':' + pad(s);
   }
+  function fmtHM(totalMin) {
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    return h + 'h ' + pad(m) + 'm';
+  }
 
+  // ── セッションタイマー ──
   function updateElapsedDisplay() {
     if (!sessionStartTime) return;
     var elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-    var remain  = Math.max(0, KAGGLE_LIMIT_SEC - elapsed);
+    var remain  = Math.max(0, SESSION_LIMIT_SEC - elapsed);
     var elEl = document.getElementById('elapsedValue');
     var reEl = document.getElementById('remainValue');
-    elEl.textContent = fmtElapsed(elapsed);
-    reEl.textContent = fmtElapsed(remain);
+    elEl.textContent = fmtHMS(elapsed);
+    reEl.textContent = fmtHMS(remain);
     elEl.className = 'metric-value ' + (elapsed > 7 * 3600 ? 'warn' : 'running');
-    reEl.className = 'metric-value ' + (remain < 2 * 3600 ? 'warn' : 'running');
-    if (remain === 0) { stopElapsedTimer(); }
+    reEl.className = 'metric-value ' + (remain < 3600 ? 'danger' : remain < 2 * 3600 ? 'warn' : 'running');
+    if (remain === 0) stopElapsedTimer();
   }
-
   function startElapsedTimer(startTs) {
     sessionStartTime = startTs;
     stopElapsedTimer();
@@ -313,6 +388,23 @@
     document.getElementById('gpuValue').className       = 'metric-value';
   }
 
+  // ── 週間使用時間の表示 ──
+  function updateWeeklyDisplay(usedMin, remainMin) {
+    var nums  = document.getElementById('weeklyNums');
+    var fill  = document.getElementById('weeklyFill');
+    var remEl = document.getElementById('weeklyRemainValue');
+    var usedH = (usedMin / 60).toFixed(1);
+    nums.textContent = usedH + 'h / 30h';
+    var pct = Math.min(100, Math.round(usedMin / WEEKLY_LIMIT_MIN * 100));
+    fill.style.width = pct + '%';
+    fill.className = 'weekly-bar-fill' +
+      (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
+    remEl.textContent = fmtHM(Math.max(0, remainMin));
+    remEl.className = 'metric-value' +
+      (remainMin < 60 ? ' danger' : remainMin < 180 ? ' warn' : ' running');
+  }
+
+  // ── ログ ──
   function log(msg, type) {
     type = type || 'default';
     var el  = document.getElementById('log');
@@ -322,13 +414,13 @@
     div.textContent = '[' + now + '] ' + msg;
     el.prepend(div);
   }
-
   function showError(msg) {
     var el = document.getElementById('errorBanner');
     if (msg) { el.textContent = msg; el.classList.add('visible'); }
     else      { el.classList.remove('visible'); }
   }
 
+  // ── ステータス表示 ──
   function updateStatus(status, time) {
     var dot  = document.getElementById('dot');
     var text = document.getElementById('statusText');
@@ -349,12 +441,15 @@
     if (status === 'running') {
       var stored = localStorage.getItem('kaggle_session_start');
       if (!stored) {
-        var ts = time ? new Date(time).getTime() : Date.now();
-        localStorage.setItem('kaggle_session_start', String(ts));
-        stored = String(ts);
+        // running検知時にセットされていない = 別端末起動など → 現在時刻で仮セット
+        stored = String(Date.now());
+        localStorage.setItem('kaggle_session_start', stored);
       }
       startElapsedTimer(parseInt(stored, 10));
     } else if (status === 'complete' || status === 'cancelAcknowledged' || status === 'error') {
+      // 停止確定 → GASに記録を送る
+      var stored = localStorage.getItem('kaggle_session_start');
+      if (stored) recordStop(parseInt(stored, 10));
       localStorage.removeItem('kaggle_session_start');
       stopElapsedTimer();
       document.getElementById('elapsedValue').className = 'metric-value';
@@ -368,9 +463,10 @@
     });
   }
 
+  // ── JSONP ──
   function jsonpGet(params, callback) {
     var url = urlInput.value.trim();
-    if (!url) { log('GAS URLが未設定です', 'err'); callback(null); return; }
+    if (!url) { log('GAS URLが未設定です', 'err'); if(callback) callback(null); return; }
     var cbName = 'cb_' + Date.now();
     var script = document.createElement('script');
     params.callback = cbName;
@@ -379,17 +475,18 @@
     }).join('&');
     script.src = url + '?' + qs;
     var timer = setTimeout(function() {
-      cleanup(); log('タイムアウト（60秒）', 'err'); callback(null);
+      cleanup(); log('タイムアウト（60秒）', 'err'); if(callback) callback(null);
     }, 60000);
     function cleanup() {
       clearTimeout(timer); delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
     }
-    window[cbName] = function(data) { cleanup(); callback(data); };
-    script.onerror = function() { cleanup(); log('接続エラー', 'err'); callback(null); };
+    window[cbName] = function(data) { cleanup(); if(callback) callback(data); };
+    script.onerror = function() { cleanup(); log('接続エラー', 'err'); if(callback) callback(null); };
     document.head.appendChild(script);
   }
 
+  // ── 起動 ──
   function startNotebook() {
     showError('');
     log('起動リクエストを送信しています…', 'info');
@@ -398,6 +495,10 @@
       setLoading(false);
       if (!data) { showError('レスポンスを取得できませんでした'); return; }
       if (data.success) {
+        // 起動時刻をlocalStorageに記録（GASがstartTime返せばそれを使用）
+        var startTs = data.startTime ? new Date(data.startTime).getTime() : Date.now();
+        localStorage.setItem('kaggle_session_start', String(startTs));
+        startElapsedTimer(startTs);
         log('起動リクエスト送信完了: ' + (data.message || ''), 'ok');
         setTimeout(checkStatus, 10000);
       } else {
@@ -407,6 +508,7 @@
     });
   }
 
+  // ── ステータス確認 ──
   function checkStatus() {
     showError('');
     log('ステータスを確認しています…', 'info');
@@ -416,6 +518,10 @@
       if (!data) { showError('レスポンスを取得できませんでした'); return; }
       if (data.success) {
         updateStatus(data.status, data.lastRunTime);
+        // 週間使用時間
+        if (data.weeklyUsedMin !== undefined) {
+          updateWeeklyDisplay(data.weeklyUsedMin, data.weeklyRemainMin);
+        }
         if (data.gpu_utilization !== undefined) {
           var gpuEl = document.getElementById('gpuValue');
           gpuEl.textContent = Math.round(data.gpu_utilization) + '%';
@@ -429,12 +535,33 @@
     });
   }
 
-  function stopNotebook() {
-    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
-    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
-    resetElapsedDisplay();
+  // ── 停止記録をGASに送信（fire-and-forget） ──
+  function recordStop(startTs) {
+    var startIso = new Date(startTs).toISOString();
+    var mins     = Math.round((Date.now() - startTs) / 60000);
+    log('停止記録をスプレッドシートに送信中… (' + mins + '分)', 'info');
+    jsonpGet({ action: 'record', startTime: startIso }, function(data) {
+      if (data && data.success) {
+        log('スプレッドシートに記録しました (' + mins + '分)', 'ok');
+        checkStatus(); // 週間残り時間を更新
+      } else {
+        log('スプレッドシート記録失敗', 'warn');
+      }
+    });
   }
 
+  // ── 停止ボタン ──
+  function stopNotebook() {
+    // 手動停止 → 即座に記録
+    var stored = localStorage.getItem('kaggle_session_start');
+    if (stored) recordStop(parseInt(stored, 10));
+    localStorage.removeItem('kaggle_session_start');
+    resetElapsedDisplay();
+    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
+    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
+  }
+
+  // ── 自動更新 ──
   function toggleAuto() {
     var on = document.getElementById('autoRefresh').checked;
     if (on) {
@@ -452,6 +579,12 @@
       document.getElementById('nextRefresh').textContent = '';
     }
   }
+
+  // ── 起動時にlocalStorageのセッション情報を復元 ──
+  (function init() {
+    var stored = localStorage.getItem('kaggle_session_start');
+    if (stored) startElapsedTimer(parseInt(stored, 10));
+  })();
 </script>
 </body>
 </html>
