@@ -326,6 +326,7 @@
   var sessionStartTime = null;
   var SESSION_LIMIT_SEC = 9 * 3600;
   var WEEKLY_LIMIT_MIN  = 30 * 60;
+  var weeklyBaseMin = 0; // GASから取得した今週の使用分（今回セッション除く）
 
   // ── 時間フォーマット ──
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -353,6 +354,17 @@
     elEl.className = 'metric-value ' + (elapsed > 7 * 3600 ? 'warn' : 'running');
     reEl.className = 'metric-value ' + (remain < 3600 ? 'danger' : remain < 2 * 3600 ? 'warn' : 'running');
     if (remain === 0) stopElapsedTimer();
+
+    // 週間使用時間にリアルタイム加算
+    var elapsedMin   = Math.floor(elapsed / 60);
+    var totalUsedMin = weeklyBaseMin + elapsedMin;
+    var weeklyRemain = Math.max(0, WEEKLY_LIMIT_MIN - totalUsedMin);
+    var nums  = document.getElementById('weeklyNums');
+    var fill  = document.getElementById('weeklyFill');
+    var pct   = Math.min(100, Math.round(totalUsedMin / WEEKLY_LIMIT_MIN * 100));
+    nums.textContent  = (totalUsedMin / 60).toFixed(1) + 'h / 30h';
+    fill.style.width  = pct + '%';
+    fill.className    = 'weekly-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
   }
   function startElapsedTimer(startTs) {
     sessionStartTime = startTs;
@@ -376,20 +388,17 @@
     document.getElementById('gpuValue').className       = 'metric-value';
   }
 
-  // ── 週間使用時間の表示 ──
+  // ── 週間使用時間の表示（GAS取得時・非実行中） ──
   function updateWeeklyDisplay(usedMin, remainMin) {
-    var nums  = document.getElementById('weeklyNums');
-    var fill  = document.getElementById('weeklyFill');
-    var remEl = document.getElementById('weeklyRemainValue');
-    var usedH = (usedMin / 60).toFixed(1);
-    nums.textContent = usedH + 'h / 30h';
-    var pct = Math.min(100, Math.round(usedMin / WEEKLY_LIMIT_MIN * 100));
+    weeklyBaseMin = usedMin; // ベースを保存
+    // 実行中なら updateElapsedDisplay に任せる
+    if (sessionStartTime) return;
+    var nums = document.getElementById('weeklyNums');
+    var fill = document.getElementById('weeklyFill');
+    var pct  = Math.min(100, Math.round(usedMin / WEEKLY_LIMIT_MIN * 100));
+    nums.textContent = (usedMin / 60).toFixed(1) + 'h / 30h';
     fill.style.width = pct + '%';
-    fill.className = 'weekly-bar-fill' +
-      (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
-    remEl.textContent = fmtHM(Math.max(0, remainMin));
-    remEl.className = 'metric-value' +
-      (remainMin < 60 ? ' danger' : remainMin < 180 ? ' warn' : ' running');
+    fill.className   = 'weekly-bar-fill' + (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
   }
 
   // ── ログ ──
