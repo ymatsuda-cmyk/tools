@@ -304,6 +304,7 @@
   function resetElapsedDisplay() {
     stopElapsedTimer();
     sessionStartTime = null;
+    localStorage.removeItem('kaggle_session_start');
     document.getElementById('elapsedValue').textContent = '--:--:--';
     document.getElementById('elapsedValue').className   = 'metric-value';
     document.getElementById('remainValue').textContent  = '--:--:--';
@@ -345,9 +346,16 @@
     text.textContent = pair[1];
     ts.textContent   = time ? new Date(time).toLocaleString('ja-JP') : '';
 
-    if (status === 'running' && time) {
-      startElapsedTimer(new Date(time).getTime());
+    if (status === 'running') {
+      var stored = localStorage.getItem('kaggle_session_start');
+      if (!stored) {
+        var ts = time ? new Date(time).getTime() : Date.now();
+        localStorage.setItem('kaggle_session_start', String(ts));
+        stored = String(ts);
+      }
+      startElapsedTimer(parseInt(stored, 10));
     } else if (status === 'complete' || status === 'cancelAcknowledged' || status === 'error') {
+      localStorage.removeItem('kaggle_session_start');
       stopElapsedTimer();
       document.getElementById('elapsedValue').className = 'metric-value';
       document.getElementById('remainValue').className  = 'metric-value';
