@@ -549,13 +549,13 @@
 
   // ── 停止ボタン ──
   function stopNotebook() {
-    // 手動停止 → 即座に記録
+    // window.openは必ず最初に呼ぶ（非同期処理後だとポップアップブロックされる）
+    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
+    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
     var stored = localStorage.getItem('kaggle_session_start');
     if (stored) recordStop(parseInt(stored, 10));
     localStorage.removeItem('kaggle_session_start');
     resetElapsedDisplay();
-    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
-    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
   }
 
   // ── 自動更新 ──
