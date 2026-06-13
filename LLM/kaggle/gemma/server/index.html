@@ -197,7 +197,7 @@
   <div class="btn-group">
     <button class="btn btn-start"  id="btnStart"  onclick="startNotebook()">▶ 起動</button>
     <button class="btn btn-status" id="btnStatus" onclick="checkStatus()">↻ 確認</button>
-    <button class="btn btn-stop"   id="btnStop"   onclick="stopNotebook()">■ 停止</button>
+    <button class="btn btn-stop"   id="btnStop"   onclick="stopNotebook()">■ 停止(Kaggle)</button>
   </div>
 
   <span class="field-label">ログ</span>
@@ -339,9 +339,8 @@
 
   // ── 停止（KaggleのUIを開く）──
   function stopNotebook() {
-    if (!confirm('KaggleのページでNotebookを停止しますか？\n（Kaggleのページが開くので、そこでセッションを停止してください）')) return;
     window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
-    log('Kaggleのページを開きました。セッションを停止してください。', 'warn');
+    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
   }
 
   // ── 自動更新 ──
