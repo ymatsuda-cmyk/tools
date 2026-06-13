@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaggle Notebook Controller</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent-dim:#1f4068;
+      --danger:    #f85149;
+      --success:   #3fb950;
+      --warning:   #d29922;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-ui:   'Inter', 'Hiragino Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    header { text-align: center; margin-bottom: 2rem; }
+    header .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    header h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+    header p  { color: var(--muted); font-size: 0.82rem; margin-top: 0.3rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 460px;
+    }
+
+    .field-label {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    .field-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.55rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 1.25rem;
+    }
+    .field-input:focus { border-color: var(--accent); }
+
+    /* ステータス */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 0.9rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1.25rem;
+      font-size: 0.82rem;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .dot.running  { background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse 2s infinite; }
+    .dot.queued   { background: var(--warning); }
+    .dot.complete { background: var(--accent); }
+    .dot.error    { background: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .status-text { flex: 1; }
+    .status-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
+
+    /* ボタン */
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .btn {
+      padding: 0.6rem 0;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      font-family: var(--font-ui);
+    }
+    .btn:active  { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-start  { background: var(--success);   color: #000; }
+    .btn-status { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+    .btn-stop   { background: transparent; color: var(--danger); border-color: var(--danger); }
+    .btn-start:hover:not(:disabled)  { opacity: 0.85; }
+    .btn-status:hover:not(:disabled) { background: #2a4f7a; }
+    .btn-stop:hover:not(:disabled)   { background: rgba(248,81,73,0.1); }
+
+    /* エラーバナー */
+    .error-banner {
+      display: none;
+      background: rgba(248,81,73,0.1);
+      border: 1px solid var(--danger);
+      border-radius: 6px;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.78rem;
+      color: var(--danger);
+      margin-bottom: 1rem;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ログ */
+    .field-label { display: block; }
+    .log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.6;
+      color: var(--muted);
+      min-height: 90px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .le { margin-bottom: 0.15rem; }
+    .le.ok   { color: var(--success); }
+    .le.err  { color: var(--danger);  }
+    .le.info { color: var(--accent);  }
+    .le.warn { color: var(--warning); }
+
+    /* フッター */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.9rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .toggle { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+    .toggle input { accent-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Kaggle · GPU Control</div>
+  <h1>Notebook Controller</h1>
+  <p>起動 · 監視 · 停止</p>
+</header>
+
+<div class="card">
+
+  <div class="field-label">GAS Endpoint URL</div>
+  <input id="gasUrl" class="field-input" type="text"
+    placeholder="https://script.google.com/macros/s/xxxxxx/exec"
+    spellcheck="false" />
+
+  <div class="status-row">
+    <div class="dot" id="dot"></div>
+    <span class="status-text" id="statusText">未確認</span>
+    <span class="status-time" id="statusTime"></span>
+  </div>
+
+  <!-- エラー詳細バナー -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="btn-group">
+    <button class="btn btn-start"  id="btnStart"  onclick="startNotebook()">▶ 起動</button>
+    <button class="btn btn-status" id="btnStatus" onclick="checkStatus()">↻ 確認</button>
+    <button class="btn btn-stop"   id="btnStop"   onclick="stopNotebook()">■ 停止</button>
+  </div>
+
+  <div class="field-label" style="margin-bottom:0.4rem">ログ</div>
+  <div class="log" id="log"></div>
+
+  <div class="footer">
+    <label class="toggle">
+      <input type="checkbox" id="autoRefresh" onchange="toggleAuto()" />
+      30秒ごとに自動更新
+    </label>
+    <span id="nextRefresh"></span>
+  </div>
+
+</div>
+
+<script>
+  // GAS URLをlocalStorageに保存
+  const urlInput = document.getElementById('gasUrl');
+  urlInput.value = localStorage.getItem('gasUrl') || '';
+  urlInput.addEventListener('input', () => localStorage.setItem('gasUrl', urlInput.value.trim()));
+
+  let autoTimer = null;
+  let cdTimer   = null;
+
+  // ── ログ ──
+  function log(msg, type) {
+    type = type || 'default';
+    const el  = document.getElementById('log');
+    const now = new Date().toLocaleTimeString('ja-JP');
+    const div = document.createElement('div');
+    div.className = 'le ' + type;
+    div.textContent = '[' + now + '] ' + msg;
+    el.prepend(div);
+  }
+
+  // ── エラーバナー ──
+  function showError(msg) {
+    const el = document.getElementById('errorBanner');
+    if (msg) { el.textContent = '⚠ ' + msg; el.classList.add('visible'); }
+    else      { el.classList.remove('visible'); }
+  }
+
+  // ── ステータス更新 ──
+  function updateStatus(status, time) {
+    const dot  = document.getElementById('dot');
+    const text = document.getElementById('statusText');
+    const ts   = document.getElementById('statusTime');
+    dot.className = 'dot';
+    const map = {
+      running:             ['running',  '実行中'],
+      queued:              ['queued',   'キュー待ち'],
+      complete:            ['complete', '完了'],
+      error:               ['error',    'エラー'],
+      cancelAcknowledged:  ['',         'キャンセル済み'],
+    };
+    const [cls, label] = map[status] || ['', status || '不明'];
+    if (cls) dot.classList.add(cls);
+    text.textContent = label;
+    ts.textContent   = time ? new Date(time).toLocaleString('ja-JP') : '';
+  }
+
+  // ── ローディング制御 ──
+  function setLoading(v) {
+    ['btnStart','btnStatus','btnStop'].forEach(id => {
+      document.getElementById(id).disabled = v;
+    });
+  }
+
+  // ── GAS GET ──
+  async function gasGet(params) {
+    const url = urlInput.value.trim();
+    if (!url) { log('GAS URLが未設定です', 'err'); return null; }
+    const qs  = new URLSearchParams(params).toString();
+    const res = await fetch(url + '?' + qs);
+    return res.json();
+  }
+
+  // ── GAS POST（GASのCORS制約でtext/plainを使用）──
+  async function gasPost(body) {
+    const url = urlInput.value.trim();
+    if (!url) { log('GAS URLが未設定です', 'err'); return null; }
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    return res.json();
+  }
+
+  // ── 起動 ──
+  async function startNotebook() {
+    showError('');
+    log('起動リクエストを送信しています…', 'info');
+    setLoading(true);
+    try {
+      const data = await gasPost({ action: 'start' });
+      if (!data) return;
+      if (data.success) {
+        log('起動リクエスト送信完了', 'ok');
+        setTimeout(checkStatus, 4000);
+      } else {
+        const detail = data.detail ? JSON.stringify(data.detail) : '';
+        log('起動失敗: ' + (data.message || ''), 'err');
+        showError((data.message || '起動失敗') + (detail ? '\n' + detail : ''));
+      }
+    } catch (e) {
+      log('通信エラー: ' + e.message, 'err');
+      showError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── ステータス確認 ──
+  async function checkStatus() {
+    showError('');
+    log('ステータスを確認しています…', 'info');
+    setLoading(true);
+    try {
+      const data = await gasGet({ action: 'status' });
+      if (!data) return;
+      if (data.success) {
+        updateStatus(data.status, data.lastRunTime);
+        log('ステータス: ' + data.status, 'ok');
+      } else {
+        log('確認失敗: ' + (data.error || ''), 'err');
+        showError((data.error || '確認失敗') + (data.detail ? '\n' + data.detail : ''));
+      }
+    } catch (e) {
+      log('通信エラー: ' + e.message, 'err');
+      showError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── 停止 ──
+  async function stopNotebook() {
+    if (!confirm('Notebookを停止しますか？')) return;
+    showError('');
+    log('停止リクエストを送信しています…', 'warn');
+    setLoading(true);
+    try {
+      const data = await gasPost({ action: 'stop' });
+      if (!data) return;
+      if (data.success) {
+        log('停止しました', 'ok');
+        updateStatus('cancelAcknowledged', null);
+      } else {
+        log('停止失敗: ' + (data.message || ''), 'err');
+        showError((data.message || '停止失敗') + (data.detail ? '\n' + data.detail : ''));
+      }
+    } catch (e) {
+      log('通信エラー: ' + e.message, 'err');
+      showError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── 自動更新 ──
+  function toggleAuto() {
+    const on = document.getElementById('autoRefresh').checked;
+    if (on) {
+      let sec = 30;
+      const tick = () => {
+        document.getElementById('nextRefresh').textContent = '次の更新: ' + sec + '秒後';
+        if (--sec < 0) sec = 30;
+      };
+      tick();
+      cdTimer    = setInterval(tick, 1000);
+      autoTimer  = setInterval(() => { checkStatus(); sec = 30; }, 30000);
+    } else {
+      clearInterval(autoTimer);
+      clearInterval(cdTimer);
+      document.getElementById('nextRefresh').textContent = '';
+    }
+  }
+</script>
+</body>
+</html>
