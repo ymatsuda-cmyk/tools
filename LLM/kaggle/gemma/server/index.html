@@ -4,173 +4,419 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaggle Notebook Controller</title>
-  <style>
+
+    <style>
     :root {
-      --bg:        #0d1117;
-      --surface:   #161b22;
-      --border:    #30363d;
-      --accent:    #58a6ff;
-      --accent-dim:#1f4068;
-      --danger:    #f85149;
-      --success:   #3fb950;
-      --warning:   #d29922;
-      --text:      #e6edf3;
-      --muted:     #8b949e;
-      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-      --font-ui:   'Inter', 'Hiragino Sans', system-ui, sans-serif;
+    --bg: var(--color-background-tertiary);
+    --surface: var(--color-background-secondary);
+    --border: var(--color-border-tertiary);
+    --accent: var(--color-text-info);
+    --danger: var(--color-text-danger);
+    --success: var(--color-text-success);
+    --warning: var(--color-text-warning);
+    --text: var(--color-text-primary);
+    --muted: var(--color-text-secondary);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-ui);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem;
-    }
-    header { text-align: center; margin-bottom: 2rem; }
-    header .eyebrow {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      letter-spacing: 0.15em;
-      color: var(--accent);
-      text-transform: uppercase;
-      margin-bottom: 0.4rem;
-    }
-    header h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
-    header p  { color: var(--muted); font-size: 0.82rem; margin-top: 0.3rem; }
-
+    body { font-family: var(--font-sans); background: transparent; padding: 1rem 0; }
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      width: 100%;
-      max-width: 460px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--border-radius-lg);
+    padding: 1.25rem;
+    max-width: 480px;
     }
-    .field-label {
-      font-size: 0.68rem;
-      font-family: var(--font-mono);
-      color: var(--muted);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 0.4rem;
-      display: block;
-    }
+    .card-title { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+    .field-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; display: block; font-family: var(--font-mono); }
     .field-input {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      padding: 0.55rem 0.75rem;
-      outline: none;
-      transition: border-color 0.15s;
-      margin-bottom: 1.25rem;
+    width: 100%;
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--border-radius-md);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    margin-bottom: 1rem;
     }
     .field-input:focus { border-color: var(--accent); }
 
+    .metrics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1rem;
+    }
+    .metric-card {
+    background: var(--color-background-primary);
+    border-radius: var(--border-radius-md);
+    padding: 10px 12px;
+    border: 0.5px solid var(--border);
+    }
+    .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .metric-value { font-size: 18px; font-weight: 500; color: var(--text); font-family: var(--font-mono); }
+    .metric-value.running { color: var(--success); }
+    .metric-value.warn    { color: var(--warning); }
+    .metric-value.muted   { color: var(--muted); }
+
     .status-row {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.75rem 0.9rem;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 1.25rem;
-      font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--border-radius-md);
+    margin-bottom: 1rem;
+    font-size: 13px;
     }
     .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-      flex-shrink: 0;
-      transition: background 0.3s;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
     }
-    .dot.running  { background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse 2s infinite; }
-    .dot.queued   { background: var(--warning); }
-    .dot.complete { background: var(--accent); }
-    .dot.error    { background: var(--danger); }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
+    .dot.running  { background: #3fb950; animation: pulse 2s infinite; }
+    .dot.queued   { background: #d29922; }
+    .dot.complete { background: #58a6ff; }
+    .dot.error    { background: #f85149; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
     .status-text { flex: 1; }
-    .status-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
+    .status-time { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
 
     .error-banner {
-      display: none;
-      background: rgba(248,81,73,0.1);
-      border: 1px solid var(--danger);
-      border-radius: 6px;
-      padding: 0.65rem 0.9rem;
-      font-size: 0.78rem;
-      color: var(--danger);
-      margin-bottom: 1rem;
-      line-height: 1.5;
-      word-break: break-all;
+    display: none;
+    background: var(--color-background-danger);
+    border: 0.5px solid var(--color-border-danger);
+    border-radius: var(--border-radius-md);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 0.75rem;
     }
     .error-banner.visible { display: block; }
 
-    .btn-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
-    }
+    .btn-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
     .btn {
-      padding: 0.6rem 0;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      font-size: 0.8rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-      font-family: var(--font-ui);
+    padding: 8px 0;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--color-background-primary);
+    color: var(--text);
+    font-family: var(--font-sans);
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s;
     }
-    .btn:active  { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
-    .btn-start  { background: var(--success);   color: #000; }
-    .btn-status { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
-    .btn-stop   { background: transparent; color: var(--danger); border-color: var(--danger); }
-    .btn-start:hover:not(:disabled)  { opacity: 0.85; }
-    .btn-status:hover:not(:disabled) { background: #2a4f7a; }
-    .btn-stop:hover:not(:disabled)   { background: rgba(248,81,73,0.1); }
+    .btn:hover:not(:disabled) { background: var(--color-background-secondary); }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-start  { color: var(--success); border-color: var(--color-border-success); }
+    .btn-start:hover:not(:disabled) { background: var(--color-background-success); }
+    .btn-stop   { color: var(--danger);  border-color: var(--color-border-danger);  }
+    .btn-stop:hover:not(:disabled)  { background: var(--color-background-danger); }
+    .btn-status { color: var(--accent);  border-color: var(--color-border-info);   }
+    .btn-status:hover:not(:disabled){ background: var(--color-background-info); }
 
     .log {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.65rem 0.75rem;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      line-height: 1.6;
-      color: var(--muted);
-      min-height: 90px;
-      max-height: 160px;
-      overflow-y: auto;
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--border-radius-md);
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--muted);
+    min-height: 80px;
+    max-height: 140px;
+    overflow-y: auto;
     }
-    .le { margin-bottom: 0.15rem; }
     .le.ok   { color: var(--success); }
     .le.err  { color: var(--danger);  }
     .le.info { color: var(--accent);  }
     .le.warn { color: var(--warning); }
 
     .footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 0.9rem;
-      font-size: 0.72rem;
-      color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    font-size: 12px;
+    color: var(--muted);
     }
-    .toggle { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
-    .toggle input { accent-color: var(--accent); }
-  </style>
+    .toggle { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    </style>
+
+    <h2 class="sr-only">Kaggle GPU ノートブックコントローラー</h2>
+
+    <div class="card">
+    <div class="card-title">
+        <i class="ti ti-brand-python" aria-hidden="true" style="font-size:16px;"></i>
+        Kaggle GPU コントローラー
+    </div>
+
+    <span class="field-label">GAS Endpoint URL</span>
+    <input id="gasUrl" class="field-input" type="text"
+        placeholder="https://script.google.com/macros/s/xxxxxx/exec"
+        spellcheck="false" />
+
+    <div class="metrics-row">
+        <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-clock" aria-hidden="true"></i> 実行時間</div>
+        <div class="metric-value muted" id="elapsedValue">--:--:--</div>
+        </div>
+        <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-hourglass" aria-hidden="true"></i> 残り時間</div>
+        <div class="metric-value muted" id="remainValue">--:--:--</div>
+        </div>
+        <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-chart-bar" aria-hidden="true"></i> GPU使用率</div>
+        <div class="metric-value muted" id="gpuValue">--%</div>
+        </div>
+    </div>
+
+    <div class="status-row">
+        <div class="dot" id="dot"></div>
+        <span class="status-text" id="statusText">未確認</span>
+        <span class="status-time" id="statusTime"></span>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div class="btn-group">
+        <button class="btn btn-start"  id="btnStart"  onclick="startNotebook()">
+        <i class="ti ti-player-play" aria-hidden="true"></i> 起動
+        </button>
+        <button class="btn btn-status" id="btnStatus" onclick="checkStatus()">
+        <i class="ti ti-refresh" aria-hidden="true"></i> 確認
+        </button>
+        <button class="btn btn-stop"   id="btnStop"   onclick="stopNotebook()">
+        <i class="ti ti-square" aria-hidden="true"></i> 停止
+        </button>
+    </div>
+
+    <span class="field-label">ログ</span>
+    <div class="log" id="log"></div>
+
+    <div class="footer">
+        <label class="toggle">
+        <input type="checkbox" id="autoRefresh" onchange="toggleAuto()" />
+        30秒ごとに自動更新
+        </label>
+        <span id="nextRefresh"></span>
+    </div>
+    </div>
+
+    <script>
+    var urlInput = document.getElementById('gasUrl');
+    urlInput.value = localStorage.getItem('gasUrl') || '';
+    urlInput.addEventListener('input', function() {
+    localStorage.setItem('gasUrl', urlInput.value.trim());
+    });
+
+    var autoTimer = null;
+    var cdTimer   = null;
+    var elapsedTimer = null;
+    var sessionStartTime = null;
+    var KAGGLE_LIMIT_SEC = 9 * 3600;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function fmtElapsed(totalSec) {
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    return pad(h) + ':' + pad(m) + ':' + pad(s);
+    }
+
+    function updateElapsedDisplay() {
+    if (!sessionStartTime) return;
+    var now = Date.now();
+    var elapsed = Math.floor((now - sessionStartTime) / 1000);
+    var remain  = Math.max(0, KAGGLE_LIMIT_SEC - elapsed);
+
+    var elEl = document.getElementById('elapsedValue');
+    var reEl = document.getElementById('remainValue');
+
+    elEl.textContent = fmtElapsed(elapsed);
+    reEl.textContent = fmtElapsed(remain);
+
+    elEl.className = 'metric-value ' + (elapsed > 7 * 3600 ? 'warn' : 'running');
+    reEl.className = 'metric-value ' + (remain < 2 * 3600 ? 'warn' : remain < 1 * 3600 ? '' : 'running');
+
+    if (remain === 0) {
+        stopElapsedTimer();
+        reEl.textContent = '00:00:00';
+        reEl.className   = 'metric-value';
+    }
+    }
+
+    function startElapsedTimer(startTs) {
+    sessionStartTime = startTs;
+    stopElapsedTimer();
+    updateElapsedDisplay();
+    elapsedTimer = setInterval(updateElapsedDisplay, 1000);
+    }
+
+    function stopElapsedTimer() {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+    }
+
+    function resetElapsedDisplay() {
+    stopElapsedTimer();
+    sessionStartTime = null;
+    document.getElementById('elapsedValue').textContent = '--:--:--';
+    document.getElementById('elapsedValue').className   = 'metric-value muted';
+    document.getElementById('remainValue').textContent  = '--:--:--';
+    document.getElementById('remainValue').className    = 'metric-value muted';
+    document.getElementById('gpuValue').textContent     = '--%';
+    document.getElementById('gpuValue').className       = 'metric-value muted';
+    }
+
+    function log(msg, type) {
+    type = type || 'default';
+    var el  = document.getElementById('log');
+    var now = new Date().toLocaleTimeString('ja-JP');
+    var div = document.createElement('div');
+    div.className = 'le ' + type;
+    div.textContent = '[' + now + '] ' + msg;
+    el.prepend(div);
+    }
+
+    function showError(msg) {
+    var el = document.getElementById('errorBanner');
+    if (msg) { el.textContent = msg; el.classList.add('visible'); }
+    else      { el.classList.remove('visible'); }
+    }
+
+    function updateStatus(status, time) {
+    var dot  = document.getElementById('dot');
+    var text = document.getElementById('statusText');
+    var ts   = document.getElementById('statusTime');
+    dot.className = 'dot';
+    var map = {
+        running:            ['running',  '実行中'],
+        queued:             ['queued',   'キュー待ち'],
+        complete:           ['complete', '完了'],
+        error:              ['error',    'エラー'],
+        cancelAcknowledged: ['',         'キャンセル済み'],
+    };
+    var pair = map[status] || ['', status || '不明'];
+    if (pair[0]) dot.classList.add(pair[0]);
+    text.textContent = pair[1];
+    ts.textContent   = time ? new Date(time).toLocaleString('ja-JP') : '';
+
+    if (status === 'running' && time) {
+        startElapsedTimer(new Date(time).getTime());
+    } else if (status === 'complete' || status === 'cancelAcknowledged' || status === 'error') {
+        stopElapsedTimer();
+        if (sessionStartTime && time) {
+        var elapsed = Math.floor((new Date(time).getTime() - sessionStartTime) / 1000);
+        document.getElementById('elapsedValue').textContent = fmtElapsed(Math.max(0, elapsed));
+        }
+        document.getElementById('elapsedValue').className = 'metric-value muted';
+        document.getElementById('remainValue').className  = 'metric-value muted';
+    }
+    }
+
+    function setLoading(v) {
+    ['btnStart','btnStatus','btnStop'].forEach(function(id) {
+        document.getElementById(id).disabled = v;
+    });
+    }
+
+    function jsonpGet(params, callback) {
+    var url = urlInput.value.trim();
+    if (!url) { log('GAS URLが未設定です', 'err'); callback(null); return; }
+    var cbName = 'cb_' + Date.now();
+    var script = document.createElement('script');
+    params.callback = cbName;
+    var qs = Object.keys(params).map(function(k) {
+        return k + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    script.src = url + '?' + qs;
+    var timer = setTimeout(function() {
+        cleanup();
+        log('タイムアウト（60秒）', 'err');
+        callback(null);
+    }, 60000);
+    function cleanup() {
+        clearTimeout(timer);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(data) { cleanup(); callback(data); };
+    script.onerror = function() { cleanup(); log('接続エラー', 'err'); callback(null); };
+    document.head.appendChild(script);
+    }
+
+    function startNotebook() {
+    showError('');
+    log('起動リクエストを送信しています…', 'info');
+    setLoading(true);
+    jsonpGet({ action: 'start' }, function(data) {
+        setLoading(false);
+        if (!data) { showError('レスポンスを取得できませんでした'); return; }
+        if (data.success) {
+        log('起動リクエスト送信完了: ' + (data.message || ''), 'ok');
+        setTimeout(checkStatus, 10000);
+        } else {
+        log('起動失敗: ' + (data.message || ''), 'err');
+        showError(data.message || '起動失敗');
+        }
+    });
+    }
+
+    function checkStatus() {
+    showError('');
+    log('ステータスを確認しています…', 'info');
+    setLoading(true);
+    jsonpGet({ action: 'status' }, function(data) {
+        setLoading(false);
+        if (!data) { showError('レスポンスを取得できませんでした'); return; }
+        if (data.success) {
+        updateStatus(data.status, data.lastRunTime);
+        if (data.gpu_utilization !== undefined) {
+            var gpuEl = document.getElementById('gpuValue');
+            gpuEl.textContent = Math.round(data.gpu_utilization) + '%';
+            gpuEl.className   = 'metric-value ' + (data.gpu_utilization > 80 ? 'running' : 'muted');
+        }
+        log('ステータス: ' + data.status, 'ok');
+        } else {
+        log('確認失敗: ' + (data.error || ''), 'err');
+        showError(data.error || '確認失敗');
+        }
+    });
+    }
+
+    function stopNotebook() {
+    window.open('https://www.kaggle.com/code/ymatsuda2025/gemma4-12b', '_blank');
+    log('Kaggleページを開きました → View Active Events → Stop Session', 'warn');
+    resetElapsedDisplay();
+    }
+
+    function toggleAuto() {
+    var on = document.getElementById('autoRefresh').checked;
+    if (on) {
+        var sec = 30;
+        var tick = function() {
+        document.getElementById('nextRefresh').textContent = '次の更新: ' + sec + '秒後';
+        if (--sec < 0) sec = 30;
+        };
+        tick();
+        cdTimer   = setInterval(tick, 1000);
+        autoTimer = setInterval(function() { checkStatus(); sec = 30; }, 30000);
+    } else {
+        clearInterval(autoTimer);
+        clearInterval(cdTimer);
+        document.getElementById('nextRefresh').textContent = '';
+    }
+    }
+    </script>
 </head>
 <body>
 
