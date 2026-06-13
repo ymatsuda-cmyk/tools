@@ -31,7 +31,6 @@
       justify-content: center;
       padding: 2rem 1rem;
     }
-
     header { text-align: center; margin-bottom: 2rem; }
     header .eyebrow {
       font-family: var(--font-mono);
@@ -52,7 +51,6 @@
       width: 100%;
       max-width: 460px;
     }
-
     .field-label {
       font-size: 0.68rem;
       font-family: var(--font-mono);
@@ -60,6 +58,7 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       margin-bottom: 0.4rem;
+      display: block;
     }
     .field-input {
       width: 100%;
@@ -76,7 +75,6 @@
     }
     .field-input:focus { border-color: var(--accent); }
 
-    /* ステータス */
     .status-row {
       display: flex;
       align-items: center;
@@ -104,7 +102,20 @@
     .status-text { flex: 1; }
     .status-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
 
-    /* ボタン */
+    .error-banner {
+      display: none;
+      background: rgba(248,81,73,0.1);
+      border: 1px solid var(--danger);
+      border-radius: 6px;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.78rem;
+      color: var(--danger);
+      margin-bottom: 1rem;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+    .error-banner.visible { display: block; }
+
     .btn-group {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -130,23 +141,6 @@
     .btn-status:hover:not(:disabled) { background: #2a4f7a; }
     .btn-stop:hover:not(:disabled)   { background: rgba(248,81,73,0.1); }
 
-    /* エラーバナー */
-    .error-banner {
-      display: none;
-      background: rgba(248,81,73,0.1);
-      border: 1px solid var(--danger);
-      border-radius: 6px;
-      padding: 0.65rem 0.9rem;
-      font-size: 0.78rem;
-      color: var(--danger);
-      margin-bottom: 1rem;
-      line-height: 1.5;
-      word-break: break-all;
-    }
-    .error-banner.visible { display: block; }
-
-    /* ログ */
-    .field-label { display: block; }
     .log {
       background: var(--bg);
       border: 1px solid var(--border);
@@ -166,7 +160,6 @@
     .le.info { color: var(--accent);  }
     .le.warn { color: var(--warning); }
 
-    /* フッター */
     .footer {
       display: flex;
       align-items: center;
@@ -188,10 +181,9 @@
 </header>
 
 <div class="card">
-
-  <div class="field-label">GAS Endpoint URL</div>
+  <span class="field-label">GAS Endpoint URL</span>
   <input id="gasUrl" class="field-input" type="text"
-    placeholder="https://script.google.com/macros/s/AKfycbzr0IbcrTlsINvTZSKZZ8nQo9HNFcT6aFlaKzprt_rCX8VeMU5MFOMFPLMmSjI441TB/exec"
+    placeholder="https://script.google.com/macros/s/xxxxxx/exec"
     spellcheck="false" />
 
   <div class="status-row">
@@ -200,7 +192,6 @@
     <span class="status-time" id="statusTime"></span>
   </div>
 
-  <!-- エラー詳細バナー -->
   <div class="error-banner" id="errorBanner"></div>
 
   <div class="btn-group">
@@ -209,7 +200,7 @@
     <button class="btn btn-stop"   id="btnStop"   onclick="stopNotebook()">■ 停止</button>
   </div>
 
-  <div class="field-label" style="margin-bottom:0.4rem">ログ</div>
+  <span class="field-label">ログ</span>
   <div class="log" id="log"></div>
 
   <div class="footer">
@@ -219,115 +210,171 @@
     </label>
     <span id="nextRefresh"></span>
   </div>
-
 </div>
 
 <script>
   // GAS URLをlocalStorageに保存
-  const urlInput = document.getElementById('gasUrl');
+  var urlInput = document.getElementById('gasUrl');
   urlInput.value = localStorage.getItem('gasUrl') || '';
-  urlInput.addEventListener('input', () => localStorage.setItem('gasUrl', urlInput.value.trim()));
+  urlInput.addEventListener('input', function() {
+    localStorage.setItem('gasUrl', urlInput.value.trim());
+  });
 
-  let autoTimer = null;
-  let cdTimer   = null;
+  var autoTimer = null;
+  var cdTimer   = null;
 
-  // ── ログ ──
   function log(msg, type) {
     type = type || 'default';
-    const el  = document.getElementById('log');
-    const now = new Date().toLocaleTimeString('ja-JP');
-    const div = document.createElement('div');
+    var el  = document.getElementById('log');
+    var now = new Date().toLocaleTimeString('ja-JP');
+    var div = document.createElement('div');
     div.className = 'le ' + type;
     div.textContent = '[' + now + '] ' + msg;
     el.prepend(div);
   }
 
-  // ── エラーバナー ──
   function showError(msg) {
-    const el = document.getElementById('errorBanner');
+    var el = document.getElementById('errorBanner');
     if (msg) { el.textContent = '⚠ ' + msg; el.classList.add('visible'); }
     else      { el.classList.remove('visible'); }
   }
 
-  // ── ステータス更新 ──
   function updateStatus(status, time) {
-    const dot  = document.getElementById('dot');
-    const text = document.getElementById('statusText');
-    const ts   = document.getElementById('statusTime');
+    var dot  = document.getElementById('dot');
+    var text = document.getElementById('statusText');
+    var ts   = document.getElementById('statusTime');
     dot.className = 'dot';
-    const map = {
-      running:             ['running',  '実行中'],
-      queued:              ['queued',   'キュー待ち'],
-      complete:            ['complete', '完了'],
-      error:               ['error',    'エラー'],
-      cancelAcknowledged:  ['',         'キャンセル済み'],
+    var map = {
+      running:            ['running',  '実行中'],
+      queued:             ['queued',   'キュー待ち'],
+      complete:           ['complete', '完了'],
+      error:              ['error',    'エラー'],
+      cancelAcknowledged: ['',         'キャンセル済み'],
     };
-    const [cls, label] = map[status] || ['', status || '不明'];
-    if (cls) dot.classList.add(cls);
-    text.textContent = label;
+    var pair  = map[status] || ['', status || '不明'];
+    if (pair[0]) dot.classList.add(pair[0]);
+    text.textContent = pair[1];
     ts.textContent   = time ? new Date(time).toLocaleString('ja-JP') : '';
   }
 
-  // ── ローディング制御 ──
   function setLoading(v) {
-    ['btnStart','btnStatus','btnStop'].forEach(id => {
+    ['btnStart','btnStatus','btnStop'].forEach(function(id) {
       document.getElementById(id).disabled = v;
     });
   }
 
-  // ── GAS GET ──
-  async function gasGet(params) {
-    const url = urlInput.value.trim();
-    if (!url) { log('GAS URLが未設定です', 'err'); return null; }
-    const qs  = new URLSearchParams(params).toString();
-    const res = await fetch(url + '?' + qs);
-    return res.json();
+  // ── JSONP方式（GET / ステータス確認）──
+  function jsonpGet(params, callback) {
+    var url = urlInput.value.trim();
+    if (!url) { log('GAS URLが未設定です', 'err'); callback(null); return; }
+
+    var cbName = 'cb_' + Date.now();
+    var script = document.createElement('script');
+    var qs = '';
+    params.callback = cbName;
+    Object.keys(params).forEach(function(k) { qs += '&' + k + '=' + encodeURIComponent(params[k]); });
+    script.src = url + '?' + qs.slice(1);
+
+    var timer = setTimeout(function() {
+      cleanup();
+      log('タイムアウト（30秒）', 'err');
+      callback(null);
+    }, 30000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data) {
+      cleanup();
+      callback(data);
+    };
+
+    script.onerror = function() {
+      cleanup();
+      log('スクリプト読み込みエラー', 'err');
+      callback(null);
+    };
+
+    document.head.appendChild(script);
   }
 
-  // ── GAS POST（GASのCORS制約でtext/plainを使用）──
-  async function gasPost(body) {
-    const url = urlInput.value.trim();
-    if (!url) { log('GAS URLが未設定です', 'err'); return null; }
-    const res = await fetch(url, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: { 'Content-Type': 'text/plain' }
-    });
-    return res.json();
+  // ── フォームsubmit方式（POST / 起動・停止）──
+  // GASはform submitのPOSTを受け付けるが、レスポンスを直接読めない
+  // そのため hidden iframe + form で送信し、完了後にステータス確認で結果を確認する
+  function formPost(action, onDone) {
+    var url = urlInput.value.trim();
+    if (!url) { log('GAS URLが未設定です', 'err'); onDone(null); return; }
+
+    // iframeを使って非同期送信
+    var iframeName = 'iframe_' + Date.now();
+    var iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = iframeName;
+    form.style.display = 'none';
+
+    // actionをhiddenフィールドで渡す
+    var input = document.createElement('input');
+    input.type  = 'hidden';
+    input.name  = 'action';
+    input.value = action;
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+
+    var timer = setTimeout(function() {
+      cleanup();
+      onDone({ success: true, message: 'リクエスト送信完了（結果は確認ボタンで確認）' });
+    }, 5000);
+
+    iframe.onload = function() {
+      clearTimeout(timer);
+      cleanup();
+      onDone({ success: true, message: 'リクエスト送信完了' });
+    };
+
+    function cleanup() {
+      if (form.parentNode)   form.parentNode.removeChild(form);
+      if (iframe.parentNode) setTimeout(function() { iframe.parentNode.removeChild(iframe); }, 1000);
+    }
+
+    form.submit();
   }
 
   // ── 起動 ──
-  async function startNotebook() {
+  function startNotebook() {
     showError('');
     log('起動リクエストを送信しています…', 'info');
     setLoading(true);
-    try {
-      const data = await gasPost({ action: 'start' });
-      if (!data) return;
-      if (data.success) {
-        log('起動リクエスト送信完了', 'ok');
-        setTimeout(checkStatus, 4000);
-      } else {
-        const detail = data.detail ? JSON.stringify(data.detail) : '';
-        log('起動失敗: ' + (data.message || ''), 'err');
-        showError((data.message || '起動失敗') + (detail ? '\n' + detail : ''));
-      }
-    } catch (e) {
-      log('通信エラー: ' + e.message, 'err');
-      showError(e.message);
-    } finally {
+    formPost('start', function(data) {
       setLoading(false);
-    }
+      if (data && data.success) {
+        log('起動リクエスト送信完了 — 数十秒後に確認してください', 'ok');
+        // 10秒後に自動でステータス確認
+        setTimeout(checkStatus, 10000);
+      } else {
+        log('送信失敗', 'err');
+        showError('送信に失敗しました');
+      }
+    });
   }
 
-  // ── ステータス確認 ──
-  async function checkStatus() {
+  // ── ステータス確認（JSONP）──
+  function checkStatus() {
     showError('');
     log('ステータスを確認しています…', 'info');
     setLoading(true);
-    try {
-      const data = await gasGet({ action: 'status' });
-      if (!data) return;
+    jsonpGet({ action: 'status' }, function(data) {
+      setLoading(false);
+      if (!data) { showError('レスポンスを取得できませんでした'); return; }
       if (data.success) {
         updateStatus(data.status, data.lastRunTime);
         log('ステータス: ' + data.status, 'ok');
@@ -335,50 +382,39 @@
         log('確認失敗: ' + (data.error || ''), 'err');
         showError((data.error || '確認失敗') + (data.detail ? '\n' + data.detail : ''));
       }
-    } catch (e) {
-      log('通信エラー: ' + e.message, 'err');
-      showError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   // ── 停止 ──
-  async function stopNotebook() {
+  function stopNotebook() {
     if (!confirm('Notebookを停止しますか？')) return;
     showError('');
     log('停止リクエストを送信しています…', 'warn');
     setLoading(true);
-    try {
-      const data = await gasPost({ action: 'stop' });
-      if (!data) return;
-      if (data.success) {
-        log('停止しました', 'ok');
+    formPost('stop', function(data) {
+      setLoading(false);
+      if (data && data.success) {
+        log('停止リクエスト送信完了', 'ok');
         updateStatus('cancelAcknowledged', null);
       } else {
-        log('停止失敗: ' + (data.message || ''), 'err');
-        showError((data.message || '停止失敗') + (data.detail ? '\n' + data.detail : ''));
+        log('送信失敗', 'err');
+        showError('送信に失敗しました');
       }
-    } catch (e) {
-      log('通信エラー: ' + e.message, 'err');
-      showError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   // ── 自動更新 ──
   function toggleAuto() {
-    const on = document.getElementById('autoRefresh').checked;
+    var on = document.getElementById('autoRefresh').checked;
     if (on) {
-      let sec = 30;
-      const tick = () => {
+      var sec = 30;
+      var tick = function() {
         document.getElementById('nextRefresh').textContent = '次の更新: ' + sec + '秒後';
         if (--sec < 0) sec = 30;
       };
       tick();
-      cdTimer    = setInterval(tick, 1000);
-      autoTimer  = setInterval(() => { checkStatus(); sec = 30; }, 30000);
+      cdTimer   = setInterval(tick, 1000);
+      autoTimer = setInterval(function() { checkStatus(); sec = 30; }, 30000);
     } else {
       clearInterval(autoTimer);
       clearInterval(cdTimer);
