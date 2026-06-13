@@ -213,7 +213,6 @@
 </div>
 
 <script>
-  // GAS URLをlocalStorageに保存
   var urlInput = document.getElementById('gasUrl');
   urlInput.value = localStorage.getItem('gasUrl') || '';
   urlInput.addEventListener('input', function() {
@@ -235,7 +234,7 @@
 
   function showError(msg) {
     var el = document.getElementById('errorBanner');
-    if (msg) { el.textContent = '⚠ ' + msg; el.classList.add('visible'); }
+    if (msg) { el.textContent = msg; el.classList.add('visible'); }
     else      { el.classList.remove('visible'); }
   }
 
@@ -251,7 +250,7 @@
       error:              ['error',    'エラー'],
       cancelAcknowledged: ['',         'キャンセル済み'],
     };
-    var pair  = map[status] || ['', status || '不明'];
+    var pair = map[status] || ['', status || '不明'];
     if (pair[0]) dot.classList.add(pair[0]);
     text.textContent = pair[1];
     ts.textContent   = time ? new Date(time).toLocaleString('ja-JP') : '';
@@ -263,23 +262,24 @@
     });
   }
 
-  // ── JSONP方式（GET / ステータス確認）──
+  // ── JSONP（GETリクエスト）──
   function jsonpGet(params, callback) {
     var url = urlInput.value.trim();
     if (!url) { log('GAS URLが未設定です', 'err'); callback(null); return; }
 
     var cbName = 'cb_' + Date.now();
     var script = document.createElement('script');
-    var qs = '';
     params.callback = cbName;
-    Object.keys(params).forEach(function(k) { qs += '&' + k + '=' + encodeURIComponent(params[k]); });
-    script.src = url + '?' + qs.slice(1);
+    var qs = Object.keys(params).map(function(k) {
+      return k + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    script.src = url + '?' + qs;
 
     var timer = setTimeout(function() {
       cleanup();
-      log('タイムアウト（30秒）', 'err');
+      log('タイムアウト（60秒）', 'err');
       callback(null);
-    }, 30000);
+    }, 60000);
 
     function cleanup() {
       clearTimeout(timer);
@@ -294,80 +294,32 @@
 
     script.onerror = function() {
       cleanup();
-      log('スクリプト読み込みエラー', 'err');
+      log('接続エラー', 'err');
       callback(null);
     };
 
     document.head.appendChild(script);
   }
 
-  // ── フォームsubmit方式（POST / 起動・停止）──
-  // GASはform submitのPOSTを受け付けるが、レスポンスを直接読めない
-  // そのため hidden iframe + form で送信し、完了後にステータス確認で結果を確認する
-  function formPost(action, onDone) {
-    var url = urlInput.value.trim();
-    if (!url) { log('GAS URLが未設定です', 'err'); onDone(null); return; }
-
-    // iframeを使って非同期送信
-    var iframeName = 'iframe_' + Date.now();
-    var iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = url;
-    form.target = iframeName;
-    form.style.display = 'none';
-
-    // actionをhiddenフィールドで渡す
-    var input = document.createElement('input');
-    input.type  = 'hidden';
-    input.name  = 'action';
-    input.value = action;
-    form.appendChild(input);
-
-    document.body.appendChild(form);
-
-    var timer = setTimeout(function() {
-      cleanup();
-      onDone({ success: true, message: 'リクエスト送信完了（結果は確認ボタンで確認）' });
-    }, 5000);
-
-    iframe.onload = function() {
-      clearTimeout(timer);
-      cleanup();
-      onDone({ success: true, message: 'リクエスト送信完了' });
-    };
-
-    function cleanup() {
-      if (form.parentNode)   form.parentNode.removeChild(form);
-      if (iframe.parentNode) setTimeout(function() { iframe.parentNode.removeChild(iframe); }, 1000);
-    }
-
-    form.submit();
-  }
-
-  // ── 起動 ──
+  // ── 起動（GETで処理）──
   function startNotebook() {
     showError('');
     log('起動リクエストを送信しています…', 'info');
     setLoading(true);
-    formPost('start', function(data) {
+    jsonpGet({ action: 'start' }, function(data) {
       setLoading(false);
-      if (data && data.success) {
-        log('起動リクエスト送信完了 — 数十秒後に確認してください', 'ok');
-        // 10秒後に自動でステータス確認
+      if (!data) { showError('レスポンスを取得できませんでした'); return; }
+      if (data.success) {
+        log('起動リクエスト送信完了: ' + (data.message || ''), 'ok');
         setTimeout(checkStatus, 10000);
       } else {
-        log('送信失敗', 'err');
-        showError('送信に失敗しました');
+        log('起動失敗: ' + (data.message || ''), 'err');
+        showError(data.message || '起動失敗');
       }
     });
   }
 
-  // ── ステータス確認（JSONP）──
+  // ── ステータス確認（GETで処理）──
   function checkStatus() {
     showError('');
     log('ステータスを確認しています…', 'info');
@@ -380,7 +332,7 @@
         log('ステータス: ' + data.status, 'ok');
       } else {
         log('確認失敗: ' + (data.error || ''), 'err');
-        showError((data.error || '確認失敗') + (data.detail ? '\n' + data.detail : ''));
+        showError(data.error || '確認失敗');
       }
     });
   }
