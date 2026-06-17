@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemma4 Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 12px 20px; background: #16213e; border-bottom: 1px solid #0f3460; font-size: 16px; font-weight: bold; color: #e94560; }
+    #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .msg.user { background: #0f3460; align-self: flex-end; }
+    .msg.assistant { background: #16213e; border: 1px solid #0f3460; align-self: flex-start; }
+    .msg.system { background: #2a2a3e; align-self: center; font-size: 13px; color: #888; font-style: italic; }
+    #input-area { display: flex; gap: 8px; padding: 16px; background: #16213e; border-top: 1px solid #0f3460; }
+    #input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #0f3460; background: #1a1a2e; color: #eee; font-size: 15px; resize: none; height: 44px; }
+    #input:focus { outline: none; border-color: #e94560; }
+    #send { padding: 10px 20px; background: #e94560; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
+    #send:disabled { background: #555; cursor: not-allowed; }
+    .thinking { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<header>🤖 Gemma4 Chat</header>
+<div id="messages">
+  <div class="msg system">Kaggle上のGemma4に接続中...</div>
+</div>
+<div id="input-area">
+  <textarea id="input" placeholder="メッセージを入力（Shift+Enterで改行）" rows="1"></textarea>
+  <button id="send" onclick="sendMessage()">送信</button>
+</div>
+
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyXCVydELMx8LegJif6c8oWizthdjRUG-RkutVW2TXEFpMMa0ov6prP2EMEFych5mdM/exec";
+
+  function addMessage(role, text) {
+    const div = document.createElement("div");
+    div.className = `msg ${role}`;
+    div.textContent = text;
+    document.getElementById("messages").appendChild(div);
+    div.scrollIntoView({ behavior: "smooth" });
+    return div;
+  }
+
+  function sendMessage() {
+    const input = document.getElementById("input");
+    const prompt = input.value.trim();
+    if (!prompt) return;
+
+    input.value = "";
+    input.style.height = "44px";
+    addMessage("user", prompt);
+    
+    const btn = document.getElementById("send");
+    btn.disabled = true;
+    const thinkingDiv = addMessage("assistant", "考え中...");
+    thinkingDiv.classList.add("thinking");
+
+    const cbName = "cb_" + Date.now();
+    window[cbName] = function(data) {
+      delete window[cbName];
+      document.getElementById("messages").removeChild(thinkingDiv);
+      if (data.ok) {
+        addMessage("assistant", data.response);
+      } else {
+        addMessage("system", "エラー: " + (data.error || "不明なエラー"));
+      }
+      btn.disabled = false;
+    };
+
+    const script = document.createElement("script");
+    script.src = `${GAS_URL}?action=chat&prompt=${encodeURIComponent(prompt)}&callback=${cbName}`;
+    script.onerror = () => {
+      addMessage("system", "通信エラー（Kaggleが起動していない可能性があります）");
+      btn.disabled = false;
+    };
+    document.body.appendChild(script);
+  }
+
+  // Shift+Enter で改行、Enterで送信
+  document.getElementById("input").addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+    // テキストエリアの高さを自動調整
+    setTimeout(() => {
+      this.style.height = "44px";
+      this.style.height = Math.min(this.scrollHeight, 120) + "px";
+    }, 0);
+  });
+
+  // 起動確認
+  window.addEventListener("load", () => {
+    const cbName = "cb_status_" + Date.now();
+    window[cbName] = function(data) {
+      delete window[cbName];
+      const status = data.status || "unknown";
+      const msg = status === "running" ? "✅ Gemma4に接続しました" : `⚠️ Kaggleの状態: ${status}`;
+      addMessage("system", msg);
+    };
+    const script = document.createElement("script");
+    script.src = `${GAS_URL}?action=status&callback=${cbName}`;
+    document.body.appendChild(script);
+  });
+</script>
+
+</body>
+</html>
