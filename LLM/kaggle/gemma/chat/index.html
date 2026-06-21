@@ -79,9 +79,15 @@
     document.body.appendChild(script);
   }
 
-  // Shift+Enter で改行、Enterで送信
-  document.getElementById("input").addEventListener("keydown", function(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+  // IME入力中フラグ（かな変換中にEnterで送信されるのを防ぐ）
+  let isComposing = false;
+  const input = document.getElementById("input");
+
+  input.addEventListener("compositionstart", () => { isComposing = true; });
+  input.addEventListener("compositionend", () => { isComposing = false; });
+
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey && !isComposing) {
       e.preventDefault();
       sendMessage();
     }
