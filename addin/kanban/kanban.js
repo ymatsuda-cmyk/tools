@@ -12,12 +12,22 @@ let selectedCategory = null;
 let selectedSubCategory = null;
 let selectedPeriod = "all";
 let showHeld = true; // 保留表示フラグ
+let officeReady = false;
+let isExcelHost = false;
 
 // レーン高さ調整のデバウンス用変数
 let heightAdjustTimeout = null;
 let isAdjustingHeights = false;
 
-Office.onReady(() => {
+Office.onReady((info) => {
+  officeReady = true;
+  isExcelHost = info && info.host === Office.HostType.Excel;
+
+  if (!isExcelHost) {
+    console.log("Excel以外のホスト、またはOffice外の実行環境のため初期化をスキップします。");
+    return;
+  }
+
   // 保存されたサイズを復元
   restoreSavedSize();
   
@@ -32,6 +42,23 @@ Office.onReady(() => {
   
   init();
 });
+
+function canUseExcelApi() {
+  return officeReady && isExcelHost && typeof Excel !== "undefined";
+}
+
+async function reloadKanban() {
+  if (!canUseExcelApi()) {
+    console.log("Excel APIが利用できないため再読み込みをスキップしました。");
+    return;
+  }
+
+  await init();
+
+  if (typeof updateVersionDisplay === "function") {
+    updateVersionDisplay();
+  }
+}
 
 // ===== サイズ記憶機能 =====
 function restoreSavedSize() {
@@ -499,6 +526,11 @@ function saveFilters() {
 }
 
 async function init() {
+  if (!canUseExcelApi()) {
+    console.log("Excel APIが利用可能になるまで待機中です。");
+    return;
+  }
+
   // 保存されたサイズまたはデフォルトサイズを適用
   try {
     const savedSize = localStorage.getItem('kanban-taskpane-size');
