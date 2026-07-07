@@ -7,26 +7,14 @@
         {
           "id": "kanban",
           "label": "カンバン",
-          "icon": "📋",
+          "icon": "",
           "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/"
         },
         {
           "id": "bug",
           "label": "バグ管理",
-          "icon": "🐞",
+          "icon": "",
           "url": "https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/"
-        },
-        {
-          "id": "dashboard",
-          "label": "ダッシュボード",
-          "icon": "📊",
-          "url": "https://ymatsuda-cmyk.github.io/tools/dashboard/"
-        },
-        {
-          "id": "taisei",
-          "label": "体制表",
-          "icon": "👥",
-          "url": "https://ymatsuda-cmyk.github.io/tools/taisei/"
         }
       ]
     },
@@ -37,7 +25,7 @@
           "id": "help",
           "label": "使い方",
           "icon": "❓",
-          "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/",
+          "url": "",
           "external": true
         }
       ]
