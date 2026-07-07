@@ -248,15 +248,24 @@ function updateChips() {
 
   const catChip = document.getElementById("chip-cat");
   if (selectedCategory) {
-    const label = selectedSubCategory
-      ? `${selectedCategory} / ${selectedSubCategory}`
-      : selectedCategory;
     catChip.classList.add("selected");
     catChip.innerHTML =
-      `分類: ${escapeHtml(label)} <span class="clear" onclick="clearCategoryFilter(event)">✕</span>`;
+      `分類: ${escapeHtml(selectedCategory)} <span class="clear" onclick="clearCategoryFilter(event)">✕</span>`;
   } else {
     catChip.classList.remove("selected");
     catChip.innerHTML = `分類 <span class="caret"></span>`;
+  }
+
+  const subCatChip = document.getElementById("chip-subcat");
+  if (subCatChip) {
+    if (selectedSubCategory) {
+      subCatChip.classList.add("selected");
+      subCatChip.innerHTML =
+        `小分類: ${escapeHtml(selectedSubCategory)} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
+    } else {
+      subCatChip.classList.remove("selected");
+      subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
+    }
   }
 }
 
@@ -271,6 +280,13 @@ function clearUserFilter(e) {
 function clearCategoryFilter(e) {
   e.stopPropagation();
   selectedCategory = null;
+  saveFilters();
+  renderFilters();
+  renderBoard();
+}
+
+function clearSubCategoryFilter(e) {
+  e.stopPropagation();
   selectedSubCategory = null;
   saveFilters();
   renderFilters();
@@ -322,17 +338,21 @@ function renderCategoryDropdown() {
     b.textContent = c;
 
     b.onclick = () => {
-      selectedCategory = (selectedCategory === c) ? null : c;
-      selectedSubCategory = null; // 大分類変更時は小分類をリセット
+      const nextCategory = (selectedCategory === c) ? null : c;
+      selectedCategory = nextCategory;
+
+      // 選択済み小分類が新しい大分類配下に存在しない場合のみリセット
+      if (selectedSubCategory && selectedCategory) {
+        const stillExists = allTasks.some(t =>
+          t.category === selectedCategory && t.classification === selectedSubCategory
+        );
+        if (!stillExists) selectedSubCategory = null;
+      }
+
       saveFilters();
       renderFilters();
       renderBoard();
-      // 小分類がある場合はドロップダウンを開いたままにする
-      const hasSub = selectedCategory &&
-        allTasks.some(t => t.category === selectedCategory &&
-          t.classification && String(t.classification).trim() !== "" &&
-          t.classification !== "#");
-      if (!hasSub) closeAllDropdowns();
+      closeAllDropdowns();
     };
 
     el.appendChild(b);
@@ -340,29 +360,27 @@ function renderCategoryDropdown() {
 }
 
 function renderSubCategoryDropdown() {
-  const section = document.getElementById("sub-category-section");
   const el = document.getElementById("sub-category-filters");
-  if (!section || !el) return;
-
-  if (!selectedCategory) {
-    section.style.display = "none";
-    return;
-  }
+  if (!el) return;
 
   const subCats = [...new Set(
     allTasks
-      .filter(t => t.category === selectedCategory)
+      .filter(t => !selectedCategory || t.category === selectedCategory)
       .map(t => t.classification)
       .filter(v => v && v !== "#" && v.toString().trim() !== "")
   )];
 
+  el.innerHTML = "";
+
   if (subCats.length === 0) {
-    section.style.display = "none";
+    const empty = document.createElement("div");
+    empty.className = "dd-item";
+    empty.textContent = "小分類なし";
+    empty.style.opacity = "0.6";
+    empty.style.cursor = "default";
+    el.appendChild(empty);
     return;
   }
-
-  section.style.display = "block";
-  el.innerHTML = "";
 
   subCats.forEach(s => {
     const b = document.createElement("button");

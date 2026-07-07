@@ -55,6 +55,9 @@
   <!-- 分類チップ -->
   <button class="chip" id="chip-cat" onclick="toggleDropdown('dd-cat', this)"></button>
 
+  <!-- 小分類チップ -->
+  <button class="chip" id="chip-subcat" onclick="toggleDropdown('dd-subcat', this)"></button>
+
   <!-- 期間セグメント -->
   <div class="segment" id="seg-period">
     <button data-p="all">全て</button>
@@ -81,10 +84,12 @@
   <div class="dropdown" id="dd-cat">
     <div class="dd-label">分類で絞り込み</div>
     <div id="category-filters"></div>
-    <div id="sub-category-section" style="display:none;">
-      <div class="dd-label">小分類</div>
-      <div id="sub-category-filters"></div>
-    </div>
+  </div>
+
+  <!-- ドロップダウン：小分類 -->
+  <div class="dropdown" id="dd-subcat">
+    <div class="dd-label">小分類で絞り込み</div>
+    <div id="sub-category-filters"></div>
   </div>
 
 </div>
