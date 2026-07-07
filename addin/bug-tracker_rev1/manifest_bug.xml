@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <!-- ★ バグ管理アドイン専用のユニークID -->
+  <Id>b3f8c2e1-9a7d-4c5b-8f3e-2d1a9c7b5e8f</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>RightArm</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+  <DisplayName DefaultValue="バグ管理"/>
+  <Description DefaultValue="バグシートを一覧/カンバンで管理するアドイン"/>
+  <!-- ★ <YOUR_GH_USER> と <REPO> を実際の値に置換 -->
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/"/>
+
+  <AppDomains>
+    <AppDomain>https://ymatsuda-cmyk.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/index.html"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="BugTracker.Group">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.64x64"/>
+                </Icon>
+                <Control xsi:type="Button" id="BugTracker.OpenPane">
+                  <Label resid="OpenPane.Label"/>
+                  <Supertip>
+                    <Title resid="OpenPane.Title"/>
+                    <Description resid="OpenPane.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.64x64"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/assets/icon-32.png"/>
+        <bt:Image id="Icon.64x64" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/assets/icon-64.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/index.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="バグ管理アドイン"/>
+        <bt:String id="Group.Label" DefaultValue="バグ管理"/>
+        <bt:String id="OpenPane.Label" DefaultValue="バグ一覧を開く"/>
+        <bt:String id="OpenPane.Title" DefaultValue="バグ管理パネルを表示"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="バグシートの内容を一覧/カンバンで表示します。"/>
+        <bt:String id="OpenPane.Tooltip" DefaultValue="バグ一覧とカンバンを切り替えて閲覧・編集できます。"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

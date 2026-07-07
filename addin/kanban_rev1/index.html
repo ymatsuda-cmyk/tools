@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <title>Kanban</title>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="kanban.js"></script>
+  <link rel="stylesheet" href="style.css">
+
+  <script>
+    const SHOW_VERSION = true;
+    const VIEW_VERSION = "rev_20260410_xxxxxxx";
+
+    function renderVersion() {
+      if (!SHOW_VERSION) return;
+      document.getElementById("version-label").textContent =
+        `${window.APP_VERSION || "loading..."}`;  
+    }
+
+    // Office.onReady後にバージョンを再表示
+    function updateVersionDisplay() {
+      if (SHOW_VERSION && window.APP_VERSION) {
+        document.getElementById("version-label").textContent =
+          `${window.APP_VERSION}`;
+      }
+    }
+  </script>
+</head>
+
+<body onload="renderVersion()">
+
+<div class="top-bar">
+  <span id="version-label"></span>
+  <button onclick="init(); updateVersionDisplay();">Reload</button>
+  <button onclick="resetSize();" title="サイズとフィルター設定をリセット">Reset</button>
+</div>
+
+<!-- フィルタ制御ボタン -->
+<div class="filter-control-buttons">
+  <button class="filter-toggle-btn" id="btn-user-filter" onclick="toggleFilterSection('user-filter')">担当者</button>
+  <button class="filter-toggle-btn" id="btn-category-filter" onclick="toggleFilterSection('category-filter')">分類</button>
+  <button class="filter-toggle-btn" id="btn-period-filter" onclick="toggleFilterSection('period-filter')">期間</button>
+</div>
+
+<div class="filter-section hidden" id="user-filter">
+  <h4>担当者</h4>
+  <div id="user-filters"></div>
+</div>
+
+<div class="filter-section hidden" id="category-filter">
+  <h4>分類</h4>
+  <div id="category-filters"></div>
+  <div id="sub-category-section" style="display:none;">
+    <h4>小分類</h4>
+    <div id="sub-category-filters"></div>
+  </div>
+</div>
+
+<div class="filter-section hidden" id="period-filter">
+  <h4>期間</h4>
+  <div>
+    <button data-period="all" onclick="setPeriod('all')">全期間</button>
+    <button data-period="past" onclick="setPeriod('past')">以前</button>
+    <button data-period="week" onclick="setPeriod('week')">今週</button>
+    <button data-period="nextweek" onclick="setPeriod('nextweek')">来週</button>
+    <button data-period="future" onclick="setPeriod('future')">以降</button>
+    <button data-period="today" onclick="setPeriod('today')">本日★</button>
+    <button data-period="todo" onclick="setPeriod('todo')">TODO</button>
+  </div>
+</div>
+
+<div>
+  <label><input type="checkbox" id="show-held" checked onchange="toggleHeldDisplay()"> 保留を表示</label>
+</div>
+
+<hr>
+
+<div id="board">
+
+  <div class="lane" id="todo">
+    <h3>未着手</h3>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="held">
+    <h3>保留</h3>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="doing">
+    <h3>対応中</h3>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="done">
+    <h3>完了</h3>
+    <div class="card-list"></div>
+  </div>
+
+</div>
+
+<!-- モーダル -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <h3 id="modal-title"></h3>
+    <textarea id="modal-note"></textarea>
+    <div class="modal-actions">
+      <button onclick="saveNote()">保存</button>
+      <button onclick="closeModal()">閉じる</button>
+      <small style="color: #666; margin-left: 10px;">ESC: 閉じる</small>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

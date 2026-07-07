@@ -1,0 +1,3442 @@
+/* バグ管理 アドイン
+   - バグシートの 2行目=項目名 / 3行目=入力例 / 4行目以降=データ
+   - Excel.js があればExcel連携、なければデモデータでブラウザ単体動作
+*/
+(function () {
+  'use strict';
+
+  const SHEET_NAME = 'バグ';
+  const HEADER_ROW = 2;
+  const SAMPLE_ROW = 3;
+  const DATA_START = 4;
+  const COL_COUNT  = 31;
+
+  // 動的にフィールド定義を生成する関数
+  function getColumns() {
+    return [
+      { key: 'id',         letter: 'A', label: 'ID',           group: '基本情報', type: 'readonly' },
+      { key: 'title',      letter: 'B', label: 'タイトル',      group: '基本情報', type: 'text' },
+      { key: 'status',     letter: 'C', label: '状況',         group: '基本情報', type: 'select', options: ['新規','解析','修正','確認','再発','完了'] },
+      { key: 'updated',    letter: 'D', label: '更新日',       group: '基本情報', type: 'date' },
+      { key: 'assignee',   letter: 'E', label: '担当者',       group: '基本情報', type: 'select', options: ['', ...ASSIGNEE_ORDER.slice(1)] }, // 動的に設定
+      { key: 'occurredOn', letter: 'F', label: '発生日',       group: '発生情報', type: 'date' },
+      { key: 'reporter',   letter: 'G', label: '登録者',       group: '発生情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'origin',     letter: 'H', label: '発生起因',     group: '発生情報', type: 'select', options: ['', ...ORIGIN_LIST] },
+      { key: 'originNumber', letter: 'I', label: '起因番号',   group: '発生情報', type: 'text' }, // 新規追加
+      { key: 'steps',      letter: 'J', label: '再現手順',     group: '発生情報', type: 'textarea' },
+      { key: 'expected',   letter: 'K', label: '期待する動作', group: '発生情報', type: 'textarea' },
+      { key: 'actual',     letter: 'L', label: '実際の動作',   group: '発生情報', type: 'textarea' },
+      { key: 'reproRate',  letter: 'M', label: '再現率',       group: '発生情報', type: 'select', options: ['','毎回','時々','1回のみ'] },
+      { key: 'cause',      letter: 'N', label: '原因',         group: '対応情報', type: 'textarea' },
+      { key: 'analyst',    letter: 'O', label: '解析者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'analysisDate', letter: 'P', label: '解析日',     group: '対応情報', type: 'date' },
+      { key: 'scope',      letter: 'Q', label: '影響範囲',     group: '対応情報', type: 'select', options: ['', ...ORIGIN_LIST, 'RPA', 'アプリ'] },
+      { key: 'fix',        letter: 'R', label: '対応内容',     group: '対応情報', type: 'textarea' },
+      { key: 'fixVer',     letter: 'S', label: '修正Ver',     group: '対応情報', type: 'text' },
+      { key: 'fixer',      letter: 'T', label: '対応者',       group: '対応情報', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'fixDate',    letter: 'U', label: '対応日',       group: '対応情報', type: 'date' },
+      { key: 'verify',     letter: 'V', label: '確認内容',     group: '結果確認', type: 'textarea' },
+      { key: 'reject',     letter: 'W', label: '差し戻し',     group: '結果確認', type: 'text' },
+      { key: 'verifier',   letter: 'X', label: '確認者',       group: '結果確認', type: 'select', options: ['', ...REPORTER_LIST] }, // 動的に設定
+      { key: 'verifyDate', letter: 'Y', label: '確認日',       group: '結果確認', type: 'date' },
+      { key: 'tag',        letter: 'Z', label: 'タグ',         group: '管理',     type: 'text' },
+      { key: 'priority',   letter: 'AA', label: '優先度',       group: '管理',     type: 'select', options: ['', ...PRIORITY_LIST] },
+      { key: 'severity',   letter: 'AB', label: '影響度',      group: '管理',     type: 'select', options: ['', ...SEVERITY_LIST] },
+      { key: 'starred',    letter: 'AC', label: '本日分',     group: '管理',     type: 'text' },
+      { key: 'periodStart', letter: 'AD', label: '期間開始',   group: '設定',     type: 'date' },
+      { key: 'periodEnd',   letter: 'AE', label: '期間終了',   group: '設定',     type: 'date' }
+    ];
+  }
+
+  const STATUS_ORDER = ['新規','解析','修正','確認','完了'];
+  
+  // 動的に設定されるマッピング（セルから取得）
+  let STATUS_DISPLAY_NAMES = {};
+  let ASSIGNEE_ORDER = ['(未割当)'];
+  let REPORTER_LIST = [];
+  let PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+  let SEVERITY_LIST = ['致命的','重大','軽微'];
+  let ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
+  const PRIORITY_RANK = { '高': 0, '中': 1, '低': 2, '': 3 };
+
+  function withGmoMember(memberList) {
+    const list = Array.isArray(memberList) ? memberList.slice() : [];
+    if (!list.includes('GMO')) list.push('GMO');
+    return list;
+  }
+
+  const state = {
+    bugs: [],
+    view: 'status',  // 'assignee' または 'status'
+    filters: { text: '', priority: '', status: '' },
+    inOffice: false,
+    editingRow: null,
+    presetTags: [], // プリセットタグを保存
+    lastSelectedReporter: localStorage.getItem('bugTracker_lastReporter') || '', // 前回選択した登録者
+    tabFormData: {} // タブのフォームデータを一時保存
+  };
+
+  function $(sel) { return document.querySelector(sel); }
+  function el(tag, attrs, children) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'text') e.textContent = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    if (children) children.forEach(c => c && e.appendChild(c));
+    return e;
+  }
+  function setStatus(msg) { $('#status-msg').textContent = msg || ''; }
+
+  function excelSerialToDateStr(v) {
+    if (v === null || v === undefined || v === '') return '';
+    if (typeof v === 'number') {
+      const ms = (v - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return String(v);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return String(v);
+  }
+
+  function ensureOffice(callback) {
+    if (typeof Office === 'undefined') {
+      state.inOffice = false;
+      $('#env-label').textContent = 'モード: ブラウザ単体(デモ)';
+      callback();
+      return;
+    }
+    Office.onReady(info => {
+      state.inOffice = (info && info.host === Office.HostType.Excel);
+      $('#env-label').textContent = state.inOffice ? 'モード: Excelアドイン' : 'モード: ブラウザ単体(デモ)';
+      callback();
+    });
+  }
+
+  async function loadFromExcel() {
+    if (!state.inOffice) {
+      state.bugs = demoData();
+      state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デモ用プリセット
+      // デモ用設定
+      STATUS_DISPLAY_NAMES = {
+        '新規': '新規',
+        '解析': '解析',
+        '修正': '修正',
+        '確認': '確認',
+        '再発': '再発',
+        '完了': '完了'
+      };
+      // E3セルから担当者リストと登録者リストを取得（デモモード）
+      const memberList = withGmoMember(['政次','高橋','伊藤','松田']);
+      ASSIGNEE_ORDER = ['(未割当)', ...memberList];
+      REPORTER_LIST = [...memberList];
+      PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+      SEVERITY_LIST = ['致命的','重大','軽微'];
+      ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
+      return;
+    }
+    setStatus('読み込み中...');
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      
+      // 各種設定をセルから取得
+      const configCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 2, 1, 28); // C3:AD3
+      configCells.load(['values']);
+      await ctx.sync();
+      
+      const configValues = configCells.values[0];
+      
+      // C3セル：状態別表記設定（「元の状態:表示名/元の状態:表示名」形式）
+      const statusDisplayConfig = configValues[0]; // C3 (C列は2番目なので0ベース)
+      if (statusDisplayConfig && typeof statusDisplayConfig === 'string') {
+        STATUS_DISPLAY_NAMES = {};
+        statusDisplayConfig.split('/').forEach(pair => {
+          const [original, display] = pair.split(':').map(s => s.trim());
+          if (original && display) {
+            STATUS_DISPLAY_NAMES[original] = display;
+          }
+        });
+      } else {
+        STATUS_DISPLAY_NAMES = {
+          '新規': '新規',
+          '解析': '解析',
+          '修正': '修正',
+          '確認': '確認',
+          '再発': '再発',
+          '完了': '完了'
+        };
+      }
+      
+      // E3セル：担当者・登録者リスト（/区切り）
+      const memberConfig = configValues[2]; // E3 (E列は4番目なので2ベース)
+      if (memberConfig && typeof memberConfig === 'string') {
+        const memberList = withGmoMember(memberConfig.split('/').map(s => s.trim()).filter(s => s));
+        ASSIGNEE_ORDER = ['(未割当)', ...memberList];
+        REPORTER_LIST = [...memberList];
+      } else {
+        const defaultMembers = withGmoMember(['政次','高橋','伊藤','松田']);
+        ASSIGNEE_ORDER = ['(未割当)', ...defaultMembers];
+        REPORTER_LIST = [...defaultMembers];
+      }
+      
+      // D3セル：割り当て表記設定（廃止予定 - E3セルを使用）
+      // const assigneeConfig = configValues[1];
+      
+      // G3セル：登録者リスト（廃止予定 - E3セルを使用）
+      // const reporterConfig = configValues[4];
+      
+      // H3セル：発生起因リスト（/区切り）
+      const originConfig = configValues[5]; // H3 (H列は7番目なので5ベース)
+      if (originConfig && typeof originConfig === 'string') {
+        ORIGIN_LIST = originConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        ORIGIN_LIST = ['定義(通常)','定義(電源断)','定義(通信断)'];
+      }
+      
+      // Y3セル：プリセットタグ
+      const presetTagValue = configValues[23]; // Z3 (Z列は25番目なので23ベース)
+      if (presetTagValue && typeof presetTagValue === 'string') {
+        state.presetTags = presetTagValue.split('/').map(t => t.trim()).filter(t => t);
+      } else {
+        state.presetTags = ['UI', 'RPA', '通信', '電源', '設定', '認証', 'データ', 'パフォーマンス']; // デフォルト
+      }
+      
+      // AA3セル：優先度リスト（/区切り）
+      const priorityConfig = configValues[26]; // AA3 (AA列は26番目なので26ベース)
+      if (priorityConfig && typeof priorityConfig === 'string') {
+        PRIORITY_LIST = priorityConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        PRIORITY_LIST = ['高（最優先）','中','低（改善）'];
+      }
+      
+      // AB3セル：影響度リスト（/区切り）
+      const severityConfig = configValues[27]; // AB3 (AB列は27番目なので27ベース)
+      if (severityConfig && typeof severityConfig === 'string') {
+        SEVERITY_LIST = severityConfig.split('/').map(s => s.trim()).filter(s => s);
+      } else {
+        SEVERITY_LIST = ['致命的','重大','軽微'];
+      }
+      
+
+      
+      const used = sheet.getUsedRange(true);
+      used.load(['rowCount', 'columnCount']);
+      await ctx.sync();
+
+      const rowCount = used.rowCount || 0;
+      if (rowCount < DATA_START) { state.bugs = []; return; }
+
+      const dataRange = sheet.getRangeByIndexes(
+        DATA_START - 1, 0, rowCount - (DATA_START - 1), COL_COUNT
+      );
+      dataRange.load(['values', 'numberFormat']);
+      await ctx.sync();
+
+      const values = dataRange.values;
+      const bugs = [];
+      const columns = getColumns(); // 一度取得して再利用
+      for (let r = 0; r < values.length; r++) {
+        const row = values[r];
+        if (row.every(v => v === '' || v === null)) continue;
+        const obj = { rowIndex: DATA_START + r };
+        for (let c = 0; c < COL_COUNT; c++) {
+          const colDef = columns[c];
+          let v = row[c];
+          if (colDef.type === 'date') v = excelSerialToDateStr(v);
+          if (v === null || v === undefined) v = '';
+          v = String(v);
+          obj[colDef.key] = v;
+        }
+        if (r === 130) {
+          console.log('Excel row[130]:', row);
+          console.log('Parsed bug obj[130]:', obj);
+        }
+        bugs.push(obj);
+      }
+      state.bugs = bugs;
+    });
+    setStatus('');
+  }
+
+  async function saveBugToExcel(bug) {
+    if (!state.inOffice) {
+      const idx = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+      if (idx >= 0) state.bugs[idx] = bug;
+      return;
+    }
+    setStatus('保存中...');
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      const rowIndex0 = bug.rowIndex - 1;
+      const writeRange = sheet.getRangeByIndexes(rowIndex0, 1, 1, COL_COUNT - 1);
+      const columns = getColumns(); // 一度取得して再利用
+      const rowVals = [];
+      for (let c = 1; c < COL_COUNT; c++) {
+        const colDef = columns[c];
+        let v = bug[colDef.key];
+        if (v === undefined || v === null) v = '';
+        rowVals.push(v);
+      }
+      writeRange.values = [rowVals];
+      
+      // 文字列の折り返しを無効にする
+      writeRange.format.wrapText = false;
+      
+      const today = new Date();
+      const tStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      const updatedRange = sheet.getRangeByIndexes(rowIndex0, 3, 1, 1);
+      updatedRange.values = [[tStr]];
+      
+      // 更新日セルの文字列折り返しを無効にする
+      updatedRange.format.wrapText = false;
+      
+      bug.updated = tStr;
+      await ctx.sync();
+    });
+    setStatus('保存しました');
+    setTimeout(() => setStatus(''), 2000);
+  }
+
+  function applyFilters(bugs) {
+    const f = state.filters;
+    return bugs.filter(b => {
+      if (f.priority && b.priority !== f.priority) return false;
+      if (f.status && b.status !== f.status) return false;
+      if (f.text) {
+        const t = f.text.toLowerCase();
+        const hay = [b.title, b.assignee, b.tag, b.reporter].join(' ').toLowerCase();
+        if (!hay.includes(t)) return false;
+      }
+      return true;
+    });
+  }
+  function sortByPriority(bugs) {
+    return bugs.slice().sort((a, b) => {
+      const pa = PRIORITY_RANK[a.priority || ''] ?? 9;
+      const pb = PRIORITY_RANK[b.priority || ''] ?? 9;
+      if (pa !== pb) return pa - pb;
+      return (a.rowIndex || 0) - (b.rowIndex || 0);
+    });
+  }
+
+
+
+  function renderKanbanAssignee() {
+    const board = $('#kanban-board-assignee');
+    board.innerHTML = '';
+    const order = ASSIGNEE_ORDER;
+
+    // 担当者別表示では完了状態を除外
+    const filteredBugs = applyFilters(state.bugs).filter(b => b.status !== '完了');
+    const bugs = sortByPriority(filteredBugs);
+    const groups = new Map();
+    order.forEach(k => groups.set(k, []));
+    bugs.forEach(b => {
+      let key;
+      // 新規の場合は必ず未割当レーンに表示
+      if (b.status === '新規') {
+        key = '(未割当)';
+      } else {
+        key = b.assignee || '(未割当)';
+      }
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(b);
+    });
+
+    groups.forEach((items, key) => {
+      const col = el('div', { class: 'kanban-col' });
+      col.dataset.group = key;
+      const header = el('div', { class: 'kanban-col-header' }, [
+        el('span', { text: key || '(未設定)' }),
+        el('span', { class: 'count', text: String(items.length) })
+      ]);
+      const body = el('div', { class: 'kanban-col-body' });
+      items.forEach(b => body.appendChild(renderCard(b, true))); // drag enabled
+      col.appendChild(header);
+      col.appendChild(body);
+      
+      // ドロップイベントを追加（担当者別表示用）
+      body.addEventListener('dragover', handleDragOver);
+      body.addEventListener('dragleave', handleDragLeave);
+      body.addEventListener('drop', handleDrop);
+      
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
+  function renderKanbanStatus() {
+    const board = $('#kanban-board-status');
+    board.innerHTML = '';
+    const order = STATUS_ORDER;
+
+    const bugs = sortByPriority(applyFilters(state.bugs));
+    const groups = new Map();
+    order.forEach(k => groups.set(k, []));
+    bugs.forEach(b => {
+      let key = b.status || '';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(b);
+    });
+
+    groups.forEach((items, key) => {
+      const col = el('div', { class: 'kanban-col' });
+      col.dataset.group = key;
+      const displayName = STATUS_DISPLAY_NAMES[key] || key || '(未設定)';
+      const header = el('div', { class: 'kanban-col-header' }, [
+        el('span', { text: displayName }),
+        el('span', { class: 'count', text: String(items.length) })
+      ]);
+      const body = el('div', { class: 'kanban-col-body' });
+      items.forEach(b => body.appendChild(renderCard(b, false))); // drag disabled
+      col.appendChild(header);
+      col.appendChild(body);
+      
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
+  function renderKanbanVersion() {
+    const board = $('#kanban-board-version');
+    board.innerHTML = '';
+
+    const bugs = sortByPriority(applyFilters(state.bugs));
+    
+    // 修正Verが設定されているバグのみを対象にする
+    const bugsWithFixVer = bugs.filter(b => b.fixVer && b.fixVer.trim() !== '');
+    
+    // バージョン別にグループ化
+    const versionGroups = new Map();
+    
+    bugsWithFixVer.forEach(b => {
+      const version = b.fixVer;
+      if (!versionGroups.has(version)) {
+        versionGroups.set(version, []);
+      }
+      versionGroups.get(version).push(b);
+    });
+    
+    // バージョンを降順でソート（Rev.X.Yの形式を考慮）
+    const sortedVersions = Array.from(versionGroups.keys()).sort((a, b) => {
+      // Rev.X.Y形式の場合、数値で比較
+      const aMatch = a.match(/Rev\.(\d+)\.(\d+)/);
+      const bMatch = b.match(/Rev\.(\d+)\.(\d+)/);
+      
+      if (aMatch && bMatch) {
+        const aMajor = parseInt(aMatch[1]);
+        const aMinor = parseInt(aMatch[2]);
+        const bMajor = parseInt(bMatch[1]);
+        const bMinor = parseInt(bMatch[2]);
+        
+        if (aMajor !== bMajor) {
+          return bMajor - aMajor; // メジャーバージョン降順
+        }
+        return bMinor - aMinor; // マイナーバージョン降順
+      }
+      
+      // その他の場合は文字列で降順ソート
+      return b.localeCompare(a);
+    });
+    
+    // 各バージョンの列を作成
+    sortedVersions.forEach(version => {
+      const items = versionGroups.get(version);
+      const col = el('div', { class: 'kanban-col version-col' });
+      col.dataset.version = version;
+      
+      const header = el('div', { class: 'kanban-col-header version-header' }, [
+        el('span', { class: 'version-title', text: version }),
+        el('span', { class: 'count', text: `${items.length}件` })
+      ]);
+      
+      const body = el('div', { class: 'kanban-col-body' });
+      
+      items.forEach(bug => {
+        // バグカードを作成（修正対象も表示）
+        const card = el('div', { 
+          class: 'kanban-card version-card', 
+          'data-id': bug.id,
+          'data-row-index': bug.rowIndex 
+        });
+        
+        // バグID
+        const idElement = el('div', { 
+          class: 'bug-id', 
+          text: `#${String(bug.id).padStart(3, '0')}`,
+          style: 'font-weight:bold;color:#007acc;margin-bottom:4px;'
+        });
+        
+        // タイトル
+        const titleElement = el('div', { 
+          class: 'bug-title', 
+          text: bug.title || '(タイトルなし)',
+          style: 'margin-bottom:8px;font-size:14px;line-height:1.3;'
+        });
+        
+        // 修正対象
+        const scopeElement = el('div', { 
+          class: 'bug-scope',
+          style: 'background:#f0f8ff;padding:4px 8px;border-radius:4px;font-size:12px;color:#333;'
+        });
+        
+        if (bug.scope && bug.scope.trim() !== '') {
+          scopeElement.textContent = `修正対象: ${bug.scope}`;
+        } else {
+          scopeElement.textContent = '修正対象: 未設定';
+          scopeElement.style.background = '#fff0f0';
+          scopeElement.style.color = '#999';
+        }
+        
+        card.appendChild(idElement);
+        card.appendChild(titleElement);
+        card.appendChild(scopeElement);
+        
+        // クリックイベント
+        card.addEventListener('click', () => openModal(bug.rowIndex));
+        
+        body.appendChild(card);
+      });
+      
+      col.appendChild(header);
+      col.appendChild(body);
+      board.appendChild(col);
+    });
+
+    $('#row-count').textContent = `${bugs.length} 件 / 全 ${state.bugs.length} 件`;
+  }
+
+  // 推移グラフ表示
+  let trendChart = null;
+  let chartType = 'line'; // line, bar, area
+
+  // ダークテーマ最適化カラーパレット
+  const CHART_COLORS = {
+    occurrence: { primary: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    analysis: { primary: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    fixed: { primary: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    verified: { primary: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' }
+  };
+
+  // チャートタイプ切り替えボタンを追加する関数
+  function addChartTypeToggle() {
+    const analysisSection = document.querySelector('#analysis-section');
+    if (!analysisSection) {
+      console.warn('analysis-section not found');
+      return;
+    }
+    
+    // 既存のコントロールを削除
+    const existingControls = analysisSection.querySelector('.chart-type-controls');
+    if (existingControls) {
+      existingControls.remove();
+    }
+    
+    const controls = el('div', { 
+      class: 'chart-type-controls',
+      style: 'margin-bottom: 15px; text-align: center; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;'
+    });
+    
+    const buttons = [
+      { type: 'line', label: '折れ線グラフ' },
+      { type: 'area', label: '面グラフ' },
+      { type: 'bar', label: '棒グラフ' },
+      { type: 'network', label: '🕸 関連図', isSpecial: true }
+    ];
+    
+    buttons.forEach(({ type, label, isSpecial }) => {
+      const btnClass = isSpecial ? `chart-btn network-btn ${type === 'network' && chartType === 'network' ? 'active' : ''}` : `chart-btn ${chartType === type ? 'active' : ''}`;
+      
+      const btn = el('button', {
+        class: btnClass,
+        text: label
+      });
+      
+      btn.addEventListener('click', () => {
+        if (type === 'network') {
+          openKeywordNetworkWindow();
+          return;
+        }
+        
+        chartType = type;
+        document.querySelectorAll('.chart-btn:not(.network-btn)').forEach(b => {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        renderTrendChart();
+      });
+      
+      btn.addEventListener('mouseenter', () => {
+        if (chartType !== type && !isSpecial) {
+          btn.style.opacity = '0.8';
+        }
+      });
+      
+      btn.addEventListener('mouseleave', () => {
+        btn.style.opacity = '1';
+      });
+      
+      controls.appendChild(btn);
+    });
+    
+    // 最も安全な挿入方法：h3要素の直後に追加
+    const h3Element = analysisSection.querySelector('h3');
+    if (h3Element) {
+      // h3要素の直後に挿入（insertAdjacentElementを使用）
+      h3Element.insertAdjacentElement('afterend', controls);
+    } else {
+      // h3がない場合は先頭に追加
+      if (analysisSection.firstElementChild) {
+        analysisSection.insertBefore(controls, analysisSection.firstElementChild);
+      } else {
+        analysisSection.appendChild(controls);
+      }
+    }
+  }
+
+  // ======= キーワード関連図機能 =======
+  function openKeywordNetworkWindow() {
+    // 新しいウィンドウでキーワード関連図を開く
+    const networkWindow = window.open(
+      'bug-network-tool.html',
+      'KeywordNetwork',
+      'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes'
+    );
+    
+    if (!networkWindow) {
+      alert('ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。');
+      return;
+    }
+    
+    // ウィンドウが読み込まれたらバグデータを送信
+    networkWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }, 500); // 初期化待ち
+    });
+    
+    // データリクエストへの対応
+    window.addEventListener('message', function(event) {
+      if (event.source === networkWindow && event.data.type === 'REQUEST_BUG_DATA') {
+        networkWindow.postMessage({
+          type: 'BUG_DATA',
+          bugs: state.bugs
+        }, window.location.origin);
+      }
+    });
+  }
+  
+  // グローバルスコープからアクセス可能にする
+  window.openKeywordNetworkWindow = openKeywordNetworkWindow;
+
+  function renderTrend() {
+    // DOMの準備が完了してからチャート機能を実行
+    setTimeout(() => {
+      try {
+        addChartTypeToggle();
+        renderTrendChart();
+        renderStats();
+      } catch (error) {
+        console.error('推移グラフの描画でエラーが発生しました:', error);
+        setStatus('推移グラフの描画に失敗しました');
+      }
+    }, 100);
+  }
+
+  async function getTrendPeriod() {
+    if (!state.inOffice) {
+      // デモモード用のデフォルト期間
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 30); // 30日前から
+      return {
+        start: startDate.toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+      };
+    }
+
+    // Excel モードではAD3, AE3セルから期間を取得
+    try {
+      return await Excel.run(async (ctx) => {
+        const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+        const periodCells = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 29, 1, 2); // AD3:AE3
+        periodCells.load(['values']);
+        await ctx.sync();
+        
+        const values = periodCells.values[0];
+        let startDate = values[0] || '';
+        let endDate = values[1] || '';
+        
+        // 数値（Excelシリアル日付）の場合は変換
+        if (typeof startDate === 'number') {
+          startDate = excelSerialToDateStr(startDate);
+        }
+        if (typeof endDate === 'number') {
+          endDate = excelSerialToDateStr(endDate);
+        }
+        
+        return { start: startDate, end: endDate };
+      });
+    } catch (error) {
+      console.error('期間取得エラー:', error);
+      // エラー時はデフォルト期間を使用
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 30);
+      return {
+        start: startDate.toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+      };
+    }
+  }
+
+  async function renderTrendChart() {
+    const period = await getTrendPeriod();
+    
+    if (!period.start || !period.end) {
+      console.warn('期間が設定されていません');
+      return;
+    }
+
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+    
+    // 日付ラベル配列を生成
+    const dateLabels = [];
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      dateLabels.push(new Date(currentDate).toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // 各日付でのデータを集計
+    const occurrenceData = [];
+    const analysisData = [];
+    const fixedData = [];
+    const verifiedData = [];
+
+    dateLabels.forEach(dateStr => {
+      const date = new Date(dateStr);
+      
+      // その日までのバグ発生件数（累計）
+      const occurrenceCount = state.bugs.filter(bug => {
+        if (!bug.occurredOn) return false;
+        const occurredDate = new Date(bug.occurredOn);
+        return occurredDate <= date;
+      }).length;
+
+      // その日までの解析完了件数（累計）
+      const analysisCount = state.bugs.filter(bug => {
+        if (!bug.analysisDate) return false;
+        const analysisDate = new Date(bug.analysisDate);
+        return analysisDate <= date;
+      }).length;
+
+      // その日までの対応完了件数（累計）
+      const fixedCount = state.bugs.filter(bug => {
+        if (!bug.fixDate) return false;
+        const fixDate = new Date(bug.fixDate);
+        return fixDate <= date;
+      }).length;
+
+      // その日までの確認完了件数（累計）
+      const verifiedCount = state.bugs.filter(bug => {
+        if (!bug.verifyDate) return false;
+        const verifyDate = new Date(bug.verifyDate);
+        return verifyDate <= date;
+      }).length;
+
+      occurrenceData.push(occurrenceCount);
+      analysisData.push(analysisCount);
+      fixedData.push(fixedCount);
+      verifiedData.push(verifiedCount);
+    });
+
+    const ctx = document.getElementById('trendChart');
+    if (!ctx) {
+      console.warn('trendChartキャンバスが見つかりません');
+      return;
+    }
+    
+    const canvasContext = ctx.getContext('2d');
+    if (!canvasContext) {
+      console.warn('Canvas 2Dコンテキストを取得できませんでした');
+      return;
+    }
+    
+    // グラデーション作成関数
+    function createGradient(color) {
+      const gradient = canvasContext.createLinearGradient(0, 0, 0, ctx.height);
+      gradient.addColorStop(0, color.primary + '40'); // 25% opacity at top
+      gradient.addColorStop(1, color.primary + '00'); // 0% opacity at bottom
+      return gradient;
+    }
+    
+    // 既存のチャートがあれば破棄
+    if (trendChart) {
+      trendChart.destroy();
+    }
+
+    // カスタムツールチップ
+    const customTooltip = {
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      borderWidth: 1,
+      cornerRadius: 8,
+      titleColor: '#9ca3af',
+      bodyColor: '#f9fafb',
+      titleFont: {
+        size: 12,
+        family: "'DM Mono', 'Fira Code', 'Courier New', monospace"
+      },
+      bodyFont: {
+        size: 13,
+        family: "'DM Mono', 'Fira Code', 'Courier New', monospace",
+        weight: '600'
+      },
+      displayColors: true,
+      padding: 12
+    };
+
+    // データセット設定
+    const createDataset = (label, data, colorKey, isMainLine = false) => {
+      const color = CHART_COLORS[colorKey];
+      
+      if (chartType === 'bar') {
+        return {
+          label,
+          data,
+          backgroundColor: isMainLine ? color.primary : color.bg,
+          borderColor: color.primary,
+          borderWidth: 2,
+          borderRadius: 4,
+          borderSkipped: false
+        };
+      } else if (chartType === 'area') {
+        return {
+          label,
+          data,
+          borderColor: color.primary,
+          backgroundColor: createGradient(color),
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBorderWidth: 2,
+          pointHoverBorderColor: '#fff'
+        };
+      } else { // line
+        return {
+          label,
+          data,
+          borderColor: color.primary,
+          backgroundColor: isMainLine ? 'transparent' : color.bg,
+          borderWidth: isMainLine ? 3 : 2,
+          fill: !isMainLine,
+          tension: 0.4,
+          pointRadius: isMainLine ? 3 : 0,
+          pointBackgroundColor: color.primary,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          pointHoverBorderWidth: 2
+        };
+      }
+    };
+
+    trendChart = new Chart(canvasContext, {
+      type: chartType === 'bar' ? 'bar' : 'line',
+      data: {
+        labels: dateLabels.map(date => {
+          const d = new Date(date);
+          return `${d.getMonth() + 1}/${d.getDate()}`;
+        }),
+        datasets: [
+          createDataset('合計（バグ発生件数）', occurrenceData, 'occurrence', true),
+          createDataset('解析（解析完了件数）', analysisData, 'analysis'),
+          createDataset('対応（対応完了件数）', fixedData, 'fixed'),
+          createDataset('完了（確認完了件数）', verifiedData, 'verified')
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `バグ対応生産性推移 (${period.start} ～ ${period.end})`,
+            color: '#e5e7eb',
+            font: {
+              size: 16,
+              family: "'Space Grotesk', sans-serif",
+              weight: '700'
+            },
+            padding: 20
+          },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', 'Fira Code', 'Courier New', monospace"
+              },
+              padding: 15,
+              usePointStyle: true,
+              pointStyle: 'rect'
+            }
+          },
+          tooltip: customTooltip
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '件数',
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', monospace"
+              }
+            },
+            ticks: {
+              color: '#6b7280',
+              font: {
+                size: 11,
+                family: "'DM Mono', monospace"
+              }
+            },
+            grid: {
+              color: '#1f2937',
+              drawBorder: false
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: '日付',
+              color: '#9ca3af',
+              font: {
+                size: 12,
+                family: "'DM Mono', monospace"
+              }
+            },
+            ticks: {
+              color: '#6b7280',
+              font: {
+                size: 11,
+                family: "'DM Mono', monospace"
+              },
+              maxTicksLimit: 10
+            },
+            grid: {
+              color: '#1f2937',
+              drawBorder: false
+            }
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        elements: {
+          point: {
+            hoverBackgroundColor: '#fff'
+          }
+        }
+      }
+    });
+  }
+
+  function renderStats() {
+    const tbody = document.querySelector('#statsTable tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    // 優先度の順序定義
+    const priorities = [
+      { key: '高', label: '高', className: 'high' },
+      { key: '中', label: '中', className: 'medium' },  
+      { key: '低', label: '低', className: 'low' },
+      { key: '', label: '未設定', className: 'none' }
+    ];
+
+    priorities.forEach(priority => {
+      // 該当優先度のバグを抽出
+      const priorityBugs = state.bugs.filter(bug => bug.priority === priority.key);
+      
+      if (priorityBugs.length === 0) return; // 該当なしはスキップ
+
+      const totalCount = priorityBugs.length;
+      const fixedCount = priorityBugs.filter(bug => bug.fixDate && bug.fixDate.trim() !== '').length;
+      const verifiedCount = priorityBugs.filter(bug => bug.verifyDate && bug.verifyDate.trim() !== '').length;
+      
+      const fixedRate = totalCount > 0 ? Math.round((fixedCount / totalCount) * 100) : 0;
+      const verifiedRate = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+
+      const row = el('tr');
+      
+      // 優先度列
+      const priorityCell = el('td');
+      if (priority.key) {
+        const badge = el('span', { 
+          class: `priority-badge ${priority.className}`,
+          text: priority.label 
+        });
+        priorityCell.appendChild(badge);
+      } else {
+        priorityCell.textContent = priority.label;
+      }
+      row.appendChild(priorityCell);
+      
+      // 総件数列
+      row.appendChild(el('td', { text: totalCount.toString() }));
+      
+      // 対応完了件数列
+      row.appendChild(el('td', { text: fixedCount.toString() }));
+      
+      // 対応完了率列
+      const fixedRateCell = el('td');
+      const fixedRateSpan = el('span', { 
+        class: `completion-rate ${fixedRate >= 80 ? 'high' : fixedRate >= 50 ? 'medium' : 'low'}`,
+        text: `${fixedRate}%` 
+      });
+      fixedRateCell.appendChild(fixedRateSpan);
+      row.appendChild(fixedRateCell);
+      
+      // 確認完了件数列  
+      row.appendChild(el('td', { text: verifiedCount.toString() }));
+      
+      // 確認完了率列
+      const verifiedRateCell = el('td');
+      const verifiedRateSpan = el('span', { 
+        class: `completion-rate ${verifiedRate >= 80 ? 'high' : verifiedRate >= 50 ? 'medium' : 'low'}`,
+        text: `${verifiedRate}%` 
+      });
+      verifiedRateCell.appendChild(verifiedRateSpan);
+      row.appendChild(verifiedRateCell);
+      
+      tbody.appendChild(row);
+    });
+  }
+  
+  // ドラッグ&ドロップ機能（担当者別表示用）
+  let draggedCard = null;
+  
+  function handleDragStart(e) {
+    draggedCard = e.target;
+    e.target.classList.add('dragging');
+  }
+  
+  function handleDragOver(e) {
+    e.preventDefault(); // ドロップを許可
+    e.currentTarget.classList.add('drag-over');
+  }
+  
+  function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+  
+  async function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedCard) return;
+    
+    const targetCol = e.currentTarget.parentElement;
+    const newAssignee = targetCol.dataset.group;
+    const rowIndex = parseInt(draggedCard.dataset.row);
+    const bug = state.bugs.find(b => b.rowIndex === rowIndex);
+    
+    if (!bug) return;
+    
+    // 実際の表示レーンを基準にoldAssigneeを判定
+    let oldAssignee;
+    if (bug.status === '新規') {
+      oldAssignee = '(未割当)';  // 新規は必ず未割当レーンに表示されるため
+    } else {
+      oldAssignee = bug.assignee || '(未割当)';
+    }
+    
+    // 担当者から未割当への移動を禁止
+    if (oldAssignee !== '(未割当)' && newAssignee === '(未割当)') {
+      setStatus('担当者から未割当には移動できません');
+      setTimeout(() => setStatus(''), 3000);
+      cleanupDrag();
+      return;
+    }
+    
+    // 同じ担当者への移動は何もしない
+    if (oldAssignee === newAssignee) {
+      cleanupDrag();
+      return;
+    }
+    
+    // 担当者を更新
+    const newAssigneeValue = newAssignee === '(未割当)' ? '' : newAssignee;
+    bug.assignee = newAssigneeValue;
+    
+    // 状態に応じて適切な担当者フィールドも更新
+    let statusMessage = '';
+    if (newAssignee !== '(未割当)') {
+      switch(bug.status) {
+        case '解析':
+          bug.analyst = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、解析者も更新しました`;
+          break;
+        case '修正':
+          bug.fixer = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、対応者も更新しました`;
+          break;
+        case '確認':
+          bug.verifier = newAssignee;
+          statusMessage = `担当者を「${newAssignee}」に変更し、確認者も更新しました`;
+          break;
+        default:
+          statusMessage = `担当者を「${newAssignee}」に変更しました`;
+          break;
+      }
+    }
+    
+    // 未割当から担当者への移動時は状態を「解析」に変更し、解析者を設定
+    if (oldAssignee === '(未割当)' && newAssignee !== '(未割当)') {
+      bug.status = '解析';
+      bug.analyst = newAssignee; // 解析者に担当者を設定
+      statusMessage = `担当者を「${newAssignee}」に変更し、状況を「解析」に変更しました`;
+    }
+    
+    setStatus(statusMessage || `担当者を「${newAssignee}」に変更しました`);
+    
+    setTimeout(() => setStatus(''), 3000);
+    
+    // Excel保存
+    try {
+      // state.bugsも確実に更新
+      const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+      if (bugIndex >= 0) {
+        state.bugs[bugIndex] = bug;
+      }
+      
+      await saveBugToExcel(bug);
+    } catch (e) {
+      console.error('保存エラー:', e);
+      setStatus('保存に失敗しました');
+    }
+    
+    cleanupDrag();
+    // 表示更新
+    render();
+  }
+  
+  function cleanupDrag() {
+    if (draggedCard) {
+      draggedCard.classList.remove('dragging');
+      draggedCard = null;
+    }
+    // 全てのdrag-overクラスを削除
+    document.querySelectorAll('.drag-over').forEach(el => {
+      el.classList.remove('drag-over');
+    });
+  }
+  
+  function renderCard(b, dragEnabled = false) {
+    const card = el('div', { class: 'kanban-card pri-' + (b.priority || '') });
+    card.dataset.row = b.rowIndex;
+    card.draggable = dragEnabled; // ドラッグ可否をパラメータで制御
+    
+    // 差し戻し状態の場合はカードにスタイルを追加
+    if (b.reject === '○' && b.status === '修正') {
+      card.style.borderLeft = '4px solid #f44336';
+      card.style.backgroundColor = '#fff3f3';
+    }
+    
+    // 星付き状態の場合はカードの背景を薄い水色に（AC列/本日分を基準）
+    if (b.starred === '○') {
+      card.style.backgroundColor = '#e3f2fd';
+    }
+    
+    // 1行目：左端にID、発生起因。右端に優先度と差し戻しマーク
+    const row1 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;' });
+    
+    // 発生起因と起因番号を組み合わせて表示
+    const originText = (() => {
+      if (!b.origin) return '';
+      if (!b.originNumber) return b.origin;
+      return `${b.origin}-${b.originNumber}`;
+    })();
+    
+    const leftPart1 = el('div', { style: 'display:flex;gap:8px;' }, [
+      el('span', { class: 'id', text: `#${b.id || ''}`, style: 'font-weight:bold;font-size:12px;' }),
+      el('span', { text: originText, style: 'font-size:11px;color:#666;' })
+    ]);
+    const rightPart1 = el('div', { style: 'display:flex;gap:4px;align-items:center;' });
+    
+    // 差し戻しマーク
+    if (b.reject === '○' && b.status === '修正') {
+      rightPart1.appendChild(el('span', { 
+        text: '⚠ 差し戻し', 
+        style: 'background:#f44336;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;' 
+      }));
+    }
+    
+    // 星マーク（優先度の左側）- AC列/本日分を基準に表示制御
+    const isStarred = b.starred === '○';
+    const starIcon = el('span', {
+      text: isStarred ? '★' : '☆',
+      style: `cursor:pointer;font-size:14px;margin-right:4px;user-select:none;${isStarred ? 'color:#ffc107;' : 'color:#ccc;'}`,
+      class: 'star-icon',
+      'data-row': b.rowIndex
+    });
+    rightPart1.appendChild(starIcon);
+    
+    // 優先度バッジ
+    if (b.priority) {
+      rightPart1.appendChild(el('span', { class: `badge pri-${b.priority}`, text: b.priority, style: 'font-size:11px;' }));
+    }
+    row1.appendChild(leftPart1);
+    row1.appendChild(rightPart1);
+    
+    // 2行目：タイトル
+    const row2 = el('div', { 
+      class: 'title', 
+      text: b.title || '(無題)', 
+      style: 'margin-bottom:4px;font-weight:500;line-height:1.3;' 
+    });
+    
+    // 3行目：左端に状態、右端に名前
+    const row3 = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;' });
+    const leftPart3 = el('div', {});
+    if (b.status) {
+      leftPart3.appendChild(el('span', { class: `badge st-${b.status}`, text: STATUS_DISPLAY_NAMES[b.status] || b.status, style: 'font-size:11px;' }));
+    }
+    
+    const rightPart3 = el('div', {});
+    // 状態により表示する名前と日付を変更
+    let nameText = '';
+    let nameStyle = 'font-size:11px;';
+    
+    switch(b.status) {
+      case '新規':
+        nameText = '(未割当)';
+        nameStyle += 'color:#999;';
+        break;
+      case '解析待ち':
+      case '解析':
+        nameText = b.analyst || '(未設定)';
+        if (!b.analyst) nameStyle += 'color:#999;';
+        // 解析日を表示（解析者と有効な解析日がある場合のみ）
+        if (b.analyst && b.analysisDate && b.analysisDate.trim() !== '') {
+          const date = new Date(b.analysisDate);
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
+        }
+        break;
+      case '修正待ち':
+      case '修正':
+        nameText = b.fixer || '(未設定)';
+        if (!b.fixer) nameStyle += 'color:#999;';
+        // 対応日を表示（対応者と有効な対応日がある場合のみ）
+        if (b.fixer && b.fixDate && b.fixDate.trim() !== '') {
+          const date = new Date(b.fixDate);
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
+        }
+        break;
+      case '確認待ち':
+      case '確認':
+        nameText = b.verifier || '(未設定)';
+        if (!b.verifier) nameStyle += 'color:#999;';
+        // 確認日を表示（確認者と有効な確認日がある場合のみ）
+        if (b.verifier && b.verifyDate && b.verifyDate.trim() !== '') {
+          const date = new Date(b.verifyDate);
+          if (!isNaN(date.getTime())) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            nameText += ` (${month}/${day})`;
+          }
+        }
+        break;
+      default:
+        if (b.assignee) {
+          nameText = b.assignee;
+        } else {
+          nameText = '(未割当)';
+          nameStyle += 'color:#999;';
+        }
+    }
+    
+    rightPart3.appendChild(el('span', { text: nameText, style: nameStyle }));
+    row3.appendChild(leftPart3);
+    row3.appendChild(rightPart3);
+    
+    card.appendChild(row1);
+    card.appendChild(row2);
+    card.appendChild(row3);
+    
+    // カードクリックイベント（星クリックの場合は除外）
+    card.addEventListener('click', (e) => {
+      // 星アイコンのクリックかチェック
+      if (e.target.classList.contains('star-icon')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rowIndex = parseInt(e.target.dataset.row);
+        const bug = state.bugs.find(b => b.rowIndex === rowIndex);
+        if (bug) {
+          toggleStar(bug);
+        }
+        return;
+      }
+      // 星以外のクリックの場合、詳細画面を開く
+      openModal(b.rowIndex);
+    });
+    
+    // ドラッグ&ドロップイベントを必要時のみ追加
+    if (dragEnabled) {
+      card.addEventListener('dragstart', handleDragStart);
+      card.addEventListener('dragend', cleanupDrag);
+    }
+    return card;
+  }
+
+  function openModal(rowIndex) {
+    const bug = state.bugs.find(b => b.rowIndex === rowIndex);
+    if (!bug) return;
+    state.editingRow = rowIndex;
+    $('#modal-title').textContent = `バグ詳細  #${bug.id || ''}  ${bug.title || ''}`;
+
+    const body = $('#modal-body');
+    body.innerHTML = '';
+
+    // タブUI
+    const tabNames = [
+      { key: 'jisho', label: '事象' },
+      { key: 'kaiseki', label: '解析' },
+      { key: 'shochi', label: '修正' },
+      { key: 'kekka', label: '確認' },
+      { key: 'kanri', label: '管理' }
+    ];
+    // 状況に応じた初期タブ
+    const statusTabMap = {
+      '新規': 'jisho',
+      '解析': 'kaiseki',
+      '修正': 'shochi',
+      '確認': 'kekka',
+      '再発': 'kekka',
+      '完了': 'jisho'
+    };
+    let activeTab = statusTabMap[bug.status] || 'jisho';
+
+    // 常時表示エリア
+    const alwaysArea = el('div', { class: 'always-area', style: 'margin-bottom:12px;padding:8px 0;border-bottom:1px solid #ccc;' });
+    
+    // 発生起因のみ表示
+    const originDisplay = (() => {
+      if (!bug.origin) return '';
+      if (!bug.originNumber) return bug.origin;
+      return `${bug.origin}-${bug.originNumber}`;
+    })();
+    
+    const row1 = el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;' }, [
+      el('div', {}, [el('b', { text: '発生起因: ' }), el('span', { text: originDisplay })])
+    ]);
+    alwaysArea.appendChild(row1);
+    
+    // 日付をm/d形式に変換する関数
+    function formatToMD(dateStr) {
+      if (!dateStr) return '';
+      if (dateStr.includes('/')) return dateStr; // 既にm/d形式
+      if (dateStr.includes('-')) {
+        // yyyy-mm-dd形式からm/d形式に変換
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          const month = parseInt(parts[1]);
+          const day = parseInt(parts[2]);
+          return `${month}/${day}`;
+        }
+      }
+      return dateStr;
+    }
+    
+    // ワークフローテーブル（流れるような表現）
+    const workflowContainer = el('div', { style: 'width:100%;' });
+    
+    // ワークフローステップの定義
+    const workflowSteps = [
+      { key: 'new', label: '新規', person: bug.reporter, date: bug.occurredOn, status: '新規' },
+      { key: 'analysis', label: '解析', person: bug.analyst, date: bug.analysisDate, status: '解析' },
+      { key: 'fix', label: '修正', person: bug.fixer, date: bug.fixDate, status: '修正' },
+      { key: 'verify', label: '確認', person: bug.verifier, date: bug.verifyDate, status: '確認' }
+    ];
+    
+    // 現在のステータスのインデックスを取得
+    const currentStatusIndex = workflowSteps.findIndex(step => step.status === bug.status);
+    const completedStatusIndex = currentStatusIndex === -1 && bug.status === '完了' ? workflowSteps.length : currentStatusIndex;
+    
+    // フレックスコンテナ
+    const flowContainer = el('div', { 
+      style: 'display:flex;align-items:center;justify-content:space-between;padding:8px;' 
+    });
+    
+    workflowSteps.forEach((step, index) => {
+      // ステップの状態を判定
+      let stepState = 'pending'; // 未完了
+      if (index < completedStatusIndex || (bug.status === '完了' && index < workflowSteps.length)) {
+        stepState = 'completed'; // 完了
+      } else if (index === completedStatusIndex) {
+        stepState = 'current'; // 現在
+      }
+      
+      // ステップの色を決定
+      let bgColor = '#f5f5f5';
+      let textColor = '#999';
+      let borderColor = '#ddd';
+      
+      if (stepState === 'completed') {
+        bgColor = '#e8f5e8';
+        textColor = '#2e7d2e';
+        borderColor = '#4caf50';
+      } else if (stepState === 'current') {
+        bgColor = '#e3f2fd';
+        textColor = '#1976d2';
+        borderColor = '#2196f3';
+      }
+      
+      // ステップボックス
+      const stepBox = el('div', {
+        style: `
+          flex: 1;
+          border: 2px solid ${borderColor};
+          background: ${bgColor};
+          border-radius: 8px;
+          padding: 8px;
+          text-align: center;
+          position: relative;
+          margin: 0 4px;
+          transition: all 0.3s ease;
+        `
+      });
+      
+      // ステップラベル
+      stepBox.appendChild(el('div', {
+        text: step.label,
+        style: `font-weight:bold;font-size:12px;color:${textColor};margin-bottom:4px;`
+      }));
+      
+      // 担当者と日付
+      const personText = step.person || '(未設定)';
+      const dateText = formatToMD(step.date);
+      const displayText = (dateText && dateText !== '') ? `${personText} (${dateText})` : personText;
+      
+      stepBox.appendChild(el('div', {
+        text: stepState === 'pending' ? '-' : displayText,
+        style: `font-size:11px;color:${stepState === 'pending' ? '#ccc' : textColor};`
+      }));
+      
+      flowContainer.appendChild(stepBox);
+      
+      // 矢印を追加（最後のステップ以外）
+      if (index < workflowSteps.length - 1) {
+        const arrow = el('div', {
+          text: '→',
+          style: `
+            font-size: 18px;
+            color: ${index < completedStatusIndex ? '#4caf50' : '#ddd'};
+            margin: 0 8px;
+            font-weight: bold;
+          `
+        });
+        flowContainer.appendChild(arrow);
+      }
+    });
+    
+    workflowContainer.appendChild(flowContainer);
+    alwaysArea.appendChild(workflowContainer);
+    
+    body.appendChild(alwaysArea);
+
+    const tabHeader = el('div', { class: 'tab-header' },
+      tabNames.map(tab => {
+        const btn = el('button', {
+          class: 'tab-btn' + (activeTab === tab.key ? ' active' : ''),
+          type: 'button'
+        }, [el('span', { text: tab.label })]);
+        btn.dataset.tab = tab.key;
+        btn.addEventListener('click', () => {
+          // タブ切り替え前に現在のタブのデータを保存
+          saveCurrentTabData();
+          
+          body.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderTab(tab.key);
+        });
+        return btn;
+      })
+    );
+    body.appendChild(tabHeader);
+
+    // タブ内容表示部
+    const tabContent = el('div', { class: 'tab-content' });
+    body.appendChild(tabContent);
+
+    // タブのフォームデータを保存する関数
+    function saveCurrentTabData() {
+      const currentTab = body.querySelector('.tab-btn.active')?.dataset.tab;
+      if (!currentTab) return;
+      
+      const formData = {};
+      
+      // すべてのinput, textarea, select要素のデータを保存
+      tabContent.querySelectorAll('input, textarea, select').forEach(element => {
+        if (element.dataset.key) {
+          if (element.type === 'checkbox') {
+            formData[element.dataset.key] = element.checked;
+          } else {
+            formData[element.dataset.key] = element.value || element.textContent;
+          }
+        }
+      });
+      
+      // チェックボックス表の特別処理（影響範囲）
+      const scopeCheckboxes = tabContent.querySelectorAll('input[data-scope-option]');
+      if (scopeCheckboxes.length > 0) {
+        formData['_scopeCheckboxes'] = {};
+        scopeCheckboxes.forEach(checkbox => {
+          formData['_scopeCheckboxes'][checkbox.dataset.scopeOption] = checkbox.checked;
+        });
+      }
+      
+      // 修正完了チェックボックスの特別処理
+      const completedCheckboxes = tabContent.querySelectorAll('input[data-scope-completed]');
+      if (completedCheckboxes.length > 0) {
+        formData['_completedCheckboxes'] = {};
+        completedCheckboxes.forEach(checkbox => {
+          formData['_completedCheckboxes'][checkbox.dataset.scopeCompleted] = checkbox.checked;
+        });
+      }
+      
+      // タブ別にデータを保存
+      if (!state.tabFormData[state.editingRow]) {
+        state.tabFormData[state.editingRow] = {};
+      }
+      state.tabFormData[state.editingRow][currentTab] = formData;
+    }
+    
+    // タブのフォームデータを復元する関数
+    function loadTabData(tabKey) {
+      if (!state.tabFormData[state.editingRow] || !state.tabFormData[state.editingRow][tabKey]) {
+        return; // 保存されたデータがない場合はそのまま
+      }
+      
+      const formData = state.tabFormData[state.editingRow][tabKey];
+      
+      // 通常のinput, textarea, select要素を復元
+      Object.keys(formData).forEach(key => {
+        if (key.startsWith('_')) return; // 特別処理用のキーはスキップ
+        
+        const element = tabContent.querySelector(`[data-key="${key}"]`);
+        if (element) {
+          if (element.type === 'checkbox') {
+            element.checked = formData[key];
+          } else {
+            if (element.tagName === 'TEXTAREA') {
+              element.textContent = formData[key];
+            } else {
+              element.value = formData[key];
+            }
+          }
+        }
+      });
+      
+      // 影響範囲チェックボックスを復元
+      if (formData['_scopeCheckboxes']) {
+        Object.keys(formData['_scopeCheckboxes']).forEach(scope => {
+          const element = tabContent.querySelector(`input[data-scope-option="${scope}"]`);
+          if (element) {
+            element.checked = formData['_scopeCheckboxes'][scope];
+          }
+        });
+      }
+      
+      // 修正完了チェックボックスを復元
+      if (formData['_completedCheckboxes']) {
+        Object.keys(formData['_completedCheckboxes']).forEach(scope => {
+          const element = tabContent.querySelector(`input[data-scope-completed="${scope}"]`);
+          if (element) {
+            element.checked = formData['_completedCheckboxes'][scope];
+          }
+        });
+      }
+    }
+
+    function renderTab(tabKey) {
+      tabContent.innerHTML = '';
+      
+      // 状況に応じた入力制御フラグ
+      const isDisabled = {
+        kaiseki: bug.status === '新規' || bug.status === '確認',
+        shochi: bug.status === '新規' || bug.status === '解析' || bug.status === '確認',
+        kekka: bug.status === '新規' || bug.status === '解析' || bug.status === '修正'
+      };
+      
+      if (tabKey === 'jisho') {
+        // 事象タブ：タイトル、発生起因・起因番号・再現率、再現手順、期待する動作、実際の動作（編集可）
+        console.log('steps:', bug.steps, '| expected:', bug.expected, '| actual:', bug.actual);
+        
+        // タイトル
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: 'タイトル' }), el('br'),
+          el('input', { 
+            type: 'text', 
+            style: 'width:98%;margin-bottom:16px;', 
+            value: bug.title || '', 
+            'data-key': 'title',
+            placeholder: 'バグのタイトルを入力してください' 
+          })
+        ]));
+        
+        // 発生起因・起因番号・再現率（横並び3列）
+        const originRow = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' }, [
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '発生起因' }));
+            fld.appendChild(el('br'));
+            const input = el('select', { style: 'width:100%;', 'data-key': 'origin' });
+            ['', ...ORIGIN_LIST].forEach(o => {
+              const op = el('option', { value: o, text: o || '(選択)' });
+              if (o === (bug.origin || '')) {
+                op.selected = true;
+              }
+              input.appendChild(op);
+            });
+            fld.appendChild(input);
+            return fld;
+          })(),
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '起因番号' }));
+            fld.appendChild(el('br'));
+            const input = el('input', { type: 'text', style: 'width:100%;', 'data-key': 'originNumber' });
+            input.value = bug.originNumber || '';
+            input.placeholder = '起因番号を入力';
+            fld.appendChild(input);
+            return fld;
+          })(),
+          (() => {
+            const fld = el('div', { style: 'flex:1;' });
+            fld.appendChild(el('label', { text: '再現率' }));
+            fld.appendChild(el('br'));
+            const input = el('select', { style: 'width:100%;', 'data-key': 'reproRate' });
+            ['','毎回','時々','1回のみ'].forEach(o => {
+              const op = el('option', { value: o, text: o || '(選択)' });
+              if (o === (bug.reproRate || '')) {
+                op.selected = true;
+              }
+              input.appendChild(op);
+            });
+            fld.appendChild(input);
+            return fld;
+          })()
+        ]);
+        tabContent.appendChild(originRow);
+        
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '再現手順' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 10,
+              style: 'width:98%;',
+              placeholder: '再現手順を入力してください',
+              'data-key': 'steps'
+            });
+            ta.textContent = (bug.steps !== undefined && bug.steps !== null) ? bug.steps : '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '期待する動作' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '期待する動作を入力してください',
+              'data-key': 'expected'
+            });
+            ta.textContent = (bug.expected !== undefined && bug.expected !== null) ? bug.expected : '';
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '実際の動作' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 2,
+              style: 'width:98%;',
+              placeholder: '実際の動作を入力してください',
+              'data-key': 'actual'
+            });
+            ta.textContent = (bug.actual !== undefined && bug.actual !== null) ? bug.actual : '';
+            return ta;
+          })()
+        ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
+      } else if (tabKey === 'kaiseki') {
+        // 解析タブ：原因（編集可）、解析完了チェック
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '原因' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 15,
+              style: 'width:98%;',
+              placeholder: '原因を入力してください',
+              'data-key': 'cause'
+            });
+            ta.textContent = (bug.cause !== undefined && bug.cause !== null) ? bug.cause : '';
+            ta.disabled = isDisabled.kaiseki; // 入力制御
+            return ta;
+          })()
+        ]));
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            (() => {
+              const checkbox = el('input', { type: 'checkbox', 'data-key': 'kaisekikanryo' });
+              // 解析日が入っていたらチェック
+              if (bug.analysisDate && bug.analysisDate.trim() !== '') {
+                checkbox.checked = true;
+                checkbox.disabled = true; // 解析日が入っている場合は読み取り専用
+              }
+              // 対応日や確認日が入っている場合も読み取り専用
+              if ((bug.fixDate && bug.fixDate.trim() !== '') || (bug.verifyDate && bug.verifyDate.trim() !== '')) {
+                checkbox.disabled = true;
+              }
+              // 状況に応じた入力制御も適用
+              if (isDisabled.kaiseki) {
+                checkbox.disabled = true;
+              }
+              return checkbox;
+            })(),
+            el('span', { text: '解析完了（修正に変更）' })
+          ])
+        ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
+      } else if (tabKey === 'shochi') {
+        // 処置タブ：影響範囲（チェックボックス表）と処置内容を横並び、修正Ver（編集可）、処置完了チェック
+        
+        // メインコンテナ（横並び）
+        const mainContainer = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' });
+        
+        // 左側：影響範囲のチェックボックス表
+        const leftPanel = el('div', { style: 'flex:0 0 auto;min-width:fit-content;' });
+        
+        const scopeOptions = [...ORIGIN_LIST, 'RPA', 'アプリ']; // H3セルの値 + 固定の選択肢
+        const currentScope = bug.scope || '';
+        
+        // デバッグ情報を出力
+        console.log('=== 修正完了抽出デバッグ ===');
+        console.log('currentScope:', JSON.stringify(currentScope));
+        
+        // 影響範囲から（済）を除去して修正対象を抽出
+        const selectedScopes = currentScope.split('/').map(s => s.trim().replace(/（済）$/, '')).filter(s => s);
+        console.log('selectedScopes:', selectedScopes);
+        
+        // 修正完了状況を取得（scopeCompletedフィールド + 影響範囲の（済）から抽出）
+        const currentCompleted = bug.scopeCompleted || '';
+        let completedScopes = currentCompleted.split('/').map(s => s.trim()).filter(s => s);
+        console.log('currentCompleted:', JSON.stringify(currentCompleted));
+        console.log('completedScopes from field:', completedScopes);
+        
+        // 影響範囲から（済）が付いているアイテムも修正完了に含める
+        const scopeItems = currentScope.split('/').map(s => s.trim()).filter(s => s);
+        console.log('scopeItems:', scopeItems);
+        
+        const scopeWithCompleted = scopeItems.filter(s => s.includes('（済）'));
+        console.log('scopeWithCompleted:', scopeWithCompleted);
+        
+        const completedFromScope = scopeWithCompleted.map(s => s.replace(/（済）$/, ''));
+        console.log('completedFromScope:', completedFromScope);
+        
+        completedScopes = [...new Set([...completedScopes, ...completedFromScope])];
+        console.log('final completedScopes:', completedScopes);
+        console.log('=== デバッグ終了 ===');
+        
+        leftPanel.appendChild(el('div', { style: 'margin-bottom:16px;' }, [
+          el('label', { text: '影響範囲', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
+          (() => {
+            const table = el('table', { style: 'border-collapse:collapse;width:100%;' });
+            
+            // ヘッダー行
+            const headerRow = el('tr');
+            headerRow.appendChild(el('th', { 
+              text: '修正対象', 
+              style: 'border:1px solid #ddd;padding:8px;background:#f5f5f5;text-align:left;white-space:nowrap;min-width:120px;' 
+            }));
+            headerRow.appendChild(el('th', { 
+              text: '修正完了', 
+              style: 'border:1px solid #ddd;padding:8px;background:#f5f5f5;text-align:center;white-space:nowrap;width:80px;' 
+            }));
+            table.appendChild(headerRow);
+            
+            // 各オプションの行
+            scopeOptions.forEach(option => {
+              const row = el('tr');
+              
+              // 修正対象列
+              const targetCell = el('td', { style: 'border:1px solid #ddd;padding:6px;white-space:nowrap;' });
+              const targetCheckbox = el('input', { 
+                type: 'checkbox', 
+                value: option,
+                'data-scope-option': option,
+                style: 'margin-right:8px;'
+              });
+              
+              if (selectedScopes.includes(option)) {
+                targetCheckbox.checked = true;
+              }
+              
+              targetCheckbox.disabled = isDisabled.shochi; // 入力制御
+              
+              const targetLabel = el('label', { style: 'display:flex;align-items:center;cursor:pointer;white-space:nowrap;' }, [
+                targetCheckbox,
+                el('span', { text: option })
+              ]);
+              
+              targetCell.appendChild(targetLabel);
+              row.appendChild(targetCell);
+              
+              // 修正完了列
+              const completedCell = el('td', { style: 'border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap;' });
+              const completedCheckbox = el('input', { 
+                type: 'checkbox', 
+                value: option,
+                'data-scope-completed': option,
+                style: 'display:none;' // 初期は非表示
+              });
+              
+              if (completedScopes.includes(option)) {
+                completedCheckbox.checked = true;
+              }
+              
+              completedCheckbox.disabled = isDisabled.shochi; // 入力制御
+              
+              // 修正対象がチェックされている場合は完了チェックボックスを表示
+              if (selectedScopes.includes(option)) {
+                completedCheckbox.style.display = 'inline-block';
+              }
+              
+              // 修正対象チェックボックスの変更イベント
+              targetCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                  completedCheckbox.style.display = 'inline-block';
+                } else {
+                  completedCheckbox.style.display = 'none';
+                  completedCheckbox.checked = false;
+                }
+              });
+              
+              completedCell.appendChild(completedCheckbox);
+              row.appendChild(completedCell);
+              table.appendChild(row);
+            });
+            
+            return table;
+          })()
+        ]));
+        
+        mainContainer.appendChild(leftPanel);
+        
+        // 右側：処置内容
+        const rightPanel = el('div', { style: 'flex:1;margin-left:16px;' });
+        rightPanel.appendChild(el('div', {}, [
+          el('label', { text: '処置内容', style: 'font-weight:bold;margin-bottom:8px;display:block;' }),
+          (() => {
+            const ta = el('textarea', {
+              rows: 15,
+              style: 'width:98%;',
+              placeholder: '処置内容を入力してください',
+              'data-key': 'fix'
+            });
+            ta.textContent = (bug.fix !== undefined && bug.fix !== null) ? bug.fix : '';
+            ta.disabled = isDisabled.shochi; // 入力制御
+            return ta;
+          })()
+        ]));
+        
+        mainContainer.appendChild(rightPanel);
+        tabContent.appendChild(mainContainer);
+        
+        // 下部：修正Ver（シンプル表示）、処置完了チェック
+        const versionContainer = el('div', {});
+        
+        // ラベル行（修正Ver + 既存バージョンボタン + 新規ボタン）
+        const labelRow = el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;' });
+        labelRow.appendChild(el('label', { text: '修正Ver', style: 'font-weight:bold;' }));
+        
+        // 既存バージョンボタン
+        const existingVersionButton = el('button', { 
+          type: 'button',
+          text: 'Rev.0.0',
+          id: 'existing-version-button',
+          style: 'padding:4px 12px;border:1px solid #28a745;background:#28a745;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
+        
+        // 新規バージョン作成ボタン
+        const newVersionButton = el('button', { 
+          type: 'button',
+          text: 'さらに新しいバージョンを払い出す',
+          id: 'new-version-button',
+          style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;font-size:12px;'
+        });
+        
+        // ボタンの非活性化判定
+        const shouldDisableButtons = isDisabled.shochi || 
+          (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+        
+        if (shouldDisableButtons) {
+          existingVersionButton.disabled = true;
+          existingVersionButton.style.opacity = '0.5';
+          existingVersionButton.style.cursor = 'not-allowed';
+          newVersionButton.disabled = true;
+          newVersionButton.style.opacity = '0.5';
+          newVersionButton.style.cursor = 'not-allowed';
+        }
+        
+        labelRow.appendChild(existingVersionButton);
+        labelRow.appendChild(newVersionButton);
+        versionContainer.appendChild(labelRow);
+        
+        // バージョン表示テキストエリア
+        const versionTextArea = el('textarea', {
+          rows: 2,
+          style: 'width:98%;resize:none;background:#f9f9f9;border:1px solid #ddd;padding:8px;',
+          readonly: true,
+          id: 'version-display-text',
+          placeholder: 'バージョン情報を取得中...'
+        });
+        
+        versionContainer.appendChild(versionTextArea);
+        
+        // 隠し入力フィールド（実際の値を保存）
+        const hiddenVersionInput = el('input', { 
+          type: 'hidden', 
+          'data-key': 'fixVer',
+          id: 'fix-ver-hidden',
+          value: bug.fixVer || ''
+        });
+        versionContainer.appendChild(hiddenVersionInput);
+        
+        // バージョン情報を初期化する関数
+        async function initializeVersionDisplay() {
+          const textArea = document.querySelector('#version-display-text');
+          const existingButton = document.querySelector('#existing-version-button');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1); // AF列は31番目（0ベース）
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1); // S列は18番目（0ベース）
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              // デバッグ：セルの実際の値を確認
+              console.log('AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('S3セルの値:', minorVersionCell.values[0][0]);
+              
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const minorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
+              
+              console.log('処理後 - メジャーバージョン:', majorVersion);
+              console.log('処理後 - マイナーバージョン:', minorVersion);
+              
+              const currentVersion = `Rev.${majorVersion}.${minorVersion}`;
+              
+              // 既存バージョンボタンのテキストを更新
+              if (existingButton) {
+                existingButton.textContent = currentVersion;
+              }
+              
+              // テキストエリアに表示
+              if (textArea) {
+                if (bug.fixVer && bug.fixVer.trim() !== '') {
+                  // 既存バージョンがある場合
+                  textArea.value = `${bug.fixVer} （設定済み）`;
+                } else {
+                  // 既存バージョンがない場合は空にする
+                  textArea.value = 'バージョンを選択してください';
+                }
+              }
+              
+              // グローバル変数に保存（他の処理で使用）
+              window.versionInfo = {
+                major: majorVersion,
+                minor: minorVersion,
+                current: currentVersion,
+                next: `Rev.${majorVersion}.${minorVersion + 1}`,
+                nextMinor: minorVersion + 1
+              };
+            });
+          } catch (error) {
+            console.error('バージョン情報取得エラー:', error);
+            // エラー時のフォールバック表示
+            if (textArea) {
+              if (bug.fixVer && bug.fixVer.trim() !== '') {
+                textArea.value = `${bug.fixVer} （設定済み）`;
+              } else {
+                textArea.value = 'バージョン情報を取得できませんでした';
+              }
+            }
+          }
+        }
+        
+        // 既存バージョンを選択する関数
+        function selectExistingVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
+          const button = document.querySelector('#existing-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          
+          if (window.versionInfo) {
+            const existingVersion = window.versionInfo.current;
+            
+            // バグオブジェクトの修正Verを更新
+            bug.fixVer = existingVersion;
+            
+            // 隠し入力フィールドも更新
+            if (hiddenInput) {
+              hiddenInput.value = existingVersion;
+            }
+            
+            // テキストエリアの表示を更新
+            if (textArea) {
+              textArea.value = `${existingVersion} （既存バージョン）`;
+            }
+            
+            console.log(`既存バージョンを選択しました: ${existingVersion}`);
+          }
+        }
+        
+        // 新しいバージョンを払い出す関数
+        async function createNewVersion() {
+          // ボタンが非活性状態の場合は処理を実行しない
+          const button = document.querySelector('#new-version-button');
+          if (button && button.disabled) {
+            return;
+          }
+          
+          const textArea = document.querySelector('#version-display-text');
+          const hiddenInput = document.querySelector('#fix-ver-hidden');
+          const existingButton = document.querySelector('#existing-version-button');
+          
+          if (button) {
+            button.disabled = true;
+            button.textContent = '処理中...';
+          }
+          
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              
+              // AF3セル（メジャーバージョン）とS3セル（マイナーバージョン）を取得
+              const majorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 31, 1, 1);
+              const minorVersionCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 18, 1, 1);
+              
+              majorVersionCell.load('values');
+              minorVersionCell.load('values');
+              
+              await ctx.sync();
+              
+              // デバッグ：セルの実際の値を確認
+              console.log('新規作成時 - AF3セルの値:', majorVersionCell.values[0][0]);
+              console.log('新規作成時 - S3セルの値:', minorVersionCell.values[0][0]);
+              
+              // 整数値として取得（小数点を除去）
+              const majorVersion = parseInt(majorVersionCell.values[0][0]) || 0;
+              const currentMinorVersion = parseInt(minorVersionCell.values[0][0]) || 0;
+              const newMinorVersion = currentMinorVersion + 1;
+              
+              // S3セルを更新
+              minorVersionCell.values = [[newMinorVersion]];
+              
+              await ctx.sync();
+              
+              const newVersion = `Rev.${majorVersion}.${newMinorVersion}`;
+              
+              // バグオブジェクトの修正Verを更新
+              bug.fixVer = newVersion;
+              
+              // 隠し入力フィールドも更新
+              if (hiddenInput) {
+                hiddenInput.value = newVersion;
+              }
+              
+              // テキストエリアの表示を更新
+              if (textArea) {
+                textArea.value = `${newVersion} （新しいバージョン）`;
+              }
+              
+              // 既存バージョンボタンも更新
+              if (existingButton) {
+                existingButton.textContent = newVersion;
+              }
+              
+              // グローバル変数を更新
+              window.versionInfo = {
+                major: majorVersion,
+                minor: newMinorVersion,
+                current: newVersion,
+                next: `Rev.${majorVersion}.${newMinorVersion + 1}`,
+                nextMinor: newMinorVersion + 1
+              };
+              
+              console.log(`新しいバージョンを払い出しました: ${newVersion}`);
+            });
+          } catch (error) {
+            console.error('バージョン払い出しエラー:', error);
+            alert('バージョン払い出しに失敗しました: ' + error.message);
+          } finally {
+            // ボタンを元に戻す（条件に応じて有効/無効を設定）
+            if (button) {
+              const shouldDisable = isDisabled.shochi || 
+                (bug.fixVer && bug.fixVer.trim() !== '' && bug.status !== '修正');
+              
+              button.disabled = shouldDisable;
+              button.textContent = 'さらに新しいバージョンを払い出す';
+              
+              if (shouldDisable) {
+                button.style.opacity = '0.5';
+                button.style.cursor = 'not-allowed';
+              } else {
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+              }
+            }
+          }
+        }
+        
+        // ボタンのイベントリスナー
+        existingVersionButton.addEventListener('click', selectExistingVersion);
+        newVersionButton.addEventListener('click', createNewVersion);
+        
+        // 初期化を実行（DOM追加後）
+        setTimeout(initializeVersionDisplay, 0);
+        
+        tabContent.appendChild(versionContainer);
+        tabContent.appendChild(el('div', { style: 'margin-top:8px;' }, [
+          el('label', {}, [
+            (() => {
+              const checkbox = el('input', { type: 'checkbox', 'data-key': 'shochikanryo' });
+              // 対応日が入っていたらチェック
+              if (bug.fixDate && bug.fixDate.trim() !== '') {
+                checkbox.checked = true;
+                checkbox.disabled = true; // 対応日が入っている場合は読み取り専用
+              }
+              // 確認日が入っている場合も読み取り専用
+              if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+                checkbox.disabled = true;
+              }
+              // 状況に応じた入力制御も適用
+              if (isDisabled.shochi) {
+                checkbox.disabled = true;
+              }
+              return checkbox;
+            })(),
+            el('span', { text: '処置完了（確認に変更）' })
+          ])
+        ]));
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
+      } else if (tabKey === 'kekka') {
+        // 結果確認タブ：確認内容（編集可）、確認完了・差し戻しラジオボタン
+        tabContent.appendChild(el('div', {}, [
+          el('label', { text: '確認内容' }), el('br'),
+          (() => {
+            const ta = el('textarea', {
+              rows: 10,
+              style: 'width:98%;',
+              placeholder: '確認内容を入力してください',
+              'data-key': 'verify'
+            });
+            ta.textContent = (bug.verify !== undefined && bug.verify !== null) ? bug.verify : '';
+            ta.disabled = isDisabled.kekka; // 入力制御
+            return ta;
+          })()
+        ]));
+        
+        // ラジオボタングループ
+        const radioGroup = el('div', { style: 'margin-top:8px;' });
+        const groupName = `result_${bug.rowIndex || 'new'}`;
+        
+        // 確認完了ラジオボタン
+        const completeRadio = el('label', { style: 'margin-right:16px;' }, [
+          (() => {
+            const radio = el('input', { 
+              type: 'radio', 
+              name: groupName, 
+              value: 'complete', 
+              'data-key': 'kekkakanryo' 
+            });
+            // 確認日が入っていたらチェック
+            if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+              radio.checked = true;
+              radio.disabled = true; // 確認日が入っている場合は読み取り専用
+            }
+            // 状況に応じた入力制御も適用
+            if (isDisabled.kekka) {
+              radio.disabled = true;
+            }
+            return radio;
+          })(),
+          el('span', { text: '確認完了（完了に変更）' })
+        ]);
+        
+        // 差し戻しラジオボタン
+        const rejectRadio = el('label', {}, [
+          (() => {
+            const radio = el('input', { 
+              type: 'radio', 
+              name: groupName, 
+              value: 'reject', 
+              'data-key': 'sashimodoshi' 
+            });
+            // 差し戻しに○が入っていて、かつ確認日がない場合のみチェック
+            if (bug.reject === '○' && (!bug.verifyDate || bug.verifyDate.trim() === '')) {
+              radio.checked = true;
+            }
+            // 確認日が入っている場合は読み取り専用
+            if (bug.verifyDate && bug.verifyDate.trim() !== '') {
+              radio.disabled = true;
+            }
+            // 状況に応じた入力制御も適用
+            if (isDisabled.kekka) {
+              radio.disabled = true;
+            }
+            return radio;
+          })(),
+          el('span', { text: '差し戻し（修正に変更）' })
+        ]);
+        
+        radioGroup.appendChild(completeRadio);
+        radioGroup.appendChild(rejectRadio);
+        tabContent.appendChild(radioGroup);
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
+      } else if (tabKey === 'kanri') {
+        // 管理タブ：優先度、影響度、タグ（編集可）
+        
+        // 1行目：優先度と影響度（横並び）
+        const row1 = el('div', { style: 'display:flex;gap:16px;margin-bottom:16px;' }, [
+          (() => {
+            const field = el('div', { style: 'flex:1;' });
+            field.appendChild(el('label', { text: '優先度' }));
+            field.appendChild(el('br'));
+            const select = el('select', { style: 'width:100%;', 'data-key': 'priority' });
+            ['', ...PRIORITY_LIST].forEach(option => {
+              const op = el('option', { value: option, text: option || '(選択)' });
+              if (option === (bug.priority || '中')) { // 初期値は中、既存の値があればそれを使用
+                op.selected = true;
+              }
+              select.appendChild(op);
+            });
+            field.appendChild(select);
+            return field;
+          })(),
+          (() => {
+            const field = el('div', { style: 'flex:1;' });
+            field.appendChild(el('label', { text: '影響度' }));
+            field.appendChild(el('br'));
+            const select = el('select', { style: 'width:100%;', 'data-key': 'severity' });
+            ['', ...SEVERITY_LIST].forEach(option => {
+              const op = el('option', { value: option, text: option || '(選択)' });
+              if (option === (bug.severity || '')) { // 初期値は空
+                op.selected = true;
+              }
+              select.appendChild(op);
+            });
+            field.appendChild(select);
+            return field;
+          })()
+        ]);
+        
+        // 2行目：タグ（チップ形式）
+        const row2 = el('div', {}, [
+          // タグヘッダー（ラベル + ＋ボタン）
+          (() => {
+            const headerContainer = el('div', { 
+              style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;' 
+            });
+            
+            headerContainer.appendChild(el('label', { 
+              text: 'タグ', 
+              style: 'font-weight:bold;' 
+            }));
+            
+            const toggleBtn = el('button', {
+              type: 'button',
+              text: '＋',
+              id: 'tag-toggle-btn',
+              style: 'height:16px;width:16px;border:1px solid #007acc;background:#007acc;color:white;border-radius:8px;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;transition:transform 0.3s ease;padding:0;'
+            });
+            
+            toggleBtn.addEventListener('click', () => {
+              const tagInputArea = document.querySelector('#tag-input-area');
+              const btn = document.querySelector('#tag-toggle-btn');
+              
+              if (tagInputArea && btn) {
+                const isVisible = tagInputArea.style.maxHeight !== '0px' && tagInputArea.style.maxHeight !== '';
+                
+                if (isVisible) {
+                  // 閉じる
+                  tagInputArea.style.maxHeight = '0px';
+                  tagInputArea.style.opacity = '0';
+                  btn.textContent = '＋';
+                  btn.style.transform = 'rotate(0deg)';
+                } else {
+                  // 開く
+                  tagInputArea.style.maxHeight = '300px';
+                  tagInputArea.style.opacity = '1';
+                  btn.textContent = '−';
+                  btn.style.transform = 'rotate(180deg)';
+                }
+              }
+            });
+            
+            headerContainer.appendChild(toggleBtn);
+            return headerContainer;
+          })(),
+          
+          // タグ入力エリア（スライド対応）
+          (() => {
+            const inputArea = el('div', {
+              id: 'tag-input-area',
+              style: 'max-height:0px;opacity:0;overflow:hidden;transition:max-height 0.3s ease, opacity 0.3s ease;margin-bottom:12px;'
+            });
+            
+            // プリセットタグボタン群
+            const presetContainer = el('div', { style: 'margin-bottom:12px;' });
+            presetContainer.appendChild(el('div', { 
+              text: 'プリセットタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const buttonContainer = el('div', { 
+              style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;',
+              id: 'preset-tags-container'
+            });
+            
+            // 初期表示は後で行う
+            
+            presetContainer.appendChild(buttonContainer);
+            inputArea.appendChild(presetContainer);
+            
+            // カスタムタグ入力
+            const customContainer = el('div', { style: 'margin-bottom:12px;' });
+            customContainer.appendChild(el('div', { 
+              text: 'カスタムタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const inputContainer = el('div', { style: 'display:flex;gap:8px;' });
+            const input = el('input', { 
+              type: 'text', 
+              placeholder: 'カスタムタグを入力',
+              style: 'flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;',
+              id: 'custom-tag-input'
+            });
+            
+            const addBtn = el('button', {
+              type: 'button',
+              text: '追加',
+              style: 'padding:4px 12px;border:1px solid #007acc;background:#007acc;color:white;border-radius:4px;cursor:pointer;'
+            });
+            
+            addBtn.addEventListener('click', () => {
+              const value = input.value.trim();
+              if (value) {
+                addTag(value);
+                input.value = '';
+              }
+            });
+            
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addBtn.click();
+              }
+            });
+            
+            inputContainer.appendChild(input);
+            inputContainer.appendChild(addBtn);
+            customContainer.appendChild(inputContainer);
+            inputArea.appendChild(customContainer);
+            
+            return inputArea;
+          })(),
+          
+          // 選択されたタグ表示エリア
+          (() => {
+            const tagContainer = el('div', { 
+              style: 'border:1px solid #ddd;border-radius:4px;padding:8px;min-height:40px;background:#fafafa;',
+              id: 'selected-tags-container'
+            });
+            tagContainer.appendChild(el('div', { 
+              text: '選択されたタグ:', 
+              style: 'font-size:12px;color:#666;margin-bottom:6px;' 
+            }));
+            
+            const tagsDisplay = el('div', { 
+              style: 'display:flex;flex-wrap:wrap;gap:6px;',
+              id: 'tags-display'
+            });
+            
+            tagContainer.appendChild(tagsDisplay);
+            return tagContainer;
+          })(),
+          
+          // 隠し入力フィールド（実際の値を保存）
+          el('input', { 
+            type: 'hidden', 
+            'data-key': 'tag',
+            id: 'tag-hidden-input',
+            value: bug.tag || ''
+          })
+        ]);
+        
+        tabContent.appendChild(row1);
+        tabContent.appendChild(row2);
+        
+        // プリセットボタン更新関数（グローバルスコープ）
+        function renderPresetButtons() {
+          const container = document.querySelector('#preset-tags-container');
+          if (!container) return;
+          
+          container.innerHTML = '';
+          const presetTags = state.presetTags || [];
+          
+          // 現在選択されているタグを取得
+          const hiddenInput = document.querySelector('#tag-hidden-input');
+          const currentTags = hiddenInput ? 
+            (hiddenInput.value || '').split('/').map(t => t.trim()).filter(t => t) : [];
+          
+          presetTags.forEach(tag => {
+            // 選択状態に応じて背景色を決定
+            const isSelected = currentTags.includes(tag);
+            const baseColor = isSelected ? '#007acc' : '#cccccc';
+            const hoverColor = isSelected ? '#0056a3' : '#999999';
+            
+            const btn = el('button', {
+              type: 'button',
+              text: tag,
+              style: `background:${baseColor};color:white;padding:4px 12px;border:none;border-radius:12px;cursor:pointer;font-size:12px;margin:2px;transition:background-color 0.2s ease;`
+            });
+            
+            // ホバー効果
+            btn.addEventListener('mouseenter', () => {
+              btn.style.backgroundColor = hoverColor;
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.backgroundColor = baseColor;
+            });
+            
+            btn.addEventListener('click', () => addTag(tag));
+            container.appendChild(btn);
+          });
+        }
+        
+        // タグ機能の初期化（DOM追加後に実行）
+        setTimeout(() => {
+          // プリセットボタンを初期表示
+          renderPresetButtons();
+          
+          // 既存のタグを表示（/区切り）
+          const currentTags = (bug.tag || '').split('/').map(t => t.trim()).filter(t => t);
+          currentTags.forEach(tag => {
+            if (tag.trim()) addTagChip(tag.trim());
+          });
+        }, 0);
+        
+        // プリセットタグをY3セルに保存する関数
+        async function savePresetTags() {
+          try {
+            await Excel.run(async (ctx) => {
+              const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+              const presetTagCell = sheet.getRangeByIndexes(SAMPLE_ROW - 1, 24, 1, 1); // Y列は24番目（0ベース）
+              presetTagCell.values = [[state.presetTags.join('/')]]; // プリセットタグを/区切りで保存
+              
+              // プリセットタグセルの文字列折り返しを無効にする
+              presetTagCell.format.wrapText = false;
+              
+              await ctx.sync();
+            });
+          } catch (error) {
+            console.error('プリセットタグ保存エラー:', error);
+          }
+        }
+
+        // タグ追加関数
+        function addTag(tagName) {
+          const tagsDisplay = document.querySelector('#tags-display');
+          const hiddenInput = document.querySelector('#tag-hidden-input');
+          
+          if (!tagsDisplay || !hiddenInput) return;
+          
+          // 既存チェック（/区切り）
+          const currentTags = (hiddenInput.value || '').split('/').map(t => t.trim()).filter(t => t);
+          if (currentTags.includes(tagName.trim())) {
+            return; // 既に存在する場合は追加しない
+          }
+          
+          // プリセットタグにない場合は追加
+          if (!state.presetTags.includes(tagName.trim())) {
+            state.presetTags.push(tagName.trim());
+            // プリセットボタンを再描画
+            renderPresetButtons();
+            // Y3セルに保存
+            savePresetTags();
+          }
+          
+          addTagChip(tagName.trim());
+          updateHiddenInput();
+        }
+        
+        // タグチップ追加関数
+        function addTagChip(tagName) {
+          const tagsDisplay = document.querySelector('#tags-display');
+          if (!tagsDisplay) return;
+          
+          const chip = el('div', {
+            style: 'display:inline-flex;align-items:center;background:#007acc;color:white;padding:2px 8px;border-radius:12px;font-size:12px;gap:4px;'
+          });
+          
+          chip.appendChild(el('span', { text: tagName }));
+          
+          const removeBtn = el('button', {
+            type: 'button',
+            text: '×',
+            style: 'background:none;border:none;color:white;cursor:pointer;font-size:14px;padding:0;margin-left:4px;'
+          });
+          
+          removeBtn.addEventListener('click', () => {
+            chip.remove();
+            updateHiddenInput();
+          });
+          
+          chip.appendChild(removeBtn);
+          tagsDisplay.appendChild(chip);
+        }
+        
+        // 隠し入力フィールド更新関数
+        function updateHiddenInput() {
+          const tagsDisplay = document.querySelector('#tags-display');
+          const hiddenInput = document.querySelector('#tag-hidden-input');
+          
+          if (!tagsDisplay || !hiddenInput) return;
+          
+          const tags = [];
+          tagsDisplay.querySelectorAll('div').forEach(chip => {
+            const span = chip.querySelector('span');
+            if (span) {
+              tags.push(span.textContent.trim());
+            }
+          });
+          
+          hiddenInput.value = tags.join('/');
+          // プリセットボタンの表示を更新（選択状態に応じて色分け）
+          renderPresetButtons();
+        }
+        
+        // 保存されたフォームデータを復元
+        loadTabData(tabKey);
+      }
+    }
+
+    renderTab(activeTab);
+    $('#modal').classList.remove('hidden');
+  }
+
+  function closeModal() {
+    $('#modal').classList.add('hidden');
+    
+    // タブのフォームデータをクリア
+    if (state.editingRow && state.tabFormData[state.editingRow]) {
+      delete state.tabFormData[state.editingRow];
+    }
+    
+    state.editingRow = null;
+  }
+
+  function getNextId() {
+    const maxId = Math.max(0, ...state.bugs.map(b => parseInt(b.id) || 0));
+    return maxId + 1;
+  }
+
+  function getTodayString() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  }
+
+  function openNewBugModal() {
+    state.editingRow = 'new';
+    $('#modal-title').textContent = '新規バグ登録';
+
+    const body = $('#modal-body');
+    body.innerHTML = '';
+
+    // データ初期値
+    const newBugData = {
+      id: String(getNextId()).padStart(4, '0'),
+      title: '', // タイトルを追加
+      occurredOn: (() => {
+        const d = new Date();
+        return `${d.getMonth()+1}/${d.getDate()}`;
+      })(),
+      reporter: '',
+      priority: '中', // 優先度のデフォルト値を「中」に設定
+      severity: '', // 影響度を追加
+      origin: '',
+      originNumber: '', // 起因番号を追加
+      reproRate: '',
+      steps: '',
+      expected: '',
+      actual: ''
+    };
+
+    // 1行目: ID, 発生日, 登録者, 優先度, 影響度（横並び5列）
+    const row1 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: 'ID *' }));
+        const input = el('input', { type: 'text', readonly: 'readonly', style: 'width:100%;text-align:center;' });
+        input.value = newBugData.id;
+        input.dataset.key = 'id';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '発生日 *' }));
+        const input = el('input', { type: 'text', style: 'width:100%;text-align:center;' });
+        input.value = newBugData.occurredOn;
+        input.required = true;
+        input.placeholder = 'm/d';
+        input.dataset.key = 'occurredOn';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '登録者 *' }));
+        const input = el('select', { style: 'width:100%;' });
+        
+        // 動的に登録者リストを設定
+        const reporterOptions = ['', ...REPORTER_LIST];
+        reporterOptions.forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          // 前回選択した登録者を初期選択
+          if (o === state.lastSelectedReporter) {
+            op.selected = true;
+            newBugData.reporter = o;
+          }
+          input.appendChild(op);
+        });
+        
+        // 登録者変更時にlocalStorageに保存
+        input.addEventListener('change', (e) => {
+          const selectedReporter = e.target.value;
+          state.lastSelectedReporter = selectedReporter;
+          localStorage.setItem('bugTracker_lastReporter', selectedReporter);
+        });
+        
+        input.required = true;
+        input.dataset.key = 'reporter';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '優先度 *' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['', ...PRIORITY_LIST].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          // データの初期値と一致する場合に選択
+          if (o === newBugData.priority) {
+            op.selected = true;
+          }
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'priority';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '影響度' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['', ...SEVERITY_LIST].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.dataset.key = 'severity';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 2行目: 発生起因, 起因番号, 再現率（横並び3列）
+    const row2 = el('div', { class: 'form-row', style: 'display:flex;gap:16px;' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '発生起因 *' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['', ...ORIGIN_LIST].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'origin';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '起因番号' }));
+        const input = el('input', { type: 'text', style: 'width:100%;' });
+        input.value = newBugData.originNumber;
+        input.placeholder = '起因番号を入力';
+        input.dataset.key = 'originNumber';
+        fld.appendChild(input);
+        return fld;
+      })(),
+      (() => {
+        const fld = el('div', { class: 'field', style: 'flex:1;' });
+        fld.appendChild(el('label', { text: '再現率 *' }));
+        const input = el('select', { style: 'width:100%;' });
+        ['','毎回','時々','1回のみ'].forEach(o => {
+          const op = el('option', { value: o, text: o || '(選択)' });
+          input.appendChild(op);
+        });
+        input.required = true;
+        input.dataset.key = 'reproRate';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 3行目: タイトル
+    const row3 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: 'タイトル *' }));
+        const input = el('input', { type: 'text', style: 'width:98%;' });
+        input.value = newBugData.title;
+        input.required = true;
+        input.placeholder = 'バグのタイトルを入力してください';
+        input.dataset.key = 'title';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 4行目: 再現手順（10行）
+    const row4 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '再現手順 *' }));
+        const input = el('textarea', { rows: 10, style: 'width:98%;' });
+        input.value = newBugData.steps;
+        input.required = true;
+        input.placeholder = '1. 再現手順を記載してください\n2. 詳細な操作手順\n3. 発生までの流れ';
+        input.dataset.key = 'steps';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 5行目: 期待する動作
+    const row5 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '期待する動作 *' }));
+        const input = el('textarea', { rows: 2, style: 'width:98%;' });
+        input.value = newBugData.expected;
+        input.required = true;
+        input.dataset.key = 'expected';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // 6行目: 実際の動作
+    const row6 = el('div', { class: 'form-row' }, [
+      (() => {
+        const fld = el('div', { class: 'field', style: 'width:100%;' });
+        fld.appendChild(el('label', { text: '実際の動作 *' }));
+        const input = el('textarea', { rows: 2, style: 'width:98%;' });
+        input.value = newBugData.actual;
+        input.required = true;
+        input.dataset.key = 'actual';
+        fld.appendChild(input);
+        return fld;
+      })()
+    ]);
+
+    // レイアウトをbodyに追加
+    body.appendChild(row1);
+    body.appendChild(row2);
+    body.appendChild(row3); // タイトル
+    body.appendChild(row4); // 再現手順
+    body.appendChild(row5); // 期待する動作
+    body.appendChild(row6); // 実際の動作
+
+    $('#modal').classList.remove('hidden');
+  }
+
+  async function saveNewBug(bugData) {
+    if (!state.inOffice) {
+      // デモモードの場合
+      const maxRowIndex = Math.max(0, ...state.bugs.map(b => b.rowIndex || 0));
+      bugData.rowIndex = maxRowIndex + 1;
+      state.bugs.push(bugData);
+      return;
+    }
+
+    setStatus('保存中...');
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      const used = sheet.getUsedRange(true);
+      used.load(['rowCount']);
+      await ctx.sync();
+      
+      const newRowIndex = (used.rowCount || DATA_START - 1) + 1;
+      bugData.rowIndex = newRowIndex;
+      
+      const columns = getColumns(); // 一度取得して再利用
+      const rowVals = [];
+      for (let c = 0; c < COL_COUNT; c++) {
+        const colDef = columns[c];
+        let v = bugData[colDef.key];
+        if (v === undefined || v === null) v = '';
+        rowVals.push(v);
+      }
+      
+      const writeRange = sheet.getRangeByIndexes(newRowIndex - 1, 0, 1, COL_COUNT);
+      writeRange.values = [rowVals];
+      
+      // 文字列の折り返しを無効にする
+      writeRange.format.wrapText = false;
+      
+      await ctx.sync();
+      
+      state.bugs.push(bugData);
+    });
+    setStatus('登録しました');
+    setTimeout(() => setStatus(''), 2000);
+  }
+
+  function validateNewBugForm() {
+    const errors = [];
+    const formData = {};
+    const modalBody = $('#modal-body');
+    modalBody.querySelectorAll('[data-key]').forEach(inp => {
+      const k = inp.dataset.key;
+      let value = inp.value.trim();
+      formData[k] = value;
+
+      // 必須項目チェック
+      if ([
+        'id', 'title', 'occurredOn', 'reporter', 'priority', 'origin', 'reproRate', 'steps', 'expected', 'actual'
+      ].includes(k)) {
+        if (!value) {
+          errors.push(`${inp.previousSibling ? inp.previousSibling.textContent.replace('*','').trim() : k}は必須項目です`);
+          inp.style.backgroundColor = '#ffebee';
+        } else {
+          inp.style.backgroundColor = '';
+        }
+      }
+
+      // 発生日のm/d形式チェック
+      if (k === 'occurredOn' && value) {
+        if (!/^\d{1,2}\/\d{1,2}$/.test(value)) {
+          errors.push('発生日は m/d 形式で入力してください');
+          inp.style.backgroundColor = '#ffebee';
+        } else {
+          // 実在日付か判定
+          const [m, d] = value.split('/').map(Number);
+          const dt = new Date(2026, m - 1, d);
+          if (dt.getMonth() + 1 !== m || dt.getDate() !== d) {
+            errors.push('発生日が不正です');
+            inp.style.backgroundColor = '#ffebee';
+          }
+        }
+      }
+    });
+    return { isValid: errors.length === 0, errors, formData };
+  }
+
+  async function saveModal() {
+    if (state.editingRow === 'new') {
+      // 新規登録の場合
+      const validation = validateNewBugForm();
+      if (!validation.isValid) {
+        alert('入力エラー:\n' + validation.errors.join('\n'));
+        return;
+      }
+      
+      const newBugData = validation.formData;
+      // 自動設定項目
+      newBugData.id = getNextId();
+      newBugData.status = '新規';
+      newBugData.updated = newBugData.occurredOn; // 更新日 = 発生日
+      newBugData.assignee = newBugData.reporter; // 更新者 = 登録者（この場合担当者として設定）
+      newBugData.tag = ''; // タグの初期値
+      newBugData.starred = ''; // 本日分の初期値
+      
+      try {
+        await saveNewBug(newBugData);
+        render();
+        closeModal();
+      } catch (e) {
+        console.error(e);
+        setStatus('登録失敗: ' + (e.message || e));
+      }
+    } else {
+      // 既存のバグ編集の場合
+      const bug = state.bugs.find(b => b.rowIndex === state.editingRow);
+      if (!bug) { closeModal(); return; }
+      
+      // 保存前に現在のタブのデータを一時保存
+      const currentTab = $('#modal-body').querySelector('.tab-btn.active')?.dataset.tab;
+      if (currentTab) {
+        const tabContent = $('#modal-body').querySelector('.tab-content');
+        const formData = {};
+        
+        // すべてのinput, textarea, select要素のデータを保存
+        tabContent.querySelectorAll('input, textarea, select').forEach(element => {
+          if (element.dataset.key) {
+            if (element.type === 'checkbox') {
+              formData[element.dataset.key] = element.checked;
+            } else {
+              formData[element.dataset.key] = element.value || element.textContent;
+            }
+          }
+        });
+        
+        // チェックボックス表の特別処理（影響範囲）
+        const scopeCheckboxes = tabContent.querySelectorAll('input[data-scope-option]');
+        if (scopeCheckboxes.length > 0) {
+          formData['_scopeCheckboxes'] = {};
+          scopeCheckboxes.forEach(checkbox => {
+            formData['_scopeCheckboxes'][checkbox.dataset.scopeOption] = checkbox.checked;
+          });
+        }
+        
+        // 修正完了チェックボックスの特別処理
+        const completedCheckboxes = tabContent.querySelectorAll('input[data-scope-completed]');
+        if (completedCheckboxes.length > 0) {
+          formData['_completedCheckboxes'] = {};
+          completedCheckboxes.forEach(checkbox => {
+            formData['_completedCheckboxes'][checkbox.dataset.scopeCompleted] = checkbox.checked;
+          });
+        }
+        
+        // タブ別にデータを保存
+        if (!state.tabFormData[state.editingRow]) {
+          state.tabFormData[state.editingRow] = {};
+        }
+        state.tabFormData[state.editingRow][currentTab] = formData;
+      }
+      
+      // 一時保存されているすべてのタブデータをバグオブジェクトに反映
+      if (state.tabFormData[state.editingRow]) {
+        Object.keys(state.tabFormData[state.editingRow]).forEach(tabKey => {
+          const tabData = state.tabFormData[state.editingRow][tabKey];
+          
+          // 通常のフィールドを反映
+          Object.keys(tabData).forEach(fieldKey => {
+            if (fieldKey.startsWith('_')) return; // 特別処理用のキーはスキップ
+            
+            const col = getColumns().find(c => c.key === fieldKey);
+            if (col && col.type !== 'readonly' && !['kekkakanryo', 'sashimodoshi'].includes(fieldKey)) {
+              // チェックボックスの場合は特別処理
+              if (fieldKey === 'kaisekikanryo' || fieldKey === 'shochikanryo') {
+                // これらは後で別途処理されるのでスキップ
+                return;
+              }
+              bug[fieldKey] = tabData[fieldKey];
+            }
+          });
+          
+          // 影響範囲チェックボックスの特別処理
+          if (tabKey === 'shochi' && tabData['_scopeCheckboxes'] && tabData['_completedCheckboxes']) {
+            const selectedScopes = [];
+            const completedScopes = [];
+            
+            Object.keys(tabData['_scopeCheckboxes']).forEach(scope => {
+              if (tabData['_scopeCheckboxes'][scope]) {
+                selectedScopes.push(scope);
+              }
+            });
+            
+            Object.keys(tabData['_completedCheckboxes']).forEach(scope => {
+              if (tabData['_completedCheckboxes'][scope]) {
+                completedScopes.push(scope);
+              }
+            });
+            
+            bug.scopeCompleted = completedScopes.join('/');
+            
+            // 修正対象と修正完了を統合して影響範囲に設定
+            const scopeWithStatus = selectedScopes.map(scope => {
+              return completedScopes.includes(scope) ? `${scope}（済）` : scope;
+            });
+            bug.scope = scopeWithStatus.join('/');
+          }
+        });
+      }
+      
+      // ラジオボタンの状態を確認
+      const selectedRadio = $('#modal-body').querySelector('input[type="radio"]:checked');
+      const isComplete = selectedRadio && selectedRadio.value === 'complete';
+      const isReject = selectedRadio && selectedRadio.value === 'reject';
+      
+      // 修正Verのテキストエリアから値を取得して設定
+      const versionTextArea = $('#modal-body').querySelector('#version-display-text');
+      if (versionTextArea && versionTextArea.value && versionTextArea.value.trim() !== '' && versionTextArea.value !== 'バージョンを選択してください') {
+        // テキストエリアからバージョン番号を抽出（Rev.x.x部分のみ）
+        const versionMatch = versionTextArea.value.match(/Rev\.\d+\.\d+/);
+        if (versionMatch) {
+          bug.fixVer = versionMatch[0];
+        }
+      }
+      
+      $('#modal-body').querySelectorAll('[data-key]').forEach(inp => {
+        const k = inp.dataset.key;
+        const col = getColumns().find(c => c.key === k);
+        if (!col || col.type === 'readonly') return;
+        if (!['kekkakanryo', 'sashimodoshi'].includes(k)) { // ラジオボタンは除外
+          bug[k] = inp.value;
+        }
+      });
+      
+      // 管理タブの変更を確実に反映
+      const prioritySelect = $('#modal-body').querySelector('[data-key="priority"]');
+      const severitySelect = $('#modal-body').querySelector('[data-key="severity"]');
+      const tagInput = $('#modal-body').querySelector('[data-key="tag"]');
+      if (prioritySelect) bug.priority = prioritySelect.value;
+      if (severitySelect) bug.severity = severitySelect.value;
+      if (tagInput) bug.tag = tagInput.value;
+      
+      // 処置完了チェックボックスの状態を確認
+      const shochoKanryoCheck = $('#modal-body').querySelector('[data-key="shochikanryo"]');
+      const isShochoKanryo = shochoKanryoCheck && shochoKanryoCheck.checked;
+      
+      // 解析完了チェックボックスの状態を確認
+      const kaisekiKanryoCheck = $('#modal-body').querySelector('[data-key="kaisekikanryo"]');
+      const isKaisekiKanryo = kaisekiKanryoCheck && kaisekiKanryoCheck.checked;
+      
+      // 現在アクティブなタブを確認
+      const activeTab = $('#modal-body').querySelector('.tab-btn.active');
+      const isShochoTab = activeTab && activeTab.dataset.tab === 'shochi';
+      
+      // 影響範囲の更新は処置タブでの操作時のみ実行（差し戻し時の影響範囲消失を防止）
+      if (isShochoTab) {
+        // 影響範囲のチェックボックスを集約
+        const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
+        const selectedScopes = [];
+        scopeCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            selectedScopes.push(cb.value);
+          }
+        });
+        
+        // 修正完了状況のチェックボックスを集約
+        const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
+        const completedScopes = [];
+        completedCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            completedScopes.push(cb.value);
+          }
+        });
+        bug.scopeCompleted = completedScopes.join('/');
+        
+        // 修正対象と修正完了を統合して影響範囲に設定
+        const scopeWithStatus = selectedScopes.map(scope => {
+          return completedScopes.includes(scope) ? `${scope}（済）` : scope;
+        });
+        bug.scope = scopeWithStatus.join('/');
+        
+        // state.bugs配列も更新（Excel保存前に確実に反映）
+        const bugIndex = state.bugs.findIndex(b => b.rowIndex === bug.rowIndex);
+        if (bugIndex >= 0) {
+          state.bugs[bugIndex].scope = bug.scope;
+          state.bugs[bugIndex].scopeCompleted = bug.scopeCompleted;
+        }
+      }
+      
+      // 処置完了がチェックされている場合のバリデーションと更新（処置タブでの操作時のみ）
+      if (isShochoKanryo && isShochoTab) {
+        // 影響範囲のチェックボックス情報を再取得（処置タブの場合のみ）
+        const scopeCheckboxes = $('#modal-body').querySelectorAll('[data-scope-option]');
+        const selectedScopes = [];
+        scopeCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            selectedScopes.push(cb.value);
+          }
+        });
+        
+        const completedCheckboxes = $('#modal-body').querySelectorAll('[data-scope-completed]');
+        const completedScopes = [];
+        completedCheckboxes.forEach(cb => {
+          if (cb.checked) {
+            completedScopes.push(cb.value);
+          }
+        });
+        
+        // 修正対象にチェックが付いている場合のバリデーション
+        if (selectedScopes.length > 0) {
+          // 修正完了チェックの確認
+          const incompleteScopes = selectedScopes.filter(scope => !completedScopes.includes(scope));
+          if (incompleteScopes.length > 0) {
+            alert(`処置完了にするには、以下の修正対象の修正完了にもチェックを付けてください：\n${incompleteScopes.join('\n')}`);
+            return; // 保存を中止
+          }
+          
+          // 修正Verと処置内容の入力確認
+          if (!bug.fixVer || bug.fixVer.trim() === '') {
+            alert('修正対象にチェックが付いている場合、修正Verが必要です。\n新しいバージョンを払い出すか、既存のバージョンを指定してください。');
+            return;
+          }
+          if (!bug.fix || bug.fix.trim() === '') {
+            alert('修正対象にチェックが付いている場合、処置内容の入力が必要です');
+            return;
+          }
+        }
+        
+        // 処置完了時の自動更新
+        if (bug.status === '修正') {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          bug.fixDate = `${year}-${month}-${day}`;
+          bug.status = '確認';
+          bug.verifier = bug.reporter; // 確認者を登録者に設定
+          bug.assignee = bug.reporter; // 担当者を登録者に設定
+          bug.reject = ''; // 差し戻しをクリア
+          setStatus('処置完了のため対応日を当日に設定し、状況を「確認」に変更、確認者と担当者を登録者で設定、差し戻しをクリアしました');
+        }
+      } else if (isShochoKanryo && !isShochoTab) {
+        // 処置タブ以外で処置完了がチェックされた場合は警告
+        alert('処置完了は処置タブで実行してください');
+        return;
+      }
+      
+      // 解析完了がチェックされている場合、解析日を当日に設定し、状況を修正に変更
+      if (isKaisekiKanryo && bug.status === '解析') {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        bug.analysisDate = `${year}-${month}-${day}`;
+        bug.status = '修正';
+        bug.fixer = bug.analyst; // 対応者を解析者の名前で更新
+        setStatus('解析完了のため解析日を当日に設定し、状況を「修正」に変更、対応者を解析者で設定しました');
+      }
+      
+      // ラジオボタンの選択に応じて状態を変更
+      if (isComplete && bug.status === '確認') {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        bug.verifyDate = `${year}-${month}-${day}`; // 確認日を当日に設定
+        bug.status = '完了';
+        setStatus('確認完了のため確認日を当日に設定し、状態を「完了」に変更しました');
+      } else if (isReject && bug.status === '確認') {
+        bug.status = '修正';
+        bug.reject = '○'; // 差し戻し列を○で更新
+        bug.fixDate = ''; // 対応日を空欄に
+        bug.assignee = bug.fixer; // 担当者を対応者に設定
+        setStatus('差し戻しのため状態を「修正」に変更し、対応日を空欄にして担当者を対応者に設定しました');
+      }
+      
+      try {
+        // 影響範囲の修正完了状態を含めてExcelに保存
+        await saveBugToExcel(bug);
+        render();
+        closeModal();
+      } catch (e) {
+        console.error(e);
+        setStatus('保存失敗: ' + (e.message || e));
+      }
+    }
+  }
+
+  function setView(v) {
+    state.view = v;
+    $('#btn-view-assignee').classList.toggle('active', v === 'assignee');
+    $('#btn-view-status').classList.toggle('active',   v === 'status');
+    $('#btn-view-version').classList.toggle('active',  v === 'version');
+    $('#btn-view-trend').classList.toggle('active',   v === 'trend');
+    $('#view-assignee').classList.toggle('active', v === 'assignee');
+    $('#view-status').classList.toggle('active',   v === 'status');
+    $('#view-version').classList.toggle('active',  v === 'version');
+    $('#view-trend').classList.toggle('active',   v === 'trend');
+    render();
+  }
+  function render() {
+    if (state.view === 'assignee') renderKanbanAssignee();
+    else if (state.view === 'version') renderKanbanVersion();
+    else if (state.view === 'trend') renderTrend();
+    else renderKanbanStatus();
+  }
+
+  function demoData() {
+    // 過去30日間の推移が見えるサンプルデータを生成
+    const today = new Date();
+    const bugs = [];
+    let bugId = 1;
+
+    // 日付をYYYY-MM-DD形式で取得
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    // 指定日数前の日付を取得
+    function daysAgo(days) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - days);
+      return date;
+    }
+
+    // 過去30日間のバグ発生データ
+    const bugTemplates = [
+      { title: 'ログイン後に画面が真っ白', origin: '定義(通常)', tag: 'UI', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: '通信断時にRPAが停止', origin: '定義(通信断)', tag: 'RPA', priority: '中', severity: '重大', reporter: '松田' },
+      { title: '電源断後に設定が消失', origin: '定義(電源断)', tag: '設定', priority: '低', severity: '軽微', reporter: '高橋' },
+      { title: '文字コード不正でエラー', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '伊藤' },
+      { title: 'メモリリークで動作停止', origin: '定義(通常)', tag: 'パフォーマンス', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: 'CSVファイル読み込み失敗', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '松田' },
+      { title: '認証タイムアウトエラー', origin: '定義(通信断)', tag: '認証', priority: '高', severity: '重大', reporter: '高橋' },
+      { title: 'UI表示崩れ（IE対応）', origin: '定義(通常)', tag: 'UI', priority: '低', severity: '軽微', reporter: '伊藤' },
+      { title: 'バックアップ処理が重い', origin: '定義(通常)', tag: 'パフォーマンス', priority: '中', severity: '軽微', reporter: '政次' },
+      { title: 'ログ出力でディスク容量不足', origin: '定義(通常)', tag: 'データ', priority: '高', severity: '重大', reporter: '松田' },
+      { title: 'スケジュール実行が失敗', origin: '定義(通常)', tag: 'RPA', priority: '中', severity: '重大', reporter: '高橋' },
+      { title: '印刷プレビューが表示されない', origin: '定義(通常)', tag: 'UI', priority: '低', severity: '軽微', reporter: '伊藤' },
+      { title: 'データベース接続エラー', origin: '定義(通信断)', tag: 'データ', priority: '高', severity: '致命的', reporter: '政次' },
+      { title: '画像アップロード処理遅延', origin: '定義(通常)', tag: 'パフォーマンス', priority: '中', severity: '軽微', reporter: '松田' },
+      { title: 'Excel出力で数式が消える', origin: '定義(通常)', tag: 'データ', priority: '中', severity: '重大', reporter: '高橋' }
+    ];
+
+    const assignees = ['政次', '高橋', '伊藤', '松田'];
+
+    // 過去30日間にバグを分散して発生させる
+    for (let i = 0; i < 25; i++) {
+      const template = bugTemplates[i % bugTemplates.length];
+      const occurredDaysAgo = 30 - Math.floor(i * 1.2); // 30日前から少しずつ最近まで
+      const occurredDate = daysAgo(Math.max(0, occurredDaysAgo));
+      
+      // バグの進行状況をランダムに設定
+      const progressRandom = Math.random();
+      let status = '新規';
+      let assignee = '';
+      let analysisDate = '';
+      let analyst = '';
+      let fixDate = '';
+      let fixer = '';
+      let verifyDate = '';
+      let verifier = '';
+      let cause = '';
+      let fix = '';
+      let fixVer = '';
+      let verify = '';
+
+      if (progressRandom > 0.8) {
+        // 20%: 新規のまま
+        status = '新規';
+      } else if (progressRandom > 0.6) {
+        // 20%: 解析中
+        status = '解析';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 3 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+      } else if (progressRandom > 0.4) {
+        // 20%: 修正中
+        status = '修正';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+      } else if (progressRandom > 0.2) {
+        // 20%: 確認中
+        status = '確認';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+      } else {
+        // 20%: 完了
+        status = '完了';
+        assignee = assignees[Math.floor(Math.random() * assignees.length)];
+        const analysisDaysAgo = Math.max(0, occurredDaysAgo - Math.floor(Math.random() * 2 + 1));
+        analysisDate = formatDate(daysAgo(analysisDaysAgo));
+        analyst = assignee;
+        cause = '設定不備により発生';
+        const fixDaysAgo = Math.max(0, analysisDaysAgo - Math.floor(Math.random() * 2 + 1));
+        fixDate = formatDate(daysAgo(fixDaysAgo));
+        fixer = assignee;
+        fix = 'パラメータ調整で対応';
+        fixVer = `v1.${Math.floor(Math.random() * 5) + 1}`;
+        const verifyDaysAgo = Math.max(0, fixDaysAgo - Math.floor(Math.random() * 2 + 1));
+        verifyDate = formatDate(daysAgo(verifyDaysAgo));
+        verifier = assignees[Math.floor(Math.random() * assignees.length)];
+        verify = '動作確認完了';
+      }
+
+      bugs.push({
+        rowIndex: bugId + 3,
+        id: bugId,
+        title: `${template.title} (${bugId})`,
+        status: status,
+        updated: status !== '新規' ? formatDate(new Date()) : '',
+        assignee: assignee,
+        occurredOn: formatDate(occurredDate),
+        reporter: template.reporter,
+        origin: template.origin,
+        originNumber: '',
+        steps: '1. 操作実行\n2. エラー発生',
+        expected: '正常動作',
+        actual: 'エラーまたは異常動作',
+        reproRate: ['毎回', '時々', '1回のみ'][Math.floor(Math.random() * 3)],
+        cause: cause,
+        analyst: analyst,
+        analysisDate: analysisDate,
+        scope: template.tag === 'RPA' ? 'RPA' : 'アプリ',
+        fix: fix,
+        fixVer: fixVer,
+        fixer: fixer,
+        fixDate: fixDate,
+        verify: verify,
+        reject: '',
+        verifier: verifier,
+        verifyDate: verifyDate,
+        tag: template.tag,
+        priority: template.priority,
+        severity: template.severity,
+        starred: '',
+        periodStart: '',
+        periodEnd: ''
+      });
+
+      bugId++;
+    }
+
+    return bugs;
+  }
+
+  function bindEvents() {
+    $('#btn-view-assignee').addEventListener('click', () => setView('assignee'));
+    $('#btn-view-status').addEventListener('click',   () => setView('status'));
+    $('#btn-view-version').addEventListener('click',  () => setView('version'));
+    $('#btn-view-trend').addEventListener('click',   () => setView('trend'));
+    $('#btn-add-new').addEventListener('click', () => openNewBugModal());
+    $('#btn-reload').addEventListener('click', async () => {
+      await loadFromExcel();
+      render();
+    });
+    $('#filter-text').addEventListener('input', (e) => { state.filters.text = e.target.value; render(); });
+    $('#filter-priority').addEventListener('change', (e) => { state.filters.priority = e.target.value; render(); });
+    $('#filter-status').addEventListener('change',   (e) => { state.filters.status   = e.target.value; render(); });
+    $('#modal-save').addEventListener('click', saveModal);
+    $('#modal-cancel').addEventListener('click', closeModal);
+    $('#modal-close').addEventListener('click', closeModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('#modal').classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+  }
+
+  // 星マーククリック処理
+  async function toggleStar(bug) {
+    try {
+      // AC列（本日分）の状態を確認
+      const isCurrentlyStarred = bug.starred === '○';
+      
+      // AC列（本日分）の状態を切り替え
+      if (isCurrentlyStarred) {
+        // 星を外す場合：空欄（★→☆）
+        bug.starred = '';
+      } else {
+        // 星を付ける場合：○（☆→★）
+        bug.starred = '○';
+      }
+      
+      // Excelに保存
+      await saveBugToExcel(bug);
+      
+      // 画面を再描画
+      render();
+    } catch (error) {
+      console.error('星の状態更新エラー:', error);
+      alert('星の状態を更新できませんでした。');
+    }
+  }
+
+  function init() {
+    bindEvents();
+    ensureOffice(() => {
+      loadFromExcel().then(render);
+    });
+  }
+
+  init();
+})();

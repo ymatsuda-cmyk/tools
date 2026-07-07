@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kanban Icon Generator</title>
+</head>
+<body>
+    <!-- 簡単な16x16のカンバンアイコンを生成 -->
+    <canvas id="icon16" width="16" height="16"></canvas>
+    <canvas id="icon32" width="32" height="32"></canvas>
+    <canvas id="icon80" width="80" height="80"></canvas>
+
+    <script>
+        function drawKanbanIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // 背景色
+            ctx.fillStyle = '#0078d4';
+            ctx.fillRect(0, 0, size, size);
+            
+            // カンバンの列を表現（3つの縦線）
+            ctx.fillStyle = '#ffffff';
+            const lineWidth = Math.max(1, Math.floor(size / 8));
+            const spacing = size / 4;
+            
+            for (let i = 0; i < 3; i++) {
+                const x = spacing * (i + 0.5);
+                ctx.fillRect(x, 2, lineWidth, size - 4);
+            }
+        }
+
+        // 各サイズのアイコンを生成
+        drawKanbanIcon(document.getElementById('icon16'), 16);
+        drawKanbanIcon(document.getElementById('icon32'), 32);
+        drawKanbanIcon(document.getElementById('icon80'), 80);
+        
+        // data URLを表示
+        console.log('16x16:', document.getElementById('icon16').toDataURL());
+        console.log('32x32:', document.getElementById('icon32').toDataURL());
+        console.log('80x80:', document.getElementById('icon80').toDataURL());
+    </script>
+</body>
+</html>
