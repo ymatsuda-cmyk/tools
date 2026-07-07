@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* ============================================================
  * kanban.js — Excel Kanban（新UI版）
  * ------------------------------------------------------------
@@ -10,11 +9,8 @@
  * レイアウトのペイン追従はCSS(flex)に一本化したため、
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
-=======
-const APP_VERSION = "rev_20260707_7d5a7bd";
->>>>>>> 2156db890a14e886ff9b9d6916f69333d42df12b
 
-const APP_VERSION = "rev_20260707_7d5a7bd";
+const APP_VERSION = "rev_20260707_ui2";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -25,43 +21,16 @@ let selectedUser = null;
 let selectedCategory = null;
 let selectedSubCategory = null;
 let selectedPeriod = "all";
-<<<<<<< HEAD
 let showHeld = true;
 let searchQuery = "";
-=======
-let showHeld = true; // 保留表示フラグ
-let officeReady = false;
-let isExcelHost = false;
->>>>>>> 2156db890a14e886ff9b9d6916f69333d42df12b
 
-<<<<<<< HEAD
 Office.onReady(() => {
-=======
-// レーン高さ調整のデバウンス用変数
-let heightAdjustTimeout = null;
-let isAdjustingHeights = false;
-
-Office.onReady((info) => {
-  officeReady = true;
-  isExcelHost = info && info.host === Office.HostType.Excel;
-
-  if (!isExcelHost) {
-    console.log("Excel以外のホスト、またはOffice外の実行環境のため初期化をスキップします。");
-    return;
-  }
-
-  // 保存されたサイズを復元
-  restoreSavedSize();
-  
-  // 保存されたフィルター設定を復元
->>>>>>> 2156db890a14e886ff9b9d6916f69333d42df12b
   restoreSavedFilters();
   restoreHeldDisplay();
   bindStaticUI();
   init();
 });
 
-<<<<<<< HEAD
 /* ============================================================
    初期化
    ============================================================ */
@@ -70,70 +39,6 @@ async function init() {
   renderFilters();
   renderPeriodSegment();
   renderBoard();
-=======
-function canUseExcelApi() {
-  return officeReady && isExcelHost && typeof Excel !== "undefined";
-}
-
-async function reloadKanban() {
-  if (!canUseExcelApi()) {
-    console.log("Excel APIが利用できないため再読み込みをスキップしました。");
-    return;
-  }
-
-  await init();
-
-  if (typeof updateVersionDisplay === "function") {
-    updateVersionDisplay();
-  }
-}
-
-// ===== サイズ記憶機能 =====
-function restoreSavedSize() {
-  try {
-    const savedSize = localStorage.getItem('kanban-taskpane-size');
-    if (savedSize) {
-      const size = JSON.parse(savedSize);
-      
-// 最小サイズの制限（デスクトップ版対応で極小に設定）
-  const minWidth = 120;
-  const minHeight = 300;
-  const width = Math.max(size.width || 120, minWidth);
-      const height = Math.max(size.height || 600, minHeight);
-      
-      // DOM要素のサイズを設定
-      document.documentElement.style.minWidth = width + "px";
-      document.body.style.minWidth = width + "px";
-      
-      // Office APIを使用してタスクペインのサイズを設定（可能な場合）
-      if (Office.context.requirements.isSetSupported('TaskPaneApp', '1.1')) {
-        try {
-          Office.addin.setTaskpaneSize(width, height);
-        } catch (e) {
-          console.log("TaskPane resize not supported:", e);
-        }
-      }
-      
-      // 親ウィンドウへのサイズヒント
-      if (window.parent && window.parent.postMessage) {
-        window.parent.postMessage({
-          type: 'resize',
-          width: width,
-          height: height
-        }, '*');
-      }
-      
-      console.log(`Restored size: ${width}x${height}`);
-    } else {
-      // デフォルトサイズを設定
-      setDefaultSize();
-    }
-  } catch (e) {
-    console.log("Size restoration error:", e);
-    setDefaultSize();
-  }
-}
->>>>>>> 2156db890a14e886ff9b9d6916f69333d42df12b
 
   const v = document.getElementById("version-label");
   if (v) v.textContent = APP_VERSION;
@@ -215,45 +120,10 @@ function saveFilters() {
   } catch (e) { /* noop */ }
 }
 
-<<<<<<< HEAD
 function restoreHeldDisplay() {
   const saved = localStorage.getItem("kanban-show-held");
   showHeld = saved !== null ? saved === "true" : true;
 }
-=======
-async function init() {
-  if (!canUseExcelApi()) {
-    console.log("Excel APIが利用可能になるまで待機中です。");
-    return;
-  }
-
-  // 保存されたサイズまたはデフォルトサイズを適用
-  try {
-    const savedSize = localStorage.getItem('kanban-taskpane-size');
-    let minWidth = 200;
-    
-    if (savedSize) {
-      const size = JSON.parse(savedSize);
-      minWidth = Math.max(size.width || 200, 200);
-    }
-    
-    document.documentElement.style.minWidth = minWidth + "px";
-    document.body.style.minWidth = minWidth + "px";
-  } catch (e) {
-    // エラー時はデフォルトサイズ
-    document.documentElement.style.minWidth = "200px";
-    document.body.style.minWidth = "200px";
-  }
-  
-  // ボードコンテナをペイン幅に完全追従させる
-  const boardEl = document.getElementById("board");
-  if (boardEl) {
-    boardEl.style.width = "100%"; // ペイン幅に完全追従
-    boardEl.style.maxWidth = "100%";
-    boardEl.style.minWidth = "200px";
-    boardEl.style.boxSizing = "border-box";
-  }
->>>>>>> 2156db890a14e886ff9b9d6916f69333d42df12b
 
 function resetSettings() {
   try {
