@@ -15,6 +15,7 @@
   <span class="version" id="version-label"></span>
   <span class="demo-badge" id="demo-badge" style="display:none">DEMO</span>
   <span class="spacer"></span>
+  <button class="btn-new" onclick="openNewModal()">＋ 新規入力</button>
   <button class="icon-btn" title="再読み込み" onclick="init()">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
       <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -24,14 +25,13 @@
 
 <!-- タブバー -->
 <div class="tab-bar" id="tab-bar">
-  <button class="tab active" data-tab="input" onclick="switchTab('input')">新規入力</button>
-  <button class="tab" data-tab="list" onclick="switchTab('list')">一覧</button>
+  <button class="tab active" data-tab="list" onclick="switchTab('list')">一覧</button>
   <button class="tab" data-tab="kanban" onclick="switchTab('kanban')">カンバン</button>
   <button class="tab" data-tab="agg" onclick="switchTab('agg')">集計</button>
 </div>
 
 <!-- フィルタバー（一覧・カンバン共通） -->
-<div class="filter-bar" id="filter-bar" style="display:none">
+<div class="filter-bar" id="filter-bar">
   <div class="search-box">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
       <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/>
@@ -40,65 +40,17 @@
     <button class="search-clear" id="search-clear" title="クリア">✕</button>
   </div>
   <select id="filter-type" class="filter-select" title="種別"></select>
-  <select id="filter-status" class="filter-select" title="状態"></select>
+  <div class="ms-wrap" id="ms-status">
+    <button class="filter-select ms-btn" id="ms-status-btn" onclick="toggleStatusDD(event)">（状態: 全て）▾</button>
+    <div class="ms-dd" id="status-dd" style="display:none"></div>
+  </div>
   <select id="filter-client" class="filter-select" title="取引先"></select>
   <select id="filter-owner" class="filter-select" title="担当者"></select>
   <button class="chip-clear" onclick="clearFilters()">条件クリア</button>
 </div>
 
-<!-- ===== 新規入力 ===== -->
-<div class="pane" id="pane-input">
-  <div class="form-card">
-    <div class="form-row">
-      <label>取引先 <span class="req">必須</span></label>
-      <div class="hstack">
-        <select id="in-client"></select>
-        <button class="btn-sub" onclick="openCustomerModal()">＋顧客追加</button>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>案件番号（自動採番）</label>
-      <input type="text" id="in-id" readonly class="ro">
-    </div>
-    <div class="form-row">
-      <label>種別 <span class="req">必須</span></label>
-      <div class="type-seg" id="in-type-seg"></div>
-    </div>
-    <div class="form-row">
-      <label>ワークフロー</label>
-      <div class="stepper mini" id="in-stepper"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>発生日</label><input type="date" id="in-occur"></div>
-      <div class="form-row"><label>担当者</label><select id="in-owner"></select></div>
-      <div class="form-row"><label>窓口</label><input type="text" id="in-contact"></div>
-      <div class="form-row"><label>優先度</label>
-        <select id="in-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
-      </div>
-      <div class="form-row quote-only"><label>見積工数（人日）</label><input type="number" step="0.5" id="in-hours"></div>
-      <div class="form-row quote-only"><label>見積金額（円）</label><input type="number" step="1000" id="in-amount"></div>
-    </div>
-    <div class="form-row">
-      <label>問合せ・提案内容 <span class="req">必須</span></label>
-      <textarea id="in-content" rows="3"></textarea>
-    </div>
-    <div class="form-row">
-      <label>対応状況（経緯）</label>
-      <textarea id="in-progress" rows="3"></textarea>
-    </div>
-    <div class="form-row">
-      <label>備考</label>
-      <textarea id="in-note" rows="2"></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn-primary" onclick="saveNewRecord()">登録する</button>
-      <span class="save-msg" id="in-msg"></span>
-    </div>
-  </div>
-</div>
-
 <!-- ===== 一覧 ===== -->
-<div class="pane" id="pane-list" style="display:none">
+<div class="pane" id="pane-list">
   <div id="list-container"></div>
 </div>
 
@@ -119,7 +71,56 @@
   <div id="agg-container"></div>
 </div>
 
-<!-- ===== 編集モーダル ===== -->
+<!-- ===== 新規入力モーダル（対応状況は起票後に編集画面で入力） ===== -->
+<div class="modal-back" id="new-modal" style="display:none" onclick="if(event.target===this)closeNewModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">新規入力（起票）</span>
+      <button class="icon-btn" onclick="closeNewModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>取引先 <span class="req">必須</span></label>
+        <div class="hstack">
+          <select id="in-client"></select>
+          <button class="btn-sub" onclick="openCustomerModal()">＋顧客追加</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>案件番号（自動採番）</label><input type="text" id="in-id" readonly class="ro"></div>
+        <div class="form-row"><label>発生日</label><input type="date" id="in-occur"></div>
+      </div>
+      <div class="form-row">
+        <label>種別 <span class="req">必須</span></label>
+        <div class="type-seg" id="in-type-seg"></div>
+      </div>
+      <div class="form-row">
+        <label>ワークフロー</label>
+        <div class="stepper mini" id="in-stepper"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>担当者</label><select id="in-owner"></select></div>
+        <div class="form-row"><label>優先度</label>
+          <select id="in-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>問合せ・提案内容 <span class="req">必須</span></label>
+        <textarea id="in-content" rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <label>備考</label>
+        <textarea id="in-note" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-primary" onclick="saveNewRecord()">登録する</button>
+      <span class="save-msg" id="in-msg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 編集モーダル（ステージタブ式） ===== -->
 <div class="modal-back" id="edit-modal" style="display:none" onclick="if(event.target===this)closeEditModal()">
   <div class="modal">
     <div class="modal-head">
@@ -128,29 +129,31 @@
     </div>
     <div class="modal-body">
       <div class="stepper" id="ed-stepper"></div>
-      <div class="transition-bar" id="ed-transitions"></div>
+
+      <!-- 基本情報 -->
       <div class="form-grid">
         <div class="form-row"><label>案件番号</label><input type="text" id="ed-id" readonly class="ro"></div>
         <div class="form-row"><label>取引先</label><input type="text" id="ed-client" readonly class="ro"></div>
         <div class="form-row"><label>種別</label><select id="ed-type"></select></div>
         <div class="form-row"><label>状態</label><input type="text" id="ed-status" readonly class="ro"></div>
-        <div class="form-row"><label>発生日</label><input type="date" id="ed-occur"></div>
-        <div class="form-row"><label>完了日</label><input type="date" id="ed-done"></div>
         <div class="form-row"><label>担当者</label><select id="ed-owner"></select></div>
-        <div class="form-row"><label>窓口</label><input type="text" id="ed-contact"></div>
         <div class="form-row"><label>優先度</label>
           <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
         </div>
-        <div class="form-row quote-only"><label>見積工数（人日）</label><input type="number" step="0.5" id="ed-hours"></div>
-        <div class="form-row quote-only"><label>見積金額（円）</label><input type="number" step="1000" id="ed-amount"></div>
-        <div class="form-row quote-only"><label>納品日</label><input type="date" id="ed-deliver"></div>
       </div>
-      <div class="form-row"><label>問合せ・提案内容</label><textarea id="ed-content" rows="3"></textarea></div>
-      <div class="form-row"><label>対応状況（経緯）</label><textarea id="ed-progress" rows="4"></textarea></div>
-      <div class="form-row"><label>備考</label><textarea id="ed-note" rows="2"></textarea></div>
+
+      <!-- ステージタブ（起票／対応中・見積中・作成中／商談中／確認中／受注） -->
+      <div class="stage-tabs" id="ed-stage-tabs"></div>
+      <div class="stage-body" id="ed-stage-body"></div>
+
+      <!-- 備考（どのステージでも編集可） -->
+      <div class="form-row" style="margin-top:10px">
+        <label>備考（常時編集可）</label>
+        <textarea id="ed-note" rows="2"></textarea>
+      </div>
     </div>
     <div class="modal-foot">
-      <button class="btn-primary" onclick="saveEditRecord()">保存</button>
+      <button class="btn-primary" onclick="saveEditRecord()">登録</button>
       <span class="save-msg" id="ed-msg"></span>
     </div>
   </div>
