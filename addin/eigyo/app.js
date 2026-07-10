@@ -1,16 +1,23 @@
 /* ============================================================
- * 営業報告アドイン app.js（ステージタブ版 rev_c）
+ * 営業報告アドイン app.js（ステージタブ版 rev_e）
  * ------------------------------------------------------------
  * 対象シート: 「営業報告」（1案件1行、ヘッダー行=1行目）
- *   A:ID B:取引先 C:No D:種別 E:状況 F:発生日 G:完了日 H:担当者
- *   I:窓口 J:優先度 K:見積工数 L:見積金額 M:受注区分 N:納品日
- *   O:問合せ・提案内容 P:対応状況（経緯） Q:備考 R:要確認メモ
- *   S:区分(問合せ/改修) T:対応開始日 U:見積根拠 V:商談状況
- *   W:確認状況 X:計上日 Y:最終工数 Z:最終価格 AA:受注条件
+ * カラム定義は SHEET_COLUMNS（列レター・見出し・用途）に一元化。
+ * 起動時にヘッダー行（A1:AF1）を照合し、見出しが無い／異なる列が
+ * あれば自動で正規の見出しに書き直す（列の並び順・位置は不変）。
+ *
+ * 【基本情報】       A:ID  B:取引先  C:No(未使用)  D:種別  E:状態
+ *                    F:発生日  G:完了日  H:担当者  I:窓口  J:優先度
+ * 【見積・受注】     K:見積工数  L:見積金額  M:受注区分  N:納品日
+ * 【内容・メモ】     O:問合せ・提案内容  P:進捗状況  Q:備考  R:(未使用)
+ * 【ステージ詳細】   S:区分  T:着手日  U:見積根拠  V:商談状況
+ *                    W:確認状況  X:計上日  Y:最終工数  Z:最終価格  AA:受注条件
+ * 【管理・完了日】   AB:起票者  AC:見積完了日  AD:検討完了日
+ *                    AE:商談完了日  AF:確認完了日
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_c";
+const APP_VERSION = "rev_20260710_e";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -31,7 +38,6 @@ const TYPES = Object.keys(WORKFLOWS);
 const HOLD = "保留";
 const QUOTE_TYPES = ["見積り", "プリセールス"];
 
-/* ステージタブ定義（編集モーダル） */
 function stageTabsOf(type) {
   if (type === "見積り") return ["起票", "見積中", "確認中", "受注"];
   if (type === "プリセールス") return ["起票", "検討中", "商談中", "確認中", "受注"];
@@ -43,16 +49,26 @@ function firstStageOf(type) {
   return "対応中";
 }
 
-/* 旧ステータス表記の読み替え */
 const LEGACY_STATUS = {
-  "未着手": "新規", "検討中※旧": "検討中",
+  "未着手": "新規",
   "作成中": "検討中",
   "見積作成中": "見積中", "見積提出済み": "確認中",
   "調整中": "対応中",
   "完了(受注)": "受注", "完了(失注)": "失注",
 };
 
-const EXT_HEADERS = ["区分", "対応開始日", "見積根拠", "商談状況", "確認状況", "計上日", "最終工数", "最終価格", "受注条件"];
+/* 正規の列見出し（A〜AF、32列）。列の並び順・位置はこれまでと不変。 */
+const SHEET_COLUMNS = [
+  "ID", "取引先", "No（未使用）", "種別", "状態",
+  "発生日", "完了日", "担当者", "窓口", "優先度",
+  "見積工数（人日）", "見積金額（税抜）", "受注区分", "納品日",
+  "問合せ・提案内容", "進捗状況", "備考", "（未使用）",
+  "区分（問合せ／改修）", "着手日", "見積根拠", "商談状況", "確認状況",
+  "計上日", "最終工数（人日）", "最終価格（税抜）", "受注条件",
+  "起票者", "見積完了日", "検討完了日", "商談完了日", "確認完了日",
+];
+/* 旧バージョンで使っていた見出し文言（読み込み時の判定に使用、書込みはしない） */
+const EXT_HEADERS = SHEET_COLUMNS.slice(18); // S列以降（互換維持用）
 
 /* ---------- 期（会計年度）：10月〜翌9月、第37期=2025/10〜2026/09 ---------- */
 function termOfDate(d) { return d.getMonth() + 1 >= 10 ? d.getFullYear() - 1988 : d.getFullYear() - 1989; }
@@ -110,7 +126,6 @@ function bindStaticUI() {
       filters[k] = e.target.value; renderCurrentPane();
     });
   });
-  // 状態マルチセレクトの外側クリックで閉じる
   document.addEventListener("click", e => {
     if (!e.target.closest("#ms-status")) {
       const dd = document.getElementById("status-dd");
@@ -138,15 +153,19 @@ async function loadAll() {
   try {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-      const hdr = sheet.getRange("S1:AA1");
+      const hdr = sheet.getRange("A1:AF1");
       hdr.load("values");
       await ctx.sync();
-      if (!hdr.values[0][0]) {
-        hdr.values = [EXT_HEADERS];
+      const cur = hdr.values[0];
+      const mismatch = SHEET_COLUMNS.some((h, i) => (cur[i] || "").toString().trim() !== h);
+      if (mismatch) {
+        hdr.values = [SHEET_COLUMNS];
         hdr.format.fill.color = "#44546A";
         hdr.format.font.color = "#FFFFFF";
+        hdr.format.font.bold = true;
+        await ctx.sync();
       }
-      const rng = sheet.getRange(`A2:AA${MAX_ROWS}`);
+      const rng = sheet.getRange(`A2:AF${MAX_ROWS}`);
       rng.load("values");
       await ctx.sync();
       records = parseRows(rng.values);
@@ -177,6 +196,9 @@ function parseRows(values) {
       kind: str(r[18]), stageStart: toDate(r[19]), basis: str(r[20]), deal: str(r[21]),
       confirm: str(r[22]), book: toDate(r[23]), finalHours: numOrNull(r[24]),
       finalAmount: numOrNull(r[25]), terms: str(r[26]),
+      reporter: str(r[27]),
+      quoteDone: toDate(r[28]), considerDone: toDate(r[29]),
+      dealDone: toDate(r[30]), confirmDone: toDate(r[31]),
     });
   });
   return out;
@@ -236,6 +258,9 @@ function recToRow(rec) {
     rec.kind ?? "", toSerial(rec.stageStart), rec.basis ?? "", rec.deal ?? "",
     rec.confirm ?? "", toSerial(rec.book), rec.finalHours ?? "", rec.finalAmount ?? "",
     rec.terms ?? "",
+    rec.reporter ?? "",
+    toSerial(rec.quoteDone), toSerial(rec.considerDone),
+    toSerial(rec.dealDone), toSerial(rec.confirmDone),
   ]];
 }
 
@@ -259,9 +284,10 @@ async function writeRecord(rec) {
       }
       rec.row = row;
     }
-    const rng = sheet.getRange(`A${row}:AA${row}`);
+    const rng = sheet.getRange(`A${row}:AF${row}`);
     rng.values = recToRow(rec);
-    ["F", "G", "N", "T", "X"].forEach(c => sheet.getRange(`${c}${row}`).numberFormat = [["yyyy/m/d"]]);
+    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF"].forEach(c =>
+      sheet.getRange(`${c}${row}`).numberFormat = [["yyyy/m/d"]]);
     ["L", "Z"].forEach(c => sheet.getRange(`${c}${row}`).numberFormat = [["#,##0"]]);
     await ctx.sync();
   });
@@ -294,6 +320,7 @@ function toDate(v) {
 }
 function toSerial(d) { return d ? Math.round(d.getTime() / 86400000) + 25569 : ""; }
 function fmtDate(d) { return d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : ""; }
+function md(d) { return d ? `${d.getMonth() + 1}/${d.getDate()}` : ""; }
 function fmtDateInput(d) {
   if (!d) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -311,9 +338,13 @@ function allStatusesOf(type) {
   return wf ? [...wf.steps, ...wf.terminals, HOLD] : [];
 }
 function isTerminal(rec) {
-  if (rec.status === "失注" || rec.status === "完了") return true;
-  if (rec.status === "受注") return true; // 受注は受注タブ完了登録後にのみ設定される
-  return false;
+  return rec.status === "失注" || rec.status === "完了" || rec.status === "受注";
+}
+
+/* 状態ラベル：ワークフロー完了後は「状態（m/d）」 */
+function statusLabel(rec) {
+  if (isTerminal(rec) && rec.done) return `${rec.status}（${md(rec.done)}）`;
+  return rec.status;
 }
 
 function allowedTransitions(rec) {
@@ -356,7 +387,6 @@ function switchTab(tab) {
   });
   document.getElementById("filter-bar").style.display =
     (tab === "list" || tab === "kanban") ? "" : "none";
-  // カンバンでは種別・状態のフィルタは非表示（種別はカンバン内のセグメントで選択）
   const isKanban = tab === "kanban";
   document.getElementById("filter-type").style.display = isKanban ? "none" : "";
   document.getElementById("ms-status").style.display = isKanban ? "none" : "";
@@ -371,15 +401,17 @@ function renderCurrentPane() {
 }
 
 /* ============================================================
-   フィルタ（状態は複数選択）
+   フィルタ
    ============================================================ */
 function renderFilters() {
   fillSelect("filter-type", ["（種別: 全て）", ...TYPES], filters.type);
   renderStatusMulti();
   const clients = [...new Set(records.map(r => r.client).filter(Boolean))];
   fillSelect("filter-client", ["（取引先: 全て）", ...clients], filters.client);
-  const owners = [...new Set(records.flatMap(r => splitOwners(r.owner)))];
-  fillSelect("filter-owner", ["（担当者: 全て）", ...owners], filters.owner);
+  fillSelect("filter-owner", ["（担当者: 全て）", ...allOwners()], filters.owner);
+}
+function allOwners() {
+  return [...new Set(records.flatMap(r => [...splitOwners(r.owner), ...splitOwners(r.reporter)]))];
 }
 function splitOwners(s) { return str(s).split(/[、,\s]+/).filter(Boolean); }
 function fillSelect(id, options, selected) {
@@ -388,7 +420,6 @@ function fillSelect(id, options, selected) {
     `<option value="${i === 0 ? "" : esc(o)}"${o === selected ? " selected" : ""}>${esc(o)}</option>`).join("");
 }
 
-/* 状態マルチセレクト */
 function renderStatusMulti() {
   const sts = [...new Set(records.map(r => r.status).filter(Boolean))];
   filters.status = filters.status.filter(s => sts.includes(s));
@@ -439,7 +470,7 @@ function filteredRecords() {
 }
 
 /* ============================================================
-   一覧（優先度列を追加）
+   一覧（優先度を左端に）
    ============================================================ */
 function renderList() {
   const cont = document.getElementById("list-container");
@@ -452,14 +483,14 @@ function renderList() {
     html += `<div class="list-group lg-${type}">
       <div class="list-group-head">${esc(type)} <span class="cnt">${group.length}件</span></div>
       <table class="list-table">
-        <tr><th>ID</th><th>取引先</th><th>状態</th><th>優先度</th><th>内容</th><th>担当</th><th>発生日</th><th>金額</th></tr>
+        <tr><th>優先度</th><th>ID</th><th>取引先</th><th>状態</th><th>内容</th><th>担当</th><th>発生日</th><th>金額</th></tr>
         ${group.map(r => `
         <tr data-id="${esc(r.id)}" oncontextmenu="onRowContext(event,'${esc(r.id)}')" onclick="openEditModal('${esc(r.id)}')">
+          <td class="c">${r.priority ? `<span class="pri pri-${esc(r.priority)}">${esc(r.priority)}</span>` : ""}</td>
           <td class="muted">${esc(r.id)}</td>
           <td>${esc(r.client)}</td>
-          <td><span class="status-pill st-${esc(r.status)}">${esc(r.status)}</span>${r.status === "確認中" && r.order === "受注" ? '<span class="mini-flag">受注</span>' : ""}</td>
-          <td class="c">${r.priority ? `<span class="pri pri-${esc(r.priority)}">${esc(r.priority)}</span>` : ""}</td>
-          <td>${esc(shorten(r.content, 36))}</td>
+          <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span>${r.status === "確認中" && r.order === "受注" ? '<span class="mini-flag">受注</span>' : ""}</td>
+          <td>${esc(shorten(r.content, 34))}</td>
           <td>${esc(r.owner)}</td>
           <td class="muted">${fmtDate(r.occur)}</td>
           <td class="r">${dispAmount(r)}</td>
@@ -477,7 +508,7 @@ function shorten(s, n) { s = str(s).replace(/\n/g, " "); return s.length > n ? s
 function onRowContext(ev, id) { ev.preventDefault(); openEditModal(id); }
 
 /* ============================================================
-   カンバン（DnDはENABLE_KANBAN_DNDで制御）
+   カンバン
    ============================================================ */
 function renderKanban() {
   const bar = document.getElementById("kanban-typebar");
@@ -509,6 +540,7 @@ function renderKanban() {
               <span>${esc(r.owner)}</span>
               ${dispAmount(r) ? `<span>${dispAmount(r)}円</span>` : ""}
               ${r.priority ? `<span>優先:${esc(r.priority)}</span>` : ""}
+              ${isTerminal(r) && r.done ? `<span>${md(r.done)}完了</span>` : ""}
               ${r.status === "確認中" && r.order === "受注" ? `<span class="mini-flag">受注</span>` : ""}
             </div>
           </div>`).join("")}
@@ -579,7 +611,7 @@ function renderStepper(el, type, currentStatus) {
 }
 
 /* ============================================================
-   新規入力モーダル（窓口は商談中タブで入力するため非表示）
+   新規入力モーダル（起票者を入力）
    ============================================================ */
 function openNewModal() {
   renderInputForm();
@@ -610,14 +642,15 @@ function setInputType(t) {
     b.classList.toggle("active", b.dataset.type === t));
   renderStepper(document.getElementById("in-stepper"), t, "新規");
 }
-function fillOwnerSelect(id, selected) {
-  const owners = [...new Set(records.flatMap(r => splitOwners(r.owner)))];
-  const el = document.getElementById(id);
-  el.innerHTML = `<option value=""></option>` +
+function ownersOptions(selected) {
+  const owners = allOwners();
+  let html = `<option value=""></option>` +
     owners.map(o => `<option${o === selected ? " selected" : ""}>${esc(o)}</option>`).join("");
-  if (selected && !owners.includes(selected)) {
-    el.innerHTML += `<option selected>${esc(selected)}</option>`;
-  }
+  if (selected && !owners.includes(selected)) html += `<option selected>${esc(selected)}</option>`;
+  return html;
+}
+function fillOwnerSelect(id, selected) {
+  document.getElementById(id).innerHTML = ownersOptions(selected);
 }
 function updateNewId() {
   const code = document.getElementById("in-client").value;
@@ -631,6 +664,7 @@ async function saveNewRecord() {
   const content = document.getElementById("in-content").value.trim();
   if (!code) { msg.className = "save-msg err"; msg.textContent = "取引先を選択してください"; return; }
   if (!content) { msg.className = "save-msg err"; msg.textContent = "内容を入力してください"; return; }
+  const reporter = document.getElementById("in-owner").value;
   const cust = customers.find(c => c.code === code);
   const rec = {
     row: 0,
@@ -639,7 +673,8 @@ async function saveNewRecord() {
     type: inputType, status: "新規",
     occur: fromDateInput(document.getElementById("in-occur").value) || new Date(),
     done: null,
-    owner: document.getElementById("in-owner").value,
+    owner: reporter,          // 担当者の初期値 = 起票者
+    reporter,                 // 起票者
     contact: cust.contact || "",
     priority: document.getElementById("in-priority").value,
     hours: null, amount: null, order: "", deliver: null,
@@ -649,6 +684,7 @@ async function saveNewRecord() {
     memo: "",
     kind: "", stageStart: null, basis: "", deal: "", confirm: "",
     book: null, finalHours: null, finalAmount: null, terms: "",
+    quoteDone: null, considerDone: null, dealDone: null, confirmDone: null,
   };
   try {
     await writeRecord(rec);
@@ -670,7 +706,8 @@ function openEditModal(id, forceTab) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   editingRec = JSON.parse(JSON.stringify(rec), (k, v) =>
-    (["occur","done","deliver","stageStart","book"].includes(k) && v) ? new Date(v) : v);
+    (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone"].includes(k) && v)
+      ? new Date(v) : v);
   editingRec.row = rec.row;
   document.getElementById("ed-title").textContent = `${rec.id}　${rec.client}`;
   document.getElementById("ed-id").value = rec.id;
@@ -693,7 +730,6 @@ function openEditModal(id, forceTab) {
 }
 function closeEditModal() { document.getElementById("edit-modal").style.display = "none"; editingRec = null; }
 
-/* 状態から活性なステージタブを決める（確認中＋受注区分=受注 → 受注タブ） */
 function activeStageTab(rec) {
   if (isTerminal(rec)) return null;
   const st = rec.status;
@@ -708,13 +744,25 @@ function defaultStageTab(rec) {
   return activeStageTab(rec) || stageTabsOf(rec.type)[stageTabsOf(rec.type).length - 1];
 }
 
+/* ステージの完了日（タブ表示用） */
+function stageDoneDate(rec, t) {
+  if (t === "対応中") return (rec.status === "完了") ? rec.done : null;
+  if (t === "見積中") return rec.quoteDone;
+  if (t === "検討中") return rec.considerDone;
+  if (t === "商談中") return rec.dealDone;
+  if (t === "確認中") return rec.confirmDone;
+  if (t === "受注") return (rec.status === "受注") ? rec.done : null;
+  return null;
+}
+
 function refreshEditModal() {
   const rec = editingRec;
   renderStepper(document.getElementById("ed-stepper"), rec.type, rec.status);
-  let stLabel = rec.status;
+  let stLabel = statusLabel(rec);
   if (rec.status === "確認中" && rec.order === "受注") stLabel += "（受注・最終登録待ち）";
-  if (isTerminal(rec)) stLabel += "（チケット完了）";
+  if (isTerminal(rec)) stLabel += "／チケット完了";
   document.getElementById("ed-status").value = stLabel;
+  document.getElementById("ed-owner").value = rec.owner;
   renderStageTabs();
   renderStageBody();
 }
@@ -727,11 +775,25 @@ function renderStageTabs() {
   el.innerHTML = tabs.map(t => {
     const enabled = (t === "起票") || (t === active);
     const isCur = t === currentStageTab;
+    const dd = stageDoneDate(rec, t);
+    const label = dd ? `${t}（${md(dd)}）` : t;
     return `<button class="stage-tab${isCur ? " current" : ""}${enabled ? "" : " locked"}"
-      onclick="setStageTab('${esc(t)}')">${esc(t)}${enabled || t === "起票" ? "" : " 🔒"}</button>`;
+      onclick="setStageTab('${esc(t)}')">${esc(label)}${enabled || t === "起票" || dd ? "" : " 🔒"}</button>`;
   }).join("");
 }
 function setStageTab(t) { currentStageTab = t; renderStageTabs(); renderStageBody(); }
+
+/* ステージ担当者の変更を担当者欄に即時反映 */
+function syncOwner(sel) {
+  editingRec.owner = sel.value;
+  const ed = document.getElementById("ed-owner");
+  if (![...ed.options].some(o => o.value === sel.value)) {
+    const opt = document.createElement("option");
+    opt.textContent = sel.value;
+    ed.appendChild(opt);
+  }
+  ed.value = sel.value;
+}
 
 function renderStageBody() {
   const rec = editingRec;
@@ -745,6 +807,7 @@ function renderStageBody() {
     body.innerHTML = `
       <div class="form-grid">
         <div class="form-row"><label>発生日</label><input type="date" id="st-occur" value="${fmtDateInput(rec.occur)}" ${disAll}></div>
+        <div class="form-row"><label>起票者</label><select id="st-reporter" ${disAll}>${ownersOptions(rec.reporter)}</select></div>
         <div class="form-row"><label>窓口</label><input type="text" id="st-contact" value="${esc(rec.contact)}" ${disAll}></div>
       </div>
       <div class="form-row"><label>問合せ・提案内容</label>
@@ -755,14 +818,19 @@ function renderStageBody() {
   if (t === "対応中" || t === "見積中" || t === "検討中") {
     const isQuote = t === "見積中";
     const isHoshu = rec.type === "保守対応";
+    const ownerLabel = t === "対応中" ? "対応担当者" : t === "見積中" ? "見積担当者" : "検討担当者";
     const doneLabel = t === "対応中" ? "対応完了（チケットを完了する）"
       : t === "見積中" ? "見積完了（確認中へ進める）"
       : "検討完了（商談中へ進める）";
     const progressLabel = t === "検討中" ? "対応状況（検討・検証・提案作成など）" : "対応状況";
-    const startInfo = rec.stageStart ? `<span class="stage-info">開始日: ${fmtDate(rec.stageStart)}</span>`
+    const dd = stageDoneDate(rec, t);
+    const startInfo = rec.stageStart
+      ? `<span class="stage-info">開始日: ${fmtDate(rec.stageStart)}${dd ? `　完了日: ${fmtDate(dd)}` : ""}</span>`
       : `<span class="stage-info">※対応状況を記入して登録すると「${esc(t)}」に遷移し、開始日を記録します</span>`;
     body.innerHTML = `
       ${startInfo}
+      <div class="form-row"><label>${esc(ownerLabel)}（変更すると担当者欄も更新）</label>
+        <select id="st-owner" ${dis} onchange="syncOwner(this)">${ownersOptions(rec.owner || rec.reporter)}</select></div>
       ${isHoshu ? `
       <div class="form-row"><label>区分 <span class="req">必須</span></label>
         <div class="radio-row">
@@ -788,7 +856,9 @@ function renderStageBody() {
   }
 
   if (t === "商談中") {
+    const dd = rec.dealDone;
     body.innerHTML = `
+      ${dd ? `<span class="stage-info">商談完了日: ${fmtDate(dd)}</span>` : ""}
       <div class="form-row"><label>窓口</label>
         <input type="text" id="st-dcontact" value="${esc(rec.contact)}" ${dis}></div>
       <div class="form-row"><label>商談状況</label>
@@ -800,16 +870,23 @@ function renderStageBody() {
   }
 
   if (t === "確認中") {
+    const dd = rec.confirmDone;
     body.innerHTML = `
+      ${dd ? `<span class="stage-info">確認完了日: ${fmtDate(dd)}</span>` : ""}
       <div class="form-row"><label>確認状況</label>
         <textarea id="st-confirm" rows="4" ${dis}>${esc(rec.confirm)}</textarea></div>
       <div class="form-row"><label>結果</label>
-        <div class="radio-row">
-          <label class="radio win"><input type="radio" name="st-result" value="受注" ${rec.order === "受注" ? "checked" : ""} ${dis}>受注（受注タブで最終登録）</label>
-          <label class="radio lose"><input type="radio" name="st-result" value="失注" ${dis}>失注（チケット完了）</label>
-        </div>
-      </div>
-      <span class="stage-info">※受注を選択して登録してもステータスは「確認中」のまま。「受注」タブでの最終登録で受注確定・チケット完了となります。</span>`;
+        <label class="check-row win-row ${dis ? "off" : ""}">
+          <input type="checkbox" id="st-win" ${rec.order === "受注" ? "checked" : ""} ${dis}
+            onchange="if(this.checked)document.getElementById('st-lose').checked=false">
+          受注確定を完了にする（確認完了日を記録し、受注タブで最終登録へ）
+        </label>
+        <label class="check-row lose-row ${dis ? "off" : ""}">
+          <input type="checkbox" id="st-lose" ${dis}
+            onchange="if(this.checked)document.getElementById('st-win').checked=false">
+          失注（確認完了日・完了日を記録し、チケット完了）
+        </label>
+      </div>`;
     return;
   }
 
@@ -858,10 +935,13 @@ async function saveEditRecord() {
   if (editable) {
     if (t === "起票") {
       rec.occur = fromDateInput(document.getElementById("st-occur").value);
+      rec.reporter = document.getElementById("st-reporter").value;
       rec.contact = document.getElementById("st-contact").value;
       rec.content = document.getElementById("st-content").value;
     }
     else if (t === "対応中" || t === "見積中" || t === "検討中") {
+      const stageOwner = document.getElementById("st-owner").value;
+      if (stageOwner) rec.owner = stageOwner;  // 担当者欄を更新
       const progress = document.getElementById("st-progress").value;
       rec.progress = progress;
       if (rec.type === "保守対応") {
@@ -886,30 +966,37 @@ async function saveEditRecord() {
           msg.className = "save-msg err"; msg.textContent = "対応状況を記入してください"; return;
         }
         if (!rec.stageStart) rec.stageStart = new Date();
-        if (t === "対応中") { applyStatus(rec, "完了"); }
+        if (t === "対応中") { applyStatus(rec, "完了"); }        // 対応完了日 = 完了日(G)
         else if (t === "見積中") {
           if (rec.amount == null) { msg.className = "save-msg err"; msg.textContent = "価格を入力してください"; return; }
+          rec.quoteDone = new Date();                             // 見積完了日
           applyStatus(rec, "確認中");
         }
-        else if (t === "検討中") { applyStatus(rec, "商談中"); }
+        else if (t === "検討中") {
+          rec.considerDone = new Date();                          // 検討完了日
+          applyStatus(rec, "商談中");
+        }
       }
     }
     else if (t === "商談中") {
       rec.contact = document.getElementById("st-dcontact").value;
       rec.deal = document.getElementById("st-deal").value;
       const doneChk = document.getElementById("st-done");
-      if (doneChk && doneChk.checked) applyStatus(rec, "確認中");
+      if (doneChk && doneChk.checked) {
+        rec.dealDone = new Date();                                // 商談完了日
+        applyStatus(rec, "確認中");
+      }
     }
     else if (t === "確認中") {
       rec.confirm = document.getElementById("st-confirm").value;
-      const res = document.querySelector('input[name="st-result"]:checked');
-      if (res) {
-        if (res.value === "受注") {
-          // ステータスは確認中のまま、受注区分のみ設定 → 受注タブが活性化
-          rec.order = "受注";
-        } else {
-          applyStatus(rec, "失注"); // チケット完了
-        }
+      const win = document.getElementById("st-win");
+      const lose = document.getElementById("st-lose");
+      if (lose && lose.checked) {
+        rec.confirmDone = new Date();                             // 確認完了日
+        applyStatus(rec, "失注");                                 // 完了日も更新
+      } else if (win && win.checked && rec.order !== "受注") {
+        rec.confirmDone = new Date();                             // 確認完了日
+        rec.order = "受注";                                       // ステータスは確認中のまま
       }
     }
     else if (t === "受注") {
@@ -922,8 +1009,8 @@ async function saveEditRecord() {
       if (doneChk && doneChk.checked) {
         if (!rec.book) { msg.className = "save-msg err"; msg.textContent = "計上日を入力してください（売上集計に使用します）"; return; }
         if (rec.finalAmount == null) { msg.className = "save-msg err"; msg.textContent = "最終価格を入力してください"; return; }
-        applyStatus(rec, "受注");   // 受注確定
-        rec.done = new Date();      // チケット完了
+        applyStatus(rec, "受注");
+        rec.done = new Date();
       }
     }
   }
@@ -989,10 +1076,10 @@ function renderAgg() {
   const cont = document.getElementById("agg-container");
   if (currentAgg === "hoshu") cont.innerHTML = termBarHtml() + renderHoshuAgg();
   else if (currentAgg === "mitsu") cont.innerHTML = renderMitsuAgg();
-  else cont.innerHTML = termBarHtml() + renderUriageAgg();
+  else cont.innerHTML = termBarHtml() + renderJuchuAgg();
 }
 
-/* --- 保守状況: 発生と完了の推移（期の12か月） --- */
+/* --- 保守状況 --- */
 function renderHoshuAgg() {
   const months = fiscalMonths(currentTerm);
   const target = records.filter(r => r.type === "保守対応" || r.type === "瑕疵対応");
@@ -1034,8 +1121,8 @@ function countByMonth(recs, field, months) {
   return months.map(m => map[m]);
 }
 
-/* --- 見積状況: 状態別（新規→見積中→検討中→商談中→確認中→失注→受注） --- */
-const MITSU_ORDER = ["新規", "見積中", "検討中", "商談中", "確認中", "失注", "受注"];
+/* --- 見積状況: 新規→検討中→見積中→商談中→確認中→失注→受注 --- */
+const MITSU_ORDER = ["新規", "検討中", "見積中", "商談中", "確認中", "失注", "受注"];
 function renderMitsuAgg() {
   const target = records.filter(r => QUOTE_TYPES.includes(r.type));
   const rows = MITSU_ORDER.map(st => {
@@ -1068,8 +1155,8 @@ function renderMitsuAgg() {
     </div>`;
 }
 
-/* --- 売上予測: 受注確定（受注区分=受注）の計上日ベース、期の12か月 --- */
-function renderUriageAgg() {
+/* --- 受注状況: 受注確定（受注区分=受注）の計上日ベース --- */
+function renderJuchuAgg() {
   const months = fiscalMonths(currentTerm);
   const won = records.filter(r => QUOTE_TYPES.includes(r.type) && r.order === "受注");
   const map = Object.fromEntries(months.map(m => [m, 0]));
@@ -1089,7 +1176,7 @@ function renderUriageAgg() {
       ${noBook ? `<div class="kpi"><div class="kv" style="color:#c00000">${noBook}</div><div class="kl">計上日未入力</div></div>` : ""}
     </div>
     <div class="agg-card">
-      <h3>月別売上予測（受注確定・計上日ベース）</h3>
+      <h3>受注状況（受注確定・計上日ベース 月別売上）</h3>
       ${legendHtml(colors)}
       <div class="chart-wrap">${groupedBarChart(months, { "確定売上": vals }, colors, v => (v / 10000) + "万")}</div>
     </div>
@@ -1103,7 +1190,7 @@ function renderUriageAgg() {
           <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
           <td>${r.book ? fmtDate(r.book) : '<span style="color:#c00000">未入力</span>'}</td>
           <td>${r.deliver ? fmtDate(r.deliver) : '<span class="muted">－</span>'}</td>
-          <td><span class="status-pill st-${esc(r.status)}">${esc(r.status)}</span></td></tr>`).join("")
+          <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span></td></tr>`).join("")
         : `<tr><td colspan="7" class="muted">受注案件はまだありません</td></tr>`}
       </table>
     </div>`;
@@ -1152,7 +1239,9 @@ function legendHtml(colors) {
 function loadDemo() {
   demoMode = true;
   const d = (y, m, day) => new Date(y, m - 1, day);
-  const blank = { kind: "", stageStart: null, basis: "", deal: "", confirm: "", book: null, finalHours: null, finalAmount: null, terms: "" };
+  const blank = { kind: "", stageStart: null, basis: "", deal: "", confirm: "", book: null,
+    finalHours: null, finalAmount: null, terms: "", reporter: "",
+    quoteDone: null, considerDone: null, dealDone: null, confirmDone: null };
   customers = [
     { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "" },
     { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "" },
@@ -1160,15 +1249,15 @@ function loadDemo() {
     { row: 5, code: "EX", name: "エキスプレス", contact: "中道様", note: "" },
   ];
   records = [
-    { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1) },
-    { ...blank, row: 3, id: "KM-02", client: "kakimoto arms", no: 2, type: "見積り", status: "確認中", occur: d(2026, 6, 18), done: null, owner: "小川", contact: "佐竹様", priority: "", hours: 8, amount: 600000, order: "受注", deliver: d(2026, 7, 17), content: "ネット予約LINEログイン連携", progress: "60万で提示", note: "", memo: "", stageStart: d(2026, 6, 20), confirm: "受注の内諾。最終登録待ち", book: d(2026, 7, 31), finalAmount: 600000, finalHours: 8 },
-    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", contact: "西野様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
-    { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", contact: "佐竹様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
-    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", contact: "中田様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
-    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", contact: "鈴木様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
-    { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), deal: "7/22打ち合わせ予定" },
-    { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), basis: "設計2人日＋実装2人日＋試験1人日" },
-    { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
-    { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
+    { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1) },
+    { ...blank, row: 3, id: "KM-02", client: "kakimoto arms", no: 2, type: "見積り", status: "確認中", occur: d(2026, 6, 18), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: 8, amount: 600000, order: "受注", deliver: d(2026, 7, 17), content: "ネット予約LINEログイン連携", progress: "60万で提示", note: "", memo: "", stageStart: d(2026, 6, 20), quoteDone: d(2026, 7, 1), confirmDone: d(2026, 7, 8), confirm: "受注の内諾。最終登録待ち", book: d(2026, 7, 31), finalAmount: 600000, finalHours: 8 },
+    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
+    { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
+    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
+    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
+    { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定" },
+    { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
+    { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
+    { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
   ];
 }

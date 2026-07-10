@@ -66,7 +66,7 @@
   <div class="agg-seg">
     <button class="seg active" data-agg="hoshu" onclick="switchAgg('hoshu')">保守状況</button>
     <button class="seg" data-agg="mitsu" onclick="switchAgg('mitsu')">見積状況</button>
-    <button class="seg" data-agg="uriage" onclick="switchAgg('uriage')">売上予測</button>
+    <button class="seg" data-agg="uriage" onclick="switchAgg('uriage')">受注状況</button>
   </div>
   <div id="agg-container"></div>
 </div>
@@ -99,7 +99,7 @@
         <div class="stepper mini" id="in-stepper"></div>
       </div>
       <div class="form-grid">
-        <div class="form-row"><label>担当者</label><select id="in-owner"></select></div>
+        <div class="form-row"><label>起票者</label><select id="in-owner"></select></div>
         <div class="form-row"><label>優先度</label>
           <select id="in-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
         </div>
@@ -136,7 +136,7 @@
         <div class="form-row"><label>取引先</label><input type="text" id="ed-client" readonly class="ro"></div>
         <div class="form-row"><label>種別</label><select id="ed-type"></select></div>
         <div class="form-row"><label>状態</label><input type="text" id="ed-status" readonly class="ro"></div>
-        <div class="form-row"><label>担当者</label><select id="ed-owner"></select></div>
+        <div class="form-row"><label>担当者（現在の対応者）</label><select id="ed-owner"></select></div>
         <div class="form-row"><label>優先度</label>
           <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
         </div>

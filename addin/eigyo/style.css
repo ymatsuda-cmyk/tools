@@ -402,3 +402,8 @@ body {
 }
 .term-btn:hover { background: #eef3fb; }
 .term-label { font-size: 13px; font-weight: bold; color: #44546a; }
+
+/* ---------- 確認中の結果チェック ---------- */
+.check-row.win-row { background: #eff6ea; color: #3c6127; margin-top: 6px; }
+.check-row.lose-row { background: #fbeeee; color: #a02020; margin-top: 6px; }
+.check-row.win-row.off, .check-row.lose-row.off { background: #f0f3f6; color: #aab; }
