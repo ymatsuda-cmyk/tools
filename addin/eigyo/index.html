@@ -72,6 +72,9 @@
     <button class="seg active" data-agg="hoshu" onclick="switchAgg('hoshu')">保守状況</button>
     <button class="seg" data-agg="mitsu" onclick="switchAgg('mitsu')">見積状況</button>
     <button class="seg" data-agg="uriage" onclick="switchAgg('uriage')">受注状況</button>
+    <label class="hours-toggle" title="保守状況の対応工数の表示を切り替え">
+      <input type="checkbox" id="hours-toggle-cb" checked onchange="toggleHours(this)"> 工数表示
+    </label>
   </div>
   <div id="agg-container"></div>
 </div>

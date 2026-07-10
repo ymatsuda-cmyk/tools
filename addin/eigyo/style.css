@@ -434,3 +434,29 @@ body {
 }
 .btn-ghost:hover { background: #f0f3f6; }
 #dialog-modal { z-index: 200; }
+
+/* ---------- 集計: 工数表示チェックボックス ---------- */
+.agg-seg { align-items: center; }
+.hours-toggle {
+  display: inline-flex; align-items: center; gap: 5px; margin-right: auto;
+  font-size: 12px; color: #556; cursor: pointer; white-space: nowrap;
+}
+.hours-toggle input { width: 14px; height: 14px; cursor: pointer; }
+
+/* ---------- 集計: 件数リンク（見積状況） ---------- */
+.cnt-link {
+  border: none; background: #eef3fb; color: #4472c4; font-weight: bold;
+  border-radius: 5px; padding: 2px 12px; cursor: pointer; font-size: 12px;
+  text-decoration: underline;
+}
+.cnt-link:hover { background: #dbe7f7; }
+.cnt-link.open { background: #4472c4; color: #fff; text-decoration: none; }
+
+/* ---------- 集計: ドリルダウン一覧（クリックで詳細） ---------- */
+.drill-table tr.drill-row { cursor: pointer; }
+.drill-table tr.drill-row:hover td { background: #f4f8fd; }
+.drill-close {
+  float: right; border: 1px solid #d0d5da; background: #fff; color: #667;
+  border-radius: 5px; padding: 2px 10px; font-size: 11px; cursor: pointer; font-weight: normal;
+}
+.drill-close:hover { background: #f0f3f6; }

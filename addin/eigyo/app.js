@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_g";
+const APP_VERSION = "rev_20260710_h";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -1209,11 +1209,15 @@ async function saveCustomer() {
    集計（期ベース: 10月〜翌9月）
    ============================================================ */
 let currentAgg = "hoshu";
+let showHours = true;        // 保守状況の対応工数の表示ON/OFF
+let mitsuOpenStatus = null;  // 見積状況で件数展開中の状態
 function switchAgg(k) {
   currentAgg = k;
+  if (k !== "mitsu") mitsuOpenStatus = null;
   document.querySelectorAll(".agg-seg .seg").forEach(b => b.classList.toggle("active", b.dataset.agg === k));
   renderAgg();
 }
+function toggleHours(cb) { showHours = cb.checked; renderAgg(); }
 function shiftTerm(d) { currentTerm += d; renderAgg(); }
 function termBarHtml() {
   return `<div class="term-bar">
@@ -1252,25 +1256,26 @@ function renderHoshuAgg() {
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${target.length}</div><div class="kl">保守・瑕疵 総件数</div></div>
       <div class="kpi"><div class="kv">${open}</div><div class="kl">未完了件数</div></div>
-      <div class="kpi"><div class="kv">${totalHoursR}</div><div class="kl">対応工数計（人日）</div></div>
+      ${showHours ? `<div class="kpi"><div class="kv">${totalHoursR}</div><div class="kl">対応工数計（人日）</div></div>` : ""}
     </div>
     <div class="agg-card">
       <h3>保守対応・瑕疵対応 月次推移（発生・完了）</h3>
       ${legendHtml(colors)}
       <div class="chart-wrap">${groupedBarChart(months, series, colors)}</div>
     </div>
+    ${showHours ? `
     <div class="agg-card">
       <h3>対応工数 推移（人日・着手月ベース）</h3>
       ${legendHtml(hoursColors)}
       <div class="chart-wrap">${lineChart(months, hoursSeries, hoursColors, v => v + "")}</div>
-    </div>
+    </div>` : ""}
     <div class="agg-card">
       <h3>月別明細（内訳）</h3>
       <table class="agg-table">
-        <tr><th>月</th><th>発生 計</th><th>完了 計</th><th>対応工数</th><th>保守 発生</th><th>保守 完了</th><th>瑕疵 発生</th><th>瑕疵 完了</th></tr>
+        <tr><th>月</th><th>発生 計</th><th>完了 計</th>${showHours ? "<th>対応工数</th>" : ""}<th>保守 発生</th><th>保守 完了</th><th>瑕疵 発生</th><th>瑕疵 完了</th></tr>
         ${months.map((m, i) => `<tr><td>${m}</td>
           <td><b>${series["発生"][i]}</b></td><td><b>${series["完了"][i]}</b></td>
-          <td>${hoursSeries["対応工数(人日)"][i] || ""}</td>
+          ${showHours ? `<td>${hoursSeries["対応工数(人日)"][i] || ""}</td>` : ""}
           <td>${countByMonth(hoshu, "occur", [m])[0]}</td><td>${countByMonth(hoshu, "done", [m])[0]}</td>
           <td>${countByMonth(kashi, "occur", [m])[0]}</td><td>${countByMonth(kashi, "done", [m])[0]}</td></tr>`).join("")}
       </table>
@@ -1299,7 +1304,31 @@ function renderMitsuAgg() {
   const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
   const pipeline = target.filter(r => !["受注", "失注"].includes(r.status));
   const pipelineAmt = pipeline.reduce((a, r) => a + (r.amount || 0), 0);
-  const wonAmt = target.filter(r => r.order === "受注").reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
+  // 受注確定金額：状態欄が「受注」のものを計上
+  const wonAmt = target.filter(r => r.status === "受注").reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
+
+  // 展開中の状態に対応する見積一覧
+  let drillHtml = "";
+  if (mitsuOpenStatus) {
+    const list = target.filter(r => r.status === mitsuOpenStatus)
+      .sort((a, b) => (b.occur || 0) - (a.occur || 0));
+    drillHtml = `
+    <div class="agg-card">
+      <h3>見積一覧：<span class="status-pill st-${esc(mitsuOpenStatus)}">${esc(mitsuOpenStatus)}</span>（${list.length}件）
+        <button class="drill-close" onclick="closeMitsuDrill()">閉じる ✕</button></h3>
+      <table class="agg-table drill-table">
+        <tr><th>ID</th><th>取引先</th><th>種別</th><th>内容</th><th>担当</th><th>金額</th></tr>
+        ${list.length ? list.map(r => `<tr class="drill-row" onclick="openEditModal('${esc(r.id)}')">
+          <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
+          <td>${esc(r.type)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
+          <td>${esc(r.owner)}</td>
+          <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
+        </tr>`).join("") : `<tr><td colspan="6" class="muted">該当する案件がありません</td></tr>`}
+      </table>
+      <p style="font-size:11px;color:#999;margin-top:6px">行をクリックすると案件の詳細画面を開きます。</p>
+    </div>`;
+  }
+
   return `
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
@@ -1312,17 +1341,23 @@ function renderMitsuAgg() {
         <tr><th>状態</th><th>件数</th><th>見積金額合計（税抜）</th></tr>
         ${rows.map(r => `<tr>
           <td><span class="status-pill st-${esc(r.st)}">${esc(r.st)}</span></td>
-          <td>${r.cnt}</td><td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td></tr>`).join("")}
+          <td>${r.cnt > 0
+            ? `<button class="cnt-link${mitsuOpenStatus === r.st ? " open" : ""}" onclick="openMitsuDrill('${esc(r.st)}')">${r.cnt}</button>`
+            : r.cnt}</td>
+          <td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td></tr>`).join("")}
         <tr class="total"><td>合計</td><td>${totalCnt}</td><td class="r">${totalAmt.toLocaleString()}円</td></tr>
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">※ 受注は最終価格、それ以外は見積金額で集計。確認中で受注区分が付いた案件は「確認中」に含まれます。</p>
-    </div>`;
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。</p>
+    </div>
+    ${drillHtml}`;
 }
+function openMitsuDrill(st) { mitsuOpenStatus = (mitsuOpenStatus === st) ? null : st; renderAgg(); }
+function closeMitsuDrill() { mitsuOpenStatus = null; renderAgg(); }
 
 /* --- 受注状況: 受注確定（受注区分=受注）の計上日ベース --- */
 function renderJuchuAgg() {
   const months = fiscalMonths(currentTerm);
-  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && r.order === "受注");
+  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && r.status === "受注");
   const map = Object.fromEntries(months.map(m => [m, 0]));
   let noBook = 0;
   won.forEach(r => {
@@ -1346,9 +1381,9 @@ function renderJuchuAgg() {
     </div>
     <div class="agg-card">
       <h3>受注案件一覧</h3>
-      <table class="agg-table">
+      <table class="agg-table drill-table">
         <tr><th>ID</th><th>取引先</th><th>内容</th><th>最終価格</th><th>計上日</th><th>納品日</th><th>状態</th></tr>
-        ${won.length ? won.map(r => `<tr>
+        ${won.length ? won.map(r => `<tr class="drill-row" onclick="openEditModal('${esc(r.id)}')">
           <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
           <td class="l">${esc(shorten(r.content, 20))}</td>
           <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
@@ -1357,6 +1392,7 @@ function renderJuchuAgg() {
           <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span></td></tr>`).join("")
         : `<tr><td colspan="7" class="muted">受注案件はまだありません</td></tr>`}
       </table>
+      <p style="font-size:11px;color:#999;margin-top:6px">行をクリックすると案件の詳細画面を開きます。</p>
     </div>`;
 }
 
@@ -1466,5 +1502,6 @@ function loadDemo() {
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
+    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受注", occur: d(2026, 5, 20), done: d(2026, 6, 15), owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 6, 15), finalAmount: 480000, finalHours: 6 },
   ];
 }
