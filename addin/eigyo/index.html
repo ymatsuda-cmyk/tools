@@ -11,6 +11,11 @@
 
 <!-- ヘッダー -->
 <div class="header">
+  <button class="icon-btn" id="menu-btn" title="メニュー" onclick="openMenu()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
   <span class="title">営業報告</span>
   <span class="version" id="version-label"></span>
   <span class="demo-badge" id="demo-badge" style="display:none">DEMO</span>
@@ -121,11 +126,11 @@
 </div>
 
 <!-- ===== 編集モーダル（ステージタブ式） ===== -->
-<div class="modal-back" id="edit-modal" style="display:none" onclick="if(event.target===this)closeEditModal()">
+<div class="modal-back" id="edit-modal" style="display:none" onclick="if(event.target===this)tryCloseEditModal()">
   <div class="modal">
     <div class="modal-head">
       <span class="modal-title" id="ed-title">案件編集</span>
-      <button class="icon-btn" onclick="closeEditModal()">✕</button>
+      <button class="icon-btn" onclick="closeEditModalConfirm()">✕</button>
     </div>
     <div class="modal-body">
       <div class="stepper" id="ed-stepper"></div>
@@ -154,6 +159,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-primary" onclick="saveEditRecord()">登録</button>
+      <button class="btn-danger" id="ed-delete-btn" onclick="deleteRecord()">削除</button>
       <span class="save-msg" id="ed-msg"></span>
     </div>
   </div>

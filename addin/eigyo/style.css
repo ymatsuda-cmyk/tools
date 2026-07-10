@@ -407,3 +407,19 @@ body {
 .check-row.win-row { background: #eff6ea; color: #3c6127; margin-top: 6px; }
 .check-row.lose-row { background: #fbeeee; color: #a02020; margin-top: 6px; }
 .check-row.win-row.off, .check-row.lose-row.off { background: #f0f3f6; color: #aab; }
+
+/* ---------- 削除ボタン ---------- */
+.btn-danger {
+  background: #fff; color: #c00000; border: 1px solid #e5b3b3;
+  border-radius: 5px; padding: 7px 16px; font-size: 13px; cursor: pointer; font-weight: bold;
+}
+.btn-danger:hover { background: #fbeeee; border-color: #c00000; }
+
+/* ---------- 一覧の行選択ハイライト ---------- */
+.list-table tr.row-selected td { background: #dbeafe !important; }
+.list-table tr.row-selected td:first-child { box-shadow: inset 3px 0 0 #4472c4; }
+
+/* ---------- 種別セレクト（登録後は変更不可） ---------- */
+#ed-type.ro, #ed-type:disabled {
+  background: #f0f3f6; color: #555; cursor: not-allowed; -webkit-appearance: none; appearance: none;
+}

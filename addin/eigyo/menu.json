@@ -5,16 +5,16 @@
       "title": "ツール",
       "items": [
         {
+          "id": "kanban",
+          "label": "カンバン",
+          "icon": "",
+          "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/"
+        },
+        {
           "id": "eigyo",
           "label": "営業報告",
           "icon": "",
           "url": "https://ymatsuda-cmyk.github.io/tools/addin/eigyo/"
-        },
-        {
-          "id": "kanban",
-          "label": "ＷＢＳ",
-          "icon": "",
-          "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/"
         },
         {
           "id": "bug",

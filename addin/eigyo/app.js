@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_e";
+const APP_VERSION = "rev_20260710_f";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -97,6 +97,39 @@ let inputType = "保守対応";
 let currentKanbanType = "保守対応";
 let dragId = null;
 let filters = { q: "", type: "", status: [], client: "", owner: "" };
+let editDirty = false;      // 詳細画面で変更があったか
+let selectedId = null;      // 一覧で選択中の案件ID（ハイライト用）
+
+/* ---------- 共通スライドメニュー ---------- */
+const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/common";
+let menuReady = null;
+function openMenu() {
+  if (!menuReady) {
+    menuReady = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = COMMON_BASE + "/slide-menu.js";
+      s.onload = () => {
+        SlideMenu.init({
+          appName: "営業報告",
+          version: APP_VERSION,
+          currentId: "eigyo",                     // menu.json の id と一致で強調
+          menuUrl: COMMON_BASE + "/menu.json",
+          localItems: [
+            { section: "操作" },
+            { label: "再読み込み", icon: "🔄", onClick: () => init() },
+          ],
+        });
+        resolve();
+      };
+      s.onerror = (e) => { menuReady = null; reject(e); };
+      document.head.appendChild(s);
+    });
+  }
+  menuReady.then(() => SlideMenu.open()).catch(() => {
+    menuReady = null;
+    alert("メニューの読み込みに失敗しました。通信環境をご確認ください。");
+  });
+}
 
 /* ============================================================
    起動
@@ -132,6 +165,10 @@ function bindStaticUI() {
       if (dd) dd.style.display = "none";
     }
   });
+  // 詳細画面の変更検知（委譲）：ステージ切替で再描画されても効くように
+  const emodal = document.getElementById("edit-modal");
+  emodal.addEventListener("input", markDirty);
+  emodal.addEventListener("change", markDirty);
 }
 
 function clearFilters() {
@@ -165,10 +202,19 @@ async function loadAll() {
         hdr.format.font.bold = true;
         await ctx.sync();
       }
-      const rng = sheet.getRange(`A2:AF${MAX_ROWS}`);
-      rng.load("values");
+      // 使用範囲の行数だけ読む（A2:AF500固定読みを避け、使用範囲の膨張を防ぐ）
+      const used = sheet.getUsedRange(true);
+      used.load("rowCount");
       await ctx.sync();
-      records = parseRows(rng.values);
+      const lastRow = Math.min(Math.max(used.rowCount, 1), MAX_ROWS);
+      if (lastRow >= 2) {
+        const rng = sheet.getRange(`A2:AF${lastRow}`);
+        rng.load("values");
+        await ctx.sync();
+        records = parseRows(rng.values);
+      } else {
+        records = [];
+      }
     });
     await ensureCustomerSheet();
     demoMode = false;
@@ -274,14 +320,10 @@ async function writeRecord(rec) {
     const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
     let row = rec.row;
     if (!row) {
-      const colA = sheet.getRange(`A2:A${MAX_ROWS}`);
-      colA.load("values");
-      await ctx.sync();
-      row = 2;
-      for (let i = 0; i < colA.values.length; i++) {
-        if (!colA.values[i][0]) { row = i + 2; break; }
-        row = i + 3;
-      }
+      // 既存レコードの最終行の次に追記（500行スキャンで使用範囲を広げない）
+      let maxRow = 1;
+      records.forEach(r => { if (r.row && r.row > maxRow) maxRow = r.row; });
+      row = maxRow + 1;
       rec.row = row;
     }
     const rng = sheet.getRange(`A${row}:AF${row}`);
@@ -421,7 +463,7 @@ function fillSelect(id, options, selected) {
 }
 
 function renderStatusMulti() {
-  const sts = [...new Set(records.map(r => r.status).filter(Boolean))];
+  const sts = [...new Set(records.map(r => r.status).filter(s => s && s !== "削除"))];
   filters.status = filters.status.filter(s => sts.includes(s));
   const btn = document.getElementById("ms-status-btn");
   btn.textContent = filters.status.length
@@ -456,6 +498,7 @@ function clearStatusFilter() {
 
 function filteredRecords() {
   return records.filter(r => {
+    if (r.status === "削除") return false;   // 削除済みは表示しない
     if (filters.type && r.type !== filters.type) return false;
     if (filters.status.length && !filters.status.includes(r.status)) return false;
     if (filters.client && r.client !== filters.client) return false;
@@ -485,11 +528,13 @@ function renderList() {
       <table class="list-table">
         <tr><th>優先度</th><th>ID</th><th>取引先</th><th>状態</th><th>内容</th><th>担当</th><th>発生日</th><th>金額</th></tr>
         ${group.map(r => `
-        <tr data-id="${esc(r.id)}" oncontextmenu="onRowContext(event,'${esc(r.id)}')" onclick="openEditModal('${esc(r.id)}')">
+        <tr data-id="${esc(r.id)}" class="${r.id === selectedId ? "row-selected" : ""}"
+            oncontextmenu="onRowContext(event,'${esc(r.id)}')"
+            onclick="onRowClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
           <td class="c">${r.priority ? `<span class="pri pri-${esc(r.priority)}">${esc(r.priority)}</span>` : ""}</td>
           <td class="muted">${esc(r.id)}</td>
           <td>${esc(r.client)}</td>
-          <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span>${r.status === "確認中" && r.order === "受注" ? '<span class="mini-flag">受注</span>' : ""}</td>
+          <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span></td>
           <td>${esc(shorten(r.content, 34))}</td>
           <td>${esc(r.owner)}</td>
           <td class="muted">${fmtDate(r.occur)}</td>
@@ -506,6 +551,35 @@ function dispAmount(r) {
 }
 function shorten(s, n) { s = str(s).replace(/\n/g, " "); return s.length > n ? s.slice(0, n) + "…" : s; }
 function onRowContext(ev, id) { ev.preventDefault(); openEditModal(id); }
+
+/* 左クリック：Excel該当行へジャンプ＆行選択、一覧はハイライト（排他） */
+function onRowClick(id) {
+  selectedId = id;
+  document.querySelectorAll("#list-container tr[data-id]").forEach(tr =>
+    tr.classList.toggle("row-selected", tr.dataset.id === id));
+  const rec = records.find(r => r.id === id);
+  if (rec) jumpToExcel(rec.row);
+}
+function onCardClick(id) {
+  const rec = records.find(r => r.id === id);
+  if (rec) jumpToExcel(rec.row);
+}
+
+/* Excelの該当行を選択状態にする（デモモードでは何もしない） */
+async function jumpToExcel(row) {
+  if (demoMode || !window.Office || !window.Excel || !row) return;
+  try {
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      sheet.activate();
+      const range = sheet.getRange(`A${row}:AF${row}`);
+      range.select();
+      await ctx.sync();
+    });
+  } catch (e) {
+    console.warn("Excel行選択に失敗:", e);
+  }
+}
 
 /* ============================================================
    カンバン
@@ -533,7 +607,7 @@ function renderKanban() {
           <div class="card t-${esc(r.type)}" draggable="${ENABLE_KANBAN_DND}" data-id="${esc(r.id)}"
                ${ENABLE_KANBAN_DND ? `ondragstart="onCardDragStart(event)"` : ""}
                oncontextmenu="onRowContext(event,'${esc(r.id)}')"
-               onclick="openEditModal('${esc(r.id)}')">
+               onclick="onCardClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
             <div class="cid">${esc(r.id)}｜${esc(r.client)}</div>
             <div class="ctitle">${esc(shorten(r.content, 46))}</div>
             <div class="cmeta">
@@ -541,7 +615,6 @@ function renderKanban() {
               ${dispAmount(r) ? `<span>${dispAmount(r)}円</span>` : ""}
               ${r.priority ? `<span>優先:${esc(r.priority)}</span>` : ""}
               ${isTerminal(r) && r.done ? `<span>${md(r.done)}完了</span>` : ""}
-              ${r.status === "確認中" && r.order === "受注" ? `<span class="mini-flag">受注</span>` : ""}
             </div>
           </div>`).join("")}
       </div>
@@ -709,26 +782,43 @@ function openEditModal(id, forceTab) {
     (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone"].includes(k) && v)
       ? new Date(v) : v);
   editingRec.row = rec.row;
+  editDirty = false;
   document.getElementById("ed-title").textContent = `${rec.id}　${rec.client}`;
   document.getElementById("ed-id").value = rec.id;
   document.getElementById("ed-client").value = rec.client;
   const tSel = document.getElementById("ed-type");
-  tSel.innerHTML = TYPES.map(t => `<option${t === rec.type ? " selected" : ""}>${esc(t)}</option>`).join("");
-  tSel.onchange = () => {
-    editingRec.type = tSel.value;
-    if (!allStatusesOf(editingRec.type).includes(editingRec.status)) editingRec.status = "新規";
-    currentStageTab = defaultStageTab(editingRec);
-    refreshEditModal();
-  };
+  // 一度登録した案件は種別変更不可（種別は固定表示）
+  tSel.innerHTML = `<option>${esc(rec.type)}</option>`;
+  tSel.value = rec.type;
+  tSel.disabled = true;
+  tSel.classList.add("ro");
   fillOwnerSelect("ed-owner", rec.owner);
   document.getElementById("ed-priority").value = rec.priority;
   document.getElementById("ed-note").value = rec.note;
   document.getElementById("ed-msg").textContent = "";
+  // 削除ボタンは既に削除済みの場合は隠す
+  const delBtn = document.getElementById("ed-delete-btn");
+  if (delBtn) delBtn.style.display = (rec.status === "削除") ? "none" : "";
   currentStageTab = forceTab || defaultStageTab(editingRec);
   refreshEditModal();
   document.getElementById("edit-modal").style.display = "";
 }
-function closeEditModal() { document.getElementById("edit-modal").style.display = "none"; editingRec = null; }
+function markDirty() { editDirty = true; }
+
+/* オーバーレイクリック時：変更があれば閉じない */
+function tryCloseEditModal() {
+  if (editDirty) {
+    // 変更あり → 閉じない（誤操作防止）
+    return;
+  }
+  closeEditModal();
+}
+function closeEditModal() { document.getElementById("edit-modal").style.display = "none"; editingRec = null; editDirty = false; }
+/* ✕ボタン用：変更があれば確認してから閉じる */
+function closeEditModalConfirm() {
+  if (editDirty && !confirm("変更内容が保存されていません。閉じてもよろしいですか？")) return;
+  closeEditModal();
+}
 
 function activeStageTab(rec) {
   if (isTerminal(rec)) return null;
@@ -840,6 +930,9 @@ function renderStageBody() {
       </div>` : ""}
       <div class="form-row"><label>${esc(progressLabel)}</label>
         <textarea id="st-progress" rows="4" ${dis}>${esc(rec.progress)}</textarea></div>
+      ${t === "対応中" ? `
+      <div class="form-row"><label>対応工数（人日）</label>
+        <input type="number" step="0.5" id="st-workhours" value="${rec.hours ?? ""}" ${dis}></div>` : ""}
       ${isQuote ? `
       <div class="form-grid">
         <div class="form-row"><label>工数（人日）</label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
@@ -953,6 +1046,10 @@ async function saveEditRecord() {
         rec.amount = numOrNull(document.getElementById("st-amount").value);
         rec.basis = document.getElementById("st-basis").value;
       }
+      if (t === "対応中") {
+        const wh = document.getElementById("st-workhours");
+        if (wh) rec.hours = numOrNull(wh.value);   // 対応工数（人日）
+      }
       if ((rec.status === "新規" || rec.status === HOLD) && progress.trim()) {
         rec.status = t;
         if (!rec.stageStart) rec.stageStart = new Date();
@@ -1017,14 +1114,31 @@ async function saveEditRecord() {
 
   try {
     await writeRecord(rec);
-    msg.textContent = "登録しました";
+    editDirty = false;
     renderFilters();
     renderCurrentPane();
-    currentStageTab = defaultStageTab(rec);
-    refreshEditModal();
-    if (isTerminal(rec)) setTimeout(closeEditModal, 700);
+    closeEditModal();       // 登録したら画面を閉じる
   } catch (e) {
     msg.className = "save-msg err"; msg.textContent = "保存に失敗しました: " + e.message;
+  }
+}
+
+/* ---------- 削除 ---------- */
+async function deleteRecord() {
+  if (!editingRec) return;
+  if (!confirm(`案件「${editingRec.id}　${editingRec.client}」を削除します。よろしいですか？\n（状態が「削除」となり、一覧・カンバンに表示されなくなります）`)) return;
+  const rec = editingRec;
+  rec.status = "削除";
+  const msg = document.getElementById("ed-msg");
+  msg.className = "save-msg";
+  try {
+    await writeRecord(rec);
+    editDirty = false;
+    renderFilters();
+    renderCurrentPane();
+    closeEditModal();
+  } catch (e) {
+    msg.className = "save-msg err"; msg.textContent = "削除に失敗しました: " + e.message;
   }
 }
 
