@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_f";
+const APP_VERSION = "rev_20260710_g";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -127,7 +127,7 @@ function openMenu() {
   }
   menuReady.then(() => SlideMenu.open()).catch(() => {
     menuReady = null;
-    alert("メニューの読み込みに失敗しました。通信環境をご確認ください。");
+    uiAlert("メニューの読み込みに失敗しました。通信環境をご確認ください。");
   });
 }
 
@@ -496,6 +496,9 @@ function clearStatusFilter() {
   renderCurrentPane();
 }
 
+/* 削除を除いた全レコード（集計はこれを使う） */
+function activeRecords() { return records.filter(r => r.status !== "削除"); }
+
 function filteredRecords() {
   return records.filter(r => {
     if (r.status === "削除") return false;   // 削除済みは表示しない
@@ -634,12 +637,12 @@ async function onLaneDrop(ev) {
   dragId = null;
   if (!rec || rec.status === to) return;
   if (!isValidTransition(rec, to)) {
-    alert(`「${rec.status}」から「${to}」へは遷移できません。\nワークフロー: ${workflowLabel(rec.type)}`);
+    uiAlert(`「${rec.status}」から「${to}」へは遷移できません。\nワークフロー: ${workflowLabel(rec.type)}`);
     return;
   }
   if (to === "受注") {
     openEditModal(rec.id, "確認中");
-    alert("受注は編集画面の「確認中」タブで結果を選択し、「受注」タブで計上日等を入力してください。");
+    uiAlert("受注は編集画面の「確認中」タブで結果を選択し、「受注」タブで計上日等を入力してください。");
     return;
   }
   applyStatus(rec, to);
@@ -805,6 +808,35 @@ function openEditModal(id, forceTab) {
 }
 function markDirty() { editDirty = true; }
 
+/* ============================================================
+   汎用ダイアログ（Office環境では window.confirm/alert 不可）
+   ============================================================ */
+let dialogResolve = null;
+function uiConfirm(message) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById("dialog-msg").textContent = message;
+    document.getElementById("dialog-cancel").style.display = "";
+    document.getElementById("dialog-ok").textContent = "OK";
+    document.getElementById("dialog-modal").style.display = "";
+  });
+}
+function uiAlert(message) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById("dialog-msg").textContent = message;
+    document.getElementById("dialog-cancel").style.display = "none";
+    document.getElementById("dialog-ok").textContent = "OK";
+    document.getElementById("dialog-modal").style.display = "";
+  });
+}
+function dialogRespond(ok) {
+  document.getElementById("dialog-modal").style.display = "none";
+  const r = dialogResolve;
+  dialogResolve = null;
+  if (r) r(ok);
+}
+
 /* オーバーレイクリック時：変更があれば閉じない */
 function tryCloseEditModal() {
   if (editDirty) {
@@ -815,8 +847,11 @@ function tryCloseEditModal() {
 }
 function closeEditModal() { document.getElementById("edit-modal").style.display = "none"; editingRec = null; editDirty = false; }
 /* ✕ボタン用：変更があれば確認してから閉じる */
-function closeEditModalConfirm() {
-  if (editDirty && !confirm("変更内容が保存されていません。閉じてもよろしいですか？")) return;
+async function closeEditModalConfirm() {
+  if (editDirty) {
+    const ok = await uiConfirm("変更内容が保存されていません。閉じてもよろしいですか？");
+    if (!ok) return;
+  }
   closeEditModal();
 }
 
@@ -1126,7 +1161,8 @@ async function saveEditRecord() {
 /* ---------- 削除 ---------- */
 async function deleteRecord() {
   if (!editingRec) return;
-  if (!confirm(`案件「${editingRec.id}　${editingRec.client}」を削除します。よろしいですか？\n（状態が「削除」となり、一覧・カンバンに表示されなくなります）`)) return;
+  const ok = await uiConfirm(`案件「${editingRec.id}　${editingRec.client}」を削除します。よろしいですか？\n（状態が「削除」となり、一覧・カンバンに表示されなくなります）`);
+  if (!ok) return;
   const rec = editingRec;
   rec.status = "削除";
   const msg = document.getElementById("ed-msg");
@@ -1196,7 +1232,7 @@ function renderAgg() {
 /* --- 保守状況 --- */
 function renderHoshuAgg() {
   const months = fiscalMonths(currentTerm);
-  const target = records.filter(r => r.type === "保守対応" || r.type === "瑕疵対応");
+  const target = activeRecords().filter(r => r.type === "保守対応" || r.type === "瑕疵対応");
   const series = {
     "発生": countByMonth(target, "occur", months),
     "完了": countByMonth(target, "done", months),
@@ -1205,10 +1241,18 @@ function renderHoshuAgg() {
   const open = target.filter(r => !isTerminal(r)).length;
   const hoshu = target.filter(r => r.type === "保守対応");
   const kashi = target.filter(r => r.type === "瑕疵対応");
+
+  // 対応工数（人日）の月次集計：着手日ベース（無ければ完了日→発生日）
+  const hoursSeries = { "対応工数(人日)": sumByMonth(target, "hours", "stageStart", months) };
+  const hoursColors = { "対応工数(人日)": "#ed7d31" };
+  const totalHours = hoursSeries["対応工数(人日)"].reduce((a, v) => a + v, 0);
+  const totalHoursR = Math.round(totalHours * 10) / 10;
+
   return `
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${target.length}</div><div class="kl">保守・瑕疵 総件数</div></div>
       <div class="kpi"><div class="kv">${open}</div><div class="kl">未完了件数</div></div>
+      <div class="kpi"><div class="kv">${totalHoursR}</div><div class="kl">対応工数計（人日）</div></div>
     </div>
     <div class="agg-card">
       <h3>保守対応・瑕疵対応 月次推移（発生・完了）</h3>
@@ -1216,11 +1260,17 @@ function renderHoshuAgg() {
       <div class="chart-wrap">${groupedBarChart(months, series, colors)}</div>
     </div>
     <div class="agg-card">
+      <h3>対応工数 推移（人日・着手月ベース）</h3>
+      ${legendHtml(hoursColors)}
+      <div class="chart-wrap">${lineChart(months, hoursSeries, hoursColors, v => v + "")}</div>
+    </div>
+    <div class="agg-card">
       <h3>月別明細（内訳）</h3>
       <table class="agg-table">
-        <tr><th>月</th><th>発生 計</th><th>完了 計</th><th>保守 発生</th><th>保守 完了</th><th>瑕疵 発生</th><th>瑕疵 完了</th></tr>
+        <tr><th>月</th><th>発生 計</th><th>完了 計</th><th>対応工数</th><th>保守 発生</th><th>保守 完了</th><th>瑕疵 発生</th><th>瑕疵 完了</th></tr>
         ${months.map((m, i) => `<tr><td>${m}</td>
           <td><b>${series["発生"][i]}</b></td><td><b>${series["完了"][i]}</b></td>
+          <td>${hoursSeries["対応工数(人日)"][i] || ""}</td>
           <td>${countByMonth(hoshu, "occur", [m])[0]}</td><td>${countByMonth(hoshu, "done", [m])[0]}</td>
           <td>${countByMonth(kashi, "occur", [m])[0]}</td><td>${countByMonth(kashi, "done", [m])[0]}</td></tr>`).join("")}
       </table>
@@ -1238,7 +1288,7 @@ function countByMonth(recs, field, months) {
 /* --- 見積状況: 新規→検討中→見積中→商談中→確認中→失注→受注 --- */
 const MITSU_ORDER = ["新規", "検討中", "見積中", "商談中", "確認中", "失注", "受注"];
 function renderMitsuAgg() {
-  const target = records.filter(r => QUOTE_TYPES.includes(r.type));
+  const target = activeRecords().filter(r => QUOTE_TYPES.includes(r.type));
   const rows = MITSU_ORDER.map(st => {
     const g = target.filter(r => r.status === st);
     return { st, cnt: g.length, amt: g.reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0) };
@@ -1272,7 +1322,7 @@ function renderMitsuAgg() {
 /* --- 受注状況: 受注確定（受注区分=受注）の計上日ベース --- */
 function renderJuchuAgg() {
   const months = fiscalMonths(currentTerm);
-  const won = records.filter(r => QUOTE_TYPES.includes(r.type) && r.order === "受注");
+  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && r.order === "受注");
   const map = Object.fromEntries(months.map(m => [m, 0]));
   let noBook = 0;
   won.forEach(r => {
@@ -1347,6 +1397,49 @@ function legendHtml(colors) {
     `<span><span class="sw" style="background:${c}"></span>${esc(n)}</span>`).join("") + `</div>`;
 }
 
+/* --- SVG 折れ線グラフ --- */
+function lineChart(labels, series, colors, fmtVal) {
+  fmtVal = fmtVal || (v => String(v));
+  const names = Object.keys(series);
+  const W = Math.max(480, labels.length * 44), H = 190;
+  const padL = 34, padB = 26, padT = 10;
+  const chartW = W - padL - 8, chartH = H - padT - padB;
+  const maxV = Math.max(1, ...names.flatMap(n => series[n]));
+  const stepX = labels.length > 1 ? chartW / (labels.length - 1) : 0;
+  const xAt = i => padL + stepX * i;
+  const yAt = v => padT + chartH - (chartH * v / maxV);
+  let grid = "", lines = "", dots = "", labelsSvg = "";
+  const gridN = 4;
+  for (let g = 0; g <= gridN; g++) {
+    const y = padT + chartH - (chartH * g / gridN);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W - 4}" y2="${y}" stroke="#eceff2"/>` +
+      `<text x="${padL - 4}" y="${y + 3}" font-size="8" text-anchor="end" fill="#999">${fmtVal(Math.round(maxV * g / gridN))}</text>`;
+  }
+  names.forEach(n => {
+    const pts = series[n].map((v, i) => `${xAt(i)},${yAt(v)}`).join(" ");
+    lines += `<polyline points="${pts}" fill="none" stroke="${colors[n]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    series[n].forEach((v, i) => {
+      dots += `<circle cx="${xAt(i)}" cy="${yAt(v)}" r="2.6" fill="${colors[n]}"><title>${labels[i]} ${n}: ${fmtVal(v)}</title></circle>`;
+    });
+  });
+  labels.forEach((lb, i) => {
+    labelsSvg += `<text x="${xAt(i)}" y="${H - 8}" font-size="8.5" text-anchor="middle" fill="#667">${lb.slice(2)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%">
+    ${grid}${lines}${dots}${labelsSvg}</svg>`;
+}
+
+/* 月別に数値フィールドを合計（日付フィールドで月を決定） */
+function sumByMonth(recs, valField, dateField, months) {
+  const map = Object.fromEntries(months.map(m => [m, 0]));
+  recs.forEach(r => {
+    const d = r[dateField] || r.done || r.occur;
+    const v = Number(r[valField]) || 0;
+    if (d && map[monthKey(d)] != null) map[monthKey(d)] += v;
+  });
+  return months.map(m => Math.round(map[m] * 10) / 10);
+}
+
 /* ============================================================
    デモモード
    ============================================================ */
@@ -1365,10 +1458,10 @@ function loadDemo() {
   records = [
     { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1) },
     { ...blank, row: 3, id: "KM-02", client: "kakimoto arms", no: 2, type: "見積り", status: "確認中", occur: d(2026, 6, 18), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: 8, amount: 600000, order: "受注", deliver: d(2026, 7, 17), content: "ネット予約LINEログイン連携", progress: "60万で提示", note: "", memo: "", stageStart: d(2026, 6, 20), quoteDone: d(2026, 7, 1), confirmDone: d(2026, 7, 8), confirm: "受注の内諾。最終登録待ち", book: d(2026, 7, 31), finalAmount: 600000, finalHours: 8 },
-    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
+    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", hours: 0.5, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
     { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
-    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
-    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
+    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", hours: 2, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
+    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", hours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
     { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定" },
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },

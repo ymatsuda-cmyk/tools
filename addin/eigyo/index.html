@@ -187,6 +187,19 @@
   </div>
 </div>
 
+<!-- ===== 汎用ダイアログ（confirm/alert代替。Office環境ではwindow.confirm不可） ===== -->
+<div class="modal-back" id="dialog-modal" style="display:none">
+  <div class="modal xsmall">
+    <div class="modal-body">
+      <div id="dialog-msg" class="dialog-msg"></div>
+    </div>
+    <div class="modal-foot dialog-foot">
+      <button class="btn-ghost" id="dialog-cancel" onclick="dialogRespond(false)">キャンセル</button>
+      <button class="btn-primary" id="dialog-ok" onclick="dialogRespond(true)">OK</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>
