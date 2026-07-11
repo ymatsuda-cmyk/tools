@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>朝会レポート 20260703 前営業日 / 20260704 本日</title>
+  <style>
+    /* ─── Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --accent:    #4f8ef7;
+      --accent2:   #7c5fe6;
+      --text:      #d4d8f0;
+      --text-muted:#7b82a8;
+      --green:     #3ecf8e;
+      --yellow:    #f5c842;
+      --red:       #f06060;
+      --radius:    10px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      --font-body: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, #1a1d27 0%, #12152a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 12px var(--accent); }
+      50%      { opacity:.6; box-shadow: 0 0 4px var(--accent); }
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #fff;
+    }
+    .header-date {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ─── Tabs ─── */
+    .tabs-wrapper {
+      padding: 20px 28px 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: var(--radius) var(--radius) 0 0;
+      transition: color .2s, border-color .2s, background .2s;
+      letter-spacing: .03em;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--surface);
+    }
+    .tab-label-wbs      { --c: var(--accent);  }
+    .tab-label-teams    { --c: var(--green);   }
+    .tab-label-bug      { --c: var(--red);     }
+    .tab-label-schedule { --c: var(--yellow);  }
+    .tab-btn.active.tab-label-teams    { color: var(--green);  border-bottom-color: var(--green);  }
+    .tab-btn.active.tab-label-bug      { color: var(--red);    border-bottom-color: var(--red);    }
+    .tab-btn.active.tab-label-schedule { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+    /* ─── Tab Panels ─── */
+    .tab-panel {
+      display: none;
+      padding: 24px 28px 40px;
+      animation: fadeIn .25s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    /* ─── Section (collapsible) ─── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .section-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      transition: background .15s;
+    }
+    .section-toggle:hover {
+      background: var(--surface2);
+    }
+    .toggle-icon {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+    .section-toggle[aria-expanded="true"] .toggle-icon {
+      transform: rotate(90deg);
+    }
+    .toggle-title {
+      flex: 1;
+    }
+
+    .section-body {
+      padding: 0 18px 16px 40px;
+      border-top: 1px solid var(--border);
+    }
+    .section-body--top {
+      padding: 12px 18px 14px;
+      border-top: none;
+    }
+    .section-body.collapsed {
+      display: none;
+    }
+
+    /* ─── Schedule (non-collapsible) ─── */
+    .section--open .section-header-plain {
+      padding: 14px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--yellow);
+      border-bottom: 1px solid var(--border);
+    }
+    .section--open .section-body {
+      padding: 14px 18px 16px;
+      border-top: none;
+    }
+
+    /* ─── Markdown 要素 ─── */
+    h1,h2,h3,h4 {
+      margin: 14px 0 6px;
+      line-height: 1.4;
+    }
+    h1 { font-size: 16px; color: #fff; }
+    h2 { font-size: 15px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom:4px; }
+    h3 { font-size: 14px; color: var(--text); }
+    h4 { font-size: 13px; color: var(--text-muted); }
+
+    p { margin: 6px 0; }
+    br { display: block; margin: 3px 0; content: ''; }
+
+    li {
+      margin: 3px 0 3px 18px;
+      list-style: disc;
+    }
+    li.indent-1 { margin-left: 34px; list-style: circle; }
+    li.indent-2 { margin-left: 50px; list-style: square; }
+    li.numbered { list-style: decimal; }
+
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #a9d1ff;
+    }
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 12px;
+      color: #c8d8ff;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+    }
+    tr:nth-child(even) td {
+      background: rgba(255,255,255,.02);
+    }
+
+    strong { color: #fff; }
+    em     { color: var(--text-muted); font-style: normal; }
+    a      { color: var(--accent); text-decoration: none; }
+    a:hover{ text-decoration: underline; }
+    hr     { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ─── Toolbar ─── */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn-expand-all {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-expand-all:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ─── Empty ─── */
+    .empty-notice {
+      color: var(--text-muted);
+      padding: 20px;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-dot"></div>
+  <div class="header-title">朝会レポート</div>
+  <div class="header-date">20260703 前営業日 / 20260704 本日</div>
+</header>
+
+<div class="tabs-wrapper">
+  <div class="tabs" role="tablist">
+    <button class="tab-btn tab-label-wbs active"      onclick="switchTab('wbs',this)"      role="tab">📋 WBS</button>
+    <button class="tab-btn tab-label-teams"           onclick="switchTab('teams',this)"    role="tab">💬 Teams</button>
+    <button class="tab-btn tab-label-bug"             onclick="switchTab('bug',this)"      role="tab">🐛 Bug</button>
+    <button class="tab-btn tab-label-schedule"        onclick="switchTab('schedule',this)" role="tab">📅 Schedule</button>
+  </div>
+</div>
+
+<!-- WBS -->
+<div id="panel-wbs" class="tab-panel active" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-wbs')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-wbs')">すべて閉じる</button>
+  </div>
+  <h1>WBS作業状況 2026-07-03</h1>
+<br>
+<p>実行日時: 2026-07-04 02:00:01</p>
+<br>
+<p>対象日: 2026-07-03  該当: 3件</p>
+<br>
+<hr>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.1 高橋 ／ 再全量実行（正常・通常：１３５件）</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<p>夕</p>
+<p>結果確認→完了　　比較結果NGはあるが、決済端末の違いによるもの</p>
+<p>（端末番号、店舗名など）</p>
+<p>会員番号が一致しているのに比較結果NGの箇所は、</p>
+<p>異常終了ケースでだけ数式がおかしいのが明白だったので</p>
+<p>数式を修復して解消</p>
+<p>（残44件の所のみ。既に確認済みの所は下手に触らない）</p>
+<p>朝</p>
+<p>残／完了／削除／総数 =  0(実施のみ)／78／19／135</p>
+<p>残38は実際44</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.2 伊藤 ／ 品質評価（バグ票から）</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<p>申し送り記入済のためクローズ</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">No.3 松田 ／ 納品＆返却準備</span>
+          </button>
+          <div class="section-body collapsed">
+            <br>
+<p>クロージング</p>
+<p>来週、A87002台、スマート電源、カードはGMO引き渡し</p>
+<p>PCは山下さんへ返却。</p>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Teams -->
+<div id="panel-teams" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-teams')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-teams')">すべて閉じる</button>
+  </div>
+  <h1>Teams状況確認 2026-07-03</h1>
+<p>実行日時: 2026-07-04 02:13:17</p>
+<p>対象日: 2026-07-03</p>
+<hr>
+<br>
+<h2>📋 昨日（2026-07-03）Teams 状況整理</h2>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🔧 GMOリリース・クロージング対応</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>明日のリリース対応で遅刻</strong>（中山 真一）</li>
+<p>  明日のリリースの件で打ち合わせがあり遅れる旨の連絡。松田はその後クロージングへ向かった。</p>
+<li class="indent-0"><strong>GMO対応クロージング完了</strong>（松田 祐弥）</li>
+<p>  GMO対応はクロージングを実施し納品対応まで完了。来週から高橋さんは杉山さん配下となる体制変更を実施。</p>
+<li class="indent-0"><strong>本日の会議体連絡／クロージング開始</strong>（松田 祐弥）</li>
+<p>  朝会10時・クロージング17時の会議体を案内し、予定どおりクロージングを開始。</p>
+<li class="indent-0"><strong>課題38の対応依頼</strong>（松田 祐弥→高橋 貴幸）</li>
+<p>  課題38が残っているためチェックを依頼。</p>
+<li class="indent-0"><strong>シナリオ定義書・自動テスト修正完了報告</strong>（伊藤 滉貴／高橋 貴幸）</li>
+<p>  「シナリオ定義書_電源断_全」「自動テスト_シナリオ一覧_電子マネー」の修正完了を報告。New_1修正の項番78・90・301はメイン電文が返らないケースのため実施方法のミスの可能性ありと指摘。高橋は再実施を了承。</p>
+<p>  GMO確認のバグに紐づく2票が残作業として報告あり。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🤝 JBA M&amp;A・ハンター製菓 体制説明準備</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>体制資料の社内共有・月曜説明</strong>（中山 真一／松田 祐弥）</li>
+<p>  JBA売却の背景（創業者引退、紺谷・小川体制の限界、ライタームとの体制強化）を含む説明資料を更新。事前に社内で確認済みで、内容に懸念なし。保守料金については聞かれた場合のみ「物価上昇に応じた見直しの可能性」を口頭補足する方針。月曜に時間を設けて社内説明予定。</p>
+<li class="indent-0"><strong>ハンター製菓 柳澤社長からの問い合わせ対応</strong>（松田 祐弥／中山 真一）</li>
+<p>  紺谷さん宛の返信メールで、代表交代（M&A吸収）の突然の変更に驚き、体制変更の説明を求める内容が来ている。訪問メンバーは紺谷さん・小川さん・松田・中山の4名で確定。体制図は「ハンター窓口＝紺谷さん、全体統括＝松田、開発部隊」の構成で説明する方針。</p>
+<li class="indent-0"><strong>主要取引先への訪問・アポ</strong>（松田 祐弥）</li>
+<p>  主要企業6社（上位5社中心）へ順次アポ取りを実施。7/10(金)13:00に柿本美容室（担当：佐竹様）のアポを確定。Line連携ログイン機能は7/3受注・8月末リリース予定。</p>
+<li class="indent-0"><strong>帝国データバンク会社概要の取得依頼</strong>（中山 真一→白石 直正）</li>
+<p>  エキスプレス・ハンター製菓の2社分の会社概要取得を依頼し、白石が対応・完了報告済み。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">💰 経費承認</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>MF経費 第一承認待ち</strong>（村岡 有希）</li>
+<p>  石川さん・五味さんの分がMF経費で第一承認待ちのため、承認を依頼。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">👥 体制検討（8月以降）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>飛鳥井・高谷の役割整理</strong>（八幡 匡志／松田 祐弥）</li>
+<p>  飛鳥井は保守経験が長く自走可能なため移管を推進したい。高谷は先月パンク状態だったため、役割をR7開発リーダに絞る必要があるが、R7を外れる8月以降のポジションは未定。8月以降の体制案とリスクカバーを検討する必要あり。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">💬 その他</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0">松田・櫻井 康平間で飲み会後のやり取り（業務外の私的連絡）。</li>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">✅ 今後のアクション一覧</span>
+          </button>
+          <div class="section-body collapsed">
+            <table>
+<tr><th>優先</th><th>担当</th><th>アクション</th><th>期限</th></tr>
+<tbody>
+<tr><td>🔴 高</td><td>村岡 有希→松田</td><td>MF経費（石川さん・五味さん分）の第一承認</td><td>至急</td></tr>
+<tr><td>🔴 高</td><td>松田・中山</td><td>JBA体制変更について社内説明を実施</td><td>月曜（7/6）</td></tr>
+<tr><td>🔴 高</td><td>高橋 貴幸</td><td>New_1修正 項番78,90,301の実施方法を見直し再実施</td><td>直近</td></tr>
+<tr><th>🟡 中</th><th>松田・中山</th><th>ハンター製菓 柳澤社長への体制変更説明訪問（紺谷・小川・松田・中山の4名）</th><th>調整中・直近</th></tr>
+<tr><th>🟡 中</th><th>松田</th><th>GMO対応：高橋さんの杉山さん配下への体制変更を実施</th><th>来週から</th></tr>
+<tr><th>🟡 中</th><th>松田</th><th>主要取引先6社への順次アポ取り継続</th><th>今週中</th></tr>
+<tr><th>🟡 中</th><th>高橋 貴幸</th><th>GMO確認バグに紐づく残2票の対応</th><th>今週中</th></tr>
+<tr><th>🟢 低</th><th>松田・八幡</th><th>飛鳥井の業務移管、高谷の8月以降ポジション含む体制案の検討</th><th>随時</th></tr>
+</tbody></table>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Bug -->
+<div id="panel-bug" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-bug')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-bug')">すべて閉じる</button>
+  </div>
+  <h1>バグ作業状況 2026-07-03</h1>
+<br>
+<p>実行日時: 2026-07-04 02:00:01</p>
+<br>
+<p>対象日: 2026-07-03  新規: 0件 / 更新: 0件</p>
+<br>
+<hr>
+<br>
+<h2>新規バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+<hr>
+<br>
+<h2>更新バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+</div>
+
+<!-- Schedule (常時表示) -->
+<div id="panel-schedule" class="tab-panel" role="tabpanel">
+  <p>> 本日以降の休み・不在予定はありません。</p>
+<br>
+</div>
+
+<script>
+  // ── タブ切り替え ──────────────────────────────────────
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── セクション開閉 ────────────────────────────────────
+  function toggleSection(btn) {
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', !expanded);
+    btn.nextElementSibling.classList.toggle('collapsed');
+  }
+
+  // ── 一括開閉 ─────────────────────────────────────────
+  function expandAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.nextElementSibling.classList.remove('collapsed');
+    });
+  }
+  function collapseAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.nextElementSibling.classList.add('collapsed');
+    });
+  }
+</script>
+</body>
+</html>

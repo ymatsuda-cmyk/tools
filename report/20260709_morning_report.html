@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>朝会レポート 20260708 前営業日 / 20260709 本日</title>
+  <style>
+    /* ─── Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --accent:    #4f8ef7;
+      --accent2:   #7c5fe6;
+      --text:      #d4d8f0;
+      --text-muted:#7b82a8;
+      --green:     #3ecf8e;
+      --yellow:    #f5c842;
+      --red:       #f06060;
+      --radius:    10px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      --font-body: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, #1a1d27 0%, #12152a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 12px var(--accent); }
+      50%      { opacity:.6; box-shadow: 0 0 4px var(--accent); }
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #fff;
+    }
+    .header-date {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ─── Tabs ─── */
+    .tabs-wrapper {
+      padding: 20px 28px 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: var(--radius) var(--radius) 0 0;
+      transition: color .2s, border-color .2s, background .2s;
+      letter-spacing: .03em;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--surface);
+    }
+    .tab-label-wbs      { --c: var(--accent);  }
+    .tab-label-teams    { --c: var(--green);   }
+    .tab-label-bug      { --c: var(--red);     }
+    .tab-label-schedule { --c: var(--yellow);  }
+    .tab-btn.active.tab-label-teams    { color: var(--green);  border-bottom-color: var(--green);  }
+    .tab-btn.active.tab-label-bug      { color: var(--red);    border-bottom-color: var(--red);    }
+    .tab-btn.active.tab-label-schedule { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+    /* ─── Tab Panels ─── */
+    .tab-panel {
+      display: none;
+      padding: 24px 28px 40px;
+      animation: fadeIn .25s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    /* ─── Section (collapsible) ─── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .section-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      transition: background .15s;
+    }
+    .section-toggle:hover {
+      background: var(--surface2);
+    }
+    .toggle-icon {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+    .section-toggle[aria-expanded="true"] .toggle-icon {
+      transform: rotate(90deg);
+    }
+    .toggle-title {
+      flex: 1;
+    }
+
+    .section-body {
+      padding: 0 18px 16px 40px;
+      border-top: 1px solid var(--border);
+    }
+    .section-body--top {
+      padding: 12px 18px 14px;
+      border-top: none;
+    }
+    .section-body.collapsed {
+      display: none;
+    }
+
+    /* ─── Schedule (non-collapsible) ─── */
+    .section--open .section-header-plain {
+      padding: 14px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--yellow);
+      border-bottom: 1px solid var(--border);
+    }
+    .section--open .section-body {
+      padding: 14px 18px 16px;
+      border-top: none;
+    }
+
+    /* ─── Markdown 要素 ─── */
+    h1,h2,h3,h4 {
+      margin: 14px 0 6px;
+      line-height: 1.4;
+    }
+    h1 { font-size: 16px; color: #fff; }
+    h2 { font-size: 15px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom:4px; }
+    h3 { font-size: 14px; color: var(--text); }
+    h4 { font-size: 13px; color: var(--text-muted); }
+
+    p { margin: 6px 0; }
+    br { display: block; margin: 3px 0; content: ''; }
+
+    li {
+      margin: 3px 0 3px 18px;
+      list-style: disc;
+    }
+    li.indent-1 { margin-left: 34px; list-style: circle; }
+    li.indent-2 { margin-left: 50px; list-style: square; }
+    li.numbered { list-style: decimal; }
+
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #a9d1ff;
+    }
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 12px;
+      color: #c8d8ff;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+    }
+    tr:nth-child(even) td {
+      background: rgba(255,255,255,.02);
+    }
+
+    strong { color: #fff; }
+    em     { color: var(--text-muted); font-style: normal; }
+    a      { color: var(--accent); text-decoration: none; }
+    a:hover{ text-decoration: underline; }
+    hr     { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ─── Toolbar ─── */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn-expand-all {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-expand-all:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ─── Empty ─── */
+    .empty-notice {
+      color: var(--text-muted);
+      padding: 20px;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-dot"></div>
+  <div class="header-title">朝会レポート</div>
+  <div class="header-date">20260708 前営業日 / 20260709 本日</div>
+</header>
+
+<div class="tabs-wrapper">
+  <div class="tabs" role="tablist">
+    <button class="tab-btn tab-label-wbs active"      onclick="switchTab('wbs',this)"      role="tab">📋 WBS</button>
+    <button class="tab-btn tab-label-teams"           onclick="switchTab('teams',this)"    role="tab">💬 Teams</button>
+    <button class="tab-btn tab-label-bug"             onclick="switchTab('bug',this)"      role="tab">🐛 Bug</button>
+    <button class="tab-btn tab-label-schedule"        onclick="switchTab('schedule',this)" role="tab">📅 Schedule</button>
+  </div>
+</div>
+
+<!-- WBS -->
+<div id="panel-wbs" class="tab-panel active" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-wbs')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-wbs')">すべて閉じる</button>
+  </div>
+  <h1>WBS作業状況 2026-07-08</h1>
+<br>
+<p>実行日時: 2026-07-09 02:00:00</p>
+<br>
+<p>対象日: 2026-07-08  該当: 0件</p>
+<br>
+<hr>
+<br>
+</div>
+
+<!-- Teams -->
+<div id="panel-teams" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-teams')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-teams')">すべて閉じる</button>
+  </div>
+  <h1>Teams状況確認 2026-07-08</h1>
+<p>実行日時: 2026-07-09 02:12:58</p>
+<p>対象日: 2026-07-08</p>
+<hr>
+<br>
+<h2>📋 昨日（2026-07-08）Teams 状況整理</h2>
+<br>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">💰 会計システム移行検討（勘定奉行→マネーフォワード会計）（中山　真一 / 松田　祐弥）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>大澤さんへの状況共有</strong>（松田さん）</li>
+<p>  JBAは勘定奉行使用中、ライタームで使うマネーフォワード会計への変更を検討中と大澤さんに共有。連結決算の方向性も気にされていたため、来期以降の連結決算方針も伝える。</p>
+<li class="indent-0"><strong>連結決算の方針</strong>（中山さん）</li>
+<p>  来期以降に連結決算化したい意向。ただし工数次第では現状運用維持の可能性もあり、マネフォへの切替メリットを見極めてから判断。</p>
+<li class="indent-0"><strong>移行費用・期限の確認</strong>（松田さん）</li>
+<p>  大澤さんとの会話で、勘定奉行→MF移行はMF側サポート費用が別途発生する可能性があると判明。MF側への確認と移行スケジュールの整理が必要。</p>
+<li class="indent-0"><strong>ライタームのMF切替時期</strong>（中山さん）</li>
+<p>  ライタームのMF切替は10月以降開始。移行含め並走で調整。現状はExcel管理でも問題ない見立て。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📊 経理集計（勘定奉行データのClaude活用）（中山　真一 / 松田　祐弥）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>科目過不足の確認</strong>（松田さん）</li>
+<p>  過去分含め集計を実施中。科目不足により合計値にずれが発覚し確認中。BS「商品」、PL「事務用品費」を追加し、合計残高試算表との一致を確認済み。</p>
+<li class="indent-0"><strong>運用改善案</strong>（中山さん）</li>
+<p>  一部月（202605）のみ読み込ませたため科目不足が発生。全月読み込ませれば自動追加されるため次回から解消見込み。売上高をCOUNTA等の数式に置き換える案も提示。</p>
+<li class="indent-0"><strong>資金繰り表</strong>（松田さん・中山さん）</li>
+<p>  資金繰り表は勘定奉行から出せず、松田さんが手作業で作成し中山さんへ共有済み。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">📈 売上計画・資金繰り（中山　真一 / 松田　祐弥）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>今期売上見込み</strong>（中山さん）</li>
+<p>  今期売上見込みは約3800万（現状運用ベースなら4000万でぶれない想定）。10月に保守契約1件復活見込み。来期は伸長計画を検討。</p>
+<li class="indent-0"><strong>受注見込みの精査</strong>（松田さん）</li>
+<p>  9月に積み上がっている3社分は期初の見込み計上であり実際の受注見込みではないため減算対象。資金繰り表・売上予測には元々含まれておらず影響なしと中山さんが確認。</p>
+<li class="indent-0"><strong>新規営業の前倒し</strong>（中山さん）</li>
+<p>  紺谷さんの稼働が空きそうなタイミングに合わせ、新規営業活動を早める案が浮上。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🏭 ハンター製菓 見積・原価算出対応（中山　真一 / 松田　祐弥）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0"><strong>見積対応の緊急性</strong>（中山さん）</li>
+<p>  期変わり前に営業を動かす必要があり、要件未確定部分は「変動する可能性あり」と注記した上で早めに見積提出すべきとの認識。</p>
+<li class="indent-0"><strong>原価算出の課題</strong>（松田さん）</li>
+<p>  ハンター側で原価算出方法や改修範囲の意思統一ができていない可能性（担当者と社長の認識ズレ）。対応として、JBA側でも原価算出案を検討／改修の松竹梅案を検討／来週水曜にハンター担当者と会話、を準備中。</p>
+<li class="indent-0"><strong>概算提示の期限</strong>（中山さん）</li>
+<p>  原価算出方法が期限までに決まらない場合は、前提条件と再見積り条件を付けたうえで概算のみ先出しする方向。</p>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🏗️ 技術検討メモ（松田　祐弥）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0">会議チャットにて認証まわりのアーキテクチャ図（ユーザー→Cognito→API Gateway（トークン検証）→Lambda→DynamoDB）を共有。</li>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">🤒 体調報告（佐々木　慶）</span>
+          </button>
+          <div class="section-body collapsed">
+            <li class="indent-0">発熱が下がり本日（7/8）より復帰。咳が残るためテレワークで対応。</li>
+<br>
+<hr>
+<br>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="section-toggle" onclick="toggleSection(this)" aria-expanded="false">
+            <span class="toggle-icon">▶</span>
+            <span class="toggle-title">✅ 今後のアクション一覧</span>
+          </button>
+          <div class="section-body collapsed">
+            <table>
+<tr><th>優先</th><th>担当</th><th>アクション</th><th>期限</th></tr>
+<tbody>
+<tr><td>🔴 高</td><td>松田</td><td>ハンター製菓：担当者と原価算出・改修範囲について会話</td><td>来週水曜</td></tr>
+<tr><td>🔴 高</td><td>松田</td><td>ハンター製菓：原価算出案・改修松竹梅案を準備し、期限までに決まらなければ前提付き概算を提示</td><td>来週水曜まで</td></tr>
+<tr><td>🟡 中</td><td>松田</td><td>会計移行：MF会計への切替に伴う費用・期限をMF側へ確認し大澤さんに共有</td><td>今週中</td></tr>
+<tr><th>🟡 中</th><th>松田</th><th>経理集計：全月データ読み込みによる科目不足解消、売上高の数式化を検討</th><th>今週中</th></tr>
+<tr><th>🟢 低</th><th>中山/松田</th><th>新規営業を紺谷さんの稼働状況に合わせて前倒し検討</th><th>随時</th></tr>
+<tr><th>🟢 低</th><th>松田</th><th>佐々木さんの体調（咳の状態）をフォロー</th><th>随時</th></tr>
+</tbody></table>
+<br>
+<hr>
+<p>※ Microsoft Graphのレート制限により、29/50チャットのスキャンで一部結果が欠落している可能性があります（テストチャットは対象期間内に確認されず）。</p>
+<br>
+          </div>
+        </div>
+</div>
+
+<!-- Bug -->
+<div id="panel-bug" class="tab-panel" role="tabpanel">
+  <div class="toolbar">
+    <button class="btn-expand-all" onclick="expandAll('panel-bug')">すべて開く</button>
+    <button class="btn-expand-all" onclick="collapseAll('panel-bug')">すべて閉じる</button>
+  </div>
+  <h1>バグ作業状況 2026-07-08</h1>
+<br>
+<p>実行日時: 2026-07-09 02:00:00</p>
+<br>
+<p>対象日: 2026-07-08  新規: 0件 / 更新: 0件</p>
+<br>
+<hr>
+<br>
+<h2>新規バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+<hr>
+<br>
+<h2>更新バグ</h2>
+<br>
+<p>（該当なし）</p>
+<br>
+</div>
+
+<!-- Schedule (常時表示) -->
+<div id="panel-schedule" class="tab-panel" role="tabpanel">
+  <p>> 本日以降の休み・不在予定はありません。</p>
+<br>
+</div>
+
+<script>
+  // ── タブ切り替え ──────────────────────────────────────
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── セクション開閉 ────────────────────────────────────
+  function toggleSection(btn) {
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', !expanded);
+    btn.nextElementSibling.classList.toggle('collapsed');
+  }
+
+  // ── 一括開閉 ─────────────────────────────────────────
+  function expandAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.nextElementSibling.classList.remove('collapsed');
+    });
+  }
+  function collapseAll(panelId) {
+    document.querySelectorAll('#' + panelId + ' .section-toggle').forEach(btn => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.nextElementSibling.classList.add('collapsed');
+    });
+  }
+</script>
+</body>
+</html>
