@@ -24,6 +24,12 @@ let selectedPeriod = "all";
 let showHeld = true;
 let searchQuery = "";
 
+// ミニカンバン用グローバル変数
+const TASK_SYMBOLS = { "□": "todo", "◎": "doing", "■": "done" };
+const LANE_TO_SYMBOL = { "todo": "□", "doing": "◎", "done": "■" };
+let miniTasks = [];
+let miniDragId = null;
+
 Office.onReady(() => {
   restoreSavedFilters();
   restoreHeldDisplay();
@@ -258,11 +264,17 @@ function updateChips() {
 
   const subCatChip = document.getElementById("chip-subcat");
   if (subCatChip) {
-    if (selectedSubCategory) {
+    if (!selectedCategory) {
+      // 大分類が未選択なら小分類チップ自体を非表示
+      subCatChip.style.display = "none";
+      selectedSubCategory = null;
+    } else if (selectedSubCategory) {
+      subCatChip.style.display = "";
       subCatChip.classList.add("selected");
       subCatChip.innerHTML =
         `小分類: ${escapeHtml(selectedSubCategory)} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
     } else {
+      subCatChip.style.display = "";
       subCatChip.classList.remove("selected");
       subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
     }
@@ -925,7 +937,10 @@ async function openModal(task) {
     modalContent.removeEventListener("click", handleContentClick);
   };
 
-  setTimeout(() => document.getElementById("modal-note").focus(), 100);
+  setTimeout(() => {
+    document.getElementById("modal-note").focus();
+    initMiniKanban();
+  }, 100);
 }
 
 function closeModal() {
@@ -1023,6 +1038,182 @@ function isMatch(t) {
     case "future":   return start > nextSunday;
     case "all":
     default:         return true;
+  }
+}
+
+/* ============================================================
+   ミニカンバン（モーダル内＜タスク＞セクション）
+   ------------------------------------------------------------
+   備考テキストの＜タスク＞〜次のセクション間を
+   ミニカンバンで視覚管理。□未着手 / ◎対応中 / ■完了
+   ============================================================ */
+
+/* テキストエリアから＜タスク＞行を抽出してminiTasksを構築 */
+function parseMiniTasks(noteText) {
+  miniTasks = [];
+  if (!noteText) return;
+
+  const lines = noteText.split("\n");
+  let inTask = false;
+  let idCounter = 0;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    if (line === "＜タスク＞") { inTask = true; continue; }
+    if (inTask && /^＜.+＞$/.test(line)) break;       // 次のセクション
+
+    if (inTask && line.length > 0) {
+      const first = line.charAt(0);
+      const status = TASK_SYMBOLS[first] || "todo";
+      const text = TASK_SYMBOLS[first] ? line.slice(1).trim() : line.trim();
+      if (text) {
+        miniTasks.push({ id: "mt_" + (idCounter++), text, status });
+      }
+    }
+  }
+}
+
+/* miniTasks → テキストエリアの＜タスク＞ブロックを書き換え */
+function syncMiniTasksToTextarea() {
+  const ta = document.getElementById("modal-note");
+  const text = ta.value;
+  const lines = text.split("\n");
+
+  let startIdx = -1, endIdx = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === "＜タスク＞") { startIdx = i; continue; }
+    if (startIdx >= 0 && /^＜.+＞$/.test(lines[i].trim())) { endIdx = i; break; }
+  }
+
+  if (startIdx < 0) return;        // ＜タスク＞がなければ何もしない
+
+  // タスク行を再構築
+  const taskLines = miniTasks.map(t => {
+    const sym = LANE_TO_SYMBOL[t.status] || "□";
+    return sym + t.text;
+  });
+
+  // 既存のタスク行を置換
+  lines.splice(startIdx + 1, endIdx - startIdx - 1, ...taskLines);
+  ta.value = lines.join("\n");
+}
+
+/* ミニカンバン表示更新 */
+function renderMiniKanban() {
+  ["mini-todo", "mini-doing", "mini-done"].forEach(id => {
+    document.getElementById(id).innerHTML = "";
+  });
+
+  miniTasks.forEach(t => {
+    const card = document.createElement("div");
+    card.className = "mini-card";
+    card.draggable = true;
+    card.dataset.id = t.id;
+
+    const label = document.createElement("span");
+    label.className = "mini-card-text";
+    label.textContent = t.text;
+
+    const del = document.createElement("button");
+    del.className = "mini-card-del";
+    del.textContent = "✕";
+    del.title = "削除";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      miniTasks = miniTasks.filter(x => x.id !== t.id);
+      syncMiniTasksToTextarea();
+      renderMiniKanban();
+    });
+
+    card.appendChild(label);
+    card.appendChild(del);
+
+    // DnD
+    card.addEventListener("dragstart", (e) => {
+      miniDragId = t.id;
+      e.dataTransfer.setData("text/plain", t.id);
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+
+    const laneId = t.status === "doing" ? "mini-doing"
+                 : t.status === "done"  ? "mini-done"
+                 : "mini-todo";
+    document.getElementById(laneId).appendChild(card);
+  });
+
+  // DnDのレーン受け側
+  document.querySelectorAll(".mini-card-list").forEach(list => {
+    list.ondragover = (e) => { e.preventDefault(); list.classList.add("drop-target"); };
+    list.ondragleave = () => list.classList.remove("drop-target");
+    list.ondrop = (e) => {
+      e.preventDefault();
+      list.classList.remove("drop-target");
+      const task = miniTasks.find(x => x.id === miniDragId);
+      if (!task) return;
+      const newStatus = list.closest(".mini-lane").dataset.st;
+      task.status = TASK_SYMBOLS[newStatus] || "todo";
+      syncMiniTasksToTextarea();
+      renderMiniKanban();
+    };
+  });
+}
+
+/* ミニカンバンの初期化（モーダルを開く度に呼ぶ） */
+function initMiniKanban() {
+  const ta = document.getElementById("modal-note");
+  const hasTaskSection = ta.value.includes("＜タスク＞");
+
+  const panel = document.getElementById("mini-kanban");
+  if (!hasTaskSection) {
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+
+  parseMiniTasks(ta.value);
+  renderMiniKanban();
+
+  // テキストエリアの変更を監視してミニカンバンを再同期
+  ta.removeEventListener("input", onNoteInputForMini);
+  ta.addEventListener("input", onNoteInputForMini);
+
+  // 追加ボタン
+  const addBtn = document.getElementById("mini-task-add-btn");
+  const addInput = document.getElementById("mini-task-input");
+
+  // 既存リスナーを除去してから再登録（多重登録防止）
+  const newAddBtn = addBtn.cloneNode(true);
+  addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+  const newAddInput = addInput.cloneNode(true);
+  addInput.parentNode.replaceChild(newAddInput, addInput);
+
+  const doAdd = () => {
+    const inp = document.getElementById("mini-task-input");
+    const val = inp.value.trim();
+    if (!val) return;
+    miniTasks.push({ id: "mt_" + Date.now(), text: val, status: "todo" });
+    syncMiniTasksToTextarea();
+    renderMiniKanban();
+    inp.value = "";
+    inp.focus();
+  };
+
+  document.getElementById("mini-task-add-btn").addEventListener("click", doAdd);
+  document.getElementById("mini-task-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); doAdd(); }
+  });
+}
+
+function onNoteInputForMini() {
+  const ta = document.getElementById("modal-note");
+  if (ta.value.includes("＜タスク＞")) {
+    document.getElementById("mini-kanban").classList.remove("hidden");
+    parseMiniTasks(ta.value);
+    renderMiniKanban();
+  } else {
+    document.getElementById("mini-kanban").classList.add("hidden");
   }
 }
 

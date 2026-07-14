@@ -19,7 +19,7 @@
       <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke-linecap="round"/>
     </svg>
   </button>
-  <span class="title">カンバン</span>
+  <span class="title">WBS</span>
   <span class="version" id="version-label"></span>
   <span class="spacer"></span>
   <button class="icon-btn" title="再読み込み" onclick="init()">
@@ -132,6 +132,32 @@
   <div class="modal-content">
     <h3 id="modal-title"></h3>
     <textarea id="modal-note"></textarea>
+
+    <!-- ミニカンバン（＜タスク＞セクション） -->
+    <div id="mini-kanban" class="mini-kanban hidden">
+      <div class="mini-kanban-header">
+        <span class="mini-kanban-title">タスク</span>
+        <div class="mini-kanban-add">
+          <input type="text" id="mini-task-input" placeholder="新しいタスク…">
+          <button class="btn-mini-add" id="mini-task-add-btn" title="追加">＋</button>
+        </div>
+      </div>
+      <div class="mini-kanban-board">
+        <div class="mini-lane" data-st="□">
+          <div class="mini-lane-head"><span class="mini-dot todo"></span>未着手</div>
+          <div class="mini-card-list" id="mini-todo"></div>
+        </div>
+        <div class="mini-lane" data-st="◎">
+          <div class="mini-lane-head"><span class="mini-dot doing"></span>対応中</div>
+          <div class="mini-card-list" id="mini-doing"></div>
+        </div>
+        <div class="mini-lane" data-st="■">
+          <div class="mini-lane-head"><span class="mini-dot done"></span>完了</div>
+          <div class="mini-card-list" id="mini-done"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveNote()">保存</button>
       <button class="btn-ghost" onclick="closeModal()">閉じる</button>
