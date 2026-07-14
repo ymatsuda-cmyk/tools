@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <title>週次状況</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <button class="icon-btn" id="menu-btn" title="メニュー" onclick="openMenu()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <span class="title">週次状況</span>
+  <span class="version" id="version-label"></span>
+  <span class="demo-badge" id="demo-badge" style="display:none">DEMO</span>
+  <span class="spacer"></span>
+  <button class="icon-btn" title="再読み込み" onclick="init()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>
+
+<!-- 週セレクタ -->
+<div class="week-bar">
+  <button class="week-nav" title="前週" onclick="moveWeek(-1)">◀</button>
+  <div class="week-label-wrap">
+    <span class="week-label" id="week-label"></span>
+    <input type="date" id="week-picker" class="week-picker" title="日付を選んでその週へ移動" onchange="jumpToDate(this.value)">
+  </div>
+  <button class="week-nav" title="翌週" onclick="moveWeek(1)">▶</button>
+  <button class="week-today" onclick="gotoThisWeek()">今週</button>
+</div>
+
+<!-- フィルタ -->
+<div class="filter-bar">
+  <select id="filter-client" class="filter-select" title="取引先"></select>
+  <select id="filter-source" class="filter-select" title="ソース">
+    <option value="">（ソース: 全て）</option>
+    <option value="営業報告">営業報告</option>
+    <option value="WBS">WBS</option>
+  </select>
+  <span class="spacer"></span>
+  <span class="save-state" id="save-state"></span>
+</div>
+
+<!-- サマリ -->
+<div class="week-summary" id="week-summary"></div>
+
+<!-- 本体 -->
+<div class="pane" id="pane-weekly">
+  <div id="weekly-container"></div>
+</div>
+
+<script src="weekly.js"></script>
+</body>
+</html>

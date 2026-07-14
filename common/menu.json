@@ -12,7 +12,7 @@
         },
         {
           "id": "kanban",
-          "label": "ＷＢＳ",
+          "label": "ｗｂｓ",
           "icon": "",
           "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/"
         },
@@ -21,6 +21,12 @@
           "label": "バグ管理",
           "icon": "",
           "url": "https://ymatsuda-cmyk.github.io/tools/addin/bug-tracker/"
+        },
+        {
+          "id": "weekly",
+          "label": "週次状況",
+          "icon": "",
+          "url": "https://ymatsuda-cmyk.github.io/tools/addin/weekly/"
         }
       ]
     },
