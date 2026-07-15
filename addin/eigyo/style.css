@@ -388,6 +388,31 @@ body {
 .pri-高 { background: #f4b183; color: #7c3c00; }
 .pri-中 { background: #ffe699; color: #7a5c00; }
 .pri-低 { background: #e3e7eb; color: #667; }
+
+.rank-pill {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: bold;
+}
+.rank-pill.rank-濃厚   { background: #f4b183; color: #7c3c00; }
+.rank-pill.rank-五分五分 { background: #ffe699; color: #7a5c00; }
+.rank-pill.rank-薄め   { background: #e3e7eb; color: #667; }
+.rank-weight-input {
+  width: 44px; font-size: 12px; text-align: right;
+  border: 1px solid #ccd3da; border-radius: 4px; padding: 2px 4px;
+}
+.rank-filter-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.rank-filter-btn {
+  display: inline-block; padding: 4px 14px; border-radius: 12px;
+  font-size: 12px; font-weight: bold; border: 1px solid transparent;
+  cursor: pointer; background: #eceef1; color: #9aa1ab; opacity: 0.55;
+  transition: opacity .15s ease;
+}
+.rank-filter-btn:hover { opacity: 0.8; }
+.rank-filter-btn.active { opacity: 1; }
+.rank-filter-btn.active:hover { opacity: 1; }
+.rank-filter-btn.active.rank-濃厚   { background: #f4b183; color: #7c3c00; }
+.rank-filter-btn.active.rank-五分五分 { background: #ffe699; color: #7a5c00; }
+.rank-filter-btn.active.rank-薄め   { background: #dfe3e8; color: #556; border-color: #b7bec7; }
 .list-table td.c { text-align: center; }
 
 /* ---------- 期セレクタ ---------- */

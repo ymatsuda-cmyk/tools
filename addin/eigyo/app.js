@@ -17,11 +17,23 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_h";
+const APP_VERSION = "rev_20260715_c";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
+const CONFIG_SHEET = "確度設定";
 const MAX_ROWS = 500;
 const TAX_RATE = 0.10;
+
+/* 確度ランク：優先度（高/中/低）を経営報告向けの3ランクに変換。
+   状態が「保留」の案件は優先度に関わらず「薄め」に固定する。 */
+const RANK_ORDER = ["濃厚", "五分五分", "薄め"];
+let confidenceWeights = { "濃厚": 0.8, "五分五分": 0.5, "薄め": 0.2 }; // 既定値。確度設定シートの値で上書きされる
+function rankOf(rec) {
+  if (rec.status === HOLD) return "薄め";
+  if (rec.priority === "高") return "濃厚";
+  if (rec.priority === "中") return "五分五分";
+  return "薄め"; // 低・未入力
+}
 
 /* カンバンのドラッグ＆ドロップ制御（true にすると有効化） */
 const ENABLE_KANBAN_DND = false;
@@ -217,6 +229,7 @@ async function loadAll() {
       }
     });
     await ensureCustomerSheet();
+    await ensureConfigSheet();
     demoMode = false;
   } catch (e) {
     console.warn("Excel読込に失敗。デモモードで起動します。", e);
@@ -281,6 +294,49 @@ async function ensureCustomerSheet() {
       .map((r, i) => ({ row: i + 2, code: str(r[0]), name: str(r[1]), contact: str(r[2]), note: str(r[3]) }))
       .filter(c => c.code && c.name);
   });
+}
+
+/* 確度設定シート：濃厚／五分五分／薄めの加重係数を保持（無ければ自動作成） */
+async function ensureConfigSheet() {
+  await Excel.run(async ctx => {
+    const sheets = ctx.workbook.worksheets;
+    sheets.load("items/name");
+    await ctx.sync();
+    let ws = sheets.items.find(s => s.name === CONFIG_SHEET);
+    if (!ws) {
+      const ns = sheets.add(CONFIG_SHEET);
+      ns.getRange("A1:B1").values = [["確度ランク", "係数（0〜1）"]];
+      ns.getRange("A1:B1").format.fill.color = "#44546A";
+      ns.getRange("A1:B1").format.font.color = "#FFFFFF";
+      ns.getRange("A2:B4").values = RANK_ORDER.map(rk => [rk, confidenceWeights[rk]]);
+      ns.getRange("B2:B4").numberFormat = [["0%"], ["0%"], ["0%"]];
+      await ctx.sync();
+    }
+    const rng = ctx.workbook.worksheets.getItem(CONFIG_SHEET).getRange("A2:B4");
+    rng.load("values");
+    await ctx.sync();
+    rng.values.forEach(r => {
+      const rk = str(r[0]);
+      const v = numOrNull(r[1]);
+      if (RANK_ORDER.includes(rk) && v != null) confidenceWeights[rk] = v;
+    });
+  });
+}
+
+async function saveConfidenceWeight(rank, value) {
+  const v = Math.max(0, Math.min(1, value));
+  confidenceWeights[rank] = v;
+  if (!demoMode && window.Excel) {
+    try {
+      await Excel.run(async ctx => {
+        const idx = RANK_ORDER.indexOf(rank);
+        const sheet = ctx.workbook.worksheets.getItem(CONFIG_SHEET);
+        sheet.getRange(`B${idx + 2}`).values = [[v]];
+        await ctx.sync();
+      });
+    } catch (e) { console.warn("確度係数の保存に失敗しました", e); }
+  }
+  renderAgg();
 }
 
 function nextCaseId(code) {
@@ -1211,6 +1267,11 @@ async function saveCustomer() {
 let currentAgg = "hoshu";
 let showHours = true;        // 保守状況の対応工数の表示ON/OFF
 let mitsuOpenStatus = null;  // 見積状況で件数展開中の状態
+let mitsuRankFilter = new Set(RANK_ORDER); // 状態別集計の確度フィルタ（既定は全選択）
+function toggleMitsuRankFilter(rank, checked) {
+  if (checked) mitsuRankFilter.add(rank); else mitsuRankFilter.delete(rank);
+  renderAgg();
+}
 function switchAgg(k) {
   currentAgg = k;
   if (k !== "mitsu") mitsuOpenStatus = null;
@@ -1294,11 +1355,12 @@ function countByMonth(recs, field, months) {
 const MITSU_ORDER = ["新規", "検討中", "見積中", "商談中", "確認中", "失注", "受注"];
 function renderMitsuAgg() {
   const target = activeRecords().filter(r => QUOTE_TYPES.includes(r.type));
+  const stateTarget = target.filter(r => mitsuRankFilter.has(rankOf(r)));
   const rows = MITSU_ORDER.map(st => {
-    const g = target.filter(r => r.status === st);
+    const g = stateTarget.filter(r => r.status === st);
     return { st, cnt: g.length, amt: g.reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0) };
   });
-  const held = target.filter(r => r.status === HOLD);
+  const held = stateTarget.filter(r => r.status === HOLD);
   if (held.length) rows.push({ st: HOLD, cnt: held.length, amt: held.reduce((a, r) => a + (r.amount || 0), 0) });
   const totalCnt = rows.reduce((a, r) => a + r.cnt, 0);
   const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
@@ -1307,10 +1369,10 @@ function renderMitsuAgg() {
   // 受注確定金額：状態欄が「受注」のものを計上
   const wonAmt = target.filter(r => r.status === "受注").reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
 
-  // 展開中の状態に対応する見積一覧
+  // 展開中の状態に対応する見積一覧（確度フィルタを反映）
   let drillHtml = "";
   if (mitsuOpenStatus) {
-    const list = target.filter(r => r.status === mitsuOpenStatus)
+    const list = stateTarget.filter(r => r.status === mitsuOpenStatus)
       .sort((a, b) => (b.occur || 0) - (a.occur || 0));
     drillHtml = `
     <div class="agg-card">
@@ -1329,6 +1391,13 @@ function renderMitsuAgg() {
     </div>`;
   }
 
+  // 確度別パイプライン（優先度→濃厚/五分五分/薄め。保留は優先度に関わらず薄め）
+  const rankRows = RANK_ORDER.map(rk => {
+    const g = pipeline.filter(r => rankOf(r) === rk);
+    return { rk, cnt: g.length, amt: g.reduce((a, r) => a + (r.amount || 0), 0) };
+  });
+  const weightedTotal = rankRows.reduce((a, r) => a + r.amt * (confidenceWeights[r.rk] ?? 0), 0);
+
   return `
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
@@ -1336,7 +1405,29 @@ function renderMitsuAgg() {
       <div class="kpi"><div class="kv">${(wonAmt / 10000).toLocaleString()}万</div><div class="kl">受注確定金額</div></div>
     </div>
     <div class="agg-card">
+      <h3>確度別パイプライン</h3>
+      <table class="agg-table">
+        <tr><th>確度</th><th>件数</th><th>見積金額合計（税抜）</th><th>係数</th><th>加重見込み額</th></tr>
+        ${rankRows.map(r => `<tr>
+          <td><span class="rank-pill rank-${esc(r.rk)}">${esc(r.rk)}</span></td>
+          <td>${r.cnt}</td>
+          <td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td>
+          <td><input type="number" class="rank-weight-input" min="0" max="100" step="5"
+                value="${Math.round((confidenceWeights[r.rk] ?? 0) * 100)}"
+                onchange="saveConfidenceWeight('${esc(r.rk)}', Number(this.value) / 100)">%</td>
+          <td class="r">${Math.round(r.amt * (confidenceWeights[r.rk] ?? 0)).toLocaleString()}円</td>
+        </tr>`).join("")}
+        <tr class="total"><td colspan="4">加重見込み合計</td><td class="r">${Math.round(weightedTotal).toLocaleString()}円</td></tr>
+      </table>
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 保留は優先度に関わらず「薄め」に分類。係数は確度設定シートに保存され、次回起動時も維持されます。</p>
+    </div>
+    <div class="agg-card">
       <h3>見積り・プリセールス 状態別集計</h3>
+      <div class="rank-filter-row">
+        ${RANK_ORDER.map(rk => `<button type="button"
+          class="rank-filter-btn rank-${esc(rk)} ${mitsuRankFilter.has(rk) ? "active" : ""}"
+          onclick="toggleMitsuRankFilter('${esc(rk)}', ${!mitsuRankFilter.has(rk)})">${esc(rk)}</button>`).join("")}
+      </div>
       <table class="agg-table">
         <tr><th>状態</th><th>件数</th><th>見積金額合計（税抜）</th></tr>
         ${rows.map(r => `<tr>
@@ -1347,7 +1438,7 @@ function renderMitsuAgg() {
           <td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td></tr>`).join("")}
         <tr class="total"><td>合計</td><td>${totalCnt}</td><td class="r">${totalAmt.toLocaleString()}円</td></tr>
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。</p>
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。上のボタンで確度を絞り込めます（色付き＝表示中、グレー＝除外中）。</p>
     </div>
     ${drillHtml}`;
 }
