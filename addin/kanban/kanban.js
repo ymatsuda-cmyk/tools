@@ -11,7 +11,7 @@
  * ============================================================ */
 
 
-const APP_VERSION = "rev_20260719_4fbb0bb";
+const APP_VERSION = "rev_20260719_67b66a8";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
