@@ -10,7 +10,11 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
+<<<<<<< HEAD
+const APP_VERSION = "rev_20260710_subtask";
+=======
 const APP_VERSION = "rev_20260719_dcad287";
+>>>>>>> aece8407c4dee31a221b807167e905fbe59f6e1e
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -910,6 +914,7 @@ async function openModal(task) {
 
   document.getElementById("modal-title").textContent = task.title;
   document.getElementById("modal-note").value = displayNote;
+  renderSubtaskKanban();
 
   const modal = document.getElementById("modal");
   modal.classList.remove("hidden");
@@ -972,6 +977,119 @@ async function saveNote() {
 
   closeModal();
   renderBoard();
+}
+
+/* ============================================================
+   サブタスクカンバン（備考モーダル内・案1: 3レーン）
+   ------------------------------------------------------------
+   備考テキスト内の行頭記号でサブタスクの状態を表す:
+     □ 未着手 / ◎ 対応中 / ■ 完了
+   カンバンのドラッグ移動・備考テキスト編集を双方向同期する。
+   ============================================================ */
+const SUB_MARKS = { "□": "todo", "◎": "doing", "■": "done" };
+const SUB_LANES = [
+  { key: "todo", mark: "□", label: "未着手", cls: "" },
+  { key: "doing", mark: "◎", label: "対応中", cls: "doing" },
+  { key: "done", mark: "■", label: "完了", cls: "done" },
+];
+
+function parseSubtasks(note) {
+  const tasks = [];
+  (note || "").split(/\r?\n/).forEach((line, idx) => {
+    const m = line.match(/^\s*([□◎■])\s?(.*)$/);
+    if (m) tasks.push({ lane: SUB_MARKS[m[1]], title: m[2].trim(), line: idx });
+  });
+  return tasks;
+}
+function subtasksToNote(note, tasks) {
+  const lines = (note || "").split(/\r?\n/);
+  const byLine = {};
+  tasks.forEach((t) => { byLine[t.line] = t; });
+  const kept = [];
+  lines.forEach((line, idx) => {
+    if (/^\s*[□◎■]/.test(line)) {
+      const t = byLine[idx];
+      if (t) kept.push(`${subMark(t.lane)} ${t.title}`);
+    } else {
+      kept.push(line);
+    }
+  });
+  return kept.join("\n");
+}
+function subMark(lane) { return lane === "doing" ? "◎" : lane === "done" ? "■" : "□"; }
+
+function renderSubtaskKanban() {
+  const host = document.getElementById("subtask-kanban");
+  if (!host) return;
+  const note = document.getElementById("modal-note").value;
+  const tasks = parseSubtasks(note);
+  const lanesHtml = SUB_LANES.map((L) => {
+    const cards = tasks.filter((t) => t.lane === L.key);
+    return `
+      <div class="sk-lane ${L.cls}" data-lane="${L.key}">
+        <div class="sk-lane-head">${L.mark} ${L.label} <span class="sk-cnt">${cards.length}</span></div>
+        <div class="sk-lane-body" data-lane="${L.key}">
+          ${cards.map((c) => `<div class="sk-card ${L.cls}" draggable="true" data-line="${c.line}">${escapeHtml(c.title || "（無題）")}</div>`).join("")}
+        </div>
+      </div>`;
+  }).join("");
+  host.innerHTML = `
+    <div class="sk-board">${lanesHtml}</div>
+    <div class="sk-add">
+      <input type="text" id="sk-new" placeholder="サブタスク名を入力してEnterまたは＋"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask()}">
+      <button type="button" onclick="addSubtask()">＋追加</button>
+    </div>`;
+  setupSubtaskDnd();
+}
+
+function setupSubtaskDnd() {
+  const host = document.getElementById("subtask-kanban");
+  let dragLine = null;
+  host.querySelectorAll(".sk-card").forEach((card) => {
+    card.addEventListener("dragstart", (e) => {
+      dragLine = Number(card.dataset.line);
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  });
+  host.querySelectorAll(".sk-lane-body").forEach((body) => {
+    body.addEventListener("dragover", (e) => { e.preventDefault(); body.classList.add("over"); });
+    body.addEventListener("dragleave", () => body.classList.remove("over"));
+    body.addEventListener("drop", (e) => {
+      e.preventDefault();
+      body.classList.remove("over");
+      if (dragLine == null) return;
+      moveSubtask(dragLine, body.dataset.lane);
+      dragLine = null;
+    });
+  });
+}
+
+/* カード移動 → 備考テキストを書き換え、テキストエリアも即時更新（双方向同期） */
+function moveSubtask(line, newLane) {
+  const ta = document.getElementById("modal-note");
+  const tasks = parseSubtasks(ta.value);
+  const t = tasks.find((x) => x.line === line);
+  if (!t || t.lane === newLane) return;
+  t.lane = newLane;
+  ta.value = subtasksToNote(ta.value, tasks);
+  renderSubtaskKanban();
+}
+
+function addSubtask() {
+  const ta = document.getElementById("modal-note");
+  const input = document.getElementById("sk-new");
+  const title = (input.value || "").trim();
+  if (!title) return;
+  ta.value = (ta.value.replace(/\s+$/, "") + `\n□ ${title}`).replace(/^\n/, "");
+  renderSubtaskKanban();
+}
+
+/* 備考テキストエリアが編集されたらカンバンを再描画（逆方向の同期） */
+function onModalNoteEdited() {
+  renderSubtaskKanban();
 }
 
 /* ============================================================
