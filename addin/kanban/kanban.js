@@ -11,9 +11,9 @@
  * ============================================================ */
 
 <<<<<<< HEAD
-const APP_VERSION = "rev_20260710_subtask";
+const APP_VERSION = "rev_20260719_507411e";
 =======
-const APP_VERSION = "rev_20260719_dcad287";
+const APP_VERSION = "rev_20260719_507411e";
 >>>>>>> aece8407c4dee31a221b807167e905fbe59f6e1e
 window.APP_VERSION = APP_VERSION;
 
