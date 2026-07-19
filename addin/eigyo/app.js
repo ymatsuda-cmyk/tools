@@ -3,7 +3,7 @@
  * ------------------------------------------------------------
  * 対象シート: 「営業報告」（1案件1行、ヘッダー行=1行目）
  * カラム定義は SHEET_COLUMNS（列レター・見出し・用途）に一元化。
- * 起動時にヘッダー行（A1:AH1）を照合し、見出しが無い／異なる列が
+ * 起動時にヘッダー行（A1:AI1）を照合し、見出しが無い／異なる列が
  * あれば自動で正規の見出しに書き直す（列の並び順・位置は不変）。
  *
  * 【基本情報】       A:ID  B:取引先  C:No(未使用)  D:種別  E:状態
@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_j";
+const APP_VERSION = "rev_20260710_k";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -70,7 +70,7 @@ const SHEET_COLUMNS = [
   "区分（問合せ／改修）", "着手日", "見積根拠", "商談状況", "確認状況",
   "計上日", "最終工数（人日）", "最終価格（税抜）", "受注条件",
   "起票者", "見積完了日", "検討完了日", "商談完了日", "確認完了日",
-  "受注確定日", "受託開始日",
+  "受注確定日", "受託開始日", "完了予定日",
 ];
 /* 旧バージョンで使っていた見出し文言（読み込み時の判定に使用、書込みはしない） */
 const EXT_HEADERS = SHEET_COLUMNS.slice(18); // S列以降（互換維持用）
@@ -102,9 +102,49 @@ let currentStageTab = null;
 let inputType = "保守対応";
 let currentKanbanType = "保守対応";
 let dragId = null;
-let filters = { q: "", type: "", status: [], client: "", owner: "" };
+let filters = { q: "", type: [], status: [], client: [], owner: "" };
 let editDirty = false;      // 詳細画面で変更があったか
 let selectedId = null;      // 一覧で選択中の案件ID（ハイライト用）
+
+/* ---------- Cookie 保存/復元 ---------- */
+const COOKIE_DAYS = 365;
+function setCookie(name, value) {
+  const exp = new Date(Date.now() + COOKIE_DAYS * 86400000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${exp};path=/;SameSite=Lax`;
+}
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function saveFiltersCookie() {
+  try { setCookie("eigyo_filters", JSON.stringify(filters)); } catch (e) {}
+}
+function restoreFiltersCookie() {
+  try {
+    const raw = getCookie("eigyo_filters");
+    if (!raw) return;
+    const f = JSON.parse(raw);
+    filters = {
+      q: f.q || "",
+      type: Array.isArray(f.type) ? f.type : (f.type ? [f.type] : []),
+      status: Array.isArray(f.status) ? f.status : (f.status ? [f.status] : []),
+      client: Array.isArray(f.client) ? f.client : (f.client ? [f.client] : []),
+      owner: f.owner || "",
+    };
+  } catch (e) {}
+}
+function saveGanttCookie() {
+  try { setCookie("eigyo_gantt", JSON.stringify({ zoom: ganttZoom, term: ganttTerm })); } catch (e) {}
+}
+function restoreGanttCookie() {
+  try {
+    const raw = getCookie("eigyo_gantt");
+    if (!raw) return;
+    const g = JSON.parse(raw);
+    if ([12, 6, 3, 1].includes(g.zoom)) ganttZoom = g.zoom;
+    if (Number.isInteger(g.term)) ganttTerm = g.term;
+  } catch (e) {}
+}
 
 /* ---------- 共通スライドメニュー ---------- */
 const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/common";
@@ -148,28 +188,32 @@ if (window.Office) {
 
 async function init() {
   document.getElementById("version-label").textContent = APP_VERSION;
+  restoreFiltersCookie();
+  restoreGanttCookie();
   bindStaticUI();
   await loadAll();
+  const si = document.getElementById("search-input");
+  if (si) si.value = filters.q || "";
   renderFilters();
   renderCurrentPane();
 }
 
 function bindStaticUI() {
   const input = document.getElementById("search-input");
-  input.addEventListener("input", () => { filters.q = input.value.trim(); renderCurrentPane(); });
+  input.addEventListener("input", () => { filters.q = input.value.trim(); saveFiltersCookie(); renderCurrentPane(); });
   document.getElementById("search-clear").addEventListener("click", () => {
-    input.value = ""; filters.q = ""; renderCurrentPane();
+    input.value = ""; filters.q = ""; saveFiltersCookie(); renderCurrentPane();
   });
-  ["type", "client", "owner"].forEach(k => {
-    document.getElementById("filter-" + k).addEventListener("change", e => {
-      filters[k] = e.target.value; renderCurrentPane();
-    });
+  document.getElementById("filter-owner").addEventListener("change", e => {
+    filters.owner = e.target.value; saveFiltersCookie(); renderCurrentPane();
   });
   document.addEventListener("click", e => {
-    if (!e.target.closest("#ms-status")) {
-      const dd = document.getElementById("status-dd");
-      if (dd) dd.style.display = "none";
-    }
+    ["type", "status", "client"].forEach(k => {
+      if (!e.target.closest("#ms-" + k)) {
+        const dd = document.getElementById(k + "-dd");
+        if (dd) dd.style.display = "none";
+      }
+    });
   });
   // 詳細画面の変更検知（委譲）：ステージ切替で再描画されても効くように
   const emodal = document.getElementById("edit-modal");
@@ -178,8 +222,9 @@ function bindStaticUI() {
 }
 
 function clearFilters() {
-  filters = { q: "", type: "", status: [], client: "", owner: "" };
+  filters = { q: "", type: [], status: [], client: [], owner: "" };
   document.getElementById("search-input").value = "";
+  saveFiltersCookie();
   renderFilters();
   renderCurrentPane();
 }
@@ -196,7 +241,7 @@ async function loadAll() {
   try {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-      const hdr = sheet.getRange("A1:AH1");
+      const hdr = sheet.getRange("A1:AI1");
       hdr.load("values");
       await ctx.sync();
       const cur = hdr.values[0];
@@ -208,13 +253,13 @@ async function loadAll() {
         hdr.format.font.bold = true;
         await ctx.sync();
       }
-      // 使用範囲の行数だけ読む（A2:AH500固定読みを避け、使用範囲の膨張を防ぐ）
+      // 使用範囲の行数だけ読む（A2:AI500固定読みを避け、使用範囲の膨張を防ぐ）
       const used = sheet.getUsedRange(true);
       used.load("rowCount");
       await ctx.sync();
       const lastRow = Math.min(Math.max(used.rowCount, 1), MAX_ROWS);
       if (lastRow >= 2) {
-        const rng = sheet.getRange(`A2:AH${lastRow}`);
+        const rng = sheet.getRange(`A2:AI${lastRow}`);
         rng.load("values");
         await ctx.sync();
         records = parseRows(rng.values);
@@ -251,7 +296,7 @@ function parseRows(values) {
       reporter: str(r[27]),
       quoteDone: toDate(r[28]), considerDone: toDate(r[29]),
       dealDone: toDate(r[30]), confirmDone: toDate(r[31]),
-      orderDone: toDate(r[32]), workStart: toDate(r[33]),
+      orderDone: toDate(r[32]), workStart: toDate(r[33]), dueDate: toDate(r[34]),
     });
   });
   return out;
@@ -314,7 +359,7 @@ function recToRow(rec) {
     rec.reporter ?? "",
     toSerial(rec.quoteDone), toSerial(rec.considerDone),
     toSerial(rec.dealDone), toSerial(rec.confirmDone),
-    toSerial(rec.orderDone), toSerial(rec.workStart),
+    toSerial(rec.orderDone), toSerial(rec.workStart), toSerial(rec.dueDate),
   ]];
 }
 
@@ -334,11 +379,14 @@ async function writeRecord(rec) {
       row = maxRow + 1;
       rec.row = row;
     }
-    const rng = sheet.getRange(`A${row}:AH${row}`);
+    const rng = sheet.getRange(`A${row}:AI${row}`);
     rng.values = recToRow(rec);
-    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF", "AG", "AH"].forEach(c =>
+    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF", "AG", "AH", "AI"].forEach(c =>
       sheet.getRange(`${c}${row}`).numberFormat = [["yyyy/m/d"]]);
     ["L", "Z"].forEach(c => sheet.getRange(`${c}${row}`).numberFormat = [["#,##0"]]);
+    // 折り返しを無効化し行高さを固定（複数行に広がらないように）
+    rng.format.wrapText = false;
+    sheet.getRange(`${row}:${row}`).format.rowHeight = 18;
     await ctx.sync();
   });
   const i = records.findIndex(r => r.row === rec.row);
@@ -438,7 +486,7 @@ function switchTab(tab) {
   document.getElementById("filter-bar").style.display =
     (tab === "list" || tab === "kanban") ? "" : "none";
   const isKanban = tab === "kanban";
-  document.getElementById("filter-type").style.display = isKanban ? "none" : "";
+  document.getElementById("ms-type").style.display = isKanban ? "none" : "";
   document.getElementById("ms-status").style.display = isKanban ? "none" : "";
   renderCurrentPane();
 }
@@ -455,10 +503,10 @@ function renderCurrentPane() {
    フィルタ
    ============================================================ */
 function renderFilters() {
-  fillSelect("filter-type", ["（種別: 全て）", ...TYPES], filters.type);
-  renderStatusMulti();
   const clients = [...new Set(records.map(r => r.client).filter(Boolean))];
-  fillSelect("filter-client", ["（取引先: 全て）", ...clients], filters.client);
+  renderMulti("type", TYPES, "種別");
+  renderMulti("status", [...new Set(records.map(r => r.status).filter(s => s && s !== "削除"))], "状態");
+  renderMulti("client", clients, "取引先");
   fillSelect("filter-owner", ["（担当者: 全て）", ...allOwners()], filters.owner);
 }
 function allOwners() {
@@ -471,37 +519,42 @@ function fillSelect(id, options, selected) {
     `<option value="${i === 0 ? "" : esc(o)}"${o === selected ? " selected" : ""}>${esc(o)}</option>`).join("");
 }
 
-function renderStatusMulti() {
-  const sts = [...new Set(records.map(r => r.status).filter(s => s && s !== "削除"))];
-  filters.status = filters.status.filter(s => sts.includes(s));
-  const btn = document.getElementById("ms-status-btn");
-  btn.textContent = filters.status.length
-    ? `状態: ${filters.status.length}件選択 ▾`
-    : "（状態: 全て）▾";
-  const dd = document.getElementById("status-dd");
-  dd.innerHTML = sts.map(s => `
+/* 汎用マルチセレクト（type/status/client 共通） */
+const MS_LABEL = { type: "種別", status: "状態", client: "取引先" };
+function renderMulti(key, options, label) {
+  filters[key] = filters[key].filter(v => options.includes(v));
+  const btn = document.getElementById(`ms-${key}-btn`);
+  btn.textContent = filters[key].length ? `${label}: ${filters[key].length}件選択 ▾` : `（${label}: 全て）▾`;
+  const dd = document.getElementById(`${key}-dd`);
+  const pill = key === "status";
+  dd.innerHTML = options.map(o => `
     <label class="ms-item">
-      <input type="checkbox" value="${esc(s)}" ${filters.status.includes(s) ? "checked" : ""}
-        onchange="onStatusCheck(this)">
-      <span class="status-pill st-${esc(s)}">${esc(s)}</span>
+      <input type="checkbox" value="${esc(o)}" ${filters[key].includes(o) ? "checked" : ""}
+        onchange="onMsCheck('${key}',this)">
+      ${pill ? `<span class="status-pill st-${esc(o)}">${esc(o)}</span>` : `<span>${esc(o)}</span>`}
     </label>`).join("") +
-    `<button class="ms-clear" onclick="clearStatusFilter()">選択解除</button>`;
+    `<button class="ms-clear" onclick="clearMsFilter('${key}')">選択解除</button>`;
 }
-function toggleStatusDD(ev) {
+function toggleMsDD(ev, key) {
   ev.stopPropagation();
-  const dd = document.getElementById("status-dd");
-  dd.style.display = dd.style.display === "none" ? "" : "none";
+  ["type", "status", "client"].forEach(k => {
+    const dd = document.getElementById(`${k}-dd`);
+    if (dd) dd.style.display = (k === key && dd.style.display === "none") ? "" : "none";
+  });
 }
-function onStatusCheck(cb) {
-  if (cb.checked) { if (!filters.status.includes(cb.value)) filters.status.push(cb.value); }
-  else filters.status = filters.status.filter(s => s !== cb.value);
-  document.getElementById("ms-status-btn").textContent = filters.status.length
-    ? `状態: ${filters.status.length}件選択 ▾` : "（状態: 全て）▾";
+function onMsCheck(key, cb) {
+  if (cb.checked) { if (!filters[key].includes(cb.value)) filters[key].push(cb.value); }
+  else filters[key] = filters[key].filter(v => v !== cb.value);
+  const label = MS_LABEL[key];
+  document.getElementById(`ms-${key}-btn`).textContent =
+    filters[key].length ? `${label}: ${filters[key].length}件選択 ▾` : `（${label}: 全て）▾`;
+  saveFiltersCookie();
   renderCurrentPane();
 }
-function clearStatusFilter() {
-  filters.status = [];
-  renderStatusMulti();
+function clearMsFilter(key) {
+  filters[key] = [];
+  saveFiltersCookie();
+  renderFilters();
   renderCurrentPane();
 }
 
@@ -511,9 +564,9 @@ function activeRecords() { return records.filter(r => r.status !== "削除"); }
 function filteredRecords() {
   return records.filter(r => {
     if (r.status === "削除") return false;   // 削除済みは表示しない
-    if (filters.type && r.type !== filters.type) return false;
+    if (filters.type.length && !filters.type.includes(r.type)) return false;
     if (filters.status.length && !filters.status.includes(r.status)) return false;
-    if (filters.client && r.client !== filters.client) return false;
+    if (filters.client.length && !filters.client.includes(r.client)) return false;
     if (filters.owner && !splitOwners(r.owner).includes(filters.owner)) return false;
     if (filters.q) {
       const q = filters.q.toLowerCase();
@@ -563,6 +616,22 @@ function dispAmount(r) {
 }
 function shorten(s, n) { s = str(s).replace(/\n/g, " "); return s.length > n ? s.slice(0, n) + "…" : s; }
 function onRowContext(ev, id) { ev.preventDefault(); openEditModal(id); }
+function onGanttContext(ev, id) {
+  ev.preventDefault();
+  selectedId = id;
+  document.querySelectorAll("#gantt-wrap .g-row[data-id]").forEach(row =>
+    row.classList.toggle("g-row-selected", row.dataset.id === id));
+  const rec = records.find(r => r.id === id);
+  if (rec) jumpToExcel(rec.row);
+}
+function onDrillContext(ev, id) {
+  ev.preventDefault();
+  selectedId = id;
+  document.querySelectorAll(".drill-row[data-id]").forEach(row =>
+    row.classList.toggle("row-selected", row.dataset.id === id));
+  const rec = records.find(r => r.id === id);
+  if (rec) jumpToExcel(rec.row);
+}
 
 /* 左クリック：Excel該当行へジャンプ＆行選択、一覧はハイライト（排他） */
 function onRowClick(id) {
@@ -584,7 +653,7 @@ async function jumpToExcel(row) {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       sheet.activate();
-      const range = sheet.getRange(`A${row}:AH${row}`);
+      const range = sheet.getRange(`A${row}:AI${row}`);
       range.select();
       await ctx.sync();
     });
@@ -791,7 +860,7 @@ function openEditModal(id, forceTab) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   editingRec = JSON.parse(JSON.stringify(rec), (k, v) =>
-    (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone","orderDone","workStart"].includes(k) && v)
+    (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone","orderDone","workStart","dueDate"].includes(k) && v)
       ? new Date(v) : v);
   editingRec.row = rec.row;
   editDirty = false;
@@ -867,8 +936,9 @@ async function closeEditModalConfirm() {
 function activeStageTab(rec) {
   if (isTerminal(rec)) return null;
   const st = rec.status;
-  if (st === "確認中" && rec.order === "受注") return "受注";       // 確認中で受注確定済み・受注タブで最終登録待ち
-  if (st === "受注" || st === "受託中") return "受託中";             // 受注確定済み・実行フェーズ
+  if (st === "確認中" && rec.order === "受注") return "受注";       // 旧データ互換
+  if (st === "受注") return "受注";                                 // 受注確定・最終登録（→受託中へ）
+  if (st === "受託中") return "受託中";                             // 実行フェーズ
   if (st === "新規" || st === HOLD) return firstStageOf(rec.type);
   if (st === "対応中" || st === "見積中" || st === "検討中") return st;
   if (st === "商談中") return "商談中";
@@ -1018,7 +1088,7 @@ function renderStageBody() {
         <label class="check-row win-row ${dis ? "off" : ""}">
           <input type="checkbox" id="st-win" ${rec.order === "受注" ? "checked" : ""} ${dis}
             onchange="if(this.checked)document.getElementById('st-lose').checked=false">
-          受注確定を完了にする（確認完了日を記録し、受注タブで最終登録へ）
+          受注確定を完了にする（確認完了日を記録し、状態を受注にする）
         </label>
         <label class="check-row lose-row ${dis ? "off" : ""}">
           <input type="checkbox" id="st-lose" ${dis}
@@ -1045,36 +1115,32 @@ function renderStageBody() {
       <div class="form-row"><label>受注条件（必要に応じて）</label>
         <textarea id="st-terms" rows="3" ${dis}>${esc(rec.terms)}</textarea></div>
       <label class="check-row ${dis ? "off" : ""}">
-        <input type="checkbox" id="st-done" ${dis}> この内容で登録し、受注確定する（受託中へ進む）
+        <input type="checkbox" id="st-done" ${dis}> この内容で登録し、受注確定する（状態を受託中にする）
       </label>`;
     return;
   }
 
   if (t === "受託中") {
-    const isStarted = rec.status === "受託中";
     body.innerHTML = `
-      ${rec.workStart ? `<span class="stage-info">開始日: ${fmtDate(rec.workStart)}</span>` : ""}
+      ${rec.orderDone ? `<span class="stage-info">受注確定日: ${fmtDate(rec.orderDone)}</span>` : ""}
       <div class="form-grid">
         <div class="form-row"><label>開始日 <span class="req">必須</span></label>
-          <input type="date" id="st-workstart" value="${fmtDateInput(rec.workStart)}" ${dis || isStarted ? "disabled" : ""}></div>
+          <input type="date" id="st-workstart" value="${fmtDateInput(rec.workStart)}" ${dis}></div>
         <div class="form-row"><label>完了予定日</label>
-          <input type="date" id="st-duedate" value="${fmtDateInput(rec.deliver)}" ${dis || isStarted ? "disabled" : ""}></div>
-        <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label>
-          <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
+          <input type="date" id="st-duedate" value="${fmtDateInput(rec.dueDate)}" ${dis}></div>
         <div class="form-row"><label>納品日</label>
           <input type="date" id="st-deliver2" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
+        <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label>
+          <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
       </div>
-      <div class="form-row"><label>WBS状況（wbsシートで小分類＝案件番号のタスク）</label>
-        <div class="wbs-status" id="wbs-status"><span class="muted">読込中…</span></div>
+      <div class="date-order-hint">開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日 の順で入力してください</div>
+      <div class="form-row"><label>WBSタスク（備考のタスクをカンバンで管理）</label>
+        <div id="wbs-kanban"></div>
       </div>
-      ${!isStarted ? `
-      <label class="check-row ${dis ? "off" : ""}">
-        <input type="checkbox" id="st-start" ${dis}> 開始日を確定し、受託中にする
-      </label>` : `
       <label class="check-row ${dis ? "off" : ""}">
         <input type="checkbox" id="st-done" ${dis}> 対応完了（完了日を記録し、チケットを完了する）
-      </label>`}`;
-    loadWbsStatus(rec.id);
+      </label>`;
+    renderWbsKanban(rec);
     return;
   }
   body.innerHTML = "";
@@ -1083,42 +1149,126 @@ function renderStageBody() {
 /* wbsシートから 小分類(B列)=案件番号 のタスク状況を集計して表示
  * 判定はカンバンアドインと同一: S列(実績終了)→完了 / O列備考に▲→保留 /
  * R列(実績開始)→対応中 / それ以外→未着手 */
-async function loadWbsStatus(caseId) {
-  const el = document.getElementById("wbs-status");
-  if (!el) return;
-  if (demoMode || !window.Excel) {
-    el.innerHTML = `<span class="wbs-chip">未着手 1</span><span class="wbs-chip doing">対応中 2</span><span class="wbs-chip done">完了 3</span><span class="wbs-chip held">保留 0</span><span class="muted">（デモ表示）</span>`;
-    return;
-  }
-  try {
-    let counts = { 未着手: 0, 対応中: 0, 完了: 0, 保留: 0 };
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-      const range = sheet.getUsedRange();
-      range.load("values");
-      await ctx.sync();
-      range.values.slice(10).forEach(r => {
-        if ((r[1] ?? "").toString().trim() !== caseId) return;   // B列=小分類
-        const note = (r[14] ?? "").toString();                    // O列=備考
-        const actualStart = r[17];                                // R列
-        const actualEnd = r[18];                                  // S列
-        if (actualEnd) counts["完了"]++;
-        else if (note.includes("▲")) counts["保留"]++;
-        else if (actualStart) counts["対応中"]++;
-        else counts["未着手"]++;
-      });
+/* ============================================================
+   WBSタスクカンバン（案1: 3レーン □未着手 / ◎対応中 / ■完了）
+   ------------------------------------------------------------
+   タスクは備考(note)に1行1タスクで格納。行頭の記号で状態を表す:
+     □ 未着手 / ◎ 対応中 / ■ 完了
+   カンバンのドラッグ移動・備考の直接編集を双方向同期する。
+   ============================================================ */
+const WBS_MARKS = { "□": "todo", "◎": "doing", "■": "done" };
+const WBS_LANES = [
+  { key: "todo", mark: "□", label: "未着手", cls: "" },
+  { key: "doing", mark: "◎", label: "対応中", cls: "doing" },
+  { key: "done", mark: "■", label: "完了", cls: "done" },
+];
+
+/* 備考テキスト → タスク配列（記号付き行のみ） */
+function parseWbsTasks(note) {
+  const tasks = [];
+  (note || "").split(/\r?\n/).forEach((line, idx) => {
+    const m = line.match(/^\s*([□◎■])\s?(.*)$/);
+    if (m) tasks.push({ lane: WBS_MARKS[m[1]], title: m[2].trim(), line: idx });
+  });
+  return tasks;
+}
+/* タスク配列 → 備考テキスト（記号付き行を置換、その他の行は保持） */
+function tasksToNote(note, tasks) {
+  const lines = (note || "").split(/\r?\n/);
+  const taskByLine = {};
+  tasks.forEach(t => { taskByLine[t.line] = t; });
+  const kept = [];
+  lines.forEach((line, idx) => {
+    if (/^\s*[□◎■]/.test(line)) {
+      const t = taskByLine[idx];
+      if (t) kept.push(`${laneMark(t.lane)} ${t.title}`);
+      // タスク行だが対応するタスクが無い場合は削除
+    } else {
+      kept.push(line);
+    }
+  });
+  return kept.join("\n");
+}
+function laneMark(lane) { return lane === "doing" ? "◎" : lane === "done" ? "■" : "□"; }
+
+function renderWbsKanban(rec) {
+  const host = document.getElementById("wbs-kanban");
+  if (!host) return;
+  const tasks = parseWbsTasks(rec.note);
+  const dis = isTerminal(rec);
+  const lanesHtml = WBS_LANES.map(L => {
+    const cards = tasks.filter(t => t.lane === L.key);
+    return `
+      <div class="wk-lane ${L.cls}" data-lane="${L.key}">
+        <div class="wk-lane-head">${L.mark} ${L.label} <span class="wk-cnt">${cards.length}</span></div>
+        <div class="wk-lane-body" data-lane="${L.key}">
+          ${cards.map(c => `<div class="wk-card ${L.cls}" draggable="${!dis}" data-line="${c.line}">${esc(c.title || "（無題）")}</div>`).join("")}
+        </div>
+      </div>`;
+  }).join("");
+  host.innerHTML = `
+    <div class="wk-board">${lanesHtml}</div>
+    ${dis ? "" : `<div class="wk-add">
+      <input type="text" id="wk-new" placeholder="新しいタスク名を入力してEnterまたは＋" onkeydown="if(event.key==='Enter'){event.preventDefault();addWbsTask()}">
+      <button type="button" onclick="addWbsTask()">＋追加</button>
+    </div>`}
+    <div class="wk-hint">カードをドラッグでレーン移動。備考欄の □◎■ 行と自動で同期します。</div>`;
+  if (!dis) setupWbsDnd();
+}
+
+function setupWbsDnd() {
+  const host = document.getElementById("wbs-kanban");
+  let dragLine = null;
+  host.querySelectorAll(".wk-card").forEach(card => {
+    card.addEventListener("dragstart", e => {
+      dragLine = Number(card.dataset.line);
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
     });
-    const total = Object.values(counts).reduce((a, v) => a + v, 0);
-    el.innerHTML = total === 0
-      ? `<span class="muted">紐づくタスクがありません（カンバンの「タスク追加」で大分類=受注・小分類=${esc(caseId)}のタスクを登録すると表示されます）</span>`
-      : `<span class="wbs-chip">未着手 ${counts["未着手"]}</span>` +
-        `<span class="wbs-chip doing">対応中 ${counts["対応中"]}</span>` +
-        `<span class="wbs-chip done">完了 ${counts["完了"]}</span>` +
-        `<span class="wbs-chip held">保留 ${counts["保留"]}</span>` +
-        `<span class="wbs-total">計 ${total}件</span>`;
-  } catch (e) {
-    el.innerHTML = `<span class="muted">wbsシートを読み込めませんでした</span>`;
-  }
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  });
+  host.querySelectorAll(".wk-lane-body").forEach(body => {
+    body.addEventListener("dragover", e => { e.preventDefault(); body.classList.add("over"); });
+    body.addEventListener("dragleave", () => body.classList.remove("over"));
+    body.addEventListener("drop", e => {
+      e.preventDefault();
+      body.classList.remove("over");
+      if (dragLine == null) return;
+      moveWbsTask(dragLine, body.dataset.lane);
+      dragLine = null;
+    });
+  });
+}
+
+/* カード移動 → 備考を書き換え、テキストエリアも即時更新（双方向同期） */
+function moveWbsTask(line, newLane) {
+  const rec = editingRec;
+  const tasks = parseWbsTasks(rec.note);
+  const t = tasks.find(x => x.line === line);
+  if (!t || t.lane === newLane) return;
+  t.lane = newLane;
+  rec.note = tasksToNote(rec.note, tasks);
+  document.getElementById("ed-note").value = rec.note;   // 備考欄に反映
+  editDirty = true;
+  renderWbsKanban(rec);
+}
+
+function addWbsTask() {
+  const rec = editingRec;
+  const input = document.getElementById("wk-new");
+  const title = (input.value || "").trim();
+  if (!title) return;
+  rec.note = ((rec.note || "").replace(/\s+$/, "") + `\n□ ${title}`).replace(/^\n/, "");
+  document.getElementById("ed-note").value = rec.note;
+  editDirty = true;
+  renderWbsKanban(rec);
+}
+
+/* 備考テキストエリアが編集されたらカンバンを再描画（双方向同期・逆方向） */
+function onNoteEdited() {
+  if (!editingRec) return;
+  editingRec.note = document.getElementById("ed-note").value;
+  if (currentStageTab === "受託中") renderWbsKanban(editingRec);
 }
 function updateTaxView() {
   const v = numOrNull(document.getElementById("st-amount").value);
@@ -1208,9 +1358,10 @@ async function saveEditRecord() {
       if (lose && lose.checked) {
         rec.confirmDone = new Date();                             // 確認完了日
         applyStatus(rec, "失注");                                 // 完了日も更新
-      } else if (win && win.checked && rec.order !== "受注") {
+      } else if (win && win.checked) {
         rec.confirmDone = new Date();                             // 確認完了日
-        rec.order = "受注";                                       // ステータスは確認中のまま
+        rec.order = "受注";
+        applyStatus(rec, "受注");                                 // 状態=受注（受注タブへ進む）
       }
     }
     else if (t === "受注") {
@@ -1224,34 +1375,32 @@ async function saveEditRecord() {
         if (!rec.book) { msg.className = "save-msg err"; msg.textContent = "計上日を入力してください（売上集計に使用します）"; return; }
         if (rec.finalAmount == null) { msg.className = "save-msg err"; msg.textContent = "最終価格を入力してください"; return; }
         rec.orderDone = new Date();          // 受注確定日
-        applyStatus(rec, "受注");            // 実行フェーズへ（受託中タブが活性化）
+        applyStatus(rec, "受託中");          // 状態=受託中（受託中タブが活性化）
       }
     }
     else if (t === "受託中") {
-      // 計上日・納品日はどちらのフェーズでも変更可能
-      const b2 = document.getElementById("st-book2");
-      const d2 = document.getElementById("st-deliver2");
-      if (b2) rec.book = fromDateInput(b2.value);
-      if (d2) rec.deliver = fromDateInput(d2.value);
-      if (rec.status === "受注") {
-        // 第1段階：開始日・完了予定日を確定して「受託中」にする
-        const workStart = fromDateInput(document.getElementById("st-workstart").value);
-        const dueDate = fromDateInput(document.getElementById("st-duedate").value);
-        const startChk = document.getElementById("st-start");
-        if (startChk && startChk.checked) {
-          if (!workStart) { msg.className = "save-msg err"; msg.textContent = "開始日を入力してください"; return; }
-          rec.workStart = workStart;
-          if (dueDate) rec.deliver = dueDate;
-          applyStatus(rec, "受託中");
-        } else if (workStart) {
-          rec.workStart = workStart;   // チェック無しでも入力値は保持
+      const workStart = fromDateInput(document.getElementById("st-workstart").value);
+      const dueDate = fromDateInput(document.getElementById("st-duedate").value);
+      const deliver = fromDateInput(document.getElementById("st-deliver2").value);
+      const book = fromDateInput(document.getElementById("st-book2").value);
+      // 相関チェック: 開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日
+      const seq = [["開始日", workStart], ["完了予定日", dueDate], ["納品日", deliver], ["計上日", book]]
+        .filter(x => x[1]);
+      for (let i = 1; i < seq.length; i++) {
+        if (seq[i][1] < seq[i - 1][1]) {
+          msg.className = "save-msg err";
+          msg.textContent = `${seq[i - 1][0]}は${seq[i][0]}以前にしてください（開始日≦完了予定日≦納品日≦計上日）`;
+          return;
         }
-      } else if (rec.status === "受託中") {
-        // 第2段階：対応完了 → チケット完了
-        const doneChk = document.getElementById("st-done");
-        if (doneChk && doneChk.checked) {
-          applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
-        }
+      }
+      rec.workStart = workStart;
+      rec.dueDate = dueDate;
+      rec.deliver = deliver;
+      rec.book = book;
+      const doneChk = document.getElementById("st-done");
+      if (doneChk && doneChk.checked) {
+        if (!workStart) { msg.className = "save-msg err"; msg.textContent = "開始日を入力してください"; return; }
+        applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
       }
     }
   }
@@ -1368,16 +1517,15 @@ function renderHoshuAgg() {
       ${showHours ? `<div class="kpi"><div class="kv">${totalHoursR}</div><div class="kl">対応工数計（人日）</div></div>` : ""}
     </div>
     <div class="agg-card">
-      <h3>保守対応・瑕疵対応 月次推移（発生・完了）</h3>
-      ${legendHtml(colors)}
-      <div class="chart-wrap">${groupedBarChart(months, series, colors)}</div>
+      <h3>保守・瑕疵 月次推移（発生・完了${showHours ? "＋対応工数" : ""}）</h3>
+      ${legendHtml(showHours ? { ...colors, ...hoursColors } : colors)}
+      <div class="chart-wrap">${
+        showHours
+          ? comboChart(months, series, colors, hoursSeries, hoursColors, v => v + "")
+          : groupedBarChart(months, series, colors)
+      }</div>
+      ${showHours ? `<p style="font-size:10px;color:#a9b2ba;margin-top:4px">棒＝件数（左軸）／折れ線＝対応工数 人日（右軸・着手月ベース）</p>` : ""}
     </div>
-    ${showHours ? `
-    <div class="agg-card">
-      <h3>対応工数 推移（人日・着手月ベース）</h3>
-      ${legendHtml(hoursColors)}
-      <div class="chart-wrap">${lineChart(months, hoursSeries, hoursColors, v => v + "")}</div>
-    </div>` : ""}
     <div class="agg-card">
       <h3>月別明細（内訳）</h3>
       <table class="agg-table">
@@ -1428,7 +1576,7 @@ function renderMitsuAgg() {
         <button class="drill-close" onclick="closeMitsuDrill()">閉じる ✕</button></h3>
       <table class="agg-table drill-table">
         <tr><th>ID</th><th>取引先</th><th>種別</th><th>内容</th><th>担当</th><th>金額</th></tr>
-        ${list.length ? list.map(r => `<tr class="drill-row" onclick="openEditModal('${esc(r.id)}')">
+        ${list.length ? list.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="openEditModal('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
           <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
           <td>${esc(r.type)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
           <td>${esc(r.owner)}</td>
@@ -1493,7 +1641,7 @@ function renderJuchuAgg() {
       <h3>受注案件一覧</h3>
       <table class="agg-table drill-table">
         <tr><th>ID</th><th>取引先</th><th>内容</th><th>最終価格</th><th>計上日</th><th>納品日</th><th>状態</th></tr>
-        ${won.length ? won.map(r => `<tr class="drill-row" onclick="openEditModal('${esc(r.id)}')">
+        ${won.length ? won.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="openEditModal('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
           <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
           <td class="l">${esc(shorten(r.content, 20))}</td>
           <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
@@ -1538,6 +1686,52 @@ function groupedBarChart(labels, series, colors, fmtVal) {
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%">
     ${grid}${bars}${labelsSvg}</svg>`;
 }
+/* --- SVG 複合グラフ（棒＝件数[左軸] ＋ 折れ線＝工数[右軸]） --- */
+function comboChart(labels, barSeries, barColors, lineSeries, lineColors, fmtLine) {
+  fmtLine = fmtLine || (v => String(v));
+  const bNames = Object.keys(barSeries);
+  const lNames = Object.keys(lineSeries);
+  const W = Math.max(500, labels.length * 46), H = 200;
+  const padL = 26, padR = 30, padB = 26, padT = 10;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxBar = Math.max(1, ...bNames.flatMap(n => barSeries[n]));
+  const maxLine = Math.max(1, ...lNames.flatMap(n => lineSeries[n]));
+  const groupW = chartW / labels.length;
+  const barW = Math.min(15, (groupW - 8) / bNames.length);
+  const yBar = v => padT + chartH - (chartH * v / maxBar);
+  const yLine = v => padT + chartH - (chartH * v / maxLine);
+  const xCenter = i => padL + groupW * i + groupW / 2;
+  let grid = "", bars = "", lines = "", dots = "", labelsSvg = "", axes = "";
+  const gridN = 4;
+  for (let g = 0; g <= gridN; g++) {
+    const y = padT + chartH - (chartH * g / gridN);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#eceff2"/>`;
+    axes += `<text x="${padL - 3}" y="${y + 3}" font-size="8" text-anchor="end" fill="#8ba">${Math.round(maxBar * g / gridN)}</text>`;
+    axes += `<text x="${W - padR + 3}" y="${y + 3}" font-size="8" text-anchor="start" fill="#d0894f">${fmtLine(Math.round(maxLine * g / gridN * 10) / 10)}</text>`;
+  }
+  labels.forEach((lb, i) => {
+    const gx = padL + groupW * i + (groupW - barW * bNames.length) / 2;
+    bNames.forEach((n, j) => {
+      const v = barSeries[n][i];
+      const h = chartH * v / maxBar;
+      bars += `<rect x="${gx + j * barW}" y="${yBar(v)}" width="${barW - 1.5}" height="${h}" fill="${barColors[n]}" rx="1.5"><title>${lb} ${n}: ${v}</title></rect>`;
+    });
+    labelsSvg += `<text x="${xCenter(i)}" y="${H - 8}" font-size="8.5" text-anchor="middle" fill="#667">${lb.slice(2)}</text>`;
+  });
+  lNames.forEach(n => {
+    const pts = lineSeries[n].map((v, i) => `${xCenter(i)},${yLine(v)}`).join(" ");
+    lines += `<polyline points="${pts}" fill="none" stroke="${lineColors[n]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    lineSeries[n].forEach((v, i) => {
+      dots += `<circle cx="${xCenter(i)}" cy="${yLine(v)}" r="2.6" fill="${lineColors[n]}"><title>${labels[i]} ${n}: ${fmtLine(v)}</title></circle>`;
+    });
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%">
+    ${grid}${axes}${bars}${lines}${dots}${labelsSvg}
+    <text x="${padL - 3}" y="${padT - 1}" font-size="8" text-anchor="end" fill="#8ba">件</text>
+    <text x="${W - padR + 3}" y="${padT - 1}" font-size="8" text-anchor="start" fill="#d0894f">人日</text>
+  </svg>`;
+}
+
 function legendHtml(colors) {
   return `<div class="legend">` + Object.entries(colors).map(([n, c]) =>
     `<span><span class="sw" style="background:${c}"></span>${esc(n)}</span>`).join("") + `</div>`;
@@ -1595,7 +1789,7 @@ function loadDemo() {
   const blank = { kind: "", stageStart: null, basis: "", deal: "", confirm: "", book: null,
     finalHours: null, finalAmount: null, terms: "", reporter: "",
     quoteDone: null, considerDone: null, dealDone: null, confirmDone: null,
-    orderDone: null, workStart: null };
+    orderDone: null, workStart: null, dueDate: null };
   customers = [
     { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "" },
     { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "" },
@@ -1613,8 +1807,8 @@ function loadDemo() {
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
-    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 6, 15), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20) },
-    { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1) },
+    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "■ 要件ヒアリング\n◎ 帳票レイアウト設計\n◎ 出力APIの実装\n□ 結合テスト", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31) },
+    { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20) },
   ];
 }
 
@@ -1626,38 +1820,16 @@ function loadDemo() {
    ・▲: 納品日(N)。バー端ドラッグ=期日変更、本体ドラッグ=期間移動
    ・期(10月〜翌9月)単位。ズーム12/6/3/1ヶ月、背景ドラッグでパン
    ============================================================ */
-let schedView = "gantt";          // gantt | graph
 let ganttTerm = termOfDate(new Date());
 let ganttZoom = 12;               // 表示月数 12/6/3/1
 const GANTT_ROW_H = 46;
 const DAY_MS = 86400000;
 
-function switchSched(v) {
-  schedView = v;
-  document.querySelectorAll(".sched-seg .seg").forEach(b =>
-    b.classList.toggle("active", b.dataset.sched === v));
-  renderSched();
-}
-function shiftGanttTerm(d) { ganttTerm += d; renderSched(); }
-function setGanttZoom(m) {
-  ganttZoom = m;
-  renderSched();
-}
+function shiftGanttTerm(d) { ganttTerm += d; saveGanttCookie(); renderSched(); }
+function setGanttZoom(m) { ganttZoom = m; saveGanttCookie(); renderSched(); }
 
 function renderSched() {
   const cont = document.getElementById("sched-container");
-  if (schedView === "graph") {
-    // 受注状況グラフ（集計と同じ内容を期バー付きで表示）
-    const keep = currentTerm;
-    currentTerm = ganttTerm;
-    cont.innerHTML = `<div class="term-bar">
-      <button class="term-btn" onclick="shiftGanttTerm(-1)">◀</button>
-      <span class="term-label">${esc(termLabel(ganttTerm))}</span>
-      <button class="term-btn" onclick="shiftGanttTerm(1)">▶</button>
-    </div>` + renderJuchuAgg();
-    currentTerm = keep;
-    return;
-  }
   cont.innerHTML = ganttHtml();
   setupGantt();
 }
@@ -1702,6 +1874,39 @@ function ganttHtml() {
   const monthLines = months.slice(1).map(m =>
     `<div class="g-vline" style="left:${m.left}%"></div>`).join("");
 
+  // 日付サブヘッダー（ズーム別に密度を自動調整）
+  //  12ヶ月: 日付なし / 6ヶ月: 隔週(1・15日) / 3ヶ月: 毎週の週頭 / 1ヶ月: 毎週の週頭＋曜日
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  let dateCells = "";
+  if (ganttZoom !== 12) {
+    const marks = [];
+    if (ganttZoom === 6) {
+      // 各月の1日・15日
+      for (let i = 0; i < 12; i++) {
+        [1, 15].forEach(day => {
+          const d = new Date(t0.getFullYear(), t0.getMonth() + i, day);
+          if (d >= t0 && d < t1) marks.push({ d, text: String(day) });
+        });
+      }
+    } else {
+      // 毎週の週頭（月曜）
+      const first = new Date(t0);
+      const shift = (first.getDay() + 6) % 7;               // 月曜起点
+      first.setDate(first.getDate() - shift);
+      for (let d = new Date(first); d < t1; d.setDate(d.getDate() + 7)) {
+        if (d < t0) continue;
+        const text = ganttZoom === 1
+          ? `${WD[d.getDay()]} ${d.getDate()}`               // 月 8
+          : `${d.getMonth() + 1}/${d.getDate()}`;            // 7/8
+        marks.push({ d: new Date(d), text });
+      }
+    }
+    dateCells = marks.map(m => {
+      const lp = ((m.d - t0) / DAY_MS) / totalDays * 100;
+      return `<span class="g-dcell" style="left:${lp}%">${m.text}</span>`;
+    }).join("");
+  }
+
   // 本日線
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let todayHtml = "", todayChip = "";
@@ -1726,8 +1931,9 @@ function ganttHtml() {
       deliverHtml = `<div class="g-deliver" style="left:${dl}%">▲${md(r.deliver)}</div>`;
     }
     return `
-    <div class="g-row">
-      <div class="g-label" onclick="openEditModal('${esc(r.id)}')" title="${esc(r.client)}">
+    <div class="g-row${r.id === selectedId ? " g-row-selected" : ""}" data-id="${esc(r.id)}">
+      <div class="g-label" onclick="openEditModal('${esc(r.id)}')"
+           oncontextmenu="onGanttContext(event,'${esc(r.id)}')" title="${esc(r.client)}">
         <div class="g-id">${esc(r.id)}</div>
         <div class="g-client">${esc(r.client)}</div>
       </div>
@@ -1761,8 +1967,11 @@ function ganttHtml() {
     <div class="gantt-inner" style="width:${widthPct}%">
       <div class="g-row g-headrow">
         <div class="g-label g-corner">案件</div>
-        <div class="g-track g-head">${monthCells}${todayChip}
-          <span class="g-pan-hint">← ドラッグで期間移動 →</span>
+        <div class="g-headstack">
+          <div class="g-track g-head">${monthCells}${todayChip}
+            <span class="g-pan-hint">← ドラッグで期間移動 →</span>
+          </div>
+          ${dateCells ? `<div class="g-track g-head g-daterow">${dateCells}</div>` : ""}
         </div>
       </div>
       ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}

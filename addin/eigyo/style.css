@@ -587,3 +587,40 @@ body {
 .gantt-legend .g-sw.done  { background: #B4B2A9; }
 .gantt-legend .g-dv { color: #993C1D; }
 .gantt-legend .g-hint { color: #a9b2ba; }
+
+/* ---------- 受託中: 日付順ヒント ---------- */
+.date-order-hint { font-size: 11px; color: #8a94a0; margin: -2px 0 10px; }
+
+/* ---------- WBSタスクカンバン（案1: 3レーン） ---------- */
+.wk-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.wk-lane { background: #f7f9fb; border: 0.5px solid #e0e4e8; border-radius: 8px; padding: 6px; min-height: 60px; }
+.wk-lane.doing { background: #eef5fc; }
+.wk-lane.done { background: #eef7f2; }
+.wk-lane-head { font-size: 11px; color: #5b6b7b; font-weight: bold; margin-bottom: 6px; }
+.wk-lane.doing .wk-lane-head { color: #185FA5; }
+.wk-lane.done .wk-lane-head { color: #0F6E56; }
+.wk-cnt { color: #a9b2ba; font-weight: normal; }
+.wk-lane-body { min-height: 40px; display: flex; flex-direction: column; gap: 4px; border-radius: 6px; }
+.wk-lane-body.over { outline: 2px dashed #85B7EB; outline-offset: -2px; }
+.wk-card {
+  background: #F1EFE8; color: #2C2C2A; border-radius: 6px; padding: 5px 7px;
+  font-size: 11px; cursor: grab; word-break: break-word; line-height: 1.3;
+}
+.wk-card.doing { background: #E6F1FB; color: #0C447C; }
+.wk-card.done  { background: #E1F5EE; color: #085041; }
+.wk-card.dragging { opacity: 0.5; }
+.wk-add { display: flex; gap: 6px; margin-top: 8px; }
+.wk-add input { flex: 1; border: 1px solid #d0d5da; border-radius: 5px; padding: 5px 8px; font-size: 12px; }
+.wk-add button { border: 1px solid #4472c4; background: #4472c4; color: #fff; border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.wk-hint { font-size: 10px; color: #a9b2ba; margin-top: 6px; }
+
+/* ---------- ガント: 日付サブヘッダー・選択行 ---------- */
+.g-headstack { flex: 1; display: flex; flex-direction: column; }
+.g-headstack .g-head { border-bottom: none; }
+.g-daterow { height: 18px; border-top: 0.5px solid #eceff2; border-bottom: 1px solid #e0e4e8; }
+.g-dcell {
+  position: absolute; top: 3px; transform: translateX(-50%);
+  font-size: 9px; color: #8a94a0; white-space: nowrap; pointer-events: none;
+}
+.g-row-selected .g-label { background: #dbeafe; box-shadow: inset 3px 0 0 #4472c4; }
+.g-row-selected .g-track { background: #f3f8ff; }
