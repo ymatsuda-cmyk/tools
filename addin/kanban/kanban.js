@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260715_fcc4cd2";
+const APP_VERSION = "rev_20260710_taskadd";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -24,18 +24,23 @@ let selectedPeriod = "all";
 let showHeld = true;
 let searchQuery = "";
 
-// ミニカンバン用グローバル変数
-const TASK_SYMBOLS = { "□": "todo", "◎": "doing", "■": "done" };
-const LANE_TO_SYMBOL = { "todo": "□", "doing": "◎", "done": "■" };
-let miniTasks = [];
-let miniDragId = null;
-
-Office.onReady(() => {
-  restoreSavedFilters();
-  restoreHeldDisplay();
-  bindStaticUI();
-  init();
-});
+if (window.Office && Office.onReady) {
+  Office.onReady(() => {
+    restoreSavedFilters();
+    restoreHeldDisplay();
+    bindStaticUI();
+    init();
+  });
+} else {
+  // ブラウザ直接表示（開発確認用）: Excel連携なしでUIのみ初期化
+  window.addEventListener("DOMContentLoaded", () => {
+    restoreSavedFilters();
+    restoreHeldDisplay();
+    bindStaticUI();
+    const v = document.getElementById("version-label");
+    if (v) v.textContent = APP_VERSION + " (no-office)";
+  });
+}
 
 /* ============================================================
    初期化
@@ -264,17 +269,11 @@ function updateChips() {
 
   const subCatChip = document.getElementById("chip-subcat");
   if (subCatChip) {
-    if (!selectedCategory) {
-      // 大分類が未選択なら小分類チップ自体を非表示
-      subCatChip.style.display = "none";
-      selectedSubCategory = null;
-    } else if (selectedSubCategory) {
-      subCatChip.style.display = "";
+    if (selectedSubCategory) {
       subCatChip.classList.add("selected");
       subCatChip.innerHTML =
         `小分類: ${escapeHtml(selectedSubCategory)} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
     } else {
-      subCatChip.style.display = "";
       subCatChip.classList.remove("selected");
       subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
     }
@@ -937,10 +936,7 @@ async function openModal(task) {
     modalContent.removeEventListener("click", handleContentClick);
   };
 
-  setTimeout(() => {
-    document.getElementById("modal-note").focus();
-    initMiniKanban();
-  }, 100);
+  setTimeout(() => document.getElementById("modal-note").focus(), 100);
 }
 
 function closeModal() {
@@ -1042,182 +1038,6 @@ function isMatch(t) {
 }
 
 /* ============================================================
-   ミニカンバン（モーダル内＜タスク＞セクション）
-   ------------------------------------------------------------
-   備考テキストの＜タスク＞〜次のセクション間を
-   ミニカンバンで視覚管理。□未着手 / ◎対応中 / ■完了
-   ============================================================ */
-
-/* テキストエリアから＜タスク＞行を抽出してminiTasksを構築 */
-function parseMiniTasks(noteText) {
-  miniTasks = [];
-  if (!noteText) return;
-
-  const lines = noteText.split("\n");
-  let inTask = false;
-  let idCounter = 0;
-
-  for (const raw of lines) {
-    const line = raw.trim();
-
-    if (line === "＜タスク＞") { inTask = true; continue; }
-    if (inTask && /^＜.+＞$/.test(line)) break;       // 次のセクション
-
-    if (inTask && line.length > 0) {
-      const first = line.charAt(0);
-      const status = TASK_SYMBOLS[first] || "todo";
-      const text = TASK_SYMBOLS[first] ? line.slice(1).trim() : line.trim();
-      if (text) {
-        miniTasks.push({ id: "mt_" + (idCounter++), text, status });
-      }
-    }
-  }
-}
-
-/* miniTasks → テキストエリアの＜タスク＞ブロックを書き換え */
-function syncMiniTasksToTextarea() {
-  const ta = document.getElementById("modal-note");
-  const text = ta.value;
-  const lines = text.split("\n");
-
-  let startIdx = -1, endIdx = lines.length;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === "＜タスク＞") { startIdx = i; continue; }
-    if (startIdx >= 0 && /^＜.+＞$/.test(lines[i].trim())) { endIdx = i; break; }
-  }
-
-  if (startIdx < 0) return;        // ＜タスク＞がなければ何もしない
-
-  // タスク行を再構築
-  const taskLines = miniTasks.map(t => {
-    const sym = LANE_TO_SYMBOL[t.status] || "□";
-    return sym + t.text;
-  });
-
-  // 既存のタスク行を置換
-  lines.splice(startIdx + 1, endIdx - startIdx - 1, ...taskLines);
-  ta.value = lines.join("\n");
-}
-
-/* ミニカンバン表示更新 */
-function renderMiniKanban() {
-  ["mini-todo", "mini-doing", "mini-done"].forEach(id => {
-    document.getElementById(id).innerHTML = "";
-  });
-
-  miniTasks.forEach(t => {
-    const card = document.createElement("div");
-    card.className = "mini-card";
-    card.draggable = true;
-    card.dataset.id = t.id;
-
-    const label = document.createElement("span");
-    label.className = "mini-card-text";
-    label.textContent = t.text;
-
-    const del = document.createElement("button");
-    del.className = "mini-card-del";
-    del.textContent = "✕";
-    del.title = "削除";
-    del.addEventListener("click", (e) => {
-      e.stopPropagation();
-      miniTasks = miniTasks.filter(x => x.id !== t.id);
-      syncMiniTasksToTextarea();
-      renderMiniKanban();
-    });
-
-    card.appendChild(label);
-    card.appendChild(del);
-
-    // DnD
-    card.addEventListener("dragstart", (e) => {
-      miniDragId = t.id;
-      e.dataTransfer.setData("text/plain", t.id);
-      card.classList.add("dragging");
-    });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-
-    const laneId = t.status === "doing" ? "mini-doing"
-                 : t.status === "done"  ? "mini-done"
-                 : "mini-todo";
-    document.getElementById(laneId).appendChild(card);
-  });
-
-  // DnDのレーン受け側
-  document.querySelectorAll(".mini-card-list").forEach(list => {
-    list.ondragover = (e) => { e.preventDefault(); list.classList.add("drop-target"); };
-    list.ondragleave = () => list.classList.remove("drop-target");
-    list.ondrop = (e) => {
-      e.preventDefault();
-      list.classList.remove("drop-target");
-      const task = miniTasks.find(x => x.id === miniDragId);
-      if (!task) return;
-      const newStatus = list.closest(".mini-lane").dataset.st;
-      task.status = TASK_SYMBOLS[newStatus] || "todo";
-      syncMiniTasksToTextarea();
-      renderMiniKanban();
-    };
-  });
-}
-
-/* ミニカンバンの初期化（モーダルを開く度に呼ぶ） */
-function initMiniKanban() {
-  const ta = document.getElementById("modal-note");
-  const hasTaskSection = ta.value.includes("＜タスク＞");
-
-  const panel = document.getElementById("mini-kanban");
-  if (!hasTaskSection) {
-    panel.classList.add("hidden");
-    return;
-  }
-  panel.classList.remove("hidden");
-
-  parseMiniTasks(ta.value);
-  renderMiniKanban();
-
-  // テキストエリアの変更を監視してミニカンバンを再同期
-  ta.removeEventListener("input", onNoteInputForMini);
-  ta.addEventListener("input", onNoteInputForMini);
-
-  // 追加ボタン
-  const addBtn = document.getElementById("mini-task-add-btn");
-  const addInput = document.getElementById("mini-task-input");
-
-  // 既存リスナーを除去してから再登録（多重登録防止）
-  const newAddBtn = addBtn.cloneNode(true);
-  addBtn.parentNode.replaceChild(newAddBtn, addBtn);
-  const newAddInput = addInput.cloneNode(true);
-  addInput.parentNode.replaceChild(newAddInput, addInput);
-
-  const doAdd = () => {
-    const inp = document.getElementById("mini-task-input");
-    const val = inp.value.trim();
-    if (!val) return;
-    miniTasks.push({ id: "mt_" + Date.now(), text: val, status: "todo" });
-    syncMiniTasksToTextarea();
-    renderMiniKanban();
-    inp.value = "";
-    inp.focus();
-  };
-
-  document.getElementById("mini-task-add-btn").addEventListener("click", doAdd);
-  document.getElementById("mini-task-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); doAdd(); }
-  });
-}
-
-function onNoteInputForMini() {
-  const ta = document.getElementById("modal-note");
-  if (ta.value.includes("＜タスク＞")) {
-    document.getElementById("mini-kanban").classList.remove("hidden");
-    parseMiniTasks(ta.value);
-    renderMiniKanban();
-  } else {
-    document.getElementById("mini-kanban").classList.add("hidden");
-  }
-}
-
-/* ============================================================
    共通スライドメニュー（遅延ロード）
    ------------------------------------------------------------
    メニュー項目（名前・URL）は tools/common/menu.json で
@@ -1269,4 +1089,223 @@ function openMenu(btn) {
       if (btn) btn.disabled = false;
       console.warn("メニューを読み込めませんでした");
     });
+}
+
+/* ============================================================
+   汎用ダイアログ（Office環境では window.confirm/alert 不可）
+   ============================================================ */
+let dialogResolve = null;
+function uiConfirm(message) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById("dialog-msg").textContent = message;
+    document.getElementById("dialog-cancel").style.display = "";
+    document.getElementById("dialog-modal").classList.remove("hidden");
+  });
+}
+function uiAlert(message) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById("dialog-msg").textContent = message;
+    document.getElementById("dialog-cancel").style.display = "none";
+    document.getElementById("dialog-modal").classList.remove("hidden");
+  });
+}
+function dialogRespond(ok) {
+  document.getElementById("dialog-modal").classList.add("hidden");
+  const r = dialogResolve;
+  dialogResolve = null;
+  if (r) r(ok);
+}
+
+/* ============================================================
+   タスク追加
+   ------------------------------------------------------------
+   ・wbsシートの名前定義「タスク範囲」内の選択行に行挿入して追加
+   ・T〜FY列の数式は隣接行からコピーして埋める
+   ・値の書込み: A=大分類, B=小分類, E=タスク名, N=担当者,
+     P=予定開始日, Q=予定終了日
+   ・大分類「受注」の場合、小分類は営業報告シートの
+     状態=受注/受託中 の案件番号から選択
+   ============================================================ */
+const EIGYO_SHEET = "営業報告";
+const ORDER_CATEGORY = "受注";
+const TASK_RANGE_NAME = "タスク範囲";
+
+function openTaskAdd() {
+  // 大分類: 既存タスクの大分類 ＋ 受注（無ければ追加）
+  const cats = [...new Set(allTasks.map(t => t.category).filter(v => v && v !== "#"))];
+  if (!cats.includes(ORDER_CATEGORY)) cats.push(ORDER_CATEGORY);
+  const catSel = document.getElementById("ta-cat");
+  catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
+
+  // 担当者: 既存タスクの担当者
+  const users = [...new Set(allTasks.map(t => t.user).filter(v => v && v !== "#"))];
+  const userSel = document.getElementById("ta-user");
+  userSel.innerHTML = `<option value=""></option>` + users.map(u => `<option>${escapeHtml(String(u))}</option>`).join("");
+
+  // 入力初期化
+  document.getElementById("ta-subcat").value = "";
+  document.getElementById("ta-title").value = "";
+  document.getElementById("ta-start").value = "";
+  document.getElementById("ta-end").value = "";
+  const msg = document.getElementById("ta-msg");
+  msg.className = "task-msg"; msg.textContent = "";
+
+  onTaCatChange();
+
+  // wbsシートが表示されていない場合はアクティブにする
+  activateWbs();
+
+  document.getElementById("task-modal").classList.remove("hidden");
+}
+function closeTaskAdd() { document.getElementById("task-modal").classList.add("hidden"); }
+
+async function activateWbs() {
+  if (!window.Excel) return;
+  try {
+    await Excel.run(async ctx => {
+      const active = ctx.workbook.worksheets.getActiveWorksheet();
+      active.load("name");
+      await ctx.sync();
+      if (active.name !== "wbs") {
+        ctx.workbook.worksheets.getItem("wbs").activate();
+        await ctx.sync();
+      }
+    });
+  } catch (e) {
+    console.warn("wbsシートのアクティブ化に失敗:", e);
+  }
+}
+
+/* 大分類の変更：受注なら小分類を案件番号セレクトに切替 */
+async function onTaCatChange() {
+  const cat = document.getElementById("ta-cat").value;
+  const txt = document.getElementById("ta-subcat");
+  const sel = document.getElementById("ta-subcat-sel");
+  if (cat === ORDER_CATEGORY) {
+    txt.style.display = "none";
+    sel.style.display = "";
+    sel.innerHTML = `<option value="">読込中…</option>`;
+    const ids = await loadOrderCaseIds();
+    sel.innerHTML = ids.length
+      ? ids.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.id)}　${escapeHtml(x.client)}</option>`).join("")
+      : `<option value="">（対象案件がありません）</option>`;
+  } else {
+    txt.style.display = "";
+    sel.style.display = "none";
+  }
+}
+
+/* 営業報告シートから 状態=受注/受託中 の案件番号を取得 */
+async function loadOrderCaseIds() {
+  if (!window.Excel) return [];
+  try {
+    let out = [];
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(EIGYO_SHEET);
+      const used = sheet.getUsedRange(true);
+      used.load("rowCount");
+      await ctx.sync();
+      const last = Math.max(used.rowCount, 2);
+      const rng = sheet.getRange(`A2:E${last}`);
+      rng.load("values");
+      await ctx.sync();
+      rng.values.forEach(r => {
+        const id = (r[0] ?? "").toString().trim();
+        const client = (r[1] ?? "").toString().trim();
+        const st = (r[4] ?? "").toString().trim();
+        if (id && (st === "受注" || st === "受託中")) out.push({ id, client });
+      });
+    });
+    return out;
+  } catch (e) {
+    console.warn("営業報告シートの読込に失敗:", e);
+    return [];
+  }
+}
+
+/* OK：選択行がタスク範囲内かを検証し、行挿入してタスクを書き込む */
+async function saveTaskAdd() {
+  const msg = document.getElementById("ta-msg");
+  msg.className = "task-msg"; msg.textContent = "";
+
+  const cat = document.getElementById("ta-cat").value;
+  const sub = (cat === ORDER_CATEGORY)
+    ? document.getElementById("ta-subcat-sel").value
+    : document.getElementById("ta-subcat").value.trim();
+  const title = document.getElementById("ta-title").value.trim();
+  const user = document.getElementById("ta-user").value;
+  const start = document.getElementById("ta-start").value;
+  const end = document.getElementById("ta-end").value;
+
+  if (!title) { msg.className = "task-msg err"; msg.textContent = "タスク名を入力してください"; return; }
+  if (cat === ORDER_CATEGORY && !sub) { msg.className = "task-msg err"; msg.textContent = "案件番号を選択してください"; return; }
+  if (!window.Excel) { msg.className = "task-msg err"; msg.textContent = "Excel環境でのみ追加できます"; return; }
+
+  try {
+    let inserted = -1;
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
+
+      // 選択セルの行
+      const selected = ctx.workbook.getSelectedRange();
+      selected.load(["rowIndex", "worksheet/name"]);
+
+      // 名前定義「タスク範囲」（ブック→wbsシートの順で検索）
+      let nameItem = ctx.workbook.names.getItemOrNullObject(TASK_RANGE_NAME);
+      let sheetNameItem = sheet.names.getItemOrNullObject(TASK_RANGE_NAME);
+      await ctx.sync();
+      if (nameItem.isNullObject && sheetNameItem.isNullObject) {
+        throw new Error(`名前定義「${TASK_RANGE_NAME}」が見つかりません。wbsシートに行挿入可能な範囲を「${TASK_RANGE_NAME}」として名前定義してください。`);
+      }
+      const rangeObj = (!nameItem.isNullObject ? nameItem : sheetNameItem).getRange();
+      rangeObj.load(["rowIndex", "rowCount", "worksheet/name"]);
+      await ctx.sync();
+
+      if (selected.worksheet.name !== "wbs") {
+        throw new Error("wbsシート上で挿入したい行を選択してください。");
+      }
+      const selRow = selected.rowIndex + 1;             // 1-based
+      const rangeTop = rangeObj.rowIndex + 1;
+      const rangeBottom = rangeObj.rowIndex + rangeObj.rowCount;
+      if (selRow < rangeTop || selRow > rangeBottom) {
+        throw new Error(`選択行（${selRow}行目）は「${TASK_RANGE_NAME}」（${rangeTop}〜${rangeBottom}行目）の外です。範囲内の行を選択してください。`);
+      }
+
+      // 行挿入（選択行の位置に。既存行は下へ）
+      sheet.getRange(`${selRow}:${selRow}`).insert(Excel.InsertShiftDirection.down);
+      await ctx.sync();
+
+      // T〜FY列の数式を隣接行からコピー（挿入行の上、先頭行の場合は下からコピー）
+      const srcRow = (selRow > rangeTop) ? selRow - 1 : selRow + 1;
+      const dst = sheet.getRange(`T${selRow}:FY${selRow}`);
+      dst.copyFrom(sheet.getRange(`T${srcRow}:FY${srcRow}`), Excel.RangeCopyType.formulas);
+
+      // 値の書込み
+      sheet.getRange(`A${selRow}`).values = [[cat]];
+      sheet.getRange(`B${selRow}`).values = [[sub]];
+      sheet.getRange(`E${selRow}`).values = [[title]];
+      sheet.getRange(`N${selRow}`).values = [[user]];
+      if (start) {
+        const c = sheet.getRange(`P${selRow}`);
+        c.values = [[dateToExcelSerial(new Date(start + "T00:00:00"))]];
+        c.numberFormat = [["m/d"]];
+      }
+      if (end) {
+        const c = sheet.getRange(`Q${selRow}`);
+        c.values = [[dateToExcelSerial(new Date(end + "T00:00:00"))]];
+        c.numberFormat = [["m/d"]];
+      }
+      await ctx.sync();
+      inserted = selRow;
+    });
+
+    closeTaskAdd();
+    await uiAlert(`${inserted}行目にタスクを追加しました。`);
+    await init();   // 再読込してボードへ反映
+  } catch (e) {
+    msg.className = "task-msg err";
+    msg.textContent = e.message || "タスクの追加に失敗しました";
+  }
 }

@@ -19,9 +19,10 @@
       <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke-linecap="round"/>
     </svg>
   </button>
-  <span class="title">WBS</span>
+  <span class="title">カンバン</span>
   <span class="version" id="version-label"></span>
   <span class="spacer"></span>
+  <button class="btn-add" id="task-add-btn" onclick="openTaskAdd()">＋ タスク追加</button>
   <button class="icon-btn" title="再読み込み" onclick="init()">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
       <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -132,36 +133,45 @@
   <div class="modal-content">
     <h3 id="modal-title"></h3>
     <textarea id="modal-note"></textarea>
-
-    <!-- ミニカンバン（＜タスク＞セクション） -->
-    <div id="mini-kanban" class="mini-kanban hidden">
-      <div class="mini-kanban-header">
-        <span class="mini-kanban-title">タスク</span>
-        <div class="mini-kanban-add">
-          <input type="text" id="mini-task-input" placeholder="新しいタスク…">
-          <button class="btn-mini-add" id="mini-task-add-btn" title="追加">＋</button>
-        </div>
-      </div>
-      <div class="mini-kanban-board">
-        <div class="mini-lane" data-st="□">
-          <div class="mini-lane-head"><span class="mini-dot todo"></span>未着手</div>
-          <div class="mini-card-list" id="mini-todo"></div>
-        </div>
-        <div class="mini-lane" data-st="◎">
-          <div class="mini-lane-head"><span class="mini-dot doing"></span>対応中</div>
-          <div class="mini-card-list" id="mini-doing"></div>
-        </div>
-        <div class="mini-lane" data-st="■">
-          <div class="mini-lane-head"><span class="mini-dot done"></span>完了</div>
-          <div class="mini-card-list" id="mini-done"></div>
-        </div>
-      </div>
-    </div>
-
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveNote()">保存</button>
       <button class="btn-ghost" onclick="closeModal()">閉じる</button>
       <small>ESC: 閉じる</small>
+    </div>
+  </div>
+</div>
+
+<!-- タスク追加モーダル -->
+<div id="task-modal" class="modal hidden">
+  <div class="modal-content task-modal-content">
+    <h3>タスク追加</h3>
+    <div class="task-hint" id="task-hint">追加したい行を選択してください。（wbsシート上で挿入位置の行をクリック）</div>
+    <div class="task-grid">
+      <div class="t-row"><label>大分類</label><select id="ta-cat" onchange="onTaCatChange()"></select></div>
+      <div class="t-row"><label>小分類</label>
+        <input type="text" id="ta-subcat">
+        <select id="ta-subcat-sel" style="display:none"></select>
+      </div>
+      <div class="t-row wide"><label>タスク名 <span class="req">必須</span></label><input type="text" id="ta-title"></div>
+      <div class="t-row"><label>担当者</label><select id="ta-user"></select></div>
+      <div class="t-row"><label>予定開始日</label><input type="date" id="ta-start"></div>
+      <div class="t-row"><label>予定終了日</label><input type="date" id="ta-end"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveTaskAdd()">OK（選択行に挿入）</button>
+      <button class="btn-ghost" onclick="closeTaskAdd()">キャンセル</button>
+      <span class="task-msg" id="ta-msg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 汎用ダイアログ（Officeではwindow.confirm/alert不可） -->
+<div id="dialog-modal" class="modal hidden">
+  <div class="modal-content dialog-content">
+    <div id="dialog-msg" class="dialog-msg"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="dialog-cancel" onclick="dialogRespond(false)">キャンセル</button>
+      <button class="btn-primary" id="dialog-ok" onclick="dialogRespond(true)">OK</button>
     </div>
   </div>
 </div>

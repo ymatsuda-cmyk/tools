@@ -3,7 +3,7 @@
  * ------------------------------------------------------------
  * 対象シート: 「営業報告」（1案件1行、ヘッダー行=1行目）
  * カラム定義は SHEET_COLUMNS（列レター・見出し・用途）に一元化。
- * 起動時にヘッダー行（A1:AF1）を照合し、見出しが無い／異なる列が
+ * 起動時にヘッダー行（A1:AH1）を照合し、見出しが無い／異なる列が
  * あれば自動で正規の見出しに書き直す（列の並び順・位置は不変）。
  *
  * 【基本情報】       A:ID  B:取引先  C:No(未使用)  D:種別  E:状態
@@ -17,42 +17,34 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260715_c";
+const APP_VERSION = "rev_20260710_i";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
-const CONFIG_SHEET = "確度設定";
 const MAX_ROWS = 500;
 const TAX_RATE = 0.10;
-
-/* 確度ランク：優先度（高/中/低）を経営報告向けの3ランクに変換。
-   状態が「保留」の案件は優先度に関わらず「薄め」に固定する。 */
-const RANK_ORDER = ["濃厚", "五分五分", "薄め"];
-let confidenceWeights = { "濃厚": 0.8, "五分五分": 0.5, "薄め": 0.2 }; // 既定値。確度設定シートの値で上書きされる
-function rankOf(rec) {
-  if (rec.status === HOLD) return "薄め";
-  if (rec.priority === "高") return "濃厚";
-  if (rec.priority === "中") return "五分五分";
-  return "薄め"; // 低・未入力
-}
 
 /* カンバンのドラッグ＆ドロップ制御（true にすると有効化） */
 const ENABLE_KANBAN_DND = false;
 
-/* ---------- ワークフロー定義 ---------- */
+/* ---------- ワークフロー定義 ----------
+ * 見積り／プリセールスは 受注 の後に「受託中」（実際の作業実施期間）を経て「完了」となる。
+ * 失注は確認中タブの選択で即座に確定するため、チェーン上の位置に関わらず特別扱い（saveEditRecord参照）。 */
 const WORKFLOWS = {
-  "保守対応":     { steps: ["新規", "対応中"],                     terminals: ["完了"] },
-  "瑕疵対応":     { steps: ["新規", "対応中"],                     terminals: ["完了"] },
-  "見積り":       { steps: ["新規", "見積中", "確認中"],           terminals: ["受注", "失注"] },
-  "プリセールス": { steps: ["新規", "検討中", "商談中", "確認中"], terminals: ["受注", "失注"] },
-  "調整":         { steps: ["新規", "対応中"],                     terminals: ["完了"] },
+  "保守対応":     { steps: ["新規", "対応中"],                              terminals: ["完了"] },
+  "瑕疵対応":     { steps: ["新規", "対応中"],                              terminals: ["完了"] },
+  "見積り":       { steps: ["新規", "見積中", "確認中", "受注", "受託中"],   terminals: ["完了", "失注"] },
+  "プリセールス": { steps: ["新規", "検討中", "商談中", "確認中", "受注", "受託中"], terminals: ["完了", "失注"] },
+  "調整":         { steps: ["新規", "対応中"],                              terminals: ["完了"] },
 };
 const TYPES = Object.keys(WORKFLOWS);
 const HOLD = "保留";
 const QUOTE_TYPES = ["見積り", "プリセールス"];
+/* 受注確定済み（以降のステージも含む）とみなす状態 */
+const ORDER_CONFIRMED_STATUSES = ["受注", "受託中", "完了"];
 
 function stageTabsOf(type) {
-  if (type === "見積り") return ["起票", "見積中", "確認中", "受注"];
-  if (type === "プリセールス") return ["起票", "検討中", "商談中", "確認中", "受注"];
+  if (type === "見積り") return ["起票", "見積中", "確認中", "受注", "受託中"];
+  if (type === "プリセールス") return ["起票", "検討中", "商談中", "確認中", "受注", "受託中"];
   return ["起票", "対応中"];
 }
 function firstStageOf(type) {
@@ -69,7 +61,7 @@ const LEGACY_STATUS = {
   "完了(受注)": "受注", "完了(失注)": "失注",
 };
 
-/* 正規の列見出し（A〜AF、32列）。列の並び順・位置はこれまでと不変。 */
+/* 正規の列見出し（A〜AH、34列）。列の並び順・位置はこれまでと不変。 */
 const SHEET_COLUMNS = [
   "ID", "取引先", "No（未使用）", "種別", "状態",
   "発生日", "完了日", "担当者", "窓口", "優先度",
@@ -78,9 +70,11 @@ const SHEET_COLUMNS = [
   "区分（問合せ／改修）", "着手日", "見積根拠", "商談状況", "確認状況",
   "計上日", "最終工数（人日）", "最終価格（税抜）", "受注条件",
   "起票者", "見積完了日", "検討完了日", "商談完了日", "確認完了日",
+  "受注確定日", "受託開始日",
 ];
 /* 旧バージョンで使っていた見出し文言（読み込み時の判定に使用、書込みはしない） */
 const EXT_HEADERS = SHEET_COLUMNS.slice(18); // S列以降（互換維持用）
+
 
 /* ---------- 期（会計年度）：10月〜翌9月、第37期=2025/10〜2026/09 ---------- */
 function termOfDate(d) { return d.getMonth() + 1 >= 10 ? d.getFullYear() - 1988 : d.getFullYear() - 1989; }
@@ -202,7 +196,7 @@ async function loadAll() {
   try {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-      const hdr = sheet.getRange("A1:AF1");
+      const hdr = sheet.getRange("A1:AH1");
       hdr.load("values");
       await ctx.sync();
       const cur = hdr.values[0];
@@ -214,13 +208,13 @@ async function loadAll() {
         hdr.format.font.bold = true;
         await ctx.sync();
       }
-      // 使用範囲の行数だけ読む（A2:AF500固定読みを避け、使用範囲の膨張を防ぐ）
+      // 使用範囲の行数だけ読む（A2:AH500固定読みを避け、使用範囲の膨張を防ぐ）
       const used = sheet.getUsedRange(true);
       used.load("rowCount");
       await ctx.sync();
       const lastRow = Math.min(Math.max(used.rowCount, 1), MAX_ROWS);
       if (lastRow >= 2) {
-        const rng = sheet.getRange(`A2:AF${lastRow}`);
+        const rng = sheet.getRange(`A2:AH${lastRow}`);
         rng.load("values");
         await ctx.sync();
         records = parseRows(rng.values);
@@ -229,7 +223,6 @@ async function loadAll() {
       }
     });
     await ensureCustomerSheet();
-    await ensureConfigSheet();
     demoMode = false;
   } catch (e) {
     console.warn("Excel読込に失敗。デモモードで起動します。", e);
@@ -258,6 +251,7 @@ function parseRows(values) {
       reporter: str(r[27]),
       quoteDone: toDate(r[28]), considerDone: toDate(r[29]),
       dealDone: toDate(r[30]), confirmDone: toDate(r[31]),
+      orderDone: toDate(r[32]), workStart: toDate(r[33]),
     });
   });
   return out;
@@ -296,49 +290,6 @@ async function ensureCustomerSheet() {
   });
 }
 
-/* 確度設定シート：濃厚／五分五分／薄めの加重係数を保持（無ければ自動作成） */
-async function ensureConfigSheet() {
-  await Excel.run(async ctx => {
-    const sheets = ctx.workbook.worksheets;
-    sheets.load("items/name");
-    await ctx.sync();
-    let ws = sheets.items.find(s => s.name === CONFIG_SHEET);
-    if (!ws) {
-      const ns = sheets.add(CONFIG_SHEET);
-      ns.getRange("A1:B1").values = [["確度ランク", "係数（0〜1）"]];
-      ns.getRange("A1:B1").format.fill.color = "#44546A";
-      ns.getRange("A1:B1").format.font.color = "#FFFFFF";
-      ns.getRange("A2:B4").values = RANK_ORDER.map(rk => [rk, confidenceWeights[rk]]);
-      ns.getRange("B2:B4").numberFormat = [["0%"], ["0%"], ["0%"]];
-      await ctx.sync();
-    }
-    const rng = ctx.workbook.worksheets.getItem(CONFIG_SHEET).getRange("A2:B4");
-    rng.load("values");
-    await ctx.sync();
-    rng.values.forEach(r => {
-      const rk = str(r[0]);
-      const v = numOrNull(r[1]);
-      if (RANK_ORDER.includes(rk) && v != null) confidenceWeights[rk] = v;
-    });
-  });
-}
-
-async function saveConfidenceWeight(rank, value) {
-  const v = Math.max(0, Math.min(1, value));
-  confidenceWeights[rank] = v;
-  if (!demoMode && window.Excel) {
-    try {
-      await Excel.run(async ctx => {
-        const idx = RANK_ORDER.indexOf(rank);
-        const sheet = ctx.workbook.worksheets.getItem(CONFIG_SHEET);
-        sheet.getRange(`B${idx + 2}`).values = [[v]];
-        await ctx.sync();
-      });
-    } catch (e) { console.warn("確度係数の保存に失敗しました", e); }
-  }
-  renderAgg();
-}
-
 function nextCaseId(code) {
   let max = 0;
   records.forEach(r => {
@@ -363,6 +314,7 @@ function recToRow(rec) {
     rec.reporter ?? "",
     toSerial(rec.quoteDone), toSerial(rec.considerDone),
     toSerial(rec.dealDone), toSerial(rec.confirmDone),
+    toSerial(rec.orderDone), toSerial(rec.workStart),
   ]];
 }
 
@@ -382,9 +334,9 @@ async function writeRecord(rec) {
       row = maxRow + 1;
       rec.row = row;
     }
-    const rng = sheet.getRange(`A${row}:AF${row}`);
+    const rng = sheet.getRange(`A${row}:AH${row}`);
     rng.values = recToRow(rec);
-    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF"].forEach(c =>
+    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF", "AG", "AH"].forEach(c =>
       sheet.getRange(`${c}${row}`).numberFormat = [["yyyy/m/d"]]);
     ["L", "Z"].forEach(c => sheet.getRange(`${c}${row}`).numberFormat = [["#,##0"]]);
     await ctx.sync();
@@ -436,7 +388,7 @@ function allStatusesOf(type) {
   return wf ? [...wf.steps, ...wf.terminals, HOLD] : [];
 }
 function isTerminal(rec) {
-  return rec.status === "失注" || rec.status === "完了" || rec.status === "受注";
+  return rec.status === "失注" || rec.status === "完了";
 }
 
 /* 状態ラベル：ワークフロー完了後は「状態（m/d）」 */
@@ -631,7 +583,7 @@ async function jumpToExcel(row) {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       sheet.activate();
-      const range = sheet.getRange(`A${row}:AF${row}`);
+      const range = sheet.getRange(`A${row}:AH${row}`);
       range.select();
       await ctx.sync();
     });
@@ -838,7 +790,7 @@ function openEditModal(id, forceTab) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   editingRec = JSON.parse(JSON.stringify(rec), (k, v) =>
-    (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone"].includes(k) && v)
+    (["occur","done","deliver","stageStart","book","quoteDone","considerDone","dealDone","confirmDone","orderDone","workStart"].includes(k) && v)
       ? new Date(v) : v);
   editingRec.row = rec.row;
   editDirty = false;
@@ -914,7 +866,8 @@ async function closeEditModalConfirm() {
 function activeStageTab(rec) {
   if (isTerminal(rec)) return null;
   const st = rec.status;
-  if (st === "確認中" && rec.order === "受注") return "受注";
+  if (st === "確認中" && rec.order === "受注") return "受注";       // 確認中で受注確定済み・受注タブで最終登録待ち
+  if (st === "受注" || st === "受託中") return "受託中";             // 受注確定済み・実行フェーズ
   if (st === "新規" || st === HOLD) return firstStageOf(rec.type);
   if (st === "対応中" || st === "見積中" || st === "検討中") return st;
   if (st === "商談中") return "商談中";
@@ -932,7 +885,8 @@ function stageDoneDate(rec, t) {
   if (t === "検討中") return rec.considerDone;
   if (t === "商談中") return rec.dealDone;
   if (t === "確認中") return rec.confirmDone;
-  if (t === "受注") return (rec.status === "受注") ? rec.done : null;
+  if (t === "受注") return rec.orderDone;
+  if (t === "受託中") return (rec.status === "完了") ? rec.done : null;
   return null;
 }
 
@@ -1076,7 +1030,9 @@ function renderStageBody() {
 
   if (t === "受注") {
     const base = rec.finalAmount ?? rec.amount;
+    const dd = rec.orderDone;
     body.innerHTML = `
+      ${dd ? `<span class="stage-info">受注確定日: ${fmtDate(dd)}</span>` : ""}
       <div class="form-grid">
         <div class="form-row"><label>納品日</label><input type="date" id="st-deliver" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
         <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label><input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
@@ -1088,11 +1044,80 @@ function renderStageBody() {
       <div class="form-row"><label>受注条件（必要に応じて）</label>
         <textarea id="st-terms" rows="3" ${dis}>${esc(rec.terms)}</textarea></div>
       <label class="check-row ${dis ? "off" : ""}">
-        <input type="checkbox" id="st-done" ${dis}> この内容で登録し、受注確定・チケットを完了する
+        <input type="checkbox" id="st-done" ${dis}> この内容で登録し、受注確定する（受託中へ進む）
       </label>`;
     return;
   }
+
+  if (t === "受託中") {
+    const isStarted = rec.status === "受託中";
+    body.innerHTML = `
+      ${rec.workStart ? `<span class="stage-info">開始日: ${fmtDate(rec.workStart)}</span>` : ""}
+      <div class="form-grid">
+        <div class="form-row"><label>開始日 <span class="req">必須</span></label>
+          <input type="date" id="st-workstart" value="${fmtDateInput(rec.workStart)}" ${dis || isStarted ? "disabled" : ""}></div>
+        <div class="form-row"><label>完了予定日</label>
+          <input type="date" id="st-duedate" value="${fmtDateInput(rec.deliver)}" ${dis || isStarted ? "disabled" : ""}></div>
+        <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label>
+          <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
+        <div class="form-row"><label>納品日</label>
+          <input type="date" id="st-deliver2" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
+      </div>
+      <div class="form-row"><label>WBS状況（wbsシートで小分類＝案件番号のタスク）</label>
+        <div class="wbs-status" id="wbs-status"><span class="muted">読込中…</span></div>
+      </div>
+      ${!isStarted ? `
+      <label class="check-row ${dis ? "off" : ""}">
+        <input type="checkbox" id="st-start" ${dis}> 開始日を確定し、受託中にする
+      </label>` : `
+      <label class="check-row ${dis ? "off" : ""}">
+        <input type="checkbox" id="st-done" ${dis}> 対応完了（完了日を記録し、チケットを完了する）
+      </label>`}`;
+    loadWbsStatus(rec.id);
+    return;
+  }
   body.innerHTML = "";
+}
+
+/* wbsシートから 小分類(B列)=案件番号 のタスク状況を集計して表示
+ * 判定はカンバンアドインと同一: S列(実績終了)→完了 / O列備考に▲→保留 /
+ * R列(実績開始)→対応中 / それ以外→未着手 */
+async function loadWbsStatus(caseId) {
+  const el = document.getElementById("wbs-status");
+  if (!el) return;
+  if (demoMode || !window.Excel) {
+    el.innerHTML = `<span class="wbs-chip">未着手 1</span><span class="wbs-chip doing">対応中 2</span><span class="wbs-chip done">完了 3</span><span class="wbs-chip held">保留 0</span><span class="muted">（デモ表示）</span>`;
+    return;
+  }
+  try {
+    let counts = { 未着手: 0, 対応中: 0, 完了: 0, 保留: 0 };
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
+      const range = sheet.getUsedRange();
+      range.load("values");
+      await ctx.sync();
+      range.values.slice(10).forEach(r => {
+        if ((r[1] ?? "").toString().trim() !== caseId) return;   // B列=小分類
+        const note = (r[14] ?? "").toString();                    // O列=備考
+        const actualStart = r[17];                                // R列
+        const actualEnd = r[18];                                  // S列
+        if (actualEnd) counts["完了"]++;
+        else if (note.includes("▲")) counts["保留"]++;
+        else if (actualStart) counts["対応中"]++;
+        else counts["未着手"]++;
+      });
+    });
+    const total = Object.values(counts).reduce((a, v) => a + v, 0);
+    el.innerHTML = total === 0
+      ? `<span class="muted">紐づくタスクがありません（カンバンの「タスク追加」で大分類=受注・小分類=${esc(caseId)}のタスクを登録すると表示されます）</span>`
+      : `<span class="wbs-chip">未着手 ${counts["未着手"]}</span>` +
+        `<span class="wbs-chip doing">対応中 ${counts["対応中"]}</span>` +
+        `<span class="wbs-chip done">完了 ${counts["完了"]}</span>` +
+        `<span class="wbs-chip held">保留 ${counts["保留"]}</span>` +
+        `<span class="wbs-total">計 ${total}件</span>`;
+  } catch (e) {
+    el.innerHTML = `<span class="muted">wbsシートを読み込めませんでした</span>`;
+  }
 }
 function updateTaxView() {
   const v = numOrNull(document.getElementById("st-amount").value);
@@ -1197,8 +1222,35 @@ async function saveEditRecord() {
       if (doneChk && doneChk.checked) {
         if (!rec.book) { msg.className = "save-msg err"; msg.textContent = "計上日を入力してください（売上集計に使用します）"; return; }
         if (rec.finalAmount == null) { msg.className = "save-msg err"; msg.textContent = "最終価格を入力してください"; return; }
-        applyStatus(rec, "受注");
-        rec.done = new Date();
+        rec.orderDone = new Date();          // 受注確定日
+        applyStatus(rec, "受注");            // 実行フェーズへ（受託中タブが活性化）
+      }
+    }
+    else if (t === "受託中") {
+      // 計上日・納品日はどちらのフェーズでも変更可能
+      const b2 = document.getElementById("st-book2");
+      const d2 = document.getElementById("st-deliver2");
+      if (b2) rec.book = fromDateInput(b2.value);
+      if (d2) rec.deliver = fromDateInput(d2.value);
+      if (rec.status === "受注") {
+        // 第1段階：開始日・完了予定日を確定して「受託中」にする
+        const workStart = fromDateInput(document.getElementById("st-workstart").value);
+        const dueDate = fromDateInput(document.getElementById("st-duedate").value);
+        const startChk = document.getElementById("st-start");
+        if (startChk && startChk.checked) {
+          if (!workStart) { msg.className = "save-msg err"; msg.textContent = "開始日を入力してください"; return; }
+          rec.workStart = workStart;
+          if (dueDate) rec.deliver = dueDate;
+          applyStatus(rec, "受託中");
+        } else if (workStart) {
+          rec.workStart = workStart;   // チェック無しでも入力値は保持
+        }
+      } else if (rec.status === "受託中") {
+        // 第2段階：対応完了 → チケット完了
+        const doneChk = document.getElementById("st-done");
+        if (doneChk && doneChk.checked) {
+          applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
+        }
       }
     }
   }
@@ -1267,11 +1319,6 @@ async function saveCustomer() {
 let currentAgg = "hoshu";
 let showHours = true;        // 保守状況の対応工数の表示ON/OFF
 let mitsuOpenStatus = null;  // 見積状況で件数展開中の状態
-let mitsuRankFilter = new Set(RANK_ORDER); // 状態別集計の確度フィルタ（既定は全選択）
-function toggleMitsuRankFilter(rank, checked) {
-  if (checked) mitsuRankFilter.add(rank); else mitsuRankFilter.delete(rank);
-  renderAgg();
-}
 function switchAgg(k) {
   currentAgg = k;
   if (k !== "mitsu") mitsuOpenStatus = null;
@@ -1352,27 +1399,27 @@ function countByMonth(recs, field, months) {
 }
 
 /* --- 見積状況: 新規→検討中→見積中→商談中→確認中→失注→受注 --- */
-const MITSU_ORDER = ["新規", "検討中", "見積中", "商談中", "確認中", "失注", "受注"];
+const MITSU_ORDER = ["新規", "検討中", "見積中", "商談中", "確認中", "失注", "受注", "受託中", "完了"];
 function renderMitsuAgg() {
   const target = activeRecords().filter(r => QUOTE_TYPES.includes(r.type));
-  const stateTarget = target.filter(r => mitsuRankFilter.has(rankOf(r)));
   const rows = MITSU_ORDER.map(st => {
-    const g = stateTarget.filter(r => r.status === st);
+    const g = target.filter(r => r.status === st);
     return { st, cnt: g.length, amt: g.reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0) };
   });
-  const held = stateTarget.filter(r => r.status === HOLD);
+  const held = target.filter(r => r.status === HOLD);
   if (held.length) rows.push({ st: HOLD, cnt: held.length, amt: held.reduce((a, r) => a + (r.amount || 0), 0) });
   const totalCnt = rows.reduce((a, r) => a + r.cnt, 0);
   const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
-  const pipeline = target.filter(r => !["受注", "失注"].includes(r.status));
+  const pipeline = target.filter(r => !["失注", ...ORDER_CONFIRMED_STATUSES].includes(r.status));
   const pipelineAmt = pipeline.reduce((a, r) => a + (r.amount || 0), 0);
-  // 受注確定金額：状態欄が「受注」のものを計上
-  const wonAmt = target.filter(r => r.status === "受注").reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
+  // 受注確定金額：状態欄が「受注」「受託中」「完了」（受注確定後の全ステージ）を計上
+  const wonAmt = target.filter(r => ORDER_CONFIRMED_STATUSES.includes(r.status))
+    .reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
 
-  // 展開中の状態に対応する見積一覧（確度フィルタを反映）
+  // 展開中の状態に対応する見積一覧
   let drillHtml = "";
   if (mitsuOpenStatus) {
-    const list = stateTarget.filter(r => r.status === mitsuOpenStatus)
+    const list = target.filter(r => r.status === mitsuOpenStatus)
       .sort((a, b) => (b.occur || 0) - (a.occur || 0));
     drillHtml = `
     <div class="agg-card">
@@ -1391,13 +1438,6 @@ function renderMitsuAgg() {
     </div>`;
   }
 
-  // 確度別パイプライン（優先度→濃厚/五分五分/薄め。保留は優先度に関わらず薄め）
-  const rankRows = RANK_ORDER.map(rk => {
-    const g = pipeline.filter(r => rankOf(r) === rk);
-    return { rk, cnt: g.length, amt: g.reduce((a, r) => a + (r.amount || 0), 0) };
-  });
-  const weightedTotal = rankRows.reduce((a, r) => a + r.amt * (confidenceWeights[r.rk] ?? 0), 0);
-
   return `
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
@@ -1405,29 +1445,7 @@ function renderMitsuAgg() {
       <div class="kpi"><div class="kv">${(wonAmt / 10000).toLocaleString()}万</div><div class="kl">受注確定金額</div></div>
     </div>
     <div class="agg-card">
-      <h3>確度別パイプライン</h3>
-      <table class="agg-table">
-        <tr><th>確度</th><th>件数</th><th>見積金額合計（税抜）</th><th>係数</th><th>加重見込み額</th></tr>
-        ${rankRows.map(r => `<tr>
-          <td><span class="rank-pill rank-${esc(r.rk)}">${esc(r.rk)}</span></td>
-          <td>${r.cnt}</td>
-          <td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td>
-          <td><input type="number" class="rank-weight-input" min="0" max="100" step="5"
-                value="${Math.round((confidenceWeights[r.rk] ?? 0) * 100)}"
-                onchange="saveConfidenceWeight('${esc(r.rk)}', Number(this.value) / 100)">%</td>
-          <td class="r">${Math.round(r.amt * (confidenceWeights[r.rk] ?? 0)).toLocaleString()}円</td>
-        </tr>`).join("")}
-        <tr class="total"><td colspan="4">加重見込み合計</td><td class="r">${Math.round(weightedTotal).toLocaleString()}円</td></tr>
-      </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">※ 保留は優先度に関わらず「薄め」に分類。係数は確度設定シートに保存され、次回起動時も維持されます。</p>
-    </div>
-    <div class="agg-card">
       <h3>見積り・プリセールス 状態別集計</h3>
-      <div class="rank-filter-row">
-        ${RANK_ORDER.map(rk => `<button type="button"
-          class="rank-filter-btn rank-${esc(rk)} ${mitsuRankFilter.has(rk) ? "active" : ""}"
-          onclick="toggleMitsuRankFilter('${esc(rk)}', ${!mitsuRankFilter.has(rk)})">${esc(rk)}</button>`).join("")}
-      </div>
       <table class="agg-table">
         <tr><th>状態</th><th>件数</th><th>見積金額合計（税抜）</th></tr>
         ${rows.map(r => `<tr>
@@ -1438,7 +1456,7 @@ function renderMitsuAgg() {
           <td class="r">${r.amt ? r.amt.toLocaleString() + "円" : "－"}</td></tr>`).join("")}
         <tr class="total"><td>合計</td><td>${totalCnt}</td><td class="r">${totalAmt.toLocaleString()}円</td></tr>
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。上のボタンで確度を絞り込めます（色付き＝表示中、グレー＝除外中）。</p>
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。</p>
     </div>
     ${drillHtml}`;
 }
@@ -1448,7 +1466,7 @@ function closeMitsuDrill() { mitsuOpenStatus = null; renderAgg(); }
 /* --- 受注状況: 受注確定（受注区分=受注）の計上日ベース --- */
 function renderJuchuAgg() {
   const months = fiscalMonths(currentTerm);
-  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && r.status === "受注");
+  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status));
   const map = Object.fromEntries(months.map(m => [m, 0]));
   let noBook = 0;
   won.forEach(r => {
@@ -1575,7 +1593,8 @@ function loadDemo() {
   const d = (y, m, day) => new Date(y, m - 1, day);
   const blank = { kind: "", stageStart: null, basis: "", deal: "", confirm: "", book: null,
     finalHours: null, finalAmount: null, terms: "", reporter: "",
-    quoteDone: null, considerDone: null, dealDone: null, confirmDone: null };
+    quoteDone: null, considerDone: null, dealDone: null, confirmDone: null,
+    orderDone: null, workStart: null };
   customers = [
     { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "" },
     { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "" },
@@ -1593,6 +1612,7 @@ function loadDemo() {
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
-    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受注", occur: d(2026, 5, 20), done: d(2026, 6, 15), owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 6, 15), finalAmount: 480000, finalHours: 6 },
+    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 6, 15), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20) },
+    { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1) },
   ];
 }

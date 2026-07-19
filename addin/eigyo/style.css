@@ -388,31 +388,6 @@ body {
 .pri-高 { background: #f4b183; color: #7c3c00; }
 .pri-中 { background: #ffe699; color: #7a5c00; }
 .pri-低 { background: #e3e7eb; color: #667; }
-
-.rank-pill {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 11px; font-weight: bold;
-}
-.rank-pill.rank-濃厚   { background: #f4b183; color: #7c3c00; }
-.rank-pill.rank-五分五分 { background: #ffe699; color: #7a5c00; }
-.rank-pill.rank-薄め   { background: #e3e7eb; color: #667; }
-.rank-weight-input {
-  width: 44px; font-size: 12px; text-align: right;
-  border: 1px solid #ccd3da; border-radius: 4px; padding: 2px 4px;
-}
-.rank-filter-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-.rank-filter-btn {
-  display: inline-block; padding: 4px 14px; border-radius: 12px;
-  font-size: 12px; font-weight: bold; border: 1px solid transparent;
-  cursor: pointer; background: #eceef1; color: #9aa1ab; opacity: 0.55;
-  transition: opacity .15s ease;
-}
-.rank-filter-btn:hover { opacity: 0.8; }
-.rank-filter-btn.active { opacity: 1; }
-.rank-filter-btn.active:hover { opacity: 1; }
-.rank-filter-btn.active.rank-濃厚   { background: #f4b183; color: #7c3c00; }
-.rank-filter-btn.active.rank-五分五分 { background: #ffe699; color: #7a5c00; }
-.rank-filter-btn.active.rank-薄め   { background: #dfe3e8; color: #556; border-color: #b7bec7; }
 .list-table td.c { text-align: center; }
 
 /* ---------- 期セレクタ ---------- */
@@ -485,3 +460,14 @@ body {
   border-radius: 5px; padding: 2px 10px; font-size: 11px; cursor: pointer; font-weight: normal;
 }
 .drill-close:hover { background: #f0f3f6; }
+
+/* ---------- WBS状況チップ ---------- */
+.wbs-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+.wbs-chip {
+  display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px;
+  background: #eef1f4; color: #5b6b7b; font-weight: bold;
+}
+.wbs-chip.doing { background: #ddebf7; color: #1f6fb5; }
+.wbs-chip.done  { background: #e2efda; color: #3c6127; }
+.wbs-chip.held  { background: #fbe9d6; color: #b05c12; }
+.wbs-total { font-size: 11px; color: #99a; margin-left: 2px; }
