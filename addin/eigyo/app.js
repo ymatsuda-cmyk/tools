@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_i";
+const APP_VERSION = "rev_20260710_j";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -432,7 +432,7 @@ function applyStatus(rec, to) {
    ============================================================ */
 function switchTab(tab) {
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  ["list", "kanban", "agg"].forEach(t => {
+  ["list", "kanban", "sched", "agg"].forEach(t => {
     document.getElementById("pane-" + t).style.display = (t === tab) ? "" : "none";
   });
   document.getElementById("filter-bar").style.display =
@@ -447,6 +447,7 @@ function renderCurrentPane() {
   const t = activeTab();
   if (t === "list") renderList();
   else if (t === "kanban") renderKanban();
+  else if (t === "sched") renderSched();
   else if (t === "agg") renderAgg();
 }
 
@@ -1615,4 +1616,288 @@ function loadDemo() {
     { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 6, 15), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20) },
     { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1) },
   ];
+}
+
+/* ============================================================
+   受託スケジュール（ガントチャート）
+   ------------------------------------------------------------
+   ・対象: 見積り/プリセールスで状態が 受注/受託中/完了 の案件
+   ・バー: 開始=受託開始日(AH)、終了=完了なら完了日(G)、それ以外は納品日(N)
+   ・▲: 納品日(N)。バー端ドラッグ=期日変更、本体ドラッグ=期間移動
+   ・期(10月〜翌9月)単位。ズーム12/6/3/1ヶ月、背景ドラッグでパン
+   ============================================================ */
+let schedView = "gantt";          // gantt | graph
+let ganttTerm = termOfDate(new Date());
+let ganttZoom = 12;               // 表示月数 12/6/3/1
+const GANTT_ROW_H = 46;
+const DAY_MS = 86400000;
+
+function switchSched(v) {
+  schedView = v;
+  document.querySelectorAll(".sched-seg .seg").forEach(b =>
+    b.classList.toggle("active", b.dataset.sched === v));
+  renderSched();
+}
+function shiftGanttTerm(d) { ganttTerm += d; renderSched(); }
+function setGanttZoom(m) {
+  ganttZoom = m;
+  renderSched();
+}
+
+function renderSched() {
+  const cont = document.getElementById("sched-container");
+  if (schedView === "graph") {
+    // 受注状況グラフ（集計と同じ内容を期バー付きで表示）
+    const keep = currentTerm;
+    currentTerm = ganttTerm;
+    cont.innerHTML = `<div class="term-bar">
+      <button class="term-btn" onclick="shiftGanttTerm(-1)">◀</button>
+      <span class="term-label">${esc(termLabel(ganttTerm))}</span>
+      <button class="term-btn" onclick="shiftGanttTerm(1)">▶</button>
+    </div>` + renderJuchuAgg();
+    currentTerm = keep;
+    return;
+  }
+  cont.innerHTML = ganttHtml();
+  setupGantt();
+}
+
+/* --- 期の開始/終了日 --- */
+function termStartDate(term) { return new Date(term + 1988, 9, 1); }               // 10/1
+function termEndDate(term) { return new Date(term + 1989, 9, 1); }                 // 翌10/1(排他)
+
+/* --- ガント対象レコード --- */
+function ganttRecords() {
+  return activeRecords()
+    .filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status))
+    .map(r => {
+      const start = r.workStart || r.orderDone || r.book || r.occur;
+      const end = (r.status === "完了" ? (r.done || r.deliver) : (r.deliver || null))
+        || (start ? new Date(start.getTime() + 14 * DAY_MS) : null);
+      return { rec: r, start, end, provisional: !r.workStart || !r.deliver };
+    })
+    .filter(g => g.start && g.end)
+    .sort((a, b) => a.start - b.start);
+}
+
+function ganttHtml() {
+  const t0 = termStartDate(ganttTerm);
+  const t1 = termEndDate(ganttTerm);
+  const totalDays = Math.round((t1 - t0) / DAY_MS);
+  const widthPct = (12 / ganttZoom) * 100;          // 内側の横幅（ビューポート比）
+
+  // 月ヘッダー
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
+    const next = new Date(t0.getFullYear(), t0.getMonth() + i + 1, 1);
+    months.push({
+      label: `${String(d.getFullYear()).slice(2)}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+      left: ((d - t0) / DAY_MS) / totalDays * 100,
+      width: ((next - d) / DAY_MS) / totalDays * 100,
+    });
+  }
+  const monthCells = months.map(m =>
+    `<div class="g-mcell" style="left:${m.left}%;width:${m.width}%">${m.label}</div>`).join("");
+  const monthLines = months.slice(1).map(m =>
+    `<div class="g-vline" style="left:${m.left}%"></div>`).join("");
+
+  // 本日線
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let todayHtml = "", todayChip = "";
+  if (today >= t0 && today < t1) {
+    const lp = ((today - t0) / DAY_MS) / totalDays * 100;
+    todayHtml = `<div class="g-today" style="left:${lp}%"></div>`;
+    todayChip = `<div class="g-today" style="left:${lp}%"></div>
+      <div class="g-today-chip" style="left:${lp}%">今日 ${md(today)}</div>`;
+  }
+
+  const items = ganttRecords();
+  const rows = items.map((g, i) => {
+    const r = g.rec;
+    const l = Math.max(((g.start - t0) / DAY_MS) / totalDays * 100, -8);
+    const rEnd = Math.min(((g.end - t0) / DAY_MS + 1) / totalDays * 100, 108);
+    const w = Math.max(rEnd - l, 0.7);
+    const cls = r.status === "完了" ? "done" : r.status === "受託中" ? "work" : "order";
+    const locked = r.status === "完了";
+    let deliverHtml = "";
+    if (r.deliver && r.deliver >= t0 && r.deliver < t1) {
+      const dl = ((r.deliver - t0) / DAY_MS + 0.5) / totalDays * 100;
+      deliverHtml = `<div class="g-deliver" style="left:${dl}%">▲${md(r.deliver)}</div>`;
+    }
+    return `
+    <div class="g-row">
+      <div class="g-label" onclick="openEditModal('${esc(r.id)}')" title="${esc(r.client)}">
+        <div class="g-id">${esc(r.id)}</div>
+        <div class="g-client">${esc(r.client)}</div>
+      </div>
+      <div class="g-track" data-row="${i}">
+        ${monthLines}${todayHtml}
+        <span class="g-date g-date-s" data-i="${i}">${md(g.start)}</span>
+        <div class="g-bar ${cls}${g.provisional ? " prov" : ""}${locked ? " locked" : ""}"
+             data-i="${i}" style="left:${l}%;width:${w}%" title="${esc(r.content)}">
+          ${locked ? "" : `<span class="g-hdl g-hdl-l" data-i="${i}"></span>`}
+          <span class="g-title">${esc(r.content)}</span>
+          ${locked ? "" : `<span class="g-hdl g-hdl-r" data-i="${i}"></span>`}
+        </div>
+        <span class="g-date g-date-e" data-i="${i}">${md(g.end)}</span>
+        ${deliverHtml}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div class="gantt-toolbar">
+    <button class="term-btn" onclick="shiftGanttTerm(-1)">◀</button>
+    <span class="term-label">${esc(termLabel(ganttTerm))}</span>
+    <button class="term-btn" onclick="shiftGanttTerm(1)">▶</button>
+    <span class="g-sp"></span>
+    <div class="g-zoom">
+      ${[12, 6, 3, 1].map(m =>
+        `<button class="${m === ganttZoom ? "active" : ""}" onclick="setGanttZoom(${m})">${m}ヶ月</button>`).join("")}
+    </div>
+  </div>
+  <div class="gantt-wrap" id="gantt-wrap">
+    <div class="gantt-inner" style="width:${widthPct}%">
+      <div class="g-row g-headrow">
+        <div class="g-label g-corner">案件</div>
+        <div class="g-track g-head">${monthCells}${todayChip}
+          <span class="g-pan-hint">← ドラッグで期間移動 →</span>
+        </div>
+      </div>
+      ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}
+    </div>
+  </div>
+  <div class="gantt-legend">
+    <span><i class="g-sw order"></i>受注（開始待ち）</span>
+    <span><i class="g-sw work"></i>受託中</span>
+    <span><i class="g-sw done"></i>完了</span>
+    <span class="g-dv">▲ 納品日</span>
+    <span class="g-hint">バー両端＝期日変更／本体＝期間移動（点線は開始日・納品日が未確定の仮表示）</span>
+  </div>`;
+}
+
+/* --- ドラッグ操作（バー編集＋背景パン） --- */
+function setupGantt() {
+  const wrap = document.getElementById("gantt-wrap");
+  if (!wrap) return;
+  const items = ganttRecords();
+  const t0 = termStartDate(ganttTerm);
+  const totalDays = Math.round((termEndDate(ganttTerm) - t0) / DAY_MS);
+
+  let drag = null;   // {mode:'move'|'l'|'r'|'pan', i, startX, origStart, origEnd, pxPerDay, bar, scrollLeft}
+
+  wrap.addEventListener("pointerdown", e => {
+    const hdl = e.target.closest(".g-hdl");
+    const bar = e.target.closest(".g-bar");
+    const track = e.target.closest(".g-track");
+    if (bar && !bar.classList.contains("locked")) {
+      const narrow = bar.getBoundingClientRect().width < 30;   // 細いバーはハンドル誤爆防止で移動のみ
+      if (hdl && !narrow) {
+        startBarDrag(e, hdl.classList.contains("g-hdl-l") ? "l" : "r", Number(hdl.dataset.i), bar);
+      } else {
+        startBarDrag(e, "move", Number(bar.dataset.i), bar);
+      }
+    } else if (track || e.target.closest(".g-head")) {
+      drag = { mode: "pan", startX: e.clientX, scrollLeft: wrap.scrollLeft };
+      wrap.classList.add("panning");
+      wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId);
+    }
+  });
+
+  function startBarDrag(e, mode, i, bar) {
+    e.preventDefault();
+    const track = bar.parentElement;
+    const pxPerDay = track.getBoundingClientRect().width / totalDays;
+    drag = {
+      mode, i, bar, track, pxPerDay,
+      startX: e.clientX,
+      origStart: new Date(items[i].start),
+      origEnd: new Date(items[i].end),
+    };
+    bar.classList.add("dragging");
+    wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId);
+  }
+
+  wrap.addEventListener("pointermove", e => {
+    if (!drag) return;
+    if (drag.mode === "pan") {
+      wrap.scrollLeft = drag.scrollLeft - (e.clientX - drag.startX);
+      return;
+    }
+    const dayDelta = Math.round((e.clientX - drag.startX) / drag.pxPerDay);
+    let ns = new Date(drag.origStart), ne = new Date(drag.origEnd);
+    if (drag.mode === "move") {
+      ns = new Date(ns.getTime() + dayDelta * DAY_MS);
+      ne = new Date(ne.getTime() + dayDelta * DAY_MS);
+    } else if (drag.mode === "l") {
+      ns = new Date(ns.getTime() + dayDelta * DAY_MS);
+      if (ns > ne) ns = new Date(ne);
+    } else {
+      ne = new Date(ne.getTime() + dayDelta * DAY_MS);
+      if (ne < ns) ne = new Date(ns);
+    }
+    drag.curStart = ns; drag.curEnd = ne;
+    const l = ((ns - t0) / DAY_MS) / totalDays * 100;
+    const w = Math.max(((ne - ns) / DAY_MS + 1) / totalDays * 100, 0.7);
+    drag.bar.style.left = l + "%";
+    drag.bar.style.width = w + "%";
+    const row = drag.track;
+    const sEl = row.querySelector(`.g-date-s[data-i="${drag.i}"]`);
+    const eEl = row.querySelector(`.g-date-e[data-i="${drag.i}"]`);
+    if (sEl) sEl.textContent = md(ns);
+    if (eEl) eEl.textContent = md(ne);
+  });
+
+  async function finishDrag() {
+    if (!drag) return;
+    const d = drag; drag = null;
+    wrap.classList.remove("panning");
+    if (d.mode === "pan") return;
+    d.bar.classList.remove("dragging");
+    if (!d.curStart && !d.curEnd) { positionGanttDates(); return; }
+    const rec = items[d.i].rec;
+    rec.workStart = d.curStart || d.origStart;
+    const newEnd = d.curEnd || d.origEnd;
+    rec.deliver = newEnd;                        // 完了予定日=納品日(N列)へ書き戻し
+    if (rec.status === "受注" && !rec.workStart) rec.workStart = d.curStart;
+    try {
+      await writeRecord(rec);
+    } catch (err) {
+      console.warn("スケジュール保存に失敗:", err);
+    }
+    renderSched();
+  }
+  wrap.addEventListener("pointerup", finishDrag);
+  wrap.addEventListener("pointercancel", finishDrag);
+
+  positionGanttDates();
+
+  // 初期スクロール: 今日（期外なら最初のバー）を中央付近に
+  if (ganttZoom < 12) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let ratio = null;
+    if (today >= t0 && today < termEndDate(ganttTerm)) {
+      ratio = ((today - t0) / DAY_MS) / totalDays;
+    } else if (items.length) {
+      ratio = ((items[0].start - t0) / DAY_MS) / totalDays;
+    }
+    if (ratio != null) {
+      const inner = wrap.querySelector(".gantt-inner");
+      wrap.scrollLeft = Math.max(inner.scrollWidth * ratio - wrap.clientWidth / 2, 0);
+    }
+  }
+}
+
+/* バー両端のm/dラベルをバー位置に追従させる */
+function positionGanttDates() {
+  document.querySelectorAll("#gantt-wrap .g-bar").forEach(bar => {
+    const i = bar.dataset.i;
+    const track = bar.parentElement;
+    const s = track.querySelector(`.g-date-s[data-i="${i}"]`);
+    const e = track.querySelector(`.g-date-e[data-i="${i}"]`);
+    const l = parseFloat(bar.style.left), w = parseFloat(bar.style.width);
+    if (s) { s.style.left = `calc(${l}% - 4px)`; }
+    if (e) { e.style.left = `calc(${l + w}% + 4px)`; }
+  });
 }

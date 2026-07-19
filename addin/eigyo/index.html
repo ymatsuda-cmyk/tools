@@ -32,6 +32,7 @@
 <div class="tab-bar" id="tab-bar">
   <button class="tab active" data-tab="list" onclick="switchTab('list')">一覧</button>
   <button class="tab" data-tab="kanban" onclick="switchTab('kanban')">カンバン</button>
+  <button class="tab" data-tab="sched" onclick="switchTab('sched')">スケジュール</button>
   <button class="tab" data-tab="agg" onclick="switchTab('agg')">集計</button>
 </div>
 
@@ -67,6 +68,15 @@
 </div>
 
 <!-- ===== 集計 ===== -->
+<!-- ===== 受託スケジュール ===== -->
+<div class="pane" id="pane-sched" style="display:none">
+  <div class="sched-seg">
+    <button class="seg active" data-sched="gantt" onclick="switchSched('gantt')">受託スケジュール</button>
+    <button class="seg" data-sched="graph" onclick="switchSched('graph')">受注状況グラフ</button>
+  </div>
+  <div id="sched-container"></div>
+</div>
+
 <div class="pane" id="pane-agg" style="display:none">
   <div class="agg-seg">
     <label class="hours-toggle" title="保守状況の対応工数の表示を切り替え">
