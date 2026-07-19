@@ -132,7 +132,11 @@
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <h3 id="modal-title"></h3>
-    <textarea id="modal-note"></textarea>
+    <textarea id="modal-note" oninput="onModalNoteEdited()"></textarea>
+    <div class="subtask-section">
+      <div class="subtask-label">サブタスク（□未着手 ◎対応中 ■完了）</div>
+      <div id="subtask-kanban"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveNote()">保存</button>
       <button class="btn-ghost" onclick="closeModal()">閉じる</button>

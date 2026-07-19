@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_k";
+const APP_VERSION = "rev_20260710_l";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -1134,13 +1134,13 @@ function renderStageBody() {
           <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
       </div>
       <div class="date-order-hint">開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日 の順で入力してください</div>
-      <div class="form-row"><label>WBSタスク（備考のタスクをカンバンで管理）</label>
-        <div id="wbs-kanban"></div>
+      <div class="form-row"><label>WBS状況（wbsシートで小分類＝案件番号のタスク）</label>
+        <div class="wbs-status" id="wbs-status"><span class="muted">読込中…</span></div>
       </div>
       <label class="check-row ${dis ? "off" : ""}">
         <input type="checkbox" id="st-done" ${dis}> 対応完了（完了日を記録し、チケットを完了する）
       </label>`;
-    renderWbsKanban(rec);
+    loadWbsStatus(rec.id);
     return;
   }
   body.innerHTML = "";
@@ -1149,126 +1149,42 @@ function renderStageBody() {
 /* wbsシートから 小分類(B列)=案件番号 のタスク状況を集計して表示
  * 判定はカンバンアドインと同一: S列(実績終了)→完了 / O列備考に▲→保留 /
  * R列(実績開始)→対応中 / それ以外→未着手 */
-/* ============================================================
-   WBSタスクカンバン（案1: 3レーン □未着手 / ◎対応中 / ■完了）
-   ------------------------------------------------------------
-   タスクは備考(note)に1行1タスクで格納。行頭の記号で状態を表す:
-     □ 未着手 / ◎ 対応中 / ■ 完了
-   カンバンのドラッグ移動・備考の直接編集を双方向同期する。
-   ============================================================ */
-const WBS_MARKS = { "□": "todo", "◎": "doing", "■": "done" };
-const WBS_LANES = [
-  { key: "todo", mark: "□", label: "未着手", cls: "" },
-  { key: "doing", mark: "◎", label: "対応中", cls: "doing" },
-  { key: "done", mark: "■", label: "完了", cls: "done" },
-];
-
-/* 備考テキスト → タスク配列（記号付き行のみ） */
-function parseWbsTasks(note) {
-  const tasks = [];
-  (note || "").split(/\r?\n/).forEach((line, idx) => {
-    const m = line.match(/^\s*([□◎■])\s?(.*)$/);
-    if (m) tasks.push({ lane: WBS_MARKS[m[1]], title: m[2].trim(), line: idx });
-  });
-  return tasks;
-}
-/* タスク配列 → 備考テキスト（記号付き行を置換、その他の行は保持） */
-function tasksToNote(note, tasks) {
-  const lines = (note || "").split(/\r?\n/);
-  const taskByLine = {};
-  tasks.forEach(t => { taskByLine[t.line] = t; });
-  const kept = [];
-  lines.forEach((line, idx) => {
-    if (/^\s*[□◎■]/.test(line)) {
-      const t = taskByLine[idx];
-      if (t) kept.push(`${laneMark(t.lane)} ${t.title}`);
-      // タスク行だが対応するタスクが無い場合は削除
-    } else {
-      kept.push(line);
-    }
-  });
-  return kept.join("\n");
-}
-function laneMark(lane) { return lane === "doing" ? "◎" : lane === "done" ? "■" : "□"; }
-
-function renderWbsKanban(rec) {
-  const host = document.getElementById("wbs-kanban");
-  if (!host) return;
-  const tasks = parseWbsTasks(rec.note);
-  const dis = isTerminal(rec);
-  const lanesHtml = WBS_LANES.map(L => {
-    const cards = tasks.filter(t => t.lane === L.key);
-    return `
-      <div class="wk-lane ${L.cls}" data-lane="${L.key}">
-        <div class="wk-lane-head">${L.mark} ${L.label} <span class="wk-cnt">${cards.length}</span></div>
-        <div class="wk-lane-body" data-lane="${L.key}">
-          ${cards.map(c => `<div class="wk-card ${L.cls}" draggable="${!dis}" data-line="${c.line}">${esc(c.title || "（無題）")}</div>`).join("")}
-        </div>
-      </div>`;
-  }).join("");
-  host.innerHTML = `
-    <div class="wk-board">${lanesHtml}</div>
-    ${dis ? "" : `<div class="wk-add">
-      <input type="text" id="wk-new" placeholder="新しいタスク名を入力してEnterまたは＋" onkeydown="if(event.key==='Enter'){event.preventDefault();addWbsTask()}">
-      <button type="button" onclick="addWbsTask()">＋追加</button>
-    </div>`}
-    <div class="wk-hint">カードをドラッグでレーン移動。備考欄の □◎■ 行と自動で同期します。</div>`;
-  if (!dis) setupWbsDnd();
-}
-
-function setupWbsDnd() {
-  const host = document.getElementById("wbs-kanban");
-  let dragLine = null;
-  host.querySelectorAll(".wk-card").forEach(card => {
-    card.addEventListener("dragstart", e => {
-      dragLine = Number(card.dataset.line);
-      card.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
+async function loadWbsStatus(caseId) {
+  const el = document.getElementById("wbs-status");
+  if (!el) return;
+  if (demoMode || !window.Excel) {
+    el.innerHTML = `<span class="wbs-chip">未着手 1</span><span class="wbs-chip doing">対応中 2</span><span class="wbs-chip done">完了 3</span><span class="wbs-chip held">保留 0</span><span class="muted">（デモ表示）</span>`;
+    return;
+  }
+  try {
+    let counts = { 未着手: 0, 対応中: 0, 完了: 0, 保留: 0 };
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
+      const range = sheet.getUsedRange();
+      range.load("values");
+      await ctx.sync();
+      range.values.slice(10).forEach(r => {
+        if ((r[1] ?? "").toString().trim() !== caseId) return;   // B列=小分類
+        const note = (r[14] ?? "").toString();                    // O列=備考
+        const actualStart = r[17];                                // R列
+        const actualEnd = r[18];                                  // S列
+        if (actualEnd) counts["完了"]++;
+        else if (note.includes("▲")) counts["保留"]++;
+        else if (actualStart) counts["対応中"]++;
+        else counts["未着手"]++;
+      });
     });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-  });
-  host.querySelectorAll(".wk-lane-body").forEach(body => {
-    body.addEventListener("dragover", e => { e.preventDefault(); body.classList.add("over"); });
-    body.addEventListener("dragleave", () => body.classList.remove("over"));
-    body.addEventListener("drop", e => {
-      e.preventDefault();
-      body.classList.remove("over");
-      if (dragLine == null) return;
-      moveWbsTask(dragLine, body.dataset.lane);
-      dragLine = null;
-    });
-  });
-}
-
-/* カード移動 → 備考を書き換え、テキストエリアも即時更新（双方向同期） */
-function moveWbsTask(line, newLane) {
-  const rec = editingRec;
-  const tasks = parseWbsTasks(rec.note);
-  const t = tasks.find(x => x.line === line);
-  if (!t || t.lane === newLane) return;
-  t.lane = newLane;
-  rec.note = tasksToNote(rec.note, tasks);
-  document.getElementById("ed-note").value = rec.note;   // 備考欄に反映
-  editDirty = true;
-  renderWbsKanban(rec);
-}
-
-function addWbsTask() {
-  const rec = editingRec;
-  const input = document.getElementById("wk-new");
-  const title = (input.value || "").trim();
-  if (!title) return;
-  rec.note = ((rec.note || "").replace(/\s+$/, "") + `\n□ ${title}`).replace(/^\n/, "");
-  document.getElementById("ed-note").value = rec.note;
-  editDirty = true;
-  renderWbsKanban(rec);
-}
-
-/* 備考テキストエリアが編集されたらカンバンを再描画（双方向同期・逆方向） */
-function onNoteEdited() {
-  if (!editingRec) return;
-  editingRec.note = document.getElementById("ed-note").value;
-  if (currentStageTab === "受託中") renderWbsKanban(editingRec);
+    const total = Object.values(counts).reduce((a, v) => a + v, 0);
+    el.innerHTML = total === 0
+      ? `<span class="muted">紐づくタスクがありません（カンバンの「タスク追加」で大分類=受注・小分類=${esc(caseId)}のタスクを登録すると表示されます）</span>`
+      : `<span class="wbs-chip">未着手 ${counts["未着手"]}</span>` +
+        `<span class="wbs-chip doing">対応中 ${counts["対応中"]}</span>` +
+        `<span class="wbs-chip done">完了 ${counts["完了"]}</span>` +
+        `<span class="wbs-chip held">保留 ${counts["保留"]}</span>` +
+        `<span class="wbs-total">計 ${total}件</span>`;
+  } catch (e) {
+    el.innerHTML = `<span class="muted">wbsシートを読み込めませんでした</span>`;
+  }
 }
 function updateTaxView() {
   const v = numOrNull(document.getElementById("st-amount").value);
@@ -1807,7 +1723,7 @@ function loadDemo() {
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日" },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
-    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "■ 要件ヒアリング\n◎ 帳票レイアウト設計\n◎ 出力APIの実装\n□ 結合テスト", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31) },
+    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31) },
     { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20) },
   ];
 }
