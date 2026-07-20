@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_l";
+const APP_VERSION = "rev_20260710_m";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -616,13 +616,18 @@ function dispAmount(r) {
 }
 function shorten(s, n) { s = str(s).replace(/\n/g, " "); return s.length > n ? s.slice(0, n) + "…" : s; }
 function onRowContext(ev, id) { ev.preventDefault(); openEditModal(id); }
-function onGanttContext(ev, id) {
-  ev.preventDefault();
+/* スケジュール左クリック：行選択＋Excel該当行へジャンプ（排他ハイライト） */
+function onGanttSelect(id) {
   selectedId = id;
   document.querySelectorAll("#gantt-wrap .g-row[data-id]").forEach(row =>
     row.classList.toggle("g-row-selected", row.dataset.id === id));
   const rec = records.find(r => r.id === id);
   if (rec) jumpToExcel(rec.row);
+}
+/* スケジュール右クリック：詳細画面を開く */
+function onGanttContext(ev, id) {
+  ev.preventDefault();
+  openEditModal(id);
 }
 function onDrillContext(ev, id) {
   ev.preventDefault();
@@ -1759,10 +1764,12 @@ function ganttRecords() {
   return activeRecords()
     .filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status))
     .map(r => {
+      // バー: 開始日(AH=workStart) 〜 完了予定日(AI=dueDate)
       const start = r.workStart || r.orderDone || r.book || r.occur;
-      const end = (r.status === "完了" ? (r.done || r.deliver) : (r.deliver || null))
+      const end = r.dueDate
+        || (r.status === "完了" ? r.done : null)
         || (start ? new Date(start.getTime() + 14 * DAY_MS) : null);
-      return { rec: r, start, end, provisional: !r.workStart || !r.deliver };
+      return { rec: r, start, end, provisional: !r.workStart || !r.dueDate };
     })
     .filter(g => g.start && g.end)
     .sort((a, b) => a.start - b.start);
@@ -1848,7 +1855,7 @@ function ganttHtml() {
     }
     return `
     <div class="g-row${r.id === selectedId ? " g-row-selected" : ""}" data-id="${esc(r.id)}">
-      <div class="g-label" onclick="openEditModal('${esc(r.id)}')"
+      <div class="g-label" onclick="onGanttSelect('${esc(r.id)}')"
            oncontextmenu="onGanttContext(event,'${esc(r.id)}')" title="${esc(r.client)}">
         <div class="g-id">${esc(r.id)}</div>
         <div class="g-client">${esc(r.client)}</div>
@@ -1982,10 +1989,9 @@ function setupGantt() {
     d.bar.classList.remove("dragging");
     if (!d.curStart && !d.curEnd) { positionGanttDates(); return; }
     const rec = items[d.i].rec;
+    // 開始日→AH(workStart)、完了予定日→AI(dueDate)。納品日(N)は連動しない
     rec.workStart = d.curStart || d.origStart;
-    const newEnd = d.curEnd || d.origEnd;
-    rec.deliver = newEnd;                        // 完了予定日=納品日(N列)へ書き戻し
-    if (rec.status === "受注" && !rec.workStart) rec.workStart = d.curStart;
+    rec.dueDate = d.curEnd || d.origEnd;
     try {
       await writeRecord(rec);
     } catch (err) {
