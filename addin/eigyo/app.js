@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260720_m";
+const APP_VERSION = "rev_20260720_a";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -391,6 +391,30 @@ async function writeRecord(rec) {
   });
   const i = records.findIndex(r => r.row === rec.row);
   if (i >= 0) records[i] = rec; else records.push(rec);
+}
+
+/* ドラッグによる日程変更専用の軽量書き込み（AH:開始日/workStart, AI:完了予定日/dueDateのみ）
+ * writeRecord()はA:AI全35セル＋書式を毎回書き直すため、ドラッグ確定のたびに
+ * 重いExcel.run()バッチが走る。ここでは変更のあった2セルだけを書き込む。 */
+async function writeScheduleDates(rec) {
+  if (demoMode) {
+    const i = records.findIndex(r => r.row === rec.row);
+    if (i >= 0) records[i] = rec;
+    return;
+  }
+  await Excel.run(async ctx => {
+    const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+    const row = rec.row;
+    const ah = sheet.getRange(`AH${row}`);
+    const ai = sheet.getRange(`AI${row}`);
+    ah.values = [[toSerial(rec.workStart)]];
+    ai.values = [[toSerial(rec.dueDate)]];
+    ah.numberFormat = [["yyyy/m/d"]];
+    ai.numberFormat = [["yyyy/m/d"]];
+    await ctx.sync();
+  });
+  const i = records.findIndex(r => r.row === rec.row);
+  if (i >= 0) records[i] = rec;
 }
 
 async function writeCustomer(cust) {
@@ -1993,7 +2017,7 @@ function setupGantt() {
     rec.workStart = d.curStart || d.origStart;
     rec.dueDate = d.curEnd || d.origEnd;
     try {
-      await writeRecord(rec);
+      await writeScheduleDates(rec);   // ← 軽量書き込みに変更（AH/AIのみ）
     } catch (err) {
       console.warn("スケジュール保存に失敗:", err);
     }
