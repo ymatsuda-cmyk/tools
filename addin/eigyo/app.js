@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260710_m";
+const APP_VERSION = "rev_20260720_c";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -687,6 +687,10 @@ function onGanttContext(ev, id) {
 }
 function onDrillContext(ev, id) {
   ev.preventDefault();
+  openEditModal(id);
+}
+/* 見積一覧（ドリルダウン）共通: 左クリック=Excel該当行へジャンプ＆選択 */
+function onDrillRowClick(id) {
   selectedId = id;
   document.querySelectorAll(".drill-row[data-id]").forEach(row =>
     row.classList.toggle("row-selected", row.dataset.id === id));
@@ -1446,9 +1450,16 @@ async function saveCustomer() {
 let currentAgg = "hoshu";
 let showHours = true;        // 保守状況の対応工数の表示ON/OFF
 let mitsuOpenStatus = null;  // 見積状況で件数展開中の状態
+let mitsuOpenPri = null;     // 確度内訳で件数展開中の優先度
+let mitsuSubView = "conf";   // 見積状況サブタブ: conf(確度内訳) / status(状態別集計)
+function switchMitsuSub(v) {
+  mitsuSubView = v;
+  document.querySelectorAll(".mitsu-sub .seg").forEach(b => b.classList.toggle("active", b.dataset.sub === v));
+  renderAgg();
+}
 function switchAgg(k) {
   currentAgg = k;
-  if (k !== "mitsu") mitsuOpenStatus = null;
+  if (k !== "mitsu") { mitsuOpenStatus = null; mitsuOpenPri = null; }
   document.querySelectorAll(".agg-seg .seg").forEach(b => b.classList.toggle("active", b.dataset.agg === k));
   renderAgg();
 }
@@ -1558,6 +1569,28 @@ function renderMitsuAgg() {
     return { p, rank, cnt: g.cnt, amt: g.amt, rate, weighted: g.amt * rate };
   });
 
+  // 確度内訳：件数展開中の優先度に対応する見積一覧
+  let priDrillHtml = "";
+  if (mitsuOpenPri) {
+    const list = pipeline.filter(r => (r.priority || "－") === mitsuOpenPri)
+      .sort((a, b) => (b.occur || 0) - (a.occur || 0));
+    priDrillHtml = `
+    <div class="agg-card">
+      <h3>見積一覧：優先度 ${esc(mitsuOpenPri)}（${list.length}件）
+        <button class="drill-close" onclick="closePriDrill()">閉じる ✕</button></h3>
+      <table class="agg-table drill-table">
+        <tr><th>ID</th><th>取引先</th><th>種別</th><th>内容</th><th>担当</th><th>金額</th></tr>
+        ${list.length ? list.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
+          <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
+          <td>${esc(r.type)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
+          <td>${esc(r.owner)}</td>
+          <td class="r">${r.amount != null ? r.amount.toLocaleString() + "円" : "－"}</td>
+        </tr>`).join("") : `<tr><td colspan="6" class="muted">該当する案件がありません</td></tr>`}
+      </table>
+      <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
+    </div>`;
+  }
+
   // 展開中の状態に対応する見積一覧
   let drillHtml = "";
   if (mitsuOpenStatus) {
@@ -1569,29 +1602,27 @@ function renderMitsuAgg() {
         <button class="drill-close" onclick="closeMitsuDrill()">閉じる ✕</button></h3>
       <table class="agg-table drill-table">
         <tr><th>ID</th><th>取引先</th><th>種別</th><th>内容</th><th>担当</th><th>金額</th></tr>
-        ${list.length ? list.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="openEditModal('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
+        ${list.length ? list.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
           <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
           <td>${esc(r.type)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
           <td>${esc(r.owner)}</td>
           <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
         </tr>`).join("") : `<tr><td colspan="6" class="muted">該当する案件がありません</td></tr>`}
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">行をクリックすると案件の詳細画面を開きます。</p>
+      <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
     </div>`;
   }
 
-  return `
-    <div class="kpi-row">
-      <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
-      <div class="kpi"><div class="kv">${(pipelineAmt / 10000).toLocaleString()}万</div><div class="kl">パイプライン金額</div></div>
-      <div class="kpi"><div class="kv">${(weightedAmt / 10000).toLocaleString()}万</div><div class="kl">加重パイプライン（確度反映）</div></div>
-    </div>
+  const confSection = `
     <div class="agg-card">
       <h3>優先度別 確度内訳</h3>
       <table class="agg-table">
         <tr><th>優先度</th><th>確度ランク</th><th>件数</th><th>金額計</th><th>確度</th><th>加重額</th></tr>
         ${priRows.map(r => `<tr>
-          <td>${esc(r.p)}</td><td>${esc(r.rank)}</td><td>${r.cnt}</td>
+          <td>${esc(r.p)}</td><td>${esc(r.rank)}</td>
+          <td>${r.cnt > 0
+            ? `<button class="cnt-link${mitsuOpenPri === r.p ? " open" : ""}" onclick="openPriDrill('${esc(r.p)}')">${r.cnt}</button>`
+            : r.cnt}</td>
           <td class="r">${r.amt.toLocaleString()}円</td>
           <td class="r">${Math.round(r.rate * 100)}%</td>
           <td class="r">${Math.round(r.weighted).toLocaleString()}円</td></tr>`).join("")}
@@ -1599,8 +1630,11 @@ function renderMitsuAgg() {
           <td class="r">${pipelineAmt.toLocaleString()}円</td><td class="r">－</td>
           <td class="r">${Math.round(weightedAmt).toLocaleString()}円</td></tr>
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">※ 確度は「確度設定」シート（優先度: 高＝濃厚／中＝五分五分／低＝薄め）の値を使用。未設定の優先度は「薄め」として計算。</p>
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 確度は「確度設定」シート（優先度: 高＝濃厚／中＝五分五分／低＝薄め）の値を使用。未設定の優先度は「薄め」として計算。件数をクリックすると下に見積一覧が表示されます。</p>
     </div>
+    ${priDrillHtml}`;
+
+  const statusSection = `
     <div class="agg-card">
       <h3>見積り・プリセールス 状態別集計</h3>
       <table class="agg-table">
@@ -1616,7 +1650,21 @@ function renderMitsuAgg() {
       <p style="font-size:11px;color:#999;margin-top:6px">※ 件数をクリックすると下に見積一覧が表示されます。受注は最終価格、それ以外は見積金額で集計。</p>
     </div>
     ${drillHtml}`;
+
+  return `
+    <div class="kpi-row">
+      <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
+      <div class="kpi"><div class="kv">${(pipelineAmt / 10000).toLocaleString()}万</div><div class="kl">パイプライン金額</div></div>
+      <div class="kpi"><div class="kv">${(weightedAmt / 10000).toLocaleString()}万</div><div class="kl">加重パイプライン（確度反映）</div></div>
+    </div>
+    <div class="sched-seg mitsu-sub">
+      <button class="seg${mitsuSubView === "conf" ? " active" : ""}" data-sub="conf" onclick="switchMitsuSub('conf')">確度内訳</button>
+      <button class="seg${mitsuSubView === "status" ? " active" : ""}" data-sub="status" onclick="switchMitsuSub('status')">状態別集計</button>
+    </div>
+    ${mitsuSubView === "conf" ? confSection : statusSection}`;
 }
+function openPriDrill(p) { mitsuOpenPri = (mitsuOpenPri === p) ? null : p; renderAgg(); }
+function closePriDrill() { mitsuOpenPri = null; renderAgg(); }
 function openMitsuDrill(st) { mitsuOpenStatus = (mitsuOpenStatus === st) ? null : st; renderAgg(); }
 function closeMitsuDrill() { mitsuOpenStatus = null; renderAgg(); }
 
@@ -1649,7 +1697,7 @@ function renderJuchuAgg() {
       <h3>受注案件一覧</h3>
       <table class="agg-table drill-table">
         <tr><th>ID</th><th>取引先</th><th>内容</th><th>最終価格</th><th>計上日</th><th>納品日</th><th>状態</th></tr>
-        ${won.length ? won.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="openEditModal('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
+        ${won.length ? won.map(r => `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}" onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
           <td>${esc(r.id)}</td><td class="l">${esc(r.client)}</td>
           <td class="l">${esc(shorten(r.content, 20))}</td>
           <td class="r">${(r.finalAmount ?? r.amount) != null ? ((r.finalAmount ?? r.amount)).toLocaleString() + "円" : "－"}</td>
@@ -1658,7 +1706,7 @@ function renderJuchuAgg() {
           <td><span class="status-pill st-${esc(r.status)}">${esc(statusLabel(r))}</span></td></tr>`).join("")
         : `<tr><td colspan="7" class="muted">受注案件はまだありません</td></tr>`}
       </table>
-      <p style="font-size:11px;color:#999;margin-top:6px">行をクリックすると案件の詳細画面を開きます。</p>
+      <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
     </div>`;
 }
 
