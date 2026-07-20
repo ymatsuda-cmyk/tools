@@ -153,7 +153,8 @@
     <div class="task-grid">
       <div class="t-row"><label>大分類</label><select id="ta-cat" onchange="onTaCatChange()"></select></div>
       <div class="t-row"><label>小分類</label>
-        <input type="text" id="ta-subcat">
+        <input type="text" id="ta-subcat" list="ta-subcat-list" placeholder="既存候補から選択 or 新規入力">
+        <datalist id="ta-subcat-list"></datalist>
         <select id="ta-subcat-sel" style="display:none"></select>
       </div>
       <div class="t-row wide"><label>タスク名 <span class="req">必須</span></label><input type="text" id="ta-title"></div>

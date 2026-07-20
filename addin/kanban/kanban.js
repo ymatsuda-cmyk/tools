@@ -106,15 +106,15 @@ function restoreSavedFilters() {
     const saved = localStorage.getItem("kanban-filters");
     if (saved) {
       const f = JSON.parse(saved);
-      selectedUser = f.user || null;
-      selectedCategory = f.category || null;
-      selectedSubCategory = f.subCategory || null;
+      selectedUsers = Array.isArray(f.users) ? f.users : (f.user ? [f.user] : []);
+      selectedCategories = Array.isArray(f.categories) ? f.categories : (f.category ? [f.category] : []);
+      selectedSubCategories = Array.isArray(f.subCategories) ? f.subCategories : (f.subCategory ? [f.subCategory] : []);
       selectedPeriod = f.period || "all";
     }
   } catch (e) {
-    selectedUser = null;
-    selectedCategory = null;
-    selectedSubCategory = null;
+    selectedUsers = [];
+    selectedCategories = [];
+    selectedSubCategories = [];
     selectedPeriod = "all";
   }
 }
@@ -122,9 +122,9 @@ function restoreSavedFilters() {
 function saveFilters() {
   try {
     localStorage.setItem("kanban-filters", JSON.stringify({
-      user: selectedUser,
-      category: selectedCategory,
-      subCategory: selectedSubCategory,
+      users: selectedUsers,
+      categories: selectedCategories,
+      subCategories: selectedSubCategories,
       period: selectedPeriod,
       timestamp: Date.now()
     }));
@@ -248,20 +248,22 @@ function closeAllDropdowns() {
 /* チップの表示テキストを選択状態に同期 */
 function updateChips() {
   const userChip = document.getElementById("chip-user");
-  if (selectedUser) {
+  if (selectedUsers.length) {
     userChip.classList.add("selected");
+    const label = selectedUsers.length === 1 ? escapeHtml(selectedUsers[0]) : `${selectedUsers.length}件選択`;
     userChip.innerHTML =
-      `担当: ${escapeHtml(selectedUser)} <span class="clear" onclick="clearUserFilter(event)">✕</span>`;
+      `担当: ${label} <span class="clear" onclick="clearUserFilter(event)">✕</span>`;
   } else {
     userChip.classList.remove("selected");
     userChip.innerHTML = `担当者 <span class="caret"></span>`;
   }
 
   const catChip = document.getElementById("chip-cat");
-  if (selectedCategory) {
+  if (selectedCategories.length) {
     catChip.classList.add("selected");
+    const label = selectedCategories.length === 1 ? escapeHtml(selectedCategories[0]) : `${selectedCategories.length}件選択`;
     catChip.innerHTML =
-      `分類: ${escapeHtml(selectedCategory)} <span class="clear" onclick="clearCategoryFilter(event)">✕</span>`;
+      `分類: ${label} <span class="clear" onclick="clearCategoryFilter(event)">✕</span>`;
   } else {
     catChip.classList.remove("selected");
     catChip.innerHTML = `分類 <span class="caret"></span>`;
@@ -269,10 +271,11 @@ function updateChips() {
 
   const subCatChip = document.getElementById("chip-subcat");
   if (subCatChip) {
-    if (selectedSubCategory) {
+    if (selectedSubCategories.length) {
       subCatChip.classList.add("selected");
+      const label = selectedSubCategories.length === 1 ? escapeHtml(selectedSubCategories[0]) : `${selectedSubCategories.length}件選択`;
       subCatChip.innerHTML =
-        `小分類: ${escapeHtml(selectedSubCategory)} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
+        `小分類: ${label} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
     } else {
       subCatChip.classList.remove("selected");
       subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
@@ -282,7 +285,7 @@ function updateChips() {
 
 function clearUserFilter(e) {
   e.stopPropagation();
-  selectedUser = null;
+  selectedUsers = [];
   saveFilters();
   renderFilters();
   renderBoard();
@@ -290,7 +293,8 @@ function clearUserFilter(e) {
 
 function clearCategoryFilter(e) {
   e.stopPropagation();
-  selectedCategory = null;
+  selectedCategories = [];
+  selectedSubCategories = [];
   saveFilters();
   renderFilters();
   renderBoard();
@@ -298,7 +302,7 @@ function clearCategoryFilter(e) {
 
 function clearSubCategoryFilter(e) {
   e.stopPropagation();
-  selectedSubCategory = null;
+  selectedSubCategories = [];
   saveFilters();
   renderFilters();
   renderBoard();
@@ -313,26 +317,44 @@ function renderUserDropdown() {
   el.innerHTML = "";
 
   users.forEach(u => {
-    const b = document.createElement("button");
-    b.className = "dd-item" + (selectedUser === u ? " on" : "");
+    const b = document.createElement("label");
+    b.className = "dd-item" + (selectedUsers.includes(u) ? " on" : "");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedUsers.includes(u);
+    cb.className = "dd-check";
 
     const av = document.createElement("span");
     av.className = "avatar";
     av.style.background = userColor(u);
     av.textContent = String(u).charAt(0);
+
+    b.appendChild(cb);
     b.appendChild(av);
     b.appendChild(document.createTextNode(u));
 
-    b.onclick = () => {
-      selectedUser = (selectedUser === u) ? null : u;
+    cb.addEventListener("change", () => {
+      selectedUsers = cb.checked
+        ? [...selectedUsers, u]
+        : selectedUsers.filter(x => x !== u);
+      b.classList.toggle("on", cb.checked);
       saveFilters();
-      renderFilters();
+      updateChips();
       renderBoard();
-      closeAllDropdowns();
-    };
+    });
 
     el.appendChild(b);
   });
+
+  if (users.length) {
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "dd-clear";
+    clearBtn.textContent = "選択解除";
+    clearBtn.onclick = () => clearUserFilter({ stopPropagation() {} });
+    el.appendChild(clearBtn);
+  }
 }
 
 function renderCategoryDropdown() {
@@ -344,30 +366,47 @@ function renderCategoryDropdown() {
   el.innerHTML = "";
 
   cats.forEach(c => {
-    const b = document.createElement("button");
-    b.className = "dd-item" + (selectedCategory === c ? " on" : "");
-    b.textContent = c;
+    const b = document.createElement("label");
+    b.className = "dd-item" + (selectedCategories.includes(c) ? " on" : "");
 
-    b.onclick = () => {
-      const nextCategory = (selectedCategory === c) ? null : c;
-      selectedCategory = nextCategory;
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedCategories.includes(c);
+    cb.className = "dd-check";
 
-      // 選択済み小分類が新しい大分類配下に存在しない場合のみリセット
-      if (selectedSubCategory && selectedCategory) {
-        const stillExists = allTasks.some(t =>
-          t.category === selectedCategory && t.classification === selectedSubCategory
-        );
-        if (!stillExists) selectedSubCategory = null;
-      }
+    b.appendChild(cb);
+    b.appendChild(document.createTextNode(c));
+
+    cb.addEventListener("change", () => {
+      selectedCategories = cb.checked
+        ? [...selectedCategories, c]
+        : selectedCategories.filter(x => x !== c);
+      b.classList.toggle("on", cb.checked);
+
+      // 選択解除された大分類配下の小分類はフィルタから外す
+      selectedSubCategories = selectedSubCategories.filter(s =>
+        allTasks.some(t =>
+          t.classification === s &&
+          (!selectedCategories.length || selectedCategories.includes(t.category))
+        )
+      );
 
       saveFilters();
       renderFilters();
       renderBoard();
-      closeAllDropdowns();
-    };
+    });
 
     el.appendChild(b);
   });
+
+  if (cats.length) {
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "dd-clear";
+    clearBtn.textContent = "選択解除";
+    clearBtn.onclick = () => clearCategoryFilter({ stopPropagation() {} });
+    el.appendChild(clearBtn);
+  }
 }
 
 function renderSubCategoryDropdown() {
@@ -376,7 +415,7 @@ function renderSubCategoryDropdown() {
 
   const subCats = [...new Set(
     allTasks
-      .filter(t => !selectedCategory || t.category === selectedCategory)
+      .filter(t => !selectedCategories.length || selectedCategories.includes(t.category))
       .map(t => t.classification)
       .filter(v => v && v !== "#" && v.toString().trim() !== "")
   )];
@@ -394,20 +433,36 @@ function renderSubCategoryDropdown() {
   }
 
   subCats.forEach(s => {
-    const b = document.createElement("button");
-    b.className = "dd-item" + (selectedSubCategory === s ? " on" : "");
-    b.textContent = s;
+    const b = document.createElement("label");
+    b.className = "dd-item" + (selectedSubCategories.includes(s) ? " on" : "");
 
-    b.onclick = () => {
-      selectedSubCategory = (selectedSubCategory === s) ? null : s;
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedSubCategories.includes(s);
+    cb.className = "dd-check";
+
+    b.appendChild(cb);
+    b.appendChild(document.createTextNode(s));
+
+    cb.addEventListener("change", () => {
+      selectedSubCategories = cb.checked
+        ? [...selectedSubCategories, s]
+        : selectedSubCategories.filter(x => x !== s);
+      b.classList.toggle("on", cb.checked);
       saveFilters();
-      renderFilters();
+      updateChips();
       renderBoard();
-      closeAllDropdowns();
-    };
+    });
 
     el.appendChild(b);
   });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "dd-clear";
+  clearBtn.textContent = "選択解除";
+  clearBtn.onclick = () => clearSubCategoryFilter({ stopPropagation() {} });
+  el.appendChild(clearBtn);
 }
 
 /* 担当者名から一意な色を生成 */
@@ -1079,8 +1134,26 @@ function addSubtask() {
   const input = document.getElementById("sk-new");
   const title = (input.value || "").trim();
   if (!title) return;
-  ta.value = (ta.value.replace(/\s+$/, "") + `\n□ ${title}`).replace(/^\n/, "");
+  ta.value = insertIntoTaskSection(ta.value, `□ ${title}`);
+  input.value = "";
   renderSubtaskKanban();
+}
+
+/* ＜タスク＞セクション内（次のセクション見出しの直前、無ければ末尾）に1行挿入する。
+   ＜タスク＞見出し自体が無い場合は、従来どおり末尾へ追記する。 */
+function insertIntoTaskSection(note, newLine) {
+  const lines = (note || "").split(/\r?\n/);
+  const startIdx = lines.findIndex(l => l.trim() === "＜タスク＞");
+  if (startIdx === -1) {
+    const trimmed = (note || "").replace(/\s+$/, "");
+    return (trimmed ? trimmed + "\n" : "") + newLine;
+  }
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (/^＜.*＞$/.test(lines[i].trim())) { endIdx = i; break; }
+  }
+  lines.splice(endIdx, 0, newLine);
+  return lines.join("\n");
 }
 
 /* 備考テキストエリアが編集されたらカンバンを再描画（逆方向の同期） */
@@ -1105,13 +1178,13 @@ function isMatch(t) {
   }
 
   // 担当者
-  if (selectedUser && t.user !== selectedUser) return false;
+  if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
 
   // 分類（大分類）
-  if (selectedCategory && t.category !== selectedCategory) return false;
+  if (selectedCategories.length && !selectedCategories.includes(t.category)) return false;
 
   // 小分類
-  if (selectedSubCategory && t.classification !== selectedSubCategory) return false;
+  if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
 
   // ★ 本日フィルタ：スター付きのみ表示
   if (selectedPeriod === "today") {
@@ -1292,11 +1365,14 @@ async function activateWbs() {
   }
 }
 
-/* 大分類の変更：受注なら小分類を案件番号セレクトに切替 */
+/* 大分類の変更：受注なら小分類を案件番号セレクトに切替。
+   それ以外は、その大分類で使われている既存の小分類をデータリスト（候補）として提示しつつ、
+   自由入力でも新しい小分類を追加できるようにする。 */
 async function onTaCatChange() {
   const cat = document.getElementById("ta-cat").value;
   const txt = document.getElementById("ta-subcat");
   const sel = document.getElementById("ta-subcat-sel");
+  const dl = document.getElementById("ta-subcat-list");
   if (cat === ORDER_CATEGORY) {
     txt.style.display = "none";
     sel.style.display = "";
@@ -1308,6 +1384,14 @@ async function onTaCatChange() {
   } else {
     txt.style.display = "";
     sel.style.display = "none";
+    txt.value = "";
+    const subs = [...new Set(
+      allTasks
+        .filter(t => t.category === cat)
+        .map(t => t.classification)
+        .filter(v => v && String(v).trim() !== "" && v !== "#")
+    )];
+    dl.innerHTML = subs.map(s => `<option value="${escapeHtml(String(s))}"></option>`).join("");
   }
 }
 

@@ -311,6 +311,26 @@ mark.hit {
   font-weight: 700;
   flex-shrink: 0;
 }
+.dropdown .dd-item .dd-check {
+  margin: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.dropdown .dd-clear {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 8px 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.dropdown .dd-clear:hover { text-decoration: underline; }
 
 /* ---- 保留トグル ---- */
 .held-toggle {
