@@ -76,6 +76,8 @@ body {
   border: none; background: none; color: #4472c4;
   font-size: 11px; cursor: pointer; text-decoration: underline;
 }
+.lw-toggle { cursor: pointer; }
+.lw-toggle.active { background: #4472c4; color: #fff; border-color: #4472c4; }
 
 /* ---------- ペイン共通 ---------- */
 .pane { flex: 1 1 auto; overflow: auto; padding: 10px; }
@@ -187,7 +189,13 @@ body {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 10px; border-radius: 6px 6px 0 0;
   color: #fff; font-weight: bold; font-size: 12px;
+  cursor: pointer; user-select: none;
 }
+.list-group-head .lg-chevron {
+  display: inline-block; font-size: 10px; transition: transform .15s;
+}
+.list-group.collapsed .lg-chevron { transform: rotate(-90deg); }
+.list-group.collapsed .list-table { display: none; }
 .list-group-head .cnt { font-weight: normal; font-size: 11px; opacity: .85; }
 .lg-保守対応     .list-group-head { background: #548235; }
 .lg-瑕疵対応     .list-group-head { background: #c00000; }
@@ -206,6 +214,7 @@ body {
   padding: 6px 8px; border-bottom: 1px solid #eef1f4; vertical-align: top;
 }
 .list-table tr:hover td { background: #f4f8fd; cursor: pointer; }
+.list-table tr.row-dim { opacity: .4; }
 .status-pill {
   display: inline-block; padding: 2px 9px; border-radius: 10px;
   font-size: 11px; background: #e3e7eb; color: #555; white-space: nowrap;
@@ -247,6 +256,7 @@ body {
   cursor: grab; font-size: 12px;
 }
 .card:active { cursor: grabbing; }
+.card.dim { opacity: .4; }
 .card .cid { font-size: 10px; color: #999; }
 .card .ctitle { margin: 2px 0; line-height: 1.35; word-break: break-all; }
 .card .cmeta { font-size: 10px; color: #778; display: flex; gap: 8px; flex-wrap: wrap; }

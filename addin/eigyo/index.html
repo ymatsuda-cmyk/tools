@@ -45,10 +45,6 @@
     <input type="search" id="search-input" placeholder="検索（内容・取引先・ID）" autocomplete="off">
     <button class="search-clear" id="search-clear" title="クリア">✕</button>
   </div>
-  <div class="ms-wrap" id="ms-type">
-    <button class="filter-select ms-btn" id="ms-type-btn" onclick="toggleMsDD(event,'type')">（種別: 全て）▾</button>
-    <div class="ms-dd" id="type-dd" style="display:none"></div>
-  </div>
   <div class="ms-wrap" id="ms-status">
     <button class="filter-select ms-btn" id="ms-status-btn" onclick="toggleMsDD(event,'status')">（状態: 全て）▾</button>
     <div class="ms-dd" id="status-dd" style="display:none"></div>
@@ -58,6 +54,7 @@
     <div class="ms-dd" id="client-dd" style="display:none"></div>
   </div>
   <select id="filter-owner" class="filter-select" title="担当者"></select>
+  <button class="filter-select lw-toggle" id="btn-lastweek" onclick="toggleLastWeek()">先週実績</button>
   <button class="chip-clear" onclick="clearFilters()">条件クリア</button>
 </div>
 

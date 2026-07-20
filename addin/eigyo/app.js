@@ -14,10 +14,11 @@
  *                    W:確認状況  X:計上日  Y:最終工数  Z:最終価格  AA:受注条件
  * 【管理・完了日】   AB:起票者  AC:見積完了日  AD:検討完了日
  *                    AE:商談完了日  AF:確認完了日
+ * 【更新管理】       AJ:最終更新日（保存の都度、自動打刻）
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260720_c";
+const APP_VERSION = "rev_20260720_d";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -70,7 +71,7 @@ const SHEET_COLUMNS = [
   "区分（問合せ／改修）", "着手日", "見積根拠", "商談状況", "確認状況",
   "計上日", "最終工数（人日）", "最終価格（税抜）", "受注条件",
   "起票者", "見積完了日", "検討完了日", "商談完了日", "確認完了日",
-  "受注確定日", "受託開始日", "完了予定日",
+  "受注確定日", "受託開始日", "完了予定日", "最終更新日",
 ];
 /* 旧バージョンで使っていた見出し文言（読み込み時の判定に使用、書込みはしない） */
 const EXT_HEADERS = SHEET_COLUMNS.slice(18); // S列以降（互換維持用）
@@ -102,9 +103,12 @@ let currentStageTab = null;
 let inputType = "保守対応";
 let currentKanbanType = "保守対応";
 let dragId = null;
-let filters = { q: "", type: [], status: [], client: [], owner: "" };
+let filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false };
 let editDirty = false;      // 詳細画面で変更があったか
 let selectedId = null;      // 一覧で選択中の案件ID（ハイライト用）
+/* 一覧: 種別グループの開閉状態（種別名の集合、閉じているものだけ保持） */
+let collapsedTypes = new Set();
+try { collapsedTypes = new Set(JSON.parse(localStorage.getItem("eigyo_collapsed_types") || "[]")); } catch (e) {}
 
 /* ---------- Cookie 保存/復元 ---------- */
 const COOKIE_DAYS = 365;
@@ -126,12 +130,47 @@ function restoreFiltersCookie() {
     const f = JSON.parse(raw);
     filters = {
       q: f.q || "",
-      type: Array.isArray(f.type) ? f.type : (f.type ? [f.type] : []),
       status: Array.isArray(f.status) ? f.status : (f.status ? [f.status] : []),
       client: Array.isArray(f.client) ? f.client : (f.client ? [f.client] : []),
       owner: f.owner || "",
+      lastWeekOnly: !!f.lastWeekOnly,
     };
   } catch (e) {}
+}
+function saveCollapsedTypes() {
+  try { localStorage.setItem("eigyo_collapsed_types", JSON.stringify([...collapsedTypes])); } catch (e) {}
+}
+function toggleTypeGroup(type) {
+  if (collapsedTypes.has(type)) collapsedTypes.delete(type); else collapsedTypes.add(type);
+  saveCollapsedTypes();
+  renderList();
+}
+
+/* ---------- 前週実績（先週実績）判定 ---------- */
+function lastWeekRange() {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const day = now.getDay(); // 0=日
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const thisMonday = new Date(now); thisMonday.setDate(now.getDate() + diffToMonday);
+  const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate() - 7);
+  const lastSunday = new Date(thisMonday); lastSunday.setDate(thisMonday.getDate() - 1);
+  lastSunday.setHours(23, 59, 59, 999);
+  return { start: lastMonday, end: lastSunday };
+}
+function isLastWeekUpdate(rec) {
+  if (!rec.lastUpdate) return false;
+  const { start, end } = lastWeekRange();
+  return rec.lastUpdate >= start && rec.lastUpdate <= end;
+}
+function toggleLastWeek() {
+  filters.lastWeekOnly = !filters.lastWeekOnly;
+  saveFiltersCookie();
+  updateLastWeekBtn();
+  renderCurrentPane();
+}
+function updateLastWeekBtn() {
+  const btn = document.getElementById("btn-lastweek");
+  if (btn) btn.classList.toggle("active", !!filters.lastWeekOnly);
 }
 function saveGanttCookie() {
   try { localStorage.setItem("eigyo_gantt", JSON.stringify({ zoom: ganttZoom, term: ganttTerm })); } catch (e) {}
@@ -195,6 +234,7 @@ async function init() {
   const si = document.getElementById("search-input");
   if (si) si.value = filters.q || "";
   renderFilters();
+  updateLastWeekBtn();
   renderCurrentPane();
 }
 
@@ -208,7 +248,7 @@ function bindStaticUI() {
     filters.owner = e.target.value; saveFiltersCookie(); renderCurrentPane();
   });
   document.addEventListener("click", e => {
-    ["type", "status", "client"].forEach(k => {
+    ["status", "client"].forEach(k => {
       if (!e.target.closest("#ms-" + k)) {
         const dd = document.getElementById(k + "-dd");
         if (dd) dd.style.display = "none";
@@ -222,10 +262,11 @@ function bindStaticUI() {
 }
 
 function clearFilters() {
-  filters = { q: "", type: [], status: [], client: [], owner: "" };
+  filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false };
   document.getElementById("search-input").value = "";
   saveFiltersCookie();
   renderFilters();
+  updateLastWeekBtn();
   renderCurrentPane();
 }
 
@@ -241,7 +282,7 @@ async function loadAll() {
   try {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
-      const hdr = sheet.getRange("A1:AI1");
+      const hdr = sheet.getRange("A1:AJ1");
       hdr.load("values");
       await ctx.sync();
       const cur = hdr.values[0];
@@ -259,7 +300,7 @@ async function loadAll() {
       await ctx.sync();
       const lastRow = Math.min(Math.max(used.rowCount, 1), MAX_ROWS);
       if (lastRow >= 2) {
-        const rng = sheet.getRange(`A2:AI${lastRow}`);
+        const rng = sheet.getRange(`A2:AJ${lastRow}`);
         rng.load("values");
         await ctx.sync();
         records = parseRows(rng.values);
@@ -298,6 +339,7 @@ function parseRows(values) {
       quoteDone: toDate(r[28]), considerDone: toDate(r[29]),
       dealDone: toDate(r[30]), confirmDone: toDate(r[31]),
       orderDone: toDate(r[32]), workStart: toDate(r[33]), dueDate: toDate(r[34]),
+      lastUpdate: toDate(r[35]),
     });
   });
   return out;
@@ -392,10 +434,12 @@ function recToRow(rec) {
     toSerial(rec.quoteDone), toSerial(rec.considerDone),
     toSerial(rec.dealDone), toSerial(rec.confirmDone),
     toSerial(rec.orderDone), toSerial(rec.workStart), toSerial(rec.dueDate),
+    toSerial(rec.lastUpdate),
   ]];
 }
 
 async function writeRecord(rec) {
+  rec.lastUpdate = new Date(); // 保存の都度、最終更新日を自動打刻
   if (demoMode) {
     const i = records.findIndex(r => r.id === rec.id);
     if (i >= 0) records[i] = rec; else { rec.row = 0; records.push(rec); }
@@ -411,9 +455,9 @@ async function writeRecord(rec) {
       row = maxRow + 1;
       rec.row = row;
     }
-    const rng = sheet.getRange(`A${row}:AI${row}`);
+    const rng = sheet.getRange(`A${row}:AJ${row}`);
     rng.values = recToRow(rec);
-    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF", "AG", "AH", "AI"].forEach(c =>
+    ["F", "G", "N", "T", "X", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ"].forEach(c =>
       sheet.getRange(`${c}${row}`).numberFormat = [["yyyy/m/d"]]);
     ["L", "Z"].forEach(c => sheet.getRange(`${c}${row}`).numberFormat = [["#,##0"]]);
     // 折り返しを無効化し行高さを固定（複数行に広がらないように）
@@ -542,7 +586,6 @@ function switchTab(tab) {
   document.getElementById("filter-bar").style.display =
     (tab === "list" || tab === "kanban") ? "" : "none";
   const isKanban = tab === "kanban";
-  document.getElementById("ms-type").style.display = isKanban ? "none" : "";
   document.getElementById("ms-status").style.display = isKanban ? "none" : "";
   renderCurrentPane();
 }
@@ -560,7 +603,6 @@ function renderCurrentPane() {
    ============================================================ */
 function renderFilters() {
   const clients = [...new Set(records.map(r => r.client).filter(Boolean))];
-  renderMulti("type", TYPES, "種別");
   renderMulti("status", [...new Set(records.map(r => r.status).filter(s => s && s !== "削除"))], "状態");
   renderMulti("client", clients, "取引先");
   fillSelect("filter-owner", ["（担当者: 全て）", ...allOwners()], filters.owner);
@@ -575,8 +617,8 @@ function fillSelect(id, options, selected) {
     `<option value="${i === 0 ? "" : esc(o)}"${o === selected ? " selected" : ""}>${esc(o)}</option>`).join("");
 }
 
-/* 汎用マルチセレクト（type/status/client 共通） */
-const MS_LABEL = { type: "種別", status: "状態", client: "取引先" };
+/* 汎用マルチセレクト（status/client 共通） */
+const MS_LABEL = { status: "状態", client: "取引先" };
 function renderMulti(key, options, label) {
   filters[key] = filters[key].filter(v => options.includes(v));
   const btn = document.getElementById(`ms-${key}-btn`);
@@ -593,7 +635,7 @@ function renderMulti(key, options, label) {
 }
 function toggleMsDD(ev, key) {
   ev.stopPropagation();
-  ["type", "status", "client"].forEach(k => {
+  ["status", "client"].forEach(k => {
     const dd = document.getElementById(`${k}-dd`);
     if (dd) dd.style.display = (k === key && dd.style.display === "none") ? "" : "none";
   });
@@ -620,7 +662,6 @@ function activeRecords() { return records.filter(r => r.status !== "削除"); }
 function filteredRecords() {
   return records.filter(r => {
     if (r.status === "削除") return false;   // 削除済みは表示しない
-    if (filters.type.length && !filters.type.includes(r.type)) return false;
     if (filters.status.length && !filters.status.includes(r.status)) return false;
     if (filters.client.length && !filters.client.includes(r.client)) return false;
     if (filters.owner && !splitOwners(r.owner).includes(filters.owner)) return false;
@@ -644,12 +685,15 @@ function renderList() {
   TYPES.forEach(type => {
     const group = recs.filter(r => r.type === type);
     if (!group.length) return;
-    html += `<div class="list-group lg-${type}">
-      <div class="list-group-head">${esc(type)} <span class="cnt">${group.length}件</span></div>
+    const collapsed = collapsedTypes.has(type);
+    html += `<div class="list-group lg-${type}${collapsed ? " collapsed" : ""}">
+      <div class="list-group-head" onclick="toggleTypeGroup('${esc(type)}')">
+        <span class="lg-chevron">▾</span>${esc(type)} <span class="cnt">${group.length}件</span>
+      </div>
       <table class="list-table">
         <tr><th>優先度</th><th>ID</th><th>取引先</th><th>状態</th><th>内容</th><th>担当</th><th>発生日</th><th>金額</th></tr>
         ${group.map(r => `
-        <tr data-id="${esc(r.id)}" class="${r.id === selectedId ? "row-selected" : ""}"
+        <tr data-id="${esc(r.id)}" class="${r.id === selectedId ? "row-selected" : ""}${filters.lastWeekOnly && !isLastWeekUpdate(r) ? " row-dim" : ""}"
             oncontextmenu="onRowContext(event,'${esc(r.id)}')"
             onclick="onRowClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
           <td class="c">${r.priority ? `<span class="pri pri-${esc(r.priority)}">${esc(r.priority)}</span>` : ""}</td>
@@ -718,7 +762,7 @@ async function jumpToExcel(row) {
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
       sheet.activate();
-      const range = sheet.getRange(`A${row}:AI${row}`);
+      const range = sheet.getRange(`A${row}:AJ${row}`);
       range.select();
       await ctx.sync();
     });
@@ -750,7 +794,7 @@ function renderKanban() {
       <div class="lane-head">${esc(st)}<span class="cnt">${cards.length}</span></div>
       <div class="lane-body">
         ${cards.map(r => `
-          <div class="card t-${esc(r.type)}" draggable="${ENABLE_KANBAN_DND}" data-id="${esc(r.id)}"
+          <div class="card t-${esc(r.type)}${filters.lastWeekOnly && !isLastWeekUpdate(r) ? " dim" : ""}" draggable="${ENABLE_KANBAN_DND}" data-id="${esc(r.id)}"
                ${ENABLE_KANBAN_DND ? `ondragstart="onCardDragStart(event)"` : ""}
                oncontextmenu="onRowContext(event,'${esc(r.id)}')"
                onclick="onCardClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
@@ -1845,7 +1889,9 @@ function loadDemo() {
   const blank = { kind: "", stageStart: null, basis: "", deal: "", confirm: "", book: null,
     finalHours: null, finalAmount: null, terms: "", reporter: "",
     quoteDone: null, considerDone: null, dealDone: null, confirmDone: null,
-    orderDone: null, workStart: null, dueDate: null };
+    orderDone: null, workStart: null, dueDate: null, lastUpdate: null };
+  const today = new Date();
+  const daysAgo = n => { const dd = new Date(today); dd.setDate(dd.getDate() - n); return dd; };
   customers = [
     { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "" },
     { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "" },
@@ -1866,6 +1912,13 @@ function loadDemo() {
     { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31) },
     { ...blank, row: 13, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20) },
   ];
+  const lw = lastWeekRange();
+  const midLastWeek = new Date(lw.start); midLastWeek.setDate(midLastWeek.getDate() + 2);
+  const setLU = (id, d) => { const r = records.find(x => x.id === id); if (r) r.lastUpdate = d; };
+  setLU("KM-01", midLastWeek);
+  setLU("KM-02", midLastWeek);
+  setLU("HN-01", daysAgo(20));
+  setLU("AG-01", daysAgo(30));
 }
 
 /* ============================================================
