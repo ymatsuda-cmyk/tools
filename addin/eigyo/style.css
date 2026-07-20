@@ -435,10 +435,11 @@ body {
 .btn-ghost:hover { background: #f0f3f6; }
 #dialog-modal { z-index: 200; }
 
-/* ---------- 集計: 工数表示チェックボックス ---------- */
+/* ---------- 集計: 工数表示チェックボックス（第37期ナビの右側） ---------- */
 .agg-seg { align-items: center; }
+.term-bar-sep { width: 1px; align-self: stretch; background: #e0e4e8; margin: 0 2px; }
 .hours-toggle {
-  display: inline-flex; align-items: center; gap: 5px; margin-right: auto;
+  display: inline-flex; align-items: center; gap: 5px;
   font-size: 12px; color: #556; cursor: pointer; white-space: nowrap;
 }
 .hours-toggle input { width: 14px; height: 14px; cursor: pointer; }

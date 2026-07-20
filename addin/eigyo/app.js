@@ -17,7 +17,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260720_a";
+const APP_VERSION = "rev_20260710_m";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -117,11 +117,11 @@ function getCookie(name) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 function saveFiltersCookie() {
-  try { setCookie("eigyo_filters", JSON.stringify(filters)); } catch (e) {}
+  try { localStorage.setItem("eigyo_filters", JSON.stringify(filters)); } catch (e) {}
 }
 function restoreFiltersCookie() {
   try {
-    const raw = getCookie("eigyo_filters");
+    const raw = localStorage.getItem("eigyo_filters");
     if (!raw) return;
     const f = JSON.parse(raw);
     filters = {
@@ -134,11 +134,11 @@ function restoreFiltersCookie() {
   } catch (e) {}
 }
 function saveGanttCookie() {
-  try { setCookie("eigyo_gantt", JSON.stringify({ zoom: ganttZoom, term: ganttTerm })); } catch (e) {}
+  try { localStorage.setItem("eigyo_gantt", JSON.stringify({ zoom: ganttZoom, term: ganttTerm })); } catch (e) {}
 }
 function restoreGanttCookie() {
   try {
-    const raw = getCookie("eigyo_gantt");
+    const raw = localStorage.getItem("eigyo_gantt");
     if (!raw) return;
     const g = JSON.parse(raw);
     if ([12, 6, 3, 1].includes(g.zoom)) ganttZoom = g.zoom;
@@ -268,6 +268,7 @@ async function loadAll() {
       }
     });
     await ensureCustomerSheet();
+    await loadConfidenceRates();
     demoMode = false;
   } catch (e) {
     console.warn("Excel読込に失敗。デモモードで起動します。", e);
@@ -333,6 +334,37 @@ async function ensureCustomerSheet() {
       .map((r, i) => ({ row: i + 2, code: str(r[0]), name: str(r[1]), contact: str(r[2]), note: str(r[3]) }))
       .filter(c => c.code && c.name);
   });
+}
+
+/* ---------- 確度ランク係数（「確度設定」シート） ----------
+ * シート構成: A列=ランク名（濃厚/五分五分/薄め）, B列=係数（0〜1、%書式）
+ * 優先度（高/中/低）はランク名に対応づけて重み付けする。未設定・空欄は「薄め」扱い。 */
+const PRIORITY_TO_RANK = { "高": "濃厚", "中": "五分五分", "低": "薄め" };
+const CONFIDENCE_SHEET = "確度設定";
+let confidenceRates = { "濃厚": 1, "五分五分": 0.5, "薄め": 0 }; // シートが無い/読めない場合のデフォルト
+function rankOfPriority(p) { return PRIORITY_TO_RANK[p] || "薄め"; }
+function rateOfPriority(p) { return confidenceRates[rankOfPriority(p)] ?? 0; }
+async function loadConfidenceRates() {
+  try {
+    await Excel.run(async ctx => {
+      const sheets = ctx.workbook.worksheets;
+      sheets.load("items/name");
+      await ctx.sync();
+      const ws = sheets.items.find(s => s.name === CONFIDENCE_SHEET);
+      if (!ws) return; // 無ければデフォルト値のまま
+      const used = ws.getUsedRange(true);
+      used.load("values");
+      await ctx.sync();
+      const rows = used.values.slice(1); // 1行目は見出し
+      rows.forEach(r => {
+        const label = str(r[0]);
+        const pct = numOrNull(r[1]);
+        if (label && pct != null) confidenceRates[label] = pct;
+      });
+    });
+  } catch (e) {
+    console.warn("確度設定の読み込みに失敗。デフォルト値を使用します。", e);
+  }
 }
 
 function nextCaseId(code) {
@@ -1427,6 +1459,10 @@ function termBarHtml() {
     <button class="term-btn" onclick="shiftTerm(-1)">◀</button>
     <span class="term-label">${esc(termLabel(currentTerm))}</span>
     <button class="term-btn" onclick="shiftTerm(1)">▶</button>
+    <span class="term-bar-sep"></span>
+    <label class="hours-toggle" title="保守状況の対応工数の表示を切り替え">
+      <input type="checkbox" id="hours-toggle-cb" ${showHours ? "checked" : ""} onchange="toggleHours(this)"> 工数表示
+    </label>
   </div>`;
 }
 function renderAgg() {
@@ -1506,9 +1542,21 @@ function renderMitsuAgg() {
   const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
   const pipeline = target.filter(r => !["失注", ...ORDER_CONFIRMED_STATUSES].includes(r.status));
   const pipelineAmt = pipeline.reduce((a, r) => a + (r.amount || 0), 0);
-  // 受注確定金額：状態欄が「受注」「受託中」「完了」（受注確定後の全ステージ）を計上
-  const wonAmt = target.filter(r => ORDER_CONFIRMED_STATUSES.includes(r.status))
-    .reduce((a, r) => a + ((r.finalAmount ?? r.amount) || 0), 0);
+  // 加重パイプライン：優先度→確度ランク（確度設定シート）で重み付け
+  const weightedAmt = pipeline.reduce((a, r) => a + (r.amount || 0) * rateOfPriority(r.priority), 0);
+  const priGroups = {};
+  pipeline.forEach(r => {
+    const p = r.priority || "－";
+    if (!priGroups[p]) priGroups[p] = { cnt: 0, amt: 0 };
+    priGroups[p].cnt++;
+    priGroups[p].amt += (r.amount || 0);
+  });
+  const priRows = ["高", "中", "低", "－"].filter(p => priGroups[p]).map(p => {
+    const g = priGroups[p];
+    const rank = rankOfPriority(p === "－" ? "" : p);
+    const rate = confidenceRates[rank] ?? 0;
+    return { p, rank, cnt: g.cnt, amt: g.amt, rate, weighted: g.amt * rate };
+  });
 
   // 展開中の状態に対応する見積一覧
   let drillHtml = "";
@@ -1536,7 +1584,22 @@ function renderMitsuAgg() {
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${pipeline.length}</div><div class="kl">進行中案件</div></div>
       <div class="kpi"><div class="kv">${(pipelineAmt / 10000).toLocaleString()}万</div><div class="kl">パイプライン金額</div></div>
-      <div class="kpi"><div class="kv">${(wonAmt / 10000).toLocaleString()}万</div><div class="kl">受注確定金額</div></div>
+      <div class="kpi"><div class="kv">${(weightedAmt / 10000).toLocaleString()}万</div><div class="kl">加重パイプライン（確度反映）</div></div>
+    </div>
+    <div class="agg-card">
+      <h3>優先度別 確度内訳</h3>
+      <table class="agg-table">
+        <tr><th>優先度</th><th>確度ランク</th><th>件数</th><th>金額計</th><th>確度</th><th>加重額</th></tr>
+        ${priRows.map(r => `<tr>
+          <td>${esc(r.p)}</td><td>${esc(r.rank)}</td><td>${r.cnt}</td>
+          <td class="r">${r.amt.toLocaleString()}円</td>
+          <td class="r">${Math.round(r.rate * 100)}%</td>
+          <td class="r">${Math.round(r.weighted).toLocaleString()}円</td></tr>`).join("")}
+        <tr class="total"><td colspan="2">合計</td><td>${pipeline.length}</td>
+          <td class="r">${pipelineAmt.toLocaleString()}円</td><td class="r">－</td>
+          <td class="r">${Math.round(weightedAmt).toLocaleString()}円</td></tr>
+      </table>
+      <p style="font-size:11px;color:#999;margin-top:6px">※ 確度は「確度設定」シート（優先度: 高＝濃厚／中＝五分五分／低＝薄め）の値を使用。未設定の優先度は「薄め」として計算。</p>
     </div>
     <div class="agg-card">
       <h3>見積り・プリセールス 状態別集計</h3>
