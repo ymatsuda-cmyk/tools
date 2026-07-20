@@ -31,13 +31,20 @@
       ]
     },
     {
-      "title": "リンク",
+      "title": "マニュアル",
       "items": [
         {
-          "id": "help",
-          "label": "使い方",
+          "id": "help_eigyo",
+          "label": "営業報告の使い方",
           "icon": "❓",
-          "url": "",
+          "url": "https://ymatsuda-cmyk.github.io/tools/addin/eigyo/eigyo_manual.html",
+          "external": true
+        },
+        {
+          "id": "help_kanban",
+          "label": "WBSの使い方",
+          "icon": "❓",
+          "url": "https://ymatsuda-cmyk.github.io/tools/addin/kanban/kanban_manual.html",
           "external": true
         }
       ]

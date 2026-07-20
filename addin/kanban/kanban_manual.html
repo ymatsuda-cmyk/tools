@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBS管理（カンバン）アドイン 操作マニュアル</title>
+<style>
+:root{
+  --ink:#1C2733; --ink-soft:#5B6B7B; --ink-faint:#93A1AF;
+  --bg:#f3f5f7; --card:#ffffff; --line:#e2e7ec;
+  --accent:#0E7A5F; --accent-soft:#e4f2ed;
+  --st-todo:#93A1AF; --st-held:#D98324; --st-doing:#1F8FE5; --st-done:#7C8794;
+  --st-delay:#E5484D; --st-active:#2E9E6B; --star:#F5B301;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Segoe UI Variable","Segoe UI","Yu Gothic UI","Hiragino Sans",Meiryo,sans-serif;
+  font-size:15px; line-height:1.75;
+}
+a{color:var(--accent); text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+.top{
+  background:#20303c; color:#fff; padding:28px 32px;
+  display:flex; align-items:center; gap:16px;
+}
+.top .badge{
+  width:40px; height:40px; border-radius:8px; background:var(--accent);
+  display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:13px; flex:0 0 auto;
+}
+.top h1{ margin:0; font-size:20px; font-weight:bold; }
+.top p{ margin:2px 0 0; font-size:12px; opacity:.75; }
+
+.layout{ display:flex; align-items:flex-start; max-width:1100px; margin:0 auto; }
+nav.toc{
+  position:sticky; top:0; flex:0 0 220px; padding:28px 16px 60px;
+  height:100vh; overflow-y:auto; font-size:13px;
+}
+nav.toc .grp{ color:var(--ink-faint); font-size:11px; margin:16px 0 4px; letter-spacing:.03em; }
+nav.toc a{ display:block; color:var(--ink-soft); padding:5px 10px; border-radius:6px; margin:1px 0; }
+nav.toc a:hover{ background:#e8ecf1; text-decoration:none; }
+
+main{ flex:1; min-width:0; padding:28px 32px 80px; }
+section{ margin-bottom:44px; scroll-margin-top:16px; }
+h2{ font-size:18px; margin:0 0 14px; padding-bottom:8px; border-bottom:2px solid var(--accent); display:inline-block; }
+h3{ font-size:15px; margin:22px 0 8px; }
+p{ margin:0 0 12px; }
+ul,ol{ margin:0 0 14px; padding-left:22px; }
+li{ margin-bottom:5px; }
+.card-box{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 20px; margin:14px 0; }
+.note{ background:#fff8e6; border:1px solid #f0dca0; border-radius:8px; padding:10px 14px; font-size:13px; color:#7a5c00; }
+.tip{ background:var(--accent-soft); border:1px solid #b7ddce; border-radius:8px; padding:10px 14px; font-size:13px; color:#0b5c47; }
+table{ width:100%; border-collapse:collapse; font-size:13px; margin:10px 0; }
+th,td{ border:1px solid var(--line); padding:6px 10px; text-align:left; vertical-align:top; }
+th{ background:#eef1f5; color:var(--ink-soft); font-weight:bold; white-space:nowrap; }
+code{ background:#eef1f5; padding:1px 5px; border-radius:4px; font-size:12px; }
+
+/* ---------- ミニUI再現（本物のアドインと同じ配色トークン） ---------- */
+.mini-filterbar{
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+  background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:12px 0;
+}
+.mini-search{ display:flex; align-items:center; gap:4px; border:1px solid var(--line); border-radius:16px; padding:4px 10px; font-size:12px; color:var(--ink-faint); }
+.mini-chip{ border:1px solid var(--line); border-radius:16px; padding:4px 10px; font-size:12px; color:var(--ink-soft); background:#fff; }
+.mini-chip.selected{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:bold; }
+.mini-seg{ display:flex; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+.mini-seg span{ padding:4px 9px; font-size:12px; color:var(--ink-soft); }
+.mini-seg span.active{ background:var(--accent-soft); color:var(--accent); font-weight:bold; }
+.mini-toggle{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); }
+.mini-switch{ width:26px; height:15px; border-radius:8px; background:var(--accent); position:relative; }
+.mini-switch::after{ content:""; position:absolute; right:2px; top:2px; width:11px; height:11px; border-radius:50%; background:#fff; }
+
+.mini-board{ display:flex; gap:8px; overflow-x:auto; padding:10px 0 4px; }
+.mini-lane{ flex:0 0 150px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px; }
+.mini-lane-head{ font-size:12px; font-weight:bold; color:var(--ink-soft); padding:2px 2px 8px; display:flex; align-items:center; gap:6px; }
+.mini-lane-head .dot{ width:7px; height:7px; border-radius:50%; background:var(--ink-faint); }
+.mini-card{
+  background:#fff; border-radius:7px; padding:7px 8px; margin-bottom:7px; font-size:11.5px;
+  box-shadow:0 1px 2px rgba(28,39,51,.08); position:relative; padding-left:11px;
+}
+.mini-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:7px 0 0 7px; background:var(--ink-faint); }
+.mini-card.c-delay::before{ background:var(--st-delay); }
+.mini-card.c-active::before{ background:var(--st-active); }
+.mini-card.c-done::before{ background:var(--st-done); }
+.mini-card.c-held::before{ background:var(--st-held); }
+.mini-card .meta{ display:flex; justify-content:space-between; align-items:center; color:var(--ink-faint); font-size:10.5px; margin-bottom:3px; }
+.mini-card .av{ width:16px; height:16px; border-radius:50%; background:#7c8794; color:#fff; font-size:9px; display:inline-flex; align-items:center; justify-content:center; }
+.mini-card .star{ color:var(--star); }
+.mini-card .badge-todo{ background:#eef1f5; color:var(--ink-soft); font-size:10px; padding:1px 6px; border-radius:8px; }
+
+.type-legend{ display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 16px; }
+.type-legend .item{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); }
+.type-legend .sw{ width:4px; height:16px; border-radius:2px; }
+
+.mini-modal{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; }
+.mini-modal textarea-like{ display:block; }
+.mini-note{ background:#f7f8f9; border:1px solid var(--line); border-radius:6px; padding:8px; font-size:12px; white-space:pre-wrap; margin-bottom:10px; }
+.mini-sk-board{ display:flex; gap:6px; }
+.mini-sk-lane{ flex:1; background:#f7f8f9; border-radius:8px; padding:6px; }
+.mini-sk-head{ font-size:11px; font-weight:bold; color:var(--ink-soft); margin-bottom:5px; }
+.mini-sk-card{ background:#fff; border-radius:5px; padding:5px 6px; font-size:11px; margin-bottom:5px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+
+.mini-form{ display:grid; grid-template-columns:90px 1fr; gap:8px 10px; font-size:12px; align-items:center; margin:10px 0; }
+.mini-form label{ color:var(--ink-soft); }
+.mini-form .field{ border:1px solid var(--line); border-radius:5px; padding:5px 8px; background:#fff; color:var(--ink-faint); }
+
+.flow{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; margin:8px 0; }
+.flow .step{ background:#eef1f5; border-radius:6px; padding:4px 10px; }
+.flow .step.held{ background:#fdecd8; color:#a05a10; }
+.flow .step.done{ background:var(--accent-soft); color:var(--accent); }
+.flow .arrow{ color:var(--ink-faint); }
+
+footer{ text-align:center; color:var(--ink-faint); font-size:12px; padding:20px 0 40px; }
+
+@media (max-width: 820px){
+  .layout{ display:block; }
+  nav.toc{ position:static; height:auto; width:auto; padding:16px 20px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+  nav.toc .grp{ display:none; }
+  main{ padding:20px; }
+  .mini-form{ grid-template-columns:80px 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="badge">WBS</div>
+  <div>
+    <h1>WBS管理（カンバン）アドイン 操作マニュアル</h1>
+    <p>対象シート「wbs」／Excel タスクペイン アドイン</p>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="grp">基本</div>
+    <a href="#overview">1. このアドインでできること</a>
+    <a href="#screen">2. 画面のみかた</a>
+    <div class="grp">絞り込み・表示</div>
+    <a href="#filter">3. フィルタ機能</a>
+    <a href="#card">4. カードの見かた（色・アイコン）</a>
+    <div class="grp">操作</div>
+    <a href="#operate">5. 基本操作（クリック・ドラッグ）</a>
+    <a href="#note">6. 備考編集とサブタスクカンバン</a>
+    <a href="#taskadd">7. タスク追加</a>
+    <div class="grp">困ったとき</div>
+    <a href="#faq">8. よくある質問</a>
+    <a href="#columns">9. 列の対応表</a>
+  </nav>
+
+  <main>
+
+    <section id="overview">
+      <h2>1. このアドインでできること</h2>
+      <p>Excel の「wbs」シートのタスクを、未着手・保留・対応中・完了の4レーンのカンバンボードで確認・操作できるアドインです。ドラッグ＆ドロップで状態を変更すると、シート側の実績日・ステータス・備考の記号が自動的に更新されます。</p>
+      <ul>
+        <li><b>ボード表示</b>：担当者・分類・期間で絞り込みながら、タスクをカードで一覧</li>
+        <li><b>ドラッグ操作</b>：レーン間の移動だけで実績日・状態を記録</li>
+        <li><b>備考モーダル</b>：右クリックで開き、さらに備考内にサブタスクの3レーンカンバンを持てる</li>
+        <li><b>タスク追加</b>：ボードから直接、wbsシートへ新規行を挿入</li>
+      </ul>
+      <div class="tip">★（優先タスク）を付けると「本日★」フィルタで一日の最優先タスクだけを抽出できます。朝一番の確認におすすめです。</div>
+    </section>
+
+    <section id="screen">
+      <h2>2. 画面のみかた</h2>
+      <div class="mini-board">
+        <div class="mini-lane"><div class="mini-lane-head"><span class="dot"></span>未着手 <span style="margin-left:auto;color:var(--ink-faint);">2</span></div></div>
+        <div class="mini-lane"><div class="mini-lane-head"><span class="dot" style="background:var(--st-held)"></span>保留 <span style="margin-left:auto;color:var(--ink-faint);">1</span></div></div>
+        <div class="mini-lane"><div class="mini-lane-head"><span class="dot" style="background:var(--st-doing)"></span>対応中 <span style="margin-left:auto;color:var(--ink-faint);">1</span></div></div>
+        <div class="mini-lane"><div class="mini-lane-head"><span class="dot" style="background:var(--st-done)"></span>完了 <span style="margin-left:auto;color:var(--ink-faint);">1</span></div></div>
+      </div>
+      <ul>
+        <li>右上の <b>＋タスク追加</b>：新規タスクを wbs シートへ登録（7章）</li>
+        <li>↻ アイコン：シートを再読み込みしてボードへ反映</li>
+        <li>⚙ アイコン：フィルタ・保留表示などの保存設定をリセット</li>
+        <li>左上のメニューアイコン：他のアドイン（営業報告／バグ管理など）への切り替え</li>
+      </ul>
+    </section>
+
+    <section id="filter">
+      <h2>3. フィルタ機能</h2>
+      <div class="mini-filterbar">
+        <span class="mini-search">🔍 検索</span>
+        <span class="mini-chip selected">担当: 松田 ✕</span>
+        <span class="mini-chip">分類</span>
+        <span class="mini-chip">小分類</span>
+        <span class="mini-seg">
+          <span class="active">全て</span><span>以前</span><span>今週</span><span>来週</span><span>以降</span><span>本日★</span><span>TODO</span>
+        </span>
+        <span class="mini-toggle"><span class="mini-switch"></span>保留</span>
+      </div>
+      <table>
+        <tr><th>項目</th><th>内容</th></tr>
+        <tr><td>検索</td><td>タスク名・備考・分類・小分類を横断検索。ヒット箇所はカード上で黄色くハイライトされます。</td></tr>
+        <tr><td>担当者／分類</td><td>チップをクリックしてドロップダウンから1件選択。選択中はチップが緑色になり、✕でクリア。</td></tr>
+        <tr><td>小分類</td><td>大分類（分類）を選んだときだけ絞り込み対象が表示されます。</td></tr>
+        <tr><td>期間セグメント</td><td>全て／以前／今週／来週／以降／<b>本日★</b>（スター付きのみ）／<b>TODO</b>（日付未設定のみ）</td></tr>
+        <tr><td>保留トグル</td><td>OFF にすると保留レーンごと非表示にできます（一時的に隠したいとき用）。</td></tr>
+      </table>
+      <p>選択した条件・保留表示のON/OFFはブラウザに保存され、次にアドインを開いたときも復元されます。</p>
+    </section>
+
+    <section id="card">
+      <h2>4. カードの見かた（色・アイコン）</h2>
+      <p>カード左端の色（色レール）で状態がひと目でわかります。</p>
+      <div class="type-legend">
+        <div class="item"><span class="sw" style="background:var(--st-delay);"></span>赤＝遅延（終了予定日を過ぎている）</div>
+        <div class="item"><span class="sw" style="background:var(--st-active);"></span>緑＝期間内（今日が開始〜終了の間）</div>
+        <div class="item"><span class="sw" style="background:var(--st-held);"></span>オレンジ＝保留</div>
+        <div class="item"><span class="sw" style="background:var(--st-done);"></span>グレー＝完了</div>
+      </div>
+      <div class="mini-board">
+        <div class="mini-lane" style="flex:0 0 100%;">
+          <div class="mini-card c-delay">
+            <div class="meta"><span>6/20 → 6/30</span><span class="av">松</span></div>
+            <div>ネット予約LINE連携の実装</div>
+          </div>
+          <div class="mini-card c-active">
+            <div class="meta"><span><span class="badge-todo">TODO</span></span><span class="star">★</span></div>
+            <div>デザインレビュー対応</div>
+          </div>
+          <div class="mini-card c-held">
+            <div class="meta"><span>7/1 → 7/10</span><span class="av">紺</span></div>
+            <div>他案件優先のため保留中</div>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li><b>日付</b>：1行目に予定開始日→予定終了日。日付が未設定の場合は「TODO」バッジになり、全期間表示でのみ対象になります。</li>
+        <li><b>担当者アバター</b>：担当者名の頭文字を色付きの丸で表示（同じ担当者は同じ色）。</li>
+        <li><b>★／☆</b>：クリックで「本日の優先タスク」に切り替え。完了レーンのカードには表示されません。</li>
+        <li><b>実績表示</b>：対応中・完了のカードには「実績 〜」の行が追加され、実際に作業した日付がわかります。</li>
+        <li><b>📝 備考ヒット</b>：検索が備考の中身にヒットした場合のみ、カード下部に該当箇所がプレビュー表示されます。</li>
+      </ul>
+    </section>
+
+    <section id="operate">
+      <h2>5. 基本操作（クリック・ドラッグ）</h2>
+      <ul>
+        <li><b>左クリック</b>：Excel の該当行にジャンプして選択状態にします。</li>
+        <li><b>右クリック</b>：備考編集モーダルを開きます（6章）。</li>
+        <li><b>ドラッグ＆ドロップ</b>：レーン間をドラッグすると、以下が自動的に更新されます。</li>
+      </ul>
+      <table>
+        <tr><th>移動先レーン</th><th>実績開始日(R)</th><th>実績終了日(S)</th><th>備考の記号</th></tr>
+        <tr><td>未着手</td><td>クリア</td><td>クリア</td><td>▲→△（保留から戻した場合）</td></tr>
+        <tr><td>保留</td><td>維持</td><td>完了から移動時のみクリア</td><td>△→▲（先頭行に付与）</td></tr>
+        <tr><td>対応中</td><td>未設定なら今日</td><td>クリア</td><td>▲→△（保留から移動時）</td></tr>
+        <tr><td>完了</td><td>未設定なら今日</td><td>今日</td><td>★を自動削除、▲→△</td></tr>
+      </table>
+      <div class="note">保留レーンは備考の先頭行にある「▲」の有無で判定しています。備考を手入力で編集した場合も、先頭の▲／△の記号を保つようにしてください（編集モーダルを使えば自動で管理されます）。</div>
+    </section>
+
+    <section id="note">
+      <h2>6. 備考編集とサブタスクカンバン</h2>
+      <p>カードを右クリックすると備考編集モーダルが開きます。備考の1行目には状態記号（★／☆・▲／△）が自動的に付与・維持されます。</p>
+      <div class="mini-modal">
+        <div class="mini-note">☆△
+＜タスク＞
+・仕様確認
+＜状況＞
+特になし
+□ デザインFIX
+◎ 実装
+■ レビュー依頼文作成</div>
+        <div class="mini-sk-board">
+          <div class="mini-sk-lane"><div class="mini-sk-head">□ 未着手 (1)</div><div class="mini-sk-card">デザインFIX</div></div>
+          <div class="mini-sk-lane"><div class="mini-sk-head">◎ 対応中 (1)</div><div class="mini-sk-card">実装</div></div>
+          <div class="mini-sk-lane"><div class="mini-sk-head">■ 完了 (1)</div><div class="mini-sk-card">レビュー依頼文作成</div></div>
+        </div>
+      </div>
+      <p>備考テキストの中で行頭が <code>□</code> <code>◎</code> <code>■</code> の行は、下のサブタスクカンバンにも同時に表示されます。</p>
+      <ul>
+        <li><b>カードをドラッグ</b>：レーン間を移動すると、備考テキストの記号（□◎■）が自動的に書き換わります。</li>
+        <li><b>＋追加／Enter</b>：入力欄にサブタスク名を入れて追加すると、備考の末尾に「□ タスク名」が追加されます。</li>
+        <li><b>テキストを直接編集</b>：備考欄を手で書き換えても、サブタスクカンバンは自動的に再描画されます（双方向同期）。</li>
+        <li>保存すると備考欄（O列）に反映され、折り返し無効・行高さ固定で書き込まれます。</li>
+      </ul>
+    </section>
+
+    <section id="taskadd">
+      <h2>7. タスク追加</h2>
+      <p>ヘッダーの<b>＋タスク追加</b>から、ボードを開いたまま wbs シートへ新しいタスク行を挿入できます。</p>
+      <ol>
+        <li>ボタンを押すとフォームが開き、wbs シートが自動的にアクティブなシートになります。</li>
+        <li><b>wbs シート上で、挿入したい位置の行をクリックして選択</b>します（この行の位置に新しい行が挿入されます）。</li>
+        <li>大分類・小分類・タスク名（必須）・担当者・予定開始日・予定終了日を入力し、「OK（選択行に挿入）」を押します。</li>
+      </ol>
+      <div class="mini-form">
+        <label>大分類</label><div class="field">受注 ▾</div>
+        <label>小分類</label><div class="field">EX-01　エキスプレス ▾</div>
+        <label>タスク名 <span style="color:#c00;">必須</span></label><div class="field">見積書ドラフト作成</div>
+        <label>担当者</label><div class="field">小川 ▾</div>
+        <label>予定開始日</label><div class="field">2026-07-21</div>
+        <label>予定終了日</label><div class="field">2026-07-25</div>
+      </div>
+      <div class="tip">大分類で<b>「受注」</b>を選ぶと、小分類が自由入力ではなく「営業報告シートで状態が受注／受託中の案件番号」から選ぶ形式に切り替わります。これにより営業報告アドインの受託中タブにある「WBS状況」の集計と紐付きます。</div>
+      <h3>事前準備・注意事項</h3>
+      <ul>
+        <li>wbs シートの行挿入可能な範囲に、あらかじめ名前「<code>タスク範囲</code>」を定義しておく必要があります（例：A11:FY400 を選択→名前ボックスに入力）。</li>
+        <li>選択した行がこの「タスク範囲」の外にある場合はエラーになり、追加されません。</li>
+        <li>行挿入時、T〜FY列（工程表などの数式列）は隣接する行から数式をコピーして自動的に埋められます。</li>
+        <li>追加後は自動的にボードが再読み込みされ、新しいタスクが反映されます。</li>
+      </ul>
+    </section>
+
+    <section id="faq">
+      <h2>8. よくある質問</h2>
+      <div class="card-box">
+        <b>Q. カードをドラッグしても保留の色にならない</b>
+        <p style="margin-top:6px;">保留レーンへ移動すると備考の先頭行に「▲」が自動で付きます。備考を直接編集して▲を消してしまうと保留の判定が外れるのでご注意ください。</p>
+      </div>
+      <div class="card-box">
+        <b>Q. タスク追加で「名前定義が見つかりません」と出る</b>
+        <p style="margin-top:6px;">wbs シートに「タスク範囲」という名前でセル範囲が定義されていないと表示されます。行挿入してよい範囲を選択し、名前ボックスに「タスク範囲」と入力して定義してください。</p>
+      </div>
+      <div class="card-box">
+        <b>Q. 大分類で「受注」を選んでも小分類の候補が出てこない</b>
+        <p style="margin-top:6px;">営業報告シートで状態が「受注」または「受託中」になっている案件が対象です。該当する案件がない場合は「（対象案件がありません）」と表示されます。</p>
+      </div>
+      <div class="card-box">
+        <b>Q. フィルタや保留表示の設定を元に戻したい</b>
+        <p style="margin-top:6px;">ヘッダーの⚙（設定をリセット）アイコンを押すと、保存されているフィルタ・サイズなどの設定がすべて初期状態に戻ります。</p>
+      </div>
+    </section>
+
+    <section id="columns">
+      <h2>9. 列の対応表（参考）</h2>
+      <table>
+        <tr><th>列</th><th>項目</th><th>列</th><th>項目</th></tr>
+        <tr><td>A</td><td>大分類</td><td>P</td><td>予定開始日</td></tr>
+        <tr><td>B</td><td>小分類</td><td>Q</td><td>予定終了日</td></tr>
+        <tr><td>E</td><td>タスク名</td><td>R</td><td>実績開始日</td></tr>
+        <tr><td>H</td><td>状態（未着手／保留／対応中／完了）</td><td>S</td><td>実績終了日</td></tr>
+        <tr><td>N</td><td>担当者</td><td>T〜FY</td><td>（工程表など・数式列）</td></tr>
+        <tr><td>O</td><td>備考（状態記号・サブタスクを含む）</td><td></td><td></td></tr>
+      </table>
+      <div class="note">11行目以降がタスクデータの対象です。行挿入によるタスク追加を使う場合は、あらかじめ「タスク範囲」の名前定義が必要です（7章参照）。</div>
+    </section>
+
+    <footer>WBS管理（カンバン）アドイン 操作マニュアル ／ RightArm</footer>
+  </main>
+</div>
+
+</body>
+</html>
