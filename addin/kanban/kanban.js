@@ -1,16 +1,6 @@
-/* ============================================================
- * kanban.js — Excel Kanban（新UI版）
- * ------------------------------------------------------------
- * Excel連携ロジック（列定義・ステータス判定・DnD更新・
- * 備考編集・スター・フィルタ保存）は旧版を踏襲。
- * UI描画をチップフィルタ／セグメント／色レールカードに刷新し、
- * 検索（タスク名・備考・分類）と共通スライドメニューを追加。
- *
- * レイアウトのペイン追従はCSS(flex)に一本化したため、
- * 旧版のJSによるレーン幅・高さ計算処理は廃止。
- * ============================================================ */
+const APP_VERSION = "rev_20260621_545bd8c";
 
-const APP_VERSION = "rev_20260720_ddba663";
+// window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -21,133 +11,552 @@ let selectedUser = null;
 let selectedCategory = null;
 let selectedSubCategory = null;
 let selectedPeriod = "all";
-let showHeld = true;
-let searchQuery = "";
+let showHeld = true; // 保留表示フラグ
 
-if (window.Office && Office.onReady) {
-  Office.onReady(() => {
-    restoreSavedFilters();
-    restoreHeldDisplay();
-    bindStaticUI();
-    init();
-  });
-} else {
-  // ブラウザ直接表示（開発確認用）: Excel連携なしでUIのみ初期化
-  window.addEventListener("DOMContentLoaded", () => {
-    restoreSavedFilters();
-    restoreHeldDisplay();
-    bindStaticUI();
-    const v = document.getElementById("version-label");
-    if (v) v.textContent = APP_VERSION + " (no-office)";
-  });
-}
+// レーン高さ調整のデバウンス用変数
+let heightAdjustTimeout = null;
+let isAdjustingHeights = false;
 
-/* ============================================================
-   初期化
-   ============================================================ */
-async function init() {
-  await loadExcelData();
-  renderFilters();
-  renderPeriodSegment();
-  renderBoard();
-
-  const v = document.getElementById("version-label");
-  if (v) v.textContent = APP_VERSION;
-}
-
-/* 静的UIのイベント（初回のみ） */
-function bindStaticUI() {
-  // 検索
-  const input = document.getElementById("search-input");
-  const clearBtn = document.getElementById("search-clear");
-
-  input.addEventListener("input", () => {
-    searchQuery = input.value.trim();
-    renderBoard();
-  });
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      input.value = "";
-      searchQuery = "";
-      renderBoard();
-    }
-  });
-  clearBtn.addEventListener("click", () => {
-    input.value = "";
-    searchQuery = "";
-    renderBoard();
-    input.focus();
-  });
-
-  // 期間セグメント
-  document.querySelectorAll("#seg-period button").forEach(b => {
-    b.addEventListener("click", () => setPeriod(b.dataset.p));
-  });
-
-  // ドロップダウンの外側クリックで閉じる
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".chip") && !e.target.closest(".dropdown")) {
-      closeAllDropdowns();
-    }
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeAllDropdowns();
-  });
-
-  // 保留トグルの初期表示
-  document.getElementById("held-toggle").classList.toggle("on", showHeld);
-}
-
-/* ============================================================
-   設定の保存・復元（localStorage）
-   ============================================================ */
-function restoreSavedFilters() {
+Office.onReady(() => {
   try {
-    const saved = localStorage.getItem("kanban-filters");
-    if (saved) {
-      const f = JSON.parse(saved);
-      selectedUsers = Array.isArray(f.users) ? f.users : (f.user ? [f.user] : []);
-      selectedCategories = Array.isArray(f.categories) ? f.categories : (f.category ? [f.category] : []);
-      selectedSubCategories = Array.isArray(f.subCategories) ? f.subCategories : (f.subCategory ? [f.subCategory] : []);
-      selectedPeriod = f.period || "all";
+    // 保存されたサイズを復元
+    restoreSavedSize();
+
+    // 保存されたフィルター設定を復元
+    restoreSavedFilters();
+
+    // フィルターセクションの表示状態を復元
+    restoreFilterSectionState();
+
+    // 保留表示設定を復元
+    restoreHeldDisplay();
+  } catch (e) {
+    // ここで例外が起きると init() が呼ばれず、データ読み込みが一切走らなくなるため
+    // 個別のエラーは握りつぶして必ず init() まで到達させる
+    console.error("[kanban] 初期化前処理でエラー（復元処理をスキップして続行）:", e);
+  }
+
+  init().catch(e => {
+    console.error("[kanban] init()で捕捉されなかったエラー:", e);
+    showLoadError(e);
+  });
+});
+
+// ===== サイズ記憶機能 =====
+function restoreSavedSize() {
+  try {
+    const savedSize = localStorage.getItem('kanban-taskpane-size');
+    if (savedSize) {
+      const size = JSON.parse(savedSize);
+      
+// 最小サイズの制限（デスクトップ版対応で極小に設定）
+  const minWidth = 120;
+  const minHeight = 300;
+  const width = Math.max(size.width || 120, minWidth);
+      const height = Math.max(size.height || 600, minHeight);
+      
+      // DOM要素のサイズを設定
+      document.documentElement.style.minWidth = width + "px";
+      document.body.style.minWidth = width + "px";
+      
+      // Office APIを使用してタスクペインのサイズを設定（可能な場合）
+      if (Office.context.requirements.isSetSupported('TaskPaneApp', '1.1')) {
+        try {
+          Office.addin.setTaskpaneSize(width, height);
+        } catch (e) {
+          console.log("TaskPane resize not supported:", e);
+        }
+      }
+      
+      // 親ウィンドウへのサイズヒント
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+          type: 'resize',
+          width: width,
+          height: height
+        }, '*');
+      }
+      
+      console.log(`Restored size: ${width}x${height}`);
+    } else {
+      // デフォルトサイズを設定
+      setDefaultSize();
     }
   } catch (e) {
-    selectedUsers = [];
-    selectedCategories = [];
-    selectedSubCategories = [];
+    console.log("Size restoration error:", e);
+    setDefaultSize();
+  }
+}
+
+function setDefaultSize() {
+  const defaultWidth = 120;
+  const defaultHeight = 600;
+  
+  document.documentElement.style.minWidth = defaultWidth + "px";
+  document.body.style.minWidth = defaultWidth + "px";
+  
+  if (window.parent && window.parent.postMessage) {
+    window.parent.postMessage({
+      type: 'resize',
+      width: defaultWidth,
+      height: defaultHeight
+    }, '*');
+  }
+}
+
+function setupSizeMonitoring() {
+  let saveTimeout;
+  let adjustTimeout;
+  let resizeTimeout;
+  let isPerformingAdjustment = false;
+  
+  // ペインサイズ追従のためのサイズ調整関数（デバウンス強化版）
+  function performSizeAdjustment() {
+    // 既に調整中の場合はスキップして無限ループを防ぐ
+    if (isPerformingAdjustment) {
+      return;
+    }
+    
+    clearTimeout(adjustTimeout);
+    adjustTimeout = setTimeout(() => {
+      isPerformingAdjustment = true;
+      try {
+        // ペインの実際の幅と高さを取得
+        const containerWidth = getActualPaneWidth();
+        adjustLaneWidths(containerWidth);
+        // 高さ調整は必要時のみ実行（チラつき防止）
+        if (!isAdjustingHeights) {
+          adjustLaneHeights();
+        }
+      } finally {
+        // 調整完了後にフラグをリセット
+        setTimeout(() => {
+          isPerformingAdjustment = false;
+        }, 100);
+      }
+    }, 100); // より長いディレイで安定化
+  }
+  
+  // ResizeObserverでサイズ変更を監視（デバウンス強化）
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(entries => {
+      // ResizeObserver自体もデバウンスして頻繁な発動を制限
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          
+          // サイズ調整を実行（内部でデバウンス済み）
+          performSizeAdjustment();
+          
+          // ストレージ保存のデバウンス処理
+          clearTimeout(saveTimeout);
+          saveTimeout = setTimeout(() => {
+            saveSizeToStorage(Math.round(width), Math.round(height));
+          }, 800); // 保存はさらに遅延
+        }
+      }, 150); // ResizeObserver自体のデバウンス
+    });
+    
+    // 複数の要素を監視して確実にサイズ変更を補捉
+    resizeObserver.observe(document.documentElement); // メインコンテナ
+    resizeObserver.observe(document.body); // body要素
+    
+    // board要素も監視（より正確な幅検知のため）
+    const boardElement = document.getElementById('board');
+    if (boardElement) {
+      resizeObserver.observe(boardElement);
+    }
+  } else {
+    // ResizeObserverが利用できない場合はwindowのresizeイベントを使用
+    let lastWidth = getActualPaneWidth();
+    let lastHeight = document.body.clientHeight || window.innerHeight;
+    
+    window.addEventListener('resize', () => {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        const currentWidth = getActualPaneWidth();
+        const currentHeight = document.body.clientHeight || window.innerHeight;
+        
+        if (Math.abs(currentWidth - lastWidth) > 1 || Math.abs(currentHeight - lastHeight) > 1) {
+          performSizeAdjustment();
+          saveSizeToStorage(currentWidth, currentHeight);
+          lastWidth = currentWidth;
+          lastHeight = currentHeight;
+        }
+      }, 50); // より短いディレイ
+    });
+  }
+  
+  // MutationObserverでDOM変更も監視（カード追加時等）
+  const mutationObserver = new MutationObserver(() => {
+    performSizeAdjustment();
+  });
+  
+  const boardElement = document.getElementById('board');
+  if (boardElement) {
+    mutationObserver.observe(boardElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style']
+    });
+  }
+  
+  // 初期表示時にも調整を実行
+  setTimeout(() => {
+    performSizeAdjustment();
+  }, 50);
+  
+  // ウィンドウフォーカス時にも再調整
+  window.addEventListener('focus', () => {
+    setTimeout(performSizeAdjustment, 100);
+  });
+}
+
+// 実際のペイン幅を正確に取得する関数（デスクトップ版対応強化）
+function getActualPaneWidth() {
+  // 複数の方法で幅を取得し、最も正確なものを選択
+  const bodyWidth = document.body.clientWidth;
+  const bodyOffsetWidth = document.body.offsetWidth;
+  const docElementWidth = document.documentElement.clientWidth;
+  const windowWidth = window.innerWidth;
+  
+  // デスクトップ版とWeb版の差を考慮した幅取得
+  let paneWidth = Math.max(bodyWidth || 0, docElementWidth || 0);
+  
+  // デスクトップ版で幅が正確に取得できない場合の対策
+  if (paneWidth <= 0 || paneWidth > 2000) {
+    paneWidth = Math.min(windowWidth || 300, bodyOffsetWidth || 300);
+  }
+  
+  // 最低幅を保証（デスクトップ版対応で極小設定）
+  return Math.max(paneWidth, 120);
+}
+
+// ===== レーン幅調整機能 =====
+function adjustLaneWidths(containerWidth) {
+  // 実際のコンテナ幅を正確に取得
+  if (!containerWidth) {
+    containerWidth = getActualPaneWidth();
+  }
+  
+  // ペイン幅に完全追従するための計算（デスクトップ版対応でさらに極小設定）
+  const margin = 1; // body marginを最小にして最大限活用
+  const gap = 2; // レーン間ギャップを最小にしてデスクトップ版に対応
+  const padding = 3; // レーン内paddingを最小にしてカード領域を確保
+  
+  // ボードの利用可能幅を最大限活用
+  const boardTotalWidth = Math.max(containerWidth - (margin * 2), 120);
+  
+  // 保留レーンが表示されているか確認
+  const heldLane = document.getElementById('held');
+  const isHeldVisible = showHeld && heldLane && heldLane.style.display !== 'none';
+  const laneCount = isHeldVisible ? 4 : 3;
+  
+  // ギャップの合計幅を算出
+  const totalGapWidth = gap * (laneCount - 1);
+  
+  // レーンコンテンツの利用可能幅
+  const availableWidth = boardTotalWidth - totalGapWidth;
+  
+  // 各レーンの幅を計算（等幅分割でペインをフル活用）
+  let laneWidth = Math.floor(availableWidth / laneCount);
+  
+  // 最小幅の保証（カード48px + padding）をデスクトップ版対応で最小に
+  const minLaneWidth = 48 + padding; 
+  laneWidth = Math.max(laneWidth, minLaneWidth);
+  
+  // ボード全体をペイン幅に完全追従させる
+  const boardElement = document.getElementById('board');
+  if (boardElement) {
+    boardElement.style.width = '100%'; // ペイン幅に完全追従
+    boardElement.style.maxWidth = 'none';
+    boardElement.style.minWidth = '120px';
+    boardElement.style.boxSizing = 'border-box';
+  }
+  
+  // CSSでレーン幅を動的に設定（ペイン全体を活用）
+  const lanes = document.querySelectorAll('.lane');
+  lanes.forEach(lane => {
+    // 保留レーンが非表示の場合はスキップ
+    if (lane.id === 'held' && !isHeldVisible) {
+      lane.style.display = 'none';
+      return;
+    }
+    
+    // 保留レーンが表示される場合は表示
+    if (lane.id === 'held' && isHeldVisible) {
+      lane.style.display = 'flex';
+    }
+    
+    // レーン幅をペインに完全追従させる
+    lane.style.width = laneWidth + 'px';
+    lane.style.minWidth = minLaneWidth + 'px';
+    lane.style.maxWidth = laneWidth + 'px';
+    lane.style.flex = `0 0 ${laneWidth}px`; // 明示的なflex-basisを指定
+    lane.style.flexShrink = '0'; // 縮小を防ぐ
+    lane.style.flexGrow = '0'; // 拡大を防ぐ
+    lane.style.boxSizing = 'border-box';
+  });
+  
+  // カードをレーン幅に完全追従させる
+  adjustCardWidths(laneWidth - padding);
+  
+  // console.log(`Pane-following adjustment: Pane=${containerWidth}px, Lane=${laneWidth}px (${laneCount} lanes), Board=${boardTotalWidth}px`);
+}
+
+// カード幅の調整 - ペイン幅に完全追従
+function adjustCardWidths(maxCardWidth) {
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(card => {
+    // カードをレーン幅に完全追従させる
+    card.style.width = '100%'; 
+    card.style.minWidth = '48px'; // 最小幅をデスクトップ版対応で最小に
+    card.style.maxWidth = 'none'; // 最大幅制限を完全解除
+    card.style.boxSizing = 'border-box';
+    card.style.wordWrap = 'break-word'; // 長いテキストの折り返し
+    card.style.overflowWrap = 'break-word';
+    card.style.flexShrink = '0'; // カードの縮小を制限
+    card.style.width = '100%'; // レーンの全幅を使用
+  });
+}
+
+// 実際のペイン高さを正確に取得する関数
+function getActualPaneHeight() {
+  // 複数の方法で高さを取得し、最も正確なものを選択
+  const bodyHeight = document.body.clientHeight;
+  const bodyOffsetHeight = document.body.offsetHeight;
+  const docElementHeight = document.documentElement.clientHeight;
+  const windowHeight = window.innerHeight;
+  
+  // タスクペインの場合は通常bodyのclientHeightが最も適切
+  let paneHeight = Math.max(bodyHeight || 0, docElementHeight || 0);
+  
+  // フォールバックとしてwindowHeightを使用
+  if (paneHeight <= 0) {
+    paneHeight = windowHeight || 600;
+  }
+  
+  // 上部要素（フィルター等）の高さを動的に計算
+  const boardElement = document.getElementById('board');
+  let topBarHeight = 150; // デフォルト値
+  
+  if (boardElement) {
+    // ボード要素の位置から上部要素の高さを計算
+    const boardRect = boardElement.getBoundingClientRect();
+    topBarHeight = Math.max(boardRect.top, 100); // 最小100pxを保証
+  }
+  
+  // 利用可能高さを計算（下部余白も考慮）
+  const availableHeight = Math.max(paneHeight - topBarHeight - 20, 200);
+  
+  return availableHeight;
+}
+
+// ===== レーン高さ調整機能（チラつき防止版） =====
+function adjustLaneHeights() {
+  // 既に調整中の場合はスキップしてチラつきを防ぐ
+  if (isAdjustingHeights) {
+    return;
+  }
+  
+  // デバウンス処理を200msに延長してスクロール操作との競合を削減
+  clearTimeout(heightAdjustTimeout);
+  heightAdjustTimeout = setTimeout(() => {
+    performHeightAdjustment();
+  }, 200);
+}
+
+function performHeightAdjustment() {
+  if (isAdjustingHeights) return;
+  isAdjustingHeights = true;
+  
+  try {
+    const lanes = document.querySelectorAll('.lane');
+    const maxPaneHeight = getActualPaneHeight();
+    
+    const visibleLanes = Array.from(lanes).filter(lane => 
+      lane.style.display !== 'none'
+    );
+    
+    if (visibleLanes.length === 0) {
+      isAdjustingHeights = false;
+      return;
+    }
+    
+    // 1. 一時的に全レーンの高さをリセット（非表示で測定）
+    visibleLanes.forEach(lane => {
+      lane.style.visibility = 'hidden'; // チラつき防止
+      lane.style.height = 'auto';
+      lane.style.minHeight = 'auto';
+      lane.style.maxHeight = 'none';
+    });
+    
+    // 2. DOM更新を強制実行してから測定（同期的）
+    document.body.offsetHeight; // reflowを強制実行
+    
+    let maxNaturalHeight = 0;
+    
+    // 3. 各レーンの実際の高さを測定
+    visibleLanes.forEach(lane => {
+      const naturalHeight = lane.offsetHeight;
+      if (naturalHeight > maxNaturalHeight) {
+        maxNaturalHeight = naturalHeight;
+      }
+    });
+    
+    // 4. 最終的なレーン高さを決定
+    const finalHeight = Math.min(
+      Math.max(maxNaturalHeight, 150), 
+      maxPaneHeight
+    );
+    
+    // 5. 全レーンを同じ高さに統一（一括変更）
+    visibleLanes.forEach(lane => {
+      // スクロール位置を保存
+      const cardList = lane.querySelector('.card-list');
+      const scrollTop = cardList ? cardList.scrollTop : 0;
+      
+      lane.style.height = finalHeight + 'px';
+      lane.style.minHeight = finalHeight + 'px';
+      lane.style.maxHeight = finalHeight + 'px';
+      lane.style.overflowY = 'auto'; // スクロール可能に変更
+      lane.style.overflowX = 'hidden';
+      lane.style.visibility = 'visible'; // 表示を復活
+      
+      // スクロール位置を復元
+      if (cardList && scrollTop > 0) {
+        cardList.scrollTop = scrollTop;
+      }
+    });
+    
+    // console.log(`Lane heights optimized: natural-max=${maxNaturalHeight}px, final=${finalHeight}px, pane-limit=${maxPaneHeight}px`);
+    
+  } finally {
+    isAdjustingHeights = false;
+  }
+}
+
+function saveSizeToStorage(width, height) {
+  try {
+    const sizeData = {
+      width: width,
+      height: height,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem('kanban-taskpane-size', JSON.stringify(sizeData));
+    console.log(`Saved size: ${width}x${height}`);
+  } catch (e) {
+    console.log("Size saving error:", e);
+  }
+}
+
+// サイズ設定をリセットする関数
+function resetSize() {
+  try {
+    localStorage.removeItem('kanban-taskpane-size');
+    localStorage.removeItem('kanban-filters');
+    console.log("Size and filter settings reset");
+    
+    // ページをリロードして新しい設定を適用
+    window.location.reload();
+  } catch (e) {
+    console.log("Reset error:", e);
+  }
+}
+
+// ===== フィルター記憶機能 =====
+function restoreSavedFilters() {
+  try {
+    const savedFilters = localStorage.getItem('kanban-filters');
+    if (savedFilters) {
+      const filters = JSON.parse(savedFilters);
+      
+      selectedUser = filters.user || null;
+      selectedCategory = filters.category || null;
+      selectedSubCategory = filters.subCategory || null;
+      selectedPeriod = filters.period || "all";
+      
+      console.log('Restored filters:', filters);
+    }
+  } catch (e) {
+    console.log("Filter restoration error:", e);
+    // エラー時はデフォルト値を維持
+    selectedUser = null;
+    selectedCategory = null; 
     selectedPeriod = "all";
   }
 }
 
 function saveFilters() {
   try {
-    localStorage.setItem("kanban-filters", JSON.stringify({
-      users: selectedUsers,
-      categories: selectedCategories,
-      subCategories: selectedSubCategories,
+    const filterData = {
+      user: selectedUser,
+      category: selectedCategory,
+      subCategory: selectedSubCategory,
       period: selectedPeriod,
       timestamp: Date.now()
-    }));
-  } catch (e) { /* noop */ }
+    };
+    
+    localStorage.setItem('kanban-filters', JSON.stringify(filterData));
+    console.log('Saved filters:', filterData);
+  } catch (e) {
+    console.log("Filter saving error:", e);
+  }
 }
 
-function restoreHeldDisplay() {
-  const saved = localStorage.getItem("kanban-show-held");
-  showHeld = saved !== null ? saved === "true" : true;
-}
-
-function resetSettings() {
+async function init() {
+  // 保存されたサイズまたはデフォルトサイズを適用
   try {
-    localStorage.removeItem("kanban-filters");
-    localStorage.removeItem("kanban-show-held");
-    localStorage.removeItem("kanban-taskpane-size"); // 旧版の残骸も掃除
-    window.location.reload();
-  } catch (e) { /* noop */ }
+    const savedSize = localStorage.getItem('kanban-taskpane-size');
+    let minWidth = 200;
+    
+    if (savedSize) {
+      const size = JSON.parse(savedSize);
+      minWidth = Math.max(size.width || 200, 200);
+    }
+    
+    document.documentElement.style.minWidth = minWidth + "px";
+    document.body.style.minWidth = minWidth + "px";
+  } catch (e) {
+    // エラー時はデフォルトサイズ
+    document.documentElement.style.minWidth = "200px";
+    document.body.style.minWidth = "200px";
+  }
+  
+  // ボードコンテナをペイン幅に完全追従させる
+  const boardEl = document.getElementById("board");
+  if (boardEl) {
+    boardEl.style.width = "100%"; // ペイン幅に完全追従
+    boardEl.style.maxWidth = "100%";
+    boardEl.style.minWidth = "200px";
+    boardEl.style.boxSizing = "border-box";
+  }
+
+  await loadExcelData();
+  renderFilters();
+  renderBoard();
+  renderPeriodFilter();
+  
+  // サイズ監視を開始（初期化後に実行）
+  setupSizeMonitoring();
+  
+  // 初期化完了後に一度だけレイアウト調整
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    adjustLaneHeights();
+  }, 500); // 遅延を延長してDOM安定化を確実に待つ
+  
+  // バージョン表示を更新
+  if (typeof updateVersionDisplay === 'function') {
+    updateVersionDisplay();
+  }
 }
 
-/* ============================================================
-   Excel日付変換
-   ============================================================ */
+// ===== Excel日付変換 =====
 function excelDateToJS(value) {
   if (!value) return null;
   if (typeof value === "number") {
@@ -159,584 +568,445 @@ function excelDateToJS(value) {
 function fmt(v) {
   const d = excelDateToJS(v);
   if (!d || isNaN(d)) return "";
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${d.getMonth()+1}/${d.getDate()}`;
 }
 
-/* ============================================================
-   データ取得（列定義は旧版と同一）
-   A:分類 B:小分類 N:担当 O:備考 P:開始 Q:終了
-   R:実績開始 S:実績終了 T:除外("-") Y:ID Z:タイトル
-   ============================================================ */
+// ===== データ取得 =====
 async function loadExcelData() {
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const range = sheet.getUsedRange();
-    range.load("values");
-    await ctx.sync();
+  try {
+    let loadedTasks = null;
 
-    const rows = range.values;
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
 
-    allTasks = rows.slice(10).map((row, i) => {
-      if (!row[25] || row[19] === "-") return null;
+      // getUsedRangeOrNullObject でシート名不一致・空シートでも例外にせず検知できるようにする
+      const range = sheet.getUsedRangeOrNullObject();
+      range.load(["values", "isNullObject", "rowCount", "columnCount", "address"]);
+      await ctx.sync();
 
-      const t = {
-        id: row[24],
-        category: row[0],
-        classification: row[1],
-        title: row[25],
-        user: row[13],
-        start: row[15],
-        end: row[16],
-        actualStart: row[17],
-        actualEnd: row[18],
-        note: row[14],
-        rowIndex: i + 11,
+      if (range.isNullObject) {
+        console.warn("[kanban] wbsシートにデータがありません（getUsedRangeがnull）");
+        loadedTasks = [];
+        return;
+      }
 
-        isNoSchedule: !row[15] && !row[16],
-        isStar: row[14] && row[14].toString().startsWith("★")
-      };
+      console.log(`[kanban] usedRange取得: address=${range.address}, rows=${range.rowCount}, cols=${range.columnCount}`);
 
-      t.status = getStatus(t);
-      return t;
-    }).filter(x => x);
-  });
+      const rows = range.values;
+
+      loadedTasks = rows.slice(10).map((row, i) => {
+        if (!row[25] || row[19] === "-") return null;
+
+        const t = {
+          id: row[24],
+          category: row[0],
+          classification: row[1],  // B列の分類を追加
+          title: row[25],
+          user: row[13],
+          start: row[15],
+          end: row[16],
+          actualStart: row[17],
+          actualEnd: row[18],
+          note: row[14],
+          rowIndex: i + 11,
+
+          isNoSchedule: !row[15] && !row[16],
+          isStar: row[14] && row[14].toString().startsWith('★')  // 備考の先頭に★があるかチェック
+        };
+
+        t.status = getStatus(t);
+        return t;
+      }).filter(x => x);
+    });
+
+    // 正常時のみ allTasks を置き換える（読み込み前の状態は既にここまで来ていれば上書きしない設計だが
+    // 例外時は下のcatchで既存allTasksを維持する）
+    allTasks = loadedTasks || [];
+    console.log(`[kanban] loadExcelData成功: ${allTasks.length}件のタスクを取得`);
+    hideLoadError();
+
+  } catch (error) {
+    // ★ここが今回のポイント：エラーを握りつぶさず、コンソールと画面の両方に出す
+    console.error("[kanban] loadExcelDataでエラー発生。読み込みを中断し、既存のallTasksを維持します。", error);
+    console.error("エラー詳細:", error && error.debugInfo ? error.debugInfo : "(debugInfoなし)");
+    showLoadError(error);
+    // allTasks は意図的に変更しない（直前の表示状態を保持し、画面が空白/消失するのを防ぐ）
+  }
 }
 
-/* ============================================================
-   ステータス
-   ============================================================ */
+// ===== 読み込みエラーの可視化 =====
+function showLoadError(error) {
+  let banner = document.getElementById("load-error-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "load-error-banner";
+    banner.style.cssText =
+      "background:#ffe0e0;color:#a00;border:1px solid #a00;padding:6px 8px;" +
+      "font-size:11px;margin-bottom:6px;border-radius:4px;white-space:pre-wrap;";
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+  const msg = (error && error.message) ? error.message : String(error);
+  banner.textContent = `⚠ Excelデータの読み込みに失敗しました: ${msg}\n（F12コンソールで詳細を確認してください。Reloadボタンで再試行できます）`;
+}
+
+function hideLoadError() {
+  const banner = document.getElementById("load-error-banner");
+  if (banner) banner.remove();
+}
+
+// ===== ステータス =====
 function getStatus(t) {
   if (t.actualEnd) return "完了";
   if (t.actualStart) return "対応中";
   return "未着手";
 }
 
-/* ============================================================
-   フィルタUI（チップ＋ドロップダウン）
-   ============================================================ */
+// ===== フィルタ =====
 function renderFilters() {
-  renderUserDropdown();
-  renderCategoryDropdown();
-  renderSubCategoryDropdown();
-  updateChips();
+  renderUserFilter();
+  renderCategoryFilter();
+  renderSubCategoryFilter();
 }
 
-function toggleDropdown(id, chip) {
-  const dd = document.getElementById(id);
-  const wasOpen = dd.classList.contains("open");
-  closeAllDropdowns();
-  if (!wasOpen) {
-    dd.classList.add("open");
-    // チップの真下に配置
-    const rect = chip.getBoundingClientRect();
-    const barRect = chip.closest(".filter-bar").getBoundingClientRect();
-    let left = rect.left - barRect.left;
-    dd.style.left = left + "px";
-    // 右端はみ出し補正
-    requestAnimationFrame(() => {
-      const ddRect = dd.getBoundingClientRect();
-      const over = ddRect.right - (barRect.right - 4);
-      if (over > 0) dd.style.left = Math.max(4, left - over) + "px";
-    });
-  }
-}
-
-function closeAllDropdowns() {
-  document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open"));
-}
-
-/* チップの表示テキストを選択状態に同期 */
-function updateChips() {
-  const userChip = document.getElementById("chip-user");
-  if (selectedUsers.length) {
-    userChip.classList.add("selected");
-    const label = selectedUsers.length === 1 ? escapeHtml(selectedUsers[0]) : `${selectedUsers.length}件選択`;
-    userChip.innerHTML =
-      `担当: ${label} <span class="clear" onclick="clearUserFilter(event)">✕</span>`;
-  } else {
-    userChip.classList.remove("selected");
-    userChip.innerHTML = `担当者 <span class="caret"></span>`;
-  }
-
-  const catChip = document.getElementById("chip-cat");
-  if (selectedCategories.length) {
-    catChip.classList.add("selected");
-    const label = selectedCategories.length === 1 ? escapeHtml(selectedCategories[0]) : `${selectedCategories.length}件選択`;
-    catChip.innerHTML =
-      `分類: ${label} <span class="clear" onclick="clearCategoryFilter(event)">✕</span>`;
-  } else {
-    catChip.classList.remove("selected");
-    catChip.innerHTML = `分類 <span class="caret"></span>`;
-  }
-
-  const subCatChip = document.getElementById("chip-subcat");
-  if (subCatChip) {
-    if (selectedSubCategories.length) {
-      subCatChip.classList.add("selected");
-      const label = selectedSubCategories.length === 1 ? escapeHtml(selectedSubCategories[0]) : `${selectedSubCategories.length}件選択`;
-      subCatChip.innerHTML =
-        `小分類: ${label} <span class="clear" onclick="clearSubCategoryFilter(event)">✕</span>`;
-    } else {
-      subCatChip.classList.remove("selected");
-      subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
-    }
-  }
-}
-
-function clearUserFilter(e) {
-  e.stopPropagation();
-  selectedUsers = [];
-  saveFilters();
-  renderFilters();
-  renderBoard();
-}
-
-function clearCategoryFilter(e) {
-  e.stopPropagation();
-  selectedCategories = [];
-  selectedSubCategories = [];
-  saveFilters();
-  renderFilters();
-  renderBoard();
-}
-
-function clearSubCategoryFilter(e) {
-  e.stopPropagation();
-  selectedSubCategories = [];
-  saveFilters();
-  renderFilters();
-  renderBoard();
-}
-
-function renderUserDropdown() {
+function renderUserFilter() {
   const users = [...new Set(
-    allTasks.map(t => t.user).filter(v => v && v !== "#")
+    allTasks
+      .map(t => t.user)
+      .filter(v => v && v !== "#")
   )];
 
   const el = document.getElementById("user-filters");
   el.innerHTML = "";
 
   users.forEach(u => {
-    const b = document.createElement("label");
-    b.className = "dd-item" + (selectedUsers.includes(u) ? " on" : "");
+    const b = document.createElement("button");
+    b.textContent = u;
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedUsers.includes(u);
-    cb.className = "dd-check";
+    if (selectedUser === u) b.classList.add("active");
 
-    const av = document.createElement("span");
-    av.className = "avatar";
-    av.style.background = userColor(u);
-    av.textContent = String(u).charAt(0);
-
-    b.appendChild(cb);
-    b.appendChild(av);
-    b.appendChild(document.createTextNode(u));
-
-    cb.addEventListener("change", () => {
-      selectedUsers = cb.checked
-        ? [...selectedUsers, u]
-        : selectedUsers.filter(x => x !== u);
-      b.classList.toggle("on", cb.checked);
-      saveFilters();
-      updateChips();
+    b.onclick = () => {
+      selectedUser = (selectedUser === u) ? null : u;
+      saveFilters(); // フィルタ設定を保存
       renderBoard();
-    });
+      renderFilters();
+    };
 
     el.appendChild(b);
   });
-
-  if (users.length) {
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "dd-clear";
-    clearBtn.textContent = "選択解除";
-    clearBtn.onclick = () => clearUserFilter({ stopPropagation() {} });
-    el.appendChild(clearBtn);
-  }
 }
 
-function renderCategoryDropdown() {
+function renderCategoryFilter() {
   const cats = [...new Set(
-    allTasks.map(t => t.category).filter(v => v && v !== "#")
+    allTasks
+      .map(t => t.category)
+      .filter(v => v && v !== "#")
   )];
 
   const el = document.getElementById("category-filters");
   el.innerHTML = "";
 
   cats.forEach(c => {
-    const b = document.createElement("label");
-    b.className = "dd-item" + (selectedCategories.includes(c) ? " on" : "");
+    const b = document.createElement("button");
+    b.textContent = c;
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedCategories.includes(c);
-    cb.className = "dd-check";
+    if (selectedCategory === c) b.classList.add("active");
 
-    b.appendChild(cb);
-    b.appendChild(document.createTextNode(c));
-
-    cb.addEventListener("change", () => {
-      selectedCategories = cb.checked
-        ? [...selectedCategories, c]
-        : selectedCategories.filter(x => x !== c);
-      b.classList.toggle("on", cb.checked);
-
-      // 選択解除された大分類配下の小分類はフィルタから外す
-      selectedSubCategories = selectedSubCategories.filter(s =>
-        allTasks.some(t =>
-          t.classification === s &&
-          (!selectedCategories.length || selectedCategories.includes(t.category))
-        )
-      );
-
-      saveFilters();
-      renderFilters();
+    b.onclick = () => {
+      selectedCategory = (selectedCategory === c) ? null : c;
+      selectedSubCategory = null; // 大分類変更時は小分類をリセット
+      saveFilters(); // フィルタ設定を保存
       renderBoard();
-    });
+      renderFilters();
+    };
 
     el.appendChild(b);
   });
-
-  if (cats.length) {
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "dd-clear";
-    clearBtn.textContent = "選択解除";
-    clearBtn.onclick = () => clearCategoryFilter({ stopPropagation() {} });
-    el.appendChild(clearBtn);
-  }
 }
 
-function renderSubCategoryDropdown() {
+function renderSubCategoryFilter() {
+  const section = document.getElementById("sub-category-section");
   const el = document.getElementById("sub-category-filters");
-  if (!el) return;
+  if (!section || !el) return;
+
+  // 大分類未選択なら小分類エリアを非表示
+  if (!selectedCategory) {
+    section.style.display = "none";
+    return;
+  }
 
   const subCats = [...new Set(
     allTasks
-      .filter(t => !selectedCategories.length || selectedCategories.includes(t.category))
+      .filter(t => t.category === selectedCategory)
       .map(t => t.classification)
       .filter(v => v && v !== "#" && v.toString().trim() !== "")
   )];
 
-  el.innerHTML = "";
-
+  // 小分類がなければエリアを非表示
   if (subCats.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "dd-item";
-    empty.textContent = "小分類なし";
-    empty.style.opacity = "0.6";
-    empty.style.cursor = "default";
-    el.appendChild(empty);
+    section.style.display = "none";
     return;
   }
 
+  section.style.display = "block";
+  el.innerHTML = "";
+
   subCats.forEach(s => {
-    const b = document.createElement("label");
-    b.className = "dd-item" + (selectedSubCategories.includes(s) ? " on" : "");
+    const b = document.createElement("button");
+    b.textContent = s;
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedSubCategories.includes(s);
-    cb.className = "dd-check";
+    if (selectedSubCategory === s) b.classList.add("active");
 
-    b.appendChild(cb);
-    b.appendChild(document.createTextNode(s));
-
-    cb.addEventListener("change", () => {
-      selectedSubCategories = cb.checked
-        ? [...selectedSubCategories, s]
-        : selectedSubCategories.filter(x => x !== s);
-      b.classList.toggle("on", cb.checked);
+    b.onclick = () => {
+      selectedSubCategory = (selectedSubCategory === s) ? null : s;
       saveFilters();
-      updateChips();
       renderBoard();
-    });
+      renderSubCategoryFilter();
+    };
 
     el.appendChild(b);
   });
-
-  const clearBtn = document.createElement("button");
-  clearBtn.type = "button";
-  clearBtn.className = "dd-clear";
-  clearBtn.textContent = "選択解除";
-  clearBtn.onclick = () => clearSubCategoryFilter({ stopPropagation() {} });
-  el.appendChild(clearBtn);
 }
 
-/* 担当者名から一意な色を生成 */
-function userColor(name) {
-  let h = 0;
-  const s = String(name);
-  for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) % 360;
-  }
-  return `hsl(${h}, 48%, 48%)`;
-}
-
-/* ============================================================
-   期間フィルタ（セグメント）
-   ============================================================ */
 function setPeriod(p) {
   selectedPeriod = (selectedPeriod === p) ? "all" : p;
-  saveFilters();
-  renderPeriodSegment();
+  saveFilters(); // フィルタ設定を保存
   renderBoard();
+  renderPeriodFilter();
 }
 
-function renderPeriodSegment() {
-  document.querySelectorAll("#seg-period button").forEach(b => {
-    b.classList.toggle("active", b.dataset.p === selectedPeriod);
+function renderPeriodFilter() {
+  document.querySelectorAll("[data-period]").forEach(b => {
+    b.classList.toggle("active", b.dataset.period === selectedPeriod);
   });
 }
 
-/* ============================================================
-   保留表示切替
-   ============================================================ */
-function toggleHeldDisplay(e) {
-  if (e) e.preventDefault();
-  showHeld = !showHeld;
-  localStorage.setItem("kanban-show-held", showHeld);
-  document.getElementById("held-toggle").classList.toggle("on", showHeld);
+// ===== 保留表示切替 =====
+function toggleHeldDisplay() {
+  showHeld = document.getElementById('show-held').checked;
+  localStorage.setItem('kanban-show-held', showHeld);
   renderBoard();
+  
+  // 保留レーンの表示切替後に必要最小限の調整
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    // 高さは必要時のみ調整（チラつき防止）
+  }, 100);
 }
 
-/* ============================================================
-   描画
-   ============================================================ */
+// 保留表示設定を復元
+function restoreHeldDisplay() {
+  const saved = localStorage.getItem('kanban-show-held');
+  showHeld = saved !== null ? saved === 'true' : true;
+  document.getElementById('show-held').checked = showHeld;
+}
+
+// ===== 描画 =====
 function renderBoard() {
-  ["todo", "held", "doing", "done"].forEach(l => {
+  ["todo","held","doing","done"].forEach(l => {
     const lane = document.querySelector(`#${l} .card-list`);
-    if (lane) lane.innerHTML = "";
+    if (lane) {
+      lane.innerHTML = "";
+    }
   });
 
-  // 保留レーンの表示/非表示
-  const heldLane = document.getElementById("held");
-  if (heldLane) heldLane.style.display = showHeld ? "" : "none";
+  // 保留レーンの表示/非表示切替
+  const heldLane = document.getElementById('held');
+  if (heldLane) {
+    heldLane.style.display = showHeld ? 'block' : 'none';
+  }
 
   const filtered = allTasks.filter(isMatch);
 
   const normal = filtered
     .filter(t => t.status !== "完了")
     .sort((a, b) => {
+      // スター付きを優先
       if (a.isStar && !b.isStar) return -1;
       if (!a.isStar && b.isStar) return 1;
+      // 同じスター状態なら期限日順
       return excelDateToJS(a.end) - excelDateToJS(b.end);
     });
 
   const done = filtered
     .filter(t => t.status === "完了")
-    .sort((a, b) => excelDateToJS(b.actualEnd) - excelDateToJS(a.actualEnd));
+    .sort((a,b)=>excelDateToJS(b.actualEnd)-excelDateToJS(a.actualEnd));
 
-  [...normal, ...done].forEach(t => {
-    const lane = getLane(t);
+  [...normal, ...done].forEach(t=>{
+    const lane = getLane(t);  // タスク全体を渡すように変更
     document.querySelector(`#${lane} .card-list`).appendChild(createCard(t));
   });
 
-  // 空レーン表示と件数バッジ
-  ["todo", "held", "doing", "done"].forEach(l => {
-    const laneEl = document.getElementById(l);
-    const list = laneEl.querySelector(".card-list");
-    const n = list.children.length;
-    laneEl.querySelector(".count").textContent = n;
-    if (n === 0) {
-      const em = document.createElement("div");
-      em.className = "empty";
-      em.textContent = "なし";
-      list.appendChild(em);
-    }
-  });
-
-  // 検索ヒット件数
-  const box = document.getElementById("search-box");
-  const hits = document.getElementById("search-hits");
-  box.classList.toggle("has-value", searchQuery.length > 0);
-  hits.textContent = searchQuery ? `${filtered.length}件` : "";
-
   setupDnD();
+  
+  // カード描画後のレイアウト調整を最小限に抑制
+  setTimeout(() => {
+    const containerWidth = getActualPaneWidth();
+    adjustLaneWidths(containerWidth);
+    // 高さ調整は必要時のみ実行（スクロール体験を優先）
+  }, 200);
 }
 
-/* ============================================================
-   カード生成
-   ============================================================ */
+// ===== カード =====
 function createCard(t) {
   const d = document.createElement("div");
   d.className = "card";
   d.draggable = true;
 
-  // 色レール（旧applyColorの枠線色に相当）
-  const lane = getLane(t);
-  if (t.status === "完了") {
-    d.classList.add("is-done");
-  } else if (lane === "held") {
-    d.classList.add("is-held");
-  } else {
-    const startRaw = excelDateToJS(t.start);
-    const endRaw = excelDateToJS(t.end);
-    if (startRaw && endRaw) {
-      const start = new Date(startRaw); start.setHours(0, 0, 0, 0);
-      const end = new Date(endRaw);     end.setHours(0, 0, 0, 0);
-      const today = new Date();         today.setHours(0, 0, 0, 0);
-      if (end < today) d.classList.add("is-delay");
-      else if (start <= today && end >= today) d.classList.add("is-active");
-    }
-  }
-  if (t.isStar) d.classList.add("starred");
-
-  // DnD
   d.addEventListener("dragstart", (e) => {
     currentDraggedId = t.id;
     e.dataTransfer.setData("text/plain", t.id);
     d.classList.add("dragging");
   });
-  d.addEventListener("dragend", () => d.classList.remove("dragging"));
 
-  // 左クリック：Excelへジャンプ
+  d.addEventListener("dragend", () => {
+    d.classList.remove("dragging");
+  });
+
   d.addEventListener("click", (e) => {
     if (e.button !== 0) return;
     jumpToExcel(t.rowIndex);
   });
 
-  // 右クリック：備考編集
   d.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
     e.stopPropagation();
     await openModal(t);
   });
 
-  /* --- 1行目：日付＋担当＋スター --- */
-  const meta = document.createElement("div");
-  meta.className = "card-meta";
+  const row1 = document.createElement("div");
+  row1.className = "card-row1";
 
-  const dates = document.createElement("span");
-  dates.className = "card-dates";
+  const left = document.createElement("span");
+  const rightGroup = document.createElement("span");
+  rightGroup.className = "right-group";
+  
+  const user = document.createElement("span");
+  user.className = "user-name";
+  user.textContent = t.user || "";
 
+  // 日付情報を設定
   if (t.isNoSchedule) {
-    const badge = document.createElement("span");
-    badge.className = "badge-todo";
-    badge.textContent = "TODO";
-    meta.appendChild(badge);
+    left.textContent = "TODO";
+  } else if (t.status === "未着手" || t.status === "保留") {
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)}`;
+  } else if (t.status === "対応中") {
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～`;
   } else {
-    dates.innerHTML =
-      `${fmt(t.start)} <span class="arrow">→</span> ${fmt(t.end)}`;
-    if (d.classList.contains("is-delay")) dates.classList.add("delay");
-  }
-  meta.appendChild(dates);
-
-  if (t.user) {
-    const av = document.createElement("span");
-    av.className = "card-user";
-    av.style.background = userColor(t.user);
-    av.textContent = String(t.user).charAt(0);
-    av.title = t.user;
-    meta.appendChild(av);
+    left.textContent = `${fmt(t.start)}～${fmt(t.end)} → ${fmt(t.actualStart)}～${fmt(t.actualEnd)}`;
   }
 
-  // 完了以外にスターを表示
+  // ユーザー名を右グループに追加
+  rightGroup.appendChild(user);
+  
+  // 完了状態以外にのみスターアイコンを追加
   if (t.status !== "完了") {
-    const star = document.createElement("button");
-    star.className = "card-star" + (t.isStar ? " on" : "");
+    const star = document.createElement("span");
+    star.className = "star-icon";
     star.textContent = t.isStar ? "★" : "☆";
-    star.title = "本日の優先タスク";
+    
+    // ★の場合は金色クラスを追加
+    if (t.isStar) {
+      star.classList.add("filled");
+    }
+    
     star.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       toggleStar(t);
     });
-    meta.appendChild(star);
+    rightGroup.appendChild(star);
   }
 
-  d.appendChild(meta);
+  // 日付情報と右グループ（ユーザー名+スター）を追加
+  row1.appendChild(left);
+  row1.appendChild(rightGroup);
 
-  /* --- 2行目：タイトル＋分類 --- */
+  // タイトル行（タイトル + 分類）
   const row2 = document.createElement("div");
   row2.className = "card-title-row";
-
+  
   const titleSpan = document.createElement("span");
   titleSpan.className = "card-title";
-  titleSpan.innerHTML = highlight(String(t.title), searchQuery);
-
-  row2.appendChild(titleSpan);
-
-  if (t.classification && String(t.classification).trim() !== "") {
-    const cls = document.createElement("span");
-    cls.className = "card-cls";
-    cls.innerHTML = highlight(String(t.classification), searchQuery);
-    row2.appendChild(cls);
+  titleSpan.textContent = t.title;
+  
+  const classificationSpan = document.createElement("span");
+  classificationSpan.className = "card-classification";
+  if (t.classification && t.classification.trim() !== "") {
+    classificationSpan.textContent = `<${t.classification}>`;
   }
+  
+  row2.appendChild(titleSpan);
+  row2.appendChild(classificationSpan);
+
+  d.appendChild(row1);
   d.appendChild(row2);
 
-  /* --- 実績日 --- */
-  if (t.status === "対応中") {
-    const ac = document.createElement("div");
-    ac.className = "card-actual";
-    ac.textContent = `実績 ${fmt(t.actualStart)} 〜`;
-    d.appendChild(ac);
-  } else if (t.status === "完了") {
-    const ac = document.createElement("div");
-    ac.className = "card-actual";
-    ac.textContent = `実績 ${fmt(t.actualStart)} 〜 ${fmt(t.actualEnd)}`;
-    d.appendChild(ac);
+  // スター状態に応じてカードスタイルを適用 
+  if (t.isStar) {
+    d.classList.add("starred");
   }
 
-  /* --- 備考プレビュー（検索が備考にヒットした時のみ） --- */
-  const note = (t.note || "").toString();
-  if (searchQuery && note.toLowerCase().includes(searchQuery.toLowerCase())) {
-    const np = document.createElement("div");
-    np.className = "card-note-hit";
-    np.innerHTML = "📝 " + highlight(note, searchQuery);
-    d.appendChild(np);
-    d.classList.add("show-note");
-  }
+  applyColor(d, t);
 
   return d;
 }
 
-/* ============================================================
-   検索ハイライト
-   ============================================================ */
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// ===== 色 =====
+function applyColor(el, t) {
+  if (t.status === "完了") {
+    el.style.border = "2px solid #333";
+    return;
+  }
+
+  const startRaw = excelDateToJS(t.start);
+  const endRaw = excelDateToJS(t.end);
+
+  if (!startRaw || !endRaw) return;
+
+  // 時刻情報を除去して日付のみで比較
+  const start = new Date(startRaw);
+  start.setHours(0,0,0,0);
+  
+  const end = new Date(endRaw);
+  end.setHours(0,0,0,0);
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // ★ 遅延
+  if (end < today) {
+    el.style.border = "2px solid red";
+    return;
+  }
+
+  // ★ 期間内（←ここが今回のポイント）
+  if (start <= today && end >= today) {
+    el.style.border = "2px solid green";
+    return;
+  }
+
+  el.style.border = "1px solid #ccc";
 }
 
-function highlight(text, q) {
-  if (!q) return escapeHtml(text);
-  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return escapeHtml(text).replace(
-    new RegExp(`(${esc})`, "gi"),
-    '<mark class="hit">$1</mark>'
-  );
-}
-
-/* ============================================================
-   DnD
-   ============================================================ */
+// ===== DnD =====
 function setupDnD() {
-  ["todo", "held", "doing", "done"].forEach(id => {
+  ["todo","held","doing","done"].forEach(id=>{
     const lane = document.getElementById(id);
-    const list = lane.querySelector(".card-list");
 
-    lane.ondragover = (e) => {
+    lane.ondragover = (e)=>e.preventDefault();
+
+    lane.ondrop = (e)=>{
       e.preventDefault();
-      list.classList.add("drop-target");
-    };
-    lane.ondragleave = () => list.classList.remove("drop-target");
-    lane.ondrop = (e) => {
-      e.preventDefault();
-      list.classList.remove("drop-target");
-      const t = allTasks.find(x => x.id === currentDraggedId);
+      const t = allTasks.find(x=>x.id===currentDraggedId);
       if (t) updateStatus(t, id);
     };
   });
 }
 
-/* ============================================================
-   Excel操作
-   ============================================================ */
-async function jumpToExcel(row) {
-  await Excel.run(async (ctx) => {
+// ===== Excel =====
+async function jumpToExcel(row){
+  await Excel.run(async (ctx)=>{
     const s = ctx.workbook.worksheets.getItem("wbs");
     s.activate();
     s.getRange(`${row}:${row}`).select();
@@ -744,49 +1014,49 @@ async function jumpToExcel(row) {
   });
 }
 
-/* ============================================================
-   util
-   ============================================================ */
-function getLane(task) {
-  // 備考欄に▲がある場合は保留レーン
-  if (task.note && task.note.toString().includes("▲")) {
+// ===== util =====
+function getLane(task){
+  // 備考欄に▲がある場合は保留レーンに表示
+  if (task.note && task.note.includes('▲')) {
     return "held";
   }
+  
+  // 通常のステータス判定
   const s = task.status;
-  if (s === "未着手") return "todo";
-  if (s === "保留") return "held";
-  if (s === "対応中") return "doing";
+  if(s==="未着手") return "todo";
+  if(s==="保留") return "held";
+  if(s==="対応中") return "doing";
   return "done";
 }
 
-function getMonday(d) {
-  const t = new Date(d);
-  const day = t.getDay();
-  const diff = t.getDate() - day + (day === 0 ? -6 : 1);
+function getMonday(d){
+  const t=new Date(d);
+  const day=t.getDay();
+  const diff=t.getDate()-day+(day===0?-6:1);
   return new Date(t.setDate(diff));
 }
 
-function addDays(d, n) {
-  const t = new Date(d);
-  t.setDate(t.getDate() + n);
+function addDays(d,n){
+  const t=new Date(d);
+  t.setDate(t.getDate()+n);
   return t;
 }
 
+// JavaScriptのDateをExcelシリアル値に変換
 function dateToExcelSerial(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return "";
+  
+  // Excel epoch: 1900年1月1日
   const excelEpoch = new Date(1900, 0, 1);
   const msPerDay = 24 * 60 * 60 * 1000;
+  
+  // 日数差を計算
   const daysDiff = Math.floor((date - excelEpoch) / msPerDay);
+  
+  // Excelの1900年うるう年バグを考慮（1900年3月1日以降は+1）
   return daysDiff + (date >= new Date(1900, 2, 1) ? 2 : 1);
 }
 
-function isValidDate(v) {
-  return v instanceof Date && !isNaN(v);
-}
-
-/* ============================================================
-   ステータス更新（DnD時、旧版と同一ロジック）
-   ============================================================ */
 async function updateStatus(task, lane) {
   let actualStart = task.actualStart;
   let actualEnd = task.actualEnd;
@@ -794,38 +1064,47 @@ async function updateStatus(task, lane) {
   if (lane === "todo") {
     actualStart = "";
     actualEnd = "";
-
-    if (task.note && task.note.toString().includes("▲")) {
-      task.note = task.note.toString().replace(/▲/g, "△");
+    
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
       await updateTaskStatus(task, "未着手");
     }
   }
 
   if (lane === "held") {
-    // 完了から保留に移動した場合のみ実績完了日をクリア
+    // 保留状態：基本的には実績日時は変更しない
+    // ただし、完了から保留に移動した場合のみ実績完了日を空にする
     if (task.status === "完了") {
-      actualEnd = "";
+      actualEnd = ""; // 完了からの移動時のみ実績完了日をクリア
     }
-
-    let newNote = ensureStatusSymbols((task.note || "").toString());
-    if (newNote.includes("△")) {
+    // actualStart は常に維持
+    
+    // 保留レーンにドラッグ：△→▲に変更
+    let newNote = ensureStatusSymbols(task.note || "");
+    if (newNote.includes('△')) {
       newNote = newNote.replace(/△/g, "▲");
-    } else if (!newNote.includes("▲")) {
-      const lines = newNote.split("\n");
-      lines[0] = lines[0].replace(/△/, "") + "▲";
-      newNote = lines.join("\n");
+    } else if (!newNote.includes('▲')) {
+      // 既に▲がない場合は追加
+      const lines = newNote.split('\n');
+      lines[0] = lines[0].replace(/△/, '') + '▲';
+      newNote = lines.join('\n');
     }
     task.note = newNote;
-
+    
+    // ステータスも「保留」に変更
     await updateTaskStatus(task, "保留");
   }
 
   if (lane === "doing") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = "";
-
-    if (task.note && task.note.toString().includes("▲")) {
-      task.note = task.note.toString().replace(/▲/g, "△");
+    
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
       await updateTaskStatus(task, "対応中");
     }
   }
@@ -833,11 +1112,16 @@ async function updateStatus(task, lane) {
   if (lane === "done") {
     if (!isValidDate(actualStart)) actualStart = new Date();
     actualEnd = new Date();
-
-    if (task.isStar) task.isStar = false;
-
-    if (task.note && task.note.toString().includes("▲")) {
-      task.note = task.note.toString().replace(/▲/g, "△");
+    
+    // 完了時は★→☆に変更
+    if (task.isStar) {
+      task.isStar = false;
+    }
+    
+    // 保留レーンから移動した場合は▲→△に変更、ステータスも更新
+    if (task.note && task.note.includes('▲')) {
+      let newNote = task.note.replace(/▲/g, "△");
+      task.note = newNote;
       await updateTaskStatus(task, "完了");
     }
   }
@@ -849,12 +1133,15 @@ async function updateStatus(task, lane) {
     const startCell = sheet.getRange(`R${row}`);
     const endCell = sheet.getRange(`S${row}`);
 
+    // Date型をExcelシリアル値に変換して設定
     startCell.values = [[dateToExcelSerial(actualStart)]];
     endCell.values = [[dateToExcelSerial(actualEnd)]];
 
+    // 表示形式をm/d に設定
     startCell.numberFormat = [["m/d"]];
     endCell.numberFormat = [["m/d"]];
 
+    // 備考の更新（保留状態変更やスター削除）
     if ((lane === "done" || lane === "doing" || lane === "held") && task.note !== undefined) {
       const noteCell = sheet.getRange(`O${row}`);
       noteCell.values = [[task.note]];
@@ -862,78 +1149,99 @@ async function updateStatus(task, lane) {
     }
 
     // 完了時に備考から★を削除
-    if (lane === "done" && task.note && task.note.toString().includes("★")) {
-      const newNote = task.note.toString().replace(/★/g, "");
+    if (lane === "done" && task.note && task.note.includes('★')) {
+      let newNote = (task.note || "").replace(/★/g, "");
       const noteCell = sheet.getRange(`O${row}`);
       noteCell.values = [[newNote]];
       noteCell.format.wrapText = false;
-      task.note = newNote;
+      task.note = newNote; // タスクの備考も更新
     }
-
+    
     await ctx.sync();
   });
 
   await init();
 }
 
-/* ステータス文字列（H列）更新 */
+// ===== ステータス文字列更新 =====
 async function updateTaskStatus(task, newStatus) {
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const statusCell = sheet.getRange(`H${task.rowIndex}`);
+    const row = task.rowIndex;
+    const statusCell = sheet.getRange(`H${row}`);
+    
     statusCell.values = [[newStatus]];
+    
     await ctx.sync();
   });
+  
   task.status = newStatus;
 }
 
-/* ============================================================
-   スター切り替え
-   ============================================================ */
-async function toggleStar(task) {
-  task.isStar = !task.isStar;
+function isValidDate(v) {
+  return v instanceof Date && !isNaN(v);
+}
 
-  let newNote = (task.note || "").toString();
+// ===== スター切り替え =====
+async function toggleStar(task) {
+  // スター状態を切り替え
+  task.isStar = !task.isStar;
+  
+  // 備考を更新
+  let newNote = task.note || "";
+  
   if (task.isStar) {
-    if (!newNote.startsWith("★")) newNote = "★" + newNote;
+    // ★を★に変更：先頭に★を付与
+    if (!newNote.startsWith('★')) {
+      newNote = '★' + newNote;
+    }
   } else {
+    // ★を☆に変更：備考から★を完全に削除（""に置換）
     newNote = newNote.replace(/★/g, "");
   }
-
+  
+  // Excelに備考を更新
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const cell = sheet.getRange(`O${task.rowIndex}`);
+    const row = task.rowIndex;
+    const cell = sheet.getRange(`O${row}`);
+    
     cell.values = [[newNote]];
     cell.format.wrapText = false;
+    
     await ctx.sync();
   });
-
+  
+  // タスクの備考を更新
   task.note = newNote;
+  
+  // 画面を再描画
   renderBoard();
 }
 
-/* ============================================================
-   ステータス記号管理
-   ============================================================ */
+// ===== ステータス記号管理 =====
 function ensureStatusSymbols(noteText) {
   if (!noteText) noteText = "";
-  const lines = noteText.split("\n");
+  
+  // 行で分割
+  const lines = noteText.split('\n');
   let firstLine = lines[0] || "";
-
-  if (!firstLine.includes("★") && !firstLine.includes("☆")) {
-    firstLine = "☆" + firstLine;
+  
+  // ★/☆がない場合、☆を追加
+  if (!firstLine.includes('★') && !firstLine.includes('☆')) {
+    firstLine = '☆' + firstLine;
   }
-  if (!firstLine.includes("▲") && !firstLine.includes("△")) {
-    firstLine = firstLine + "△";
+  
+  // ▲/△がない場合、△を追加
+  if (!firstLine.includes('▲') && !firstLine.includes('△')) {
+    firstLine = firstLine + '△';
   }
-
+  
+  // 1行目を更新して復元
   lines[0] = firstLine;
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
-/* ============================================================
-   備考編集モーダル（旧版と同一ロジック）
-   ============================================================ */
 async function openModal(task) {
   currentTask = task;
 
@@ -945,59 +1253,87 @@ async function openModal(task) {
       const noteCell = sheet.getRange(`O${task.rowIndex}`);
       noteCell.load("values");
       await ctx.sync();
+      
       originalNote = (noteCell.values[0][0] || "").toString();
     });
   } catch (error) {
-    originalNote = (task.note || "").toString();
+    console.log("O列の読み取りエラー:", error);
+    // エラーの場合はタスクオブジェクトの値を使用
+    originalNote = task.note || "";
   }
-
+  
+  // 備考欄のテンプレート処理
   let displayNote = originalNote;
-
+  
   if (!displayNote.trim()) {
+    // 完全に空の場合：ステータス記号とテンプレートを追加
     displayNote = "☆△\n＜タスク＞\n＜状況＞";
   } else {
+    // ステータス記号を確認・追加
     displayNote = ensureStatusSymbols(displayNote);
-    const lines = displayNote.split("\n");
+    
+    // 内容がある場合：行数をチェック
+    const lines = displayNote.split('\n');
+    
+    // 2行目がない場合（1行のみまたは空行のみ）
     if (lines.length < 2 || (lines.length === 2 && !lines[1].trim())) {
       displayNote = displayNote.trimEnd() + "\n＜タスク＞\n＜状況＞";
     }
   }
-
+  
   document.getElementById("modal-title").textContent = task.title;
   document.getElementById("modal-note").value = displayNote;
-  renderSubtaskKanban();
 
   const modal = document.getElementById("modal");
   modal.classList.remove("hidden");
-
+  
+  // Escキーでモーダルを閉じる
   const handleEscKey = (event) => {
-    if (event.key === "Escape") closeModal();
+    if (event.key === 'Escape') {
+      closeModal();
+    }
   };
+  
+  // モーダル外クリックで閉じる（変更がない場合のみ）
   const handleOverlayClick = (event) => {
     if (event.target === modal) {
       const currentNote = document.getElementById("modal-note").value;
-      if (currentNote === displayNote) closeModal();
+      // 変更がない場合のみ閉じる（O列から取得した最新値と比較）
+      if (currentNote === displayNote) {
+        closeModal();
+      }
     }
   };
-  const modalContent = modal.querySelector(".modal-content");
-  const handleContentClick = (event) => event.stopPropagation();
-
-  document.addEventListener("keydown", handleEscKey);
-  modal.addEventListener("click", handleOverlayClick);
-  modalContent.addEventListener("click", handleContentClick);
-
-  modal._cleanup = () => {
-    document.removeEventListener("keydown", handleEscKey);
-    modal.removeEventListener("click", handleOverlayClick);
-    modalContent.removeEventListener("click", handleContentClick);
+  
+  // モーダルコンテンツ内のクリックでイベント伝播を止める
+  const modalContent = modal.querySelector('.modal-content');
+  const handleContentClick = (event) => {
+    event.stopPropagation();
   };
-
-  setTimeout(() => document.getElementById("modal-note").focus(), 100);
+  
+  // イベントリスナーを追加
+  document.addEventListener('keydown', handleEscKey);
+  modal.addEventListener('click', handleOverlayClick);
+  modalContent.addEventListener('click', handleContentClick);
+  
+  // クリーンアップ関数をモーダルに保存
+  modal._cleanup = () => {
+    document.removeEventListener('keydown', handleEscKey);
+    modal.removeEventListener('click', handleOverlayClick);
+    modalContent.removeEventListener('click', handleContentClick);
+  };
+  
+  // テキストエリアにフォーカス
+  setTimeout(() => {
+    document.getElementById("modal-note").focus();
+  }, 100);
 }
 
 function closeModal() {
   const modal = document.getElementById("modal");
   modal.classList.add("hidden");
+  
+  // イベントリスナーをクリーンアップ
   if (modal._cleanup) {
     modal._cleanup();
     modal._cleanup = null;
@@ -1012,179 +1348,42 @@ async function saveNote() {
     const row = currentTask.rowIndex;
 
     const cell = sheet.getRange(`O${row}`);
+
     cell.values = [[note]];
+
+    // ★これ追加
     cell.format.wrapText = false;
 
+    // ★行高さ固定（例：20）
     const entireRow = sheet.getRange(`${row}:${row}`);
     entireRow.format.rowHeight = 20;
 
     await ctx.sync();
   });
 
+  // タスクオブジェクトの備考を直接更新（Excel再読み込みを回避）
   if (currentTask) {
     currentTask.note = note;
-    currentTask.isStar = note.startsWith("★");
+    // スター状態も更新
+    currentTask.isStar = note.startsWith('★');
   }
 
   closeModal();
+  
+  // 軽量な再描画（Excelデータ再読み込みなし）
   renderBoard();
 }
 
-/* ============================================================
-   サブタスクカンバン（備考モーダル内・案1: 3レーン）
-   ------------------------------------------------------------
-   備考テキスト内の行頭記号でサブタスクの状態を表す:
-     □ 未着手 / ◎ 対応中 / ■ 完了
-   カンバンのドラッグ移動・備考テキスト編集を双方向同期する。
-   ============================================================ */
-const SUB_MARKS = { "□": "todo", "◎": "doing", "■": "done" };
-const SUB_LANES = [
-  { key: "todo", mark: "□", label: "未着手", cls: "" },
-  { key: "doing", mark: "◎", label: "対応中", cls: "doing" },
-  { key: "done", mark: "■", label: "完了", cls: "done" },
-];
-
-function parseSubtasks(note) {
-  const tasks = [];
-  (note || "").split(/\r?\n/).forEach((line, idx) => {
-    const m = line.match(/^\s*([□◎■])\s?(.*)$/);
-    if (m) tasks.push({ lane: SUB_MARKS[m[1]], title: m[2].trim(), line: idx });
-  });
-  return tasks;
-}
-function subtasksToNote(note, tasks) {
-  const lines = (note || "").split(/\r?\n/);
-  const byLine = {};
-  tasks.forEach((t) => { byLine[t.line] = t; });
-  const kept = [];
-  lines.forEach((line, idx) => {
-    if (/^\s*[□◎■]/.test(line)) {
-      const t = byLine[idx];
-      if (t) kept.push(`${subMark(t.lane)} ${t.title}`);
-    } else {
-      kept.push(line);
-    }
-  });
-  return kept.join("\n");
-}
-function subMark(lane) { return lane === "doing" ? "◎" : lane === "done" ? "■" : "□"; }
-
-function renderSubtaskKanban() {
-  const host = document.getElementById("subtask-kanban");
-  if (!host) return;
-  const note = document.getElementById("modal-note").value;
-  const tasks = parseSubtasks(note);
-  const lanesHtml = SUB_LANES.map((L) => {
-    const cards = tasks.filter((t) => t.lane === L.key);
-    return `
-      <div class="sk-lane ${L.cls}" data-lane="${L.key}">
-        <div class="sk-lane-head">${L.mark} ${L.label} <span class="sk-cnt">${cards.length}</span></div>
-        <div class="sk-lane-body" data-lane="${L.key}">
-          ${cards.map((c) => `<div class="sk-card ${L.cls}" draggable="true" data-line="${c.line}">${escapeHtml(c.title || "（無題）")}</div>`).join("")}
-        </div>
-      </div>`;
-  }).join("");
-  host.innerHTML = `
-    <div class="sk-board">${lanesHtml}</div>
-    <div class="sk-add">
-      <input type="text" id="sk-new" placeholder="サブタスク名を入力してEnterまたは＋"
-        onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask()}">
-      <button type="button" onclick="addSubtask()">＋追加</button>
-    </div>`;
-  setupSubtaskDnd();
-}
-
-function setupSubtaskDnd() {
-  const host = document.getElementById("subtask-kanban");
-  let dragLine = null;
-  host.querySelectorAll(".sk-card").forEach((card) => {
-    card.addEventListener("dragstart", (e) => {
-      dragLine = Number(card.dataset.line);
-      card.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-    });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-  });
-  host.querySelectorAll(".sk-lane-body").forEach((body) => {
-    body.addEventListener("dragover", (e) => { e.preventDefault(); body.classList.add("over"); });
-    body.addEventListener("dragleave", () => body.classList.remove("over"));
-    body.addEventListener("drop", (e) => {
-      e.preventDefault();
-      body.classList.remove("over");
-      if (dragLine == null) return;
-      moveSubtask(dragLine, body.dataset.lane);
-      dragLine = null;
-    });
-  });
-}
-
-/* カード移動 → 備考テキストを書き換え、テキストエリアも即時更新（双方向同期） */
-function moveSubtask(line, newLane) {
-  const ta = document.getElementById("modal-note");
-  const tasks = parseSubtasks(ta.value);
-  const t = tasks.find((x) => x.line === line);
-  if (!t || t.lane === newLane) return;
-  t.lane = newLane;
-  ta.value = subtasksToNote(ta.value, tasks);
-  renderSubtaskKanban();
-}
-
-function addSubtask() {
-  const ta = document.getElementById("modal-note");
-  const input = document.getElementById("sk-new");
-  const title = (input.value || "").trim();
-  if (!title) return;
-  ta.value = insertIntoTaskSection(ta.value, `□ ${title}`);
-  input.value = "";
-  renderSubtaskKanban();
-}
-
-/* ＜タスク＞セクション内（次のセクション見出しの直前、無ければ末尾）に1行挿入する。
-   ＜タスク＞見出し自体が無い場合は、従来どおり末尾へ追記する。 */
-function insertIntoTaskSection(note, newLine) {
-  const lines = (note || "").split(/\r?\n/);
-  const startIdx = lines.findIndex(l => l.trim() === "＜タスク＞");
-  if (startIdx === -1) {
-    const trimmed = (note || "").replace(/\s+$/, "");
-    return (trimmed ? trimmed + "\n" : "") + newLine;
-  }
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (/^＜.*＞$/.test(lines[i].trim())) { endIdx = i; break; }
-  }
-  lines.splice(endIdx, 0, newLine);
-  return lines.join("\n");
-}
-
-/* 備考テキストエリアが編集されたらカンバンを再描画（逆方向の同期） */
-function onModalNoteEdited() {
-  renderSubtaskKanban();
-}
-
-/* ============================================================
-   フィルタ判定（検索を追加）
-   ============================================================ */
 function isMatch(t) {
 
-  // ★ 検索（タスク名・備考・大分類・小分類を横断）
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    const hit =
-      (t.title || "").toString().toLowerCase().includes(q) ||
-      (t.note || "").toString().toLowerCase().includes(q) ||
-      (t.category || "").toString().toLowerCase().includes(q) ||
-      (t.classification || "").toString().toLowerCase().includes(q);
-    if (!hit) return false;
-  }
-
   // 担当者
-  if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
+  if (selectedUser && t.user !== selectedUser) return false;
 
   // 分類（大分類）
-  if (selectedCategories.length && !selectedCategories.includes(t.category)) return false;
+  if (selectedCategory && t.category !== selectedCategory) return false;
 
   // 小分類
-  if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
+  if (selectedSubCategory && t.classification !== selectedSubCategory) return false;
 
   // ★ 本日フィルタ：スター付きのみ表示
   if (selectedPeriod === "today") {
@@ -1207,7 +1406,7 @@ function isMatch(t) {
   if (!start || !end) return false;
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setHours(0,0,0,0);
 
   const monday = getMonday(today);
   const sunday = addDays(monday, 6);
@@ -1215,295 +1414,96 @@ function isMatch(t) {
   const nextSunday = addDays(monday, 13);
 
   switch (selectedPeriod) {
-    case "past":     return end < monday;
-    case "week":     return (start <= sunday && end >= monday);
-    case "nextweek": return (start <= nextSunday && end >= nextMonday);
-    case "future":   return start > nextSunday;
+
+    case "past":
+      return end < monday;
+
+    case "week":
+      return (start <= sunday && end >= monday);
+
+    case "nextweek":
+      return (start <= nextSunday && end >= nextMonday);
+
+    case "future":
+      return start > nextSunday;
+
     case "all":
-    default:         return true;
+    default:
+      return true;
   }
 }
 
-/* ============================================================
-   共通スライドメニュー（遅延ロード）
-   ------------------------------------------------------------
-   メニュー項目（名前・URL）は tools/common/menu.json で
-   一元管理。menu.json を編集すれば全アプリに反映される。
-   ============================================================ */
-const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/common";
+// ===== フィルタエリア表示制御 =====
+// フィルタセクションの表示状態を管理
+let filterSectionState = {
+  'user-filter': false,
+  'category-filter': false,
+  'period-filter': false
+};
 
-let menuReady = null;
-
-function openMenu(btn) {
-  if (!menuReady) {
-    // 初回クリック時にだけ slide-menu.js を読み込む
-    if (btn) btn.disabled = true;
-    menuReady = new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = COMMON_BASE + "/slide-menu.js";
-      s.onload = () => {
-        SlideMenu.init({
-          appName: "Excel Kanban",
-          version: APP_VERSION,
-          position: "right",
-          width: 250,
-          theme: { accent: "#0E7A5F" },
-          footer: "© RightArm",
-          currentId: "kanban",                       // menu.json のidと一致で強調表示
-          menuUrl: COMMON_BASE + "/menu.json",       // ★ メニュー定義はJSONで一元管理
-          localItems: [                              // このアプリ固有の操作
-            { section: "操作" },
-            { label: "再読み込み", icon: "🔄", onClick: () => init() },
-            { label: "設定をリセット", icon: "🧹", onClick: () => resetSettings() }
-          ]
-        });
-        resolve();
-      };
-      s.onerror = () => {
-        menuReady = null; // 失敗時は次回リトライ可能に
-        reject(new Error("slide-menu.js load failed"));
-      };
-      document.head.appendChild(s);
-    });
+// フィルタエリアの表示/非表示を切り替え
+function toggleFilterSection(sectionId) {
+  // 現在の状態を切り替え
+  filterSectionState[sectionId] = !filterSectionState[sectionId];
+  
+  // DOM要素を取得
+  const section = document.getElementById(sectionId);
+  const button = document.getElementById(`btn-${sectionId}`);
+  
+  if (section && button) {
+    // 表示状態を更新
+    if (filterSectionState[sectionId]) {
+      section.classList.remove('hidden');
+      button.classList.add('active');
+    } else {
+      section.classList.add('hidden');
+      button.classList.remove('active');
+    }
+    
+    // 状態をローカルストレージに保存
+    saveFilterSectionState();
+    
+    // レイアウトを再調整
+    setTimeout(() => {
+      const containerWidth = getActualPaneWidth();
+      adjustLaneWidths(containerWidth);
+    }, 100);
   }
-
-  menuReady
-    .then(() => {
-      if (btn) btn.disabled = false;
-      SlideMenu.open();
-    })
-    .catch(() => {
-      if (btn) btn.disabled = false;
-      console.warn("メニューを読み込めませんでした");
-    });
 }
 
-/* ============================================================
-   汎用ダイアログ（Office環境では window.confirm/alert 不可）
-   ============================================================ */
-let dialogResolve = null;
-function uiConfirm(message) {
-  return new Promise(resolve => {
-    dialogResolve = resolve;
-    document.getElementById("dialog-msg").textContent = message;
-    document.getElementById("dialog-cancel").style.display = "";
-    document.getElementById("dialog-modal").classList.remove("hidden");
-  });
-}
-function uiAlert(message) {
-  return new Promise(resolve => {
-    dialogResolve = resolve;
-    document.getElementById("dialog-msg").textContent = message;
-    document.getElementById("dialog-cancel").style.display = "none";
-    document.getElementById("dialog-modal").classList.remove("hidden");
-  });
-}
-function dialogRespond(ok) {
-  document.getElementById("dialog-modal").classList.add("hidden");
-  const r = dialogResolve;
-  dialogResolve = null;
-  if (r) r(ok);
-}
-
-/* ============================================================
-   タスク追加
-   ------------------------------------------------------------
-   ・wbsシートの名前定義「タスク範囲」内の選択行に行挿入して追加
-   ・T〜FY列の数式は隣接行からコピーして埋める
-   ・値の書込み: A=大分類, B=小分類, E=タスク名, N=担当者,
-     P=予定開始日, Q=予定終了日
-   ・大分類「受注」の場合、小分類は営業報告シートの
-     状態=受注/受託中 の案件番号から選択
-   ============================================================ */
-const EIGYO_SHEET = "営業報告";
-const ORDER_CATEGORY = "受注";
-const TASK_RANGE_NAME = "タスク範囲";
-
-function openTaskAdd() {
-  // 大分類: 既存タスクの大分類 ＋ 受注（無ければ追加）
-  const cats = [...new Set(allTasks.map(t => t.category).filter(v => v && v !== "#"))];
-  if (!cats.includes(ORDER_CATEGORY)) cats.push(ORDER_CATEGORY);
-  const catSel = document.getElementById("ta-cat");
-  catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
-
-  // 担当者: 既存タスクの担当者
-  const users = [...new Set(allTasks.map(t => t.user).filter(v => v && v !== "#"))];
-  const userSel = document.getElementById("ta-user");
-  userSel.innerHTML = `<option value=""></option>` + users.map(u => `<option>${escapeHtml(String(u))}</option>`).join("");
-
-  // 入力初期化
-  document.getElementById("ta-subcat").value = "";
-  document.getElementById("ta-title").value = "";
-  document.getElementById("ta-start").value = "";
-  document.getElementById("ta-end").value = "";
-  const msg = document.getElementById("ta-msg");
-  msg.className = "task-msg"; msg.textContent = "";
-
-  onTaCatChange();
-
-  // wbsシートが表示されていない場合はアクティブにする
-  activateWbs();
-
-  document.getElementById("task-modal").classList.remove("hidden");
-}
-function closeTaskAdd() { document.getElementById("task-modal").classList.add("hidden"); }
-
-async function activateWbs() {
-  if (!window.Excel) return;
+// フィルタセクションの状態をローカルストレージに保存
+function saveFilterSectionState() {
   try {
-    await Excel.run(async ctx => {
-      const active = ctx.workbook.worksheets.getActiveWorksheet();
-      active.load("name");
-      await ctx.sync();
-      if (active.name !== "wbs") {
-        ctx.workbook.worksheets.getItem("wbs").activate();
-        await ctx.sync();
+    localStorage.setItem('kanban-filter-sections', JSON.stringify(filterSectionState));
+  } catch (e) {
+    console.log("Filter section state saving error:", e);
+  }
+}
+
+// フィルタセクションの状態をローカルストレージから復元
+function restoreFilterSectionState() {
+  try {
+    const saved = localStorage.getItem('kanban-filter-sections');
+    if (saved) {
+      filterSectionState = { ...filterSectionState, ...JSON.parse(saved) };
+    }
+    
+    // DOM更新
+    Object.keys(filterSectionState).forEach(sectionId => {
+      const section = document.getElementById(sectionId);
+      const button = document.getElementById(`btn-${sectionId}`);
+      
+      if (section && button) {
+        if (filterSectionState[sectionId]) {
+          section.classList.remove('hidden');
+          button.classList.add('active');
+        } else {
+          section.classList.add('hidden');
+          button.classList.remove('active');
+        }
       }
     });
   } catch (e) {
-    console.warn("wbsシートのアクティブ化に失敗:", e);
-  }
-}
-
-/* 大分類の変更：受注なら小分類を案件番号セレクトに切替。
-   それ以外は、その大分類で使われている既存の小分類をデータリスト（候補）として提示しつつ、
-   自由入力でも新しい小分類を追加できるようにする。 */
-async function onTaCatChange() {
-  const cat = document.getElementById("ta-cat").value;
-  const txt = document.getElementById("ta-subcat");
-  const sel = document.getElementById("ta-subcat-sel");
-  const dl = document.getElementById("ta-subcat-list");
-  if (cat === ORDER_CATEGORY) {
-    txt.style.display = "none";
-    sel.style.display = "";
-    sel.innerHTML = `<option value="">読込中…</option>`;
-    const ids = await loadOrderCaseIds();
-    sel.innerHTML = ids.length
-      ? ids.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.id)}　${escapeHtml(x.client)}</option>`).join("")
-      : `<option value="">（対象案件がありません）</option>`;
-  } else {
-    txt.style.display = "";
-    sel.style.display = "none";
-    txt.value = "";
-    const subs = [...new Set(
-      allTasks
-        .filter(t => t.category === cat)
-        .map(t => t.classification)
-        .filter(v => v && String(v).trim() !== "" && v !== "#")
-    )];
-    dl.innerHTML = subs.map(s => `<option value="${escapeHtml(String(s))}"></option>`).join("");
-  }
-}
-
-/* 営業報告シートから 状態=受注/受託中 の案件番号を取得 */
-async function loadOrderCaseIds() {
-  if (!window.Excel) return [];
-  try {
-    let out = [];
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem(EIGYO_SHEET);
-      const used = sheet.getUsedRange(true);
-      used.load("rowCount");
-      await ctx.sync();
-      const last = Math.max(used.rowCount, 2);
-      const rng = sheet.getRange(`A2:E${last}`);
-      rng.load("values");
-      await ctx.sync();
-      rng.values.forEach(r => {
-        const id = (r[0] ?? "").toString().trim();
-        const client = (r[1] ?? "").toString().trim();
-        const st = (r[4] ?? "").toString().trim();
-        if (id && (st === "受注" || st === "受託中")) out.push({ id, client });
-      });
-    });
-    return out;
-  } catch (e) {
-    console.warn("営業報告シートの読込に失敗:", e);
-    return [];
-  }
-}
-
-/* OK：選択行がタスク範囲内かを検証し、行挿入してタスクを書き込む */
-async function saveTaskAdd() {
-  const msg = document.getElementById("ta-msg");
-  msg.className = "task-msg"; msg.textContent = "";
-
-  const cat = document.getElementById("ta-cat").value;
-  const sub = (cat === ORDER_CATEGORY)
-    ? document.getElementById("ta-subcat-sel").value
-    : document.getElementById("ta-subcat").value.trim();
-  const title = document.getElementById("ta-title").value.trim();
-  const user = document.getElementById("ta-user").value;
-  const start = document.getElementById("ta-start").value;
-  const end = document.getElementById("ta-end").value;
-
-  if (!title) { msg.className = "task-msg err"; msg.textContent = "タスク名を入力してください"; return; }
-  if (cat === ORDER_CATEGORY && !sub) { msg.className = "task-msg err"; msg.textContent = "案件番号を選択してください"; return; }
-  if (!window.Excel) { msg.className = "task-msg err"; msg.textContent = "Excel環境でのみ追加できます"; return; }
-
-  try {
-    let inserted = -1;
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-
-      // 選択セルの行
-      const selected = ctx.workbook.getSelectedRange();
-      selected.load(["rowIndex", "worksheet/name"]);
-
-      // 名前定義「タスク範囲」（ブック→wbsシートの順で検索）
-      let nameItem = ctx.workbook.names.getItemOrNullObject(TASK_RANGE_NAME);
-      let sheetNameItem = sheet.names.getItemOrNullObject(TASK_RANGE_NAME);
-      await ctx.sync();
-      if (nameItem.isNullObject && sheetNameItem.isNullObject) {
-        throw new Error(`名前定義「${TASK_RANGE_NAME}」が見つかりません。wbsシートに行挿入可能な範囲を「${TASK_RANGE_NAME}」として名前定義してください。`);
-      }
-      const rangeObj = (!nameItem.isNullObject ? nameItem : sheetNameItem).getRange();
-      rangeObj.load(["rowIndex", "rowCount", "worksheet/name"]);
-      await ctx.sync();
-
-      if (selected.worksheet.name !== "wbs") {
-        throw new Error("wbsシート上で挿入したい行を選択してください。");
-      }
-      const selRow = selected.rowIndex + 1;             // 1-based
-      const rangeTop = rangeObj.rowIndex + 1;
-      const rangeBottom = rangeObj.rowIndex + rangeObj.rowCount;
-      if (selRow < rangeTop || selRow > rangeBottom) {
-        throw new Error(`選択行（${selRow}行目）は「${TASK_RANGE_NAME}」（${rangeTop}〜${rangeBottom}行目）の外です。範囲内の行を選択してください。`);
-      }
-
-      // 行挿入（選択行の位置に。既存行は下へ）
-      sheet.getRange(`${selRow}:${selRow}`).insert(Excel.InsertShiftDirection.down);
-      await ctx.sync();
-
-      // T〜FY列の数式を隣接行からコピー（挿入行の上、先頭行の場合は下からコピー）
-      const srcRow = (selRow > rangeTop) ? selRow - 1 : selRow + 1;
-      const dst = sheet.getRange(`T${selRow}:FY${selRow}`);
-      dst.copyFrom(sheet.getRange(`T${srcRow}:FY${srcRow}`), Excel.RangeCopyType.formulas);
-
-      // 値の書込み
-      sheet.getRange(`A${selRow}`).values = [[cat]];
-      sheet.getRange(`B${selRow}`).values = [[sub]];
-      sheet.getRange(`E${selRow}`).values = [[title]];
-      sheet.getRange(`N${selRow}`).values = [[user]];
-      if (start) {
-        const c = sheet.getRange(`P${selRow}`);
-        c.values = [[dateToExcelSerial(new Date(start + "T00:00:00"))]];
-        c.numberFormat = [["m/d"]];
-      }
-      if (end) {
-        const c = sheet.getRange(`Q${selRow}`);
-        c.values = [[dateToExcelSerial(new Date(end + "T00:00:00"))]];
-        c.numberFormat = [["m/d"]];
-      }
-      await ctx.sync();
-      inserted = selRow;
-    });
-
-    closeTaskAdd();
-    await uiAlert(`${inserted}行目にタスクを追加しました。`);
-    await init();   // 再読込してボードへ反映
-  } catch (e) {
-    msg.className = "task-msg err";
-    msg.textContent = e.message || "タスクの追加に失敗しました";
+    console.log("Filter section state restoration error:", e);
   }
 }
