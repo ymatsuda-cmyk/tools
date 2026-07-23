@@ -1,4 +1,4 @@
-const APP_VERSION = "rev_20260723_0ec95a4";
+const APP_VERSION = "rev_20260621_545bd8c";
 
 // window.APP_VERSIONも設定してindex.htmlから参照可能にする
 window.APP_VERSION = APP_VERSION;
@@ -676,6 +676,10 @@ function renderUserFilter() {
   )];
 
   const el = document.getElementById("user-filters");
+  if (!el) {
+    console.warn("[kanban] #user-filters が見つかりません（HTMLとJSのバージョン不一致の可能性）");
+    return;
+  }
   el.innerHTML = "";
 
   users.forEach(u => {
@@ -703,6 +707,10 @@ function renderCategoryFilter() {
   )];
 
   const el = document.getElementById("category-filters");
+  if (!el) {
+    console.warn("[kanban] #category-filters が見つかりません（HTMLとJSのバージョン不一致の可能性）");
+    return;
+  }
   el.innerHTML = "";
 
   cats.forEach(c => {
@@ -782,7 +790,12 @@ function renderPeriodFilter() {
 
 // ===== 保留表示切替 =====
 function toggleHeldDisplay() {
-  showHeld = document.getElementById('show-held').checked;
+  const checkbox = document.getElementById('show-held');
+  if (!checkbox) {
+    console.warn("[kanban] #show-held が見つかりません（HTMLとJSのバージョン不一致の可能性）");
+    return;
+  }
+  showHeld = checkbox.checked;
   localStorage.setItem('kanban-show-held', showHeld);
   renderBoard();
   
@@ -798,7 +811,12 @@ function toggleHeldDisplay() {
 function restoreHeldDisplay() {
   const saved = localStorage.getItem('kanban-show-held');
   showHeld = saved !== null ? saved === 'true' : true;
-  document.getElementById('show-held').checked = showHeld;
+  const checkbox = document.getElementById('show-held');
+  if (!checkbox) {
+    console.warn("[kanban] #show-held が見つかりません（HTMLとJSのバージョン不一致の可能性）。showHeld変数のみ復元して続行します。");
+    return;
+  }
+  checkbox.checked = showHeld;
 }
 
 // ===== 描画 =====
@@ -993,6 +1011,10 @@ function applyColor(el, t) {
 function setupDnD() {
   ["todo","held","doing","done"].forEach(id=>{
     const lane = document.getElementById(id);
+    if (!lane) {
+      console.warn(`[kanban] #${id} レーンが見つかりません（HTMLとJSのバージョン不一致の可能性）`);
+      return;
+    }
 
     lane.ondragover = (e)=>e.preventDefault();
 
