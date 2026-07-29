@@ -10,16 +10,16 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260723_a293847";
+const APP_VERSION = "rev_20260729_01";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
 let currentDraggedId = null;
 let currentTask = null;
 
-let selectedUser = null;
-let selectedCategory = null;
-let selectedSubCategory = null;
+let selectedUsers = [];
+let selectedCategories = [];
+let selectedSubCategories = [];
 let selectedPeriod = "all";
 let showHeld = true;
 let searchQuery = "";
@@ -170,7 +170,15 @@ function fmt(v) {
 async function loadExcelData() {
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const range = sheet.getUsedRange();
+    // ゴースト使用範囲（例: A1:XFD240 = 約393万セル）を拾って
+    // Excel on the web の 5MB ペイロード制限を超えるのを防ぐため、
+    // 行数だけ先に取得し、必要な A:Z 列のみを読む。
+    const used = sheet.getUsedRange(true);
+    used.load(["rowIndex", "rowCount"]);
+    await ctx.sync();
+
+    const lastRow = Math.max(used.rowIndex + used.rowCount, 11);
+    const range = sheet.getRangeByIndexes(0, 0, lastRow, 26); // A1:Z{lastRow}
     range.load("values");
     await ctx.sync();
 
