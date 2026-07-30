@@ -144,17 +144,28 @@
     <div class="modal-body">
       <div class="stepper" id="ed-stepper"></div>
 
-      <!-- 基本情報 -->
-      <div class="form-grid">
+      <!-- 基本情報：案件番号／取引先／内容 -->
+      <div class="form-grid g-basic">
         <div class="form-row"><label>案件番号</label><input type="text" id="ed-id" readonly class="ro"></div>
         <div class="form-row"><label>取引先</label><input type="text" id="ed-client" readonly class="ro"></div>
+        <div class="form-row"><label>内容</label><input type="text" id="ed-content-view" readonly class="ro"></div>
+      </div>
+      <div class="form-grid">
         <div class="form-row"><label>種別</label><select id="ed-type"></select></div>
-        <div class="form-row"><label>状態</label><input type="text" id="ed-status" readonly class="ro"></div>
+        <div class="form-row"><label>状態</label>
+          <div class="status-cell">
+            <input type="text" id="ed-status" readonly class="ro">
+            <label class="hold-check" id="ed-hold-wrap" title="状態は保持したまま保留にします">
+              <input type="checkbox" id="ed-hold" onchange="onToggleHold(this)"> 保留
+            </label>
+          </div>
+        </div>
         <div class="form-row"><label>担当者（現在の対応者）</label><select id="ed-owner"></select></div>
         <div class="form-row"><label>優先度</label>
           <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
         </div>
       </div>
+      <div class="hold-note" id="ed-hold-note" style="display:none"></div>
 
       <!-- ステージタブ（起票／対応中・見積中・作成中／商談中／確認中／受注） -->
       <div class="stage-tabs" id="ed-stage-tabs"></div>

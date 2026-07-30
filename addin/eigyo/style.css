@@ -635,3 +635,123 @@ body {
 }
 .g-row-selected .g-label { background: #dbeafe; box-shadow: inset 3px 0 0 #4472c4; }
 .g-row-selected .g-track { background: #f3f8ff; }
+
+/* ============================================================
+   rev_20260730_e 追加分
+   ・保留フラグ（一覧・カンバン・詳細画面）
+   ・集計の一覧フィルタ（チップ／リスト選択）
+   ・見積有効期限の超過表示
+   ============================================================ */
+
+/* ---------- 詳細画面：内容表示と保留チェック ---------- */
+/* 案件番号・取引先は幅を絞り、内容に残り幅を割り当てる */
+.form-grid.g-basic { grid-template-columns: 106px 150px 1fr; }
+@media (max-width: 640px) { .form-grid.g-basic { grid-template-columns: 1fr; } }
+
+.status-cell { display: flex; align-items: center; gap: 8px; }
+.status-cell input[type="text"] { flex: 1; min-width: 0; }
+.hold-check {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 12px; font-weight: bold; color: #c05c14;
+  background: #fbeadf; border: 1px solid #ebc9ab; border-radius: 5px;
+  padding: 5px 9px; cursor: pointer;
+}
+.hold-check:hover { background: #f8ddc9; }
+.hold-check input { width: 14px; height: 14px; margin: 0; }
+.hold-check.on { background: #c05c14; border-color: #c05c14; color: #fff; }
+.hold-note {
+  margin: 8px 0 0; padding: 7px 10px; font-size: 12px; color: #7a3c0c;
+  background: #fbeadf; border: 1px solid #ebc9ab; border-left: 3px solid #c05c14;
+  border-radius: 0 5px 5px 0;
+}
+.hold-lock { margin-left: auto; font-size: 11px; font-weight: normal; color: #c05c14; }
+.opt-tag {
+  display: inline-block; margin-left: 5px; padding: 0 5px; font-size: 10px; font-weight: normal;
+  color: #8a949c; border: 1px solid #dfe4e8; border-radius: 3px;
+}
+.form-row input.need { border-color: #c00000; background: #fdecea; }
+
+/* ステッパー：保留中は現在ステージをオレンジに */
+.step.current.held .circle { background: #ed7d31 !important; border-color: #ed7d31 !important; color: #fff !important; }
+
+/* ---------- 一覧：保留行 ---------- */
+.list-table tr.row-hold td { background: #fdf3ec; }
+.list-table tr.row-hold:hover td { background: #fbe8dc; }
+.list-group-head .cnt-hold { background: #fbeadf; color: #c05c14; }
+
+/* ---------- カンバン：保留レーン ---------- */
+.lane.lane-hold { background: #fdf3ec; }
+.lane.lane-hold .lane-head { color: #c05c14; }
+.card.card-hold { border-left-color: #ed7d31 !important; }
+.cmeta .c-hold { color: #c05c14; font-weight: bold; }
+
+/* ---------- 集計：一覧フィルタ ---------- */
+.agg-filters {
+  border: 1px solid #cfe0d9; background: #f2f8f5; border-radius: 6px;
+  padding: 7px 9px; margin-bottom: 9px;
+}
+.af-row { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+.af-label {
+  min-width: 94px; flex: 0 0 auto; padding-top: 3px;
+  font-size: 11px; font-weight: bold; color: #2f6b4a;
+}
+.fchips { display: flex; gap: 4px; flex-wrap: wrap; }
+.fchip {
+  border: 1px solid #c5d2d8; background: #fff; color: #52616b;
+  border-radius: 11px; padding: 2px 10px; font-size: 11px; cursor: pointer;
+}
+.fchip:hover { border-color: #2f6b4a; color: #2f6b4a; }
+.fchip.on { background: #2f6b4a; border-color: #2f6b4a; color: #fff; font-weight: bold; }
+.fchip.clear { border-style: dashed; color: #98a2a9; }
+.af-select {
+  border: 1px solid #c5d2d8; background: #fff; border-radius: 5px;
+  padding: 3px 7px; font-size: 11.5px; font-family: inherit; color: #2f3640; min-width: 160px;
+}
+.af-select:focus { outline: none; border-color: #2f6b4a; }
+.af-meta {
+  margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cfe0d9;
+  font-size: 11px; color: #52616b;
+}
+.af-meta b { color: #2f6b4a; }
+.af-meta b.txt-alert { color: #c00000; }
+.cnt-inline { font-size: 11px; font-weight: normal; color: #8a949c; margin-left: 4px; }
+
+/* ---------- 集計：KPIの色分け ---------- */
+.kpi.kpi-alert .kv { color: #c00000; }
+.kpi.kpi-hold .kv { color: #c05c14; }
+
+/* ---------- 集計：保留行と本来の状態の内訳 ---------- */
+.agg-table tr.row-hold td { background: #fdf3ec; }
+.hold-brk { display: block; margin-top: 2px; font-size: 10px; color: #c05c14; }
+
+/* ---------- 見積有効期限：超過表示 ---------- */
+.agg-table tr.row-overdue td { background: #fdecea; }
+.agg-table tr.row-overdue:hover td { background: #fbdedb; }
+.lim-cell-over { color: #c00000; font-weight: bold; }
+.lim-tag {
+  display: inline-block; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: bold; white-space: nowrap; border: 1px solid transparent;
+}
+.lim-tag.lim-over { background: #c00000; color: #fff; }
+.lim-tag.lim-soon { background: #fdf6e3; color: #b7791f; border-color: #e8d5a8; }
+.lim-tag.lim-ok { background: #f0f3f6; color: #6b7780; border-color: #e0e4e8; }
+.lim-tag.lim-none { background: #fff; color: #98a2a9; border-color: #e0e4e8; }
+
+/* ---------- 保守案件一覧：区分タグ ---------- */
+.kind-tag {
+  display: inline-block; padding: 1px 7px; border-radius: 3px;
+  font-size: 10px; font-weight: bold; white-space: nowrap; border: 1px solid transparent;
+}
+.kind-tag.k-問合せ { background: #eaf2f8; color: #2c6e9b; border-color: #c3dae9; }
+.kind-tag.k-改修 { background: #fdf6e3; color: #b7791f; border-color: #e8d5a8; }
+.kind-tag.k-瑕疵 { background: #f3edfa; color: #7b4baf; border-color: #dccbee; }
+.kind-tag.k-区分未設定 { background: #f0f3f6; color: #8a949c; border-color: #e0e4e8; }
+
+/* ---------- 凡例：折れ線マーカー ---------- */
+.legend .sw-line {
+  height: 0; width: 14px; border-radius: 0; border-top: 2px solid #548235;
+  background: none; vertical-align: 2px;
+}
+
+/* ---------- ドリルダウンカード ---------- */
+.agg-card.drill-card { border-color: #cfe0d9; }
