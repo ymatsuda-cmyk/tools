@@ -186,7 +186,10 @@ function updateLastWeekBtn() {
   if (btn) btn.classList.toggle("active", !!filters.lastWeekOnly);
 }
 function saveGanttCookie() {
-  try { localStorage.setItem("eigyo_gantt", JSON.stringify({ zoom: ganttZoom, term: ganttTerm })); } catch (e) {}
+  try {
+    localStorage.setItem("eigyo_gantt",
+      JSON.stringify({ zoom: ganttZoom, term: ganttTerm, hideDone: ganttHideDone }));
+  } catch (e) {}
 }
 function restoreGanttCookie() {
   try {
@@ -195,6 +198,7 @@ function restoreGanttCookie() {
     const g = JSON.parse(raw);
     if ([12, 6, 3, 1].includes(g.zoom)) ganttZoom = g.zoom;
     if (Number.isInteger(g.term)) ganttTerm = g.term;
+    if (typeof g.hideDone === "boolean") ganttHideDone = g.hideDone;
   } catch (e) {}
 }
 
@@ -924,32 +928,30 @@ function workflowLabel(type) {
 /* ============================================================
    ステッパー
    ============================================================ */
+/* ステッパー：ステージ名のピルを ▶ でつなぐ（ステージタブと表記を揃える）
+ * 完了／失注に到達したときだけ、末尾にその結果ピルを足す。 */
 function renderStepper(el, type, currentStatus, held) {
   const wf = WORKFLOWS[type];
   if (!wf) { el.innerHTML = ""; return; }
-  const idx = wf.steps.indexOf(currentStatus);
-  const termReached = wf.terminals.includes(currentStatus);
-  let html = "";
-  wf.steps.forEach((s, i) => {
-    let cls = "step";
+  const chain = stageTabsOf(type);                       // 起票／見積中／確認中／…
+  const stage = currentStatus === "新規" ? "起票" : currentStatus;
+  const idx = chain.indexOf(stage);
+  const term = wf.terminals.includes(currentStatus) ? currentStatus : null;
+  const pills = chain.map((s, i) => {
+    let cls = "step-pill";
     if (currentStatus != null) {
-      if (termReached || i < idx) cls += " done";
-      else if (i === idx) cls += " current" + (held ? " held" : "");
+      if (term || (idx >= 0 && i < idx)) cls += " done";
+      else if (i === idx) cls += held ? " now held" : " now";
     }
-    html += `<div class="${cls}"><div class="dot"><div class="circle">${held && i === idx ? "||" : i + 1}</div><div class="lbl">${esc(s)}</div></div>
-      <div class="arrow"></div></div>`;
+    return `<span class="${cls}">${held && i === idx ? "❙❙ " : ""}${esc(s)}</span>`;
   });
-  const parts = wf.terminals.map(t => {
-    let cls = "step";
-    if (currentStatus === t) cls += t === "失注" ? " terminal-lose current" : " terminal-win current";
-    const mark = t === "受注" ? "○" : t === "失注" ? "×" : "✓";
-    return `<div class="${cls}"><div class="dot"><div class="circle">${mark}</div><div class="lbl">${esc(t)}</div></div></div>`;
-  });
-  html += parts.join(`<div class="step"><div class="branch">or</div></div>`);
-  /* 保留中：本来のステージを || で示しつつ、末尾に保留バッジを添える */
-  if (held || currentStatus === HOLD) {
-    html += `<div class="step current" style="margin-left:8px"><div class="dot"><div class="circle" style="background:#ed7d31;border-color:#ed7d31;color:#fff">||</div><div class="lbl">保留中</div></div></div>`;
+  let html = pills.join(`<span class="step-sep">▶</span>`);
+  if (term) {
+    html += `<span class="step-sep">▶</span>` +
+      `<span class="step-pill ${term === "失注" ? "lose" : "win"}">${esc(term)}</span>`;
   }
+  /* 旧データ（状態＝保留）でステージが特定できない場合だけ保留ピルを添える */
+  if (held && idx < 0) html += `<span class="step-pill hold-pill">❙❙ 保留中</span>`;
   el.innerHTML = html;
 }
 
@@ -1731,9 +1733,16 @@ function renderHoshuAgg() {
 }
 
 /* --- 保守案件一覧（取引先・発生月・区分でフィルタ） --- */
-let maintF = { clients: [], month: "", kinds: [] };
-function onMaintFilter(which, el) {
-  if (which === "month") maintF.month = el.value;
+let maintF = { clients: [], month: null, monthTerm: null, kinds: [] };
+/* 月ラベル: "2026/07" → "7月" ／ 期の12か月は 10月〜9月の順 */
+function monthBtnLabel(key) { return `${Number(key.slice(5))}月`; }
+/* 既定は当月（表示中の期に当月が含まれない場合は「すべて」） */
+function defaultMonthKey(months) {
+  const k = monthKey(new Date());
+  return months.includes(k) ? k : "";
+}
+function pickMaintMonth(v) {
+  maintF.month = (maintF.month === v) ? "" : v;
   renderAgg();
 }
 function toggleMaintChip(which, v) {
@@ -1755,6 +1764,11 @@ function renderMaintList(target) {
   const clients = [...new Set(target.map(r => r.client).filter(Boolean))];
   const kinds = ["問合せ", "改修", "瑕疵"];
   maintF.clients = maintF.clients.filter(c => clients.includes(c));
+  /* 期が変わったら当月を選び直す */
+  if (maintF.monthTerm !== currentTerm) {
+    maintF.month = defaultMonthKey(months);
+    maintF.monthTerm = currentTerm;
+  }
   if (maintF.month && !months.includes(maintF.month)) maintF.month = "";
 
   const rows = target.filter(r =>
@@ -1779,10 +1793,11 @@ function renderMaintList(target) {
             ${clients.map(c => chip("client", c, maintF.clients.includes(c))).join("")}
           </div></div>
         <div class="af-row"><span class="af-label">月別（発生月）</span>
-          <select class="af-select" onchange="onMaintFilter('month',this)">
-            <option value="">すべての月</option>
-            ${months.map(m => `<option value="${m}"${maintF.month === m ? " selected" : ""}>${m}</option>`).join("")}
-          </select></div>
+          <div class="fchips month-chips">
+            <button class="fchip clear${maintF.month ? "" : " on"}" onclick="pickMaintMonth('')">すべて</button>
+            ${months.map(m => `<button class="fchip mchip${maintF.month === m ? " on" : ""}"
+              title="${m}" onclick="pickMaintMonth('${m}')">${monthBtnLabel(m)}</button>`).join("")}
+          </div></div>
         <div class="af-row"><span class="af-label">区分</span>
           <div class="fchips">
             <button class="fchip clear${maintF.kinds.length ? "" : " on"}" onclick="clearMaintChips('kind')">すべて</button>
@@ -2031,8 +2046,11 @@ function closeMitsuDrill() { mitsuOpenStatus = null; renderAgg(); }
 function clearQuoteChips2() { quoteF.clients = []; quoteF.owners = []; }
 
 /* --- 受注状況: 受注確定（受注区分=受注）の計上日ベース --- */
-let juchuF = { clients: [], owners: [], month: "" };
-function onJuchuMonth(el) { juchuF.month = el.value; renderAgg(); }
+let juchuF = { clients: [], owners: [], month: null, monthTerm: null };
+function pickJuchuMonth(v) {
+  juchuF.month = (juchuF.month === v) ? "" : v;
+  renderAgg();
+}
 function toggleJuchuChip(which, v) {
   const arr = which === "client" ? juchuF.clients : juchuF.owners;
   const i = arr.indexOf(v);
@@ -2062,6 +2080,10 @@ function renderJuchuAgg() {
   const owners = [...new Set(won.flatMap(r => splitOwners(r.owner)))];
   juchuF.clients = juchuF.clients.filter(c => clients.includes(c));
   juchuF.owners = juchuF.owners.filter(o => owners.includes(o));
+  if (juchuF.monthTerm !== currentTerm) {
+    juchuF.month = defaultMonthKey(months);
+    juchuF.monthTerm = currentTerm;
+  }
   if (juchuF.month && juchuF.month !== "__none" && !months.includes(juchuF.month)) juchuF.month = "";
 
   const rows = won.filter(r =>
@@ -2096,11 +2118,13 @@ function renderJuchuAgg() {
             ${clients.map(c => chip("client", c, juchuF.clients.includes(c))).join("")}
           </div></div>
         <div class="af-row"><span class="af-label">月別（計上日）</span>
-          <select class="af-select" onchange="onJuchuMonth(this)">
-            <option value="">すべての月</option>
-            ${months.map(m => `<option value="${m}"${juchuF.month === m ? " selected" : ""}>${m}</option>`).join("")}
-            <option value="__none"${juchuF.month === "__none" ? " selected" : ""}>計上日 未入力</option>
-          </select></div>
+          <div class="fchips month-chips">
+            <button class="fchip clear${juchuF.month ? "" : " on"}" onclick="pickJuchuMonth('')">すべて</button>
+            ${months.map(m => `<button class="fchip mchip${juchuF.month === m ? " on" : ""}"
+              title="${m}" onclick="pickJuchuMonth('${m}')">${monthBtnLabel(m)}</button>`).join("")}
+            <button class="fchip mchip-none${juchuF.month === "__none" ? " on" : ""}"
+              onclick="pickJuchuMonth('__none')">未入力</button>
+          </div></div>
         <div class="af-row"><span class="af-label">担当者</span>
           <div class="fchips">
             <button class="fchip clear${juchuF.owners.length ? "" : " on"}" onclick="clearJuchuChips('owner')">すべて</button>
@@ -2365,11 +2389,13 @@ function loadDemo() {
    ============================================================ */
 let ganttTerm = termOfDate(new Date());
 let ganttZoom = 12;               // 表示月数 12/6/3/1
+let ganttHideDone = false;        // 完了除く（チェックすると完了案件を隠す）
 const GANTT_ROW_H = 46;
 const DAY_MS = 86400000;
 
 function shiftGanttTerm(d) { ganttTerm += d; saveGanttCookie(); renderSched(); }
 function setGanttZoom(m) { ganttZoom = m; saveGanttCookie(); renderSched(); }
+function toggleGanttHideDone(cb) { ganttHideDone = cb.checked; saveGanttCookie(); renderSched(); }
 
 function renderSched() {
   const cont = document.getElementById("sched-container");
@@ -2385,6 +2411,7 @@ function termEndDate(term) { return new Date(term + 1989, 9, 1); }              
 function ganttRecords() {
   return activeRecords()
     .filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status))
+    .filter(r => !(ganttHideDone && r.status === "完了"))
     .map(r => {
       // バー: 開始日(AH=workStart) 〜 完了予定日(AI=dueDate)
       const start = r.workStart || r.orderDone || r.book || r.occur;
@@ -2502,6 +2529,11 @@ function ganttHtml() {
     <button class="term-btn" onclick="shiftGanttTerm(-1)">◀</button>
     <span class="term-label">${esc(termLabel(ganttTerm))}</span>
     <button class="term-btn" onclick="shiftGanttTerm(1)">▶</button>
+    <span class="term-bar-sep"></span>
+    <label class="hours-toggle" title="完了した案件をガントから隠す">
+      <input type="checkbox" id="gantt-hidedone-cb" ${ganttHideDone ? "checked" : ""}
+        onchange="toggleGanttHideDone(this)"> 完了除く
+    </label>
     <span class="g-sp"></span>
     <div class="g-zoom">
       ${[12, 6, 3, 1].map(m =>
