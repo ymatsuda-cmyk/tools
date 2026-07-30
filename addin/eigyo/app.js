@@ -1054,11 +1054,13 @@ function openEditModal(id, forceTab) {
       ? new Date(v) : v);
   editingRec.row = rec.row;
   editDirty = false;
-  document.getElementById("ed-title").textContent = `${rec.id}　${rec.client}`;
+  /* タイトルバー：案件番号／取引先／内容（内容は長い場合は省略表示＋ツールチップ） */
+  document.getElementById("ed-title").innerHTML =
+    `<span class="mt-id">${esc(rec.id)}</span>` +
+    `<span class="mt-client">${esc(rec.client)}</span>` +
+    (str(rec.content) ? `<span class="mt-content" title="${esc(rec.content)}">${esc(rec.content)}</span>` : "");
   document.getElementById("ed-id").value = rec.id;
   document.getElementById("ed-client").value = rec.client;
-  const cEl = document.getElementById("ed-content-view");
-  if (cEl) { cEl.value = str(rec.content); cEl.title = str(rec.content); }
   const tSel = document.getElementById("ed-type");
   // 一度登録した案件は種別変更不可（種別は固定表示）
   tSel.innerHTML = `<option>${esc(rec.type)}</option>`;
