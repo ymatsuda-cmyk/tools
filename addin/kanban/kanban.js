@@ -1379,16 +1379,15 @@ function openMenu(btn) {
       s.src = COMMON_BASE + "/slide-menu.js";
       s.onload = () => {
         SlideMenu.init({
-          appName: "Excel Kanban",
+          appName: "Menu",
           version: APP_VERSION,
-          position: "right",
+          position: "left",
           width: 250,
           theme: { accent: "#0E7A5F" },
           footer: "© RightArm",
           currentId: "kanban",                       // menu.json のidと一致で強調表示
           menuUrl: COMMON_BASE + "/menu.json",       // ★ メニュー定義はJSONで一元管理
           localItems: [                              // このアプリ固有の操作
-            { section: "操作" },
             { label: "再読み込み", icon: "🔄", onClick: () => init() },
             { label: "設定をリセット", icon: "🧹", onClick: () => resetSettings() }
           ]

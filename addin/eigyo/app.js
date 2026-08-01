@@ -214,10 +214,10 @@ function openMenu() {
         SlideMenu.init({
           appName: "営業報告",
           version: APP_VERSION,
+          position: "left",
           currentId: "eigyo",                     // menu.json の id と一致で強調
           menuUrl: COMMON_BASE + "/menu.json",
           localItems: [
-            { section: "操作" },
             { label: "再読み込み", icon: "🔄", onClick: () => init() },
           ],
         });
