@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260801_b96cd68";
+const APP_VERSION = "rev_20260801_e5b7d14";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -29,6 +29,9 @@ let searchQuery = "";
 let currentTab = "board";     // "board" | "agg"
 let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
+
+/* 遅延タブ：KPIクリックで表示するリストの選択 */
+let delaySel = "overdue";     // "overdue" | "soon" | "idle" | "held"
 
 /* 遅延タブ：期限接近とみなす残日数 */
 const DUE_SOON_DAYS = 3;
@@ -132,6 +135,13 @@ function bindStaticUI() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAllDropdowns();
+  });
+
+  // 画面サイズ変更時に一覧の高さを追従させる
+  let sizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(sizeTimer);
+    sizeTimer = setTimeout(sizeAggLists, 120);
   });
 
   // トグルの初期表示
@@ -1284,16 +1294,8 @@ function onModalNoteEdited() {
    ============================================================ */
 function isMatch(t) {
 
-  // ★ 検索（タスク名・備考・大分類・小分類を横断）
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    const hit =
-      (t.title || "").toString().toLowerCase().includes(q) ||
-      (t.note || "").toString().toLowerCase().includes(q) ||
-      (t.category || "").toString().toLowerCase().includes(q) ||
-      (t.classification || "").toString().toLowerCase().includes(q);
-    if (!hit) return false;
-  }
+  // ★ 検索（タスク名・備考）
+  if (!matchesSearch(t)) return false;
 
   // 担当者
   if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
@@ -1690,6 +1692,8 @@ function restoreTabState() {
     if (s === "status" || s === "delay") aggSubTab = s;
     const a = localStorage.getItem("kanban-agg-axis");
     if (a === "total" || a === "cum" || a === "day") aggAxis = a;
+    const d = localStorage.getItem("kanban-delay-sel");
+    if (["overdue", "soon", "idle", "held"].includes(d)) delaySel = d;
   } catch (e) {
     console.log("Tab state restoration error:", e);
   }
@@ -1720,19 +1724,38 @@ function applyTabState() {
   if (st) st.classList.toggle("hidden", aggSubTab !== "status");
   const dl = document.getElementById("agg-delay");
   if (dl) dl.classList.toggle("hidden", aggSubTab !== "delay");
+
+  moveSearchBox(isAgg);
+}
+
+/* 検索ボックスを実体ごと移動する。
+   入力欄を1つに保つことで、タブ間で検索語とイベント束縛が共有される。
+   集計 → サブタブ行の右端 / カンバン → フィルタバーの元位置 */
+function moveSearchBox(toAgg) {
+  const box = document.getElementById("search-box");
+  if (!box) return;
+
+  const target = toAgg
+    ? document.getElementById("agg-subtabs")
+    : document.getElementById("search-slot");
+  if (!target || box.parentElement === target) return;
+
+  target.appendChild(box);
+  box.classList.toggle("in-subtabs", !!toAgg);
+}
+
+/* 一覧の高さを画面下端までに収める（超える分はスクロール） */
+function sizeAggLists() {
+  document.querySelectorAll(".agg-list-scroll").forEach(el => {
+    const top = el.getBoundingClientRect().top;
+    const h = Math.max(window.innerHeight - top - 6, 120);
+    el.style.maxHeight = h + "px";
+  });
 }
 
 /* ===== 集計対象の判定（検索・担当者・大分類・小分類のみ） ===== */
 function aggMatch(t) {
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    const hit =
-      (t.title || "").toString().toLowerCase().includes(q) ||
-      (t.note || "").toString().toLowerCase().includes(q) ||
-      (t.category || "").toString().toLowerCase().includes(q) ||
-      (t.classification || "").toString().toLowerCase().includes(q);
-    if (!hit) return false;
-  }
+  if (!matchesSearch(t)) return false;
   if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
   if (selectedCategories.length && !selectedCategories.includes(t.category)) return false;
   if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
@@ -1873,16 +1896,13 @@ function renderAggStatus(rows) {
       listEl.innerHTML = `<div class="agg-empty">該当するタスクがありません</div>`;
     } else {
       const sorted = rows.slice().sort(aggListSort);
-      listEl.innerHTML =
-        `<div class="agg-list-scroll"><table class="agg-table sticky">
-           <thead><tr>
-             <th>タスク</th><th>担当</th><th>予定</th><th>実績</th><th>状態</th>
-           </tr></thead>
-           <tbody>${sorted.map(aggRowHtml).join("")}</tbody>
-         </table></div>`;
+      listEl.innerHTML = buildTable(sorted,
+        [COL_TITLE, COL_CAT, COL_SUB, COL_USER, COL_PLAN, COL_ACT, COL_STAT]);
       bindAggRowJump(listEl);
     }
   }
+
+  sizeAggLists();
 }
 
 /* 一覧の並び：遅延 → 対応中 → 未着手 → 完了、同区分内は予定終了日順 */
@@ -1902,27 +1922,6 @@ function aggListSort(a, b) {
   if (!ea) return 1;
   if (!eb) return -1;
   return ea - eb;
-}
-
-function aggRowHtml(t) {
-  const overdue = isOverdue(t);
-  let pill = `<span class="pill p-todo">未着手</span>`;
-  if (t.actualEnd) pill = `<span class="pill p-done">完了</span>`;
-  else if (overdue) pill = `<span class="pill p-late">遅延</span>`;
-  else if (isInProgress(t)) pill = `<span class="pill p-doing">対応中</span>`;
-
-  const plan = t.isNoSchedule ? "—" : `${fmt(t.start)}→${fmt(t.end)}`;
-  const act = t.actualStart
-    ? `${fmt(t.actualStart)}→${t.actualEnd ? fmt(t.actualEnd) : ""}`
-    : "—";
-
-  return `<tr data-row="${t.rowIndex}">
-    <td class="c-title">${escapeHtml(t.title || "")}</td>
-    <td>${escapeHtml(t.user || "")}</td>
-    <td class="c-date${overdue ? " late" : ""}">${plan}</td>
-    <td class="c-date">${act}</td>
-    <td>${pill}</td>
-  </tr>`;
 }
 
 function aggBarRow(r, cfg, max, showLabels, opts) {
@@ -2053,6 +2052,103 @@ function bindAggDrill(scope) {
   });
 }
 
+/* ============================================================
+   一覧テーブル共通
+   ------------------------------------------------------------
+   ・検索対象はタスク名と備考のみ
+   ・タスク名以外の列は「最大文字数」に合わせた固定幅、
+     余りをタスク名列が受け取る（table-layout:fixed + colgroup）
+   ============================================================ */
+/* タスク名列に最低限確保する幅（px） */
+const TITLE_MIN_PX = 110;
+
+function matchesSearch(t) {
+  if (!searchQuery) return true;
+  const q = searchQuery.toLowerCase();
+  return (t.title || "").toString().toLowerCase().includes(q) ||
+         (t.note  || "").toString().toLowerCase().includes(q);
+}
+
+/* 全角を2、半角を1として表示幅を数える（ch単位に対応させるため） */
+function dispLen(v) {
+  const str = String(v == null ? "" : v);
+  let n = 0;
+  for (const ch of str) {
+    const c = ch.codePointAt(0);
+    n += (c >= 0x1100 && (c <= 0x115F || c === 0x2192 || c === 0x2605 || c === 0x2606 ||
+          (c >= 0x2E80 && c <= 0xA4CF) || (c >= 0xAC00 && c <= 0xD7A3) ||
+          (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFE30 && c <= 0xFE6F) ||
+          (c >= 0xFF00 && c <= 0xFF60) || (c >= 0xFFE0 && c <= 0xFFE6))) ? 2 : 1;
+  }
+  return n;
+}
+
+/* cols: [{ label, get, cls, flex }]  flex:true の列が残り幅を受け取る */
+function buildTable(rows, cols, extraClass) {
+  const widths = cols.map(c => {
+    if (c.flex) return null;
+    const max = rows.reduce((m, r) => Math.max(m, dispLen(c.get(r))), dispLen(c.label));
+    // 余白2ch分を加算し、極端な長さは頭打ちにする
+    return Math.min(Math.max(max + 2, 5), 24);
+  });
+
+  const colgroup = widths
+    .map(w => w === null ? `<col>` : `<col style="width:${w}ch">`).join("");
+
+  // 固定列の合計＋タスク名の最低幅を下限にする。
+  // 狭いペインではタスク名が潰れる代わりに横スクロールさせる。
+  const fixedCh = widths.reduce((a, w) => a + (w || 0), 0);
+  const minWidth = `calc(${fixedCh}ch + ${TITLE_MIN_PX}px)`;
+
+  const head = cols.map(c => `<th class="${c.cls || ""}">${escapeHtml(c.label)}</th>`).join("");
+
+  const body = rows.map(r =>
+    `<tr data-row="${r.rowIndex}">` +
+    cols.map(c => {
+      const v = c.get(r);
+      const cell = c.html ? c.html(r) : escapeHtml(v);
+      return `<td class="${c.cls || ""}">${cell}</td>`;
+    }).join("") +
+    `</tr>`).join("");
+
+  return `<div class="agg-list-scroll">
+    <table class="agg-table sticky ${extraClass || ""}" style="min-width:${minWidth}">
+      <colgroup>${colgroup}</colgroup>
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  </div>`;
+}
+
+/* 一覧の共通列（タスク名は flex で残り幅） */
+function planText(t) { return t.isNoSchedule ? "\u2014" : `${fmt(t.start)}\u2192${fmt(t.end)}`; }
+function actText(t) {
+  if (!t.actualStart) return "\u2014";
+  return `${fmt(t.actualStart)}\u2192${t.actualEnd ? fmt(t.actualEnd) : ""}`;
+}
+function statusText(t) {
+  if (t.actualEnd) return "\u5b8c\u4e86";
+  if (isOverdue(t)) return "\u9045\u5ef6";
+  if (isInProgress(t)) return "\u5bfe\u5fdc\u4e2d";
+  return "\u672a\u7740\u624b";
+}
+function statusPill(t) {
+  const label = statusText(t);
+  const cls = label === "完了" ? "p-done"
+    : label === "遅延" ? "p-late"
+    : label === "対応中" ? "p-doing" : "p-todo";
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+const COL_TITLE = { label: "タスク", cls: "c-title", flex: true, get: t => t.title || "" };
+const COL_CAT   = { label: "大分類", cls: "c-cat", get: t => t.category || "" };
+const COL_SUB   = { label: "小分類", cls: "c-cat", get: t => t.classification || "" };
+const COL_USER  = { label: "担当", cls: "c-user", get: t => t.user || "" };
+const COL_PLAN  = { label: "予定", cls: "c-date", get: planText,
+                    html: t => `<span class="${isOverdue(t) ? "late" : ""}">${escapeHtml(planText(t))}</span>` };
+const COL_ACT   = { label: "実績", cls: "c-date", get: actText };
+const COL_STAT  = { label: "状態", cls: "c-stat", get: statusText, html: statusPill };
+
 /* ===== 遅延タブ ===== */
 function isOverdue(t) {
   if (t.actualEnd) return false;              // 完了は対象外
@@ -2094,72 +2190,98 @@ function isHeld(t) {
 }
 
 function renderAggDelay(rows) {
-  const overdue = rows.filter(isOverdue)
-    .sort((a, b) => (overdueDays(b) || 0) - (overdueDays(a) || 0));
+  const groups = {
+    overdue: {
+      label: "遅延", kpiCls: "bad",
+      title: "遅延タスク（超過日数順）",
+      valueHead: "超過",
+      rows: rows.filter(isOverdue)
+        .sort((x, y) => (overdueDays(y) || 0) - (overdueDays(x) || 0)),
+      value: t => `<span class="d-bad">${overdueDays(t)}日</span>`,
+      valueText: t => `${overdueDays(t)}日`
+    },
+    soon: {
+      label: `期限${DUE_SOON_DAYS}日内`, kpiCls: "warn",
+      title: `期限接近（${DUE_SOON_DAYS}日以内）`,
+      valueHead: "期限",
+      rows: rows.filter(t => {
+        if (t.actualEnd) return false;
+        const d = daysToDue(t);
+        return d !== null && d >= 0 && d <= DUE_SOON_DAYS;
+      }).sort((x, y) => (daysToDue(x) || 0) - (daysToDue(y) || 0)),
+      value: t => { const d = daysToDue(t); return `<span class="d-warn">${d === 0 ? "本日" : "残" + d + "日"}</span>`; },
+      valueText: t => { const d = daysToDue(t); return d === 0 ? "本日" : "残" + d + "日"; }
+    },
+    idle: {
+      label: "未着手放置", kpiCls: "warn",
+      title: "未着手のまま放置（予定開始日を経過）",
+      valueHead: "放置",
+      rows: rows.filter(t => idleDays(t) !== null)
+        .sort((x, y) => idleDays(y) - idleDays(x)),
+      value: t => `<span class="d-warn">${idleDays(t)}日</span>`,
+      valueText: t => `${idleDays(t)}日`
+    },
+    held: {
+      label: "保留", kpiCls: "warn",
+      title: "保留中（備考に▲）",
+      valueHead: "状況",
+      rows: rows.filter(t => isHeld(t) && !t.actualEnd)
+        .sort((x, y) => (overdueDays(y) || 0) - (overdueDays(x) || 0)),
+      value: t => { const d = overdueDays(t); return d ? `<span class="d-bad">${d}日超過</span>` : `<span class="d-none">—</span>`; },
+      valueText: t => { const d = overdueDays(t); return d ? `${d}日超過` : "—"; }
+    }
+  };
 
-  const dueSoon = rows.filter(t => {
-    if (t.actualEnd) return false;
-    const d = daysToDue(t);
-    return d !== null && d >= 0 && d <= DUE_SOON_DAYS;
-  }).sort((a, b) => (daysToDue(a) || 0) - (daysToDue(b) || 0));
+  const order = ["overdue", "soon", "idle", "held"];
+  if (!order.includes(delaySel)) delaySel = "overdue";
 
-  const idle = rows.filter(t => idleDays(t) !== null)
-    .sort((a, b) => idleDays(b) - idleDays(a));
-
-  const held = rows.filter(t => isHeld(t) && !t.actualEnd)
-    .sort((a, b) => (overdueDays(b) || 0) - (overdueDays(a) || 0));
-
-  // KPI
+  // KPI（クリックで下の一覧を切り替え）
   const kpiEl = document.getElementById("delay-kpis");
   if (kpiEl) {
-    const maxIdle = idle.length ? idleDays(idle[0]) : 0;
-    kpiEl.innerHTML = `
-      <div class="kpi bad"><span class="kpi-k">遅延</span><span class="kpi-v">${overdue.length}</span></div>
-      <div class="kpi warn"><span class="kpi-k">期限${DUE_SOON_DAYS}日内</span><span class="kpi-v">${dueSoon.length}</span></div>
-      <div class="kpi warn"><span class="kpi-k">保留</span><span class="kpi-v">${held.length}</span></div>
-      <div class="kpi"><span class="kpi-k">未着手最長</span><span class="kpi-v">${maxIdle}<small>日</small></span></div>`;
+    kpiEl.innerHTML = order.map(k => {
+      const g = groups[k];
+      return `<button class="kpi ${g.kpiCls} clickable ${k === delaySel ? "sel" : ""}" data-delay="${k}">
+        <span class="kpi-k">${escapeHtml(g.label)}</span>
+        <span class="kpi-v">${g.rows.length}</span>
+      </button>`;
+    }).join("");
+
+    kpiEl.querySelectorAll("[data-delay]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        delaySel = btn.dataset.delay;
+        try { localStorage.setItem("kanban-delay-sel", delaySel); } catch (e) { /* 継続 */ }
+        renderAggDelay(rows);
+      });
+    });
   }
 
+  // 選択されたグループの一覧のみ表示
   const body = document.getElementById("delay-body");
   if (!body) return;
 
-  body.innerHTML =
-    delayTable("遅延タスク（超過日数順）", overdue,
-      t => `<span class="d-bad">${overdueDays(t)}日</span>`, "超過") +
-    delayTable(`期限接近（${DUE_SOON_DAYS}日以内）`, dueSoon,
-      t => { const d = daysToDue(t); return `<span class="d-warn">${d === 0 ? "本日" : "残" + d + "日"}</span>`; }, "期限") +
-    delayTable("未着手のまま放置（予定開始日を経過）", idle,
-      t => `<span class="d-warn">${idleDays(t)}日</span>`, "放置") +
-    delayTable("保留中（備考に▲）", held,
-      t => { const d = overdueDays(t); return d ? `<span class="d-bad">${d}日超過</span>` : `<span class="d-none">—</span>`; }, "状況");
+  const g = groups[delaySel];
+  let html = `<div class="agg-sec-head">${escapeHtml(g.title)} <span class="cnt">${g.rows.length}件</span></div>`;
 
-  bindAggRowJump(body);
-}
-
-function delayTable(title, rows, valueFn, valueHead) {
-  if (!rows.length) {
-    return `<div class="agg-sec">
-      <div class="agg-sec-head">${escapeHtml(title)} <span class="cnt">0件</span></div>
-      <div class="agg-empty">該当なし</div>
-    </div>`;
+  if (!g.rows.length) {
+    html += `<div class="agg-empty">該当なし</div>`;
+    body.innerHTML = html;
+    return;
   }
 
-  return `<div class="agg-sec">
-    <div class="agg-sec-head">${escapeHtml(title)} <span class="cnt">${rows.length}件</span></div>
-    <table class="agg-table">
-      <thead><tr>
-        <th>タスク</th><th>担当</th><th>予定終了</th><th>${escapeHtml(valueHead)}</th>
-      </tr></thead>
-      <tbody>
-        ${rows.map(t => `<tr data-row="${t.rowIndex}">
-          <td class="c-title">${escapeHtml(t.title || "")}</td>
-          <td>${escapeHtml(t.user || "")}</td>
-          <td class="c-date">${t.isNoSchedule ? "—" : fmt(t.end)}</td>
-          <td class="c-val">${valueFn(t)}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>
-  </div>`;
+  const colValue = {
+    label: g.valueHead, cls: "c-val",
+    get: g.valueText, html: g.value
+  };
+  const colDue = {
+    label: "予定終了", cls: "c-date",
+    get: t => t.isNoSchedule ? "—" : fmt(t.end)
+  };
+
+  html += buildTable(g.rows, [COL_TITLE, COL_CAT, COL_SUB, COL_USER, colDue, colValue]);
+  body.innerHTML = html;
+
+  bindAggRowJump(body);
+  sizeAggLists();
 }
 
 /* 行クリックでExcelの該当行へジャンプ／右クリックで備考モーダル */

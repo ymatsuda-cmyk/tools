@@ -1108,3 +1108,58 @@ mark.hit {
   z-index: 1;
   box-shadow: 0 1px 0 var(--line);
 }
+
+/* ============================================================
+   集計タブ 第2版（検索バー移動・列幅フィット・KPIクリック）
+   ============================================================ */
+
+/* 集計中はフィルタバー全体を隠す（検索はサブタブ行へ移動する） */
+.filter-bar.agg-mode { display: none; }
+
+/* サブタブ行の右端に置いた検索ボックス */
+#agg-subtabs { align-items: center; }
+.search-box.in-subtabs {
+  margin-left: auto;
+  min-width: 120px;
+  max-width: 240px;
+  flex: 0 1 200px;
+}
+
+/* KPIをボタン化（遅延タブ） */
+button.kpi {
+  font-family: inherit;
+  cursor: default;
+  text-align: center;
+}
+button.kpi.clickable { cursor: pointer; transition: all .12s; }
+button.kpi.clickable:hover { border-color: var(--ink-faint); }
+button.kpi.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---- 一覧テーブル（列幅フィット版） ---- */
+.agg-table { table-layout: fixed; }
+.agg-table .c-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agg-table .c-cat,
+.agg-table .c-user {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agg-table .c-stat { text-align: center; }
+.agg-table .c-val  { text-align: right; }
+.agg-table .c-date .late { color: #A32D2D; font-weight: 600; }
+
+/* 高さは JS が画面下端まで割り当てる（初期値のみ指定）
+   狭いペインではタスク名の最低幅を守るため横スクロールを許可する */
+.agg-list-scroll {
+  max-height: 60vh;
+  overflow-x: auto;
+}
+.agg-list-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
