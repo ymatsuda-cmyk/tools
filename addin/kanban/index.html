@@ -45,8 +45,7 @@
 <!-- フィルタバー -->
 <div class="filter-bar" id="filter-bar">
 
-  <!-- 検索（タスク名・備考）／集計タブではサブタブ行へ移動する -->
-  <span id="search-slot"></span>
+  <!-- 検索（タスク名・備考） -->
   <div class="search-box" id="search-box">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
       <circle cx="7" cy="7" r="4.5"/>
@@ -151,17 +150,9 @@
 
   <!-- 対応状況 -->
   <div id="agg-status">
+    <div id="agg-filter"></div>
     <div class="kpi-row" id="agg-kpis"></div>
-
-    <div class="axis-bar">
-      <span class="axis-label">グラフ軸</span>
-      <div class="segment" id="agg-axis">
-        <button data-a="total" class="on">総件数</button>
-        <button data-a="cum">累計</button>
-        <button data-a="day">当日</button>
-      </div>
-    </div>
-
+    <div class="axis-hint" id="agg-axis-hint"></div>
     <div class="agg-legend" id="agg-legend"></div>
     <div id="agg-bars"></div>
 
@@ -173,6 +164,7 @@
 
   <!-- 遅延 -->
   <div id="agg-delay" class="hidden">
+    <div class="delay-note">このタブはフィルタ対象外（常に全件を集計）</div>
     <div class="kpi-row" id="delay-kpis"></div>
     <div id="delay-body"></div>
   </div>

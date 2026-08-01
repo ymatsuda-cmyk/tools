@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260801_5b71b40";
+const APP_VERSION = "rev_20260802_a8c31f5";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -29,6 +29,7 @@ let searchQuery = "";
 let currentTab = "board";     // "board" | "agg"
 let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
+let aggPanelOpen = false;     // 分類フィルタ行の開閉
 
 /* 遅延タブ：KPIクリックで表示するリストの選択 */
 let delaySel = "overdue";     // "overdue" | "soon" | "idle" | "held"
@@ -122,10 +123,6 @@ function bindStaticUI() {
     b.addEventListener("click", () => switchAggSub(b.dataset.s));
   });
 
-  // 集計のグラフ軸（総件数／累計／当日）
-  document.querySelectorAll("#agg-axis button").forEach(b => {
-    b.addEventListener("click", () => setAggAxis(b.dataset.a));
-  });
 
   // ドロップダウンの外側クリックで閉じる
   document.addEventListener("click", (e) => {
@@ -1694,6 +1691,7 @@ function restoreTabState() {
     if (a === "total" || a === "cum" || a === "day") aggAxis = a;
     const d = localStorage.getItem("kanban-delay-sel");
     if (["overdue", "soon", "idle", "held"].includes(d)) delaySel = d;
+    aggPanelOpen = localStorage.getItem("kanban-agg-panel") === "true";
   } catch (e) {
     console.log("Tab state restoration error:", e);
   }
@@ -1717,31 +1715,11 @@ function applyTabState() {
     b.classList.toggle("on", b.dataset.tab === currentTab));
   document.querySelectorAll("#agg-subtabs button").forEach(b =>
     b.classList.toggle("on", b.dataset.s === aggSubTab));
-  document.querySelectorAll("#agg-axis button").forEach(b =>
-    b.classList.toggle("on", b.dataset.a === aggAxis));
 
   const st = document.getElementById("agg-status");
   if (st) st.classList.toggle("hidden", aggSubTab !== "status");
   const dl = document.getElementById("agg-delay");
   if (dl) dl.classList.toggle("hidden", aggSubTab !== "delay");
-
-  moveSearchBox(isAgg);
-}
-
-/* 検索ボックスを実体ごと移動する。
-   入力欄を1つに保つことで、タブ間で検索語とイベント束縛が共有される。
-   集計 → サブタブ行の右端 / カンバン → フィルタバーの元位置 */
-function moveSearchBox(toAgg) {
-  const box = document.getElementById("search-box");
-  if (!box) return;
-
-  const target = toAgg
-    ? document.getElementById("agg-subtabs")
-    : document.getElementById("search-slot");
-  if (!target || box.parentElement === target) return;
-
-  target.appendChild(box);
-  box.classList.toggle("in-subtabs", !!toAgg);
 }
 
 /* 一覧の高さを画面下端までに収める（超える分はスクロール） */
@@ -1801,9 +1779,21 @@ function aggregateBy(rows, key) {
     map.get(name).push(t);
   });
 
+  // 並び順はカンバンのチップと同じ「シート出現順」に合わせる
+  const order = sheetOrder(key);
+  const idx = n => {
+    const i = order.indexOf(n);
+    return i < 0 ? order.length + 1 : i;      // 未設定は末尾
+  };
+
   return [...map.entries()]
     .map(([name, list]) => Object.assign({ name }, aggregate(list)))
-    .sort((x, y) => y.total - x.total);
+    .sort((x, y) => idx(x.name) - idx(y.name));
+}
+
+/* 指定列の値をシートの出現順に並べた配列（カンバンのドロップダウンと同じ基準） */
+function sheetOrder(key) {
+  return [...new Set(allTasks.map(t => t[key]).filter(v => v && v !== "#"))];
 }
 
 /* ===== 軸ごとの描画定義 ===== */
@@ -1819,7 +1809,7 @@ const AGG_AXIS_DEF = {
     meta: r => `${r.done} / ${r.doing} / ${r.todo}`,
     rate: r => r.total ? Math.round(r.done / r.total * 100) : null,
     warn: false,     // 完了率は進行中に低くなるのが自然なため色分けしない
-    kpis: ["kpi-total"]
+    hint: "総件数：棒＝総件数、内訳は 完了 → 対応中 → 未着手"
   },
   cum: {
     legend: [["seg-act", "累計実績"], ["seg-gap", "予定との差"]],
@@ -1828,7 +1818,7 @@ const AGG_AXIS_DEF = {
     meta: r => `${r.ac} / ${r.pc}`,
     rate: r => r.pc ? Math.round(r.ac / r.pc * 100) : null,
     warn: true,
-    kpis: ["kpi-pc", "kpi-ac"]
+    hint: "累計：棒＝累計予定、青＝累計実績、グレー＝未達（達成率80%未満は赤字）"
   },
   day: {
     legend: [["seg-act", "当日実績"], ["seg-gap", "予定との差"]],
@@ -1837,16 +1827,15 @@ const AGG_AXIS_DEF = {
     meta: r => `${r.ad} / ${r.pd}`,
     rate: r => r.pd ? Math.round(r.ad / r.pd * 100) : null,
     warn: true,
-    kpis: ["kpi-pd", "kpi-ad"]
+    hint: "当日：棒＝当日予定、青＝当日実績、グレー＝未達（達成率80%未満は赤字）"
   }
 };
 
 /* ===== 集計ビューの描画エントリ ===== */
 function renderAggViews() {
   if (!document.getElementById("agg-view")) return;
-  const rows = allTasks.filter(aggMatch);
-  renderAggStatus(rows);
-  renderAggDelay(rows);
+  renderAggStatus(allTasks.filter(aggMatch));
+  renderAggDelay(allTasks);          // 遅延はフィルタ対象外（常に全件）
 }
 
 /* ===== 対応状況タブ ===== */
@@ -1854,22 +1843,32 @@ function renderAggStatus(rows) {
   const cfg = AGG_AXIS_DEF[aggAxis] || AGG_AXIS_DEF.total;
   const overall = aggregate(rows);
 
-  // KPI
+  // 担当者・分類フィルタパネル
+  renderAggFilterPanel();
+
+  // KPI（クリックでグラフ軸を切り替える）
   const kpiEl = document.getElementById("agg-kpis");
   if (kpiEl) {
     const defs = [
-      ["kpi-total", "総数", overall.total, ""],
-      ["kpi-pc", "累計予定", overall.pc, "plan"],
-      ["kpi-ac", "累計実績", overall.ac, "act"],
-      ["kpi-pd", "当日予定", overall.pd, "plan"],
-      ["kpi-ad", "当日実績", overall.ad, "act"]
+      ["総数", overall.total, "", "total"],
+      ["累計予定", overall.pc, "plan", "cum"],
+      ["累計実績", overall.ac, "act", "cum"],
+      ["当日予定", overall.pd, "plan", "day"],
+      ["当日実績", overall.ad, "act", "day"]
     ];
-    kpiEl.innerHTML = defs.map(([id, label, val, cls]) =>
-      `<div class="kpi ${cls} ${cfg.kpis.includes(id) ? "sel" : ""}">
+    kpiEl.innerHTML = defs.map(([label, val, cls, ax]) =>
+      `<button class="kpi ${cls} clickable ${aggAxis === ax ? "sel" : ""}" data-ax="${ax}">
          <span class="kpi-k">${escapeHtml(label)}</span>
          <span class="kpi-v">${val}</span>
-       </div>`).join("");
+       </button>`).join("");
+
+    kpiEl.querySelectorAll("[data-ax]").forEach(b => {
+      b.addEventListener("click", () => setAggAxis(b.dataset.ax));
+    });
   }
+
+  const hintEl = document.getElementById("agg-axis-hint");
+  if (hintEl) hintEl.textContent = cfg.hint;
 
   // 凡例
   const lg = document.getElementById("agg-legend");
@@ -2148,6 +2147,107 @@ const COL_PLAN  = { label: "予定", cls: "c-date", get: planText,
                     html: t => `<span class="${isOverdue(t) ? "late" : ""}">${escapeHtml(planText(t))}</span>` };
 const COL_ACT   = { label: "実績", cls: "c-date", get: actText };
 const COL_STAT  = { label: "状態", cls: "c-stat", get: statusText, html: statusPill };
+
+/* ============================================================
+   集計タブのフィルタパネル
+   ------------------------------------------------------------
+   担当者は常時1行。分類・小分類は折りたたみ（既定は閉）。
+   閉じていても選択中の内容をバッジに出すので絞り込みを見落とさない。
+   選択状態は既存の selectedUsers / selectedCategories /
+   selectedSubCategories をそのまま使うため、カンバンのチップ・
+   パンくず・グラフのどこから操作しても表示が一致する。
+   ============================================================ */
+function renderAggFilterPanel() {
+  const el = document.getElementById("agg-filter");
+  if (!el) return;
+
+  const users = sheetOrder("user");
+  const cats = sheetOrder("category");
+  const cat = selectedCategories.length === 1 ? selectedCategories[0] : null;
+  const sub = selectedSubCategories.length === 1 ? selectedSubCategories[0] : null;
+
+  const badge = cat ? (sub ? `${cat} › ${sub}` : cat) : "すべて";
+
+  let html = `<div class="agg-fpanel">
+    <div class="f-row">
+      <span class="f-label">担当者</span>
+      <span class="f-chips">${chipsHtml(users, selectedUsers, "user")}</span>
+    </div>
+    <div class="f-row">
+      <div style="flex:1;min-width:0">
+        <button class="f-toggle" data-panel="toggle">
+          <span class="cv">${aggPanelOpen ? "▾" : "▸"}</span>
+          <span class="lbl">分類で絞り込む</span>
+          <span class="badge ${cat ? "" : "off"}">${escapeHtml(badge)}</span>
+          ${cat ? `<span class="clr" data-fkey="cat" data-fval="">解除</span>` : ""}
+        </button>`;
+
+  if (aggPanelOpen) {
+    const subs = cat
+      ? [...new Set(allTasks.filter(t => t.category === cat)
+          .map(t => t.classification).filter(v => v && v !== "#"))]
+      : [];
+
+    html += `<div class="f-sub">
+      <div class="f-row inner">
+        <span class="f-label sub">分類</span>
+        <span class="f-chips">${chipsHtml(cats, selectedCategories, "cat")}</span>
+      </div>
+      <div class="f-row inner">
+        <span class="f-label sub">小分類</span>
+        <span class="f-chips">${cat
+          ? (subs.length ? chipsHtml(subs, selectedSubCategories, "sub")
+                         : `<span class="f-chip dis">小分類なし</span>`)
+          : `<span class="f-chip dis">分類を選択すると表示</span>`}</span>
+      </div>
+    </div>`;
+  }
+
+  html += `</div></div></div>`;
+  el.innerHTML = html;
+
+  el.querySelectorAll("[data-panel]").forEach(b => {
+    b.addEventListener("click", (e) => {
+      if (e.target.closest("[data-fkey]")) return;   // 「解除」は別処理
+      aggPanelOpen = !aggPanelOpen;
+      try { localStorage.setItem("kanban-agg-panel", aggPanelOpen); } catch (err) { /* 継続 */ }
+      renderAggFilterPanel();
+      sizeAggLists();
+    });
+  });
+
+  el.querySelectorAll("[data-fkey]").forEach(b => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      applyAggFilter(b.dataset.fkey, b.dataset.fval || null);
+    });
+  });
+}
+
+function chipsHtml(items, selected, key) {
+  const all = `<button class="f-chip ${selected.length ? "" : "on"}" data-fkey="${key}" data-fval="">すべて</button>`;
+  return all + items.map(v =>
+    `<button class="f-chip ${selected.includes(v) ? "on" : ""}" data-fkey="${key}" data-fval="${escapeHtml(v)}">${escapeHtml(v)}</button>`
+  ).join("");
+}
+
+/* パネルのチップは単一選択（同じ値の再クリックで解除） */
+function applyAggFilter(key, value) {
+  const set = (cur) => (!value || (cur.length === 1 && cur[0] === value)) ? [] : [value];
+
+  if (key === "user") {
+    selectedUsers = set(selectedUsers);
+  } else if (key === "cat") {
+    selectedCategories = set(selectedCategories);
+    selectedSubCategories = [];
+  } else if (key === "sub") {
+    selectedSubCategories = set(selectedSubCategories);
+  }
+
+  saveFilters();
+  renderFilters();
+  renderBoard();     // 末尾で renderAggViews() が走る
+}
 
 /* ===== 遅延タブ ===== */
 function isOverdue(t) {

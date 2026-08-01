@@ -1163,3 +1163,199 @@ button.kpi.sel {
   overflow-x: auto;
 }
 .agg-list-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+
+/* ============================================================
+   集計タブ 第3版：青系配色・タブ見た目・フィルタパネル
+   ============================================================ */
+:root {
+  --bl:       #1B6DC1;   /* 青アクセント */
+  --bl-deep:  #0C447C;   /* 濃い青（文字） */
+  --bl-soft:  #E7F1FB;   /* 淡い青（背景） */
+  --bl-panel: #F2F7FC;   /* パネル背景 */
+  --bl-line:  #D6E6F5;   /* パネル枠線 */
+}
+
+/* ---- メインタブ：等幅・中央寄せ・下線 ---- */
+.main-tabs {
+  padding: 0;
+  gap: 0;
+}
+.main-tabs button {
+  flex: 1;
+  font-size: 12.5px;
+  padding: 9px 0 8px;
+  text-align: center;
+  border-bottom: 3px solid transparent;
+}
+.main-tabs button:hover { color: var(--ink); background: #FAFBFC; }
+.main-tabs button.on {
+  color: var(--bl-deep);
+  font-weight: 700;
+  border-bottom-color: var(--bl);
+  background: transparent;
+}
+
+/* ---- サブタブ：角丸フォルダ型 ---- */
+.subtabs {
+  gap: 4px;
+  padding: 8px 10px 0;
+  background: #FAFBFC;
+}
+.subtabs button {
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: #EDF1F5;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  padding: 6px 14px;
+}
+.subtabs button:hover { border-color: transparent; color: var(--ink); }
+.subtabs button.on {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--bl-deep);
+  font-weight: 700;
+  margin-bottom: -1px;
+  padding-bottom: 7px;
+}
+
+/* ---- フィルタパネル ---- */
+.agg-fpanel {
+  margin: 9px 10px 0;
+  background: var(--bl-panel);
+  border: 1px solid var(--bl-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.agg-fpanel .f-row { display: flex; align-items: flex-start; gap: 8px; }
+.agg-fpanel .f-row + .f-row {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--bl-line);
+}
+.agg-fpanel .f-row.inner { border: 0; margin: 0; padding: 0; }
+.agg-fpanel .f-row.inner + .f-row.inner { margin-top: 5px; }
+.agg-fpanel .f-label {
+  flex: 0 0 52px;
+  width: 52px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--bl-deep);
+  padding-top: 4px;
+}
+.agg-fpanel .f-label.sub { font-weight: 400; color: #5B7590; }
+.agg-fpanel .f-chips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.agg-fpanel .f-sub { margin-top: 6px; }
+
+.f-chip {
+  font-family: inherit;
+  font-size: 10.5px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--bl-line);
+  background: var(--surface);
+  color: #3A464F;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.f-chip:hover { border-color: var(--bl); }
+.f-chip.on {
+  background: var(--bl);
+  border-color: var(--bl);
+  color: #fff;
+  font-weight: 600;
+}
+.f-chip.dis {
+  background: #F7F9FA;
+  color: var(--ink-faint);
+  border-style: dashed;
+  cursor: default;
+}
+
+.f-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 2px 0 0;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--bl-deep);
+  cursor: pointer;
+  text-align: left;
+}
+.f-toggle .cv { font-size: 9px; color: var(--bl); }
+.f-toggle .lbl { font-weight: 700; }
+.f-toggle .badge {
+  font-size: 9.5px;
+  background: var(--bl);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-weight: 600;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-toggle .badge.off {
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--bl-line);
+  font-weight: 400;
+}
+.f-toggle .clr {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+}
+
+/* ---- KPI：軸切替ボタン ---- */
+.axis-hint {
+  padding: 0 10px 6px;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+button.kpi.sel { outline-color: var(--bl); }
+
+/* ---- 青系に差し替え ---- */
+.seg-done, .seg-act { background: var(--bl); }
+.seg-doing { background: #7FB2E5; }
+
+.agg-crumb button { color: var(--bl); }
+.agg-rate.ok { color: var(--bl-deep); }
+.agg-row.clickable:hover { background: var(--bl-soft); }
+.agg-table tbody tr:hover { background: var(--bl-soft); }
+.p-doing { background: var(--bl-soft); color: var(--bl-deep); }
+
+/* ドリルダウンの名称は省略せず全て表示する幅 */
+.agg-name {
+  flex: 0 0 118px;
+  width: 118px;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* 遅延タブの注記 */
+.delay-note {
+  display: inline-block;
+  margin: 9px 10px 0;
+  font-size: 9.5px;
+  color: #5B7590;
+  background: var(--bl-panel);
+  border: 1px solid var(--bl-line);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
