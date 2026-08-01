@@ -36,6 +36,12 @@
   </button>
 </div>
 
+<!-- メインタブ -->
+<div class="main-tabs" id="main-tabs">
+  <button data-tab="board" class="on">カンバン</button>
+  <button data-tab="agg">集計</button>
+</div>
+
 <!-- フィルタバー -->
 <div class="filter-bar" id="filter-bar">
 
@@ -66,13 +72,19 @@
     <button data-p="week">今週</button>
     <button data-p="nextweek">来週</button>
     <button data-p="future">以降</button>
-    <button data-p="today">本日★</button>
+    <button data-p="today" title="期間内・遅延・対応中のタスク">本日</button>
+    <button data-p="star" title="スター付きのタスク">★</button>
     <button data-p="todo">TODO</button>
   </div>
 
   <!-- 保留トグル -->
   <label class="held-toggle" id="held-toggle" onclick="toggleHeldDisplay(event)">
     <span class="switch"></span>保留
+  </label>
+
+  <!-- 完了全てトグル（OFF: 実績完了日が15日以上前の完了は非表示） -->
+  <label class="held-toggle sub-toggle" id="alldone-toggle" title="OFF: 直近15日の完了のみ表示" onclick="toggleAllDone(event)">
+    <span class="switch"></span>完了全て
   </label>
 
   <!-- ドロップダウン：担当者 -->
@@ -124,6 +136,44 @@
       <span class="dot"></span><span class="name">完了</span><span class="count">0</span>
     </div>
     <div class="card-list"></div>
+  </div>
+
+</div>
+
+<!-- 集計ビュー -->
+<div id="agg-view" class="hidden">
+
+  <div class="subtabs" id="agg-subtabs">
+    <button data-s="status" class="on">対応状況</button>
+    <button data-s="delay">遅延</button>
+  </div>
+
+  <!-- 対応状況 -->
+  <div id="agg-status">
+    <div class="kpi-row" id="agg-kpis"></div>
+
+    <div class="axis-bar">
+      <span class="axis-label">グラフ軸</span>
+      <div class="segment" id="agg-axis">
+        <button data-a="total" class="on">総件数</button>
+        <button data-a="cum">累計</button>
+        <button data-a="day">当日</button>
+      </div>
+    </div>
+
+    <div class="agg-legend" id="agg-legend"></div>
+    <div id="agg-bars"></div>
+
+    <div class="agg-sec">
+      <div class="agg-sec-head">タスク一覧 <span class="cnt" id="agg-list-count"></span></div>
+      <div id="agg-list"></div>
+    </div>
+  </div>
+
+  <!-- 遅延 -->
+  <div id="agg-delay" class="hidden">
+    <div class="kpi-row" id="delay-kpis"></div>
+    <div id="delay-body"></div>
   </div>
 
 </div>

@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260730_9e6919b";
+const APP_VERSION = "rev_20260801_7d41e6c";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -22,12 +22,34 @@ let selectedCategories = [];
 let selectedSubCategories = [];
 let selectedPeriod = "all";
 let showHeld = true;
+let showAllDone = false;          // 完了全て（OFF時は直近のみ表示）
 let searchQuery = "";
+
+/* ===== 集計タブの状態 ===== */
+let currentTab = "board";     // "board" | "agg"
+let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
+let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
+
+/* 遅延タブ：期限接近とみなす残日数 */
+const DUE_SOON_DAYS = 3;
+
+/* 集計の達成率警告しきい値（%）。累計・当日にのみ適用 */
+const AGG_WARN_RATE = 80;
+
+/* 「完了全て」OFF時に完了レーンへ残す日数（実績完了日 基準） */
+const DONE_VISIBLE_DAYS = 15;
+
+/* フィルタ保存フォーマットのバージョン
+   v1: "today" = スター付きのみ
+   v2: "star"  = スター付きのみ / "today" = 本日（期間内＋遅延＋対応中） */
+const FILTER_SCHEMA_VERSION = 2;
 
 if (window.Office && Office.onReady) {
   Office.onReady(() => {
     restoreSavedFilters();
     restoreHeldDisplay();
+    restoreAllDoneDisplay();
+    restoreTabState();
     bindStaticUI();
     init();
   });
@@ -36,6 +58,8 @@ if (window.Office && Office.onReady) {
   window.addEventListener("DOMContentLoaded", () => {
     restoreSavedFilters();
     restoreHeldDisplay();
+    restoreAllDoneDisplay();
+    restoreTabState();
     bindStaticUI();
     const v = document.getElementById("version-label");
     if (v) v.textContent = APP_VERSION + " (no-office)";
@@ -47,6 +71,7 @@ if (window.Office && Office.onReady) {
    ============================================================ */
 async function init() {
   await loadExcelData();
+  applyTabState();
   renderFilters();
   renderPeriodSegment();
   renderBoard();
@@ -84,6 +109,21 @@ function bindStaticUI() {
     b.addEventListener("click", () => setPeriod(b.dataset.p));
   });
 
+  // メインタブ（カンバン／集計）
+  document.querySelectorAll("#main-tabs button").forEach(b => {
+    b.addEventListener("click", () => switchTab(b.dataset.tab));
+  });
+
+  // 集計のサブタブ（対応状況／遅延）
+  document.querySelectorAll("#agg-subtabs button").forEach(b => {
+    b.addEventListener("click", () => switchAggSub(b.dataset.s));
+  });
+
+  // 集計のグラフ軸（総件数／累計／当日）
+  document.querySelectorAll("#agg-axis button").forEach(b => {
+    b.addEventListener("click", () => setAggAxis(b.dataset.a));
+  });
+
   // ドロップダウンの外側クリックで閉じる
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".chip") && !e.target.closest(".dropdown")) {
@@ -94,8 +134,11 @@ function bindStaticUI() {
     if (e.key === "Escape") closeAllDropdowns();
   });
 
-  // 保留トグルの初期表示
-  document.getElementById("held-toggle").classList.toggle("on", showHeld);
+  // トグルの初期表示
+  const heldToggle = document.getElementById("held-toggle");
+  if (heldToggle) heldToggle.classList.toggle("on", showHeld);
+  const allDoneToggle = document.getElementById("alldone-toggle");
+  if (allDoneToggle) allDoneToggle.classList.toggle("on", showAllDone);
 }
 
 /* ============================================================
@@ -110,6 +153,9 @@ function restoreSavedFilters() {
       selectedCategories = Array.isArray(f.categories) ? f.categories : (f.category ? [f.category] : []);
       selectedSubCategories = Array.isArray(f.subCategories) ? f.subCategories : (f.subCategory ? [f.subCategory] : []);
       selectedPeriod = f.period || "all";
+
+      // v1では「本日★」の内部値が "today" だったため "star" に読み替える
+      if ((f.v || 1) < 2 && selectedPeriod === "today") selectedPeriod = "star";
     }
   } catch (e) {
     selectedUsers = [];
@@ -126,6 +172,7 @@ function saveFilters() {
       categories: selectedCategories,
       subCategories: selectedSubCategories,
       period: selectedPeriod,
+      v: FILTER_SCHEMA_VERSION,
       timestamp: Date.now()
     }));
   } catch (e) { /* noop */ }
@@ -136,10 +183,16 @@ function restoreHeldDisplay() {
   showHeld = saved !== null ? saved === "true" : true;
 }
 
+function restoreAllDoneDisplay() {
+  const saved = localStorage.getItem("kanban-show-all-done");
+  showAllDone = saved !== null ? saved === "true" : false;  // 既定はOFF
+}
+
 function resetSettings() {
   try {
     localStorage.removeItem("kanban-filters");
     localStorage.removeItem("kanban-show-held");
+    localStorage.removeItem("kanban-show-all-done");
     localStorage.removeItem("kanban-taskpane-size"); // 旧版の残骸も掃除
     window.location.reload();
   } catch (e) { /* noop */ }
@@ -219,6 +272,31 @@ function getStatus(t) {
   return "未着手";
 }
 
+/* 対応中（実績開始済み・未完了）判定
+   status文字列はH列更新で「保留」等に書き換わるため実績日で判定する */
+function isInProgress(t) {
+  return !!t.actualStart && !t.actualEnd;
+}
+
+/* 時刻を落とした日付を返す（不正値はnull） */
+function toMidnight(d) {
+  if (!d || isNaN(d)) return null;
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/* 完了タスクが直近 DONE_VISIBLE_DAYS 日以内か
+   実績完了日が読めない完了タスクは常に表示する */
+function isRecentDone(t) {
+  const ae = toMidnight(excelDateToJS(t.actualEnd));
+  if (!ae) return true;
+
+  const limit = toMidnight(new Date());
+  limit.setDate(limit.getDate() - DONE_VISIBLE_DAYS);
+  return ae >= limit;
+}
+
 /* ============================================================
    フィルタUI（チップ＋ドロップダウン）
    ============================================================ */
@@ -279,6 +357,17 @@ function updateChips() {
 
   const subCatChip = document.getElementById("chip-subcat");
   if (subCatChip) {
+    // 分類（大分類）が未選択なら小分類は非活性
+    const subEnabled = selectedCategories.length > 0;
+    subCatChip.disabled = !subEnabled;
+    subCatChip.title = subEnabled ? "" : "分類を選択すると使用できます";
+    if (!subEnabled) {
+      const dd = document.getElementById("dd-subcat");
+      if (dd) dd.classList.remove("open");
+      subCatChip.classList.remove("selected");
+      subCatChip.innerHTML = `小分類 <span class="caret"></span>`;
+      return;
+    }
     if (selectedSubCategories.length) {
       subCatChip.classList.add("selected");
       const label = selectedSubCategories.length === 1 ? escapeHtml(selectedSubCategories[0]) : `${selectedSubCategories.length}件選択`;
@@ -391,13 +480,17 @@ function renderCategoryDropdown() {
         : selectedCategories.filter(x => x !== c);
       b.classList.toggle("on", cb.checked);
 
-      // 選択解除された大分類配下の小分類はフィルタから外す
-      selectedSubCategories = selectedSubCategories.filter(s =>
-        allTasks.some(t =>
-          t.classification === s &&
-          (!selectedCategories.length || selectedCategories.includes(t.category))
-        )
-      );
+      // 大分類が未選択になったら小分類フィルタは解除（チップが非活性になるため）
+      if (!selectedCategories.length) {
+        selectedSubCategories = [];
+      } else {
+        // 選択解除された大分類配下の小分類はフィルタから外す
+        selectedSubCategories = selectedSubCategories.filter(s =>
+          allTasks.some(t =>
+            t.classification === s && selectedCategories.includes(t.category)
+          )
+        );
+      }
 
       saveFilters();
       renderFilters();
@@ -506,7 +599,21 @@ function toggleHeldDisplay(e) {
   if (e) e.preventDefault();
   showHeld = !showHeld;
   localStorage.setItem("kanban-show-held", showHeld);
-  document.getElementById("held-toggle").classList.toggle("on", showHeld);
+  const el = document.getElementById("held-toggle");
+  if (el) el.classList.toggle("on", showHeld);
+  renderBoard();
+}
+
+/* ============================================================
+   完了全て 表示切替
+   OFF: 実績完了日が DONE_VISIBLE_DAYS 日以上前の完了タスクを隠す
+   ============================================================ */
+function toggleAllDone(e) {
+  if (e) e.preventDefault();
+  showAllDone = !showAllDone;
+  localStorage.setItem("kanban-show-all-done", showAllDone);
+  const el = document.getElementById("alldone-toggle");
+  if (el) el.classList.toggle("on", showAllDone);
   renderBoard();
 }
 
@@ -563,6 +670,9 @@ function renderBoard() {
   hits.textContent = searchQuery ? `${filtered.length}件` : "";
 
   setupDnD();
+
+  // フィルタ・検索・データ再読込のたびに集計側も更新する
+  renderAggViews();
 }
 
 /* ============================================================
@@ -1194,9 +1304,26 @@ function isMatch(t) {
   // 小分類
   if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
 
-  // ★ 本日フィルタ：スター付きのみ表示
-  if (selectedPeriod === "today") {
+  // ★ 完了の表示範囲：「完了全て」OFFなら実績完了日が古い完了タスクを隠す
+  if (t.status === "完了" && !showAllDone && !isRecentDone(t)) return false;
+
+  // ★ ★フィルタ：スター付きのみ表示
+  if (selectedPeriod === "star") {
     return t.isStar;
+  }
+
+  // ★ 本日フィルタ：期間内＋遅延＋対応中（完了は対象外）
+  if (selectedPeriod === "today") {
+    if (t.status === "完了") return false;
+    if (isInProgress(t)) return true;        // 対応中は常に表示
+    if (t.isNoSchedule) return false;
+
+    const s = toMidnight(excelDateToJS(t.start));
+    const e = toMidnight(excelDateToJS(t.end));
+    if (!s || !e) return false;
+
+    const today = toMidnight(new Date());
+    return e < today || (s <= today && e >= today);  // 遅延 または 期間内
   }
 
   // ★ 日付なし（TODO）
@@ -1514,4 +1641,456 @@ async function saveTaskAdd() {
     msg.className = "task-msg err";
     msg.textContent = e.message || "タスクの追加に失敗しました";
   }
+}
+
+/* ============================================================
+   集計タブ
+   ------------------------------------------------------------
+   ・対応状況：KPI（総数/累計予定/累計実績/当日予定/当日実績）＋
+     件数比の積み上げ横棒（全体・大分類別・小分類別・担当者別）＋タスク一覧
+   ・遅延：遅延／期限接近／未着手放置／保留の一覧
+
+   指標定義
+     累計予定 = 予定終了日(Q) が今日以前
+     累計実績 = 実績完了日(S) が今日以前
+     当日予定 = 予定終了日(Q) が今日
+     当日実績 = 実績完了日(S) が今日
+
+   集計側のフィルタは「検索・担当者・大分類・小分類」のみを適用する。
+   期間セグメント／保留トグル／完了全ては board 用途なので集計には効かせない。
+   ============================================================ */
+
+/* ===== タブ切替 ===== */
+function switchTab(tab) {
+  currentTab = tab;
+  try { localStorage.setItem("kanban-tab", tab); } catch (e) { /* 保存できなくても継続 */ }
+  applyTabState();
+  renderBoard();
+}
+
+function switchAggSub(sub) {
+  aggSubTab = sub;
+  try { localStorage.setItem("kanban-agg-sub", sub); } catch (e) { /* 同上 */ }
+  applyTabState();
+  renderAggViews();
+}
+
+function setAggAxis(axis) {
+  aggAxis = axis;
+  try { localStorage.setItem("kanban-agg-axis", axis); } catch (e) { /* 同上 */ }
+  applyTabState();
+  renderAggViews();
+}
+
+function restoreTabState() {
+  try {
+    const t = localStorage.getItem("kanban-tab");
+    if (t === "board" || t === "agg") currentTab = t;
+    const s = localStorage.getItem("kanban-agg-sub");
+    if (s === "status" || s === "delay") aggSubTab = s;
+    const a = localStorage.getItem("kanban-agg-axis");
+    if (a === "total" || a === "cum" || a === "day") aggAxis = a;
+  } catch (e) {
+    console.log("Tab state restoration error:", e);
+  }
+}
+
+/* 表示中タブに応じて DOM の表示状態を揃える */
+function applyTabState() {
+  const isAgg = currentTab === "agg";
+
+  const board = document.getElementById("board");
+  if (board) board.classList.toggle("hidden", isAgg);
+
+  const agg = document.getElementById("agg-view");
+  if (agg) agg.classList.toggle("hidden", !isAgg);
+
+  // 集計では期間・保留・完了全ては使わないため隠す
+  const bar = document.getElementById("filter-bar");
+  if (bar) bar.classList.toggle("agg-mode", isAgg);
+
+  document.querySelectorAll("#main-tabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === currentTab));
+  document.querySelectorAll("#agg-subtabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.s === aggSubTab));
+  document.querySelectorAll("#agg-axis button").forEach(b =>
+    b.classList.toggle("on", b.dataset.a === aggAxis));
+
+  const st = document.getElementById("agg-status");
+  if (st) st.classList.toggle("hidden", aggSubTab !== "status");
+  const dl = document.getElementById("agg-delay");
+  if (dl) dl.classList.toggle("hidden", aggSubTab !== "delay");
+}
+
+/* ===== 集計対象の判定（検索・担当者・大分類・小分類のみ） ===== */
+function aggMatch(t) {
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const hit =
+      (t.title || "").toString().toLowerCase().includes(q) ||
+      (t.note || "").toString().toLowerCase().includes(q) ||
+      (t.category || "").toString().toLowerCase().includes(q) ||
+      (t.classification || "").toString().toLowerCase().includes(q);
+    if (!hit) return false;
+  }
+  if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
+  if (selectedCategories.length && !selectedCategories.includes(t.category)) return false;
+  if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
+  return true;
+}
+
+/* ===== 集計計算 ===== */
+function aggregate(rows) {
+  const today = toMidnight(new Date());
+  const a = { total: 0, todo: 0, doing: 0, done: 0, pc: 0, ac: 0, pd: 0, ad: 0 };
+
+  rows.forEach(t => {
+    a.total++;
+
+    if (t.actualEnd) a.done++;
+    else if (t.actualStart) a.doing++;
+    else a.todo++;
+
+    const end = toMidnight(excelDateToJS(t.end));
+    if (end) {
+      if (end <= today) a.pc++;
+      if (end.getTime() === today.getTime()) a.pd++;
+    }
+
+    const ae = toMidnight(excelDateToJS(t.actualEnd));
+    if (ae) {
+      if (ae <= today) a.ac++;
+      if (ae.getTime() === today.getTime()) a.ad++;
+    }
+  });
+
+  return a;
+}
+
+/* 指定キーでグループ化して集計（値が空のものは「未設定」に寄せる） */
+function aggregateBy(rows, key) {
+  const map = new Map();
+  rows.forEach(t => {
+    const raw = t[key];
+    const name = (raw === null || raw === undefined || String(raw).trim() === "")
+      ? "未設定" : String(raw);
+    if (!map.has(name)) map.set(name, []);
+    map.get(name).push(t);
+  });
+
+  return [...map.entries()]
+    .map(([name, list]) => Object.assign({ name }, aggregate(list)))
+    .sort((x, y) => y.total - x.total);
+}
+
+/* ===== 軸ごとの描画定義 ===== */
+const AGG_AXIS_DEF = {
+  total: {
+    legend: [["seg-todo", "未着手"], ["seg-doing", "対応中"], ["seg-done", "完了"]],
+    base: r => r.total,
+    segs: r => [
+      ["seg-todo", r.todo, "未" + r.todo],
+      ["seg-doing", r.doing, "中" + r.doing],
+      ["seg-done", r.done, "完" + r.done]
+    ],
+    meta: r => `${r.todo} / ${r.doing} / ${r.done}`,
+    rate: r => r.total ? Math.round(r.done / r.total * 100) : null,
+    warn: false,     // 完了率は進行中に低くなるのが自然なため色分けしない
+    kpis: ["kpi-total"]
+  },
+  cum: {
+    legend: [["seg-act", "累計実績"], ["seg-gap", "予定との差"]],
+    base: r => r.pc,
+    segs: r => [["seg-act", r.ac, String(r.ac)], ["seg-gap", Math.max(r.pc - r.ac, 0), ""]],
+    meta: r => `${r.ac} / ${r.pc}`,
+    rate: r => r.pc ? Math.round(r.ac / r.pc * 100) : null,
+    warn: true,
+    kpis: ["kpi-pc", "kpi-ac"]
+  },
+  day: {
+    legend: [["seg-act", "当日実績"], ["seg-gap", "予定との差"]],
+    base: r => r.pd,
+    segs: r => [["seg-act", r.ad, String(r.ad)], ["seg-gap", Math.max(r.pd - r.ad, 0), ""]],
+    meta: r => `${r.ad} / ${r.pd}`,
+    rate: r => r.pd ? Math.round(r.ad / r.pd * 100) : null,
+    warn: true,
+    kpis: ["kpi-pd", "kpi-ad"]
+  }
+};
+
+/* ===== 集計ビューの描画エントリ ===== */
+function renderAggViews() {
+  if (!document.getElementById("agg-view")) return;
+  const rows = allTasks.filter(aggMatch);
+  renderAggStatus(rows);
+  renderAggDelay(rows);
+}
+
+/* ===== 対応状況タブ ===== */
+function renderAggStatus(rows) {
+  const cfg = AGG_AXIS_DEF[aggAxis] || AGG_AXIS_DEF.total;
+  const overall = aggregate(rows);
+
+  // KPI
+  const kpiEl = document.getElementById("agg-kpis");
+  if (kpiEl) {
+    const defs = [
+      ["kpi-total", "総数", overall.total, ""],
+      ["kpi-pc", "累計予定", overall.pc, "plan"],
+      ["kpi-ac", "累計実績", overall.ac, "act"],
+      ["kpi-pd", "当日予定", overall.pd, "plan"],
+      ["kpi-ad", "当日実績", overall.ad, "act"]
+    ];
+    kpiEl.innerHTML = defs.map(([id, label, val, cls]) =>
+      `<div class="kpi ${cls} ${cfg.kpis.includes(id) ? "sel" : ""}">
+         <span class="kpi-k">${escapeHtml(label)}</span>
+         <span class="kpi-v">${val}</span>
+       </div>`).join("");
+  }
+
+  // 凡例
+  const lg = document.getElementById("agg-legend");
+  if (lg) {
+    lg.innerHTML = cfg.legend
+      .map(([c, t]) => `<span><i class="sw ${c}"></i>${escapeHtml(t)}</span>`).join("") +
+      `<span class="legend-hint">棒の長さ＝件数比</span>`;
+  }
+
+  // 積み上げ横棒
+  const barsEl = document.getElementById("agg-bars");
+  if (barsEl) {
+    let html = aggSection("全体", [Object.assign({ name: "全体" }, overall)], cfg, true);
+    html += aggSection("大分類別", aggregateBy(rows, "category"), cfg, false);
+
+    // 小分類は大分類が選択されているときのみ
+    if (selectedCategories.length) {
+      html += aggSection("小分類別", aggregateBy(rows, "classification"), cfg, false);
+    }
+    html += aggSection("担当者別", aggregateBy(rows, "user"), cfg, false);
+
+    barsEl.innerHTML = html;
+  }
+
+  // タスク一覧
+  const listEl = document.getElementById("agg-list");
+  const cntEl = document.getElementById("agg-list-count");
+  if (cntEl) cntEl.textContent = `${rows.length}件`;
+
+  if (listEl) {
+    if (!rows.length) {
+      listEl.innerHTML = `<div class="agg-empty">該当するタスクがありません</div>`;
+    } else {
+      const sorted = rows.slice().sort(aggListSort);
+      listEl.innerHTML =
+        `<table class="agg-table">
+           <thead><tr>
+             <th>タスク</th><th>担当</th><th>予定</th><th>実績</th><th>状態</th>
+           </tr></thead>
+           <tbody>${sorted.map(aggRowHtml).join("")}</tbody>
+         </table>`;
+      bindAggRowJump(listEl);
+    }
+  }
+}
+
+/* 一覧の並び：遅延 → 対応中 → 未着手 → 完了、同区分内は予定終了日順 */
+function aggListSort(a, b) {
+  const rank = t => {
+    if (t.actualEnd) return 3;
+    if (isOverdue(t)) return 0;
+    if (isInProgress(t)) return 1;
+    return 2;
+  };
+  const d = rank(a) - rank(b);
+  if (d !== 0) return d;
+
+  const ea = toMidnight(excelDateToJS(a.end));
+  const eb = toMidnight(excelDateToJS(b.end));
+  if (!ea && !eb) return 0;
+  if (!ea) return 1;
+  if (!eb) return -1;
+  return ea - eb;
+}
+
+function aggRowHtml(t) {
+  const overdue = isOverdue(t);
+  let pill = `<span class="pill p-todo">未着手</span>`;
+  if (t.actualEnd) pill = `<span class="pill p-done">完了</span>`;
+  else if (overdue) pill = `<span class="pill p-late">遅延</span>`;
+  else if (isInProgress(t)) pill = `<span class="pill p-doing">対応中</span>`;
+
+  const plan = t.isNoSchedule ? "—" : `${fmt(t.start)}→${fmt(t.end)}`;
+  const act = t.actualStart
+    ? `${fmt(t.actualStart)}→${t.actualEnd ? fmt(t.actualEnd) : ""}`
+    : "—";
+
+  return `<tr data-row="${t.rowIndex}">
+    <td class="c-title">${escapeHtml(t.title || "")}</td>
+    <td>${escapeHtml(t.user || "")}</td>
+    <td class="c-date${overdue ? " late" : ""}">${plan}</td>
+    <td class="c-date">${act}</td>
+    <td>${pill}</td>
+  </tr>`;
+}
+
+/* 積み上げ横棒のセクション1つ分 */
+function aggSection(title, rows, cfg, showLabels) {
+  if (!rows || !rows.length) return "";
+  const max = Math.max(...rows.map(cfg.base));
+
+  return `<div class="agg-sec">
+    <div class="agg-sec-head">${escapeHtml(title)}</div>
+    ${rows.map(r => aggBarRow(r, cfg, max, showLabels)).join("")}
+  </div>`;
+}
+
+function aggBarRow(r, cfg, max, showLabels) {
+  const base = cfg.base(r);
+  const width = max > 0 && base > 0 ? Math.max(base / max * 100, 4) : 0;
+  const rate = cfg.rate(r);
+
+  let cls = "rate";
+  if (rate === null) cls = "rate none";
+  else if (cfg.warn) cls = rate < AGG_WARN_RATE ? "rate warn" : "rate ok";
+
+  const segs = cfg.segs(r).filter(s => s[1] > 0);
+  const bar = segs.length
+    ? `<div class="bar" style="width:${width}%">` +
+      segs.map(([c, v, lbl]) =>
+        `<i class="${c}" style="flex:${v}">${showLabels ? escapeHtml(lbl) : ""}</i>`).join("") +
+      `</div>`
+    : `<span class="bar-none">—</span>`;
+
+  return `<div class="agg-row">
+    <span class="agg-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+    <span class="agg-track">${bar}</span>
+    <span class="agg-meta">${escapeHtml(cfg.meta(r))}</span>
+    <span class="agg-${cls}">${rate === null ? "—" : rate + "%"}</span>
+  </div>`;
+}
+
+/* ===== 遅延タブ ===== */
+function isOverdue(t) {
+  if (t.actualEnd) return false;              // 完了は対象外
+  const end = toMidnight(excelDateToJS(t.end));
+  if (!end) return false;
+  return end < toMidnight(new Date());
+}
+
+function daysBetween(from, to) {
+  return Math.round((to - from) / 86400000);
+}
+
+/* 予定終了日の超過日数（遅延でなければ null） */
+function overdueDays(t) {
+  const end = toMidnight(excelDateToJS(t.end));
+  if (!end) return null;
+  const d = daysBetween(end, toMidnight(new Date()));
+  return d > 0 ? d : null;
+}
+
+/* 予定終了までの残日数（過ぎていれば負値） */
+function daysToDue(t) {
+  const end = toMidnight(excelDateToJS(t.end));
+  if (!end) return null;
+  return daysBetween(toMidnight(new Date()), end);
+}
+
+/* 未着手のまま予定開始日を過ぎている日数 */
+function idleDays(t) {
+  if (t.actualStart || t.actualEnd) return null;
+  const s = toMidnight(excelDateToJS(t.start));
+  if (!s) return null;
+  const d = daysBetween(s, toMidnight(new Date()));
+  return d > 0 ? d : null;
+}
+
+function isHeld(t) {
+  return !!(t.note && String(t.note).includes("▲"));
+}
+
+function renderAggDelay(rows) {
+  const overdue = rows.filter(isOverdue)
+    .sort((a, b) => (overdueDays(b) || 0) - (overdueDays(a) || 0));
+
+  const dueSoon = rows.filter(t => {
+    if (t.actualEnd) return false;
+    const d = daysToDue(t);
+    return d !== null && d >= 0 && d <= DUE_SOON_DAYS;
+  }).sort((a, b) => (daysToDue(a) || 0) - (daysToDue(b) || 0));
+
+  const idle = rows.filter(t => idleDays(t) !== null)
+    .sort((a, b) => idleDays(b) - idleDays(a));
+
+  const held = rows.filter(t => isHeld(t) && !t.actualEnd)
+    .sort((a, b) => (overdueDays(b) || 0) - (overdueDays(a) || 0));
+
+  // KPI
+  const kpiEl = document.getElementById("delay-kpis");
+  if (kpiEl) {
+    const maxIdle = idle.length ? idleDays(idle[0]) : 0;
+    kpiEl.innerHTML = `
+      <div class="kpi bad"><span class="kpi-k">遅延</span><span class="kpi-v">${overdue.length}</span></div>
+      <div class="kpi warn"><span class="kpi-k">期限${DUE_SOON_DAYS}日内</span><span class="kpi-v">${dueSoon.length}</span></div>
+      <div class="kpi warn"><span class="kpi-k">保留</span><span class="kpi-v">${held.length}</span></div>
+      <div class="kpi"><span class="kpi-k">未着手最長</span><span class="kpi-v">${maxIdle}<small>日</small></span></div>`;
+  }
+
+  const body = document.getElementById("delay-body");
+  if (!body) return;
+
+  body.innerHTML =
+    delayTable("遅延タスク（超過日数順）", overdue,
+      t => `<span class="d-bad">${overdueDays(t)}日</span>`, "超過") +
+    delayTable(`期限接近（${DUE_SOON_DAYS}日以内）`, dueSoon,
+      t => { const d = daysToDue(t); return `<span class="d-warn">${d === 0 ? "本日" : "残" + d + "日"}</span>`; }, "期限") +
+    delayTable("未着手のまま放置（予定開始日を経過）", idle,
+      t => `<span class="d-warn">${idleDays(t)}日</span>`, "放置") +
+    delayTable("保留中（備考に▲）", held,
+      t => { const d = overdueDays(t); return d ? `<span class="d-bad">${d}日超過</span>` : `<span class="d-none">—</span>`; }, "状況");
+
+  bindAggRowJump(body);
+}
+
+function delayTable(title, rows, valueFn, valueHead) {
+  if (!rows.length) {
+    return `<div class="agg-sec">
+      <div class="agg-sec-head">${escapeHtml(title)} <span class="cnt">0件</span></div>
+      <div class="agg-empty">該当なし</div>
+    </div>`;
+  }
+
+  return `<div class="agg-sec">
+    <div class="agg-sec-head">${escapeHtml(title)} <span class="cnt">${rows.length}件</span></div>
+    <table class="agg-table">
+      <thead><tr>
+        <th>タスク</th><th>担当</th><th>予定終了</th><th>${escapeHtml(valueHead)}</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(t => `<tr data-row="${t.rowIndex}">
+          <td class="c-title">${escapeHtml(t.title || "")}</td>
+          <td>${escapeHtml(t.user || "")}</td>
+          <td class="c-date">${t.isNoSchedule ? "—" : fmt(t.end)}</td>
+          <td class="c-val">${valueFn(t)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* 行クリックでExcelの該当行へジャンプ／右クリックで備考モーダル */
+function bindAggRowJump(scope) {
+  scope.querySelectorAll("tr[data-row]").forEach(tr => {
+    const rowIndex = Number(tr.dataset.row);
+
+    tr.addEventListener("click", () => {
+      jumpToExcel(rowIndex).catch(e => console.log("jump error:", e));
+    });
+
+    tr.addEventListener("contextmenu", async (e) => {
+      e.preventDefault();
+      const t = allTasks.find(x => x.rowIndex === rowIndex);
+      if (t) await openModal(t);
+    });
+  });
 }
