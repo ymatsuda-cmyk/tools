@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260801_782f739";
+const APP_VERSION = "rev_20260801_c93f2a8";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -1786,14 +1786,14 @@ function aggregateBy(rows, key) {
 /* ===== 軸ごとの描画定義 ===== */
 const AGG_AXIS_DEF = {
   total: {
-    legend: [["seg-todo", "未着手"], ["seg-doing", "対応中"], ["seg-done", "完了"]],
+    legend: [["seg-done", "完了"], ["seg-doing", "対応中"], ["seg-todo", "未着手"]],
     base: r => r.total,
     segs: r => [
-      ["seg-todo", r.todo, "未" + r.todo],
+      ["seg-done", r.done, "完" + r.done],
       ["seg-doing", r.doing, "中" + r.doing],
-      ["seg-done", r.done, "完" + r.done]
+      ["seg-todo", r.todo, "未" + r.todo]
     ],
-    meta: r => `${r.todo} / ${r.doing} / ${r.done}`,
+    meta: r => `${r.done} / ${r.doing} / ${r.todo}`,
     rate: r => r.total ? Math.round(r.done / r.total * 100) : null,
     warn: false,     // 完了率は進行中に低くなるのが自然なため色分けしない
     kpis: ["kpi-total"]
@@ -1856,19 +1856,11 @@ function renderAggStatus(rows) {
       `<span class="legend-hint">棒の長さ＝件数比</span>`;
   }
 
-  // 積み上げ横棒
+  // 積み上げ横棒（パンくず式ドリルダウン）
   const barsEl = document.getElementById("agg-bars");
   if (barsEl) {
-    let html = aggSection("全体", [Object.assign({ name: "全体" }, overall)], cfg, true);
-    html += aggSection("大分類別", aggregateBy(rows, "category"), cfg, false);
-
-    // 小分類は大分類が選択されているときのみ
-    if (selectedCategories.length) {
-      html += aggSection("小分類別", aggregateBy(rows, "classification"), cfg, false);
-    }
-    html += aggSection("担当者別", aggregateBy(rows, "user"), cfg, false);
-
-    barsEl.innerHTML = html;
+    barsEl.innerHTML = aggDrillHtml(rows, cfg, overall);
+    bindAggDrill(barsEl);
   }
 
   // タスク一覧
@@ -1882,12 +1874,12 @@ function renderAggStatus(rows) {
     } else {
       const sorted = rows.slice().sort(aggListSort);
       listEl.innerHTML =
-        `<table class="agg-table">
+        `<div class="agg-list-scroll"><table class="agg-table sticky">
            <thead><tr>
              <th>タスク</th><th>担当</th><th>予定</th><th>実績</th><th>状態</th>
            </tr></thead>
            <tbody>${sorted.map(aggRowHtml).join("")}</tbody>
-         </table>`;
+         </table></div>`;
       bindAggRowJump(listEl);
     }
   }
@@ -1933,18 +1925,8 @@ function aggRowHtml(t) {
   </tr>`;
 }
 
-/* 積み上げ横棒のセクション1つ分 */
-function aggSection(title, rows, cfg, showLabels) {
-  if (!rows || !rows.length) return "";
-  const max = Math.max(...rows.map(cfg.base));
-
-  return `<div class="agg-sec">
-    <div class="agg-sec-head">${escapeHtml(title)}</div>
-    ${rows.map(r => aggBarRow(r, cfg, max, showLabels)).join("")}
-  </div>`;
-}
-
-function aggBarRow(r, cfg, max, showLabels) {
+function aggBarRow(r, cfg, max, showLabels, opts) {
+  const o = opts || {};
   const base = cfg.base(r);
   const width = max > 0 && base > 0 ? Math.max(base / max * 100, 4) : 0;
   const rate = cfg.rate(r);
@@ -1961,12 +1943,114 @@ function aggBarRow(r, cfg, max, showLabels) {
       `</div>`
     : `<span class="bar-none">—</span>`;
 
-  return `<div class="agg-row">
-    <span class="agg-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+  return `<div class="agg-row ${o.cls || ""} ${o.drill ? "clickable" : ""}"${o.drill ? ` data-drill="${escapeHtml(o.drill)}"` : ""}>
+    <span class="agg-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}${o.caret ? `<i class="caret">${o.caret}</i>` : ""}</span>
     <span class="agg-track">${bar}</span>
     <span class="agg-meta">${escapeHtml(cfg.meta(r))}</span>
     <span class="agg-${cls}">${rate === null ? "—" : rate + "%"}</span>
   </div>`;
+}
+
+/* ============================================================
+   ドリルダウン（パンくず式）
+   ------------------------------------------------------------
+   階層は「フィルタの選択状態」から導出する。専用の状態を持たない
+   ことで、チップ操作とドリルダウンが常に一致する。
+     レベル0: 大分類別（大分類の単一選択なし）
+     レベル1: 小分類別（大分類を1つだけ選択中）
+     レベル2: 担当者別（大分類・小分類を1つずつ選択中）
+   ============================================================ */
+function aggLevel() {
+  const c = selectedCategories.length;
+  const s = selectedSubCategories.length;
+  if (c === 1 && s === 1) return 2;
+  if (c === 1) return 1;
+  return 0;
+}
+
+const AGG_LEVELS = [
+  { key: "category",       title: "大分類別",  drill: "cat"  },
+  { key: "classification", title: "小分類別",  drill: "sub"  },
+  { key: "user",           title: "担当者別",  drill: "user" }
+];
+
+function aggDrillHtml(rows, cfg, overall) {
+  const level = aggLevel();
+  const def = AGG_LEVELS[level];
+
+  // パンくず
+  let crumb = `<button data-drill="root">全体</button>`;
+  if (level >= 1) {
+    const cat = selectedCategories[0];
+    crumb += `<span class="sepa">›</span>` + (level >= 2
+      ? `<button data-drill="cat:${escapeHtml(cat)}">${escapeHtml(cat)}</button>`
+      : `<span class="cur">${escapeHtml(cat)}</span>`);
+  }
+  if (level >= 2) {
+    crumb += `<span class="sepa">›</span><span class="cur">${escapeHtml(selectedSubCategories[0])}</span>`;
+  }
+  crumb += `<span class="lvl">表示中：${def.title}</span>`;
+
+  const headName = level === 0 ? "全体"
+    : (level === 1 ? selectedCategories[0] : selectedSubCategories[0]);
+
+  let html = `<div class="agg-crumb">${crumb}</div>`;
+  html += aggBarRow(Object.assign({ name: headName }, overall), cfg, cfg.base(overall), true, { cls: "head" });
+
+  if (!rows.length) {
+    return html + `<div class="agg-empty">該当するタスクがありません</div>`;
+  }
+
+  const children = aggregateBy(rows, def.key);
+  const max = Math.max(...children.map(cfg.base));
+
+  html += `<div class="agg-sec-head">${def.title}</div>`;
+  html += children.map(r => {
+    // 「未設定」は絞り込みキーにできないためドリル不可
+    const canDrill = r.name !== "未設定";
+    return aggBarRow(r, cfg, max, false, {
+      drill: canDrill ? `${def.drill}:${r.name}` : null,
+      caret: canDrill ? (level < 2 ? "›" : "＋") : ""
+    });
+  }).join("");
+
+  html += `<div class="agg-hint">${level < 2
+    ? "行をクリックすると1段深く掘り、フィルタにも反映されます。"
+    : "行をクリックすると担当者フィルタを切り替えます。"}</div>`;
+
+  return html;
+}
+
+/* ドリルダウン操作。フィルタ状態を直接書き換えることで
+   チップ・カンバン・集計・タスク一覧のすべてが同じ条件で揃う。 */
+function aggDrill(kind, name) {
+  if (kind === "root") {
+    selectedCategories = [];
+    selectedSubCategories = [];
+  } else if (kind === "cat") {
+    selectedCategories = [name];
+    selectedSubCategories = [];
+  } else if (kind === "sub") {
+    selectedSubCategories = [name];
+  } else if (kind === "user") {
+    // 同じ担当者を再クリックしたら解除
+    selectedUsers = (selectedUsers.length === 1 && selectedUsers[0] === name) ? [] : [name];
+  }
+
+  saveFilters();
+  renderFilters();
+  renderBoard();     // 末尾で renderAggViews() が走る
+}
+
+function bindAggDrill(scope) {
+  scope.querySelectorAll("[data-drill]").forEach(el => {
+    el.addEventListener("click", () => {
+      const v = el.dataset.drill;
+      const i = v.indexOf(":");
+      if (i < 0) aggDrill(v, null);
+      else aggDrill(v.slice(0, i), v.slice(i + 1));
+    });
+  });
 }
 
 /* ===== 遅延タブ ===== */
