@@ -167,7 +167,7 @@
     overlay.addEventListener("click", close);
 
     panel = document.createElement("nav");
-    panel.className = "sm-panel " + (config.position === "left" ? "sm-left" : "sm-right");
+    panel.className = "sm-panel " + (config.position === "right" ? "sm-right" : "sm-left");
     panel.setAttribute("aria-label", config.appName || "メニュー");
     panel.style.setProperty("--sm-width", (config.width || 250) + "px");
     if (config.theme && config.theme.accent) {

@@ -1359,3 +1359,6 @@ button.kpi.sel { outline-color: var(--bl); }
   border-radius: 999px;
   padding: 2px 9px;
 }
+
+/* 遅延タブの注記（担当者フィルタ追加に伴い文言変更） */
+#delay-filter .agg-fpanel { margin-top: 9px; }

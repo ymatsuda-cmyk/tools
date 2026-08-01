@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260801_728a945";
+const APP_VERSION = "rev_20260802_f6c92db";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -30,6 +30,7 @@ let currentTab = "board";     // "board" | "agg"
 let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
 let aggPanelOpen = false;     // 分類フィルタ行の開閉
+let selectedDelayUsers = [];  // 遅延タブ専用の担当者フィルタ（対応状況側とは独立）
 
 /* 遅延タブ：KPIクリックで表示するリストの選択 */
 let delaySel = "overdue";     // "overdue" | "soon" | "idle" | "held"
@@ -200,6 +201,7 @@ function resetSettings() {
     localStorage.removeItem("kanban-filters");
     localStorage.removeItem("kanban-show-held");
     localStorage.removeItem("kanban-show-all-done");
+    localStorage.removeItem("kanban-delay-users");
     localStorage.removeItem("kanban-taskpane-size"); // 旧版の残骸も掃除
     window.location.reload();
   } catch (e) { /* noop */ }
@@ -1692,6 +1694,10 @@ function restoreTabState() {
     const d = localStorage.getItem("kanban-delay-sel");
     if (["overdue", "soon", "idle", "held"].includes(d)) delaySel = d;
     aggPanelOpen = localStorage.getItem("kanban-agg-panel") === "true";
+    try {
+      const du = JSON.parse(localStorage.getItem("kanban-delay-users") || "[]");
+      if (Array.isArray(du)) selectedDelayUsers = du;
+    } catch (e) { /* 既定値のまま継続 */ }
   } catch (e) {
     console.log("Tab state restoration error:", e);
   }
@@ -1896,7 +1902,7 @@ function renderAggStatus(rows) {
     } else {
       const sorted = rows.slice().sort(aggListSort);
       listEl.innerHTML = buildTable(sorted,
-        [COL_TITLE, COL_CAT, COL_SUB, COL_USER, COL_PLAN, COL_ACT, COL_STAT]);
+        [COL_CAT, COL_SUB, COL_TITLE, COL_USER, COL_PLAN, COL_ACT, COL_STAT]);
       bindAggRowJump(listEl);
     }
   }
@@ -2231,6 +2237,9 @@ function chipsHtml(items, selected, key) {
   ).join("");
 }
 
+/* delay-user キーは renderDelayFilterPanel が個別にクリック処理するため、
+   applyAggFilter 側のグローバル委譲とは衝突しない（別要素・別リスナー）。 */
+
 /* パネルのチップは単一選択（同じ値の再クリックで解除） */
 function applyAggFilter(key, value) {
   const set = (cur) => (!value || (cur.length === 1 && cur[0] === value)) ? [] : [value];
@@ -2247,6 +2256,29 @@ function applyAggFilter(key, value) {
   saveFilters();
   renderFilters();
   renderBoard();     // 末尾で renderAggViews() が走る
+}
+
+/* 遅延タブ専用の担当者フィルタパネル（分類は対象外） */
+function renderDelayFilterPanel() {
+  const el = document.getElementById("delay-filter");
+  if (!el) return;
+
+  const users = sheetOrder("user");
+  el.innerHTML = `<div class="agg-fpanel">
+    <div class="f-row">
+      <span class="f-label">担当者</span>
+      <span class="f-chips">${chipsHtml(users, selectedDelayUsers, "delay-user")}</span>
+    </div>
+  </div>`;
+
+  el.querySelectorAll("[data-fkey]").forEach(b => {
+    b.addEventListener("click", () => {
+      const v = b.dataset.fval || null;
+      selectedDelayUsers = (!v || (selectedDelayUsers.length === 1 && selectedDelayUsers[0] === v)) ? [] : [v];
+      try { localStorage.setItem("kanban-delay-users", JSON.stringify(selectedDelayUsers)); } catch (e) { /* 継続 */ }
+      renderAggDelay(allTasks);
+    });
+  });
 }
 
 /* ===== 遅延タブ ===== */
@@ -2289,7 +2321,14 @@ function isHeld(t) {
   return !!(t.note && String(t.note).includes("▲"));
 }
 
-function renderAggDelay(rows) {
+function renderAggDelay(allRows) {
+  renderDelayFilterPanel();
+
+  // 遅延タブは「担当者」のみで絞り込む（分類・検索は対象外）
+  const rows = selectedDelayUsers.length
+    ? allRows.filter(t => selectedDelayUsers.includes(t.user))
+    : allRows;
+
   const groups = {
     overdue: {
       label: "遅延", kpiCls: "bad",
@@ -2377,7 +2416,7 @@ function renderAggDelay(rows) {
     get: t => t.isNoSchedule ? "—" : fmt(t.end)
   };
 
-  html += buildTable(g.rows, [COL_TITLE, COL_CAT, COL_SUB, COL_USER, colDue, colValue]);
+  html += buildTable(g.rows, [COL_CAT, COL_SUB, COL_TITLE, COL_USER, colDue, colValue]);
   body.innerHTML = html;
 
   bindAggRowJump(body);
