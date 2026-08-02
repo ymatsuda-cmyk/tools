@@ -60,6 +60,18 @@
  *   window.ApiConfig.taskRangeName= "タスク範囲" （既定値）
  * ============================================================ */
 
+/* ------------------------------------------------------------
+   以降は IIFE で包み、内部変数をグローバルへ漏らさない。
+   api.js と呼び出し側アプリ（app.js / kanban.js）は通常スクリプトとして
+   グローバルスコープを共有するため、同名のトップレベル let / const が
+   両方にあると SyntaxError となり、後から読み込まれる側のスクリプトが
+   丸ごと実行されなくなる（実際に dialogResolve の衝突で営業報告の
+   app.js が全く動かなくなる不具合が発生した）。
+   公開が必要な関数だけを末尾で window に明示的に載せる。
+   ------------------------------------------------------------ */
+(function () {
+"use strict";
+
 window.ApiConfig = Object.assign({
   wbsSheet: "wbs",
   eigyoSheet: "営業報告",
@@ -127,6 +139,17 @@ function dialogRespond(ok) {
   const r = wapiDialogResolve;
   wapiDialogResolve = null;
   if (r) r(ok);
+}
+
+/* api.js 内部から確認ダイアログを出すときは必ずこれを使う。
+   呼び出し側アプリが独自の uiAlert を持っていればそちらを優先する
+   （営業報告は #dialog-modal を style.display で開閉する独自実装のため、
+     api.js 版の classList 操作では表示できない）。 */
+function apiAlert(message) {
+  if (typeof window.uiAlert === "function" && window.uiAlert !== uiAlert) {
+    return window.uiAlert(message);
+  }
+  return uiAlert(message);
 }
 
 /* ============================================================
@@ -615,7 +638,7 @@ async function saveTaskAdd() {
     });
 
     closeTaskAdd();
-    await uiAlert(`${inserted}行目にタスクを追加しました。`);
+    await apiAlert(`${inserted}行目にタスクを追加しました。`);
     if (typeof cfg().onTaskAdded === "function") cfg().onTaskAdded();
   } catch (e) {
     msg.className = "task-msg err";
@@ -820,7 +843,7 @@ async function moveMiniKanbanTask(task, lane, el) {
     });
   } catch (e) {
     console.warn("ミニカンバンのステータス更新に失敗:", e);
-    await uiAlert("ステータスの更新に失敗しました。もう一度お試しください。");
+    await apiAlert("ステータスの更新に失敗しました。もう一度お試しください。");
   }
 
   await renderMiniKanban(el, el.__mkMatchFn, el.__mkOpts);
@@ -906,5 +929,29 @@ function ensureApiDom() {
   while (wrap.firstElementChild) document.body.appendChild(wrap.firstElementChild);
 }
 
+
+/* ============================================================
+   公開API（inline onclick から呼ばれるものを含む）
+   ------------------------------------------------------------
+   ここに載せたものだけがグローバルから見える。
+   新しく外部公開する関数を追加したら、必ずここにも追記すること。
+   ============================================================ */
+Object.assign(window, {
+  // 呼び出し側アプリから使う
+  openModal, openTaskAdd, renderMiniKanban, matchByCaseId, fetchWbsTasks,
+  jumpToWbsRow, escapeHtml, dateToExcelSerial, ensureStatusSymbols,
+  // 注入したモーダルの inline onclick から呼ばれる
+  closeModal, saveNote, onModalNoteEdited, addSubtask,
+  closeTaskAdd, saveTaskAdd, onTaCatChange,
+  dialogRespond
+});
+
+/* uiAlert / uiConfirm は呼び出し側が独自実装を持つ場合があるため、
+   まだ定義されていないときだけ載せる（営業報告は自前のものを使う）。 */
+if (typeof window.uiAlert !== "function") window.uiAlert = uiAlert;
+if (typeof window.uiConfirm !== "function") window.uiConfirm = uiConfirm;
+
 if (document.body) ensureApiDom();
 else document.addEventListener("DOMContentLoaded", ensureApiDom);
+
+})();
