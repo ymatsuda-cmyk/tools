@@ -6,10 +6,17 @@
  * 無い場合はデフォルト値（カンバン/営業報告 共通デザイントークン）
  * にフォールバックするため、どちらのアドインに置いても
  * そのまま馴染む。
+ *
+ * クラス名にはすべて "wapi-" プレフィックスを付けている。
+ * 呼び出し側アプリ（営業報告など）が独自に .modal / .btn-primary /
+ * .btn-ghost / .dialog-msg といった一般的な名前のクラスを既に
+ * 持っているケースがあり、プレフィックス無しだと意図せず
+ * スタイルが混ざってしまうため（実際に営業報告アドインで衝突が
+ * 確認された）。
  * ============================================================ */
 
 /* ===== モーダル共通 ===== */
-.modal {
+.wapi-modal {
   position: fixed;
   inset: 0;
   background: rgba(28, 39, 51, .4);
@@ -18,9 +25,9 @@
   align-items: center;
   z-index: 500;
 }
-.modal.hidden { display: none; }
+.wapi-modal.wapi-hidden { display: none; }
 
-.modal-content {
+.wapi-modal-content {
   background: var(--surface, #FFFFFF);
   padding: 18px;
   border-radius: 12px;
@@ -30,11 +37,11 @@
   font-family: var(--font, "Segoe UI Variable", "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", sans-serif);
   color: var(--ink, #1C2733);
 }
-.modal-content h3 {
+.wapi-modal-content h3 {
   margin: 0 0 4px;
   font-size: 14px;
 }
-.modal textarea {
+.wapi-modal textarea {
   width: 100%;
   margin: 10px 0;
   padding: 12px;
@@ -48,22 +55,22 @@
   line-height: 1.5;
   outline: none;
 }
-.modal textarea:focus {
+.wapi-modal textarea:focus {
   border-color: var(--accent, #0E7A5F);
   box-shadow: 0 0 0 3px rgba(14, 122, 95, .10);
 }
-.modal-actions {
+.wapi-modal-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.modal-actions small {
+.wapi-modal-actions small {
   margin-left: auto;
   color: var(--ink-faint, #93A1AF);
 }
 
 /* ===== 共通ボタン ===== */
-.btn-primary {
+.wapi-btn-primary {
   border: none;
   background: var(--accent, #0E7A5F);
   color: #fff;
@@ -74,8 +81,8 @@
   cursor: pointer;
   font-family: inherit;
 }
-.btn-primary:hover { filter: brightness(1.08); }
-.btn-ghost {
+.wapi-btn-primary:hover { filter: brightness(1.08); }
+.wapi-btn-ghost {
   border: 1px solid var(--line, #E2E7EC);
   background: var(--surface, #FFFFFF);
   color: var(--ink-soft, #5B6B7B);
@@ -85,14 +92,14 @@
   cursor: pointer;
   font-family: inherit;
 }
-.btn-ghost:hover { background: var(--bg, #F3F5F7); color: var(--ink, #1C2733); }
+.wapi-btn-ghost:hover { background: var(--bg, #F3F5F7); color: var(--ink, #1C2733); }
 
 @media (prefers-reduced-motion: reduce) {
-  .modal, .btn-primary, .btn-ghost, .sk-card { transition: none !important; }
+  .wapi-modal, .wapi-btn-primary, .wapi-btn-ghost, .sk-card { transition: none !important; }
 }
 
 /* ===== タスク追加モーダル ===== */
-.task-modal-content { width: 480px; }
+.wapi-task-modal-content { width: 480px; }
 .task-hint {
   background: var(--accent-soft, #E4F2ED);
   color: var(--accent, #0E7A5F);
@@ -124,8 +131,8 @@
 .task-msg.err { color: #E5484D; }
 
 /* ===== 汎用ダイアログ ===== */
-.dialog-content { width: 360px; }
-.dialog-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; margin: 4px 0 12px; }
+.wapi-dialog-content { width: 360px; }
+.wapi-dialog-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; margin: 4px 0 12px; }
 
 /* ===== サブタスクカンバン（備考モーダル内） ===== */
 .subtask-section { margin: 10px 0 6px; }

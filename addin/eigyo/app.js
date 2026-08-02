@@ -218,7 +218,7 @@ function openMenu() {
           currentId: "eigyo",                     // menu.json の id と一致で強調
           menuUrl: COMMON_BASE + "/menu.json",
           localItems: [
-            { label: "再読み込み", icon: "🔄", onClick: () => init() },
+            { label: "設定をリセット", icon: "", onClick: () => resetSettings() }
           ],
         });
         resolve();
@@ -232,6 +232,19 @@ function openMenu() {
     uiAlert("メニューの読み込みに失敗しました。通信環境をご確認ください。");
   });
 }
+
+/* ============================================================
+   共通モジュール（api.js）との連携設定
+   ------------------------------------------------------------
+   ・wbsシート名／営業報告シート名を明示
+   ・タスク追加／備考編集の後、案件編集モーダルが開いていれば
+     タスク一覧（ミニカンバン）と件数バッジを更新する
+   ============================================================ */
+window.ApiConfig = window.ApiConfig || {};
+window.ApiConfig.wbsSheet = "wbs";
+window.ApiConfig.eigyoSheet = SHEET_NAME;
+window.ApiConfig.onTaskAdded = () => { if (editingRec) refreshEdTaskPanel(); };
+window.ApiConfig.onNoteSaved = () => { if (editingRec) refreshEdTaskPanel(); };
 
 /* ============================================================
    起動
@@ -715,10 +728,11 @@ function clearMsFilter(key) {
 /* 削除を除いた全レコード（集計はこれを使う） */
 function activeRecords() { return records.filter(r => r.status !== "削除"); }
 
-function filteredRecords() {
+function filteredRecords(opts) {
+  const skipStatus = !!(opts && opts.ignoreStatusFilter);
   return records.filter(r => {
     if (r.status === "削除") return false;   // 削除済みは表示しない
-    if (filters.status.length && !filters.status.includes(effectiveStatus(r))) return false;
+    if (!skipStatus && filters.status.length && !filters.status.includes(effectiveStatus(r))) return false;
     if (filters.client.length && !filters.client.includes(r.client)) return false;
     if (filters.owner && !splitOwners(r.owner).includes(filters.owner)) return false;
     if (filters.q) {
@@ -845,7 +859,7 @@ function renderKanban() {
 
   const board = document.getElementById("board");
   const lanes = allStatusesOf(currentKanbanType);
-  const recs = filteredRecords().filter(r => r.type === currentKanbanType);
+  const recs = filteredRecords({ ignoreStatusFilter: true }).filter(r => r.type === currentKanbanType);
   const dndLane = ENABLE_KANBAN_DND
     ? `ondragover="onLaneDragOver(event)" ondragleave="onLaneDragLeave(event)" ondrop="onLaneDrop(event)"` : "";
   board.innerHTML = lanes.map(st => {
@@ -1078,9 +1092,75 @@ function openEditModal(id, forceTab) {
   if (delBtn) delBtn.style.display = (rec.status === "削除") ? "none" : "";
   currentStageTab = forceTab || defaultStageTab(editingRec);
   refreshEditModal();
+  initEdTaskPanel(rec.id);
   document.getElementById("edit-modal").style.display = "";
 }
 function markDirty() { editDirty = true; }
+
+/* ============================================================
+   WBSタスク一覧（ミニカンバン。中身は api.js の renderMiniKanban）
+   ------------------------------------------------------------
+   ・案件番号（＝小分類）が一致するwbsタスクを、案件編集モーダル内に
+     未着手／対応中／完了の3レーンで表示する
+   ・パネルは既定で閉じておき、「タスク一覧」ボタンで開閉する
+   ・件数バッジは開閉に関わらず常に表示する
+   ============================================================ */
+function initEdTaskPanel(caseId) {
+  document.getElementById("ed-task-case").textContent = caseId;
+  document.getElementById("task-panel").classList.add("hidden");
+  const closeBtn = document.querySelector("#task-panel .close-mini");
+  if (closeBtn) closeBtn.textContent = "閉じる ▲";
+  refreshEdTaskPanel();
+}
+
+/* パネルの開閉トグル（開くときだけミニカンバンを再取得・再描画） */
+function toggleEdTaskPanel() {
+  const panel = document.getElementById("task-panel");
+  const closeBtn = panel.querySelector(".close-mini");
+  const willOpen = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden");
+  if (closeBtn) closeBtn.textContent = willOpen ? "閉じる ▲" : "開く ▼";
+  if (willOpen && editingRec) refreshEdTaskPanel();
+}
+
+/* ミニカンバンを再取得・再描画し、件数バッジも更新する */
+async function refreshEdTaskPanel() {
+  if (!editingRec) return;
+  const caseId = editingRec.id;
+  const tasks = await renderMiniKanban(
+    "ed-mk-board",
+    matchByCaseId(caseId),
+    { onChanged: () => refreshEdTaskBadge(caseId) }
+  );
+  // 案件が切り替わっている間に届いた古い結果は無視する
+  if (!editingRec || editingRec.id !== caseId) return;
+  updateEdTaskBadge(tasks.length);
+}
+
+/* ドラッグ操作後など、パネルを開き直さずバッジだけ更新したいとき用 */
+async function refreshEdTaskBadge(caseId) {
+  const tasks = await fetchWbsTasks(matchByCaseId(caseId));
+  if (!editingRec || editingRec.id !== caseId) return;
+  updateEdTaskBadge(tasks.length);
+}
+
+function updateEdTaskBadge(n) {
+  const btn = document.getElementById("ed-tasklist-btn");
+  if (!btn) return;
+  btn.classList.toggle("empty", n === 0);
+  btn.innerHTML = n > 0
+    ? `タスク一覧 <span class="cnt">${n}</span>`
+    : `タスク未登録`;
+}
+
+/* 「＋タスク追加」：この案件の番号を小分類にあらかじめ選択した状態で開く */
+function openTaskAddForCase() {
+  if (!editingRec) return;
+  openTaskAdd({
+    category: (window.ApiConfig && window.ApiConfig.orderCategory) || "受注",
+    caseId: editingRec.id
+  });
+}
 
 /* ============================================================
    汎用ダイアログ（Office環境では window.confirm/alert 不可）

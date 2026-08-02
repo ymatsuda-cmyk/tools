@@ -23,10 +23,13 @@
  * ------------------------------------------------------------
  *   openModal(task)   … task = { rowIndex, title, note, isStar? }
  *                        タスク詳細／備考編集モーダルを開く。
- *   openTaskAdd()     … タスク追加モーダルを開く。
+ *   openTaskAdd(preset?) … タスク追加モーダルを開く。
  *                        大分類/担当者候補は本ファイルがwbsシートから
  *                        直接読み込むため、呼び出し側でallTasksなどを
  *                        用意する必要はない。
+ *                        preset = { category, caseId } を渡すと、
+ *                        大分類と案件番号（受注時の小分類候補）を
+ *                        あらかじめ選択した状態で開ける。
  *   renderMiniKanban(container, matchFn, opts)
  *                     … container（要素 or id文字列）に、matchFnに
  *                       一致するwbsタスクの未着手/対応中/完了の
@@ -42,6 +45,10 @@
  *   matchByCaseId(caseId)
  *                     … 小分類（B列）が案件番号と一致するかを見る
  *                       renderMiniKanban 用の絞り込み関数を作るヘルパー。
+ *   jumpToWbsRow(row) … wbsシートの指定行をアクティブ化して選択する。
+ *                       （呼び出し側アプリが自前の "jumpToExcel" を
+ *                       持っていて名前が衝突するケースがあるため、
+ *                       あえて別名にしてある）
  *
  * 連携フック（呼び出し側が必要に応じて設定する）
  * ------------------------------------------------------------
@@ -90,7 +97,7 @@ function uiConfirm(message) {
     dialogResolve = resolve;
     document.getElementById("dialog-msg").textContent = message;
     document.getElementById("dialog-cancel").style.display = "";
-    document.getElementById("dialog-modal").classList.remove("hidden");
+    document.getElementById("dialog-modal").classList.remove("wapi-hidden");
   });
 }
 function uiAlert(message) {
@@ -98,11 +105,11 @@ function uiAlert(message) {
     dialogResolve = resolve;
     document.getElementById("dialog-msg").textContent = message;
     document.getElementById("dialog-cancel").style.display = "none";
-    document.getElementById("dialog-modal").classList.remove("hidden");
+    document.getElementById("dialog-modal").classList.remove("wapi-hidden");
   });
 }
 function dialogRespond(ok) {
-  document.getElementById("dialog-modal").classList.add("hidden");
+  document.getElementById("dialog-modal").classList.add("wapi-hidden");
   const r = dialogResolve;
   dialogResolve = null;
   if (r) r(ok);
@@ -161,7 +168,7 @@ async function openModal(task) {
   renderSubtaskKanban();
 
   const modal = document.getElementById("modal");
-  modal.classList.remove("hidden");
+  modal.classList.remove("wapi-hidden");
 
   const handleEscKey = (event) => {
     if (event.key === "Escape") closeModal();
@@ -172,7 +179,7 @@ async function openModal(task) {
       if (currentNote === displayNote) closeModal();
     }
   };
-  const modalContent = modal.querySelector(".modal-content");
+  const modalContent = modal.querySelector(".wapi-modal-content");
   const handleContentClick = (event) => event.stopPropagation();
 
   document.addEventListener("keydown", handleEscKey);
@@ -190,7 +197,7 @@ async function openModal(task) {
 
 function closeModal() {
   const modal = document.getElementById("modal");
-  modal.classList.add("hidden");
+  modal.classList.add("wapi-hidden");
   if (modal._cleanup) {
     modal._cleanup();
     modal._cleanup = null;
@@ -404,7 +411,13 @@ async function loadWbsMeta() {
 
 let taskAddMeta = { categories: [], users: [], subcatsByCategory: {} };
 
-async function openTaskAdd() {
+/* preset（任意）: { category, caseId }
+   … 呼び出し元（例：営業報告の案件編集画面）から、大分類と
+     案件番号（＝小分類、大分類が「受注」の場合の候補）を
+     あらかじめ選択した状態でモーダルを開きたいときに使う。
+     例）openTaskAdd({ category: "受注", caseId: "AG-03" }) */
+async function openTaskAdd(preset) {
+  preset = preset || {};
   taskAddMeta = await loadWbsMeta();
 
   // 大分類: wbs既存の大分類 ＋ 受注（無ければ追加）
@@ -412,6 +425,7 @@ async function openTaskAdd() {
   if (!cats.includes(cfg().orderCategory)) cats.push(cfg().orderCategory);
   const catSel = document.getElementById("ta-cat");
   catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
+  if (preset.category && cats.includes(preset.category)) catSel.value = preset.category;
 
   // 担当者: wbs既存の担当者
   const userSel = document.getElementById("ta-user");
@@ -427,12 +441,18 @@ async function openTaskAdd() {
 
   await onTaCatChange();
 
+  // 受注案件番号の事前選択（該当する候補があれば）
+  if (preset.caseId && catSel.value === cfg().orderCategory) {
+    const sel = document.getElementById("ta-subcat-sel");
+    if ([...sel.options].some(o => o.value === preset.caseId)) sel.value = preset.caseId;
+  }
+
   // wbsシートが表示されていない場合はアクティブにする
   activateWbs();
 
-  document.getElementById("task-modal").classList.remove("hidden");
+  document.getElementById("task-modal").classList.remove("wapi-hidden");
 }
-function closeTaskAdd() { document.getElementById("task-modal").classList.add("hidden"); }
+function closeTaskAdd() { document.getElementById("task-modal").classList.add("wapi-hidden"); }
 
 async function activateWbs() {
   if (!window.Excel) return;
@@ -602,7 +622,7 @@ async function saveTaskAdd() {
    ・営業報告・カンバンどちらの画面からも呼び出せる
    ============================================================ */
 
-async function jumpToExcel(row) {
+async function jumpToWbsRow(row) {
   await Excel.run(async (ctx) => {
     const s = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
     s.activate();
@@ -683,10 +703,11 @@ const MINI_LANES = [
 
 /* container: DOM要素 または id文字列
    matchFn:   task => boolean（wbsの行から作ったタスクオブジェクトを判定）
-   opts.onChanged: ドラッグでステータスが変わり再描画された後に呼ばれる（任意） */
+   opts.onChanged: ドラッグでステータスが変わり再描画された後に呼ばれる（任意）
+   戻り値: 表示したタスク配列（呼び出し側で件数バッジ表示等に使える） */
 async function renderMiniKanban(container, matchFn, opts) {
   const el = typeof container === "string" ? document.getElementById(container) : container;
-  if (!el) return;
+  if (!el) return [];
   opts = opts || {};
   el.__mkMatchFn = matchFn;
   el.__mkOpts = opts;
@@ -713,6 +734,7 @@ async function renderMiniKanban(container, matchFn, opts) {
 
   el.innerHTML = `<div class="mk-board">${lanesHtml}</div>`;
   bindMiniKanbanEvents(el, tasks);
+  return tasks;
 }
 
 function bindMiniKanbanEvents(el, tasks) {
@@ -727,7 +749,7 @@ function bindMiniKanbanEvents(el, tasks) {
     card.addEventListener("dragend", () => card.classList.remove("dragging"));
 
     card.addEventListener("click", () => {
-      jumpToExcel(Number(card.dataset.row)).catch(err => console.log("jump error:", err));
+      jumpToWbsRow(Number(card.dataset.row)).catch(err => console.log("jump error:", err));
     });
 
     card.addEventListener("contextmenu", async (e) => {
@@ -794,32 +816,37 @@ async function moveMiniKanbanTask(task, lane, el) {
 /* ============================================================
    モーダルDOMの自動注入
    ------------------------------------------------------------
-   呼び出し側のindex.htmlに #modal / #task-modal / #dialog-modal が
-   すでに存在する場合は何もしない（重複注入を防止・移行期の互換用）。
+   #modal / #task-modal / #dialog-modal のうち、呼び出し側の
+   index.htmlにまだ存在しないものだけを個別に注入する。
+   （例：営業報告アドインは独自の #dialog-modal を既に持っているため、
+    その分だけスキップし、重複IDを作らないようにする）
    ============================================================ */
 function ensureApiDom() {
-  if (document.getElementById("modal")) return;
+  const pieces = [];
 
-  const wrap = document.createElement("div");
-  wrap.innerHTML = `
-    <div id="modal" class="modal hidden">
-      <div class="modal-content">
+  if (!document.getElementById("modal")) {
+    pieces.push(`
+    <div id="modal" class="wapi-modal wapi-hidden">
+      <div class="wapi-modal-content">
         <h3 id="modal-title"></h3>
         <textarea id="modal-note" oninput="onModalNoteEdited()"></textarea>
         <div class="subtask-section">
           <div class="subtask-label">サブタスク（□未着手 ◎対応中 ■完了）</div>
           <div id="subtask-kanban"></div>
         </div>
-        <div class="modal-actions">
-          <button class="btn-primary" onclick="saveNote()">保存</button>
-          <button class="btn-ghost" onclick="closeModal()">閉じる</button>
+        <div class="wapi-modal-actions">
+          <button class="wapi-btn-primary" onclick="saveNote()">保存</button>
+          <button class="wapi-btn-ghost" onclick="closeModal()">閉じる</button>
           <small>ESC: 閉じる</small>
         </div>
       </div>
-    </div>
+    </div>`);
+  }
 
-    <div id="task-modal" class="modal hidden">
-      <div class="modal-content task-modal-content">
+  if (!document.getElementById("task-modal")) {
+    pieces.push(`
+    <div id="task-modal" class="wapi-modal wapi-hidden">
+      <div class="wapi-modal-content wapi-task-modal-content">
         <h3>タスク追加</h3>
         <div class="task-hint" id="task-hint">追加したい行を選択してください。（wbsシート上で挿入位置の行をクリック）</div>
         <div class="task-grid">
@@ -834,24 +861,34 @@ function ensureApiDom() {
           <div class="t-row"><label>予定開始日</label><input type="date" id="ta-start"></div>
           <div class="t-row"><label>予定終了日</label><input type="date" id="ta-end"></div>
         </div>
-        <div class="modal-actions">
-          <button class="btn-primary" onclick="saveTaskAdd()">OK（選択行に挿入）</button>
-          <button class="btn-ghost" onclick="closeTaskAdd()">キャンセル</button>
+        <div class="wapi-modal-actions">
+          <button class="wapi-btn-primary" onclick="saveTaskAdd()">OK（選択行に挿入）</button>
+          <button class="wapi-btn-ghost" onclick="closeTaskAdd()">キャンセル</button>
           <span class="task-msg" id="ta-msg"></span>
         </div>
       </div>
-    </div>
+    </div>`);
+  }
 
-    <div id="dialog-modal" class="modal hidden">
-      <div class="modal-content dialog-content">
-        <div id="dialog-msg" class="dialog-msg"></div>
-        <div class="modal-actions">
-          <button class="btn-ghost" id="dialog-cancel" onclick="dialogRespond(false)">キャンセル</button>
-          <button class="btn-primary" id="dialog-ok" onclick="dialogRespond(true)">OK</button>
+  // dialog-modal は呼び出し側アプリが独自の確認ダイアログを
+  // 既に持っていることが多いため（例：営業報告）、無い場合のみ注入する。
+  if (!document.getElementById("dialog-modal")) {
+    pieces.push(`
+    <div id="dialog-modal" class="wapi-modal wapi-hidden">
+      <div class="wapi-modal-content wapi-dialog-content">
+        <div id="dialog-msg" class="wapi-dialog-msg"></div>
+        <div class="wapi-modal-actions">
+          <button class="wapi-btn-ghost" id="dialog-cancel" onclick="dialogRespond(false)">キャンセル</button>
+          <button class="wapi-btn-primary" id="dialog-ok" onclick="dialogRespond(true)">OK</button>
         </div>
       </div>
-    </div>`;
+    </div>`);
+  }
 
+  if (!pieces.length) return;
+
+  const wrap = document.createElement("div");
+  wrap.innerHTML = pieces.join("");
   while (wrap.firstElementChild) document.body.appendChild(wrap.firstElementChild);
 }
 
