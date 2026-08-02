@@ -90,11 +90,25 @@ function dateToExcelSerial(date) {
 
 /* ============================================================
    汎用ダイアログ（Office環境では window.confirm/alert 不可）
+   ------------------------------------------------------------
+   ※ 変数名は "wapi" プレフィックス必須。
+     api.js と呼び出し側アプリはどちらも通常スクリプト（module ではない）
+     としてグローバルスコープを共有するため、同名のトップレベル let を
+     両方で宣言すると SyntaxError になり、後から読み込まれる側の
+     スクリプトが丸ごと実行されなくなる。
+     （実際に営業報告アドインの dialogResolve と衝突して app.js が
+       全く動かなくなる不具合が発生した）
+
+     一方 uiConfirm / uiAlert / dialogRespond は関数宣言なので、
+     呼び出し側が同名の関数を持つ場合は後勝ちで上書きされる。
+     これは意図した動作で、営業報告では同アプリ独自のダイアログ
+     （#dialog-modal を style.display で開閉する実装）が使われ、
+     カンバンでは下記の api.js 版が使われる。
    ============================================================ */
-let dialogResolve = null;
+let wapiDialogResolve = null;
 function uiConfirm(message) {
   return new Promise(resolve => {
-    dialogResolve = resolve;
+    wapiDialogResolve = resolve;
     document.getElementById("dialog-msg").textContent = message;
     document.getElementById("dialog-cancel").style.display = "";
     document.getElementById("dialog-modal").classList.remove("wapi-hidden");
@@ -102,7 +116,7 @@ function uiConfirm(message) {
 }
 function uiAlert(message) {
   return new Promise(resolve => {
-    dialogResolve = resolve;
+    wapiDialogResolve = resolve;
     document.getElementById("dialog-msg").textContent = message;
     document.getElementById("dialog-cancel").style.display = "none";
     document.getElementById("dialog-modal").classList.remove("wapi-hidden");
@@ -110,8 +124,8 @@ function uiAlert(message) {
 }
 function dialogRespond(ok) {
   document.getElementById("dialog-modal").classList.add("wapi-hidden");
-  const r = dialogResolve;
-  dialogResolve = null;
+  const r = wapiDialogResolve;
+  wapiDialogResolve = null;
   if (r) r(ok);
 }
 
