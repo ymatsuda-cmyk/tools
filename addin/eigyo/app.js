@@ -20,7 +20,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260730_e";
+const APP_VERSION = "rev_20260802_wbs";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -116,7 +116,7 @@ let currentStageTab = null;
 let inputType = "保守対応";
 let currentKanbanType = "保守対応";
 let dragId = null;
-let filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false };
+let filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false, thisWeekOnly: false };
 let editDirty = false;      // 詳細画面で変更があったか
 let selectedId = null;      // 一覧で選択中の案件ID（ハイライト用）
 /* 一覧: 種別グループの開閉状態（種別名の集合、閉じているものだけ保持） */
@@ -147,6 +147,7 @@ function restoreFiltersCookie() {
       client: Array.isArray(f.client) ? f.client : (f.client ? [f.client] : []),
       owner: f.owner || "",
       lastWeekOnly: !!f.lastWeekOnly,
+      thisWeekOnly: !!f.thisWeekOnly,
     };
   } catch (e) {}
 }
@@ -175,15 +176,52 @@ function isLastWeekUpdate(rec) {
   const { start, end } = lastWeekRange();
   return rec.lastUpdate >= start && rec.lastUpdate <= end;
 }
+/* ---------- 今週実績判定 ---------- */
+function thisWeekRange() {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const day = now.getDay(); // 0=日
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(now); monday.setDate(now.getDate() + diffToMonday);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: monday, end: sunday };
+}
+function isThisWeekUpdate(rec) {
+  if (!rec.lastUpdate) return false;
+  const { start, end } = thisWeekRange();
+  return rec.lastUpdate >= start && rec.lastUpdate <= end;
+}
+
+/* 先週実績・今週実績は排他（両方ONにしても該当0件になるだけなので、
+   一方をONにしたら他方を自動でOFFにする） */
 function toggleLastWeek() {
   filters.lastWeekOnly = !filters.lastWeekOnly;
+  if (filters.lastWeekOnly) filters.thisWeekOnly = false;
   saveFiltersCookie();
-  updateLastWeekBtn();
+  updateWeekBtns();
   renderCurrentPane();
 }
-function updateLastWeekBtn() {
-  const btn = document.getElementById("btn-lastweek");
-  if (btn) btn.classList.toggle("active", !!filters.lastWeekOnly);
+function toggleThisWeek() {
+  filters.thisWeekOnly = !filters.thisWeekOnly;
+  if (filters.thisWeekOnly) filters.lastWeekOnly = false;
+  saveFiltersCookie();
+  updateWeekBtns();
+  renderCurrentPane();
+}
+function updateWeekBtns() {
+  const lw = document.getElementById("btn-lastweek");
+  if (lw) lw.classList.toggle("active", !!filters.lastWeekOnly);
+  const tw = document.getElementById("btn-thisweek");
+  if (tw) tw.classList.toggle("active", !!filters.thisWeekOnly);
+}
+/* 旧名（他から呼ばれていた場合の互換） */
+function updateLastWeekBtn() { updateWeekBtns(); }
+
+/* 実績フィルタで「対象外」として薄く表示するか */
+function isDimmedByWeek(rec) {
+  if (filters.lastWeekOnly) return !isLastWeekUpdate(rec);
+  if (filters.thisWeekOnly) return !isThisWeekUpdate(rec);
+  return false;
 }
 function saveGanttCookie() {
   try {
@@ -243,7 +281,11 @@ function openMenu() {
 window.ApiConfig = window.ApiConfig || {};
 window.ApiConfig.wbsSheet = "wbs";
 window.ApiConfig.eigyoSheet = SHEET_NAME;
-window.ApiConfig.onTaskAdded = () => { if (editingRec) refreshEdTaskPanel(); };
+window.ApiConfig.onTaskAdded = async () => {
+  await loadWbsTaskCounts();          // 一覧・カンバンのバッジを最新化
+  if (editingRec) refreshEdTaskPanel();
+  renderCurrentPane();
+};
 window.ApiConfig.onNoteSaved = () => { if (editingRec) refreshEdTaskPanel(); };
 
 /* ============================================================
@@ -261,10 +303,11 @@ async function init() {
   restoreGanttCookie();
   bindStaticUI();
   await loadAll();
+  await loadWbsTaskCounts();
   const si = document.getElementById("search-input");
   if (si) si.value = filters.q || "";
   renderFilters();
-  updateLastWeekBtn();
+  updateWeekBtns();
   renderCurrentPane();
 }
 
@@ -292,7 +335,7 @@ function bindStaticUI() {
 }
 
 function clearFilters() {
-  filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false };
+  filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false, thisWeekOnly: false };
   document.getElementById("search-input").value = "";
   saveFiltersCookie();
   renderFilters();
@@ -765,9 +808,9 @@ function renderList() {
         ${holdCnt ? `<span class="cnt cnt-hold">保留 ${holdCnt}</span>` : ""}
       </div>
       <table class="list-table">
-        <tr><th>優先度</th><th>ID</th><th>取引先</th><th>状態</th><th>内容</th><th>担当</th><th>発生日</th><th>金額</th></tr>
+        <tr><th>優先度</th><th>ID</th><th>取引先</th><th>状態</th><th>内容</th><th>担当</th><th>WBS</th><th>発生日</th><th>金額</th></tr>
         ${group.map(r => `
-        <tr data-id="${esc(r.id)}" class="${r.id === selectedId ? "row-selected" : ""}${isHold(r) ? " row-hold" : ""}${filters.lastWeekOnly && !isLastWeekUpdate(r) ? " row-dim" : ""}"
+        <tr data-id="${esc(r.id)}" class="${r.id === selectedId ? "row-selected" : ""}${isHold(r) ? " row-hold" : ""}${isDimmedByWeek(r) ? " row-dim" : ""}"
             oncontextmenu="onRowContext(event,'${esc(r.id)}')"
             onclick="onRowClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
           <td class="c">${r.priority ? `<span class="pri pri-${esc(r.priority)}">${esc(r.priority)}</span>` : ""}</td>
@@ -776,6 +819,7 @@ function renderList() {
           <td><span class="status-pill st-${esc(effectiveStatus(r))}">${esc(statusLabel(r))}</span></td>
           <td>${esc(shorten(r.content, 34))}</td>
           <td>${esc(r.owner)}</td>
+          <td class="c">${wbsBadgeHtml(r.id)}</td>
           <td class="muted">${fmtDate(r.occur)}</td>
           <td class="r">${dispAmount(r)}</td>
         </tr>`).join("")}
@@ -871,7 +915,7 @@ function renderKanban() {
       <div class="lane-head">${esc(st)}<span class="cnt">${cards.length}</span></div>
       <div class="lane-body">
         ${cards.map(r => `
-          <div class="card t-${esc(r.type)}${isHold(r) ? " card-hold" : ""}${filters.lastWeekOnly && !isLastWeekUpdate(r) ? " dim" : ""}" draggable="${ENABLE_KANBAN_DND}" data-id="${esc(r.id)}"
+          <div class="card t-${esc(r.type)}${isHold(r) ? " card-hold" : ""}${isDimmedByWeek(r) ? " dim" : ""}" draggable="${ENABLE_KANBAN_DND}" data-id="${esc(r.id)}"
                ${ENABLE_KANBAN_DND ? `ondragstart="onCardDragStart(event)"` : ""}
                oncontextmenu="onRowContext(event,'${esc(r.id)}')"
                onclick="onCardClick('${esc(r.id)}')" ondblclick="openEditModal('${esc(r.id)}')">
@@ -879,6 +923,7 @@ function renderKanban() {
             <div class="ctitle">${esc(shorten(r.content, 46))}</div>
             <div class="cmeta">
               <span>${esc(r.owner)}</span>
+              ${wbsBadgeHtml(r.id)}
               ${dispAmount(r) ? `<span>${dispAmount(r)}円</span>` : ""}
               ${r.priority ? `<span>優先:${esc(r.priority)}</span>` : ""}
               ${isHold(r) ? `<span class="c-hold">元:${esc(r.holdLegacy && r.status === HOLD ? "要確認" : r.status)}</span>` : ""}
@@ -1114,6 +1159,89 @@ function markDirty() { editDirty = true; }
 /* api.js（共通モジュール）が読み込めているか。
    GitHub Pagesの公開前・通信不良・旧index.htmlのままなど、
    読み込めていないケースでも編集画面本体は動かせるようにする。 */
+/* ============================================================
+   WBS大分類の判定（種別＋状態から一意に決まる）
+   ------------------------------------------------------------
+     保守対応      → 保守
+     瑕疵対応      → 瑕疵
+     調整          → 調整
+     見積り        → 見積   （受注確定後は 受託）
+     プリセールス  → プリセ （受注確定後は 受託）
+   受注確定 = 状態が 受注 / 受託中 / 完了（ORDER_CONFIRMED_STATUSES）
+   小分類は常に案件番号。
+   ============================================================ */
+const WBS_CATEGORY_BY_TYPE = {
+  "保守対応": "保守",
+  "瑕疵対応": "瑕疵",
+  "調整":     "調整",
+  "見積り":       "見積",
+  "プリセールス": "プリセ"
+};
+const WBS_ORDERED_CATEGORY = "受託";
+
+function wbsCategoryOf(rec) {
+  if (!rec) return "";
+  // 見積り／プリセールスは受注確定後に「受託」へ切り替わる
+  if (QUOTE_TYPES.includes(rec.type) && ORDER_CONFIRMED_STATUSES.includes(rec.status)) {
+    return WBS_ORDERED_CATEGORY;
+  }
+  return WBS_CATEGORY_BY_TYPE[rec.type] || "";
+}
+
+/* 大分類がなぜその値になったかの説明（タスク追加モーダルに表示） */
+function wbsCategoryReason(rec) {
+  const cat = wbsCategoryOf(rec);
+  if (!cat) return "";
+  return (cat === WBS_ORDERED_CATEGORY)
+    ? `種別「${rec.type}」＋状態「${rec.status}」から自動設定`
+    : `種別「${rec.type}」から自動設定`;
+}
+
+/* ============================================================
+   WBSタスク件数（一覧・カンバンのバッジ用）
+   ------------------------------------------------------------
+   案件ごとに毎回wbsを読むと重いので、起動時に一度だけ
+   小分類(B列)→{total, done} を集計してキャッシュする。
+   ============================================================ */
+let wbsTaskCounts = {};   // { "KM-13": { total: 9, done: 9 }, ... }
+
+async function loadWbsTaskCounts() {
+  wbsTaskCounts = {};
+  if (demoMode || !window.Excel) return;
+  try {
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem("wbs");
+      const used = sheet.getUsedRange(true);
+      used.load(["rowIndex", "rowCount"]);
+      await ctx.sync();
+
+      const lastRow = Math.max(used.rowIndex + used.rowCount, 11);
+      const range = sheet.getRangeByIndexes(0, 0, lastRow, 26); // A1:Z
+      range.load("values");
+      await ctx.sync();
+
+      range.values.slice(10).forEach(r => {
+        if (!r[25] || r[19] === "-") return;                 // Z空 / T="-" は除外
+        const key = (r[1] ?? "").toString().trim();          // B列=小分類=案件番号
+        if (!key) return;
+        if (!wbsTaskCounts[key]) wbsTaskCounts[key] = { total: 0, done: 0 };
+        wbsTaskCounts[key].total++;
+        if (r[18]) wbsTaskCounts[key].done++;                // S列=実績終了日
+      });
+    });
+  } catch (e) {
+    console.warn("WBSタスク件数の集計に失敗:", e);
+  }
+}
+
+/* 一覧・カンバン用のバッジHTML（完了数/総数）。0件はグレー表示 */
+function wbsBadgeHtml(caseId) {
+  const c = wbsTaskCounts[caseId];
+  if (!c || !c.total) return `<span class="wbs-badge none" title="WBSタスク未登録">0/0</span>`;
+  const done = c.done === c.total;
+  return `<span class="wbs-badge${done ? " all-done" : ""}" title="WBSタスク 完了${c.done} / 全${c.total}件">${c.done}/${c.total}</span>`;
+}
+
 function apiReady() {
   return typeof renderMiniKanban === "function" && typeof matchByCaseId === "function";
 }
@@ -1199,9 +1327,16 @@ function openTaskAddForCase() {
     uiAlert("タスク追加機能を読み込めませんでした。通信環境をご確認ください。");
     return;
   }
+  const cat = wbsCategoryOf(editingRec);
+  if (!cat) {
+    uiAlert(`種別「${editingRec.type}」に対応するWBS大分類が未定義です。`);
+    return;
+  }
   openTaskAdd({
-    category: (window.ApiConfig && window.ApiConfig.orderCategory) || "受注",
-    caseId: editingRec.id
+    lock: true,
+    category: cat,
+    subCategory: editingRec.id,
+    reason: wbsCategoryReason(editingRec)
   });
 }
 
