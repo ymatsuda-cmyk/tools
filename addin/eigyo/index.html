@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <title>営業報告 </title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル／ミニカンバン）
+       カンバンアドインと同じファイルを読み込んで共有する -->
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/kanban/api.css">
+  <script src="https://ymatsuda-cmyk.github.io/tools/kanban/api.js"></script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -145,11 +151,12 @@
       <div class="stepper" id="ed-stepper"></div>
 
       <!-- 基本情報 -->
-      <div class="form-grid">
+      <div class="form-grid g3">
         <div class="form-row"><label>案件番号</label><input type="text" id="ed-id" readonly class="ro"></div>
         <div class="form-row"><label>取引先</label><input type="text" id="ed-client" readonly class="ro"></div>
+        <div class="form-row"><label>担当者（現在の対応者）</label><select id="ed-owner"></select></div>
         <div class="form-row"><label>種別</label><select id="ed-type"></select></div>
-        <div class="form-row"><label>状態</label>
+        <div class="form-row" style="grid-column: span 2;"><label>状態</label>
           <div class="status-cell">
             <input type="text" id="ed-status" readonly class="ro">
             <label class="hold-check" id="ed-hold-wrap" title="状態は保持したまま保留にします">
@@ -157,12 +164,29 @@
             </label>
           </div>
         </div>
-        <div class="form-row"><label>担当者（現在の対応者）</label><select id="ed-owner"></select></div>
-        <div class="form-row"><label>優先度</label>
-          <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
-        </div>
       </div>
       <div class="hold-note" id="ed-hold-note" style="display:none"></div>
+
+      <!-- 優先度＋WBSタスク連携 -->
+      <div class="pri-row">
+        <div class="pri-fld">
+          <label>優先度</label>
+          <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
+        </div>
+        <div class="task-actions">
+          <button class="btn-tasklist" id="ed-tasklist-btn" onclick="toggleEdTaskPanel()">タスク一覧</button>
+          <button class="btn-taskadd" onclick="openTaskAddForCase()">＋ タスク追加</button>
+        </div>
+      </div>
+
+      <!-- WBSタスク一覧（ミニカンバン。api.jsのrenderMiniKanbanが描画） -->
+      <div class="task-panel hidden" id="task-panel">
+        <div class="task-panel-head">
+          <span class="ttl">タスク一覧（小分類 = <span class="case" id="ed-task-case"></span>）</span>
+          <button class="close-mini" onclick="toggleEdTaskPanel()">閉じる ▲</button>
+        </div>
+        <div id="ed-mk-board"></div>
+      </div>
 
       <!-- ステージタブ（起票／対応中・見積中・作成中／商談中／確認中／受注） -->
       <div class="stage-tabs" id="ed-stage-tabs"></div>

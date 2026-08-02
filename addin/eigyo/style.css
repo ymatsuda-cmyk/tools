@@ -118,6 +118,51 @@ body {
 .form-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px;
 }
+/* 案件番号／取引先／担当者を1行に並べる3列バリアント（案件編集モーダル用） */
+.form-grid.g3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* ---------- 優先度行＋WBSタスク連携ボタン ---------- */
+.pri-row {
+  display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.pri-row .pri-fld { width: 140px; flex: 0 0 auto; }
+.pri-row .task-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+.btn-tasklist {
+  background: #e4f1ec; border: 1px solid #b8dcd0; color: #0e7a5f;
+  border-radius: 5px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer;
+  white-space: nowrap; display: flex; align-items: center; gap: 5px;
+}
+.btn-tasklist:hover { background: #d7ebe2; }
+.btn-tasklist.empty { background: #fff; color: #8a97a0; border-color: #dde3e7; }
+.btn-tasklist .cnt {
+  background: #0e7a5f; color: #fff; border-radius: 8px; font-size: 10.5px;
+  padding: 0 6px; font-weight: bold;
+}
+.btn-taskadd {
+  background: #0e7a5f; border: 1px solid #0e7a5f; color: #fff;
+  border-radius: 5px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-taskadd:hover { background: #0b6650; }
+
+/* ---------- WBSタスク一覧パネル（ミニカンバン。中身は api.js の renderMiniKanban が描画） ---------- */
+.task-panel {
+  border: 1px solid #dde3e7; border-radius: 6px; padding: 10px 12px 12px;
+  background: #fbfcfc; margin-bottom: 12px;
+}
+.task-panel.hidden { display: none; }
+.task-panel-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.task-panel-head .ttl { font-size: 11px; color: #52616b; font-weight: bold; }
+.task-panel-head .ttl .case { color: #0e7a5f; }
+.task-panel-head .close-mini {
+  border: none; background: none; color: #8a97a0; cursor: pointer; font-size: 12px;
+}
+.task-panel-head .close-mini:hover { color: #52616b; }
+
 .hstack { display: flex; gap: 6px; }
 .hstack select { flex: 1; }
 .form-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
@@ -516,16 +561,8 @@ body {
 }
 .drill-close:hover { background: #fdecea; border-color: #c0392b; color: #c0392b; }
 
-/* ---------- WBS状況チップ ---------- */
-.wbs-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
-.wbs-chip {
-  display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px;
-  background: #eef1f3; color: #52616b; font-weight: bold;
-}
-.wbs-chip.doing { background: #eaf2f8; color: #2c6e9b; }
-.wbs-chip.done  { background: #e4f1ec; color: #0e7a5f; }
-.wbs-chip.held  { background: #fbeadf; color: #c05c14; }
-.wbs-total { font-size: 11px; color: #8a97a0; margin-left: 2px; }
+/* WBS状況チップ（.wbs-status / .wbs-chip / .wbs-total）は、
+   案件編集画面の「タスク一覧」（ミニカンバン）への一本化に伴い廃止した */
 
 /* ============================================================
    受託スケジュール（ガント）
