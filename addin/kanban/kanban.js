@@ -10,12 +10,12 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260802_b347cfb";
+const APP_VERSION = "rev_20260802_f6c92db";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
 let currentDraggedId = null;
-let currentTask = null;
+// currentTask は api.js（タスク詳細/備考編集モーダル）が保持する
 
 let selectedUsers = [];
 let selectedCategories = [];
@@ -48,6 +48,13 @@ const DONE_VISIBLE_DAYS = 15;
    v1: "today" = スター付きのみ
    v2: "star"  = スター付きのみ / "today" = 本日（期間内＋遅延＋対応中） */
 const FILTER_SCHEMA_VERSION = 2;
+
+// api.js（タスク追加・タスク詳細/備考編集モーダル）からの再描画フック
+window.ApiConfig = window.ApiConfig || {};
+window.ApiConfig.wbsSheet = "wbs";
+window.ApiConfig.eigyoSheet = "営業報告";
+window.ApiConfig.onNoteSaved = () => renderBoard();
+window.ApiConfig.onTaskAdded = () => init();
 
 if (window.Office && Office.onReady) {
   Office.onReady(() => {
@@ -822,12 +829,9 @@ function createCard(t) {
 
 /* ============================================================
    検索ハイライト
+   ------------------------------------------------------------
+   escapeHtml は api.js（共通モジュール）で定義されている
    ============================================================ */
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 function highlight(text, q) {
   if (!q) return escapeHtml(text);
   const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -899,13 +903,7 @@ function addDays(d, n) {
   return t;
 }
 
-function dateToExcelSerial(date) {
-  if (!date || !(date instanceof Date) || isNaN(date)) return "";
-  const excelEpoch = new Date(1900, 0, 1);
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const daysDiff = Math.floor((date - excelEpoch) / msPerDay);
-  return daysDiff + (date >= new Date(1900, 2, 1) ? 2 : 1);
-}
+// dateToExcelSerial は api.js（共通モジュール）で定義されている
 
 function isValidDate(v) {
   return v instanceof Date && !isNaN(v);
@@ -1040,253 +1038,11 @@ async function toggleStar(task) {
 }
 
 /* ============================================================
-   ステータス記号管理
-   ============================================================ */
-function ensureStatusSymbols(noteText) {
-  if (!noteText) noteText = "";
-  const lines = noteText.split("\n");
-  let firstLine = lines[0] || "";
-
-  if (!firstLine.includes("★") && !firstLine.includes("☆")) {
-    firstLine = "☆" + firstLine;
-  }
-  if (!firstLine.includes("▲") && !firstLine.includes("△")) {
-    firstLine = firstLine + "△";
-  }
-
-  lines[0] = firstLine;
-  return lines.join("\n");
-}
-
-/* ============================================================
-   備考編集モーダル（旧版と同一ロジック）
-   ============================================================ */
-async function openModal(task) {
-  currentTask = task;
-
-  // O列から最新の備考内容を取得
-  let originalNote = "";
-  try {
-    await Excel.run(async (ctx) => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-      const noteCell = sheet.getRange(`O${task.rowIndex}`);
-      noteCell.load("values");
-      await ctx.sync();
-      originalNote = (noteCell.values[0][0] || "").toString();
-    });
-  } catch (error) {
-    originalNote = (task.note || "").toString();
-  }
-
-  let displayNote = originalNote;
-
-  if (!displayNote.trim()) {
-    displayNote = "☆△\n＜タスク＞\n＜状況＞";
-  } else {
-    displayNote = ensureStatusSymbols(displayNote);
-    const lines = displayNote.split("\n");
-    if (lines.length < 2 || (lines.length === 2 && !lines[1].trim())) {
-      displayNote = displayNote.trimEnd() + "\n＜タスク＞\n＜状況＞";
-    }
-  }
-
-  document.getElementById("modal-title").textContent = task.title;
-  document.getElementById("modal-note").value = displayNote;
-  renderSubtaskKanban();
-
-  const modal = document.getElementById("modal");
-  modal.classList.remove("hidden");
-
-  const handleEscKey = (event) => {
-    if (event.key === "Escape") closeModal();
-  };
-  const handleOverlayClick = (event) => {
-    if (event.target === modal) {
-      const currentNote = document.getElementById("modal-note").value;
-      if (currentNote === displayNote) closeModal();
-    }
-  };
-  const modalContent = modal.querySelector(".modal-content");
-  const handleContentClick = (event) => event.stopPropagation();
-
-  document.addEventListener("keydown", handleEscKey);
-  modal.addEventListener("click", handleOverlayClick);
-  modalContent.addEventListener("click", handleContentClick);
-
-  modal._cleanup = () => {
-    document.removeEventListener("keydown", handleEscKey);
-    modal.removeEventListener("click", handleOverlayClick);
-    modalContent.removeEventListener("click", handleContentClick);
-  };
-
-  setTimeout(() => document.getElementById("modal-note").focus(), 100);
-}
-
-function closeModal() {
-  const modal = document.getElementById("modal");
-  modal.classList.add("hidden");
-  if (modal._cleanup) {
-    modal._cleanup();
-    modal._cleanup = null;
-  }
-}
-
-async function saveNote() {
-  const note = document.getElementById("modal-note").value;
-
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const row = currentTask.rowIndex;
-
-    const cell = sheet.getRange(`O${row}`);
-    cell.values = [[note]];
-    cell.format.wrapText = false;
-
-    const entireRow = sheet.getRange(`${row}:${row}`);
-    entireRow.format.rowHeight = 20;
-
-    await ctx.sync();
-  });
-
-  if (currentTask) {
-    currentTask.note = note;
-    currentTask.isStar = note.startsWith("★");
-  }
-
-  closeModal();
-  renderBoard();
-}
-
-/* ============================================================
-   サブタスクカンバン（備考モーダル内・案1: 3レーン）
+   タスク詳細/備考編集モーダル（サブタスクカンバン含む）
    ------------------------------------------------------------
-   備考テキスト内の行頭記号でサブタスクの状態を表す:
-     □ 未着手 / ◎ 対応中 / ■ 完了
-   カンバンのドラッグ移動・備考テキスト編集を双方向同期する。
+   openModal / closeModal / saveNote / サブタスクカンバン関連は
+   api.js（共通モジュール）に移動した
    ============================================================ */
-const SUB_MARKS = { "□": "todo", "◎": "doing", "■": "done" };
-const SUB_LANES = [
-  { key: "todo", mark: "□", label: "未着手", cls: "" },
-  { key: "doing", mark: "◎", label: "対応中", cls: "doing" },
-  { key: "done", mark: "■", label: "完了", cls: "done" },
-];
-
-function parseSubtasks(note) {
-  const tasks = [];
-  (note || "").split(/\r?\n/).forEach((line, idx) => {
-    const m = line.match(/^\s*([□◎■])\s?(.*)$/);
-    if (m) tasks.push({ lane: SUB_MARKS[m[1]], title: m[2].trim(), line: idx });
-  });
-  return tasks;
-}
-function subtasksToNote(note, tasks) {
-  const lines = (note || "").split(/\r?\n/);
-  const byLine = {};
-  tasks.forEach((t) => { byLine[t.line] = t; });
-  const kept = [];
-  lines.forEach((line, idx) => {
-    if (/^\s*[□◎■]/.test(line)) {
-      const t = byLine[idx];
-      if (t) kept.push(`${subMark(t.lane)} ${t.title}`);
-    } else {
-      kept.push(line);
-    }
-  });
-  return kept.join("\n");
-}
-function subMark(lane) { return lane === "doing" ? "◎" : lane === "done" ? "■" : "□"; }
-
-function renderSubtaskKanban() {
-  const host = document.getElementById("subtask-kanban");
-  if (!host) return;
-  const note = document.getElementById("modal-note").value;
-  const tasks = parseSubtasks(note);
-  const lanesHtml = SUB_LANES.map((L) => {
-    const cards = tasks.filter((t) => t.lane === L.key);
-    return `
-      <div class="sk-lane ${L.cls}" data-lane="${L.key}">
-        <div class="sk-lane-head">${L.mark} ${L.label} <span class="sk-cnt">${cards.length}</span></div>
-        <div class="sk-lane-body" data-lane="${L.key}">
-          ${cards.map((c) => `<div class="sk-card ${L.cls}" draggable="true" data-line="${c.line}">${escapeHtml(c.title || "（無題）")}</div>`).join("")}
-        </div>
-      </div>`;
-  }).join("");
-  host.innerHTML = `
-    <div class="sk-board">${lanesHtml}</div>
-    <div class="sk-add">
-      <input type="text" id="sk-new" placeholder="サブタスク名を入力してEnterまたは＋"
-        onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask()}">
-      <button type="button" onclick="addSubtask()">＋追加</button>
-    </div>`;
-  setupSubtaskDnd();
-}
-
-function setupSubtaskDnd() {
-  const host = document.getElementById("subtask-kanban");
-  let dragLine = null;
-  host.querySelectorAll(".sk-card").forEach((card) => {
-    card.addEventListener("dragstart", (e) => {
-      dragLine = Number(card.dataset.line);
-      card.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-    });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-  });
-  host.querySelectorAll(".sk-lane-body").forEach((body) => {
-    body.addEventListener("dragover", (e) => { e.preventDefault(); body.classList.add("over"); });
-    body.addEventListener("dragleave", () => body.classList.remove("over"));
-    body.addEventListener("drop", (e) => {
-      e.preventDefault();
-      body.classList.remove("over");
-      if (dragLine == null) return;
-      moveSubtask(dragLine, body.dataset.lane);
-      dragLine = null;
-    });
-  });
-}
-
-/* カード移動 → 備考テキストを書き換え、テキストエリアも即時更新（双方向同期） */
-function moveSubtask(line, newLane) {
-  const ta = document.getElementById("modal-note");
-  const tasks = parseSubtasks(ta.value);
-  const t = tasks.find((x) => x.line === line);
-  if (!t || t.lane === newLane) return;
-  t.lane = newLane;
-  ta.value = subtasksToNote(ta.value, tasks);
-  renderSubtaskKanban();
-}
-
-function addSubtask() {
-  const ta = document.getElementById("modal-note");
-  const input = document.getElementById("sk-new");
-  const title = (input.value || "").trim();
-  if (!title) return;
-  ta.value = insertIntoTaskSection(ta.value, `□ ${title}`);
-  input.value = "";
-  renderSubtaskKanban();
-}
-
-/* ＜タスク＞セクション内（次のセクション見出しの直前、無ければ末尾）に1行挿入する。
-   ＜タスク＞見出し自体が無い場合は、従来どおり末尾へ追記する。 */
-function insertIntoTaskSection(note, newLine) {
-  const lines = (note || "").split(/\r?\n/);
-  const startIdx = lines.findIndex(l => l.trim() === "＜タスク＞");
-  if (startIdx === -1) {
-    const trimmed = (note || "").replace(/\s+$/, "");
-    return (trimmed ? trimmed + "\n" : "") + newLine;
-  }
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (/^＜.*＞$/.test(lines[i].trim())) { endIdx = i; break; }
-  }
-  lines.splice(endIdx, 0, newLine);
-  return lines.join("\n");
-}
-
-/* 備考テキストエリアが編集されたらカンバンを再描画（逆方向の同期） */
-function onModalNoteEdited() {
-  renderSubtaskKanban();
-}
 
 /* ============================================================
    フィルタ判定（検索を追加）
@@ -1379,7 +1135,7 @@ function openMenu(btn) {
       s.src = COMMON_BASE + "/slide-menu.js";
       s.onload = () => {
         SlideMenu.init({
-          appName: "Menu",
+          appName: "WBSカンバン",
           version: APP_VERSION,
           position: "left",
           width: 250,
@@ -1388,8 +1144,8 @@ function openMenu(btn) {
           currentId: "kanban",                       // menu.json のidと一致で強調表示
           menuUrl: COMMON_BASE + "/menu.json",       // ★ メニュー定義はJSONで一元管理
           localItems: [                              // このアプリ固有の操作
-            { label: "再読み込み", icon: "🔄", onClick: () => init() },
-            { label: "設定をリセット", icon: "🧹", onClick: () => resetSettings() }
+            { section: "操作" },
+            { label: "設定をリセット", icon: "", onClick: () => resetSettings() }
           ]
         });
         resolve();
@@ -1414,234 +1170,11 @@ function openMenu(btn) {
 }
 
 /* ============================================================
-   汎用ダイアログ（Office環境では window.confirm/alert 不可）
+   汎用ダイアログ（uiConfirm/uiAlert/dialogRespond）と
+   タスク追加（openTaskAdd/saveTaskAdd 等）は
+   api.js（共通モジュール）に移動した
    ============================================================ */
-let dialogResolve = null;
-function uiConfirm(message) {
-  return new Promise(resolve => {
-    dialogResolve = resolve;
-    document.getElementById("dialog-msg").textContent = message;
-    document.getElementById("dialog-cancel").style.display = "";
-    document.getElementById("dialog-modal").classList.remove("hidden");
-  });
-}
-function uiAlert(message) {
-  return new Promise(resolve => {
-    dialogResolve = resolve;
-    document.getElementById("dialog-msg").textContent = message;
-    document.getElementById("dialog-cancel").style.display = "none";
-    document.getElementById("dialog-modal").classList.remove("hidden");
-  });
-}
-function dialogRespond(ok) {
-  document.getElementById("dialog-modal").classList.add("hidden");
-  const r = dialogResolve;
-  dialogResolve = null;
-  if (r) r(ok);
-}
 
-/* ============================================================
-   タスク追加
-   ------------------------------------------------------------
-   ・wbsシートの名前定義「タスク範囲」内の選択行に行挿入して追加
-   ・T〜FY列の数式は隣接行からコピーして埋める
-   ・値の書込み: A=大分類, B=小分類, E=タスク名, N=担当者,
-     P=予定開始日, Q=予定終了日
-   ・大分類「受注」の場合、小分類は営業報告シートの
-     状態=受注/受託中 の案件番号から選択
-   ============================================================ */
-const EIGYO_SHEET = "営業報告";
-const ORDER_CATEGORY = "受注";
-const TASK_RANGE_NAME = "タスク範囲";
-
-function openTaskAdd() {
-  // 大分類: 既存タスクの大分類 ＋ 受注（無ければ追加）
-  const cats = [...new Set(allTasks.map(t => t.category).filter(v => v && v !== "#"))];
-  if (!cats.includes(ORDER_CATEGORY)) cats.push(ORDER_CATEGORY);
-  const catSel = document.getElementById("ta-cat");
-  catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
-
-  // 担当者: 既存タスクの担当者
-  const users = [...new Set(allTasks.map(t => t.user).filter(v => v && v !== "#"))];
-  const userSel = document.getElementById("ta-user");
-  userSel.innerHTML = `<option value=""></option>` + users.map(u => `<option>${escapeHtml(String(u))}</option>`).join("");
-
-  // 入力初期化
-  document.getElementById("ta-subcat").value = "";
-  document.getElementById("ta-title").value = "";
-  document.getElementById("ta-start").value = "";
-  document.getElementById("ta-end").value = "";
-  const msg = document.getElementById("ta-msg");
-  msg.className = "task-msg"; msg.textContent = "";
-
-  onTaCatChange();
-
-  // wbsシートが表示されていない場合はアクティブにする
-  activateWbs();
-
-  document.getElementById("task-modal").classList.remove("hidden");
-}
-function closeTaskAdd() { document.getElementById("task-modal").classList.add("hidden"); }
-
-async function activateWbs() {
-  if (!window.Excel) return;
-  try {
-    await Excel.run(async ctx => {
-      const active = ctx.workbook.worksheets.getActiveWorksheet();
-      active.load("name");
-      await ctx.sync();
-      if (active.name !== "wbs") {
-        ctx.workbook.worksheets.getItem("wbs").activate();
-        await ctx.sync();
-      }
-    });
-  } catch (e) {
-    console.warn("wbsシートのアクティブ化に失敗:", e);
-  }
-}
-
-/* 大分類の変更：受注なら小分類を案件番号セレクトに切替。
-   それ以外は、その大分類で使われている既存の小分類をデータリスト（候補）として提示しつつ、
-   自由入力でも新しい小分類を追加できるようにする。 */
-async function onTaCatChange() {
-  const cat = document.getElementById("ta-cat").value;
-  const txt = document.getElementById("ta-subcat");
-  const sel = document.getElementById("ta-subcat-sel");
-  const dl = document.getElementById("ta-subcat-list");
-  if (cat === ORDER_CATEGORY) {
-    txt.style.display = "none";
-    sel.style.display = "";
-    sel.innerHTML = `<option value="">読込中…</option>`;
-    const ids = await loadOrderCaseIds();
-    sel.innerHTML = ids.length
-      ? ids.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.id)}　${escapeHtml(x.client)}</option>`).join("")
-      : `<option value="">（対象案件がありません）</option>`;
-  } else {
-    txt.style.display = "";
-    sel.style.display = "none";
-    txt.value = "";
-    const subs = [...new Set(
-      allTasks
-        .filter(t => t.category === cat)
-        .map(t => t.classification)
-        .filter(v => v && String(v).trim() !== "" && v !== "#")
-    )];
-    dl.innerHTML = subs.map(s => `<option value="${escapeHtml(String(s))}"></option>`).join("");
-  }
-}
-
-/* 営業報告シートから 状態=受注/受託中 の案件番号を取得 */
-async function loadOrderCaseIds() {
-  if (!window.Excel) return [];
-  try {
-    let out = [];
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem(EIGYO_SHEET);
-      const used = sheet.getUsedRange(true);
-      used.load("rowCount");
-      await ctx.sync();
-      const last = Math.max(used.rowCount, 2);
-      const rng = sheet.getRange(`A2:E${last}`);
-      rng.load("values");
-      await ctx.sync();
-      rng.values.forEach(r => {
-        const id = (r[0] ?? "").toString().trim();
-        const client = (r[1] ?? "").toString().trim();
-        const st = (r[4] ?? "").toString().trim();
-        if (id && (st === "受注" || st === "受託中")) out.push({ id, client });
-      });
-    });
-    return out;
-  } catch (e) {
-    console.warn("営業報告シートの読込に失敗:", e);
-    return [];
-  }
-}
-
-/* OK：選択行がタスク範囲内かを検証し、行挿入してタスクを書き込む */
-async function saveTaskAdd() {
-  const msg = document.getElementById("ta-msg");
-  msg.className = "task-msg"; msg.textContent = "";
-
-  const cat = document.getElementById("ta-cat").value;
-  const sub = (cat === ORDER_CATEGORY)
-    ? document.getElementById("ta-subcat-sel").value
-    : document.getElementById("ta-subcat").value.trim();
-  const title = document.getElementById("ta-title").value.trim();
-  const user = document.getElementById("ta-user").value;
-  const start = document.getElementById("ta-start").value;
-  const end = document.getElementById("ta-end").value;
-
-  if (!title) { msg.className = "task-msg err"; msg.textContent = "タスク名を入力してください"; return; }
-  if (cat === ORDER_CATEGORY && !sub) { msg.className = "task-msg err"; msg.textContent = "案件番号を選択してください"; return; }
-  if (!window.Excel) { msg.className = "task-msg err"; msg.textContent = "Excel環境でのみ追加できます"; return; }
-
-  try {
-    let inserted = -1;
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-
-      // 選択セルの行
-      const selected = ctx.workbook.getSelectedRange();
-      selected.load(["rowIndex", "worksheet/name"]);
-
-      // 名前定義「タスク範囲」（ブック→wbsシートの順で検索）
-      let nameItem = ctx.workbook.names.getItemOrNullObject(TASK_RANGE_NAME);
-      let sheetNameItem = sheet.names.getItemOrNullObject(TASK_RANGE_NAME);
-      await ctx.sync();
-      if (nameItem.isNullObject && sheetNameItem.isNullObject) {
-        throw new Error(`名前定義「${TASK_RANGE_NAME}」が見つかりません。wbsシートに行挿入可能な範囲を「${TASK_RANGE_NAME}」として名前定義してください。`);
-      }
-      const rangeObj = (!nameItem.isNullObject ? nameItem : sheetNameItem).getRange();
-      rangeObj.load(["rowIndex", "rowCount", "worksheet/name"]);
-      await ctx.sync();
-
-      if (selected.worksheet.name !== "wbs") {
-        throw new Error("wbsシート上で挿入したい行を選択してください。");
-      }
-      const selRow = selected.rowIndex + 1;             // 1-based
-      const rangeTop = rangeObj.rowIndex + 1;
-      const rangeBottom = rangeObj.rowIndex + rangeObj.rowCount;
-      if (selRow < rangeTop || selRow > rangeBottom) {
-        throw new Error(`選択行（${selRow}行目）は「${TASK_RANGE_NAME}」（${rangeTop}〜${rangeBottom}行目）の外です。範囲内の行を選択してください。`);
-      }
-
-      // 行挿入（選択行の位置に。既存行は下へ）
-      sheet.getRange(`${selRow}:${selRow}`).insert(Excel.InsertShiftDirection.down);
-      await ctx.sync();
-
-      // T〜FY列の数式を隣接行からコピー（挿入行の上、先頭行の場合は下からコピー）
-      const srcRow = (selRow > rangeTop) ? selRow - 1 : selRow + 1;
-      const dst = sheet.getRange(`T${selRow}:FY${selRow}`);
-      dst.copyFrom(sheet.getRange(`T${srcRow}:FY${srcRow}`), Excel.RangeCopyType.formulas);
-
-      // 値の書込み
-      sheet.getRange(`A${selRow}`).values = [[cat]];
-      sheet.getRange(`B${selRow}`).values = [[sub]];
-      sheet.getRange(`E${selRow}`).values = [[title]];
-      sheet.getRange(`N${selRow}`).values = [[user]];
-      if (start) {
-        const c = sheet.getRange(`P${selRow}`);
-        c.values = [[dateToExcelSerial(new Date(start + "T00:00:00"))]];
-        c.numberFormat = [["m/d"]];
-      }
-      if (end) {
-        const c = sheet.getRange(`Q${selRow}`);
-        c.values = [[dateToExcelSerial(new Date(end + "T00:00:00"))]];
-        c.numberFormat = [["m/d"]];
-      }
-      await ctx.sync();
-      inserted = selRow;
-    });
-
-    closeTaskAdd();
-    await uiAlert(`${inserted}行目にタスクを追加しました。`);
-    await init();   // 再読込してボードへ反映
-  } catch (e) {
-    msg.className = "task-msg err";
-    msg.textContent = e.message || "タスクの追加に失敗しました";
-  }
-}
 
 /* ============================================================
    集計タブ
