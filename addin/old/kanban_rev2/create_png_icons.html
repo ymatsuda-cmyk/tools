@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SVG to PNG Converter</title>
+    <style>
+        canvas { border: 1px solid #ccc; margin: 10px; }
+        .icon { margin: 20px; }
+    </style>
+</head>
+<body>
+    <h1>SVG to PNG Icon Generator</h1>
+    <div class="icon">
+        <h3>16x16 PNG</h3>
+        <canvas id="canvas16" width="16" height="16"></canvas>
+        <br><a id="download16" download="icon-16.png">Download 16x16 PNG</a>
+    </div>
+    <div class="icon">
+        <h3>32x32 PNG</h3>
+        <canvas id="canvas32" width="32" height="32"></canvas>
+        <br><a id="download32" download="icon-32.png">Download 32x32 PNG</a>
+    </div>
+    <div class="icon">
+        <h3>80x80 PNG</h3>
+        <canvas id="canvas80" width="80" height="80"></canvas>
+        <br><a id="download80" download="icon-80.png">Download 80x80 PNG</a>
+    </div>
+
+    <script>
+        // カンバン風アイコンを描画
+        function drawKanbanIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // 背景色
+            ctx.fillStyle = '#0078d4';
+            ctx.fillRect(0, 0, size, size);
+            
+            // カラム線を描画
+            ctx.fillStyle = 'white';
+            const colWidth = Math.floor(size / 5);
+            const margin = Math.floor(size / 8);
+            
+            // 3つのカラムを描画
+            for (let i = 0; i < 3; i++) {
+                const x = margin + i * (colWidth + margin);
+                ctx.fillRect(x, margin, colWidth, size - margin * 2);
+            }
+        }
+        
+        // 各サイズのアイコンを生成
+        const sizes = [
+            {canvas: 'canvas16', download: 'download16', size: 16},
+            {canvas: 'canvas32', download: 'download32', size: 32},
+            {canvas: 'canvas80', download: 'download80', size: 80}
+        ];
+        
+        sizes.forEach(({canvas, download, size}) => {
+            const canvasElement = document.getElementById(canvas);
+            drawKanbanIcon(canvasElement, size);
+            
+            // ダウンロードリンクを設定
+            canvasElement.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById(download).href = url;
+            }, 'image/png');
+        });
+    </script>
+</body>
+</html>

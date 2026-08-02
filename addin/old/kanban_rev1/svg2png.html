@@ -1,0 +1,24 @@
+﻿<!DOCTYPE html>
+<html><head><title>SVG to PNG</title></head>
+<body>
+<canvas id="canvas" width="80" height="80"></canvas>
+<script>
+const svg = `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="80" height="80" fill="#0078d4"/>
+<rect x="10" y="10" width="15" height="60" fill="white"/>
+<rect x="32.5" y="10" width="15" height="60" fill="white"/>
+<rect x="55" y="10" width="15" height="60" fill="white"/>
+</svg>`;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const img = new Image();
+img.onload = () => {
+  ctx.drawImage(img, 0, 0);
+  const link = document.createElement('a');
+  link.download = 'icon-80.png';
+  link.href = canvas.toDataURL();
+  link.click();
+};
+img.src = 'data:image/svg+xml;base64,' + btoa(svg);
+</script>
+</body></html>
