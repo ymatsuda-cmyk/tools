@@ -842,3 +842,13 @@ body {
 
 /* ---------- ドリルダウンカード ---------- */
 .agg-card.drill-card { border-color: #b8dcd0; }
+
+/* ---------- WBSタスク件数バッジ（一覧・カンバン共通。完了数/総数） ---------- */
+.wbs-badge {
+  display: inline-block; background: #e4f1ec; color: #0e7a5f; border: 1px solid #b8dcd0;
+  border-radius: 9px; padding: 0 6px; font-size: 10px; font-weight: bold;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.wbs-badge.all-done { background: #0e7a5f; border-color: #0e7a5f; color: #fff; }
+.wbs-badge.none { background: #f4f6f7; color: #a8b2b8; border-color: #e3e8eb; font-weight: normal; }
+.list-table td .wbs-badge { font-size: 10px; }

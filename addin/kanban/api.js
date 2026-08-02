@@ -447,6 +447,8 @@ async function loadWbsMeta() {
 }
 
 let taskAddMeta = { categories: [], users: [], subcatsByCategory: {} };
+/* 大分類・小分類を固定表示にする場合の指定（null なら通常の編集可能モード） */
+let taskAddLock = null;
 
 /* preset（任意）: { category, caseId }
    … 呼び出し元（例：営業報告の案件編集画面）から、大分類と
@@ -457,31 +459,67 @@ async function openTaskAdd(preset) {
   preset = preset || {};
   taskAddMeta = await loadWbsMeta();
 
-  // 大分類: wbs既存の大分類 ＋ 受注（無ければ追加）
-  const cats = [...taskAddMeta.categories];
-  if (!cats.includes(cfg().orderCategory)) cats.push(cfg().orderCategory);
+  // ロック指定（営業報告の案件編集画面から呼ばれた場合）
+  taskAddLock = preset.lock
+    ? { category: String(preset.category ?? ""), subCategory: String(preset.subCategory ?? preset.caseId ?? ""),
+        reason: preset.reason || "" }
+    : null;
+
   const catSel = document.getElementById("ta-cat");
-  catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
-  if (preset.category && cats.includes(preset.category)) catSel.value = preset.category;
+  const txt = document.getElementById("ta-subcat");
+  const sel = document.getElementById("ta-subcat-sel");
+  const catHint = document.getElementById("ta-cat-hint");
+  const subHint = document.getElementById("ta-subcat-hint");
 
   // 担当者: wbs既存の担当者
   const userSel = document.getElementById("ta-user");
   userSel.innerHTML = `<option value=""></option>` + taskAddMeta.users.map(u => `<option>${escapeHtml(String(u))}</option>`).join("");
 
   // 入力初期化
-  document.getElementById("ta-subcat").value = "";
   document.getElementById("ta-title").value = "";
   document.getElementById("ta-start").value = "";
   document.getElementById("ta-end").value = "";
   const msg = document.getElementById("ta-msg");
   msg.className = "task-msg"; msg.textContent = "";
 
-  await onTaCatChange();
+  if (taskAddLock) {
+    /* 大分類・小分類は呼び出し元が決定済み。誤って別案件のタスクを
+       作らないよう、値を固定して編集不可にする。 */
+    catSel.innerHTML = `<option>${escapeHtml(taskAddLock.category)}</option>`;
+    catSel.value = taskAddLock.category;
+    catSel.disabled = true;
+    catSel.classList.add("ta-locked");
 
-  // 受注案件番号の事前選択（該当する候補があれば）
-  if (preset.caseId && catSel.value === cfg().orderCategory) {
-    const sel = document.getElementById("ta-subcat-sel");
-    if ([...sel.options].some(o => o.value === preset.caseId)) sel.value = preset.caseId;
+    sel.style.display = "none";
+    txt.style.display = "";
+    txt.value = taskAddLock.subCategory;
+    txt.readOnly = true;
+    txt.classList.add("ta-locked");
+
+    if (catHint) catHint.textContent = taskAddLock.reason || "";
+    if (subHint) subHint.textContent = "案件番号を自動設定";
+  } else {
+    // 大分類: wbs既存の大分類 ＋ 受注（無ければ追加）
+    const cats = [...taskAddMeta.categories];
+    if (!cats.includes(cfg().orderCategory)) cats.push(cfg().orderCategory);
+    catSel.innerHTML = cats.map(c => `<option>${escapeHtml(String(c))}</option>`).join("");
+    if (preset.category && cats.includes(preset.category)) catSel.value = preset.category;
+    catSel.disabled = false;
+    catSel.classList.remove("ta-locked");
+
+    txt.value = "";
+    txt.readOnly = false;
+    txt.classList.remove("ta-locked");
+
+    if (catHint) catHint.textContent = "";
+    if (subHint) subHint.textContent = "";
+
+    await onTaCatChange();
+
+    // 受注案件番号の事前選択（該当する候補があれば）
+    if (preset.caseId && catSel.value === cfg().orderCategory) {
+      if ([...sel.options].some(o => o.value === preset.caseId)) sel.value = preset.caseId;
+    }
   }
 
   // wbsシートが表示されていない場合はアクティブにする
@@ -566,17 +604,19 @@ async function saveTaskAdd() {
   const msg = document.getElementById("ta-msg");
   msg.className = "task-msg"; msg.textContent = "";
 
-  const cat = document.getElementById("ta-cat").value;
-  const sub = (cat === cfg().orderCategory)
-    ? document.getElementById("ta-subcat-sel").value
-    : document.getElementById("ta-subcat").value.trim();
+  const cat = taskAddLock ? taskAddLock.category : document.getElementById("ta-cat").value;
+  const sub = taskAddLock
+    ? taskAddLock.subCategory
+    : ((cat === cfg().orderCategory)
+        ? document.getElementById("ta-subcat-sel").value
+        : document.getElementById("ta-subcat").value.trim());
   const title = document.getElementById("ta-title").value.trim();
   const user = document.getElementById("ta-user").value;
   const start = document.getElementById("ta-start").value;
   const end = document.getElementById("ta-end").value;
 
   if (!title) { msg.className = "task-msg err"; msg.textContent = "タスク名を入力してください"; return; }
-  if (cat === cfg().orderCategory && !sub) { msg.className = "task-msg err"; msg.textContent = "案件番号を選択してください"; return; }
+  if (!taskAddLock && cat === cfg().orderCategory && !sub) { msg.className = "task-msg err"; msg.textContent = "案件番号を選択してください"; return; }
   if (!window.Excel) { msg.className = "task-msg err"; msg.textContent = "Excel環境でのみ追加できます"; return; }
 
   try {
@@ -751,8 +791,26 @@ async function renderMiniKanban(container, matchFn, opts) {
 
   const tasks = await fetchWbsTasks(matchFn);
 
+  /* 大分類フィルタ。案件が見積段階と受託段階の両方でタスクを持つ場合など、
+     大分類が2種類以上あるときだけチップ行を出す（1種類ならノイズなので隠す）。 */
+  const cats = [...new Set(tasks.map(t => String(t.category ?? "").trim()).filter(Boolean))];
+  if (el.__mkCat && !cats.includes(el.__mkCat)) el.__mkCat = "";   // 消えた分類の選択は解除
+  const selCat = el.__mkCat || "";
+  const shown = selCat ? tasks.filter(t => String(t.category ?? "").trim() === selCat) : tasks;
+
+  const filterHtml = cats.length >= 2
+    ? `<div class="mk-filter">
+         <span class="lbl">大分類</span>
+         <button class="mk-fchip ${selCat ? "" : "on"}" data-cat="">すべて ${tasks.length}</button>
+         ${cats.map(c => {
+           const n = tasks.filter(t => String(t.category ?? "").trim() === c).length;
+           return `<button class="mk-fchip ${selCat === c ? "on" : ""}" data-cat="${escapeHtml(c)}">${escapeHtml(c)} ${n}</button>`;
+         }).join("")}
+       </div>`
+    : "";
+
   const lanesHtml = MINI_LANES.map(L => {
-    const cards = tasks.filter(t => miniStatus(t) === L.key);
+    const cards = shown.filter(t => miniStatus(t) === L.key);
     return `
       <div class="mk-lane" data-lane="${L.key}">
         <div class="mk-lane-head">${escapeHtml(L.label)} <span>${cards.length}</span></div>
@@ -760,8 +818,11 @@ async function renderMiniKanban(container, matchFn, opts) {
           ${cards.map(t => {
             const overdue = L.key !== "done" && t.end &&
               miniExcelDateToJS(t.end) < new Date(new Date().toDateString());
+            const cat = String(t.category ?? "").trim();
+            // 分類が複数あるときだけカードにも分類タグを出す
+            const catTag = (cats.length >= 2 && cat) ? `<span class="cat">${escapeHtml(cat)}</span>` : "";
             return `<div class="mk-card ${L.key}${overdue ? " overdue" : ""}" draggable="true" data-row="${t.rowIndex}">
-              ${escapeHtml(t.title || "（無題）")}
+              ${catTag}${escapeHtml(t.title || "（無題）")}
               <span class="due">${t.isNoSchedule ? "TODO" : miniFmt(t.end)}${t.user ? "・" + escapeHtml(t.user) : ""}</span>
             </div>`;
           }).join("")}
@@ -769,9 +830,17 @@ async function renderMiniKanban(container, matchFn, opts) {
       </div>`;
   }).join("");
 
-  el.innerHTML = `<div class="mk-board">${lanesHtml}</div>`;
-  bindMiniKanbanEvents(el, tasks);
-  return tasks;
+  el.innerHTML = filterHtml + `<div class="mk-board">${lanesHtml}</div>`;
+
+  el.querySelectorAll(".mk-fchip").forEach(b => {
+    b.addEventListener("click", () => {
+      el.__mkCat = b.dataset.cat || "";
+      renderMiniKanban(el, el.__mkMatchFn, el.__mkOpts);
+    });
+  });
+
+  bindMiniKanbanEvents(el, shown);
+  return tasks;   // 件数バッジ用は常に全件を返す（フィルタの影響を受けない）
 }
 
 function bindMiniKanbanEvents(el, tasks) {
@@ -887,11 +956,14 @@ function ensureApiDom() {
         <h3>タスク追加</h3>
         <div class="task-hint" id="task-hint">追加したい行を選択してください。（wbsシート上で挿入位置の行をクリック）</div>
         <div class="task-grid">
-          <div class="t-row"><label>大分類</label><select id="ta-cat" onchange="onTaCatChange()"></select></div>
+          <div class="t-row"><label>大分類</label><select id="ta-cat" onchange="onTaCatChange()"></select>
+            <span class="ta-hint" id="ta-cat-hint"></span>
+          </div>
           <div class="t-row"><label>小分類</label>
             <input type="text" id="ta-subcat" list="ta-subcat-list" placeholder="既存候補から選択 or 新規入力">
             <datalist id="ta-subcat-list"></datalist>
             <select id="ta-subcat-sel" style="display:none"></select>
+            <span class="ta-hint" id="ta-subcat-hint"></span>
           </div>
           <div class="t-row wide"><label>タスク名 <span class="req">必須</span></label><input type="text" id="ta-title"></div>
           <div class="t-row"><label>担当者</label><select id="ta-user"></select></div>
