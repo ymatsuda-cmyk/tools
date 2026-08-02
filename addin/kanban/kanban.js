@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260802_82dc757";
+const APP_VERSION = "rev_20260802_540af92";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
