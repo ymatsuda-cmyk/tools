@@ -561,16 +561,8 @@ body {
 }
 .drill-close:hover { background: #fdecea; border-color: #c0392b; color: #c0392b; }
 
-/* ---------- WBS状況チップ ---------- */
-.wbs-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
-.wbs-chip {
-  display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px;
-  background: #eef1f3; color: #52616b; font-weight: bold;
-}
-.wbs-chip.doing { background: #eaf2f8; color: #2c6e9b; }
-.wbs-chip.done  { background: #e4f1ec; color: #0e7a5f; }
-.wbs-chip.held  { background: #fbeadf; color: #c05c14; }
-.wbs-total { font-size: 11px; color: #8a97a0; margin-left: 2px; }
+/* WBS状況チップ（.wbs-status / .wbs-chip / .wbs-total）は、
+   案件編集画面の「タスク一覧」（ミニカンバン）への一本化に伴い廃止した */
 
 /* ============================================================
    受託スケジュール（ガント）

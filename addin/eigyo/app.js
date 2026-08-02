@@ -1504,59 +1504,17 @@ function renderStageBody() {
           <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
       </div>
       <div class="date-order-hint">開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日 の順で入力してください</div>
-      <div class="form-row"><label>WBS状況（wbsシートで小分類＝案件番号のタスク）</label>
-        <div class="wbs-status" id="wbs-status"><span class="muted">読込中…</span></div>
-      </div>
       <label class="check-row ${doneDis ? "off" : ""}">
         <input type="checkbox" id="st-done" ${doneDis}> 対応完了（完了日を記録し、チケットを完了する）
         ${holdMsg}
       </label>`;
-    loadWbsStatus(rec.id);
     return;
   }
   body.innerHTML = "";
 }
 
-/* wbsシートから 小分類(B列)=案件番号 のタスク状況を集計して表示
- * 判定はカンバンアドインと同一: S列(実績終了)→完了 / O列備考に▲→保留 /
- * R列(実績開始)→対応中 / それ以外→未着手 */
-async function loadWbsStatus(caseId) {
-  const el = document.getElementById("wbs-status");
-  if (!el) return;
-  if (demoMode || !window.Excel) {
-    el.innerHTML = `<span class="wbs-chip">未着手 1</span><span class="wbs-chip doing">対応中 2</span><span class="wbs-chip done">完了 3</span><span class="wbs-chip held">保留 0</span><span class="muted">（デモ表示）</span>`;
-    return;
-  }
-  try {
-    let counts = { 未着手: 0, 対応中: 0, 完了: 0, 保留: 0 };
-    await Excel.run(async ctx => {
-      const sheet = ctx.workbook.worksheets.getItem("wbs");
-      const range = sheet.getUsedRange();
-      range.load("values");
-      await ctx.sync();
-      range.values.slice(10).forEach(r => {
-        if ((r[1] ?? "").toString().trim() !== caseId) return;   // B列=小分類
-        const note = (r[14] ?? "").toString();                    // O列=備考
-        const actualStart = r[17];                                // R列
-        const actualEnd = r[18];                                  // S列
-        if (actualEnd) counts["完了"]++;
-        else if (note.includes("▲")) counts["保留"]++;
-        else if (actualStart) counts["対応中"]++;
-        else counts["未着手"]++;
-      });
-    });
-    const total = Object.values(counts).reduce((a, v) => a + v, 0);
-    el.innerHTML = total === 0
-      ? `<span class="muted">紐づくタスクがありません（カンバンの「タスク追加」で大分類=受注・小分類=${esc(caseId)}のタスクを登録すると表示されます）</span>`
-      : `<span class="wbs-chip">未着手 ${counts["未着手"]}</span>` +
-        `<span class="wbs-chip doing">対応中 ${counts["対応中"]}</span>` +
-        `<span class="wbs-chip done">完了 ${counts["完了"]}</span>` +
-        `<span class="wbs-chip held">保留 ${counts["保留"]}</span>` +
-        `<span class="wbs-total">計 ${total}件</span>`;
-  } catch (e) {
-    el.innerHTML = `<span class="muted">wbsシートを読み込めませんでした</span>`;
-  }
-}
+/* 旧 loadWbsStatus()（受託中タブ内のWBS件数チップ）は廃止。
+   案件編集画面 上部の「タスク一覧」（ミニカンバン）に一本化した。 */
 function updateTaxView() {
   const v = numOrNull(document.getElementById("st-amount").value);
   document.getElementById("st-tax").value = v != null ? withTax(v).toLocaleString() + " 円" : "";
