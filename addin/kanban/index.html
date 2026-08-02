@@ -6,6 +6,12 @@
   <title>Kanban</title>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル）
+       営業報告アドインも同じファイルを読み込んで共有する -->
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/common/api.css">
+  <script src="https://ymatsuda-cmyk.github.io/tools/common/api.js"></script>
+
   <script src="kanban.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -172,58 +178,8 @@
 
 </div>
 
-<!-- 備考編集モーダル -->
-<div id="modal" class="modal hidden">
-  <div class="modal-content">
-    <h3 id="modal-title"></h3>
-    <textarea id="modal-note" oninput="onModalNoteEdited()"></textarea>
-    <div class="subtask-section">
-      <div class="subtask-label">サブタスク（□未着手 ◎対応中 ■完了）</div>
-      <div id="subtask-kanban"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-primary" onclick="saveNote()">保存</button>
-      <button class="btn-ghost" onclick="closeModal()">閉じる</button>
-      <small>ESC: 閉じる</small>
-    </div>
-  </div>
-</div>
-
-<!-- タスク追加モーダル -->
-<div id="task-modal" class="modal hidden">
-  <div class="modal-content task-modal-content">
-    <h3>タスク追加</h3>
-    <div class="task-hint" id="task-hint">追加したい行を選択してください。（wbsシート上で挿入位置の行をクリック）</div>
-    <div class="task-grid">
-      <div class="t-row"><label>大分類</label><select id="ta-cat" onchange="onTaCatChange()"></select></div>
-      <div class="t-row"><label>小分類</label>
-        <input type="text" id="ta-subcat" list="ta-subcat-list" placeholder="既存候補から選択 or 新規入力">
-        <datalist id="ta-subcat-list"></datalist>
-        <select id="ta-subcat-sel" style="display:none"></select>
-      </div>
-      <div class="t-row wide"><label>タスク名 <span class="req">必須</span></label><input type="text" id="ta-title"></div>
-      <div class="t-row"><label>担当者</label><select id="ta-user"></select></div>
-      <div class="t-row"><label>予定開始日</label><input type="date" id="ta-start"></div>
-      <div class="t-row"><label>予定終了日</label><input type="date" id="ta-end"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-primary" onclick="saveTaskAdd()">OK（選択行に挿入）</button>
-      <button class="btn-ghost" onclick="closeTaskAdd()">キャンセル</button>
-      <span class="task-msg" id="ta-msg"></span>
-    </div>
-  </div>
-</div>
-
-<!-- 汎用ダイアログ（Officeではwindow.confirm/alert不可） -->
-<div id="dialog-modal" class="modal hidden">
-  <div class="modal-content dialog-content">
-    <div id="dialog-msg" class="dialog-msg"></div>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="dialog-cancel" onclick="dialogRespond(false)">キャンセル</button>
-      <button class="btn-primary" id="dialog-ok" onclick="dialogRespond(true)">OK</button>
-    </div>
-  </div>
-</div>
+<!-- 備考編集モーダル／タスク追加モーダル／汎用ダイアログのDOMは
+     api.js（共通モジュール）が自動的にここへ注入する -->
 
 </body>
 </html>
