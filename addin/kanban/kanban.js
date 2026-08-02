@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260802_c09287f";
+const APP_VERSION = "rev_20260802_f6c92db";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -865,15 +865,9 @@ function setupDnD() {
 
 /* ============================================================
    Excel操作
+   ------------------------------------------------------------
+   jumpToExcel は api.js（共通モジュール）で定義されている
    ============================================================ */
-async function jumpToExcel(row) {
-  await Excel.run(async (ctx) => {
-    const s = ctx.workbook.worksheets.getItem("wbs");
-    s.activate();
-    s.getRange(`${row}:${row}`).select();
-    await ctx.sync();
-  });
-}
 
 /* ============================================================
    util
@@ -1135,7 +1129,7 @@ function openMenu(btn) {
       s.src = COMMON_BASE + "/slide-menu.js";
       s.onload = () => {
         SlideMenu.init({
-          appName: "WBSカンバン",
+          appName: "WBS Kanban",
           version: APP_VERSION,
           position: "left",
           width: 250,

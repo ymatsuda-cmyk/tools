@@ -150,3 +150,37 @@
 .sk-add { display: flex; gap: 6px; margin-top: 8px; }
 .sk-add input { flex: 1; border: 1px solid var(--line, #E2E7EC); border-radius: 5px; padding: 5px 8px; font-size: 12px; }
 .sk-add button { border: 1px solid var(--accent, #0E7A5F); background: var(--accent, #0E7A5F); color: #fff; border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+
+/* ===== ミニカンバン（renderMiniKanban）===== */
+.mk-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mk-lane {
+  background: var(--bg, #F3F5F7);
+  border: 1px solid var(--line, #E2E7EC);
+  border-radius: 8px;
+  padding: 6px;
+  min-height: 60px;
+}
+.mk-lane-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10.5px; font-weight: bold; color: var(--ink-soft, #5B6B7B);
+  margin-bottom: 6px;
+}
+.mk-lane-body { min-height: 40px; display: flex; flex-direction: column; gap: 5px; border-radius: 6px; }
+.mk-lane-body.over { outline: 2px dashed var(--accent, #0E7A5F); outline-offset: -2px; }
+.mk-card {
+  background: #fff;
+  border: 1px solid var(--line, #E2E7EC);
+  border-left: 3px solid var(--ink-faint, #93A1AF);
+  border-radius: 5px;
+  padding: 5px 7px;
+  font-size: 11px;
+  line-height: 1.35;
+  cursor: grab;
+  word-break: break-word;
+}
+.mk-card:hover { border-color: var(--accent, #0E7A5F); }
+.mk-card.doing { border-left-color: #1F8FE5; }
+.mk-card.done  { border-left-color: var(--accent, #0E7A5F); }
+.mk-card.overdue { border-left-color: #E5484D; }
+.mk-card .due { display: block; color: var(--ink-faint, #93A1AF); font-size: 9.5px; margin-top: 2px; }
+.mk-card.dragging { opacity: .5; }

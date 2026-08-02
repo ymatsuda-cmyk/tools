@@ -5,6 +5,7 @@
  *
  *   ① タスク追加モーダル（wbsシートの「タスク範囲」への行挿入）
  *   ④ タスク詳細／備考編集モーダル（サブタスクカンバン込み）
+ *   ⑤ ミニカンバン（案件配下タスクの3レーン表示・D&D対応）
  *   ＋ 汎用ダイアログ（uiAlert/uiConfirm）、escapeHtml、日付変換など
  *     どちらのアドインからも使う小さなユーティリティ
  *
@@ -26,6 +27,21 @@
  *                        大分類/担当者候補は本ファイルがwbsシートから
  *                        直接読み込むため、呼び出し側でallTasksなどを
  *                        用意する必要はない。
+ *   renderMiniKanban(container, matchFn, opts)
+ *                     … container（要素 or id文字列）に、matchFnに
+ *                       一致するwbsタスクの未着手/対応中/完了の
+ *                       3レーン・ミニカンバンを描画する。
+ *                       ドラッグ＆ドロップで実績日をwbsへ書き込み、
+ *                       完了後は自動で再描画する。
+ *                       例）
+ *                         renderMiniKanban(
+ *                           "mini-kanban-AG03",
+ *                           matchByCaseId("AG-03"),
+ *                           { onChanged: () => refreshBadge() }
+ *                         );
+ *   matchByCaseId(caseId)
+ *                     … 小分類（B列）が案件番号と一致するかを見る
+ *                       renderMiniKanban 用の絞り込み関数を作るヘルパー。
  *
  * 連携フック（呼び出し側が必要に応じて設定する）
  * ------------------------------------------------------------
@@ -571,6 +587,208 @@ async function saveTaskAdd() {
     msg.className = "task-msg err";
     msg.textContent = e.message || "タスクの追加に失敗しました";
   }
+}
+
+/* ============================================================
+   ⑤ ミニカンバン（案件配下タスクの3レーン表示）
+   ------------------------------------------------------------
+   ・wbsシートを直接読み込み、matchFnに一致するタスクだけを
+     未着手／対応中／完了の3レーンで表示する
+   ・ドラッグ＆ドロップで実績開始日・実績完了日をwbsへ書き込む
+     （保留レーンは扱わない簡易版。カンバン本体の updateStatus と
+     同じ考え方で R列/S列を更新する）
+   ・カード左クリック：Excelの該当行へジャンプ
+     カード右クリック：タスク詳細/備考編集モーダル（openModal）
+   ・営業報告・カンバンどちらの画面からも呼び出せる
+   ============================================================ */
+
+async function jumpToExcel(row) {
+  await Excel.run(async (ctx) => {
+    const s = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
+    s.activate();
+    s.getRange(`${row}:${row}`).select();
+    await ctx.sync();
+  });
+}
+
+function miniExcelDateToJS(value) {
+  if (!value) return null;
+  if (typeof value === "number") return new Date((value - 25569) * 86400 * 1000);
+  return new Date(value);
+}
+function miniFmt(v) {
+  const d = miniExcelDateToJS(v);
+  if (!d || isNaN(d)) return "";
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+function miniStatus(t) {
+  if (t.actualEnd) return "done";
+  if (t.actualStart) return "doing";
+  return "todo";
+}
+
+/* 案件番号（小分類=B列）が一致するかを見る、renderMiniKanban 用の絞り込みヘルパー */
+function matchByCaseId(caseId) {
+  const target = String(caseId ?? "").trim();
+  return (t) => String(t.classification ?? "").trim() === target;
+}
+
+/* wbsシートを読み込み、matchFnに一致する行だけをタスクとして返す */
+async function fetchWbsTasks(matchFn) {
+  const out = [];
+  if (!window.Excel) return out;
+  try {
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
+      const used = sheet.getUsedRange(true);
+      used.load(["rowIndex", "rowCount"]);
+      await ctx.sync();
+
+      const lastRow = Math.max(used.rowIndex + used.rowCount, 11);
+      const range = sheet.getRangeByIndexes(0, 0, lastRow, 26); // A1:Z{lastRow}
+      range.load("values");
+      await ctx.sync();
+
+      range.values.slice(10).forEach((row, i) => {
+        if (!row[25] || row[19] === "-") return; // Z空 or T="-" は除外
+
+        const t = {
+          id: row[24],
+          category: row[0],
+          classification: row[1],
+          title: row[25],
+          user: row[13],
+          note: row[14],
+          start: row[15],
+          end: row[16],
+          actualStart: row[17],
+          actualEnd: row[18],
+          rowIndex: i + 11,
+          isNoSchedule: !row[15] && !row[16]
+        };
+        if (!matchFn || matchFn(t)) out.push(t);
+      });
+    });
+  } catch (e) {
+    console.warn("wbsタスクの取得に失敗:", e);
+  }
+  return out;
+}
+
+const MINI_LANES = [
+  { key: "todo", label: "未着手" },
+  { key: "doing", label: "対応中" },
+  { key: "done", label: "完了" }
+];
+
+/* container: DOM要素 または id文字列
+   matchFn:   task => boolean（wbsの行から作ったタスクオブジェクトを判定）
+   opts.onChanged: ドラッグでステータスが変わり再描画された後に呼ばれる（任意） */
+async function renderMiniKanban(container, matchFn, opts) {
+  const el = typeof container === "string" ? document.getElementById(container) : container;
+  if (!el) return;
+  opts = opts || {};
+  el.__mkMatchFn = matchFn;
+  el.__mkOpts = opts;
+
+  const tasks = await fetchWbsTasks(matchFn);
+
+  const lanesHtml = MINI_LANES.map(L => {
+    const cards = tasks.filter(t => miniStatus(t) === L.key);
+    return `
+      <div class="mk-lane" data-lane="${L.key}">
+        <div class="mk-lane-head">${escapeHtml(L.label)} <span>${cards.length}</span></div>
+        <div class="mk-lane-body" data-lane="${L.key}">
+          ${cards.map(t => {
+            const overdue = L.key !== "done" && t.end &&
+              miniExcelDateToJS(t.end) < new Date(new Date().toDateString());
+            return `<div class="mk-card ${L.key}${overdue ? " overdue" : ""}" draggable="true" data-row="${t.rowIndex}">
+              ${escapeHtml(t.title || "（無題）")}
+              <span class="due">${t.isNoSchedule ? "TODO" : miniFmt(t.end)}${t.user ? "・" + escapeHtml(t.user) : ""}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+  }).join("");
+
+  el.innerHTML = `<div class="mk-board">${lanesHtml}</div>`;
+  bindMiniKanbanEvents(el, tasks);
+}
+
+function bindMiniKanbanEvents(el, tasks) {
+  let dragRow = null;
+
+  el.querySelectorAll(".mk-card").forEach(card => {
+    card.addEventListener("dragstart", (e) => {
+      dragRow = Number(card.dataset.row);
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+
+    card.addEventListener("click", () => {
+      jumpToExcel(Number(card.dataset.row)).catch(err => console.log("jump error:", err));
+    });
+
+    card.addEventListener("contextmenu", async (e) => {
+      e.preventDefault();
+      const t = tasks.find(x => x.rowIndex === Number(card.dataset.row));
+      if (t) await openModal(t);
+    });
+  });
+
+  el.querySelectorAll(".mk-lane-body").forEach(body => {
+    body.addEventListener("dragover", (e) => { e.preventDefault(); body.classList.add("over"); });
+    body.addEventListener("dragleave", () => body.classList.remove("over"));
+    body.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      body.classList.remove("over");
+      if (dragRow == null) return;
+      const t = tasks.find(x => x.rowIndex === dragRow);
+      dragRow = null;
+      if (!t || miniStatus(t) === body.dataset.lane) return;
+      await moveMiniKanbanTask(t, body.dataset.lane, el);
+    });
+  });
+}
+
+/* ドラッグによるステータス変更：実績開始日・実績完了日をwbsのR/S列へ書き込む */
+async function moveMiniKanbanTask(task, lane, el) {
+  let actualStart = task.actualStart;
+  let actualEnd = task.actualEnd;
+
+  if (lane === "todo") {
+    actualStart = "";
+    actualEnd = "";
+  } else if (lane === "doing") {
+    if (!(actualStart instanceof Date) || isNaN(actualStart)) actualStart = new Date();
+    actualEnd = "";
+  } else if (lane === "done") {
+    if (!(actualStart instanceof Date) || isNaN(actualStart)) actualStart = new Date();
+    actualEnd = new Date();
+  }
+
+  try {
+    await Excel.run(async (ctx) => {
+      const sheet = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
+      const row = task.rowIndex;
+
+      const startCell = sheet.getRange(`R${row}`);
+      const endCell = sheet.getRange(`S${row}`);
+      startCell.values = [[dateToExcelSerial(actualStart)]];
+      endCell.values = [[dateToExcelSerial(actualEnd)]];
+      startCell.numberFormat = [["m/d"]];
+      endCell.numberFormat = [["m/d"]];
+
+      await ctx.sync();
+    });
+  } catch (e) {
+    console.warn("ミニカンバンのステータス更新に失敗:", e);
+    await uiAlert("ステータスの更新に失敗しました。もう一度お試しください。");
+  }
+
+  await renderMiniKanban(el, el.__mkMatchFn, el.__mkOpts);
+  if (el.__mkOpts && typeof el.__mkOpts.onChanged === "function") el.__mkOpts.onChanged();
 }
 
 /* ============================================================
