@@ -1092,8 +1092,14 @@ function openEditModal(id, forceTab) {
   if (delBtn) delBtn.style.display = (rec.status === "削除") ? "none" : "";
   currentStageTab = forceTab || defaultStageTab(editingRec);
   refreshEditModal();
-  initEdTaskPanel(rec.id);
+  // 編集画面は必ず先に表示する。タスク一覧（WBS連携）は付随機能なので、
+  // 初期化に失敗しても編集画面自体は開けるようにする。
   document.getElementById("edit-modal").style.display = "";
+  try {
+    initEdTaskPanel(rec.id);
+  } catch (e) {
+    console.warn("タスク一覧の初期化に失敗:", e);
+  }
 }
 function markDirty() { editDirty = true; }
 
@@ -1105,17 +1111,40 @@ function markDirty() { editDirty = true; }
    ・パネルは既定で閉じておき、「タスク一覧」ボタンで開閉する
    ・件数バッジは開閉に関わらず常に表示する
    ============================================================ */
+/* api.js（共通モジュール）が読み込めているか。
+   GitHub Pagesの公開前・通信不良・旧index.htmlのままなど、
+   読み込めていないケースでも編集画面本体は動かせるようにする。 */
+function apiReady() {
+  return typeof renderMiniKanban === "function" && typeof matchByCaseId === "function";
+}
+
 function initEdTaskPanel(caseId) {
-  document.getElementById("ed-task-case").textContent = caseId;
-  document.getElementById("task-panel").classList.add("hidden");
-  const closeBtn = document.querySelector("#task-panel .close-mini");
+  const caseEl = document.getElementById("ed-task-case");
+  const panel = document.getElementById("task-panel");
+  const btn = document.getElementById("ed-tasklist-btn");
+
+  // 旧index.htmlのままなど、タスク一覧のDOMが無い場合は何もしない
+  if (!panel || !btn) return;
+
+  if (caseEl) caseEl.textContent = caseId;
+  panel.classList.add("hidden");
+  const closeBtn = panel.querySelector(".close-mini");
   if (closeBtn) closeBtn.textContent = "閉じる ▲";
+
+  if (!apiReady()) {
+    btn.classList.add("empty");
+    btn.textContent = "タスク一覧（読込不可）";
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
   refreshEdTaskPanel();
 }
 
 /* パネルの開閉トグル（開くときだけミニカンバンを再取得・再描画） */
 function toggleEdTaskPanel() {
   const panel = document.getElementById("task-panel");
+  if (!panel) return;
   const closeBtn = panel.querySelector(".close-mini");
   const willOpen = panel.classList.contains("hidden");
   panel.classList.toggle("hidden");
@@ -1125,23 +1154,33 @@ function toggleEdTaskPanel() {
 
 /* ミニカンバンを再取得・再描画し、件数バッジも更新する */
 async function refreshEdTaskPanel() {
-  if (!editingRec) return;
+  if (!editingRec || !apiReady()) return;
+  if (!document.getElementById("ed-mk-board")) return;
   const caseId = editingRec.id;
-  const tasks = await renderMiniKanban(
-    "ed-mk-board",
-    matchByCaseId(caseId),
-    { onChanged: () => refreshEdTaskBadge(caseId) }
-  );
-  // 案件が切り替わっている間に届いた古い結果は無視する
-  if (!editingRec || editingRec.id !== caseId) return;
-  updateEdTaskBadge(tasks.length);
+  try {
+    const tasks = await renderMiniKanban(
+      "ed-mk-board",
+      matchByCaseId(caseId),
+      { onChanged: () => refreshEdTaskBadge(caseId) }
+    );
+    // 案件が切り替わっている間に届いた古い結果は無視する
+    if (!editingRec || editingRec.id !== caseId) return;
+    updateEdTaskBadge(tasks.length);
+  } catch (e) {
+    console.warn("タスク一覧の取得に失敗:", e);
+  }
 }
 
 /* ドラッグ操作後など、パネルを開き直さずバッジだけ更新したいとき用 */
 async function refreshEdTaskBadge(caseId) {
-  const tasks = await fetchWbsTasks(matchByCaseId(caseId));
-  if (!editingRec || editingRec.id !== caseId) return;
-  updateEdTaskBadge(tasks.length);
+  if (!apiReady()) return;
+  try {
+    const tasks = await fetchWbsTasks(matchByCaseId(caseId));
+    if (!editingRec || editingRec.id !== caseId) return;
+    updateEdTaskBadge(tasks.length);
+  } catch (e) {
+    console.warn("タスク件数の取得に失敗:", e);
+  }
 }
 
 function updateEdTaskBadge(n) {
@@ -1156,6 +1195,10 @@ function updateEdTaskBadge(n) {
 /* 「＋タスク追加」：この案件の番号を小分類にあらかじめ選択した状態で開く */
 function openTaskAddForCase() {
   if (!editingRec) return;
+  if (typeof openTaskAdd !== "function") {
+    uiAlert("タスク追加機能を読み込めませんでした。通信環境をご確認ください。");
+    return;
+  }
   openTaskAdd({
     category: (window.ApiConfig && window.ApiConfig.orderCategory) || "受注",
     caseId: editingRec.id
