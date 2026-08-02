@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260802_57a1b4f";
+const APP_VERSION = "rev_20260802_f6c92db";
 window.APP_VERSION = APP_VERSION;
 
 let allTasks = [];
@@ -21,6 +21,8 @@ let selectedUsers = [];
 let selectedCategories = [];
 let selectedSubCategories = [];
 let selectedPeriod = "all";
+/* カンバン専用：更新日付(U列)による実績フィルタ  "" | "this" | "last" */
+let weekFilter = "";
 let showHeld = true;
 let showAllDone = false;          // 完了全て（OFF時は直近のみ表示）
 let searchQuery = "";
@@ -31,6 +33,12 @@ let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延�
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
 let aggPanelOpen = false;     // 分類フィルタ行の開閉
 let selectedDelayUsers = [];  // 遅延タブ専用の担当者フィルタ（対応状況側とは独立）
+
+/* 集計タブ専用のフィルタ（カンバンタブとは完全に分離して管理する）
+   カンバン側の検索・担当者・分類を変えても集計には影響しない。 */
+let aggUsers = [];
+let aggCategories = [];
+let aggSubCategories = [];
 
 /* 遅延タブ：KPIクリックで表示するリストの選択 */
 let delaySel = "overdue";     // "overdue" | "soon" | "idle" | "held"
@@ -86,7 +94,9 @@ async function init() {
   applyTabState();
   renderFilters();
   renderPeriodSegment();
+  renderWeekButtons();
   renderBoard();
+  renderAggViews();   // 集計はカンバンのフィルタと独立。データ再読込時のみ更新
 
   const v = document.getElementById("version-label");
   if (v) v.textContent = APP_VERSION;
@@ -168,6 +178,10 @@ function restoreSavedFilters() {
       selectedCategories = Array.isArray(f.categories) ? f.categories : (f.category ? [f.category] : []);
       selectedSubCategories = Array.isArray(f.subCategories) ? f.subCategories : (f.subCategory ? [f.subCategory] : []);
       selectedPeriod = f.period || "all";
+      weekFilter = f.weekFilter || "";
+      aggUsers = Array.isArray(f.aggUsers) ? f.aggUsers : [];
+      aggCategories = Array.isArray(f.aggCategories) ? f.aggCategories : [];
+      aggSubCategories = Array.isArray(f.aggSubCategories) ? f.aggSubCategories : [];
 
       // v1では「本日★」の内部値が "today" だったため "star" に読み替える
       if ((f.v || 1) < 2 && selectedPeriod === "today") selectedPeriod = "star";
@@ -177,6 +191,10 @@ function restoreSavedFilters() {
     selectedCategories = [];
     selectedSubCategories = [];
     selectedPeriod = "all";
+    weekFilter = "";
+    aggUsers = [];
+    aggCategories = [];
+    aggSubCategories = [];
   }
 }
 
@@ -187,6 +205,10 @@ function saveFilters() {
       categories: selectedCategories,
       subCategories: selectedSubCategories,
       period: selectedPeriod,
+      weekFilter: weekFilter,
+      aggUsers: aggUsers,
+      aggCategories: aggCategories,
+      aggSubCategories: aggSubCategories,
       v: FILTER_SCHEMA_VERSION,
       timestamp: Date.now()
     }));
@@ -266,6 +288,7 @@ async function loadExcelData() {
         end: row[16],
         actualStart: row[17],
         actualEnd: row[18],
+        updatedAt: row[20],        // U列=更新日付（今週/先週実績の判定に使用）
         note: row[14],
         rowIndex: i + 11,
 
@@ -686,9 +709,6 @@ function renderBoard() {
   hits.textContent = searchQuery ? `${filtered.length}件` : "";
 
   setupDnD();
-
-  // フィルタ・検索・データ再読込のたびに集計側も更新する
-  renderAggViews();
 }
 
 /* ============================================================
@@ -729,7 +749,7 @@ function createCard(t) {
   // 左クリック：Excelへジャンプ
   d.addEventListener("click", (e) => {
     if (e.button !== 0) return;
-    jumpToExcel(t.rowIndex);
+    jumpToWbsRow(t.rowIndex);
   });
 
   // 右クリック：備考編集
@@ -866,7 +886,10 @@ function setupDnD() {
 /* ============================================================
    Excel操作
    ------------------------------------------------------------
-   jumpToExcel は api.js（共通モジュール）で定義されている
+   jumpToWbsRow は api.js（共通モジュール）で定義されている。
+   ※営業報告アドイン側は自前の jumpToExcel（営業報告シート用）を
+     持っているため、名前が衝突しないよう api.js 側は
+     jumpToWbsRow という名前にしてある。
    ============================================================ */
 
 /* ============================================================
@@ -989,6 +1012,7 @@ async function updateStatus(task, lane) {
       task.note = newNote;
     }
 
+    stampWbsUpdate(sheet, row);
     await ctx.sync();
   });
 
@@ -1001,6 +1025,7 @@ async function updateTaskStatus(task, newStatus) {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
     const statusCell = sheet.getRange(`H${task.rowIndex}`);
     statusCell.values = [[newStatus]];
+    stampWbsUpdate(sheet, task.rowIndex);
     await ctx.sync();
   });
   task.status = newStatus;
@@ -1024,6 +1049,7 @@ async function toggleStar(task) {
     const cell = sheet.getRange(`O${task.rowIndex}`);
     cell.values = [[newNote]];
     cell.format.wrapText = false;
+    stampWbsUpdate(sheet, task.rowIndex);
     await ctx.sync();
   });
 
@@ -1039,9 +1065,59 @@ async function toggleStar(task) {
    ============================================================ */
 
 /* ============================================================
+   実績フィルタ（更新日付 U列 ベース。カンバンタブ専用）
+   ------------------------------------------------------------
+   営業報告アドインの「今週実績／先週実績」と同じ考え方で、
+   月曜はじまりの週に更新されたタスクだけを表示する。
+   先週と今週は排他（一方をONにすると他方はOFF）。
+   ============================================================ */
+function weekRangeOf(which) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const day = now.getDay();                       // 0=日
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const thisMonday = new Date(now); thisMonday.setDate(now.getDate() + diffToMonday);
+
+  if (which === "this") {
+    const sunday = new Date(thisMonday); sunday.setDate(thisMonday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { start: thisMonday, end: sunday };
+  }
+  const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate() - 7);
+  const lastSunday = new Date(thisMonday); lastSunday.setDate(thisMonday.getDate() - 1);
+  lastSunday.setHours(23, 59, 59, 999);
+  return { start: lastMonday, end: lastSunday };
+}
+
+function matchesWeekFilter(t) {
+  if (!weekFilter) return true;
+  const d = excelDateToJS(t.updatedAt);
+  if (!d || isNaN(d)) return false;               // 更新日付なしは対象外
+  const { start, end } = weekRangeOf(weekFilter);
+  return d >= start && d <= end;
+}
+
+function setWeekFilter(w) {
+  weekFilter = (weekFilter === w) ? "" : w;       // 同じボタンで解除
+  saveFilters();
+  renderWeekButtons();
+  renderBoard();
+}
+
+function renderWeekButtons() {
+  const t = document.getElementById("btn-thisweek");
+  if (t) t.classList.toggle("on", weekFilter === "this");
+  const l = document.getElementById("btn-lastweek");
+  if (l) l.classList.toggle("on", weekFilter === "last");
+}
+
+/* ============================================================
    フィルタ判定（検索を追加）
    ============================================================ */
 function isMatch(t) {
+
+  // ★ 実績フィルタ（更新日付）
+  if (!matchesWeekFilter(t)) return false;
+
 
   // ★ 検索（タスク名・備考）
   if (!matchesSearch(t)) return false;
@@ -1139,7 +1215,7 @@ function openMenu(btn) {
           menuUrl: COMMON_BASE + "/menu.json",       // ★ メニュー定義はJSONで一元管理
           localItems: [                              // このアプリ固有の操作
             { section: "操作" },
-            { label: "設定をリセット", icon: "", onClick: () => resetSettings() }
+            { label: "設定をリセット", icon: "🧹", onClick: () => resetSettings() }
           ]
         });
         resolve();
@@ -1264,11 +1340,11 @@ function sizeAggLists() {
 }
 
 /* ===== 集計対象の判定（検索・担当者・大分類・小分類のみ） ===== */
+/* 集計タブの絞り込み。カンバンタブの検索・フィルタ・週フィルタは一切適用しない */
 function aggMatch(t) {
-  if (!matchesSearch(t)) return false;
-  if (selectedUsers.length && !selectedUsers.includes(t.user)) return false;
-  if (selectedCategories.length && !selectedCategories.includes(t.category)) return false;
-  if (selectedSubCategories.length && !selectedSubCategories.includes(t.classification)) return false;
+  if (aggUsers.length && !aggUsers.includes(t.user)) return false;
+  if (aggCategories.length && !aggCategories.includes(t.category)) return false;
+  if (aggSubCategories.length && !aggSubCategories.includes(t.classification)) return false;
   return true;
 }
 
@@ -1491,8 +1567,8 @@ function aggBarRow(r, cfg, max, showLabels, opts) {
      レベル2: 担当者別（大分類・小分類を1つずつ選択中）
    ============================================================ */
 function aggLevel() {
-  const c = selectedCategories.length;
-  const s = selectedSubCategories.length;
+  const c = aggCategories.length;
+  const s = aggSubCategories.length;
   if (c === 1 && s === 1) return 2;
   if (c === 1) return 1;
   return 0;
@@ -1555,21 +1631,20 @@ function aggDrillHtml(rows, cfg, overall) {
    チップ・カンバン・集計・タスク一覧のすべてが同じ条件で揃う。 */
 function aggDrill(kind, name) {
   if (kind === "root") {
-    selectedCategories = [];
-    selectedSubCategories = [];
+    aggCategories = [];
+    aggSubCategories = [];
   } else if (kind === "cat") {
-    selectedCategories = [name];
-    selectedSubCategories = [];
+    aggCategories = [name];
+    aggSubCategories = [];
   } else if (kind === "sub") {
-    selectedSubCategories = [name];
+    aggSubCategories = [name];
   } else if (kind === "user") {
     // 同じ担当者を再クリックしたら解除
-    selectedUsers = (selectedUsers.length === 1 && selectedUsers[0] === name) ? [] : [name];
+    aggUsers = (aggUsers.length === 1 && aggUsers[0] === name) ? [] : [name];
   }
 
   saveFilters();
-  renderFilters();
-  renderBoard();     // 末尾で renderAggViews() が走る
+  renderAggViews();   // カンバン側は再描画しない（フィルタが独立しているため）
 }
 
 function bindAggDrill(scope) {
@@ -1695,15 +1770,15 @@ function renderAggFilterPanel() {
 
   const users = sheetOrder("user");
   const cats = sheetOrder("category");
-  const cat = selectedCategories.length === 1 ? selectedCategories[0] : null;
-  const sub = selectedSubCategories.length === 1 ? selectedSubCategories[0] : null;
+  const cat = aggCategories.length === 1 ? aggCategories[0] : null;
+  const sub = aggSubCategories.length === 1 ? aggSubCategories[0] : null;
 
   const badge = cat ? (sub ? `${cat} › ${sub}` : cat) : "すべて";
 
   let html = `<div class="agg-fpanel">
     <div class="f-row">
       <span class="f-label">担当者</span>
-      <span class="f-chips">${chipsHtml(users, selectedUsers, "user")}</span>
+      <span class="f-chips">${chipsHtml(users, aggUsers, "user")}</span>
     </div>
     <div class="f-row">
       <div style="flex:1;min-width:0">
@@ -1723,12 +1798,12 @@ function renderAggFilterPanel() {
     html += `<div class="f-sub">
       <div class="f-row inner">
         <span class="f-label sub">分類</span>
-        <span class="f-chips">${chipsHtml(cats, selectedCategories, "cat")}</span>
+        <span class="f-chips">${chipsHtml(cats, aggCategories, "cat")}</span>
       </div>
       <div class="f-row inner">
         <span class="f-label sub">小分類</span>
         <span class="f-chips">${cat
-          ? (subs.length ? chipsHtml(subs, selectedSubCategories, "sub")
+          ? (subs.length ? chipsHtml(subs, aggSubCategories, "sub")
                          : `<span class="f-chip dis">小分類なし</span>`)
           : `<span class="f-chip dis">分類を選択すると表示</span>`}</span>
       </div>
@@ -1771,17 +1846,16 @@ function applyAggFilter(key, value) {
   const set = (cur) => (!value || (cur.length === 1 && cur[0] === value)) ? [] : [value];
 
   if (key === "user") {
-    selectedUsers = set(selectedUsers);
+    aggUsers = set(aggUsers);
   } else if (key === "cat") {
-    selectedCategories = set(selectedCategories);
-    selectedSubCategories = [];
+    aggCategories = set(aggCategories);
+    aggSubCategories = [];
   } else if (key === "sub") {
-    selectedSubCategories = set(selectedSubCategories);
+    aggSubCategories = set(aggSubCategories);
   }
 
   saveFilters();
-  renderFilters();
-  renderBoard();     // 末尾で renderAggViews() が走る
+  renderAggViews();   // カンバン側は再描画しない（フィルタが独立しているため）
 }
 
 /* 遅延タブ専用の担当者フィルタパネル（分類は対象外） */
@@ -1955,7 +2029,7 @@ function bindAggRowJump(scope) {
     const rowIndex = Number(tr.dataset.row);
 
     tr.addEventListener("click", () => {
-      jumpToExcel(rowIndex).catch(e => console.log("jump error:", e));
+      jumpToWbsRow(rowIndex).catch(e => console.log("jump error:", e));
     });
 
     tr.addEventListener("contextmenu", async (e) => {

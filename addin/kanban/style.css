@@ -638,8 +638,9 @@ mark.hit {
 }
 .btn-add:hover { filter: brightness(1.08); }
 
-/* task-modal-content / task-hint / task-grid / task-msg / dialog-content /
-   dialog-msg / subtask-section / sk-* は api.css（共通モジュール）に移動した */
+/* task-modal-content(→wapi-task-modal-content) / task-hint / task-grid / task-msg /
+   dialog-content(→wapi-dialog-content) / dialog-msg(→wapi-dialog-msg) /
+   subtask-section / sk-* は api.css（共通モジュール）に移動した */
 
 /* ============================================================
    メインタブ（カンバン／集計）
@@ -1230,3 +1231,23 @@ button.kpi.sel { outline-color: var(--bl); }
 
 /* 遅延タブの注記（担当者フィルタ追加に伴い文言変更） */
 #delay-filter .agg-fpanel { margin-top: 9px; }
+
+/* ---------- 実績フィルタ（今週／先週。更新日付U列ベース） ---------- */
+.week-btn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.week-btn:hover { background: var(--bg); color: var(--ink); }
+.week-btn.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}

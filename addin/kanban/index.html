@@ -9,11 +9,11 @@
 
   <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル）
        営業報告アドインも同じファイルを読み込んで共有する -->
-  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260802d">
-  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260802d"></script>
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260802e">
+  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260802e"></script>
 
-  <script src="kanban.js?v=20260802d"></script>
-  <link rel="stylesheet" href="style.css?v=20260802d">
+  <script src="kanban.js?v=20260802e"></script>
+  <link rel="stylesheet" href="style.css?v=20260802e">
 </head>
 
 <body>
@@ -82,6 +82,10 @@
     <button data-p="star" title="スター付きのタスク">★</button>
     <button data-p="todo">TODO</button>
   </div>
+
+  <!-- 実績フィルタ（更新日付U列ベース。カンバンのみ有効） -->
+  <button class="week-btn" id="btn-thisweek" title="更新日付が今週のタスクのみ表示" onclick="setWeekFilter('this')">今週実績</button>
+  <button class="week-btn" id="btn-lastweek" title="更新日付が先週のタスクのみ表示" onclick="setWeekFilter('last')">先週実績</button>
 
   <!-- 保留トグル -->
   <label class="held-toggle" id="held-toggle" onclick="toggleHeldDisplay(event)">

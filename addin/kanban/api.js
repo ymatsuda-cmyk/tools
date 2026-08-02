@@ -92,6 +92,23 @@ function escapeHtml(s) {
   }[c]));
 }
 
+/* wbsシートの更新管理列
+   U = カンバン/営業報告からの更新日付（V・Wは予備。行挿入時にクリアする） */
+const WBS_UPDATE_COL = "U";
+const WBS_CLEAR_COLS = "U:W";
+
+/* wbsへ書き込むすべての経路から呼ぶ。既存の Excel.run 内で使うこと
+   （単体で sync はしない）。 */
+function stampWbsUpdate(sheet, row) {
+  try {
+    const c = sheet.getRange(`${WBS_UPDATE_COL}${row}`);
+    c.values = [[dateToExcelSerial(new Date())]];
+    c.numberFormat = [["yyyy/m/d"]];
+  } catch (e) {
+    console.warn("更新日付の打刻に失敗:", e);
+  }
+}
+
 function dateToExcelSerial(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return "";
   const excelEpoch = new Date(1900, 0, 1);
@@ -255,6 +272,7 @@ async function saveNote() {
     const entireRow = sheet.getRange(`${row}:${row}`);
     entireRow.format.rowHeight = 20;
 
+    stampWbsUpdate(sheet, row);
     await ctx.sync();
   });
 
@@ -658,6 +676,11 @@ async function saveTaskAdd() {
       const dst = sheet.getRange(`T${selRow}:FY${selRow}`);
       dst.copyFrom(sheet.getRange(`T${srcRow}:FY${srcRow}`), Excel.RangeCopyType.formulas);
 
+      /* U〜Wは判定式ではなく更新管理用に使うため、数式コピーで入った値を消す。
+         数式コピー自体（T〜FY）は今週タスク・遅延判定のため残す必要がある。 */
+      sheet.getRange(`${WBS_CLEAR_COLS.split(":")[0]}${selRow}:${WBS_CLEAR_COLS.split(":")[1]}${selRow}`)
+           .clear(Excel.ClearApplyTo.contents);
+
       // 値の書込み
       sheet.getRange(`A${selRow}`).values = [[cat]];
       sheet.getRange(`B${selRow}`).values = [[sub]];
@@ -673,6 +696,7 @@ async function saveTaskAdd() {
         c.values = [[dateToExcelSerial(new Date(end + "T00:00:00"))]];
         c.numberFormat = [["m/d"]];
       }
+      stampWbsUpdate(sheet, selRow);
       await ctx.sync();
       inserted = selRow;
     });
@@ -699,11 +723,18 @@ async function saveTaskAdd() {
    ・営業報告・カンバンどちらの画面からも呼び出せる
    ============================================================ */
 
+/* wbsシートの該当行を選択して見える位置までスクロールする。
+   シートのアクティブ化と選択は別の sync に分ける必要がある
+   （同一バッチだと、非アクティブなシートに対する select が
+     無視されて行が選択されないことがある）。 */
 async function jumpToWbsRow(row) {
   await Excel.run(async (ctx) => {
-    const s = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
-    s.activate();
-    s.getRange(`${row}:${row}`).select();
+    const sheet = ctx.workbook.worksheets.getItem(cfg().wbsSheet);
+    sheet.activate();
+    await ctx.sync();
+
+    const target = sheet.getRange(`A${row}:Z${row}`);
+    target.select();
     await ctx.sync();
   });
 }
@@ -760,6 +791,7 @@ async function fetchWbsTasks(matchFn) {
           end: row[16],
           actualStart: row[17],
           actualEnd: row[18],
+          updatedAt: row[20],          // U列=更新日付
           rowIndex: i + 11,
           isNoSchedule: !row[15] && !row[16]
         };
@@ -908,6 +940,7 @@ async function moveMiniKanbanTask(task, lane, el) {
       startCell.numberFormat = [["m/d"]];
       endCell.numberFormat = [["m/d"]];
 
+      stampWbsUpdate(sheet, row);
       await ctx.sync();
     });
   } catch (e) {
@@ -1011,7 +1044,7 @@ function ensureApiDom() {
 Object.assign(window, {
   // 呼び出し側アプリから使う
   openModal, openTaskAdd, renderMiniKanban, matchByCaseId, fetchWbsTasks,
-  jumpToWbsRow, escapeHtml, dateToExcelSerial, ensureStatusSymbols,
+  jumpToWbsRow, escapeHtml, dateToExcelSerial, ensureStatusSymbols, stampWbsUpdate,
   // 注入したモーダルの inline onclick から呼ばれる
   closeModal, saveNote, onModalNoteEdited, addSubtask,
   closeTaskAdd, saveTaskAdd, onTaCatChange,
