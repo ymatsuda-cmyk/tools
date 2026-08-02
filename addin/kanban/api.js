@@ -791,14 +791,14 @@ async function renderMiniKanban(container, matchFn, opts) {
 
   const tasks = await fetchWbsTasks(matchFn);
 
-  /* 大分類フィルタ。案件が見積段階と受託段階の両方でタスクを持つ場合など、
-     大分類が2種類以上あるときだけチップ行を出す（1種類ならノイズなので隠す）。 */
+  /* 大分類フィルタ。分類が1種類しかない案件でも、機能の存在が分かるよう
+     常にチップ行を出す（タスクが0件のときだけ隠す）。 */
   const cats = [...new Set(tasks.map(t => String(t.category ?? "").trim()).filter(Boolean))];
   if (el.__mkCat && !cats.includes(el.__mkCat)) el.__mkCat = "";   // 消えた分類の選択は解除
   const selCat = el.__mkCat || "";
   const shown = selCat ? tasks.filter(t => String(t.category ?? "").trim() === selCat) : tasks;
 
-  const filterHtml = cats.length >= 2
+  const filterHtml = cats.length >= 1
     ? `<div class="mk-filter">
          <span class="lbl">大分類</span>
          <button class="mk-fchip ${selCat ? "" : "on"}" data-cat="">すべて ${tasks.length}</button>
