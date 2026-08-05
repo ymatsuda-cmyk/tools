@@ -107,6 +107,58 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .notion-row.open-row{background:var(--accent-bg)}
 .notion-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
 .notion-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
+/* ===== 検索・件数バッジ・結果サマリー ===== */
+.search-row{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px 16px 8px;border:1px solid var(--border)}
+.search-row input{background:none;border:none;outline:none;color:var(--text2);font-size:13px;flex:1;font-family:var(--font)}
+.search-row input::placeholder{color:var(--text3)}
+.search-clear{font-size:14px;color:var(--text3);cursor:pointer;padding:2px}
+.search-clear:hover{color:var(--text2)}
+
+.chip .cnt{font-size:10px;font-family:var(--mono);color:var(--text3);background:#f0ede6;border-radius:8px;padding:1px 6px;min-width:16px;text-align:center;margin-left:4px}
+.chip.active .cnt{background:rgba(255,255,255,.25);color:#fff}
+.chip.fav-chip{border-color:#d97706;color:#d97706}
+.chip.fav-chip.active{background:#d97706;border-color:#d97706;color:#fff}
+
+.result-bar{padding:9px 16px;background:#f5f3ee;border-bottom:1px solid var(--border);display:none}
+.result-bar.show{display:block}
+.result-bar-top{display:flex;align-items:center;gap:8px}
+.result-text{font-size:12px;color:var(--text2)}
+.result-text strong{color:var(--text);font-weight:700;font-family:var(--mono)}
+.result-clear{margin-left:auto;font-size:11px;color:var(--accent);font-weight:700;cursor:pointer;white-space:nowrap}
+.active-filters{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.active-pill{font-size:11px;font-weight:600;padding:2px 6px 2px 9px;border-radius:12px;background:var(--surface);border:1px solid var(--border2);color:var(--text2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.active-pill .x{color:var(--text3);font-size:12px}
+
+.art-title mark{background:#fef08a;color:var(--text);padding:0 1px;border-radius:2px}
+
+.empty-result{text-align:center;padding:50px 24px;color:var(--text3)}
+.empty-result .icon{font-size:36px;margin-bottom:12px}
+.empty-result h4{font-size:14px;color:var(--text2);margin-bottom:6px;font-weight:700}
+.empty-result p{font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:14px}
+.empty-reset{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--accent);padding:6px 14px;border-radius:8px;border:1.5px solid #c7d9fb;background:var(--accent-bg);cursor:pointer}
+
+.fav-row{position:relative}
+.fav-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#d97706}
+.fav-star-badge{position:absolute;bottom:-1px;right:-1px;font-size:11px;background:#fff;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+
+.tag-panel{background:var(--surface);border:1.5px solid var(--border2);border-radius:10px;padding:12px;margin-top:10px}
+.tag-panel-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:8px}
+.tag-options{display:flex;gap:6px;flex-wrap:wrap}
+.tag-opt{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid var(--border2);color:var(--text3);background:transparent;cursor:pointer}
+.tag-opt.selected{background:var(--accent);border-color:var(--accent);color:#fff}
+.tag-confirm{margin-top:10px;width:100%;font-size:12px;font-weight:700;padding:8px;border-radius:8px;background:var(--text);color:#fff;border:none;cursor:pointer}
+
+.pub-panel{background:var(--surface);border:1.5px solid var(--border2);border-radius:10px;padding:12px;margin-top:10px}
+.pub-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:8px}
+.pub-options{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.pub-opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+.pub-opt input[type=checkbox]{width:16px;height:16px}
+.pub-url{background:var(--bg);border-radius:7px;padding:8px 10px;font-size:11px;color:var(--text3);font-family:var(--mono);word-break:break-all;margin-bottom:8px;display:none}
+.pub-url.show{display:block}
+.pub-copy{width:100%;font-size:12px;font-weight:700;padding:8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+
+.unread-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px;margin-right:-4px}
+
 .fav-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;transition:transform .15s;flex-shrink:0}
 .fav-btn:hover{transform:scale(1.2)}
 .read-dim .art-title{color:var(--text3)}
@@ -200,7 +252,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <button class="btn-log" onclick="toggleDrawer()">📅</button>
     <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
     <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
-    <button class="btn btn-ghost" onclick="openJsonModal()">📋</button>
   </div>
 </header>
 
@@ -236,16 +287,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
     <!-- パーソナル -->
     <div id="tab-personal" style="display:none">
-      <div class="subbar">
-        <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて</button>
-        <button class="chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り</button>
-        <button class="chip" onclick="setPersonalFilter(this,'unread')">未読</button>
-        <div class="subbar-right">
-          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
-          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
-          <span class="count-lbl" id="personalCount">— 件</span>
+      <div class="subbar" style="flex-direction:column;align-items:stretch;padding:0 0 8px">
+        <div class="search-row">
+          <span style="color:var(--text3);font-size:14px">🔍</span>
+          <input type="text" id="personalSearch" placeholder="記事を検索..." oninput="onPersonalSearch()">
+          <span class="search-clear" id="searchClearBtn" style="display:none" onclick="clearPersonalSearch()">✕</span>
         </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:0 16px">
+          <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて <span class="cnt" id="cnt-all">0</span></button>
+          <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り <span class="cnt" id="cnt-fav">0</span></button>
+          <button class="chip" onclick="setPersonalFilter(this,'unread')">未読 <span class="cnt" id="cnt-unread">0</span></button>
+          <div class="subbar-right">
+            <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
+            <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
+          </div>
+        </div>
+        <div id="tagChipsRow" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 16px 0"></div>
       </div>
+
+      <!-- 結果サマリーバー -->
+      <div class="result-bar" id="resultBar">
+        <div class="result-bar-top">
+          <span class="result-text" id="resultText"></span>
+          <span class="result-clear" onclick="clearAllPersonalFilters()">✕ クリア</span>
+        </div>
+        <div class="active-filters" id="activeFiltersRow"></div>
+      </div>
+
       <div class="notion-list" id="notionList"></div>
     </div>
 
@@ -318,6 +386,10 @@ var personalArts = [];
 var openNewsIdx = -1, openPersonalIdx = -1;
 var regionFilter = 'all', catFilter = 'all', personalFilter = 'all';
 var personalDateFilter = '';
+var personalSearchQuery = '';
+var personalTagFilter = '';
+var openTagEditIdx = -1;
+var openPubPanelIdx = -1;
 var curTab  = 'news';
 var curDate = '';
 var favIds  = new Set(JSON.parse(localStorage.getItem('p_favs')  || '[]'));
@@ -660,13 +732,145 @@ async function syncPersonal(){
 }
 
 function renderPersonal(){
-  var list=getPersonalFiltered();
-  document.getElementById('personalCount').textContent=list.length+'件';
-  var el=document.getElementById('notionList');
-  if(!list.length){ el.innerHTML='<div class="empty"><div class="icon">🔖</div><h3>記事がありません</h3><p>「＋ 追加」から登録するか🔄で同期してください</p></div>'; return; }
-  el.innerHTML=list.map((a,i)=>renderPersonalItem(a,i)).join('');
+  var list = getPersonalFiltered();
+  var el = document.getElementById('notionList');
+
+  updateFilterCounts();
+  renderTagChips();
+  updateResultBar();
+
+  if(!list.length){
+    if(hasActiveFilters()){
+      el.innerHTML = '<div class="empty-result"><div class="icon">🔍</div><h4>該当する記事がありません</h4><p>検索語やフィルターの<br>組み合わせを見直してみてください</p><div class="empty-reset" onclick="clearAllPersonalFilters()">↺ フィルターをリセット</div></div>';
+    } else {
+      el.innerHTML = '<div class="empty"><div class="icon">🔖</div><h3>記事がありません</h3><p>「＋ 追加」から登録するか🔄で同期してください</p></div>';
+    }
+    return;
+  }
+  el.innerHTML = list.map((a,i)=>renderPersonalItem(a,i)).join('');
 }
 
+// ================================================================
+// 件数バッジ更新（フィルターチップの数字）
+// ================================================================
+function updateFilterCounts(){
+  var base = personalDateFilter ? personalArts.filter(a=>a.addedAt===personalDateFilter) : personalArts;
+  var searched = applySearch(base, personalSearchQuery);
+
+  document.getElementById('cnt-all').textContent    = searched.length;
+  document.getElementById('cnt-fav').textContent    = searched.filter(a=>favIds.has(a.notionId)).length;
+  document.getElementById('cnt-unread').textContent = searched.filter(a=>!readIds.has(a.notionId)).length;
+}
+
+// ================================================================
+// タグチップ（動的にタグ一覧を生成）
+// ================================================================
+function renderTagChips(){
+  var el = document.getElementById('tagChipsRow');
+  var base = personalDateFilter ? personalArts.filter(a=>a.addedAt===personalDateFilter) : personalArts;
+  var searched = applySearch(base, personalSearchQuery);
+
+  // 全タグを集計
+  var tagCounts = {};
+  searched.forEach(function(a){
+    (a.tags||[]).forEach(function(t){ tagCounts[t] = (tagCounts[t]||0)+1; });
+  });
+  var tags = Object.keys(tagCounts).sort(function(a,b){ return tagCounts[b]-tagCounts[a]; });
+
+  if(!tags.length){ el.innerHTML=''; return; }
+
+  el.innerHTML = tags.map(function(t){
+    var active = personalTagFilter === t;
+    return '<button class="chip'+(active?' active':'')+'" onclick="setPersonalTagFilter(\''+esc(t)+'\',this)">'+esc(t)+' <span class="cnt">'+tagCounts[t]+'</span></button>';
+  }).join('');
+}
+
+function setPersonalTagFilter(tag, el){
+  personalTagFilter = (personalTagFilter === tag) ? '' : tag;
+  openPersonalIdx = -1;
+  renderPersonal();
+}
+
+// ================================================================
+// 検索
+// ================================================================
+function onPersonalSearch(){
+  personalSearchQuery = document.getElementById('personalSearch').value.trim();
+  document.getElementById('searchClearBtn').style.display = personalSearchQuery ? 'inline' : 'none';
+  openPersonalIdx = -1;
+  renderPersonal();
+}
+function clearPersonalSearch(){
+  personalSearchQuery = '';
+  document.getElementById('personalSearch').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  renderPersonal();
+}
+function applySearch(list, query){
+  if(!query) return list;
+  var q = query.toLowerCase();
+  return list.filter(function(a){
+    var title = (a.title||a.url||'').toLowerCase();
+    var summary = (a.summary||'').toLowerCase();
+    var tags = (a.tags||[]).join(' ').toLowerCase();
+    return title.includes(q) || summary.includes(q) || tags.includes(q);
+  });
+}
+function highlightMatch(text, query){
+  if(!query) return esc(text);
+  var escaped = esc(text);
+  var q = esc(query);
+  var re = new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  return escaped.replace(re, '<mark>$1</mark>');
+}
+
+// ================================================================
+// 結果サマリーバー
+// ================================================================
+function hasActiveFilters(){
+  return !!personalSearchQuery || personalFilter!=='all' || !!personalTagFilter;
+}
+function updateResultBar(){
+  var bar = document.getElementById('resultBar');
+  if(!hasActiveFilters()){ bar.classList.remove('show'); return; }
+
+  bar.classList.add('show');
+  var totalBase = personalDateFilter ? personalArts.filter(a=>a.addedAt===personalDateFilter) : personalArts;
+  var filtered  = getPersonalFiltered();
+
+  document.getElementById('resultText').innerHTML =
+    '<strong>'+filtered.length+'件</strong> 見つかりました（全'+totalBase.length+'件中）';
+
+  var pills = [];
+  if(personalSearchQuery) pills.push('<div class="active-pill" onclick="clearPersonalSearch()">🔍 "'+esc(personalSearchQuery)+'" <span class="x">✕</span></div>');
+  if(personalFilter==='fav') pills.push('<div class="active-pill" onclick="resetPersonalFilterChip()">⭐ お気に入り <span class="x">✕</span></div>');
+  if(personalFilter==='unread') pills.push('<div class="active-pill" onclick="resetPersonalFilterChip()">未読 <span class="x">✕</span></div>');
+  if(personalTagFilter) pills.push('<div class="active-pill" onclick="setPersonalTagFilter(\''+esc(personalTagFilter)+'\')">🏷 '+esc(personalTagFilter)+' <span class="x">✕</span></div>');
+
+  document.getElementById('activeFiltersRow').innerHTML = pills.join('');
+}
+function resetPersonalFilterChip(){
+  personalFilter = 'all';
+  document.querySelectorAll('#tab-personal .subbar > div > .chip').forEach(c=>c.classList.remove('active'));
+  var allChip = document.querySelector('#tab-personal .subbar .chip');
+  if(allChip) allChip.classList.add('active');
+  renderPersonal();
+}
+function clearAllPersonalFilters(){
+  personalSearchQuery = '';
+  personalFilter = 'all';
+  personalTagFilter = '';
+  document.getElementById('personalSearch').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  document.querySelectorAll('#tab-personal .subbar > div > .chip').forEach(c=>c.classList.remove('active'));
+  var allChip = document.querySelector('#tab-personal .subbar .chip');
+  if(allChip) allChip.classList.add('active');
+  renderPersonal();
+}
+
+// ================================================================
+// 記事アイテム描画
+// ================================================================
 function renderPersonalItem(a,i){
   var isOpen=openPersonalIdx===i, isRead=readIds.has(a.notionId), isFav=favIds.has(a.notionId);
   var domain=getDomain(a.url);
@@ -674,37 +878,129 @@ function renderPersonalItem(a,i){
   var emoji=domainEmoji(domain);
   var tags=(a.tags||[]).map(t=>'<span style="font-size:10px;padding:1px 6px;border-radius:5px;background:#f0ede8;color:var(--text2);border:1px solid var(--border)">'+esc(t)+'</span>').join('');
   var title=(a.title&&a.title.trim()&&!a.title.startsWith('http'))?a.title:(a.url||'');
+  var titleHtml = personalSearchQuery ? highlightMatch(title, personalSearchQuery) : esc(title);
+
   var h='';
-  h+='<div class="notion-row'+(isOpen?' open-row':'')+(isRead&&!isOpen?' read-dim':'')+'" onclick="togglePersonal('+i+')">';
-  h+='<div class="art-favicon">'+(fav?'<img src="'+fav+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">':emoji)+'</div>';
+  h+='<div class="notion-row'+(isOpen?' open-row':'')+(isRead&&!isOpen?' read-dim':'')+(isFav?' fav-row':'')+'" onclick="togglePersonal('+i+')">';
+  h+='<div class="art-favicon" style="position:relative">'+(fav?'<img src="'+fav+'" onerror="this.parentNode.innerHTML=\''+emoji+'\'">':emoji)+(isFav?'<span class="fav-star-badge">⭐</span>':'')+'</div>';
   h+='<div class="art-body">';
-  h+='<div class="art-title">'+(isFav?'<span style="color:#f59e0b;margin-right:3px">⭐</span>':'')+esc(title)+'</div>';
-  h+='<div class="art-meta"><span class="meta-date">'+fmtDate(a.addedAt)+'</span>'+(domain?'<span class="meta-sep">·</span><span class="meta-src">'+esc(domain)+'</span>':'')+(isRead&&!isOpen?'<span style="font-size:10px;color:var(--text3);margin-left:4px">既読</span>':'')+'</div>';
+  if(!isRead && !isOpen) h = h.replace('<div class="art-body">','<div class="art-body">'); // placeholder (dot handled below)
+  h+='<div class="art-title">'+titleHtml+'</div>';
+  h+='<div class="art-meta">'+(!isRead?'<span class="unread-dot" style="display:inline-block;margin-right:2px"></span>':'')+'<span class="meta-date">'+fmtDate(a.addedAt)+'</span>'+(domain?'<span class="meta-sep">·</span><span class="meta-src">'+esc(domain)+'</span>':'')+(isRead&&!isOpen?'<span style="font-size:10px;color:var(--text3);margin-left:4px">既読</span>':'')+'</div>';
   if(tags) h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+tags+'</div>';
   h+='</div><span class="art-chevron" style="font-size:10px;color:var(--text3);transition:transform .2s;'+(isOpen?'transform:rotate(180deg)':'')+'">▼</span></div>';
+
   h+='<div class="notion-acc'+(isOpen?' open':'')+'">';
   if(a.summary) h+='<div class="acc-summary-box"><div class="acc-lbl blue">📝 要約</div><div class="acc-text">'+esc(a.summary)+'</div></div>';
   if(a.kaisetsu) h+='<div class="acc-note-box"><div class="acc-lbl amber">💡 解説</div><div class="acc-text">'+esc(a.kaisetsu)+'</div></div>';
   if(a.katsuyo) h+='<div class="acc-impact-box"><div class="acc-lbl green">🚀 活用アイデア</div><div class="acc-text">'+esc(a.katsuyo)+'</div></div>';
   if(!a.summary&&!a.kaisetsu) h+='<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px">要約未生成</div>';
-  h+='<div class="acc-actions"><button class="fav-btn" onclick="toggleFav(\''+esc(a.notionId)+'\',event)">'+(isFav?'⭐':'☆')+'</button>';
-  h+='<a class="acc-link" href="'+esc(a.url)+'" target="_blank" rel="noopener" onclick="markRead(\''+esc(a.notionId)+'\');event.stopPropagation()">🔗 開く</a></div>';
+
+  // タグ編集パネル（開いている場合のみ表示制御はJS側で行う。ここでは非表示のプレースホルダ）
+  if(openTagEditIdx === i){
+    h += renderTagPanel(a);
+  }
+  if(openPubPanelIdx === i){
+    h += renderPubPanel(a);
+  }
+
+  h+='<div class="acc-actions">';
+  h+='<button class="fav-btn" onclick="toggleFav(\''+esc(a.notionId)+'\',event)">'+(isFav?'⭐':'☆')+'</button>';
+  h+='<a class="acc-link" href="'+esc(a.url)+'" target="_blank" rel="noopener" onclick="markRead(\''+esc(a.notionId)+'\');event.stopPropagation()">🔗 開く</a>';
+  h+='<button class="acc-link" style="background:none;cursor:pointer;font-family:var(--font)" onclick="toggleTagPanel('+i+',event)">🏷 タグ編集</button>';
+  h+='<button class="acc-link" style="background:none;cursor:pointer;font-family:var(--font)" onclick="togglePubPanel('+i+',event)">🌐 公開</button>';
+  h+='</div>';
   h+='</div>';
   return h;
 }
 
+// ================================================================
+// タグ編集パネル
+// ================================================================
+var ALL_TAG_OPTIONS = ['AI','ロボット','ビジネス','技術','政策','経済','その他'];
+
+function renderTagPanel(a){
+  var current = a.tags || [];
+  var opts = ALL_TAG_OPTIONS.map(function(t){
+    var sel = current.includes(t);
+    return '<div class="tag-opt'+(sel?' selected':'')+'" onclick="toggleTagOption(this,\''+esc(t)+'\')">'+esc(t)+'</div>';
+  }).join('');
+  return '<div class="tag-panel" onclick="event.stopPropagation()">'
+    + '<div class="tag-panel-title">🏷 タグを編集</div>'
+    + '<div class="tag-options" id="tagOptionsBox">'+opts+'</div>'
+    + '<button class="tag-confirm" onclick="confirmTagEdit(\''+esc(a.notionId)+'\',event)">確定</button>'
+    + '</div>';
+}
+function toggleTagOption(el, tag){
+  el.classList.toggle('selected');
+}
+function toggleTagPanel(i, e){
+  e && e.stopPropagation();
+  openTagEditIdx = (openTagEditIdx === i) ? -1 : i;
+  openPubPanelIdx = -1;
+  renderPersonal();
+}
+async function confirmTagEdit(id, e){
+  e && e.stopPropagation();
+  var selected = Array.from(document.querySelectorAll('#tagOptionsBox .tag-opt.selected')).map(el=>el.textContent.trim());
+  var a = personalArts.find(a=>a.notionId===id);
+  if(a) a.tags = selected;
+  saveLocal();
+  openTagEditIdx = -1;
+  renderPersonal();
+  showToast('✅ タグを更新しました');
+  if(GAS_URL){
+    try{ await fetch(GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'updateBookmark',pageId:id,data:{tags:selected}})}); }
+    catch(e){ showToast('⚠️ Notion反映失敗'); }
+  }
+}
+
+// ================================================================
+// 公開パネル
+// ================================================================
+function renderPubPanel(a){
+  var pubId = a.notionId ? a.notionId.replace(/-/g,'') : '';
+  var url = 'https://ymatsuda-cmyk.github.io/tools/shared/'+pubId+'.html';
+  return '<div class="pub-panel" onclick="event.stopPropagation()">'
+    + '<div class="pub-title">🌐 公開設定</div>'
+    + '<div class="pub-options">'
+    +   '<label class="pub-opt"><input type="checkbox" id="pubSummary" checked> 要約を公開</label>'
+    +   '<label class="pub-opt"><input type="checkbox" id="pubKaisetsu" checked> 解説を公開</label>'
+    +   '<label class="pub-opt"><input type="checkbox" id="pubKatsuyo"> 活用アイデアを公開</label>'
+    + '</div>'
+    + '<div class="pub-url show" id="pubUrlBox">'+url+'</div>'
+    + '<button class="pub-copy" onclick="copyPublishLink(\''+esc(url)+'\')">📋 リンクをコピー</button>'
+    + '</div>';
+}
+function togglePubPanel(i, e){
+  e && e.stopPropagation();
+  openPubPanelIdx = (openPubPanelIdx === i) ? -1 : i;
+  openTagEditIdx = -1;
+  renderPersonal();
+}
+function copyPublishLink(url){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){ showToast('📋 リンクをコピーしました'); });
+  } else {
+    showToast('📋 '+url);
+  }
+}
+
 function togglePersonal(i){
   openPersonalIdx=openPersonalIdx===i?-1:i;
+  openTagEditIdx=-1; openPubPanelIdx=-1;
   if(openPersonalIdx!==-1){ var list=getPersonalFiltered(); if(list[i]) markRead(list[i].notionId); }
   renderPersonal();
 }
 function setPersonalFilter(el,f){
-  document.querySelectorAll('#tab-personal .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#tab-personal .subbar > div > .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active'); personalFilter=f; openPersonalIdx=-1; renderPersonal();
 }
 function getPersonalFiltered(){
   var list=personalArts;
   if(personalDateFilter) list=list.filter(a=>a.addedAt===personalDateFilter);
+  list = applySearch(list, personalSearchQuery);
+  if(personalTagFilter) list=list.filter(a=>(a.tags||[]).includes(personalTagFilter));
   if(personalFilter==='fav')    list=list.filter(a=>favIds.has(a.notionId));
   if(personalFilter==='unread') list=list.filter(a=>!readIds.has(a.notionId));
   return list;
