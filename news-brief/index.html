@@ -315,10 +315,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
           <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて <span class="cnt" id="cnt-all">0</span></button>
           <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り <span class="cnt" id="cnt-fav">0</span></button>
           <button class="chip" onclick="setPersonalFilter(this,'unread')">未読 <span class="cnt" id="cnt-unread">0</span></button>
-          <div class="subbar-right">
-            <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
-            <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
-          </div>
         </div>
         <div class="tag-scroll-row" id="tagChipsRow"></div>
         <div class="add-tag-panel" id="addTagPanel">
