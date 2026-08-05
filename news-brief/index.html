@@ -22,8 +22,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .hdr{height:var(--hdr);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 20px;flex-shrink:0}
 .logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:var(--text);text-decoration:none;padding-right:20px;border-right:1px solid var(--border);white-space:nowrap}
 .logo-dot{width:26px;height:26px;border-radius:6px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
-.tabs{display:flex;align-items:stretch;padding-left:4px}
-.tab{display:flex;align-items:center;gap:6px;padding:0 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border:none;background:transparent;font-family:var(--font);border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
+.tabs{display:flex;align-items:stretch;padding-left:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:0 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border:none;background:transparent;font-family:var(--font);border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
 .tab:hover{color:var(--text2)}
 .tab.active{color:var(--text);border-bottom-color:var(--accent);font-weight:700}
 .hdr-right{display:flex;align-items:center;gap:8px;margin-left:auto}
@@ -107,6 +108,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .notion-row.open-row{background:var(--accent-bg)}
 .notion-acc{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .25s;opacity:0;background:#f7f8fd;border-bottom:1px solid var(--border)}
 .notion-acc.open{max-height:none;opacity:1;padding:14px 20px 16px 76px}
+/* ===== タグ行の横スクロール ===== */
+.tag-scroll-row{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:6px 16px 4px;position:relative}
+.tag-scroll-row::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0}
+.chip.add-tag-chip{border:1.5px dashed var(--border2);color:var(--text3);background:transparent;display:inline-flex;align-items:center;gap:3px;cursor:pointer}
+.chip.add-tag-chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* タグ追加パネル */
+.add-tag-panel{margin:0 16px 8px;padding:10px 12px;background:var(--accent-bg);border:1.5px dashed #c7d9fb;border-radius:10px;display:none}
+.add-tag-panel.show{display:block}
+.add-tag-panel-title{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:6px}
+.add-tag-row{display:flex;gap:6px}
+.add-tag-input{flex:1;border:1.5px solid var(--border2);border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--font);outline:none;background:var(--surface);color:var(--text)}
+.add-tag-input:focus{border-color:var(--accent)}
+.add-tag-btn{font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+
 /* ===== 検索・件数バッジ・結果サマリー ===== */
 .search-row{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:10px;padding:9px 12px;margin:10px 16px 8px;border:1px solid var(--border)}
 .search-row input{background:none;border:none;outline:none;color:var(--text2);font-size:13px;flex:1;font-family:var(--font)}
@@ -247,11 +264,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <button class="tab active" onclick="switchTab('news',this)">ニュース</button>
     <button class="tab" onclick="switchTab('ideas',this)">活用</button>
     <button class="tab" onclick="switchTab('personal',this)">パーソナル</button>
+    <button class="tab" onclick="switchTab('history',this)">履歴</button>
+    <button class="tab" onclick="switchTab('settings',this)">設定</button>
   </nav>
   <div class="hdr-right">
-    <button class="btn-log" onclick="toggleDrawer()">履歴</button>
-    <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
     <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
+    <button class="btn btn-ghost" onclick="openJsonModal()">📋</button>
   </div>
 </header>
 
@@ -262,8 +280,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <div id="tab-news">
       <div class="subbar">
         <button class="chip active" onclick="setRegion(this,'all')">すべて</button>
-        <button class="chip" onclick="setRegion(this,'global')">🌍 グローバル</button>
-        <button class="chip" onclick="setRegion(this,'domestic')">🇯🇵 国内</button>
+        <button class="chip" onclick="setRegion(this,'global')">グローバル</button>
+        <button class="chip" onclick="setRegion(this,'domestic')">国内</button>
         <span style="color:var(--border2);font-size:12px;margin:0 2px">|</span>
         <button class="chip cat-chip active" onclick="setCat(this,'all')">全て</button>
         <button class="chip cat-chip" onclick="setCat(this,'policy')">政策</button>
@@ -281,7 +299,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
     <!-- 活用アイデア -->
     <div id="tab-ideas" style="display:none">
-      <div class="subbar"><span style="font-size:13px;color:var(--text2);font-weight:600">💡 活用アイデア</span><div class="subbar-right"><span class="count-lbl" id="ideaCount">— 件</span></div></div>
+      <div class="subbar"><span style="font-size:13px;color:var(--text2);font-weight:600">活用アイデア</span><div class="subbar-right"><span class="count-lbl" id="ideaCount">— 件</span></div></div>
       <div class="idea-grid" id="ideaGrid"></div>
     </div>
 
@@ -293,16 +311,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
           <input type="text" id="personalSearch" placeholder="記事を検索..." oninput="onPersonalSearch()">
           <span class="search-clear" id="searchClearBtn" style="display:none" onclick="clearPersonalSearch()">✕</span>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:0 16px">
+        <div style="display:flex;gap:6px;align-items:center;padding:0 16px">
           <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて <span class="cnt" id="cnt-all">0</span></button>
-          <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐  <span class="cnt" id="cnt-fav">0</span></button>
+          <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り <span class="cnt" id="cnt-fav">0</span></button>
           <button class="chip" onclick="setPersonalFilter(this,'unread')">未読 <span class="cnt" id="cnt-unread">0</span></button>
           <div class="subbar-right">
             <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
             <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="openNotionAddModal()">＋ 追加</button>
           </div>
         </div>
-        <div id="tagChipsRow" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 16px 0"></div>
+        <div class="tag-scroll-row" id="tagChipsRow"></div>
+        <div class="add-tag-panel" id="addTagPanel">
+          <div class="add-tag-panel-title">＋ 新しいタグを作成</div>
+          <div class="add-tag-row">
+            <input class="add-tag-input" id="newTagInput" placeholder="例: 経済、教育..." onkeydown="if(event.key==='Enter')confirmNewTag()">
+            <button class="add-tag-btn" onclick="confirmNewTag()">追加</button>
+          </div>
+        </div>
       </div>
 
       <!-- 結果サマリーバー -->
@@ -317,17 +342,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
       <div class="notion-list" id="notionList"></div>
     </div>
 
-  </div>
-</div>
+    <!-- 履歴タブ -->
+    <div id="tab-history" style="display:none">
+      <div class="subbar"><span style="font-size:13px;color:var(--text2);font-weight:600">📅 過去ログ</span></div>
+      <div class="tl" id="tl"></div>
+    </div>
 
-<!-- ドロワー -->
-<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <div class="drawer-header">
-    <span class="drawer-title">過去ログ</span>
-    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    <!-- 設定タブ -->
+    <div id="tab-settings" style="display:none">
+      <div class="subbar"><span style="font-size:13px;color:var(--text2);font-weight:600">⚙️ 設定</span></div>
+      <div style="padding:16px;max-width:480px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:8px">GAS URL（パーソナル用）</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="text" class="setup-input" id="gasUrlInput" placeholder="https://script.google.com/macros/s/...">
+          <button class="btn btn-primary" onclick="saveGasUrl()">保存</button>
+        </div>
+        <p class="setup-note" style="margin-bottom:20px">ニュースは <code>data/yyyymmdd.json</code> から自動取得します。</p>
+        <button class="btn btn-ghost" style="color:#dc2626;border-color:#fecaca;width:100%;justify-content:center;padding:9px" onclick="clearPersonalCache()">🗑 キャッシュクリア</button>
+      </div>
+    </div>
+
   </div>
-  <div class="tl" id="tl"></div>
 </div>
 
 <!-- JSON投入モーダル -->
@@ -352,22 +387,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeNotionAddModal()">キャンセル</button>
       <button class="btn btn-primary" id="nSaveBtn" onclick="saveNotionArticle()">💾 保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- セットアップ -->
-<div class="setup-ov" id="setupOv">
-  <div class="setup-box">
-    <div class="setup-title">⚙️ 設定</div>
-    <div class="setup-row">
-      <input type="text" class="setup-input" id="gasUrlInput" placeholder="GAS URL（パーソナル用）">
-      <button class="btn btn-primary" onclick="saveGasUrl()">保存</button>
-    </div>
-    <p class="setup-note">ニュースは <code>data/yyyymmdd.json</code> から自動取得します。</p>
-    <div style="margin-top:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost" style="color:#dc2626;border-color:#fecaca" onclick="clearPersonalCache()">🗑 キャッシュクリア</button>
-      <button class="btn btn-ghost" onclick="toggleSetup()">閉じる</button>
     </div>
   </div>
 </div>
@@ -697,11 +716,12 @@ function renderIdeas(){
 // パーソナル
 // ================================================================
 async function syncPersonal(){
-  if(!GAS_URL){ toggleSetup(); return; }
+  if(!GAS_URL){ goToSettings(); return; }
   var btn=document.getElementById('syncBtn');
   btn.innerHTML='<span class="spinner spinner-w"></span>'; btn.disabled=true;
   try{
-    var res = await fetch(GAS_URL+'?action=getDates',{redirect:'follow'});
+    var res = await fetch(GAS_URL+'?action=getDates&_t='+Date.now(),{redirect:'follow',cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status+' (getDates)');
     var json = await res.json();
     if(json.error) throw new Error(json.error);
     var remoteDates = json.dates||{};
@@ -721,7 +741,8 @@ async function syncPersonal(){
     var addedCount=0;
     for(var i=0;i<newDates.length;i++){
       var date=newDates[i];
-      var r2=await fetch(GAS_URL+'?action=getBookmarksByDate&date='+date,{redirect:'follow'});
+      var r2=await fetch(GAS_URL+'?action=getBookmarksByDate&date='+date+'&_t='+Date.now(),{redirect:'follow',cache:'no-store'});
+      if(!r2.ok) continue;
       var j2=await r2.json();
       if(j2.error) continue;
       personalArts=personalArts.filter(function(a){return a.addedAt!==date;});
@@ -778,19 +799,24 @@ function renderTagChips(){
   var base = personalDateFilter ? personalArts.filter(a=>a.addedAt===personalDateFilter) : personalArts;
   var searched = applySearch(base, personalSearchQuery);
 
-  // 全タグを集計
+  // 全タグを集計（記事に付いているタグ + カスタムタグ一覧をマージ）
   var tagCounts = {};
   searched.forEach(function(a){
     (a.tags||[]).forEach(function(t){ tagCounts[t] = (tagCounts[t]||0)+1; });
   });
+  // 記事がまだ0件のカスタムタグも一覧に出す（件数0で表示）
+  customTags.forEach(function(t){ if(!(t in tagCounts)) tagCounts[t] = 0; });
+
   var tags = Object.keys(tagCounts).sort(function(a,b){ return tagCounts[b]-tagCounts[a]; });
 
-  if(!tags.length){ el.innerHTML=''; return; }
-
-  el.innerHTML = tags.map(function(t){
+  var html = tags.map(function(t){
     var active = personalTagFilter === t;
     return '<button class="chip'+(active?' active':'')+'" onclick="setPersonalTagFilter(\''+esc(t)+'\',this)">'+esc(t)+' <span class="cnt">'+tagCounts[t]+'</span></button>';
   }).join('');
+
+  html += '<button class="chip add-tag-chip" onclick="toggleAddTagPanel()">＋ タグ追加</button>';
+
+  el.innerHTML = html;
 }
 
 function setPersonalTagFilter(tag, el){
@@ -925,11 +951,16 @@ function renderPersonalItem(a,i){
 // ================================================================
 // タグ編集パネル
 // ================================================================
-var ALL_TAG_OPTIONS = ['AI','ロボット','ビジネス','技術','政策','経済','その他'];
+var ALL_TAG_OPTIONS_BASE = ['AI','ロボット','ビジネス','技術','政策','経済','その他'];
+function getAllTagOptions(){
+  var merged = ALL_TAG_OPTIONS_BASE.slice();
+  customTags.forEach(function(t){ if(!merged.includes(t)) merged.push(t); });
+  return merged;
+}
 
 function renderTagPanel(a){
   var current = a.tags || [];
-  var opts = ALL_TAG_OPTIONS.map(function(t){
+  var opts = getAllTagOptions().map(function(t){
     var sel = current.includes(t);
     return '<div class="tag-opt'+(sel?' selected':'')+'" onclick="toggleTagOption(this,\''+esc(t)+'\')">'+esc(t)+'</div>';
   }).join('');
@@ -1029,7 +1060,7 @@ document.getElementById('notionAddModal').addEventListener('click',e=>{if(e.targ
 async function saveNotionArticle(){
   var url=document.getElementById('nUrl').value.trim(), title=document.getElementById('nTitle').value.trim(), tags=document.getElementById('nTags').value.trim();
   if(!url||!title){ showToast('⚠️ URLとタイトルは必須'); return; }
-  if(!GAS_URL){ showToast('⚠️ GAS URLを設定してください'); toggleSetup(); return; }
+  if(!GAS_URL){ showToast('⚠️ GAS URLを設定してください'); goToSettings(); return; }
   var btn=document.getElementById('nSaveBtn'); btn.innerHTML='<span class="spinner spinner-w"></span>'; btn.disabled=true;
   try{
     var res=await fetch(GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addBookmark',data:{title,url,tags:tags?tags.split(',').map(t=>t.trim()).filter(Boolean):[]}})});
@@ -1040,31 +1071,51 @@ async function saveNotionArticle(){
 }
 
 // ================================================================
-// タブ・ドロワー
+// タブ切り替え
 // ================================================================
+function goToSettings(){
+  var btn = document.querySelector('.tab[onclick*="settings"]');
+  if(btn) switchTab('settings', btn);
+}
 function switchTab(tab,el){
-  ['news','ideas','personal'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+  ['news','ideas','personal','history','settings'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active'); curTab=tab; closeDrawer();
+  el.classList.add('active'); curTab=tab;
   if(tab==='ideas') renderIdeas();
   if(tab==='personal'){ if(GAS_URL) syncPersonal(); else renderPersonal(); }
+  if(tab==='history') buildTimeline();
+  if(tab==='settings' && GAS_URL) document.getElementById('gasUrlInput').value = GAS_URL;
 }
-function toggleDrawer(){
-  var d=document.getElementById('drawer'), o=document.getElementById('drawerOverlay');
-  if(d.classList.contains('open')){ closeDrawer(); }
-  else { buildTimeline(); d.classList.add('open'); o.classList.add('open'); }
+
+// ================================================================
+// タグ新規追加
+// ================================================================
+var customTags = JSON.parse(localStorage.getItem('p_custom_tags')||'[]');
+
+function toggleAddTagPanel(){
+  var panel = document.getElementById('addTagPanel');
+  panel.classList.toggle('show');
+  if(panel.classList.contains('show')){
+    setTimeout(()=>document.getElementById('newTagInput').focus(), 50);
+  }
 }
-function closeDrawer(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('drawerOverlay').classList.remove('open');
+function confirmNewTag(){
+  var input = document.getElementById('newTagInput');
+  var tag = input.value.trim();
+  if(!tag){ showToast('⚠️ タグ名を入力してください'); return; }
+  if(!customTags.includes(tag)) customTags.push(tag);
+  localStorage.setItem('p_custom_tags', JSON.stringify(customTags));
+  input.value = '';
+  document.getElementById('addTagPanel').classList.remove('show');
+  personalTagFilter = tag;
+  renderPersonal();
+  showToast('✅ タグ「'+tag+'」を追加しました');
 }
 
 // ================================================================
 // セットアップ・キャッシュ
 // ================================================================
-function toggleSetup(){ document.getElementById('setupOv').classList.toggle('show'); }
-document.getElementById('setupOv').addEventListener('click',e=>{if(e.target===e.currentTarget)toggleSetup();});
-function saveGasUrl(){ GAS_URL=document.getElementById('gasUrlInput').value.trim(); if(!GAS_URL){showToast('⚠️ URLを入力');return;} localStorage.setItem('bm_gas_url',GAS_URL); showToast('✅ 保存しました'); toggleSetup(); }
+function saveGasUrl(){ GAS_URL=document.getElementById('gasUrlInput').value.trim(); if(!GAS_URL){showToast('⚠️ URLを入力');return;} localStorage.setItem('bm_gas_url',GAS_URL); showToast('✅ 保存しました'); }
 function clearPersonalCache(){
   if(!confirm('パーソナルタブのキャッシュ（記事一覧・お気に入り・既読状態・同期記録）を全て削除します。よろしいですか？')) return;
   localStorage.removeItem('bm_personal');
@@ -1076,7 +1127,6 @@ function clearPersonalCache(){
   readIds = new Set();
   syncedDates = {};
   showToast('🗑 キャッシュを削除しました');
-  toggleSetup();
   if(curTab === 'personal') syncPersonal();
 }
 function saveLocal(){ try{localStorage.setItem('bm_personal',JSON.stringify(personalArts));}catch(e){} }
