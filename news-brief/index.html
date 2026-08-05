@@ -249,7 +249,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <button class="tab" onclick="switchTab('personal',this)">パーソナル</button>
   </nav>
   <div class="hdr-right">
-    <button class="btn-log" onclick="toggleDrawer()">📅</button>
+    <button class="btn-log" onclick="toggleDrawer()">履歴</button>
     <button class="btn btn-ghost" onclick="toggleSetup()">⚙️</button>
     <button class="btn btn-ghost" id="syncBtn" onclick="syncPersonal()">🔄</button>
   </div>
@@ -295,7 +295,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:0 16px">
           <button class="chip active" onclick="setPersonalFilter(this,'all')">すべて <span class="cnt" id="cnt-all">0</span></button>
-          <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐ お気に入り <span class="cnt" id="cnt-fav">0</span></button>
+          <button class="chip fav-chip" onclick="setPersonalFilter(this,'fav')">⭐  <span class="cnt" id="cnt-fav">0</span></button>
           <button class="chip" onclick="setPersonalFilter(this,'unread')">未読 <span class="cnt" id="cnt-unread">0</span></button>
           <div class="subbar-right">
             <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="syncPersonal()">🔄 同期</button>
@@ -365,7 +365,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
       <button class="btn btn-primary" onclick="saveGasUrl()">保存</button>
     </div>
     <p class="setup-note">ニュースは <code>data/yyyymmdd.json</code> から自動取得します。</p>
-    <div style="margin-top:12px;text-align:right"><button class="btn btn-ghost" onclick="toggleSetup()">閉じる</button></div>
+    <div style="margin-top:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" style="color:#dc2626;border-color:#fecaca" onclick="clearPersonalCache()">🗑 キャッシュクリア</button>
+      <button class="btn btn-ghost" onclick="toggleSetup()">閉じる</button>
+    </div>
   </div>
 </div>
 
@@ -705,6 +708,11 @@ async function syncPersonal(){
     var newDates = Object.keys(remoteDates).filter(function(date){
       return (syncedDates[date]||0) !== remoteDates[date];
     });
+    // personalArtsが空なのに「差分なし」と判定された場合は強制的に全件再取得
+    if(!newDates.length && personalArts.length === 0){
+      newDates = Object.keys(remoteDates);
+      syncedDates = {}; // 同期記録をリセットして確実に取り直す
+    }
     if(!newDates.length){
       showToast('✅ 最新です');
       btn.innerHTML='🔄'; btn.disabled=false;
@@ -1057,6 +1065,20 @@ function closeDrawer(){
 function toggleSetup(){ document.getElementById('setupOv').classList.toggle('show'); }
 document.getElementById('setupOv').addEventListener('click',e=>{if(e.target===e.currentTarget)toggleSetup();});
 function saveGasUrl(){ GAS_URL=document.getElementById('gasUrlInput').value.trim(); if(!GAS_URL){showToast('⚠️ URLを入力');return;} localStorage.setItem('bm_gas_url',GAS_URL); showToast('✅ 保存しました'); toggleSetup(); }
+function clearPersonalCache(){
+  if(!confirm('パーソナルタブのキャッシュ（記事一覧・お気に入り・既読状態・同期記録）を全て削除します。よろしいですか？')) return;
+  localStorage.removeItem('bm_personal');
+  localStorage.removeItem('p_favs');
+  localStorage.removeItem('p_reads');
+  localStorage.removeItem('p_synced_dates');
+  personalArts = [];
+  favIds = new Set();
+  readIds = new Set();
+  syncedDates = {};
+  showToast('🗑 キャッシュを削除しました');
+  toggleSetup();
+  if(curTab === 'personal') syncPersonal();
+}
 function saveLocal(){ try{localStorage.setItem('bm_personal',JSON.stringify(personalArts));}catch(e){} }
 function loadLocal(){ try{personalArts=JSON.parse(localStorage.getItem('bm_personal')||'[]');}catch(e){personalArts=[];} }
 
