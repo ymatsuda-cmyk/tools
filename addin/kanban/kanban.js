@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260806_175b067";
+const APP_VERSION = "rev_20260806_b4e7d10";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -93,14 +93,33 @@ window.ApiConfig.onNoteSaved = () => {
 };
 window.ApiConfig.onTaskAdded = () => init();
 
+/* ============================================================
+   DOM の準備を待つ
+   ------------------------------------------------------------
+   Excel on the web では Office.onReady が DOM の解析より先に
+   解決することがある。kanban.js は <head> で読み込まれるため、
+   その場合 document.getElementById() が null を返し、
+   bindStaticUI() の中で TypeError になって初期化が丸ごと止まる。
+   （症状：ペインが空白のまま／フィルタが効かない）
+   ============================================================ */
+function whenDomReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
 if (window.Office && Office.onReady) {
   Office.onReady(() => {
-    restoreSavedFilters();
-    restoreHeldDisplay();
-    restoreAllDoneDisplay();
-    restoreTabState();
-    bindStaticUI();
-    init();
+    whenDomReady(() => {
+      restoreSavedFilters();
+      restoreHeldDisplay();
+      restoreAllDoneDisplay();
+      restoreTabState();
+      bindStaticUI();
+      init();
+    });
   });
 } else {
   // ブラウザ直接表示（開発確認用）: Excel連携なしでUIのみ初期化
@@ -137,23 +156,28 @@ function bindStaticUI() {
   const input = document.getElementById("search-input");
   const clearBtn = document.getElementById("search-clear");
 
-  input.addEventListener("input", () => {
-    searchQuery = input.value.trim();
-    renderBoard();
-  });
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      input.value = "";
+  // 要素が無くても初期化チェーンを止めない（1つの null で全機能が死ぬのを防ぐ）
+  if (input) {
+    input.addEventListener("input", () => {
+      searchQuery = input.value.trim();
+      renderBoard();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        input.value = "";
+        searchQuery = "";
+        renderBoard();
+      }
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (input) input.value = "";
       searchQuery = "";
       renderBoard();
-    }
-  });
-  clearBtn.addEventListener("click", () => {
-    input.value = "";
-    searchQuery = "";
-    renderBoard();
-    input.focus();
-  });
+      if (input) input.focus();
+    });
+  }
 
   // 期間セグメント
   document.querySelectorAll("#seg-period button").forEach(b => {
