@@ -20,7 +20,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260806_b4e7d10";
+const APP_VERSION = "rev_20260806_c9f2e58";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -2649,10 +2649,125 @@ function shiftGanttTerm(d) { ganttTerm += d; saveGanttCookie(); renderSched(); }
 function setGanttZoom(m) { ganttZoom = m; saveGanttCookie(); renderSched(); }
 function toggleGanttHideDone(cb) { ganttHideDone = cb.checked; saveGanttCookie(); renderSched(); }
 
+/* ============================================================
+   ① 案件行をクリックしたときの WBSタスク展開
+   ------------------------------------------------------------
+   小分類 = その案件ID のタスクを抽出し、1件1行の「線」と
+   リストを案件行の直下に差し込む。描画部品は api.js と共有。
+   ============================================================ */
+let schedExpandedId = null;
+let schedExpandTasks = [];
+let schedShowLeave = false;
+let schedExpandMeta = null;
+
+async function toggleSchedExpand(id) {
+  if (schedExpandedId === id) {
+    schedExpandedId = null;
+    schedExpandTasks = [];
+    schedExpandMeta = null;
+    renderSched();
+    return;
+  }
+  schedExpandedId = id;
+  schedExpandTasks = [];
+  schedExpandMeta = null;
+  if (typeof fetchWbsTasks === "function" && typeof matchByCaseId === "function") {
+    try {
+      schedExpandTasks = await fetchWbsTasks(matchByCaseId(id));
+    } catch (e) {
+      console.warn("WBSタスクの取得に失敗:", e);
+    }
+  }
+  if (schedShowLeave && typeof loadLeaveGrid === "function") {
+    try { await loadLeaveGrid(); } catch (e) { /* 休みが読めなくてもガントは出す */ }
+  }
+  try {
+    renderSched();
+  } catch (e) {
+    console.error("スケジュールの再描画に失敗:", e);
+    schedExpandedId = null; schedExpandTasks = [];
+    renderSched();
+  }
+}
+
+/* 案件行クリック：選択（既存）＋ タスク展開 */
+function onGanttRowClick(id) {
+  onGanttSelect(id);
+  toggleSchedExpand(id);
+}
+
+async function toggleSchedLeave(cb) {
+  schedShowLeave = !!(cb && cb.checked);
+  if (schedShowLeave && typeof loadLeaveGrid === "function") {
+    try { await loadLeaveGrid(); } catch (e) { /* 同上 */ }
+  }
+  renderSched();
+}
+
 function renderSched() {
   const cont = document.getElementById("sched-container");
+  if (!cont) return;
   cont.innerHTML = ganttHtml();
   setupGantt();
+  if (typeof bindTaskLines === "function") bindTaskLines(cont);
+}
+
+/* 展開部（線＋リスト）。api.js の共通部品で描く */
+function schedExpandHtml(r, g, geo) {
+  if (schedExpandedId !== r.id) return "";
+  if (typeof taskLineRowsHtml !== "function") return "";
+  try {
+    return schedExpandHtmlInner(r, g, geo);
+  } catch (e) {
+    // 展開部だけの失敗でガント全体を壊さない
+    console.warn("タスク展開の描画に失敗:", e);
+    return `<div class="g-row wsc-listrow"><div class="g-label"></div><div class="g-track">
+      <div class="wsc-list"><div class="wsc-empty">タスクの表示に失敗しました。再読み込みしてください。</div></div>
+    </div></div>`;
+  }
+}
+
+function schedExpandHtmlInner(r, g, geo) {
+
+  const tasks = schedExpandTasks.slice().sort((a, b) => {
+    const x = a.start ? toDate(a.start) : null;
+    const y = b.start ? toDate(b.start) : null;
+    if (!x && !y) return 0;
+    if (!x) return 1;
+    if (!y) return -1;
+    return x - y;
+  });
+
+  const geom = {
+    t0: geo.t0, totalDays: geo.totalDays,
+    monthLines: geo.monthLines, todayHtml: geo.todayHtml,
+    guide: { start: g.start, end: g.end },
+    dueLimit: r.dueDate || null,
+    showActual: true,
+    showLeave: schedShowLeave,
+    showCat: true
+  };
+  const done = tasks.filter(t => t.actualEnd).length;
+  const over = r.dueDate
+    ? tasks.filter(t => t.end && toDate(t.end) > r.dueDate).length : 0;
+
+  // リストはガントの外（ズームで横に伸びないように）へ回す
+  schedExpandMeta = {
+    tasks, showCat: true, bare: true, dueLimit: r.dueDate || null,
+    title: `${r.id}　${r.client}　${r.content || ""}`,
+    meta: `${r.status} ／ タスク ${tasks.length}件 ／ 完了 ${done}件`
+          + (over ? ` ／ 完了予定日を超過 ${over}件` : ""),
+    hint: `「＋ タスク追加」で小分類に ${r.id} を入れて登録すると、この行に並びます。`
+  };
+  return taskLineRowsHtml(tasks, geom);
+}
+
+/* ガントの外に出すリスト。ズーム倍率の影響を受けない */
+function schedExpandListHtml() {
+  if (!schedExpandedId || !schedExpandMeta) return "";
+  if (typeof taskListHtml !== "function") return "";
+  const m = schedExpandMeta;
+  return `<div class="wsc-outlist">${taskListHtml(m.tasks, m)}</div>`;
 }
 
 /* --- 期の開始/終了日 --- */
@@ -2756,7 +2871,7 @@ function ganttHtml() {
     }
     return `
     <div class="g-row${r.id === selectedId ? " g-row-selected" : ""}" data-id="${esc(r.id)}">
-      <div class="g-label" onclick="onGanttSelect('${esc(r.id)}')"
+      <div class="g-label" onclick="onGanttRowClick('${esc(r.id)}')"
            oncontextmenu="onGanttContext(event,'${esc(r.id)}')" title="${esc(r.client)}">
         <div class="g-id">${esc(r.id)}</div>
         <div class="g-client">${esc(r.client)}</div>
@@ -2773,7 +2888,7 @@ function ganttHtml() {
         <span class="g-date g-date-e" data-i="${i}">${md(g.end)}</span>
         ${deliverHtml}
       </div>
-    </div>`;
+    </div>${schedExpandHtml(r, g, { t0, totalDays, monthLines, todayHtml })}`;
   }).join("");
 
   return `
@@ -2785,6 +2900,10 @@ function ganttHtml() {
     <label class="hours-toggle" title="完了した案件をガントから隠す">
       <input type="checkbox" id="gantt-hidedone-cb" ${ganttHideDone ? "checked" : ""}
         onchange="toggleGanttHideDone(this)"> 完了除く
+    </label>
+    <label class="hours-toggle" title="展開したタスク行に担当者の休みを重ねる">
+      <input type="checkbox" id="gantt-leave-cb" ${schedShowLeave ? "checked" : ""}
+        onchange="toggleSchedLeave(this)"> 休み
     </label>
     <span class="g-sp"></span>
     <div class="g-zoom">
@@ -2798,7 +2917,7 @@ function ganttHtml() {
         <div class="g-label g-corner">案件</div>
         <div class="g-headstack">
           <div class="g-track g-head">${monthCells}${todayChip}
-            <span class="g-pan-hint">← ドラッグで期間移動 →</span>
+            <span class="g-pan-hint">← ドラッグで期間移動 ／ 案件名クリックでタスク展開 →</span>
           </div>
           ${dateCells ? `<div class="g-track g-head g-daterow">${dateCells}</div>` : ""}
         </div>
@@ -2806,6 +2925,7 @@ function ganttHtml() {
       ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}
     </div>
   </div>
+  ${schedExpandListHtml()}
   <div class="gantt-legend">
     <span><i class="g-sw order"></i>受注（開始待ち）</span>
     <span><i class="g-sw work"></i>受託中</span>

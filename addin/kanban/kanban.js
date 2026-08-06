@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260806_a8f3d50";
+const APP_VERSION = "rev_20260806_c9f2e58";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -64,7 +64,7 @@ let showAllDone = false;          // 完了全て（OFF時は直近のみ表示�
 let searchQuery = "";
 
 /* ===== 集計タブの状態 ===== */
-let currentTab = "board";     // "board" | "agg"
+let currentTab = "board";     // "board" | "sched" | "agg"
 let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
 let aggPanelOpen = false;     // 分類フィルタ行の開閉
@@ -97,6 +97,9 @@ const FILTER_SCHEMA_VERSION = 2;
 window.ApiConfig = window.ApiConfig || {};
 window.ApiConfig.wbsSheet = "wbs";
 window.ApiConfig.eigyoSheet = "営業報告";
+// 優先度は C列に移したので、備考の先頭に ☆ を書かない
+window.ApiConfig.noteStarSymbol = false;
+window.ApiConfig.onLeaveChanged = () => { if (currentTab === "sched") renderScheduleTab(); };
 window.ApiConfig.onNoteSaved = () => {
   // api.js の saveNote() は備考先頭の★で isStar を更新するが、
   // 優先度の正は C列なので上書きされた値を戻してから再描画する。
@@ -150,6 +153,7 @@ if (window.Office && Office.onReady) {
    初期化
    ============================================================ */
 async function init() {
+  if (typeof schedRestore === "function") schedRestore();
   await loadExcelData();
   applyTabState();
   renderFilters();
@@ -157,6 +161,7 @@ async function init() {
   renderWeekButtons();
   renderBoard();
   renderAggViews();   // 集計はカンバンのフィルタと独立。データ再読込時のみ更新
+  if (currentTab === "sched") renderScheduleTab();
 
   const v = document.getElementById("version-label");
   if (v) v.textContent = APP_VERSION;
@@ -861,6 +866,16 @@ function createCard(t) {
     meta.appendChild(av);
   }
 
+  // サブタスク数（③）。0件は出さない。親が完了なのに残っていればオレンジ
+  if (typeof subtaskBadgeHtml === "function") {
+    const badge = subtaskBadgeHtml(t.note, { parentDone: t.status === "完了" });
+    if (badge) {
+      const wrap = document.createElement("span");
+      wrap.innerHTML = badge;
+      if (wrap.firstChild) meta.appendChild(wrap.firstChild);
+    }
+  }
+
   // 完了以外にスターを表示
   if (t.status !== "完了") {
     const star = document.createElement("button");
@@ -1321,7 +1336,35 @@ function switchTab(tab) {
   currentTab = tab;
   try { localStorage.setItem("kanban-tab", tab); } catch (e) { /* 保存できなくても継続 */ }
   applyTabState();
-  renderBoard();
+  if (tab === "sched") renderScheduleTab();
+  else renderBoard();
+}
+
+/* ============================================================
+   ① スケジュールタブ
+   ------------------------------------------------------------
+   描画は api.js の renderSchedule()。大分類 → 小分類 → タスクの
+   3段で、小分類をクリックするとタスクの線とリストが開く。
+   ============================================================ */
+function renderScheduleTab() {
+  const host = document.getElementById("sched-container");
+  if (!host) return;
+  if (typeof renderSchedule !== "function") {
+    host.innerHTML = '<div style="padding:14px;font-size:11px;color:#93A1AF">'
+      + 'api.js が読み込まれていないためスケジュールを表示できません。</div>';
+    return;
+  }
+  renderSchedule(host).catch((e) => {
+    console.warn("スケジュールの描画に失敗:", e);
+    host.innerHTML = '<div style="padding:14px;font-size:11px;color:#B4262B">'
+      + 'スケジュールの描画に失敗しました: ' + escapeHtml(String(e && e.message || e)) + "</div>";
+  });
+}
+
+/* ④ 個人予定（api.js のモーダル） */
+function openPersonalSchedule() {
+  if (typeof openMyLeave !== "function") return;
+  openMyLeave(null);
 }
 
 function switchAggSub(sub) {
@@ -1341,7 +1384,7 @@ function setAggAxis(axis) {
 function restoreTabState() {
   try {
     const t = localStorage.getItem("kanban-tab");
-    if (t === "board" || t === "agg") currentTab = t;
+    if (t === "board" || t === "sched" || t === "agg") currentTab = t;
     const s = localStorage.getItem("kanban-agg-sub");
     if (s === "status" || s === "delay") aggSubTab = s;
     const a = localStorage.getItem("kanban-agg-axis");
@@ -1361,16 +1404,20 @@ function restoreTabState() {
 /* 表示中タブに応じて DOM の表示状態を揃える */
 function applyTabState() {
   const isAgg = currentTab === "agg";
+  const isSched = currentTab === "sched";
 
   const board = document.getElementById("board");
-  if (board) board.classList.toggle("hidden", isAgg);
+  if (board) board.classList.toggle("hidden", isAgg || isSched);
 
   const agg = document.getElementById("agg-view");
   if (agg) agg.classList.toggle("hidden", !isAgg);
 
-  // 集計では期間・保留・完了全ては使わないため隠す
+  const sched = document.getElementById("sched-view");
+  if (sched) sched.classList.toggle("hidden", !isSched);
+
+  // 集計・スケジュールでは期間・保留・完了全ては使わないため隠す
   const bar = document.getElementById("filter-bar");
-  if (bar) bar.classList.toggle("agg-mode", isAgg);
+  if (bar) bar.classList.toggle("agg-mode", isAgg || isSched);
 
   document.querySelectorAll("#main-tabs button").forEach(b =>
     b.classList.toggle("on", b.dataset.tab === currentTab));

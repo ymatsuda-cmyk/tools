@@ -9,11 +9,11 @@
 
   <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル）
        営業報告アドインも同じファイルを読み込んで共有する -->
-  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806b">
-  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806b"></script>
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806c">
+  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806c"></script>
 
-  <script src="kanban.js?v=20260806b"></script>
-  <link rel="stylesheet" href="style.css?v=20260806b">
+  <script src="kanban.js?v=20260806c"></script>
+  <link rel="stylesheet" href="style.css?v=20260806c">
 </head>
 
 <body>
@@ -29,6 +29,7 @@
   <span class="version" id="version-label"></span>
   <span class="spacer"></span>
   <button class="btn-add" id="task-add-btn" onclick="openTaskAdd()">＋ タスク追加</button>
+  <button class="icon-btn" id="leave-btn" title="個人予定（休み）" onclick="openPersonalSchedule()">個人予定</button>
   <button class="icon-btn" title="再読み込み" onclick="init()">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
       <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -45,6 +46,7 @@
 <!-- メインタブ -->
 <div class="main-tabs" id="main-tabs">
   <button data-tab="board" class="on">カンバン</button>
+  <button data-tab="sched">スケジュール</button>
   <button data-tab="agg">集計</button>
 </div>
 
@@ -148,6 +150,11 @@
     <div class="card-list"></div>
   </div>
 
+</div>
+
+<!-- スケジュールビュー（描画は api.js の renderSchedule） -->
+<div id="sched-view" class="hidden">
+  <div id="sched-container"></div>
 </div>
 
 <!-- 集計ビュー -->
