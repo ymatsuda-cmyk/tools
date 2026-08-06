@@ -5,12 +5,12 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
+  <Id>7e0526e2-a329-4f21-9808-8f98535c599b</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
-  <DisplayName DefaultValue="Excel Kanban"/>
+  <DisplayName DefaultValue="WBS bata"/>
   <Description DefaultValue="Kanban Board"/>
   
   <!-- 管理センター展開に必須の3要素 -->
@@ -93,7 +93,7 @@
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/bata/kanban/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
+        <bt:String id="KanbanGroupLabel" DefaultValue="カンバンbata"/>
         <bt:String id="ShowKanbanButtonLabel" DefaultValue="カンバン表示"/>
       </bt:ShortStrings>
       <bt:LongStrings>
