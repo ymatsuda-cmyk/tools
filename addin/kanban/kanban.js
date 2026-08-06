@@ -10,8 +10,32 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260805_28ca559";
+const APP_VERSION = "rev_20260806_a1c93f2";
 window.APP_VERSION = APP_VERSION;
+
+/* ============================================================
+   シート構造の定点
+   ------------------------------------------------------------
+   担当者（休み）の行数が変動するため、タスクの開始行を固定で
+   持たない。A列に HEADER_KEYWORD がある行をヘッダー行とし、
+   その2行下からタスクとして読む。
+   優先度は C列。★ に限らず「空欄でなければ優先」と判定する。
+   ============================================================ */
+const HEADER_KEYWORD = "大分類";   // A列でヘッダー行を探すキーワード
+const PRIORITY_MARK  = "★";        // 優先ボタンでC列に書く文字
+let wbsHeaderRow = 9;              // 見つかったヘッダー行（1基点）
+
+/** C列の値が「優先」かどうか。空欄でなければ優先。 */
+function isPriority(v) {
+  return v != null && v.toString().trim() !== "";
+}
+
+/** カードに出す優先マーク。★以外の手入力値（A・高 など）はそのまま見せる。 */
+function priorityMark(v) {
+  const t = (v == null ? "" : v.toString()).trim();
+  if (!t) return "☆";
+  return t.length <= 2 ? t : PRIORITY_MARK;
+}
 
 let allTasks = [];
 let currentDraggedId = null;
@@ -61,7 +85,12 @@ const FILTER_SCHEMA_VERSION = 2;
 window.ApiConfig = window.ApiConfig || {};
 window.ApiConfig.wbsSheet = "wbs";
 window.ApiConfig.eigyoSheet = "営業報告";
-window.ApiConfig.onNoteSaved = () => renderBoard();
+window.ApiConfig.onNoteSaved = () => {
+  // api.js の saveNote() は備考先頭の★で isStar を更新するが、
+  // 優先度の正は C列なので上書きされた値を戻してから再描画する。
+  allTasks.forEach((t) => { t.isStar = isPriority(t.priority); });
+  renderBoard();
+};
 window.ApiConfig.onTaskAdded = () => init();
 
 if (window.Office && Office.onReady) {
@@ -275,13 +304,24 @@ async function loadExcelData() {
 
     const rows = range.values;
 
-    allTasks = rows.slice(10).map((row, i) => {
+    // ヘッダー行（A列＝「大分類」）を探す。担当者の行が増減しても追従する。
+    let hIdx = -1;
+    for (let i = 0; i < Math.min(rows.length, 60); i++) {
+      const a = rows[i][0];
+      if (a != null && a.toString().trim() === HEADER_KEYWORD) { hIdx = i; break; }
+    }
+    // 見つからなければ従来どおり11行目から（0基点で10）
+    const dataIdx = hIdx >= 0 ? hIdx + 2 : 10;
+    wbsHeaderRow = hIdx >= 0 ? hIdx + 1 : 9;
+
+    allTasks = rows.slice(dataIdx).map((row, i) => {
       if (!row[25] || row[19] === "-") return null;
 
       const t = {
         id: row[24],
         category: row[0],
         classification: row[1],
+        priority: row[2],          // C列＝優先度
         title: row[25],
         user: row[13],
         start: row[15],
@@ -290,10 +330,10 @@ async function loadExcelData() {
         actualEnd: row[18],
         updatedAt: row[20],        // U列=更新日付（今週/先週実績の判定に使用）
         note: row[14],
-        rowIndex: i + 11,
+        rowIndex: dataIdx + i + 1,
 
         isNoSchedule: !row[15] && !row[16],
-        isStar: row[14] && row[14].toString().startsWith("★")
+        isStar: isPriority(row[2])
       };
 
       t.status = getStatus(t);
@@ -791,8 +831,10 @@ function createCard(t) {
   if (t.status !== "完了") {
     const star = document.createElement("button");
     star.className = "card-star" + (t.isStar ? " on" : "");
-    star.textContent = t.isStar ? "★" : "☆";
-    star.title = "本日の優先タスク";
+    star.textContent = t.isStar ? priorityMark(t.priority) : "☆";
+    star.title = t.isStar
+      ? `優先（C列: ${(t.priority == null ? "" : t.priority).toString().trim()}）`
+      : "本日の優先タスク";
     star.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -939,7 +981,6 @@ async function updateStatus(task, lane) {
 
     if (task.note && task.note.toString().includes("▲")) {
       task.note = task.note.toString().replace(/▲/g, "△");
-      await updateTaskStatus(task, "未着手");
     }
   }
 
@@ -958,8 +999,6 @@ async function updateStatus(task, lane) {
       newNote = lines.join("\n");
     }
     task.note = newNote;
-
-    await updateTaskStatus(task, "保留");
   }
 
   if (lane === "doing") {
@@ -968,7 +1007,6 @@ async function updateStatus(task, lane) {
 
     if (task.note && task.note.toString().includes("▲")) {
       task.note = task.note.toString().replace(/▲/g, "△");
-      await updateTaskStatus(task, "対応中");
     }
   }
 
@@ -977,10 +1015,10 @@ async function updateStatus(task, lane) {
     actualEnd = new Date();
 
     if (task.isStar) task.isStar = false;
+    task.priority = "";
 
     if (task.note && task.note.toString().includes("▲")) {
       task.note = task.note.toString().replace(/▲/g, "△");
-      await updateTaskStatus(task, "完了");
     }
   }
 
@@ -1003,13 +1041,9 @@ async function updateStatus(task, lane) {
       noteCell.format.wrapText = false;
     }
 
-    // 完了時に備考から★を削除
-    if (lane === "done" && task.note && task.note.toString().includes("★")) {
-      const newNote = task.note.toString().replace(/★/g, "");
-      const noteCell = sheet.getRange(`O${row}`);
-      noteCell.values = [[newNote]];
-      noteCell.format.wrapText = false;
-      task.note = newNote;
+    // 完了時は優先度（C列）を空にする（備考は触らない）
+    if (lane === "done") {
+      sheet.getRange(`C${row}`).values = [[""]];
     }
 
     stampWbsUpdate(sheet, row);
@@ -1019,41 +1053,26 @@ async function updateStatus(task, lane) {
   await init();
 }
 
-/* ステータス文字列（H列）更新 */
-async function updateTaskStatus(task, newStatus) {
-  await Excel.run(async (ctx) => {
-    const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const statusCell = sheet.getRange(`H${task.rowIndex}`);
-    statusCell.values = [[newStatus]];
-    stampWbsUpdate(sheet, task.rowIndex);
-    await ctx.sync();
-  });
-  task.status = newStatus;
-}
+/* H列（状態文字列）への書き込みは廃止した。
+   状態は 実績開始/完了日（R・S列）と備考の ▲ だけで決まる。
+   H列は人が手で書く自由欄として残す。 */
 
 /* ============================================================
    スター切り替え
    ============================================================ */
 async function toggleStar(task) {
-  task.isStar = !task.isStar;
-
-  let newNote = (task.note || "").toString();
-  if (task.isStar) {
-    if (!newNote.startsWith("★")) newNote = "★" + newNote;
-  } else {
-    newNote = newNote.replace(/★/g, "");
-  }
+  const on = !task.isStar;
+  task.isStar = on;
+  task.priority = on ? PRIORITY_MARK : "";
 
   await Excel.run(async (ctx) => {
     const sheet = ctx.workbook.worksheets.getItem("wbs");
-    const cell = sheet.getRange(`O${task.rowIndex}`);
-    cell.values = [[newNote]];
-    cell.format.wrapText = false;
+    const cell = sheet.getRange(`C${task.rowIndex}`);
+    cell.values = [[task.priority]];
     stampWbsUpdate(sheet, task.rowIndex);
     await ctx.sync();
   });
 
-  task.note = newNote;
   renderBoard();
 }
 
