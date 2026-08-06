@@ -25,6 +25,18 @@ const HEADER_KEYWORD = "大分類";   // A列でヘッダー行を探すキー�
 const PRIORITY_MARK  = "★";        // 優先ボタンでC列に書く文字
 let wbsHeaderRow = 9;              // 見つかったヘッダー行（1基点）
 
+/** ヘッダー行の探索。通常は api.js の findWbsHeader() を使い、
+    これはそれが読み込まれていない場合のフォールバック。 */
+function localFindWbsHeader(rows) {
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
+    const a = rows[i] && rows[i][0];
+    if (a != null && a.toString().trim() === HEADER_KEYWORD) {
+      return { headerRow: i + 1, dataIdx: i + 2 };
+    }
+  }
+  return { headerRow: 9, dataIdx: 10 };
+}
+
 /** C列の値が「優先」かどうか。空欄でなければ優先。 */
 function isPriority(v) {
   return v != null && v.toString().trim() !== "";
@@ -329,14 +341,12 @@ async function loadExcelData() {
     const rows = range.values;
 
     // ヘッダー行（A列＝「大分類」）を探す。担当者の行が増減しても追従する。
-    let hIdx = -1;
-    for (let i = 0; i < Math.min(rows.length, 60); i++) {
-      const a = rows[i][0];
-      if (a != null && a.toString().trim() === HEADER_KEYWORD) { hIdx = i; break; }
-    }
-    // 見つからなければ従来どおり11行目から（0基点で10）
-    const dataIdx = hIdx >= 0 ? hIdx + 2 : 10;
-    wbsHeaderRow = hIdx >= 0 ? hIdx + 1 : 9;
+    // 判定は api.js の findWbsHeader() に一元化し、3ファイルで挙動をそろえる。
+    const hdr = (typeof findWbsHeader === "function")
+      ? findWbsHeader(rows)
+      : localFindWbsHeader(rows);
+    const dataIdx = hdr.dataIdx;
+    wbsHeaderRow = hdr.headerRow;
 
     allTasks = rows.slice(dataIdx).map((row, i) => {
       if (!row[25] || row[19] === "-") return null;

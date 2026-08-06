@@ -20,7 +20,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260802_wbs";
+const APP_VERSION = "rev_20260806_b4e7d10";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -292,13 +292,30 @@ window.ApiConfig.onNoteSaved = () => { if (editingRec) refreshEdTaskPanel(); };
    起動
    ============================================================ */
 if (window.Office) {
-  Office.onReady(() => init());
+  Office.onReady(() => whenDomReady(init));
 } else {
   window.addEventListener("DOMContentLoaded", () => init());
 }
 
+/* ============================================================
+   DOM の準備を待つ
+   ------------------------------------------------------------
+   Excel on the web では Office.onReady が DOM の解析より先に
+   解決することがある。app.js は <head> で読み込まれるため、
+   その場合 init() の 1 行目で version-label が null になり
+   TypeError で初期化が丸ごと止まる（ペインが空白のまま）。
+   ============================================================ */
+function whenDomReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
 async function init() {
-  document.getElementById("version-label").textContent = APP_VERSION;
+  const vl = document.getElementById("version-label");
+  if (vl) vl.textContent = APP_VERSION;
   restoreFiltersCookie();
   restoreGanttCookie();
   bindStaticUI();
@@ -312,14 +329,24 @@ async function init() {
 }
 
 function bindStaticUI() {
+  // 要素が1つ欠けても以降のバインドと初期化を止めない
   const input = document.getElementById("search-input");
-  input.addEventListener("input", () => { filters.q = input.value.trim(); saveFiltersCookie(); renderCurrentPane(); });
-  document.getElementById("search-clear").addEventListener("click", () => {
-    input.value = ""; filters.q = ""; saveFiltersCookie(); renderCurrentPane();
-  });
-  document.getElementById("filter-owner").addEventListener("change", e => {
-    filters.owner = e.target.value; saveFiltersCookie(); renderCurrentPane();
-  });
+  if (input) {
+    input.addEventListener("input", () => { filters.q = input.value.trim(); saveFiltersCookie(); renderCurrentPane(); });
+  }
+  const clearBtn = document.getElementById("search-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (input) input.value = "";
+      filters.q = ""; saveFiltersCookie(); renderCurrentPane();
+    });
+  }
+  const ownerSel = document.getElementById("filter-owner");
+  if (ownerSel) {
+    ownerSel.addEventListener("change", e => {
+      filters.owner = e.target.value; saveFiltersCookie(); renderCurrentPane();
+    });
+  }
   document.addEventListener("click", e => {
     ["status", "client"].forEach(k => {
       if (!e.target.closest("#ms-" + k)) {
@@ -330,13 +357,16 @@ function bindStaticUI() {
   });
   // 詳細画面の変更検知（委譲）：ステージ切替で再描画されても効くように
   const emodal = document.getElementById("edit-modal");
-  emodal.addEventListener("input", markDirty);
-  emodal.addEventListener("change", markDirty);
+  if (emodal) {
+    emodal.addEventListener("input", markDirty);
+    emodal.addEventListener("change", markDirty);
+  }
 }
 
 function clearFilters() {
   filters = { q: "", status: [], client: [], owner: "", lastWeekOnly: false, thisWeekOnly: false };
-  document.getElementById("search-input").value = "";
+  const si0 = document.getElementById("search-input");
+  if (si0) si0.value = "";
   saveFiltersCookie();
   renderFilters();
   updateLastWeekBtn();
@@ -1220,7 +1250,13 @@ async function loadWbsTaskCounts() {
       range.load("values");
       await ctx.sync();
 
-      range.values.slice(10).forEach(r => {
+      // 担当者（休み）の行数が変動するため、開始行は固定で持たない。
+      // api.js の findWbsHeader() を使い、無い場合だけ従来の11行目にフォールバック。
+      const dataIdx = (typeof findWbsHeader === "function")
+        ? findWbsHeader(range.values).dataIdx
+        : 10;
+
+      range.values.slice(dataIdx).forEach(r => {
         if (!r[25] || r[19] === "-") return;                 // Z空 / T="-" は除外
         const key = (r[1] ?? "").toString().trim();          // B列=小分類=案件番号
         if (!key) return;

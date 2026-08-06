@@ -99,6 +99,26 @@ const WBS_CLEAR_COLS = "U:W";
 
 /* wbsへ書き込むすべての経路から呼ぶ。既存の Excel.run 内で使うこと
    （単体で sync はしない）。 */
+/* ============================================================
+   wbs シートのヘッダー行を探す（共通）
+   ------------------------------------------------------------
+   シート上部に担当者ごとの休み予定マトリクスがあり、その行数が
+   変動するため、タスクの開始行を 11 行目固定で持てない。
+   A列に「大分類」がある行をヘッダー行とし、その2行下から
+   タスクとして読む。見つからないときは従来どおり 11 行目。
+   ============================================================ */
+const WBS_HEADER_KEYWORD = "大分類";
+
+function findWbsHeader(rows) {
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
+    const a = rows[i] && rows[i][0];
+    if (a != null && a.toString().trim() === WBS_HEADER_KEYWORD) {
+      return { headerRow: i + 1, dataIdx: i + 2 };   // headerRow は1基点、dataIdx は0基点
+    }
+  }
+  return { headerRow: 9, dataIdx: 10 };
+}
+
 function stampWbsUpdate(sheet, row) {
   try {
     const c = sheet.getRange(`${WBS_UPDATE_COL}${row}`);
@@ -440,7 +460,8 @@ async function loadWbsMeta() {
       const userSet = new Set();
       const subMap = {};
 
-      range.values.slice(10).forEach((row) => {
+      const { dataIdx } = findWbsHeader(range.values);
+      range.values.slice(dataIdx).forEach((row) => {
         if (!row[25] || row[19] === "-") return; // Z空 or T="-" は除外
 
         const cat = row[0], sub = row[1], user = row[13];
@@ -777,7 +798,8 @@ async function fetchWbsTasks(matchFn) {
       range.load("values");
       await ctx.sync();
 
-      range.values.slice(10).forEach((row, i) => {
+      const { dataIdx } = findWbsHeader(range.values);
+      range.values.slice(dataIdx).forEach((row, i) => {
         if (!row[25] || row[19] === "-") return; // Z空 or T="-" は除外
 
         const t = {
@@ -792,7 +814,7 @@ async function fetchWbsTasks(matchFn) {
           actualStart: row[17],
           actualEnd: row[18],
           updatedAt: row[20],          // U列=更新日付
-          rowIndex: i + 11,
+          rowIndex: dataIdx + i + 1,
           isNoSchedule: !row[15] && !row[16]
         };
         if (!matchFn || matchFn(t)) out.push(t);
@@ -1045,6 +1067,7 @@ Object.assign(window, {
   // 呼び出し側アプリから使う
   openModal, openTaskAdd, renderMiniKanban, matchByCaseId, fetchWbsTasks,
   jumpToWbsRow, escapeHtml, dateToExcelSerial, ensureStatusSymbols, stampWbsUpdate,
+  findWbsHeader,
   // 注入したモーダルの inline onclick から呼ばれる
   closeModal, saveNote, onModalNoteEdited, addSubtask,
   closeTaskAdd, saveTaskAdd, onTaCatChange,

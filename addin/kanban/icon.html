@@ -1,42 +1,189 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>Kanban Icon Generator</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <title>Kanban</title>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル）
+       営業報告アドインも同じファイルを読み込んで共有する -->
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806b">
+  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806b"></script>
+
+  <script src="kanban.js?v=20260806b"></script>
+  <link rel="stylesheet" href="style.css?v=20260806b">
 </head>
+
 <body>
-    <!-- 簡単な16x16のカンバンアイコンを生成 -->
-    <canvas id="icon16" width="16" height="16"></canvas>
-    <canvas id="icon32" width="32" height="32"></canvas>
-    <canvas id="icon80" width="80" height="80"></canvas>
 
-    <script>
-        function drawKanbanIcon(canvas, size) {
-            const ctx = canvas.getContext('2d');
-            
-            // 背景色
-            ctx.fillStyle = '#0078d4';
-            ctx.fillRect(0, 0, size, size);
-            
-            // カンバンの列を表現（3つの縦線）
-            ctx.fillStyle = '#ffffff';
-            const lineWidth = Math.max(1, Math.floor(size / 8));
-            const spacing = size / 4;
-            
-            for (let i = 0; i < 3; i++) {
-                const x = spacing * (i + 0.5);
-                ctx.fillRect(x, 2, lineWidth, size - 4);
-            }
-        }
+<!-- ヘッダー -->
+<div class="header">
+  <button class="icon-btn" id="menu-btn" title="メニュー" onclick="openMenu(this)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <span class="title">WBS</span>
+  <span class="version" id="version-label"></span>
+  <span class="spacer"></span>
+  <button class="btn-add" id="task-add-btn" onclick="openTaskAdd()">＋ タスク追加</button>
+  <button class="icon-btn" title="再読み込み" onclick="init()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <button class="icon-btn" title="設定をリセット" onclick="resetSettings()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <circle cx="8" cy="8" r="2.2"/>
+      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke-linecap="round"/>
+    </svg>
+  </button>
+</div>
 
-        // 各サイズのアイコンを生成
-        drawKanbanIcon(document.getElementById('icon16'), 16);
-        drawKanbanIcon(document.getElementById('icon32'), 32);
-        drawKanbanIcon(document.getElementById('icon80'), 80);
-        
-        // data URLを表示
-        console.log('16x16:', document.getElementById('icon16').toDataURL());
-        console.log('32x32:', document.getElementById('icon32').toDataURL());
-        console.log('80x80:', document.getElementById('icon80').toDataURL());
-    </script>
+<!-- メインタブ -->
+<div class="main-tabs" id="main-tabs">
+  <button data-tab="board" class="on">カンバン</button>
+  <button data-tab="agg">集計</button>
+</div>
+
+<!-- フィルタバー -->
+<div class="filter-bar" id="filter-bar">
+
+  <!-- 検索（タスク名・備考） -->
+  <div class="search-box" id="search-box">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+      <circle cx="7" cy="7" r="4.5"/>
+      <path d="M10.5 10.5 14 14" stroke-linecap="round"/>
+    </svg>
+    <input type="search" id="search-input" placeholder="検索" autocomplete="off">
+    <span class="search-hits" id="search-hits"></span>
+    <button class="search-clear" id="search-clear" title="クリア">✕</button>
+  </div>
+
+  <!-- 担当者チップ -->
+  <button class="chip" id="chip-user" onclick="toggleDropdown('dd-user', this)"></button>
+
+  <!-- 分類チップ -->
+  <button class="chip" id="chip-cat" onclick="toggleDropdown('dd-cat', this)"></button>
+
+  <!-- 小分類チップ -->
+  <button class="chip" id="chip-subcat" onclick="toggleDropdown('dd-subcat', this)"></button>
+
+  <!-- 期間セグメント -->
+  <div class="segment" id="seg-period">
+    <button data-p="all">全て</button>
+    <button data-p="past">以前</button>
+    <button data-p="week">今週</button>
+    <button data-p="nextweek">来週</button>
+    <button data-p="future">以降</button>
+    <button data-p="today" title="期間内・遅延・対応中のタスク">本日</button>
+    <button data-p="star" title="スター付きのタスク">★</button>
+    <button data-p="todo">TODO</button>
+  </div>
+
+  <!-- 実績フィルタ（更新日付U列ベース。カンバンのみ有効） -->
+  <button class="week-btn" id="btn-thisweek" title="更新日付が今週のタスクのみ表示" onclick="setWeekFilter('this')">今週実績</button>
+  <button class="week-btn" id="btn-lastweek" title="更新日付が先週のタスクのみ表示" onclick="setWeekFilter('last')">先週実績</button>
+
+  <!-- 保留トグル -->
+  <label class="held-toggle" id="held-toggle" onclick="toggleHeldDisplay(event)">
+    <span class="switch"></span>保留
+  </label>
+
+  <!-- 完了全てトグル（OFF: 実績完了日が15日以上前の完了は非表示） -->
+  <label class="held-toggle sub-toggle" id="alldone-toggle" title="OFF: 直近15日の完了のみ表示" onclick="toggleAllDone(event)">
+    <span class="switch"></span>完了全て
+  </label>
+
+  <!-- ドロップダウン：担当者 -->
+  <div class="dropdown" id="dd-user">
+    <div class="dd-label">担当者で絞り込み</div>
+    <div id="user-filters"></div>
+  </div>
+
+  <!-- ドロップダウン：分類（大分類＋小分類） -->
+  <div class="dropdown" id="dd-cat">
+    <div class="dd-label">分類で絞り込み</div>
+    <div id="category-filters"></div>
+  </div>
+
+  <!-- ドロップダウン：小分類 -->
+  <div class="dropdown" id="dd-subcat">
+    <div class="dd-label">小分類で絞り込み</div>
+    <div id="sub-category-filters"></div>
+  </div>
+
+</div>
+
+<!-- ボード -->
+<div id="board">
+
+  <div class="lane" id="todo" data-lane="todo">
+    <div class="lane-head">
+      <span class="dot"></span><span class="name">未着手</span><span class="count">0</span>
+    </div>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="held" data-lane="held">
+    <div class="lane-head">
+      <span class="dot"></span><span class="name">保留</span><span class="count">0</span>
+    </div>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="doing" data-lane="doing">
+    <div class="lane-head">
+      <span class="dot"></span><span class="name">対応中</span><span class="count">0</span>
+    </div>
+    <div class="card-list"></div>
+  </div>
+
+  <div class="lane" id="done" data-lane="done">
+    <div class="lane-head">
+      <span class="dot"></span><span class="name">完了</span><span class="count">0</span>
+    </div>
+    <div class="card-list"></div>
+  </div>
+
+</div>
+
+<!-- 集計ビュー -->
+<div id="agg-view" class="hidden">
+
+  <div class="subtabs" id="agg-subtabs">
+    <button data-s="status" class="on">対応状況</button>
+    <button data-s="delay">遅延</button>
+  </div>
+
+  <!-- 対応状況 -->
+  <div id="agg-status">
+    <div id="agg-filter"></div>
+    <div class="kpi-row" id="agg-kpis"></div>
+    <div class="axis-hint" id="agg-axis-hint"></div>
+    <div class="agg-legend" id="agg-legend"></div>
+    <div id="agg-bars"></div>
+
+    <div class="agg-sec">
+      <div class="agg-sec-head">タスク一覧 <span class="cnt" id="agg-list-count"></span></div>
+      <div id="agg-list"></div>
+    </div>
+  </div>
+
+  <!-- 遅延 -->
+  <div id="agg-delay" class="hidden">
+    <div class="delay-note">分類・検索はフィルタ対象外（担当者のみ絞り込めます）</div>
+    <div id="delay-filter"></div>
+    <div class="kpi-row" id="delay-kpis"></div>
+    <div id="delay-body"></div>
+  </div>
+
+</div>
+
+<!-- 備考編集モーダル／タスク追加モーダル／汎用ダイアログのDOMは
+     api.js（共通モジュール）が自動的にここへ注入する -->
+
 </body>
 </html>
