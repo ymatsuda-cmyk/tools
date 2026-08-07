@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ollama Chat & 要約（Gemma on Kaggle）</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a;
+    --text:#e6e9ef; --muted:#9aa4b2; --accent:#4f8cff; --accent2:#3ad29f;
+    --user:#26476f; --ai:#232833; --danger:#ff5d5d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+       background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+
+  /* ===== サイドバー（設定） ===== */
+  .sidebar{width:340px;min-width:340px;background:var(--panel);border-right:1px solid var(--border);
+           display:flex;flex-direction:column;padding:16px;overflow-y:auto}
+  .sidebar h1{font-size:16px;margin:0 0 4px}
+  .sidebar .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .field input,.field select,.field textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:9px 10px;font-size:13px;outline:none}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+  .row{display:flex;gap:10px}
+  .row .field{flex:1}
+  .btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;
+       padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.secondary{background:var(--panel2);border:1px solid var(--border)}
+  .status{font-size:12px;margin-top:8px;padding:8px 10px;border-radius:8px;display:none}
+  .status.ok{display:block;background:#12351f;color:var(--accent2)}
+  .status.ng{display:block;background:#3a1414;color:var(--danger)}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .divider{height:1px;background:var(--border);margin:14px 0}
+
+  /* ===== メイン（チャット） ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+          padding:0 18px;gap:12px;background:var(--panel)}
+  .topbar .modelchip{font-size:12px;color:var(--muted);background:var(--panel2);
+          padding:5px 10px;border-radius:20px;border:1px solid var(--border)}
+  .tabs{display:flex;gap:6px;margin-left:auto}
+  .tab{font-size:13px;padding:6px 14px;border-radius:20px;cursor:pointer;color:var(--muted);
+       border:1px solid transparent}
+  .tab.active{background:var(--panel2);color:var(--text);border-color:var(--border)}
+
+  .chat{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:80%;padding:12px 14px;border-radius:12px;font-size:14px;line-height:1.65;
+       white-space:pre-wrap;word-break:break-word}
+  .msg.user{align-self:flex-end;background:var(--user)}
+  .msg.ai{align-self:flex-start;background:var(--ai);border:1px solid var(--border)}
+  .msg .who{font-size:11px;color:var(--muted);margin-bottom:5px}
+  .msg.system{align-self:center;background:transparent;color:var(--muted);font-size:12px;max-width:90%;text-align:center}
+
+  /* 入力欄 */
+  .inputbar{border-top:1px solid var(--border);padding:14px 18px;background:var(--panel)}
+  .inputbar .box{display:flex;gap:10px;align-items:flex-end}
+  .inputbar textarea{flex:1;resize:none;min-height:46px;max-height:200px;
+       background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+       color:var(--text);padding:12px;font-size:14px;outline:none;font-family:inherit}
+  .inputbar textarea:focus{border-color:var(--accent)}
+  .sendbtn{background:var(--accent);color:#fff;border:none;border-radius:10px;
+       padding:0 20px;height:46px;font-size:14px;font-weight:600;cursor:pointer}
+  .sendbtn:disabled{opacity:.5;cursor:not-allowed}
+  .modeinfo{font-size:11px;color:var(--muted);margin-bottom:8px}
+
+  .typing{display:inline-block}
+  .typing span{animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}
+  .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- ===== サイドバー：Ollama 設定 ===== -->
+<aside class="sidebar">
+  <h1>⚙️ Ollama 設定</h1>
+  <div class="sub">Gemma on Kaggle（ngrok公開URL）に接続</div>
+
+  <div class="field">
+    <label>公開URL（OLLAMA_BASE_URL）</label>
+    <input id="baseUrl" placeholder="https://xxxx.ngrok-free.app" />
+    <div class="hint">Kaggle の ngrok が出力したURLを貼り付け</div>
+  </div>
+
+  <div class="field">
+    <label>モデル</label>
+    <div class="row">
+      <div class="field" style="margin:0">
+        <select id="model"><option value="">（接続テストで取得）</option></select>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn secondary" id="testBtn">🔌 接続テスト＆モデル取得</button>
+  <div class="status" id="status"></div>
+
+  <div class="divider"></div>
+
+  <div class="row">
+    <div class="field">
+      <label>num_ctx</label>
+      <input id="numCtx" type="number" value="8192" />
+    </div>
+    <div class="field">
+      <label>temperature</label>
+      <input id="temp" type="number" step="0.1" value="0.3" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>システムプロンプト（任意）</label>
+    <textarea id="system" rows="2" placeholder="あなたは有能な日本語アシスタントです。"></textarea>
+  </div>
+
+  <div class="divider"></div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:8px">📄 要約モードの設定</div>
+  <div class="row">
+    <div class="field">
+      <label>チャンク文字数</label>
+      <input id="chunkChars" type="number" value="6000" />
+    </div>
+    <div class="field">
+      <label>オーバーラップ</label>
+      <input id="overlap" type="number" value="400" />
+    </div>
+  </div>
+  <div class="field">
+    <label>最終要約スタイル</label>
+    <textarea id="finalStyle" rows="2">全体を800字程度で、要点を箇条書き＋総括の順にまとめてください。</textarea>
+  </div>
+
+  <button class="btn secondary" id="clearBtn" style="margin-top:8px">🗑️ 会話をクリア</button>
+  <div class="hint" style="margin-top:12px">設定はブラウザに自動保存されます。</div>
+</aside>
+
+<!-- ===== メイン：チャット ===== -->
+<main class="main">
+  <div class="topbar">
+    <strong>💬 Ollama Chat</strong>
+    <span class="modelchip" id="modelChip">未接続</span>
+    <div class="tabs">
+      <div class="tab active" data-mode="chat" id="tabChat">チャット</div>
+      <div class="tab" data-mode="summary" id="tabSummary">要約（Map-Reduce）</div>
+    </div>
+  </div>
+
+  <div class="chat" id="chat">
+    <div class="msg system">左で公開URLを設定し「接続テスト」を押してください。</div>
+  </div>
+
+  <div class="inputbar">
+    <div class="modeinfo" id="modeInfo">💬 チャットモード：メッセージを送信します。</div>
+    <div class="box">
+      <textarea id="input" placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）"></textarea>
+      <button class="sendbtn" id="sendBtn">送信</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// ================= 状態 =================
+const $ = (id) => document.getElementById(id);
+let mode = "chat";           // "chat" | "summary"
+let history = [];            // チャット履歴 [{role, content}]
+let busy = false;
+
+// ================= 設定の保存/復元 =================
+const SETTINGS_KEYS = ["baseUrl","model","numCtx","temp","system","chunkChars","overlap","finalStyle"];
+function saveSettings(){
+  const o={}; SETTINGS_KEYS.forEach(k=>o[k]=$(k).value);
+  localStorage.setItem("ollamaChatSettings", JSON.stringify(o));
+}
+function loadSettings(){
+  try{
+    const o=JSON.parse(localStorage.getItem("ollamaChatSettings")||"{}");
+    SETTINGS_KEYS.forEach(k=>{ if(o[k]!==undefined && $(k)) $(k).value=o[k]; });
+    if(o.model){ ensureModelOption(o.model); $("model").value=o.model; updateChip(); }
+  }catch(e){}
+}
+SETTINGS_KEYS.forEach(k=>$(k).addEventListener("input",saveSettings));
+
+function baseUrl(){ return $("baseUrl").value.trim().replace(/\/$/,""); }
+function headers(){ return {"Content-Type":"application/json","ngrok-skip-browser-warning":"true"}; }
+
+// ================= 接続テスト＆モデル取得 =================
+$("testBtn").onclick = async ()=>{
+  const url = baseUrl();
+  const st = $("status");
+  if(!url){ st.className="status ng"; st.textContent="公開URLを入力してください"; return; }
+  st.className="status"; st.style.display="block"; st.textContent="接続中...";
+  try{
+    const res = await fetch(url+"/api/tags",{headers:headers()});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data = await res.json();
+    const models = (data.models||[]).map(m=>m.name);
+    const sel = $("model"); sel.innerHTML="";
+    if(models.length===0){ sel.innerHTML='<option value="">モデル無し（ollama pull を実行）</option>'; }
+    models.forEach(m=>{ const o=document.createElement("option");o.value=m;o.textContent=m;sel.appendChild(o); });
+    st.className="status ok"; st.textContent="✅ 接続成功（"+models.length+"モデル）";
+    saveSettings(); updateChip();
+  }catch(e){
+    st.className="status ng";
+    st.textContent="❌ 接続失敗: "+e.message+"（URL/セッション/GPU稼働を確認）";
+  }
+};
+
+function ensureModelOption(name){
+  const sel=$("model");
+  if(![...sel.options].some(o=>o.value===name)){
+    const o=document.createElement("option");o.value=name;o.textContent=name;sel.appendChild(o);
+  }
+}
+$("model").addEventListener("change",()=>{saveSettings();updateChip();});
+function updateChip(){
+  const m=$("model").value;
+  $("modelChip").textContent = m ? m : "未接続";
+}
+
+// ================= タブ切替 =================
+function setMode(m){
+  mode=m;
+  $("tabChat").classList.toggle("active",m==="chat");
+  $("tabSummary").classList.toggle("active",m==="summary");
+  if(m==="chat"){
+    $("modeInfo").textContent="💬 チャットモード：会話履歴を保持して応答します。";
+    $("input").placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）";
+  }else{
+    $("modeInfo").textContent="📄 要約モード：長文を貼り付けるとMap-Reduceで要約します（冒頭切れ防止）。";
+    $("input").placeholder="要約したい長文を貼り付けて送信...";
+  }
+}
+$("tabChat").onclick=()=>setMode("chat");
+$("tabSummary").onclick=()=>setMode("summary");
+
+// ================= メッセージ描画 =================
+function addMsg(role, text){
+  const div=document.createElement("div");
+  div.className="msg "+(role==="user"?"user":role==="system"?"system":"ai");
+  if(role!=="system"){
+    const who=document.createElement("div");who.className="who";
+    who.textContent = role==="user"?"あなた":"AI";
+    div.appendChild(who);
+  }
+  const body=document.createElement("div");body.textContent=text;div.appendChild(body);
+  $("chat").appendChild(div);
+  $("chat").scrollTop=$("chat").scrollHeight;
+  return body;
+}
+$("clearBtn").onclick=()=>{ history=[]; $("chat").innerHTML='<div class="msg system">会話をクリアしました。</div>'; };
+
+// ================= Ollama 呼び出し（ストリーミング） =================
+async function ollamaGenerate(prompt, onToken){
+  const payload={
+    model:$("model").value, prompt, stream:!!onToken,
+    options:{ num_ctx:+$("numCtx").value||8192, temperature:+$("temp").value||0.3 }
+  };
+  const sys=$("system").value.trim();
+  if(sys) payload.system=sys;
+
+  const res=await fetch(baseUrl()+"/api/generate",{method:"POST",headers:headers(),body:JSON.stringify(payload)});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+
+  if(!onToken){ const d=await res.json(); return (d.response||"").trim(); }
+
+  // ストリーミング読み取り
+  const reader=res.body.getReader(); const dec=new TextDecoder(); let full="",buf="";
+  while(true){
+    const {done,value}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n"); buf=lines.pop();
+    for(const line of lines){
+      if(!line.trim()) continue;
+      try{ const j=JSON.parse(line); if(j.response){ full+=j.response; onToken(full); } }catch(e){}
+    }
+  }
+  return full.trim();
+}
+
+// ================= Map-Reduce 要約 =================
+function splitIntoChunks(text,size,overlap){
+  const sents=text.split(/(?<=[。！？\n])/).filter(s=>s.trim());
+  const chunks=[]; let cur="";
+  for(const s of sents){
+    if(cur.length+s.length<=size){ cur+=s; }
+    else{ if(cur)chunks.push(cur); const tail=overlap&&cur?cur.slice(-overlap):""; cur=tail+s; }
+  }
+  if(cur.trim())chunks.push(cur);
+  return chunks;
+}
+async function summarizeChunk(chunk,i,total){
+  const p=`あなたは優秀な要約者です。以下は長い文書の一部（${i}/${total}）です。\n`+
+    `この部分の重要な論点・事実・数値を漏らさず、日本語の箇条書きで簡潔にまとめてください。\n`+
+    `前後の文脈は不明でも構いません。この部分の内容だけを要約してください。\n\n`+
+    `=== 本文 ===\n${chunk}\n\n=== 要約（箇条書き） ===`;
+  return ollamaGenerate(p);
+}
+async function mergeGroup(items,finalStyle,isFinal){
+  const joined=items.map((s,i)=>`[part ${i+1}]\n${s}`).join("\n\n");
+  const p=isFinal
+    ? "以下は1つの長い文書を分割して部分ごとに要約したものです。\n★冒頭(part 1)から末尾まで全ての部分を必ず反映し、時系列・論理の順序を保ってください。\n重複は除き、全体像がわかる最終要約を作成してください。\n"+finalStyle+"\n\n=== 部分要約の集合 ===\n"+joined+"\n\n=== 最終要約 ==="
+    : "以下は長い文書の連続する部分要約です。順序を保ったまま、重要な論点・事実・数値を落とさずに1つの要約へ統合してください（箇条書き可）。\n\n=== 部分要約 ===\n"+joined+"\n\n=== 統合要約 ===";
+  return ollamaGenerate(p);
+}
+async function reduceSummaries(summaries,finalStyle,log){
+  const BATCH=5, BUDGET=4000; let level=0, current=summaries;
+  while(true){
+    const total=current.reduce((a,s)=>a+s.length,0);
+    if(current.length<=BATCH && total<=BUDGET){ log(`統合(最終) ${current.length}件`); return mergeGroup(current,finalStyle,true); }
+    level++;
+    const groups=[]; let buf=[],len=0;
+    for(const s of current){
+      if(buf.length&&(buf.length>=BATCH||len+s.length>BUDGET)){ groups.push(buf);buf=[];len=0; }
+      buf.push(s);len+=s.length;
+    }
+    if(buf.length)groups.push(buf);
+    log(`統合L${level}: ${current.length}件→${groups.length}グループ`);
+    const merged=[];
+    for(let g=0;g<groups.length;g++){ log(`　グループ ${g+1}/${groups.length}...`); merged.push(await mergeGroup(groups[g],finalStyle,false)); }
+    current=merged;
+  }
+}
+
+// ================= 送信ハンドラ =================
+async function send(){
+  if(busy) return;
+  const text=$("input").value.trim();
+  if(!text) return;
+  if(!baseUrl()||!$("model").value){ addMsg("system","⚠️ 先に公開URLとモデルを設定してください。"); return; }
+
+  busy=true; $("sendBtn").disabled=true; $("input").value="";
+  addMsg("user",text);
+
+  if(mode==="chat"){
+    // 履歴を含めたプロンプト
+    history.push({role:"user",content:text});
+    const convo=history.map(m=>(m.role==="user"?"ユーザー: ":"アシスタント: ")+m.content).join("\n")+"\nアシスタント: ";
+    const bodyEl=addMsg("ai",""); bodyEl.innerHTML='<span class="typing"><span>●</span><span>●</span><span>●</span></span>';
+    try{
+      const ans=await ollamaGenerate(convo,(partial)=>{ bodyEl.textContent=partial; $("chat").scrollTop=$("chat").scrollHeight; });
+      bodyEl.textContent=ans; history.push({role:"assistant",content:ans});
+    }catch(e){ bodyEl.textContent="❌ エラー: "+e.message; }
+  }else{
+    // 要約モード
+    const chars=+$("chunkChars").value||6000, ov=+$("overlap").value||400;
+    const chunks=splitIntoChunks(text,chars,ov);
+    const logEl=addMsg("system",`[分割] ${text.length.toLocaleString()}文字 → ${chunks.length}チャンク`);
+    const log=(m)=>{ logEl.textContent=m; };
+    try{
+      if(chunks.length===1){
+        const bodyEl=addMsg("ai","要約中...");
+        bodyEl.textContent=await summarizeChunk(chunks[0],1,1);
+      }else{
+        const partials=[];
+        for(let i=0;i<chunks.length;i++){ log(`[Map] チャンク ${i+1}/${chunks.length} を要約中...`); partials.push(await summarizeChunk(chunks[i],i+1,chunks.length)); }
+        log("[Reduce] 部分要約を統合中...");
+        const final=await reduceSummaries(partials,$("finalStyle").value,log);
+        logEl.textContent="✅ 要約完了";
+        addMsg("ai",final);
+      }
+    }catch(e){ addMsg("system","❌ エラー: "+e.message); }
+  }
+  busy=false; $("sendBtn").disabled=false; $("input").focus();
+}
+$("sendBtn").onclick=send;
+$("input").addEventListener("keydown",(e)=>{
+  if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); }
+});
+// テキストエリア自動リサイズ
+$("input").addEventListener("input",function(){ this.style.height="46px"; this.style.height=Math.min(this.scrollHeight,200)+"px"; });
+
+// ================= 初期化 =================
+loadSettings(); setMode("chat");
+</script>
+</body>
+</html>
