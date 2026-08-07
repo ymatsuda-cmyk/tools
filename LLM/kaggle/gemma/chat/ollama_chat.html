@@ -14,7 +14,6 @@
   body{margin:0;font-family:"Segoe UI",system-ui,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
        background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
 
-  /* ===== サイドバー（設定） ===== */
   .sidebar{width:340px;min-width:340px;background:var(--panel);border-right:1px solid var(--border);
            display:flex;flex-direction:column;padding:16px;overflow-y:auto}
   .sidebar h1{font-size:16px;margin:0 0 4px}
@@ -37,7 +36,6 @@
   .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
   .divider{height:1px;background:var(--border);margin:14px 0}
 
-  /* ===== メイン（チャット） ===== */
   .main{flex:1;display:flex;flex-direction:column;min-width:0}
   .topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;
           padding:0 18px;gap:12px;background:var(--panel)}
@@ -56,7 +54,6 @@
   .msg .who{font-size:11px;color:var(--muted);margin-bottom:5px}
   .msg.system{align-self:center;background:transparent;color:var(--muted);font-size:12px;max-width:90%;text-align:center}
 
-  /* 入力欄 */
   .inputbar{border-top:1px solid var(--border);padding:14px 18px;background:var(--panel)}
   .inputbar .box{display:flex;gap:10px;align-items:flex-end}
   .inputbar textarea{flex:1;resize:none;min-height:46px;max-height:200px;
@@ -68,7 +65,6 @@
   .sendbtn:disabled{opacity:.5;cursor:not-allowed}
   .modeinfo{font-size:11px;color:var(--muted);margin-bottom:8px}
 
-  .typing{display:inline-block}
   .typing span{animation:blink 1.2s infinite}
   .typing span:nth-child(2){animation-delay:.2s}
   .typing span:nth-child(3){animation-delay:.4s}
@@ -77,24 +73,19 @@
 </head>
 <body>
 
-<!-- ===== サイドバー：Ollama 設定 ===== -->
 <aside class="sidebar">
   <h1>⚙️ Ollama 設定</h1>
   <div class="sub">Gemma on Kaggle（ngrok公開URL）に接続</div>
 
   <div class="field">
-    <label>公開URL（OLLAMA_BASE_URL）</label>
+    <label for="baseUrl">公開URL（OLLAMA_BASE_URL）</label>
     <input id="baseUrl" placeholder="https://xxxx.ngrok-free.app" />
     <div class="hint">Kaggle の ngrok が出力したURLを貼り付け</div>
   </div>
 
   <div class="field">
-    <label>モデル</label>
-    <div class="row">
-      <div class="field" style="margin:0">
-        <select id="model"><option value="">（接続テストで取得）</option></select>
-      </div>
-    </div>
+    <label for="model">モデル</label>
+    <select id="model"><option value="">（接続テストで取得）</option></select>
   </div>
 
   <button class="btn secondary" id="testBtn">🔌 接続テスト＆モデル取得</button>
@@ -104,17 +95,17 @@
 
   <div class="row">
     <div class="field">
-      <label>num_ctx</label>
+      <label for="numCtx">num_ctx</label>
       <input id="numCtx" type="number" value="8192" />
     </div>
     <div class="field">
-      <label>temperature</label>
+      <label for="temp">temperature</label>
       <input id="temp" type="number" step="0.1" value="0.3" />
     </div>
   </div>
 
   <div class="field">
-    <label>システムプロンプト（任意）</label>
+    <label for="system">システムプロンプト（任意）</label>
     <textarea id="system" rows="2" placeholder="あなたは有能な日本語アシスタントです。"></textarea>
   </div>
 
@@ -122,16 +113,16 @@
   <div style="font-size:12px;color:var(--muted);margin-bottom:8px">📄 要約モードの設定</div>
   <div class="row">
     <div class="field">
-      <label>チャンク文字数</label>
+      <label for="chunkChars">チャンク文字数</label>
       <input id="chunkChars" type="number" value="6000" />
     </div>
     <div class="field">
-      <label>オーバーラップ</label>
+      <label for="overlap">オーバーラップ</label>
       <input id="overlap" type="number" value="400" />
     </div>
   </div>
   <div class="field">
-    <label>最終要約スタイル</label>
+    <label for="finalStyle">最終要約スタイル</label>
     <textarea id="finalStyle" rows="2">全体を800字程度で、要点を箇条書き＋総括の順にまとめてください。</textarea>
   </div>
 
@@ -139,7 +130,6 @@
   <div class="hint" style="margin-top:12px">設定はブラウザに自動保存されます。</div>
 </aside>
 
-<!-- ===== メイン：チャット ===== -->
 <main class="main">
   <div class="topbar">
     <strong>💬 Ollama Chat</strong>
@@ -164,13 +154,11 @@
 </main>
 
 <script>
-// ================= 状態 =================
 const $ = (id) => document.getElementById(id);
-let mode = "chat";           // "chat" | "summary"
-let history = [];            // チャット履歴 [{role, content}]
+let mode = "chat";
+let history = [];
 let busy = false;
 
-// ================= 設定の保存/復元 =================
 const SETTINGS_KEYS = ["baseUrl","model","numCtx","temp","system","chunkChars","overlap","finalStyle"];
 function saveSettings(){
   const o={}; SETTINGS_KEYS.forEach(k=>o[k]=$(k).value);
@@ -186,7 +174,20 @@ function loadSettings(){
 SETTINGS_KEYS.forEach(k=>$(k).addEventListener("input",saveSettings));
 
 function baseUrl(){ return $("baseUrl").value.trim().replace(/\/$/,""); }
-function headers(){ return {"Content-Type":"application/json","ngrok-skip-browser-warning":"true"}; }
+
+/* ★CORS対策の要★
+   ・カスタムヘッダー(ngrok-skip-browser-warning)や Content-Type:application/json は
+     プリフライト(OPTIONS)を誘発し、Ollamaがそのヘッダーを許可せずブロックされる。
+   ・そこで「単純リクエスト」に徹する:
+       - GET: ヘッダー無し
+       - POST: Content-Type を text/plain にする（Ollamaは中身がJSONなら解釈可）
+     これでプリフライト自体が発生せず、OLLAMA_ORIGINS=* の ACAO だけで通る。 */
+function postHeaders(){ return {"Content-Type":"text/plain;charset=UTF-8"}; }
+
+// ngrok の警告HTMLが返った場合の検知
+function looksLikeNgrokWarning(t){
+  return /<!DOCTYPE html>|ngrok|You are about to visit/i.test(t||"");
+}
 
 // ================= 接続テスト＆モデル取得 =================
 $("testBtn").onclick = async ()=>{
@@ -195,9 +196,14 @@ $("testBtn").onclick = async ()=>{
   if(!url){ st.className="status ng"; st.textContent="公開URLを入力してください"; return; }
   st.className="status"; st.style.display="block"; st.textContent="接続中...";
   try{
-    const res = await fetch(url+"/api/tags",{headers:headers()});
+    // 単純GET（カスタムヘッダー無し）→ プリフライト無し
+    const res = await fetch(url+"/api/tags");
+    const raw = await res.text();
     if(!res.ok) throw new Error("HTTP "+res.status);
-    const data = await res.json();
+    if(looksLikeNgrokWarning(raw)){
+      throw new Error("ngrok警告ページが返りました。ブラウザで公開URLを一度開き『Visit Site』を押してから再試行してください。");
+    }
+    const data = JSON.parse(raw);
     const models = (data.models||[]).map(m=>m.name);
     const sel = $("model"); sel.innerHTML="";
     if(models.length===0){ sel.innerHTML='<option value="">モデル無し（ollama pull を実行）</option>'; }
@@ -206,7 +212,7 @@ $("testBtn").onclick = async ()=>{
     saveSettings(); updateChip();
   }catch(e){
     st.className="status ng";
-    st.textContent="❌ 接続失敗: "+e.message+"（URL/セッション/GPU稼働を確認）";
+    st.textContent="❌ 接続失敗: "+e.message;
   }
 };
 
@@ -217,10 +223,7 @@ function ensureModelOption(name){
   }
 }
 $("model").addEventListener("change",()=>{saveSettings();updateChip();});
-function updateChip(){
-  const m=$("model").value;
-  $("modelChip").textContent = m ? m : "未接続";
-}
+function updateChip(){ $("modelChip").textContent = $("model").value || "未接続"; }
 
 // ================= タブ切替 =================
 function setMode(m){
@@ -254,7 +257,7 @@ function addMsg(role, text){
 }
 $("clearBtn").onclick=()=>{ history=[]; $("chat").innerHTML='<div class="msg system">会話をクリアしました。</div>'; };
 
-// ================= Ollama 呼び出し（ストリーミング） =================
+// ================= Ollama 呼び出し（ストリーミング対応） =================
 async function ollamaGenerate(prompt, onToken){
   const payload={
     model:$("model").value, prompt, stream:!!onToken,
@@ -263,12 +266,19 @@ async function ollamaGenerate(prompt, onToken){
   const sys=$("system").value.trim();
   if(sys) payload.system=sys;
 
-  const res=await fetch(baseUrl()+"/api/generate",{method:"POST",headers:headers(),body:JSON.stringify(payload)});
+  // POSTだが Content-Type:text/plain にして「単純リクエスト」化 → プリフライト回避
+  const res=await fetch(baseUrl()+"/api/generate",{
+    method:"POST", headers:postHeaders(), body:JSON.stringify(payload)
+  });
   if(!res.ok) throw new Error("HTTP "+res.status);
 
-  if(!onToken){ const d=await res.json(); return (d.response||"").trim(); }
+  if(!onToken){
+    const raw=await res.text();
+    if(looksLikeNgrokWarning(raw)) throw new Error("ngrok警告ページ応答。公開URLを一度ブラウザで開いてください。");
+    return (JSON.parse(raw).response||"").trim();
+  }
 
-  // ストリーミング読み取り
+  // ストリーミング
   const reader=res.body.getReader(); const dec=new TextDecoder(); let full="",buf="";
   while(true){
     const {done,value}=await reader.read(); if(done) break;
@@ -333,11 +343,10 @@ async function send(){
   if(!text) return;
   if(!baseUrl()||!$("model").value){ addMsg("system","⚠️ 先に公開URLとモデルを設定してください。"); return; }
 
-  busy=true; $("sendBtn").disabled=true; $("input").value="";
+  busy=true; $("sendBtn").disabled=true; $("input").value=""; $("input").style.height="46px";
   addMsg("user",text);
 
   if(mode==="chat"){
-    // 履歴を含めたプロンプト
     history.push({role:"user",content:text});
     const convo=history.map(m=>(m.role==="user"?"ユーザー: ":"アシスタント: ")+m.content).join("\n")+"\nアシスタント: ";
     const bodyEl=addMsg("ai",""); bodyEl.innerHTML='<span class="typing"><span>●</span><span>●</span><span>●</span></span>';
@@ -346,7 +355,6 @@ async function send(){
       bodyEl.textContent=ans; history.push({role:"assistant",content:ans});
     }catch(e){ bodyEl.textContent="❌ エラー: "+e.message; }
   }else{
-    // 要約モード
     const chars=+$("chunkChars").value||6000, ov=+$("overlap").value||400;
     const chunks=splitIntoChunks(text,chars,ov);
     const logEl=addMsg("system",`[分割] ${text.length.toLocaleString()}文字 → ${chunks.length}チャンク`);
@@ -371,10 +379,8 @@ $("sendBtn").onclick=send;
 $("input").addEventListener("keydown",(e)=>{
   if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); }
 });
-// テキストエリア自動リサイズ
 $("input").addEventListener("input",function(){ this.style.height="46px"; this.style.height=Math.min(this.scrollHeight,200)+"px"; });
 
-// ================= 初期化 =================
 loadSettings(); setMode("chat");
 </script>
 </body>
