@@ -16,6 +16,8 @@ export function openSettings(settings, onSave) {
     const temperature = h('input', { type: 'number', step: '0.1', value: draft.temperature })
     const systemPrompt = h('textarea', { rows: '2' })
     systemPrompt.value = draft.systemPrompt
+    const gasUrl = h('input', { value: draft.gasUrl, placeholder: 'https://script.google.com/macros/s/.../exec' })
+    const controlToken = h('input', { type: 'password', value: draft.controlToken, placeholder: 'CONTROL_TOKEN' })
     const result = h('div', { class: 'hint', style: { marginBottom: '12px' } })
 
     const currentModel = () =>
@@ -29,6 +31,8 @@ export function openSettings(settings, onSave) {
       numCtx: Number(numCtx.value),
       temperature: Number(temperature.value),
       systemPrompt: systemPrompt.value,
+      gasUrl: gasUrl.value.trim(),
+      controlToken: controlToken.value.trim(),
     })
 
     const testBtn = h('button', {
@@ -71,6 +75,9 @@ export function openSettings(settings, onSave) {
       field('モデル', modelInput, modelSelect),
       h('div', { class: 'row' }, field('num_ctx', numCtx), field('temperature', temperature)),
       field('システムプロンプト', systemPrompt),
+      h('div', { class: 'section', text: 'Kaggle 起動制御（任意）' }),
+      field('GAS ウェブアプリ URL', gasUrl),
+      field('CONTROL_TOKEN', controlToken),
       result,
       h(
         'div',

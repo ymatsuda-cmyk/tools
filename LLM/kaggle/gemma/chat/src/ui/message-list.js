@@ -115,6 +115,12 @@ export function createMessageList(root) {
       scrollToEnd()
       return body
     },
+    /** 一時的な案内を末尾に出す（DB には保存しない） */
+    showNotice(text) {
+      root.append(h('div', { class: 'msg' }, h('div', { class: 'warn', text })))
+      stick = true
+      scrollToEnd()
+    },
     scrollToEnd,
   }
 }

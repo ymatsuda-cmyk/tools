@@ -7,6 +7,8 @@ export const DEFAULT_SETTINGS = {
   numCtx: 32768,
   temperature: 0.7,
   systemPrompt: '必ず日本語で回答してください。',
+  gasUrl: '',
+  controlToken: '',
 }
 
 export function loadSettings() {
