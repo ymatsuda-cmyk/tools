@@ -14,6 +14,7 @@ import { createThrottledRenderer } from './lib/markdown.js'
 import { createMessageList } from './ui/message-list.js'
 import { createComposer } from './ui/composer.js'
 import { openSettings } from './ui/settings-dialog.js'
+import { createStatusBar } from './ui/status-bar.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -21,6 +22,7 @@ let settings = loadSettings()
 let convId = null
 let controller = null
 
+const statusBar = createStatusBar($('status-bar'), { getSettings: () => settings })
 const list = createMessageList($('messages'))
 const composer = createComposer($('composer'), { onSend, onStop, onCompress, onNewChat })
 
@@ -33,10 +35,6 @@ function toWire(m) {
 
 function renderTopbar() {
   $('model-name').textContent = settings.model
-  const chip = $('conn-chip')
-  chip.className = settings.apiKey ? 'chip ok' : 'chip ng'
-  clear(chip)
-  chip.append(h('span', { class: 'dot' }), settings.apiKey ? '設定済み' : '未設定')
 }
 
 async function renderSidebar() {
@@ -100,6 +98,11 @@ function onStop() {
 async function onSend(text, atts) {
   if (!settings.apiKey) {
     openSettings(settings, applySettings)
+    return
+  }
+  // 起動制御を設定している場合、停止中なら先に知らせる
+  if (settings.gasUrl && statusBar.getState().key === 'stopped') {
+    list.showNotice('バックエンドが停止しています。上部の「起動」を押してから、3〜5分待って再送してください。')
     return
   }
   if (convId === null) convId = await createConversation()
@@ -198,6 +201,7 @@ function applySettings(s) {
   settings = s
   saveSettings(s)
   renderTopbar()
+  statusBar.refresh()
   refresh()
 }
 
@@ -205,6 +209,7 @@ $('new-chat').addEventListener('click', onNewChat)
 $('open-settings').addEventListener('click', () => openSettings(settings, applySettings))
 
 renderTopbar()
+statusBar.refresh()
 const convs = await listConversations()
 if (convs.length) convId = convs[0].id
 await refresh()
