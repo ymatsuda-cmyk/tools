@@ -76,29 +76,9 @@ export function createStatusBar(root, ctx) {
       h('span', { class: `chip ${state.tone}` }, h('span', { class: 'dot' }), state.label),
     )
 
-    const quota = status?.gpuQuota
-
-    if (quota) {
-
-      const blocks =
-        Math.round(quota.remainPct / 10)
-
-      const bar =
-        '■'.repeat(blocks) +
-        '□'.repeat(10 - blocks)
-
-      root.append(
-        h(
-          'span',
-          {
-            class: 'hint quota-display'
-          },
-          `GPU ${bar} ${quota.remainPct}% `,
-          `${quota.remainHour.toFixed(1)}h/${quota.totalHour.toFixed(0)}h`
-        )
-      )
-    }
-    
+    const quota = formatQuota(status)
+    if (quota) root.append(h('span', { class: 'hint', text: quota }))
+          
     if (busy) {
       root.append(h('span', { class: 'hint', text: '送信中…' }))
     } else if (state.canStart) {

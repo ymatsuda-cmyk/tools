@@ -82,7 +82,30 @@ export function deriveState(st) {
   return { key: 'stopped', label: '停止中', tone: 'ng', canStart: true, canStop: false }
 }
 
+/**
 export function formatQuota(st) {
   if (!st || typeof st.weeklyRemainMin !== 'number') return null
   return `週残 ${(st.weeklyRemainMin / 60).toFixed(1)}h`
+}
+*/
+
+export function formatQuota(st) {
+
+  if (!st?.gpuQuota)
+    return null
+
+  const q = st.gpuQuota
+
+  const blocks =
+    Math.round(q.remainPct / 10)
+
+  const bar =
+    '■'.repeat(blocks) +
+    '□'.repeat(10 - blocks)
+
+  return [
+    'GPU',
+    `${bar} ${q.remainPct}%`,
+    `${q.remainHour.toFixed(1)}h / ${q.totalHour.toFixed(0)}h`
+  ].join(' ')
 }
