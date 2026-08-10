@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260806_ecbe878";
+const APP_VERSION = "rev_20260807_d2a6b91";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -67,6 +67,7 @@ let searchQuery = "";
 let currentTab = "board";     // "board" | "sched" | "agg"
 let aggSubTab  = "status";    // "status"（対応状況） | "delay"（遅延）
 let aggAxis    = "total";     // "total"（総件数） | "cum"（累計） | "day"（当日）
+let aggView    = "graph";     // 対応状況内の表示切替: "graph"（グラフ） | "list"（タスク一覧）
 let aggPanelOpen = false;     // 分類フィルタ行の開閉
 let selectedDelayUsers = [];  // 遅延タブ専用の担当者フィルタ（対応状況側とは独立）
 
@@ -209,6 +210,11 @@ function bindStaticUI() {
   // 集計のサブタブ（対応状況／遅延）
   document.querySelectorAll("#agg-subtabs button").forEach(b => {
     b.addEventListener("click", () => switchAggSub(b.dataset.s));
+  });
+
+  // 対応状況内の表示切替（グラフ／タスク一覧）
+  document.querySelectorAll("#agg-view-tabs button").forEach(b => {
+    b.addEventListener("click", () => switchAggView(b.dataset.v));
   });
 
 
@@ -1374,6 +1380,16 @@ function switchAggSub(sub) {
   renderAggViews();
 }
 
+/* 対応状況タブ内の グラフ／タスク一覧 切替（案2：タブ切替）
+   長くなるとペイン全体が見えなくなる問題への対策。KPI・フィルタは常に
+   表示したまま、下の内容だけをどちらか一方に絞る。 */
+function switchAggView(view) {
+  aggView = view;
+  try { localStorage.setItem("kanban-agg-view", view); } catch (e) { /* 保存できなくても継続 */ }
+  applyTabState();
+  sizeAggLists();
+}
+
 function setAggAxis(axis) {
   aggAxis = axis;
   try { localStorage.setItem("kanban-agg-axis", axis); } catch (e) { /* 同上 */ }
@@ -1389,6 +1405,8 @@ function restoreTabState() {
     if (s === "status" || s === "delay") aggSubTab = s;
     const a = localStorage.getItem("kanban-agg-axis");
     if (a === "total" || a === "cum" || a === "day") aggAxis = a;
+    const v = localStorage.getItem("kanban-agg-view");
+    if (v === "graph" || v === "list") aggView = v;
     const d = localStorage.getItem("kanban-delay-sel");
     if (["overdue", "soon", "idle", "held"].includes(d)) delaySel = d;
     aggPanelOpen = localStorage.getItem("kanban-agg-panel") === "true";
@@ -1428,6 +1446,13 @@ function applyTabState() {
   if (st) st.classList.toggle("hidden", aggSubTab !== "status");
   const dl = document.getElementById("agg-delay");
   if (dl) dl.classList.toggle("hidden", aggSubTab !== "delay");
+
+  document.querySelectorAll("#agg-view-tabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.v === aggView));
+  const gp = document.getElementById("agg-graph-pane");
+  if (gp) gp.classList.toggle("hidden", aggView !== "graph");
+  const lp = document.getElementById("agg-list-pane");
+  if (lp) lp.classList.toggle("hidden", aggView !== "list");
 }
 
 /* 一覧の高さを画面下端までに収める（超える分はスクロール） */
@@ -1451,16 +1476,26 @@ function aggMatch(t) {
 /* ===== 集計計算 ===== */
 function aggregate(rows) {
   const today = toMidnight(new Date());
-  const a = { total: 0, todo: 0, doing: 0, done: 0, pc: 0, ac: 0, pd: 0, ad: 0 };
+  // dd = 対応中のうち遅延（対応中(遅延)）／ td = 未着手のうち遅延（未着手(遅延)）
+  // doing/todo は内訳を含む総数のまま維持し、5区分の表示側で差し引く。
+  const a = { total: 0, todo: 0, doing: 0, done: 0, dd: 0, td: 0, pc: 0, ac: 0, pd: 0, ad: 0 };
 
   rows.forEach(t => {
     a.total++;
 
-    if (t.actualEnd) a.done++;
-    else if (t.actualStart) a.doing++;
-    else a.todo++;
-
     const end = toMidnight(excelDateToJS(t.end));
+    const late = !t.actualEnd && !!end && end < today;
+
+    if (t.actualEnd) {
+      a.done++;
+    } else if (t.actualStart) {
+      a.doing++;
+      if (late) a.dd++;
+    } else {
+      a.todo++;
+      if (late) a.td++;
+    }
+
     if (end) {
       if (end <= today) a.pc++;
       if (end.getTime() === today.getTime()) a.pd++;
@@ -1507,17 +1542,23 @@ function sheetOrder(key) {
 /* ===== 軸ごとの描画定義 ===== */
 const AGG_AXIS_DEF = {
   total: {
-    legend: [["seg-done", "完了"], ["seg-doing", "対応中"], ["seg-todo", "未着手"]],
+    // 表示順は指定どおり：完了 → 対応中 → 対応中(遅延) → 未着手(遅延) → 未着手
+    legend: [
+      ["seg-done", "完了"], ["seg-doing", "対応中"], ["seg-doingdelay", "対応中(遅延)"],
+      ["seg-tododelay", "未着手(遅延)"], ["seg-todo", "未着手"]
+    ],
     base: r => r.total,
     segs: r => [
       ["seg-done", r.done, "完" + r.done],
-      ["seg-doing", r.doing, "中" + r.doing],
-      ["seg-todo", r.todo, "未" + r.todo]
+      ["seg-doing", r.doing - r.dd, "中" + (r.doing - r.dd)],
+      ["seg-doingdelay", r.dd, "遅" + r.dd],
+      ["seg-tododelay", r.td, "遅" + r.td],
+      ["seg-todo", r.todo - r.td, "未" + (r.todo - r.td)]
     ],
     meta: r => `${r.done} / ${r.doing} / ${r.todo}`,
     rate: r => r.total ? Math.round(r.done / r.total * 100) : null,
     warn: false,     // 完了率は進行中に低くなるのが自然なため色分けしない
-    hint: "総件数：棒＝総件数、内訳は 完了 → 対応中 → 未着手"
+    hint: "総件数：棒＝総件数、内訳は 完了→対応中→対応中(遅延)→未着手(遅延)→未着手"
   },
   cum: {
     legend: [["seg-act", "累計実績"], ["seg-gap", "予定との差"]],
@@ -1557,17 +1598,23 @@ function renderAggStatus(rows) {
   // KPI（クリックでグラフ軸を切り替える）
   const kpiEl = document.getElementById("agg-kpis");
   if (kpiEl) {
+    // 実績カードは、対応する予定との差を値の隣に（xx）で添える
+    const diffTag = (diff) => {
+      const sign = diff > 0 ? "+" : "";
+      const cls = diff < 0 ? "minus" : diff > 0 ? "plus" : "";
+      return `<span class="kpi-d ${cls}">（${sign}${diff}）</span>`;
+    };
     const defs = [
-      ["総数", overall.total, "", "total"],
-      ["累計予定", overall.pc, "plan", "cum"],
-      ["累計実績", overall.ac, "act", "cum"],
-      ["当日予定", overall.pd, "plan", "day"],
-      ["当日実績", overall.ad, "act", "day"]
+      ["総数", overall.total, "", "total", null],
+      ["累計予定", overall.pc, "plan", "cum", null],
+      ["累計実績", overall.ac, "act", "cum", overall.ac - overall.pc],
+      ["当日予定", overall.pd, "plan", "day", null],
+      ["当日実績", overall.ad, "act", "day", overall.ad - overall.pd]
     ];
-    kpiEl.innerHTML = defs.map(([label, val, cls, ax]) =>
+    kpiEl.innerHTML = defs.map(([label, val, cls, ax, diff]) =>
       `<button class="kpi ${cls} clickable ${aggAxis === ax ? "sel" : ""}" data-ax="${ax}">
          <span class="kpi-k">${escapeHtml(label)}</span>
-         <span class="kpi-v">${val}</span>
+         <span class="kpi-v">${val}${diff === null ? "" : diffTag(diff)}</span>
        </button>`).join("");
 
     kpiEl.querySelectorAll("[data-ax]").forEach(b => {
@@ -1586,12 +1633,9 @@ function renderAggStatus(rows) {
       `<span class="legend-hint">棒の長さ＝件数比</span>`;
   }
 
-  // 積み上げ横棒（パンくず式ドリルダウン）
+  // 積み上げ横棒（クリックでは反応しない。フィルタチップのみで絞り込む）
   const barsEl = document.getElementById("agg-bars");
-  if (barsEl) {
-    barsEl.innerHTML = aggDrillHtml(rows, cfg, overall);
-    bindAggDrill(barsEl);
-  }
+  if (barsEl) barsEl.innerHTML = aggDrillHtml(rows, cfg, overall);
 
   // タスク一覧
   const listEl = document.getElementById("agg-list");
@@ -1612,15 +1656,21 @@ function renderAggStatus(rows) {
   sizeAggLists();
 }
 
-/* 一覧の並び：遅延 → 対応中 → 未着手 → 完了、同区分内は予定終了日順 */
+/* 一覧の並び：未着手(遅延) → 対応中(遅延) → 対応中 → 未着手 → 完了。
+   グラフの積み上げ順（完了→対応中→対応中(遅延)→未着手(遅延)→未着手）とは
+   意図的に別の順序。グラフは進み具合、一覧は着手すべき優先度を表すため。
+   同区分内は予定終了日の古い順（対応が必要な期限が近いものを上に）。 */
+function aggListRank(t) {
+  if (t.actualEnd) return 4;                                    // 完了
+  const doing = isInProgress(t);
+  const late = isOverdue(t);
+  if (!doing && late) return 0;                                 // 未着手(遅延)
+  if (doing && late) return 1;                                  // 対応中(遅延)
+  return doing ? 2 : 3;                                         // 対応中 / 未着手
+}
+
 function aggListSort(a, b) {
-  const rank = t => {
-    if (t.actualEnd) return 3;
-    if (isOverdue(t)) return 0;
-    if (isInProgress(t)) return 1;
-    return 2;
-  };
-  const d = rank(a) - rank(b);
+  const d = aggListRank(a) - aggListRank(b);
   if (d !== 0) return d;
 
   const ea = toMidnight(excelDateToJS(a.end));
@@ -1631,8 +1681,8 @@ function aggListSort(a, b) {
   return ea - eb;
 }
 
-function aggBarRow(r, cfg, max, showLabels, opts) {
-  const o = opts || {};
+/* 行はクリックでは反応しない。掘り下げ・絞り込みはフィルタチップのみで行う。 */
+function aggBarRow(r, cfg, max, showLabels, extraCls) {
   const base = cfg.base(r);
   const width = max > 0 && base > 0 ? Math.max(base / max * 100, 4) : 0;
   const rate = cfg.rate(r);
@@ -1649,8 +1699,8 @@ function aggBarRow(r, cfg, max, showLabels, opts) {
       `</div>`
     : `<span class="bar-none">—</span>`;
 
-  return `<div class="agg-row ${o.cls || ""} ${o.drill ? "clickable" : ""}"${o.drill ? ` data-drill="${escapeHtml(o.drill)}"` : ""}>
-    <span class="agg-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}${o.caret ? `<i class="caret">${o.caret}</i>` : ""}</span>
+  return `<div class="agg-row ${extraCls || ""}">
+    <span class="agg-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
     <span class="agg-track">${bar}</span>
     <span class="agg-meta">${escapeHtml(cfg.meta(r))}</span>
     <span class="agg-${cls}">${rate === null ? "—" : rate + "%"}</span>
@@ -1675,87 +1725,44 @@ function aggLevel() {
 }
 
 const AGG_LEVELS = [
-  { key: "category",       title: "大分類別",  drill: "cat"  },
-  { key: "classification", title: "小分類別",  drill: "sub"  },
-  { key: "user",           title: "担当者別",  drill: "user" }
+  { key: "category",       title: "大分類別" },
+  { key: "classification", title: "小分類別" },
+  { key: "user",           title: "担当者別" }
 ];
 
+/* ============================================================
+   グラフ本体
+   ------------------------------------------------------------
+   表示する階層は「分類チップの選択状態」から決まる（別状態は持たない）。
+     分類＝すべて     … 全体行 ＋ 大分類別の内訳
+     分類＝いずれか1つ … その分類の小分類別の内訳（全体行は出さない）
+     分類＋小分類 選択 … その組み合わせの担当者別の内訳（同上）
+   行のクリックによる掘り下げは廃止。絞り込みはフィルタチップのみで行う。
+   ============================================================ */
 function aggDrillHtml(rows, cfg, overall) {
   const level = aggLevel();
   const def = AGG_LEVELS[level];
 
-  // パンくず
-  let crumb = `<button data-drill="root">全体</button>`;
-  if (level >= 1) {
-    const cat = selectedCategories[0];
-    crumb += `<span class="sepa">›</span>` + (level >= 2
-      ? `<button data-drill="cat:${escapeHtml(cat)}">${escapeHtml(cat)}</button>`
-      : `<span class="cur">${escapeHtml(cat)}</span>`);
-  }
-  if (level >= 2) {
-    crumb += `<span class="sepa">›</span><span class="cur">${escapeHtml(selectedSubCategories[0])}</span>`;
-  }
-  crumb += `<span class="lvl">表示中：${def.title}</span>`;
-
-  const headName = level === 0 ? "全体"
-    : (level === 1 ? selectedCategories[0] : selectedSubCategories[0]);
-
-  let html = `<div class="agg-crumb">${crumb}</div>`;
-  html += aggBarRow(Object.assign({ name: headName }, overall), cfg, cfg.base(overall), true, { cls: "head" });
+  // 「分類＝すべて」のときだけ全体行を出す。分類を選んでいるときは
+  // 全体＝その分類の合計＝KPIの総数と同じ数字になり冗長なため出さない。
+  let html = level === 0
+    ? aggBarRow(Object.assign({ name: "全体" }, overall), cfg, cfg.base(overall), true, "head")
+    : "";
 
   if (!rows.length) {
     return html + `<div class="agg-empty">該当するタスクがありません</div>`;
   }
 
   const children = aggregateBy(rows, def.key);
+  if (!children.length) {
+    return html + `<div class="agg-empty">該当するタスクがありません</div>`;
+  }
   const max = Math.max(...children.map(cfg.base));
 
   html += `<div class="agg-sec-head">${def.title}</div>`;
-  html += children.map(r => {
-    // 「未設定」は絞り込みキーにできないためドリル不可
-    const canDrill = r.name !== "未設定";
-    return aggBarRow(r, cfg, max, false, {
-      drill: canDrill ? `${def.drill}:${r.name}` : null,
-      caret: canDrill ? (level < 2 ? "›" : "＋") : ""
-    });
-  }).join("");
-
-  html += `<div class="agg-hint">${level < 2
-    ? "行をクリックすると1段深く掘り、フィルタにも反映されます。"
-    : "行をクリックすると担当者フィルタを切り替えます。"}</div>`;
+  html += children.map(r => aggBarRow(r, cfg, max, false)).join("");
 
   return html;
-}
-
-/* ドリルダウン操作。フィルタ状態を直接書き換えることで
-   チップ・カンバン・集計・タスク一覧のすべてが同じ条件で揃う。 */
-function aggDrill(kind, name) {
-  if (kind === "root") {
-    aggCategories = [];
-    aggSubCategories = [];
-  } else if (kind === "cat") {
-    aggCategories = [name];
-    aggSubCategories = [];
-  } else if (kind === "sub") {
-    aggSubCategories = [name];
-  } else if (kind === "user") {
-    // 同じ担当者を再クリックしたら解除
-    aggUsers = (aggUsers.length === 1 && aggUsers[0] === name) ? [] : [name];
-  }
-
-  saveFilters();
-  renderAggViews();   // カンバン側は再描画しない（フィルタが独立しているため）
-}
-
-function bindAggDrill(scope) {
-  scope.querySelectorAll("[data-drill]").forEach(el => {
-    el.addEventListener("click", () => {
-      const v = el.dataset.drill;
-      const i = v.indexOf(":");
-      if (i < 0) aggDrill(v, null);
-      else aggDrill(v.slice(0, i), v.slice(i + 1));
-    });
-  });
 }
 
 /* ============================================================
@@ -1832,16 +1839,20 @@ function actText(t) {
   if (!t.actualStart) return "\u2014";
   return `${fmt(t.actualStart)}\u2192${t.actualEnd ? fmt(t.actualEnd) : ""}`;
 }
+/* 状態は5区分。遅延を対応中／未着手で分けて表示する
+   （手が付いているかどうかで打ち手が違うため一色にまとめない）。 */
 function statusText(t) {
-  if (t.actualEnd) return "\u5b8c\u4e86";
-  if (isOverdue(t)) return "\u9045\u5ef6";
-  if (isInProgress(t)) return "\u5bfe\u5fdc\u4e2d";
-  return "\u672a\u7740\u624b";
+  if (t.actualEnd) return "完了";
+  const doing = isInProgress(t);
+  const late = isOverdue(t);
+  if (doing) return late ? "対応中(遅延)" : "対応中";
+  return late ? "未着手(遅延)" : "未着手";
 }
 function statusPill(t) {
   const label = statusText(t);
   const cls = label === "完了" ? "p-done"
-    : label === "遅延" ? "p-late"
+    : label === "未着手(遅延)" ? "p-late"
+    : label === "対応中(遅延)" ? "p-latedoing"
     : label === "対応中" ? "p-doing" : "p-todo";
   return `<span class="pill ${cls}">${label}</span>`;
 }

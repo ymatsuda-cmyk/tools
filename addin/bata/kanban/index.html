@@ -9,11 +9,11 @@
 
   <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル）
        営業報告アドインも同じファイルを読み込んで共有する -->
-  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806c">
-  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806c"></script>
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260807d">
+  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260807d"></script>
 
-  <script src="kanban.js?v=20260806c"></script>
-  <link rel="stylesheet" href="style.css?v=20260806c">
+  <script src="kanban.js?v=20260807d"></script>
+  <link rel="stylesheet" href="style.css?v=20260807d">
 </head>
 
 <body>
@@ -170,11 +170,21 @@
     <div id="agg-filter"></div>
     <div class="kpi-row" id="agg-kpis"></div>
     <div class="axis-hint" id="agg-axis-hint"></div>
-    <div class="agg-legend" id="agg-legend"></div>
-    <div id="agg-bars"></div>
 
-    <div class="agg-sec">
-      <div class="agg-sec-head">タスク一覧 <span class="cnt" id="agg-list-count"></span></div>
+    <!-- グラフ／タスク一覧の切替（案2）。KPI・フィルタは常に表示したまま、
+         下の内容だけをどちらか一方に絞ることで、長くなっても
+         ペイン全体が見えなくなる問題を避ける -->
+    <div class="subtabs" id="agg-view-tabs">
+      <button data-v="graph" class="on">グラフ</button>
+      <button data-v="list">タスク一覧 <span class="cnt" id="agg-list-count"></span></button>
+    </div>
+
+    <div id="agg-graph-pane">
+      <div class="agg-legend" id="agg-legend"></div>
+      <div id="agg-bars"></div>
+    </div>
+
+    <div id="agg-list-pane" class="hidden">
       <div id="agg-list"></div>
     </div>
   </div>
