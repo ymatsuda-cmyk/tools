@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaggle × Ollama 自前 LLM 基盤 — システム構成</title>
+<style>
+:root{
+  --ink:#14181c;
+  --ink-2:#4a545c;
+  --ink-3:#7d888f;
+  --paper:#eef1f2;
+  --surface:#ffffff;
+  --rule:#d5dcdf;
+  --rule-2:#e8edee;
+  --control:#5b6b78;   /* 制御経路 */
+  --data:#0d7a6b;      /* データ経路 */
+  --flag:#8a5a10;      /* 制約・注意 */
+  --flag-bg:#fbf3e2;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Hiragino Sans","Yu Gothic Medium","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:15px;line-height:1.9;
+  font-feature-settings:"palt" 1;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:48px}
+main{flex:1;min-width:0;max-width:820px;padding:0 0 120px}
+
+/* ── ヘッダー ── */
+.masthead{border-bottom:1px solid var(--rule);margin-bottom:56px;padding:64px 0 28px}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 18px
+}
+h1{
+  font-family:var(--mincho);font-weight:600;font-size:clamp(28px,4.4vw,42px);
+  line-height:1.35;letter-spacing:.01em;margin:0 0 20px
+}
+.thesis{font-size:17px;line-height:2;color:var(--ink-2);margin:0;max-width:60ch}
+
+.strip{display:flex;flex-wrap:wrap;gap:0;margin-top:36px;border-top:1px solid var(--rule)}
+.strip div{
+  flex:1 1 130px;padding:16px 18px 14px 0;border-right:1px solid var(--rule-2)
+}
+.strip div:last-child{border-right:none}
+.strip dt{font-size:11px;color:var(--ink-3);letter-spacing:.06em;margin:0 0 4px}
+.strip dd{margin:0;font-family:var(--mono);font-size:17px;font-weight:500}
+
+/* ── セクション ── */
+section{margin:0 0 72px;scroll-margin-top:24px}
+h2{
+  font-family:var(--mincho);font-size:23px;font-weight:600;letter-spacing:.02em;
+  margin:0 0 8px;padding-top:8px
+}
+h2::before{
+  content:attr(data-n);display:block;font-family:var(--mono);font-size:11px;
+  font-weight:400;letter-spacing:.16em;color:var(--data);margin-bottom:10px
+}
+h3{font-size:15px;font-weight:600;margin:34px 0 10px;letter-spacing:.02em}
+p{margin:0 0 16px;max-width:64ch}
+.lede{color:var(--ink-2);margin-bottom:28px;max-width:62ch}
+a{color:var(--data)}
+
+/* ── 図 ── */
+figure{margin:28px 0;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:26px 22px 18px}
+figure svg{display:block;width:100%;height:auto}
+figcaption{
+  font-size:12.5px;color:var(--ink-3);margin-top:16px;padding-top:12px;
+  border-top:1px solid var(--rule-2);line-height:1.8
+}
+.svg-lab{font-family:var(--sans);font-size:12.5px;fill:var(--ink)}
+.svg-sub{font-family:var(--mono);font-size:10.5px;fill:var(--ink-3)}
+.svg-msg{font-family:var(--sans);font-size:11.5px;fill:var(--ink-2)}
+.svg-note{font-family:var(--mono);font-size:10px;fill:var(--ink-3)}
+
+/* ── 表 ── */
+table{width:100%;border-collapse:collapse;margin:20px 0 26px;font-size:14px}
+th,td{text-align:left;padding:11px 14px 11px 0;border-bottom:1px solid var(--rule-2);vertical-align:top}
+th{
+  font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--rule);
+  padding-bottom:8px;white-space:nowrap
+}
+td code,p code,li code{
+  font-family:var(--mono);font-size:.88em;background:var(--surface);
+  border:1px solid var(--rule-2);border-radius:2px;padding:1px 5px
+}
+.num{font-family:var(--mono);white-space:nowrap}
+
+/* ── 経路タグ ── */
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  padding:2px 7px;border-radius:2px;vertical-align:2px;white-space:nowrap
+}
+.tag.c{background:#e9edf0;color:var(--control)}
+.tag.d{background:#e0f0ed;color:var(--data)}
+
+/* ── 計測ゲージ（このページの署名要素）── */
+.gauges{margin:24px 0 8px;border-top:1px solid var(--rule)}
+.gauge{padding:18px 0 16px;border-bottom:1px solid var(--rule-2)}
+.gauge-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.gauge-name{font-size:14px;font-weight:600;flex:1;min-width:150px}
+.gauge-val{font-family:var(--mono);font-size:19px;letter-spacing:-.01em}
+.gauge-src{
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--ink-3);
+  border:1px solid var(--rule);border-radius:2px;padding:1px 6px
+}
+.track{height:3px;background:var(--rule-2);margin:12px 0 10px;position:relative;overflow:hidden}
+.track i{position:absolute;inset:0 auto 0 0;background:var(--data);display:block}
+.track.limit i{background:var(--flag)}
+.gauge-note{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin:0;max-width:60ch}
+
+/* ── 注意ブロック ── */
+.flag{
+  background:var(--flag-bg);border-left:2px solid var(--flag);
+  padding:16px 18px;margin:22px 0;font-size:14px;line-height:1.85
+}
+.flag p{margin:0;max-width:none}
+.flag strong{color:var(--flag)}
+
+/* ── 記録リスト ── */
+.log{list-style:none;padding:0;margin:20px 0 0;counter-reset:l}
+.log li{
+  border-top:1px solid var(--rule-2);padding:18px 0 16px;display:grid;
+  grid-template-columns:26px 1fr;gap:0 16px
+}
+.log li::before{
+  counter-increment:l;content:counter(l,decimal-leading-zero);
+  font-family:var(--mono);font-size:11px;color:var(--ink-3);padding-top:5px
+}
+.log b{display:block;font-size:14.5px;margin-bottom:4px}
+.log span{font-size:13.5px;color:var(--ink-2);line-height:1.85}
+
+/* ── 目次 ── */
+nav.toc{
+  width:210px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;
+  max-height:100vh;overflow-y:auto;padding:72px 0 40px;font-size:13px
+}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+nav.toc li{margin:0 0 3px}
+nav.toc a{
+  display:block;padding:5px 10px 5px 0;color:var(--ink-2);text-decoration:none;
+  border-left:2px solid transparent;padding-left:12px;line-height:1.6
+}
+nav.toc a:hover{color:var(--ink);border-left-color:var(--rule)}
+nav.toc a::before{
+  counter-increment:t;content:counter(t,decimal-leading-zero) " ";
+  font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-right:6px
+}
+footer{
+  border-top:1px solid var(--rule);padding:26px 0 60px;
+  font-size:12.5px;color:var(--ink-3);font-family:var(--mono)
+}
+:focus-visible{outline:2px solid var(--data);outline-offset:2px}
+
+@media (max-width:920px){
+  nav.toc{display:none}
+  .wrap{padding:0 20px}
+}
+@media print{
+  body{background:#fff}
+  nav.toc{display:none}
+  figure,section{break-inside:avoid}
+}
+@media (prefers-reduced-motion:no-preference){
+  section{animation:rise .5s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc" aria-label="目次">
+  <ol>
+    <li><a href="#arch">全体構成</a></li>
+    <li><a href="#planes">経路の分離</a></li>
+    <li><a href="#lifecycle">起動から停止まで</a></li>
+    <li><a href="#roundtrip">チャット1往復</a></li>
+    <li><a href="#components">構成要素</a></li>
+    <li><a href="#features">機能一覧</a></li>
+    <li><a href="#config">設定と秘密情報</a></li>
+    <li><a href="#measured">実測値</a></li>
+    <li><a href="#decisions">設計判断の記録</a></li>
+    <li><a href="#pitfalls">つまずいた記録</a></li>
+    <li><a href="#limits">制約と未実装</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="masthead">
+  <p class="eyebrow">System documentation</p>
+  <h1>Kaggle の無料 GPU で動く<br>自前 LLM 基盤</h1>
+  <p class="thesis">
+    週30時間だけ存在する GPU の上に Ollama を立て、ブラウザ・Obsidian・任意のクライアントから
+    OpenAI 互換 API として使う。サーバーを一台も持たず、静的ホスティングと Apps Script だけで
+    起動・停止・使用量管理まで完結させた構成の記録。
+  </p>
+  <dl class="strip">
+    <div><dt>GPU</dt><dd>P100 16GB</dd></div>
+    <div><dt>モデル</dt><dd>gemma4:12b</dd></div>
+    <div><dt>入力上限</dt><dd>30,000 tok</dd></div>
+    <div><dt>prefill</dt><dd>270 tok/s</dd></div>
+    <div><dt>常設サーバー</dt><dd>0 台</dd></div>
+  </dl>
+</header>
+
+<!-- 01 ─────────────────────────────────────── -->
+<section id="arch">
+<h2 data-n="01">全体構成</h2>
+<p class="lede">
+  クライアントは2種類、経路は2本。灰色が制御、緑がデータを運ぶ。
+  この2本が交わらないことが、この構成の設計上いちばん重要な性質。
+</p>
+
+<figure>
+<svg viewBox="0 0 760 520" role="img" aria-labelledby="archT">
+  <title id="archT">全体構成図</title>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#7d888f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="40" y="34" width="300" height="58" rx="3" fill="#fff" stroke="#5b6b78" stroke-width="1"/>
+  <text class="svg-lab" x="190" y="58" text-anchor="middle">ブラウザ</text>
+  <text class="svg-sub" x="190" y="76" text-anchor="middle">GitHub Pages / 静的SPA</text>
+
+  <rect x="420" y="34" width="300" height="58" rx="3" fill="#fff" stroke="#0d7a6b" stroke-width="1"/>
+  <text class="svg-lab" x="570" y="58" text-anchor="middle">Obsidian Copilot</text>
+  <text class="svg-sub" x="570" y="76" text-anchor="middle">iPad / Mac</text>
+
+  <path d="M140 94 L140 138" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+  <path d="M290 94 L290 118 L620 118 L620 138" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+  <path d="M500 94 L500 138" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+
+  <rect x="40" y="144" width="300" height="58" rx="3" fill="#f3f5f6" stroke="#5b6b78" stroke-width="1"/>
+  <text class="svg-lab" x="190" y="168" text-anchor="middle">Apps Script ウェブアプリ</text>
+  <text class="svg-sub" x="190" y="186" text-anchor="middle">start / stop / status / record</text>
+
+  <rect x="420" y="144" width="300" height="58" rx="3" fill="#eaf4f2" stroke="#0d7a6b" stroke-width="1"/>
+  <text class="svg-lab" x="570" y="168" text-anchor="middle">ngrok</text>
+  <text class="svg-sub" x="570" y="186" text-anchor="middle">固定ドメイン / HTTPS</text>
+
+  <path d="M100 204 L100 250" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+  <path d="M240 204 L240 250" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+  <path d="M320 204 L320 228 L385 228 L385 250" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+  <path d="M640 204 L640 350" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+
+  <rect x="40" y="256" width="122" height="54" rx="3" fill="#fff" stroke="#c9d2d6"/>
+  <text class="svg-lab" x="101" y="278" text-anchor="middle">Drive</text>
+  <text class="svg-sub" x="101" y="295" text-anchor="middle">proxy_py</text>
+
+  <rect x="178" y="256" width="122" height="54" rx="3" fill="#fff" stroke="#c9d2d6"/>
+  <text class="svg-lab" x="239" y="278" text-anchor="middle">Sheets</text>
+  <text class="svg-sub" x="239" y="295" text-anchor="middle">実行ログ</text>
+
+  <rect x="316" y="256" width="138" height="54" rx="3" fill="#fff" stroke="#c9d2d6"/>
+  <text class="svg-lab" x="385" y="278" text-anchor="middle">Kaggle API</text>
+  <text class="svg-sub" x="385" y="295" text-anchor="middle">kernels/push</text>
+
+  <path d="M385 312 L385 350" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+
+  <rect x="40" y="356" width="680" height="130" rx="3" fill="#fff" stroke="#0d7a6b" stroke-width="1"/>
+  <text class="svg-lab" x="380" y="382" text-anchor="middle">Kaggle notebook — P100 16GB / 週30時間</text>
+
+  <rect x="66" y="402" width="300" height="60" rx="3" fill="#fafcfc" stroke="#c9d2d6"/>
+  <text class="svg-lab" x="216" y="426" text-anchor="middle">プロキシ :11435</text>
+  <text class="svg-sub" x="216" y="444" text-anchor="middle">OpenAI互換 / 認証 / CORS</text>
+
+  <rect x="394" y="402" width="300" height="60" rx="3" fill="#fafcfc" stroke="#c9d2d6"/>
+  <text class="svg-lab" x="544" y="426" text-anchor="middle">ollama serve :11434</text>
+  <text class="svg-sub" x="544" y="444" text-anchor="middle">gemma4:12b / num_ctx 32768</text>
+
+  <path d="M368 432 L390 432" fill="none" stroke="#7d888f" stroke-width="1" marker-end="url(#a1)"/>
+</svg>
+<figcaption>
+  図に描き切れていない線が1本ある。notebook は30秒ごとに Apps Script へ折り返し、
+  停止指示の受け取りと生存通知を兼ねている。終了時には稼働分数を Sheets に書き戻す。
+</figcaption>
+</figure>
+</section>
+
+<!-- 02 ─────────────────────────────────────── -->
+<section id="planes">
+<h2 data-n="02">経路の分離</h2>
+<p class="lede">
+  Apps Script を制御に使い、チャットは通さない。これは好みではなく、
+  通さざるを得ない理由が3つある。
+</p>
+
+<table>
+<thead><tr><th>制約</th><th>影響</th></tr></thead>
+<tbody>
+<tr><td>リクエストは GET のクエリ文字列</td><td>長文もファイルも載らない</td></tr>
+<tr><td>レスポンスを分割送信できない</td><td>ストリーミング不可。無音で数十秒待つことになる</td></tr>
+<tr><td><code>UrlFetchApp</code> の上限は約60秒</td><td>3万トークンの prefill に間に合わない</td></tr>
+</tbody>
+</table>
+
+<p>
+  よってデータは <span class="tag d">ブラウザ → ngrok → プロキシ</span> の直通、
+  制御だけが <span class="tag c">ブラウザ → Apps Script → Kaggle API</span> を通る。
+  Kaggle の API キーが Apps Script の外に出ないという副次的な利点も、この分離から来ている。
+</p>
+</section>
+
+<!-- 03 ─────────────────────────────────────── -->
+<section id="lifecycle">
+<h2 data-n="03">起動から停止まで</h2>
+<p class="lede">
+  Kaggle には「カーネルを停止する API」が存在しない。
+  そのため停止は、notebook 自身にポーリングさせて自ら終わらせる形をとっている。
+</p>
+
+<figure>
+<svg viewBox="0 0 760 430" role="img" aria-labelledby="seq1T">
+  <title id="seq1T">起動から停止までのシーケンス</title>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 2L9 5L2 8" fill="#7d888f"/>
+    </marker>
+  </defs>
+
+  <g>
+    <rect x="20" y="0" width="150" height="34" rx="3" fill="#fff" stroke="#5b6b78"/>
+    <text class="svg-lab" x="95" y="21" text-anchor="middle">ブラウザ</text>
+    <rect x="210" y="0" width="150" height="34" rx="3" fill="#f3f5f6" stroke="#5b6b78"/>
+    <text class="svg-lab" x="285" y="21" text-anchor="middle">Apps Script</text>
+    <rect x="400" y="0" width="150" height="34" rx="3" fill="#fff" stroke="#c9d2d6"/>
+    <text class="svg-lab" x="475" y="21" text-anchor="middle">Kaggle API</text>
+    <rect x="590" y="0" width="150" height="34" rx="3" fill="#fff" stroke="#0d7a6b"/>
+    <text class="svg-lab" x="665" y="21" text-anchor="middle">notebook</text>
+  </g>
+
+  <g stroke="#dde3e6" stroke-width="1" stroke-dasharray="2 4">
+    <line x1="95" y1="34" x2="95" y2="415"/>
+    <line x1="285" y1="34" x2="285" y2="415"/>
+    <line x1="475" y1="34" x2="475" y2="415"/>
+    <line x1="665" y1="34" x2="665" y2="415"/>
+  </g>
+
+  <text class="svg-msg" x="98" y="66">起動</text>
+  <line x1="95" y1="74" x2="281" y2="74" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="292" y="102">二重起動とクォータ残を確認</text>
+  <path d="M285 110 L340 110 L340 124 L289 124" fill="none" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="380" y="150">kernels/push</text>
+  <line x1="285" y1="158" x2="471" y2="158" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="530" y="186">セッション開始（3〜5分）</text>
+  <line x1="475" y1="194" x2="661" y2="194" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="410" y="222">started</text>
+  <line x1="665" y1="230" x2="289" y2="230" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="380" y="258">shouldStop（30秒ごと）</text>
+  <line x1="665" y1="266" x2="289" y2="266" stroke="#7d888f" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="98" y="306">停止</text>
+  <line x1="95" y1="314" x2="281" y2="314" stroke="#7d888f" marker-end="url(#a2)"/>
+  <text class="svg-note" x="292" y="314">フラグを立てるだけ</text>
+
+  <text class="svg-msg" x="410" y="342">stop = true</text>
+  <line x1="289" y1="350" x2="661" y2="350" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="410" y="392">record（稼働分数）</text>
+  <line x1="665" y1="400" x2="289" y2="400" stroke="#7d888f" marker-end="url(#a2)"/>
+</svg>
+<figcaption>
+  記録を notebook 側から送るのが要点。ブラウザを閉じても、セッションが上限で自然終了しても、
+  稼働時間が必ず残る。週30時間の枠を超過する方向の誤差を防ぐための設計。
+</figcaption>
+</figure>
+</section>
+
+<!-- 04 ─────────────────────────────────────── -->
+<section id="roundtrip">
+<h2 data-n="04">チャット1往復</h2>
+<p class="lede">
+  送信前に推定し、応答後に実測と突き合わせる。この二段構えが、
+  この基盤でいちばん厄介な失敗——無言の切り捨て——への対策になっている。
+</p>
+
+<figure>
+<svg viewBox="0 0 760 400" role="img" aria-labelledby="seq2T">
+  <title id="seq2T">チャット1往復のシーケンス</title>
+
+  <g>
+    <rect x="30" y="0" width="200" height="34" rx="3" fill="#fff" stroke="#5b6b78"/>
+    <text class="svg-lab" x="130" y="21" text-anchor="middle">ブラウザ</text>
+    <rect x="280" y="0" width="200" height="34" rx="3" fill="#eaf4f2" stroke="#0d7a6b"/>
+    <text class="svg-lab" x="380" y="21" text-anchor="middle">プロキシ</text>
+    <rect x="530" y="0" width="200" height="34" rx="3" fill="#fff" stroke="#c9d2d6"/>
+    <text class="svg-lab" x="630" y="21" text-anchor="middle">Ollama</text>
+  </g>
+
+  <g stroke="#dde3e6" stroke-width="1" stroke-dasharray="2 4">
+    <line x1="130" y1="34" x2="130" y2="385"/>
+    <line x1="380" y1="34" x2="380" y2="385"/>
+    <line x1="630" y1="34" x2="630" y2="385"/>
+  </g>
+
+  <text class="svg-msg" x="137" y="64">トークンを推定し、上限超過なら送信を止める</text>
+  <path d="M130 72 L196 72 L196 86 L134 86" fill="none" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="150" y="114">POST /v1/chat/completions</text>
+  <line x1="130" y1="122" x2="376" y2="122" stroke="#7d888f" marker-end="url(#a2)"/>
+  <text class="svg-note" x="150" y="138">ngrok を透過</text>
+
+  <text class="svg-msg" x="387" y="166">Bearer 照合／本文と画像を分離</text>
+  <path d="M380 174 L446 174 L446 188 L384 188" fill="none" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="400" y="216">POST /api/chat</text>
+  <line x1="380" y1="224" x2="626" y2="224" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="400" y="252">NDJSON でトークンを逐次返す</text>
+  <line x1="630" y1="260" x2="384" y2="260" stroke="#7d888f" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="150" y="288">SSE に変換して中継</text>
+  <line x1="380" y1="296" x2="134" y2="296" stroke="#7d888f" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="150" y="324">最終チャンクに usage</text>
+  <line x1="380" y1="332" x2="134" y2="332" stroke="#7d888f" marker-end="url(#a2)"/>
+
+  <text class="svg-msg" x="137" y="362">実測と推定を照合し、推定係数を較正</text>
+  <path d="M130 370 L196 370 L196 384 L134 384" fill="none" stroke="#7d888f" marker-end="url(#a2)"/>
+</svg>
+<figcaption>
+  ngrok は経路上にあるが変換をしないため省略している。
+  <code>usage.prompt_tokens</code> は Ollama の応答をプロキシが最終チャンクに載せ替えたもの。
+</figcaption>
+</figure>
+
+<div class="flag">
+<p>
+  <strong>無言の切り捨て。</strong>
+  入力が <code>num_ctx</code> を超えると、Ollama はエラーを返さずに前半を捨て、
+  残った後半だけで応答する。それらしい答えが返るため気づけない。
+  実測では上限の半分ちょうどの位置で切られた。
+</p>
+</div>
+</section>
+
+<!-- 05 ─────────────────────────────────────── -->
+<section id="components">
+<h2 data-n="05">構成要素</h2>
+
+<table>
+<thead><tr><th>経路</th><th>要素</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td><span class="tag c">制御</span></td><td>Apps Script ウェブアプリ</td><td>起動・停止・状態取得・使用量記録。Kaggle の API キーはここから出さない</td></tr>
+<tr><td><span class="tag c">制御</span></td><td>Google Drive</td><td>notebook の Python 本体を <code>proxy_py.html</code> として保管</td></tr>
+<tr><td><span class="tag c">制御</span></td><td>Google Sheets</td><td>起動・停止日時と稼働分数。週次クォータの算出元</td></tr>
+<tr><td><span class="tag c">制御</span></td><td>Kaggle API</td><td><code>kernels/push</code> で新バージョンを作ることが起動に相当する</td></tr>
+<tr><td><span class="tag d">データ</span></td><td>ngrok</td><td>予約ドメインの HTTPS トンネル。再起動しても URL が変わらない</td></tr>
+<tr><td><span class="tag d">データ</span></td><td>プロキシ :11435</td><td>OpenAI 互換への変換、Bearer 認証、CORS、SSE 化</td></tr>
+<tr><td><span class="tag d">データ</span></td><td>ollama serve :11434</td><td>gemma4:12b の実行</td></tr>
+<tr><td>—</td><td>ブラウザアプリ</td><td>ビルド不要の静的 SPA。GitHub Pages から配信</td></tr>
+</tbody>
+</table>
+
+<h3>プロキシが担っていること</h3>
+<p>
+  Ollama にも <code>/v1</code> はあるが、間に自前のプロキシを挟んでいる。
+  理由は Bearer 認証、CORS ヘッダ、思考モードの抑止、
+  そしてストリーミング時に <code>usage</code> を返すこと。
+  最後の1つは Ollama の <code>/v1</code> が返してくれないため、
+  切り捨て検知のために自前で載せ替える必要があった。
+</p>
+</section>
+
+<!-- 06 ─────────────────────────────────────── -->
+<section id="features">
+<h2 data-n="06">機能一覧</h2>
+
+<table>
+<thead><tr><th>領域</th><th>機能</th><th>備考</th></tr></thead>
+<tbody>
+<tr><td rowspan="3">接続</td><td>ベースURL・APIキー・モデル・num_ctx の設定</td><td>localStorage に保存</td></tr>
+<tr><td>接続テスト</td><td><code>/v1/models</code> からモデル一覧を自動取得</td></tr>
+<tr><td>APIキーの入力検証</td><td>改行・全角の混入を保存前に弾く</td></tr>
+<tr><td rowspan="3">会話</td><td>ストリーミング表示・途中停止</td><td>SSE。Markdown は 120ms でスロットル描画</td></tr>
+<tr><td>会話履歴の永続化</td><td>IndexedDB（Dexie）</td></tr>
+<tr><td>やりとり単位のコピー</td><td>添付の本文も連結して取得</td></tr>
+<tr><td rowspan="4">添付</td><td>PDF / docx / xlsx / テキスト系の抽出</td><td>すべてブラウザ内。CDN から遅延読み込み</td></tr>
+<tr><td>画像</td><td>OpenAI 形式で送り、プロキシが Ollama 形式へ変換</td></tr>
+<tr><td>ドラッグ＆ドロップ / ペースト</td><td>スクリーンショットの貼り付けにも対応</td></tr>
+<tr><td>2,000字超のペーストを自動カード化</td><td>本文に展開せず視認性を保つ</td></tr>
+<tr><td rowspan="3">上限管理</td><td>コンテキスト使用量メーター</td><td>入力欄の直上に常設</td></tr>
+<tr><td>超過時の送信ブロック</td><td>原因になっている添付を名指しする</td></tr>
+<tr><td>切り捨ての事後検知と推定係数の自動較正</td><td><code>usage.prompt_tokens</code> と突き合わせる</td></tr>
+<tr><td rowspan="3">起動制御</td><td>状態表示（停止中／起動中／稼働中）</td><td>Kaggle の状態とハートビートを併用</td></tr>
+<tr><td>起動・停止ボタン、週次残量</td><td>状態に応じて 6〜20秒でポーリング</td></tr>
+<tr><td>停止中の送信を事前に案内</td><td>接続エラーを見せない</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- 07 ─────────────────────────────────────── -->
+<section id="config">
+<h2 data-n="07">設定と秘密情報</h2>
+<p class="lede">
+  3つの秘密が登場する。性質が違うので、置き場所を混同しないこと。
+</p>
+
+<table>
+<thead><tr><th>値</th><th>置き場所</th><th>ブラウザに出るか</th><th>守っている対象</th></tr></thead>
+<tbody>
+<tr><td><code>KAGGLE_API_KEY</code></td><td>Apps Script のみ</td><td class="num">出さない</td><td>Kaggle アカウント全体</td></tr>
+<tr><td><code>CONTROL_TOKEN</code></td><td>Apps Script ＋ ブラウザ</td><td class="num">出る</td><td>GPU の起動</td></tr>
+<tr><td><code>PROXY_API_KEY</code></td><td>Apps Script ＋ ブラウザ</td><td class="num">出る</td><td>GPU の利用</td></tr>
+</tbody>
+</table>
+
+<p>
+  下2つはブラウザに入る前提の値で、アプリ利用者から隠す秘密ではない。
+  守っているのは「URL を偶然知った第三者が GPU 枠を消費すること」に限られる。
+  Kaggle の API キーだけは性質が違い、これはアカウント全体の操作権限を持つ。
+</p>
+
+<h3>Apps Script のスクリプトプロパティ</h3>
+<table>
+<thead><tr><th>キー</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>KAGGLE_API_KEY</code></td><td>Kaggle の API キー</td></tr>
+<tr><td><code>KAGGLE_KERNEL</code></td><td><code>ymatsuda2025/gemma4-12b</code></td></tr>
+<tr><td><code>SPREADSHEET_ID</code></td><td>実行ログのスプレッドシート</td></tr>
+<tr><td><code>CONTROL_TOKEN</code> / <code>PROXY_API_KEY</code></td><td><code>openssl rand -hex 16</code> で生成</td></tr>
+<tr><td><code>NGROK_DOMAIN</code></td><td>予約済みの固定ドメイン</td></tr>
+<tr><td><code>GAS_WEBAPP_URL</code></td><td>デプロイ後の <code>/exec</code> URL</td></tr>
+</tbody>
+</table>
+<p>
+  notebook のソースはプロパティではなく、プロジェクト内の <code>proxy_py.html</code> に置いている。
+  プロパティは1件あたり 9KB までで、10KB を超えるソースは入らない。
+  Apps Script が push の直前にプレースホルダへ実際の値を差し込む。
+</p>
+</section>
+
+<!-- 08 ─────────────────────────────────────── -->
+<section id="measured">
+<h2 data-n="08">実測値</h2>
+<p class="lede">
+  この基盤の設定値は、ほぼすべて測って決めた。
+  ドキュメントに書くべきは「推奨値」ではなく「測った値と、測った条件」だと考えている。
+</p>
+
+<div class="gauges">
+
+  <div class="gauge">
+    <div class="gauge-top">
+      <span class="gauge-name">prefill 速度</span>
+      <span class="gauge-val">270 tok/s</span>
+      <span class="gauge-src">実測 / 4条件</span>
+    </div>
+    <div class="track"><i style="width:100%"></i></div>
+    <p class="gauge-note">
+      5,000〜50,000字の4条件で 263〜280 tok/s と一定。
+      待ち時間の予測式はこの値を使っている。生成側は別で約 20 tok/s。
+    </p>
+  </div>
+
+  <div class="gauge">
+    <div class="gauge-top">
+      <span class="gauge-name">コンテキスト長</span>
+      <span class="gauge-val">32,768</span>
+      <span class="gauge-src">VRAM 制約</span>
+    </div>
+    <div class="track limit"><i style="width:12.5%"></i></div>
+    <p class="gauge-note">
+      モデル自体は 262,144 まで対応する。32,768 に抑えているのは P100 の 15.9GB が理由で、
+      モデルの制約ではない。KV キャッシュが収まるならまだ上げられる。
+    </p>
+  </div>
+
+  <div class="gauge">
+    <div class="gauge-top">
+      <span class="gauge-name">入力の実質上限</span>
+      <span class="gauge-val">30,000 tok</span>
+      <span class="gauge-src">導出</span>
+    </div>
+    <div class="track limit"><i style="width:91.5%"></i></div>
+    <p class="gauge-note">
+      出力用に 2,048 を残した残り。日本語の散文なら約 7万字、
+      コードや ID が混じると約 3.7万字。字数ではなくトークン数が上限を決める。
+    </p>
+  </div>
+
+  <div class="gauge">
+    <div class="gauge-top">
+      <span class="gauge-name">トークン効率</span>
+      <span class="gauge-val">0.50 tok/字</span>
+      <span class="gauge-src">実測 / 回帰</span>
+    </div>
+    <div class="track"><i style="width:50%"></i></div>
+    <p class="gauge-note">
+      5往復の会話から <code>tokens ≒ 0.50 × 文字数 + 17</code>。誤差は数トークン。
+      英数字の羅列は逆に 0.82 tok/字と重くなる。アプリは実測値で係数を自動較正する。
+    </p>
+  </div>
+
+  <div class="gauge">
+    <div class="gauge-top">
+      <span class="gauge-name">週次クォータ</span>
+      <span class="gauge-val">30 時間</span>
+      <span class="gauge-src">Kaggle 仕様</span>
+    </div>
+    <div class="track limit"><i style="width:100%"></i></div>
+    <p class="gauge-note">
+      リセットは土曜の朝（UTC）。需要によって変動するため 30 は目安。
+      集計を月曜起点にしていた時期があり、残量を過大に見積もっていた。
+    </p>
+  </div>
+
+</div>
+</section>
+
+<!-- 09 ─────────────────────────────────────── -->
+<section id="decisions">
+<h2 data-n="09">設計判断の記録</h2>
+
+<h3>OpenAI 互換に寄せた</h3>
+<p>
+  Ollama 独自の <code>/api/chat</code> ではなく <code>/v1/chat/completions</code> を話す。
+  これ1本で Obsidian Copilot、VS Code、Python SDK、curl がすべて同じ設定で繋がる。
+  他のアプリから使うための API を「作る」必要がなく、すでにあることになる。
+</p>
+
+<h3>ビルドをやめた</h3>
+<p>
+  React と Vite で組んだあと、素の JS / HTML / CSS に作り直した。
+  importmap で CDN から ESM を読めばモジュール分割は保てる。
+  <code>npm install</code> も GitHub Actions も不要になり、
+  Pages の <code>base</code> パスの罠も消えた。失ったのは型チェックと差分描画で、
+  後者は Markdown のスロットル描画で埋めている。
+</p>
+
+<h3>Apps Script との通信は JSONP</h3>
+<p>
+  ウェブアプリの <code>/exec</code> はレスポンス時にリダイレクトが挟まり、
+  ブラウザからの <code>fetch</code> は環境によって CORS が不安定になる。
+  JSONP なら CORS の対象外で確実に通る。
+  代償として <code>CONTROL_TOKEN</code> が URL に載るため、
+  このトークンで守る対象は GPU の起動だけに留めている。
+</p>
+
+<h3>notebook のソースは Drive ではなくプロジェクト内に</h3>
+<p>
+  当初は Drive の <code>.ipynb</code> を読んでいたが、
+  Apps Script 内の HTML ファイルに Python を直接置き、
+  ipynb の JSON は push 時に組み立てる形に変えた。
+  <code>DriveApp</code> のスコープが不要になり、
+  編集対象がエスケープ済み JSON から素の Python になった。
+</p>
+</section>
+
+<!-- 10 ─────────────────────────────────────── -->
+<section id="pitfalls">
+<h2 data-n="10">つまずいた記録</h2>
+<p class="lede">
+  原因の特定に時間がかかったものを、症状と実際の原因の対で残しておく。
+  どれも「表示されるエラーが本当の原因を指していない」種類のもの。
+</p>
+
+<ol class="log">
+<li>
+  <b>HTTP/2 の PROTOCOL_ERROR と 400 Bad Request</b>
+  <span>
+    プロキシの実装を疑ったが、原因は環境変数に入れた API キーに余計な文字が混ざっていたこと。
+    ヘッダとして送れない値だったため、ngrok のエッジに到達する前に捨てられていた。
+    でたらめな32桁を直接書いて 401 が返ることを確認したのが決め手。
+  </span>
+</li>
+<li>
+  <b>Google ドライブの「ファイルを開くことができません」</b>
+  <span>
+    Apps Script のウェブアプリ URL を開いたときの症状。URL の形式ではなく、
+    そのデプロイ ID がもう有効でなかった。デプロイを作り直して解決。
+    コードを保存しただけではウェブアプリに反映されない点も同根。
+  </span>
+</li>
+<li>
+  <b>入力欄で1文字打つとフォーカスが外れる</b>
+  <span>
+    入力イベントで DOM を丸ごと作り直していたため、textarea が一度 DOM から外れていた。
+    構造の組み立てと値の更新を分離して解決。素の JS に移した際に持ち込んだ問題。
+  </span>
+</li>
+<li>
+  <b>画像を添付してもモデルが認識しない</b>
+  <span>
+    プロキシの実装やモデルの対応状況を疑ったが、原因は Kaggle のデータセットに入れていた
+    モデルの複製が不完全で、画像エンコーダのブロブが欠けていたこと。
+    Kaggle 上で公式から取り直してデータセットを作り直した。
+  </span>
+</li>
+<li>
+  <b>preflight が CORS で弾かれる</b>
+  <span>
+    <code>Authorization</code> ヘッダを付けると OPTIONS が先に飛ぶが、
+    そこには <code>ngrok-skip-browser-warning</code> が乗らない。
+    ただし多くの場合、実体は「Kaggle が停止していて ngrok がエラーページを返している」だけだった。
+    オフラインが CORS エラーの顔をして現れる。
+  </span>
+</li>
+<li>
+  <b>Kaggle のセルが謎の FileNotFoundError で落ちる</b>
+  <span>
+    <code>ollama</code> が無いというエラーだったが、実際の原因は40秒前の行にあった。
+    インターネットが無効で、あるいは <code>zstd</code> が無くてインストーラが失敗していた。
+    導入直後に成否を確認する行を入れて、原因の位置を前に持ってきた。
+  </span>
+</li>
+</ol>
+</section>
+
+<!-- 11 ─────────────────────────────────────── -->
+<section id="limits">
+<h2 data-n="11">制約と未実装</h2>
+
+<h3>構造上の制約</h3>
+<table>
+<thead><tr><th>制約</th><th>影響</th></tr></thead>
+<tbody>
+<tr><td>セッションは最長9時間</td><td>常時稼働はできない。使うたびに3〜5分の起動待ちがある</td></tr>
+<tr><td>週30時間のクォータ</td><td>変動枠のため、集計はあくまで目安</td></tr>
+<tr><td>ngrok 無料枠</td><td>同時接続数と帯域に制限がある</td></tr>
+<tr><td>キーが1本</td><td>クライアントごとの失効ができない</td></tr>
+<tr><td>P100 の VRAM 15.9GB</td><td>コンテキスト長の上限を決めている最大の要因</td></tr>
+</tbody>
+</table>
+
+<h3>未実装</h3>
+<table>
+<thead><tr><th>項目</th><th>備考</th></tr></thead>
+<tbody>
+<tr><td>埋め込みモデルと RAG</td><td>Obsidian の Vault QA を使うにはこれが要る</td></tr>
+<tr><td>Cloudflare Workers の前段</td><td>永続URL、クライアント別キー、停止中の 503 を返せる</td></tr>
+<tr><td>履歴の要約圧縮</td><td>現在は機械的に切り詰めているだけ</td></tr>
+<tr><td>PWA 化とエクスポート</td><td>—</td></tr>
+<tr><td>コンテキスト長の引き上げ</td><td>49,152 が載るかは未検証。1行の変更で試せる</td></tr>
+</tbody>
+</table>
+</section>
+
+<footer>
+  gemma4:12b / P100 16GB / Kaggle · GitHub Pages · Apps Script · ngrok
+</footer>
+
+</main>
+</div>
+</body>
+</html>
