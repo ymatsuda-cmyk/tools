@@ -20,7 +20,7 @@
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260806_c9f2e58";
+const APP_VERSION = "rev_20260807_g8d14c3";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -2659,6 +2659,7 @@ let schedExpandedId = null;
 let schedExpandTasks = [];
 let schedShowLeave = false;
 let schedExpandMeta = null;
+let schedHolidaysTried = false;
 
 async function toggleSchedExpand(id) {
   if (schedExpandedId === id) {
@@ -2707,6 +2708,13 @@ async function toggleSchedLeave(cb) {
 function renderSched() {
   const cont = document.getElementById("sched-container");
   if (!cont) return;
+
+  /* 休業日（wbs 8行目）を1度だけ読み込む。読めたらもう一度描き直して影を出す。
+     読めなくてもガント自体は描くので、失敗しても表示は壊れない。 */
+  if (!schedHolidaysTried && typeof loadHolidays === "function") {
+    schedHolidaysTried = true;
+    loadHolidays().then(() => renderSched()).catch(() => { /* 影なしで続行 */ });
+  }
   cont.innerHTML = ganttHtml();
   setupGantt();
   if (typeof bindTaskLines === "function") bindTaskLines(cont);
@@ -2797,63 +2805,34 @@ function ganttHtml() {
   const totalDays = Math.round((t1 - t0) / DAY_MS);
   const widthPct = (12 / ganttZoom) * 100;          // 内側の横幅（ビューポート比）
 
-  // 月ヘッダー
-  const months = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
-    const next = new Date(t0.getFullYear(), t0.getMonth() + i + 1, 1);
-    months.push({
-      label: `${String(d.getFullYear()).slice(2)}/${String(d.getMonth() + 1).padStart(2, "0")}`,
-      left: ((d - t0) / DAY_MS) / totalDays * 100,
-      width: ((next - d) / DAY_MS) / totalDays * 100,
-    });
-  }
-  const monthCells = months.map(m =>
-    `<div class="g-mcell" style="left:${m.left}%;width:${m.width}%">${m.label}</div>`).join("");
-  const monthLines = months.slice(1).map(m =>
-    `<div class="g-vline" style="left:${m.left}%"></div>`).join("");
-
-  // 日付サブヘッダー（ズーム別に密度を自動調整）
-  //  12ヶ月: 日付なし / 6ヶ月: 隔週(1・15日) / 3ヶ月: 毎週の週頭 / 1ヶ月: 毎週の週頭＋曜日
-  const WD = ["日", "月", "火", "水", "木", "金", "土"];
-  let dateCells = "";
-  if (ganttZoom !== 12) {
-    const marks = [];
-    if (ganttZoom === 6) {
-      // 各月の1日・15日
-      for (let i = 0; i < 12; i++) {
-        [1, 15].forEach(day => {
-          const d = new Date(t0.getFullYear(), t0.getMonth() + i, day);
-          if (d >= t0 && d < t1) marks.push({ d, text: String(day) });
-        });
-      }
-    } else {
-      // 毎週の週頭（月曜）
-      const first = new Date(t0);
-      const shift = (first.getDay() + 6) % 7;               // 月曜起点
-      first.setDate(first.getDate() - shift);
-      for (let d = new Date(first); d < t1; d.setDate(d.getDate() + 7)) {
-        if (d < t0) continue;
-        const text = ganttZoom === 1
-          ? `${WD[d.getDay()]} ${d.getDate()}`               // 月 8
-          : `${d.getMonth() + 1}/${d.getDate()}`;            // 7/8
-        marks.push({ d: new Date(d), text });
-      }
+  /* カレンダー（api.js の共通実装。WBSカンバンのスケジュールと同じ見た目）
+     内部は常に12ヶ月ぶん描き、ズームは幅の倍率で表すため、
+     描く月数は12、密度の基準は ganttZoom を渡す。 */
+  let monthCells = "", dateCells = "", monthLines = "", todayHtml = "", todayChip = "";
+  let calRows = null;
+  if (typeof schedCalendar === "function") {
+    const cal = schedCalendar({ t0, t1, totalDays, monthCount: 12, zoom: ganttZoom });
+    calRows = cal.rows;
+    monthLines = cal.bg;
+    todayHtml = cal.todayLine;
+    todayChip = cal.todayChip;
+  } else {
+    // api.js が古い場合のフォールバック（従来の簡易ヘッダー）
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
+      const next = new Date(t0.getFullYear(), t0.getMonth() + i + 1, 1);
+      const left = ((d - t0) / DAY_MS) / totalDays * 100;
+      const width = ((next - d) / DAY_MS) / totalDays * 100;
+      monthCells += `<div class="g-mcell" style="left:${left}%;width:${width}%">${String(d.getFullYear()).slice(2)}/${String(d.getMonth() + 1).padStart(2, "0")}</div>`;
+      if (i > 0) monthLines += `<div class="g-vline" style="left:${left}%"></div>`;
     }
-    dateCells = marks.map(m => {
-      const lp = ((m.d - t0) / DAY_MS) / totalDays * 100;
-      return `<span class="g-dcell" style="left:${lp}%">${m.text}</span>`;
-    }).join("");
-  }
-
-  // 本日線
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  let todayHtml = "", todayChip = "";
-  if (today >= t0 && today < t1) {
-    const lp = ((today - t0) / DAY_MS) / totalDays * 100;
-    todayHtml = `<div class="g-today" style="left:${lp}%"></div>`;
-    todayChip = `<div class="g-today" style="left:${lp}%"></div>
-      <div class="g-today-chip" style="left:${lp}%">今日 ${md(today)}</div>`;
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    if (today0 >= t0 && today0 < t1) {
+      const lp = ((today0 - t0) / DAY_MS) / totalDays * 100;
+      todayHtml = `<div class="g-today" style="left:${lp}%"></div>`;
+      todayChip = todayHtml + `<div class="g-today-chip" style="left:${lp}%">今日 ${md(today0)}</div>`;
+    }
+    calRows = [{ h: 20, html: monthCells + todayChip }];
   }
 
   const items = ganttRecords();
@@ -2916,10 +2895,9 @@ function ganttHtml() {
       <div class="g-row g-headrow">
         <div class="g-label g-corner">案件</div>
         <div class="g-headstack">
-          <div class="g-track g-head">${monthCells}${todayChip}
-            <span class="g-pan-hint">← ドラッグで期間移動 ／ 案件名クリックでタスク展開 →</span>
-          </div>
-          ${dateCells ? `<div class="g-track g-head g-daterow">${dateCells}</div>` : ""}
+          ${calRows.map((r, i) => `<div class="g-track g-head cal-row" style="height:${r.h}px">${r.html}${
+            i === 0 ? '<span class="g-pan-hint">← ドラッグで期間移動 ／ 案件名クリックでタスク展開 →</span>' : ""
+          }</div>`).join("")}
         </div>
       </div>
       ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}
