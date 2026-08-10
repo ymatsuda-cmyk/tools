@@ -1536,18 +1536,28 @@ function schedPct(d, geom) { return ((d - geom.t0) / 86400000) / geom.totalDays 
 function schedClamp(v) { return Math.max(-8, Math.min(108, v)); }
 function schedMd(d) { return (d.getMonth() + 1) + "/" + d.getDate(); }
 
+/* 遅延は「対応中(遅延)」と「未着手(遅延)」に分ける。
+   同じ遅延でも手が付いているかどうかで打ち手が違うため、
+   集計タブの5区分と表記・色をそろえる。 */
 function taskStatusKey(t) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const end = miniExcelDateToJS(t.end);
   if (t.actualEnd) return "done";
   if ((t.note || "").toString().includes("▲")) return "held";
   if (!t.start || !t.end) return "todo";
-  if (end && end < today) return "delay";
+
   const start = miniExcelDateToJS(t.start);
-  if (t.actualStart || (start && start <= today)) return "active";
-  return "todo";
+  const end = miniExcelDateToJS(t.end);
+  const doing = !!t.actualStart || (start && start <= today);
+
+  if (end && end < today) return doing ? "delaydoing" : "delaytodo";
+  return doing ? "active" : "todo";
 }
-const TASK_STATUS_JA = { todo: "未着手", active: "対応中", held: "保留", done: "完了", delay: "遅延" };
+const TASK_STATUS_JA = {
+  todo: "未着手", active: "対応中", held: "保留", done: "完了",
+  delaydoing: "対応中(遅延)", delaytodo: "未着手(遅延)"
+};
+/* 遅延件数＝対応中(遅延) ＋ 未着手(遅延) */
+function isDelayKey(k) { return k === "delaydoing" || k === "delaytodo"; }
 
 function taskLineRowsHtml(tasks, geom) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1599,8 +1609,8 @@ function taskLineRowsHtml(tasks, geom) {
     return `
     <div class="g-row wsc-taskrow" data-row="${t.rowIndex}">
       <div class="g-label wsc-tlabel">
-        <div class="wsc-tname">${pri ? `<span class="wsc-pri">${escapeHtml(pri)}</span>` : ""}${escapeHtml(t.title)}</div>
-        <div class="wsc-tmeta">${escapeHtml(t.user || "")}${geom.showCat && t.category ? `<span class="wsc-cat">${escapeHtml(t.category)}</span>` : ""}${subtaskBadgeHtml(t.note, { parentDone: !!t.actualEnd })}</div>
+        <div class="wsc-tname">${pri ? `<span class="wsc-pri">${escapeHtml(pri)}</span>` : ""}${escapeHtml(t.title)}<span class="wsc-st ${st}">${TASK_STATUS_JA[st]}</span></div>
+        <div class="wsc-tmeta">${escapeHtml(t.user || "")}${geom.showCat && t.category ? `<span class="wsc-cattag">${escapeHtml(t.category)}</span>` : ""}${subtaskBadgeHtml(t.note, { parentDone: !!t.actualEnd })}</div>
       </div>
       <div class="g-track wsc-ttrack">
         ${geom.monthLines || ""}${guideHtml}${leaveHtml}${geom.todayHtml || ""}${bar}${act}${tick}${dl}
@@ -1676,7 +1686,13 @@ function bindTaskLines(container) {
 /* ============================================================
    ① スケジュール（WBSカンバン用：大分類 → 小分類 → タスク）
    ============================================================ */
-const schedState = { months: 3, offset: 0, closed: {}, sel: null, showLeave: false, showActual: true, hideDone: false };
+/* open … 展開中のキー。既定は空＝大分類だけの表示。
+   タブを開くたびにリセットするため localStorage には保存しない。
+   filter … スケジュールタブ専用の絞り込み（カンバン側とは独立）。 */
+const schedState = {
+  months: 3, offset: 0, open: {}, showLeave: false, showActual: true, hideDone: false,
+  filter: { user: "", cat: "", sub: "" }
+};
 
 function schedRestore() {
   try {
@@ -1684,12 +1700,15 @@ function schedRestore() {
     ["months", "offset", "showLeave", "showActual", "hideDone"].forEach((k) => {
       if (s[k] !== undefined) schedState[k] = s[k];
     });
-    if (s.sel) schedState.sel = s.sel;
-    if (s.closed) schedState.closed = s.closed;
+    if (s.filter) Object.assign(schedState.filter, s.filter);
   } catch (e) { /* 既定値で続行 */ }
 }
 function schedSave() {
-  try { localStorage.setItem("wbs-sched", JSON.stringify(schedState)); } catch (e) { /* 無視 */ }
+  try {
+    // 展開状態（open）は毎回リセットするので保存しない
+    const { open, ...rest } = schedState;
+    localStorage.setItem("wbs-sched", JSON.stringify(rest));
+  } catch (e) { /* 無視 */ }
 }
 
 let schedHost = null;
@@ -1704,13 +1723,30 @@ async function renderSchedule(container, opts) {
     schedTasks = await fetchWbsTasks(null);
     if (schedState.showLeave) await loadLeaveGrid();
   }
+  schedState.open = {};        // 開くたびに大分類だけの表示に戻す
   drawSchedule(o);
 }
 
 function drawSchedule(o) {
   const host = schedHost;
   if (!host) return;
-  const tasks = schedTasks.filter((t) => !(schedState.hideDone && t.actualEnd));
+  const F = schedState.filter;
+  const norm2 = (v) => (v == null ? "" : String(v)).trim();
+  const tasks = schedTasks.filter((t) => {
+    if (schedState.hideDone && t.actualEnd) return false;
+    if (F.user && norm2(t.user) !== F.user) return false;
+    if (F.cat && norm2(t.category) !== F.cat) return false;
+    if (F.sub && norm2(t.classification) !== F.sub) return false;
+    return true;
+  });
+  /* 選択肢は「絞り込み前」の全件から作る（自分で選んだ値が消えないように）。
+     小分類は大分類が選ばれているときだけ、その配下に限定して出す。 */
+  const uniq = (arr) => [...new Set(arr.filter((x) => x))].sort();
+  const optUsers = uniq(schedTasks.map((t) => norm2(t.user)));
+  const optCats = uniq(schedTasks.map((t) => norm2(t.category)));
+  const optSubs = uniq(schedTasks
+    .filter((t) => !F.cat || norm2(t.category) === F.cat)
+    .map((t) => norm2(t.classification)));
 
   /* --- 期間 --- */
   const now = new Date();
@@ -1719,22 +1755,30 @@ function drawSchedule(o) {
   const totalDays = Math.round((t1 - t0) / 86400000);
   const geomBase = { t0, totalDays, showLeave: schedState.showLeave, showActual: schedState.showActual };
 
-  let monthCells = "", monthLines = "";
+  /* ---- カレンダー表記 ----
+     ・月ラベルは中央寄せで「2026年8月」→以降は「9月」。年は最初と年替わりだけ
+       出すので、12ヶ月表示でも横幅を食わず、どの年か迷わない。
+     ・月ごとに背景を薄く互い違いにして、棒がどの月にあるか目で追えるようにする。
+     ・日付の目盛りは3ヶ月以下のときだけ出す。6・12ヶ月では線が混んで
+       かえって読めないため月ラベルに任せる。
+     ・「今日」は専用の行に出して、月ラベルに重ならないようにする。 */
+  let monthCells = "", monthLines = "", monthBands = "";
   for (let i = 0; i < schedState.months; i++) {
     const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
     const n = new Date(t0.getFullYear(), t0.getMonth() + i + 1, 1);
     const l = schedPct(d, geomBase), w = schedPct(n, geomBase) - l;
-    monthCells += `<div class="g-mcell" style="left:${l}%;width:${w}%">${String(d.getFullYear()).slice(2)}/${String(d.getMonth() + 1).padStart(2, "0")}</div>`;
+    const showYear = i === 0 || d.getMonth() === 0;
+    const label = showYear ? `${d.getFullYear()}年${d.getMonth() + 1}月` : `${d.getMonth() + 1}月`;
+    monthCells += `<div class="g-mcell" style="left:${l}%;width:${w}%">${label}</div>`;
+    if (i % 2 === 1) monthBands += `<div class="wsc-band" style="left:${l}%;width:${w}%"></div>`;
     if (i > 0) monthLines += `<div class="g-vline" style="left:${l}%"></div>`;
   }
   let dateCells = "";
-  if (schedState.months <= 6) {
-    const step = schedState.months === 6 ? 2 : 1;
-    let wi = 0;
+  if (schedState.months <= 3) {
     const f = new Date(t0); f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
     for (let d = new Date(f); d < t1; d.setDate(d.getDate() + 7)) {
       if (d < t0) continue;
-      if (wi++ % step === 0) dateCells += `<span class="g-dcell" style="left:${schedPct(d, geomBase)}%">${schedMd(d)}</span>`;
+      dateCells += `<span class="g-dcell" style="left:${schedPct(d, geomBase)}%">${d.getDate()}</span>`;
     }
   }
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1742,9 +1786,9 @@ function drawSchedule(o) {
   if (today >= t0 && today < t1) {
     const lp = schedPct(today, geomBase);
     todayHtml = `<div class="g-today" style="left:${lp}%"></div>`;
-    todayChip = `${todayHtml}<div class="g-today-chip" style="left:${lp}%">今日 ${schedMd(today)}</div>`;
+    todayChip = `<div class="g-today-chip" style="left:${lp}%">今日 ${schedMd(today)}</div>`;
   }
-  const geom = Object.assign({}, geomBase, { monthLines, todayHtml });
+  const geom = Object.assign({}, geomBase, { monthLines: monthBands + monthLines, todayHtml });
 
   /* --- 大分類 → 小分類 --- */
   const order = [], map = {};
@@ -1784,12 +1828,12 @@ function drawSchedule(o) {
          + `<div class="wsc-rollp" style="left:${l}%;width:${w * ratio}%"></div>`
          + (l > 4 ? `<div class="wsc-sd" style="left:${Math.max(l - 6.5, 0)}%">${schedMd(sp.start)}</div>` : "");
   };
-  const delayN = (list) => list.filter((t) => taskStatusKey(t) === "delay").length;
+  const delayN = (list) => list.filter((t) => isDelayKey(taskStatusKey(t))).length;
 
   let rows = "";
   order.forEach((k1) => {
     const g1 = map[k1];
-    const closed = !!schedState.closed[k1];
+    const open1 = !!schedState.open[k1];       // 既定は閉（大分類だけ表示）
     let all = [];
     g1.order.forEach((k2) => { all = all.concat(g1.sub[k2]); });
     const dn = all.filter((t) => t.actualEnd).length;
@@ -1797,14 +1841,14 @@ function drawSchedule(o) {
 
     rows += `<div class="g-row wsc-cat" data-cat="${escapeHtml(k1)}">
       <div class="g-label">
-        <div class="wsc-k"><span class="wsc-chev">${closed ? "▶" : "▼"}</span>${escapeHtml(k1)}
+        <div class="wsc-k"><span class="wsc-chev">${open1 ? "▼" : "▶"}</span>${escapeHtml(k1)}
           <span class="wsc-cnt">${dn}/${all.length}</span>
           ${dl ? `<span class="wsc-warn">遅延${dl}</span>` : ""}</div>
         <div class="wsc-sub2">小分類 ${g1.order.length}件</div>
       </div>
       <div class="g-track">${monthLines}${todayHtml}${rollHtml(spanOf(all), all.length ? dn / all.length : 0)}</div>
     </div>`;
-    if (closed) return;
+    if (!open1) return;
 
     g1.order.sort((a, b) => {
       const fa = firstOf(g1.sub[a]), fb = firstOf(g1.sub[b]);
@@ -1817,7 +1861,7 @@ function drawSchedule(o) {
     g1.order.forEach((k2) => {
       const list = g1.sub[k2].slice().sort(byStart);
       const key = k1 + "/" + k2;
-      const sel = schedState.sel === key;
+      const sel = !!schedState.open[key];
       const d2 = list.filter((t) => t.actualEnd).length;
       const dl2 = delayN(list);
       const sp = spanOf(list);
@@ -1832,17 +1876,21 @@ function drawSchedule(o) {
       </div>`;
       if (!sel) return;
 
+      // スケジュールタブではタスク一覧（表）は出さない。線だけを見せる。
       rows += taskLineRowsHtml(list, Object.assign({}, geom, { guide: sp }));
-      rows += taskListHtml(list, {
-        title: k1 + "　/　" + k2,
-        meta: `タスク ${list.length}件 ／ 完了 ${d2}件` + (dl2 ? ` ／ 遅延 ${dl2}件` : "")
-      });
     });
   });
 
   const sw = (k, label, title) =>
     `<label class="wsc-sw${schedState[k] ? " on" : ""}" data-sw="${k}" title="${escapeHtml(title || "")}">
        <span class="switch"></span>${label}</label>`;
+
+  const selHtml = (key, label, opts, cur) =>
+    `<label class="wsc-fl"><span class="fl-k">${label}</span>
+       <select data-f="${key}">
+         <option value="">すべて</option>
+         ${opts.map((o) => `<option value="${escapeHtml(o)}"${o === cur ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}
+       </select></label>`;
 
   host.innerHTML = `
   <div class="gantt-toolbar wsc-toolbar">
@@ -1858,12 +1906,23 @@ function drawSchedule(o) {
       ${[12, 6, 3, 1].map((m) => `<button class="${m === schedState.months ? "active" : ""}" data-z="${m}">${m}ヶ月</button>`).join("")}
     </div>
   </div>
+
+  <div class="wsc-filter">
+    ${selHtml("user", "担当者", optUsers, F.user)}
+    ${selHtml("cat", "大分類", optCats, F.cat)}
+    ${selHtml("sub", "小分類", optSubs, F.sub)}
+    ${(F.user || F.cat || F.sub) ? '<button class="wsc-clear" data-clear="1">条件クリア</button>' : ""}
+    <span class="g-sp"></span>
+    <span class="wsc-hint">ドラッグで上下左右に移動／右クリックで詳細</span>
+  </div>
+
   <div class="wsc-wrap">
     <div class="wsc-inner">
       <div class="g-row g-headrow wsc-head">
         <div class="g-label">大分類 / 小分類</div>
         <div class="wsc-headstack">
-          <div class="g-track g-head">${monthCells}${todayChip}</div>
+          <div class="g-track wsc-todayrow">${todayChip}</div>
+          <div class="g-track g-head">${monthCells}</div>
           ${dateCells ? `<div class="g-track g-head g-daterow">${dateCells}</div>` : ""}
         </div>
       </div>
@@ -1872,7 +1931,8 @@ function drawSchedule(o) {
   </div>
   <div class="wsc-legend">
     <span><i class="roll"></i>集計（緑＝完了割合）</span>
-    <span><i class="delay"></i>遅延</span><span><i class="active"></i>期間内</span>
+    <span><i class="delaydoing"></i>対応中(遅延)</span><span><i class="delaytodo"></i>未着手(遅延)</span>
+    <span><i class="active"></i>期間内</span>
     <span><i class="held"></i>保留</span><span><i class="todo"></i>未着手</span>
     <span><i class="done"></i>完了</span><span><i class="act"></i>実績</span>
     <span><i class="leave"></i>休み（AM・PMは薄く／リモートは出しません）</span>
@@ -1898,19 +1958,94 @@ function bindSchedule(host) {
       drawSchedule();
     });
   });
+  // 大分類・小分類の開閉（open ベース。既定は大分類だけの表示）
   host.querySelectorAll(".wsc-cat").forEach((r) => {
     r.addEventListener("click", () => {
       const k = r.dataset.cat;
-      schedState.closed[k] = !schedState.closed[k];
-      schedSave(); drawSchedule();
+      if (schedState.open[k]) {
+        // 大分類を閉じるときは、その配下の小分類の展開も畳む
+        delete schedState.open[k];
+        Object.keys(schedState.open).forEach((x) => {
+          if (x.indexOf(k + "/") === 0) delete schedState.open[x];
+        });
+      } else {
+        schedState.open[k] = true;
+      }
+      drawSchedule();
     });
   });
   host.querySelectorAll(".wsc-subrow").forEach((r) => {
     r.addEventListener("click", () => {
       const k = r.dataset.sub;
-      schedState.sel = (schedState.sel === k) ? null : k;
+      if (schedState.open[k]) delete schedState.open[k];
+      else schedState.open[k] = true;
+      drawSchedule();
+    });
+  });
+
+  // フィルタ
+  host.querySelectorAll(".wsc-filter select[data-f]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const k = sel.dataset.f;
+      schedState.filter[k] = sel.value;
+      if (k === "cat") schedState.filter.sub = "";   // 大分類を変えたら小分類は解除
+      schedState.open = {};                          // 絞り込み直後は大分類だけに戻す
       schedSave(); drawSchedule();
     });
+  });
+  const clr = host.querySelector(".wsc-filter [data-clear]");
+  if (clr) clr.addEventListener("click", () => {
+    schedState.filter = { user: "", cat: "", sub: "" };
+    schedState.open = {};
+    schedSave(); drawSchedule();
+  });
+
+  bindSchedDrag(host);
+  bindSchedContext(host);
+}
+
+/* ドラッグでガントを上下左右に動かす。
+   バーやフィルタの操作を邪魔しないよう、行の余白部分でだけ掴む。 */
+function bindSchedDrag(host) {
+  const wrap = host.querySelector(".wsc-wrap");
+  if (!wrap) return;
+  let drag = null;
+
+  wrap.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    // バー・ラベル・ヘッダーからは開始しない（クリック操作を優先）
+    if (e.target.closest(".wsc-t, .g-label, .wsc-head, select, button, label")) return;
+    drag = {
+      x: e.clientX, y: e.clientY,
+      sl: wrap.scrollLeft, st: wrap.scrollTop, moved: false
+    };
+    wrap.classList.add("dragging");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.moved = true;
+    wrap.scrollLeft = drag.sl - dx;
+    wrap.scrollTop = drag.st - dy;
+    if (drag.moved) e.preventDefault();
+  });
+  window.addEventListener("mouseup", () => {
+    if (!drag) return;
+    wrap.classList.remove("dragging");
+    drag = null;
+  });
+}
+
+/* 右クリックでタスクの詳細（備考編集モーダル）を開く */
+function bindSchedContext(host) {
+  host.addEventListener("contextmenu", (e) => {
+    const row = e.target.closest(".wsc-taskrow, .wsc-t[data-row]");
+    if (!row) return;
+    e.preventDefault();
+    const rowIndex = Number(row.dataset.row);
+    if (!rowIndex) return;
+    const t = schedTasks.find((x) => x.rowIndex === rowIndex);
+    if (t && typeof openModal === "function") openModal(t);
   });
 }
 

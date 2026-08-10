@@ -1265,8 +1265,11 @@ button.kpi.sel { outline-color: var(--bl); }
    そのまま流用し、既存の配色ルールと揃えています。
    同じ「遅延」でも対応中と未着手で打ち手が違うため色を分けていますが、
    1色にまとめたい場合はどちらも --st-delay に統一してください。 */
-.agg-row .bar i.seg-doingdelay { background: var(--st-held, #D98324); }
-.agg-row .bar i.seg-tododelay  { background: var(--st-delay, #E5484D); }
+/* 既存の .seg-todo / .seg-doing 等と同じくスコープなしで定義する。
+   棒（.agg-row .bar i）だけでなく凡例（.agg-legend .sw）にも同じクラスが
+   使われているため、限定するとどちらか片方に色が付かなくなる。 */
+.seg-doingdelay { background: var(--st-held, #D98324); }
+.seg-tododelay  { background: var(--st-delay, #E5484D); }
 
 /* ===== タスク一覧：状態ピル「対応中(遅延)」 =====
    既存の .p-late（未着手(遅延)想定・赤系）と対になるオレンジ系。 */

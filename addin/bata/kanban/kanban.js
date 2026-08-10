@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260807_e5c108f";
+const APP_VERSION = "rev_20260807_f7b3d24";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -1637,16 +1637,21 @@ function renderAggStatus(rows) {
   const barsEl = document.getElementById("agg-bars");
   if (barsEl) barsEl.innerHTML = aggDrillHtml(rows, cfg, overall);
 
-  // タスク一覧
+  // タスク一覧。選択中の軸（総数／累計／当日）に連動させる。
+  // 軸を切り替えるとグラフの母数が変わるため、一覧も同じ母数に揃える。
+  const listRows = aggAxisRows(rows);
   const listEl = document.getElementById("agg-list");
   const cntEl = document.getElementById("agg-list-count");
-  if (cntEl) cntEl.textContent = `${rows.length}件`;
+  if (cntEl) cntEl.textContent = `${listRows.length}件`;
+
+  const scopeEl = document.getElementById("agg-list-scope");
+  if (scopeEl) scopeEl.textContent = AGG_AXIS_SCOPE[aggAxis] || "";
 
   if (listEl) {
-    if (!rows.length) {
+    if (!listRows.length) {
       listEl.innerHTML = `<div class="agg-empty">該当するタスクがありません</div>`;
     } else {
-      const sorted = rows.slice().sort(aggListSort);
+      const sorted = listRows.slice().sort(aggListSort);
       listEl.innerHTML = buildTable(sorted,
         [COL_CAT, COL_SUB, COL_TITLE, COL_USER, COL_PLAN, COL_ACT, COL_STAT]);
       bindAggRowJump(listEl);
@@ -1655,6 +1660,28 @@ function renderAggStatus(rows) {
 
   sizeAggLists();
 }
+
+/* 軸ごとに一覧の母数を揃える。
+     総数 … 絞り込み結果すべて
+     累計 … 予定終了日が今日以前（＝累計予定の対象）
+     当日 … 予定終了日が今日（＝当日予定の対象）
+   グラフが「予定に対する実績」を測っている軸では、一覧も同じ
+   母集団を出さないと数字とリストが食い違ってしまう。 */
+function aggAxisRows(rows) {
+  if (aggAxis === "total") return rows;
+  const today = toMidnight(new Date());
+  return rows.filter(t => {
+    const end = toMidnight(excelDateToJS(t.end));
+    if (!end) return false;
+    return aggAxis === "cum" ? end <= today : end.getTime() === today.getTime();
+  });
+}
+
+const AGG_AXIS_SCOPE = {
+  total: "",
+  cum: "（予定終了日が今日以前のタスク）",
+  day: "（予定終了日が今日のタスク）"
+};
 
 /* 一覧の並び：未着手(遅延) → 対応中(遅延) → 対応中 → 未着手 → 完了。
    グラフの積み上げ順（完了→対応中→対応中(遅延)→未着手(遅延)→未着手）とは

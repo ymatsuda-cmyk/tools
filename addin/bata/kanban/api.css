@@ -327,7 +327,10 @@
   font-size:9.5px; color:var(--ink-faint,#93A1AF); display:flex; align-items:center; gap:5px;
   white-space:nowrap; overflow:hidden;
 }
-.wsc-cat{
+/* タスク行のラベルに出す「大分類」タグ。
+   大分類の行（.wsc-cat）と名前が衝突して padding が漏れ、
+   本日線が段差になっていたため .wsc-cattag に改名した。 */
+.wsc-cattag{
   font-size:8px; background:var(--bg,#F3F5F7); border:1px solid var(--line,#E2E7EC);
   color:var(--ink-soft,#5B6B7B); border-radius:3px; padding:0 4px; font-weight:600;
 }
@@ -480,7 +483,8 @@
 }
 .wsc-legend i{ display:inline-block; width:16px; height:7px; border-radius:4px; margin-right:4px; vertical-align:1px; }
 .wsc-legend i.roll{ background:#CFD7DE; }
-.wsc-legend i.delay{ background:#E5484D; }
+.wsc-legend i.delaydoing{ background:var(--st-held,#D98324); }
+.wsc-legend i.delaytodo{ background:var(--st-delay,#E5484D); }
 .wsc-legend i.active{ background:#2E9E6B; }
 .wsc-legend i.held{ background:#D98324; }
 .wsc-legend i.todo{ background:repeating-linear-gradient(135deg,#9FAAB3 0 3px,#B6C0C8 3px 6px); }
@@ -493,3 +497,83 @@
 
 /* 営業報告：ガントの外に出したリスト（ズーム倍率の影響を受けない） */
 .wsc-outlist{ border-top:1px solid var(--line,#E2E7EC); background:#F4F9FB; }
+
+/* ============================================================
+ * スケジュールタブ 改修分
+ * ============================================================ */
+
+/* ===== 本日線のズレ対策 =====
+   .g-label は width と padding を併用しているため、box-sizing が
+   content-box だと padding 分だけ列幅が広がる。小分類行は
+   padding-left が大きいので、大分類行と track の開始位置が
+   12px ずれ、本日線が段差になっていた。 */
+.wsc-inner .g-label,
+.wsc-inner .g-track { box-sizing: border-box; }
+
+/* 期間外にはみ出したバーがラベル列に重ならないようにする */
+.wsc-inner .g-track { overflow: hidden; }
+
+/* ===== 月の互い違い背景（棒がどの月にあるか目で追える） ===== */
+.wsc-band {
+  position: absolute; top: 0; bottom: 0;
+  background: rgba(28, 39, 51, .028);
+  pointer-events: none;
+}
+
+/* ===== 「今日」を専用行に置く（月ラベルに重ならない） ===== */
+.wsc-todayrow { min-height: 15px; position: relative; }
+.wsc-todayrow .g-today-chip { top: 0; }
+
+/* 月ラベルは中央寄せ */
+.wsc-inner .g-mcell {
+  text-align: center; padding-left: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ===== フィルタ行 ===== */
+.wsc-filter {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 10px; background: var(--surface, #fff);
+  border-bottom: 1px solid var(--line, #E2E7EC);
+}
+.wsc-fl { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+.wsc-fl .fl-k { color: var(--ink-faint, #93A1AF); }
+.wsc-fl select {
+  border: 1px solid var(--line, #E2E7EC); border-radius: var(--radius-sm, 6px);
+  padding: 3px 6px; font-size: 11px; font-family: inherit; background: #fff;
+  max-width: 130px;
+}
+.wsc-clear {
+  border: 1px solid var(--line, #E2E7EC); background: var(--surface, #fff);
+  color: var(--ink-soft, #5B6B7B); border-radius: var(--radius-sm, 6px);
+  padding: 3px 9px; font-size: 10.5px; cursor: pointer; font-family: inherit;
+}
+.wsc-clear:hover { background: var(--bg, #F3F5F7); }
+.wsc-filter .wsc-hint { font-size: 10px; color: var(--ink-faint, #93A1AF); }
+
+/* ===== ドラッグでスクロール ===== */
+.wsc-wrap { overflow: auto; max-height: 62vh; cursor: grab; }
+.wsc-wrap.dragging { cursor: grabbing; user-select: none; }
+/* ラベル列は横スクロールしても残す */
+.wsc-inner .g-label { position: sticky; left: 0; z-index: 4; background: inherit; }
+.wsc-head .g-label { z-index: 6; background: #FAFBFC; }
+.wsc-cat > .g-label { background: #F5F8F9; }
+.wsc-subrow > .g-label { background: #FCFDFD; }
+.wsc-taskrow > .g-label { background: #F9FCFD; }
+.wsc-head { position: sticky; top: 0; z-index: 5; background: #FAFBFC; }
+
+/* ===== 遅延を対応中／未着手で分ける（集計タブと同色） ===== */
+.wsc-t.delaydoing { background: var(--st-held, #D98324); }
+.wsc-t.delaytodo  { background: var(--st-delay, #E5484D); }
+
+/* ===== タスク名欄の状態バッジ ===== */
+.wsc-tname .wsc-st {
+  flex-shrink: 0; margin-left: 5px; font-size: 8.5px; font-weight: 700;
+  border-radius: 999px; padding: 0 5px; line-height: 1.5;
+}
+.wsc-st.todo       { background: var(--bg, #F3F5F7);        color: var(--ink-soft, #5B6B7B); }
+.wsc-st.active     { background: var(--accent-soft, #E4F2ED); color: var(--accent, #0E7A5F); }
+.wsc-st.held       { background: #FFF3E0;                    color: #B06E0C; }
+.wsc-st.done       { background: #EFF1F3;                    color: #7C8794; }
+.wsc-st.delaydoing { background: #FDF0E0;                    color: #A85D0E; }
+.wsc-st.delaytodo  { background: #FDECEC;                    color: #B4262B; }
