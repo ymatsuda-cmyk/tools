@@ -513,22 +513,7 @@
 /* 期間外にはみ出したバーがラベル列に重ならないようにする */
 .wsc-inner .g-track { overflow: hidden; }
 
-/* ===== 月の互い違い背景（棒がどの月にあるか目で追える） ===== */
-.wsc-band {
-  position: absolute; top: 0; bottom: 0;
-  background: rgba(28, 39, 51, .028);
-  pointer-events: none;
-}
-
-/* ===== 「今日」を専用行に置く（月ラベルに重ならない） ===== */
-.wsc-todayrow { min-height: 15px; position: relative; }
-.wsc-todayrow .g-today-chip { top: 0; }
-
-/* 月ラベルは中央寄せ */
-.wsc-inner .g-mcell {
-  text-align: center; padding-left: 0;
-  display: flex; align-items: center; justify-content: center;
-}
+/* （月帯・今日行・月ラベルの整形は共通カレンダーへ移動） */
 
 /* ===== フィルタ行 ===== */
 .wsc-filter {
@@ -577,3 +562,45 @@
 .wsc-st.done       { background: #EFF1F3;                    color: #7C8794; }
 .wsc-st.delaydoing { background: #FDF0E0;                    color: #A85D0E; }
 .wsc-st.delaytodo  { background: #FDECEC;                    color: #B4262B; }
+
+/* ============================================================
+ * 共通カレンダー（案A：密度可変）
+ * WBSカンバンのスケジュールと営業報告のガントで共用。
+ * ============================================================ */
+
+/* ヘッダーの各行。高さは schedCalendar() が指定する */
+.cal-row { position: relative; box-sizing: border-box; }
+
+/* 月ラベルは中央寄せ・月境界は太線で本体まで通す */
+.g-mcell {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding-left: 0;
+  border-left: 2px solid #C9D3DB;
+}
+.g-mcell.first { border-left: none; }
+
+/* 目盛り */
+.g-dcell {
+  border-left: 1px solid #E4E9ED;
+  padding-left: 2px; transform: none;
+  display: flex; align-items: center;
+}
+.g-dcell.mstart { color: var(--ink, #1C2733); font-weight: 700; border-left: 2px solid #C9D3DB; }
+/* 1ヶ月表示：日＋曜日の2段組 */
+.g-dcell.dow {
+  flex-direction: column; justify-content: center; align-items: center;
+  padding-left: 0; line-height: 1.15;
+}
+.g-dcell.dow .d { font-size: 9px; }
+.g-dcell.dow .w { font-size: 7.5px; color: var(--ink-faint, #93A1AF); }
+.g-dcell.dow.sat .d, .g-dcell.dow.sat .w { color: #1F8FE5; }
+.g-dcell.dow.sun .d, .g-dcell.dow.sun .w,
+.g-dcell.dow.hol .d, .g-dcell.dow.hol .w { color: #E5484D; }
+
+/* 本体の背景：月の互い違い帯／月境界の太線／休業日の影 */
+.cal-band  { position: absolute; top: 0; bottom: 0; background: rgba(28,39,51,.030); pointer-events: none; }
+.cal-mline { position: absolute; top: 0; bottom: 0; width: 2px; background: #C9D3DB; pointer-events: none; }
+.cal-hol   { position: absolute; top: 0; bottom: 0; background: rgba(229,72,77,.055); pointer-events: none; }
+
+/* 本日：細線＋その日1日分の淡い帯（線だけだと見失うため） */
+.cal-todaybg { position: absolute; top: 0; bottom: 0; background: rgba(229,72,77,.10); z-index: 1; pointer-events: none; }

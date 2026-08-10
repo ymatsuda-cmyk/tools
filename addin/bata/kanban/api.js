@@ -1155,6 +1155,17 @@ function leaveStyleOf(value) {
 }
 
 let leaveGridCache = null;
+let holidaySet = new Set();          // 休業日（ISO文字列）。wbs 8行目より
+
+/* 休業日かどうか。loadLeaveGrid() 済みでなければ常に false（＝影を出さない） */
+function isHolidayDate(d) {
+  return holidaySet.has(isoOf(d));
+}
+/* 営業報告など、休みマトリクス本体は要らないが休業日だけ欲しい呼び出し用 */
+async function loadHolidays() {
+  await loadLeaveGrid();
+  return holidaySet;
+}
 
 async function loadLeaveGrid(force) {
   if (leaveGridCache && !force) return leaveGridCache;
@@ -1179,6 +1190,10 @@ async function loadLeaveGrid(force) {
 
       /* --- 基準日 --- */
       let baseDate = miniExcelDateToJS(base.values[0][0]);
+      // miniExcelDateToJS は文字列などに対して Invalid Date を返すことがあり、
+      // それ自体は truthy なので日付計算に入り込んで NaN 日付を量産してしまう。
+      // 実際に数値化できるかどうかで弾く。
+      if (!baseDate || isNaN(baseDate.getTime())) baseDate = null;
       let warn = "";
 
       /* --- 日付列 → 日付 --- */
@@ -1219,6 +1234,17 @@ async function loadLeaveGrid(force) {
           const d = dates.find((x) => x.col === c);
           if (d) workdays[d.date.getFullYear() + "-" + String(d.date.getMonth() + 1).padStart(2, "0")] = +m[1];
         }
+      });
+
+      /* --- 休業日 ---
+         日付列（AB〜FY）に対して「ヘッダー行の1つ上の行」＝8行目が
+         空欄でない列を休業日とする。土日も含めて記入されているため、
+         アドイン側で曜日計算はしない（会社の休業日カレンダーと必ず一致する）。
+         行番号はヘッダー行からの相対で求めるので、担当者の行が増減しても追従する。 */
+      const holRow = v[hIdx - 1] || [];
+      holidaySet = new Set();
+      dates.forEach((x) => {
+        if (String(holRow[x.col] ?? "").trim() !== "") holidaySet.add(x.iso);
       });
 
       /* --- 担当者と値 --- */
@@ -1684,6 +1710,103 @@ function bindTaskLines(container) {
 }
 
 /* ============================================================
+   共通カレンダー（案A：密度可変）
+   ------------------------------------------------------------
+   WBSカンバンのスケジュールと営業報告のガントで同じ見た目を使う。
+   営業報告は内部で常に12ヶ月を描き、ズームは幅の倍率で表すため、
+   「描く月数（monthCount）」と「密度の基準（zoom）」を別に受け取る。
+
+   opt = { t0, t1, totalDays, monthCount, zoom }
+   戻り = { rows:[{h,html}...], bg, todayLine, todayChip }
+     rows      … ヘッダーの各行（上から順）
+     bg        … 本体の背景（月の互い違い帯・月境界の太線・休業日の影）
+     todayLine … 本日の細線＋その日1日分の淡い帯
+     todayChip … 「今日 8/10」のチップ（rows の1行目に入れる想定）
+   ============================================================ */
+const CAL_WD = ["日", "月", "火", "水", "木", "金", "土"];
+
+function schedCalendar(opt) {
+  const { t0, t1, totalDays, monthCount, zoom } = opt;
+  const P = (d) => ((d - t0) / 86400000) / totalDays * 100;
+  const oneDay = 100 / totalDays;
+
+  /* --- 月ラベル：年は最初と1月だけ出す --- */
+  let monthCells = "", monthLines = "", bands = "";
+  for (let i = 0; i < monthCount; i++) {
+    const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
+    const n = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const l = P(d), w = P(n) - l;
+    const showYear = i === 0 || d.getMonth() === 0;
+    const label = showYear ? `${d.getFullYear()}年${d.getMonth() + 1}月` : `${d.getMonth() + 1}月`;
+    monthCells += `<div class="g-mcell${i === 0 ? " first" : ""}" style="left:${l}%;width:${w}%">${label}</div>`;
+    if (i % 2 === 1) bands += `<div class="cal-band" style="left:${l}%;width:${w}%"></div>`;
+    if (i > 0) monthLines += `<div class="cal-mline" style="left:${l}%"></div>`;
+  }
+
+  /* --- 目盛り：ズームで単位を変える --- */
+  let ticks = "", tickH = 16;
+  if (zoom >= 12) {
+    for (let i = 0; i < monthCount; i++) {
+      const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
+      ticks += `<span class="g-dcell mstart" style="left:${P(d)}%">1</span>`;
+    }
+  } else if (zoom === 6) {
+    for (let i = 0; i < monthCount; i++) {
+      [1, 15].forEach((day) => {
+        const d = new Date(t0.getFullYear(), t0.getMonth() + i, day);
+        if (d >= t0 && d < t1) {
+          ticks += `<span class="g-dcell${day === 1 ? " mstart" : ""}" style="left:${P(d)}%">${day}</span>`;
+        }
+      });
+    }
+  } else if (zoom === 3) {
+    const f = new Date(t0); f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
+    for (const d = new Date(f); d < t1; d.setDate(d.getDate() + 7)) {
+      if (d < t0) continue;
+      ticks += `<span class="g-dcell${d.getDate() <= 7 ? " mstart" : ""}" style="left:${P(d)}%">`
+             + `${d.getMonth() + 1}/${d.getDate()}</span>`;
+    }
+  } else {
+    tickH = 24;
+    for (const d = new Date(t0); d < t1; d.setDate(d.getDate() + 1)) {
+      const dw = d.getDay();
+      const c = dw === 0 ? " sun" : dw === 6 ? " sat" : (isHolidayDate(d) ? " hol" : "");
+      ticks += `<span class="g-dcell dow${c}" style="left:${P(d)}%;width:${oneDay}%">`
+             + `<span class="d">${d.getDate()}</span><span class="w">${CAL_WD[dw]}</span></span>`;
+    }
+  }
+
+  /* --- 休業日の影（土日もシートに入っているのでまとめて塗る）--- */
+  let holShade = "";
+  if (zoom <= 6) {
+    for (const d = new Date(t0); d < t1; d.setDate(d.getDate() + 1)) {
+      if (!isHolidayDate(d)) continue;
+      holShade += `<div class="cal-hol" style="left:${P(d)}%;width:${oneDay}%"></div>`;
+    }
+  }
+
+  /* --- 本日 --- */
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let todayLine = "", todayChip = "";
+  if (today >= t0 && today < t1) {
+    const l = P(today);
+    todayLine = `<div class="cal-todaybg" style="left:${l}%;width:${oneDay}%"></div>`
+              + `<div class="g-today" style="left:${l}%"></div>`;
+    todayChip = `<div class="g-today-chip" style="left:${l}%">今日 ${schedMd(today)}</div>`;
+  }
+
+  return {
+    rows: [
+      { h: 15, html: todayChip },
+      { h: 20, html: monthCells },
+      { h: tickH, html: ticks + todayLine }
+    ],
+    bg: bands + holShade + monthLines,
+    todayLine, todayChip
+  };
+}
+
+/* ============================================================
    ① スケジュール（WBSカンバン用：大分類 → 小分類 → タスク）
    ============================================================ */
 /* open … 展開中のキー。既定は空＝大分類だけの表示。
@@ -1721,7 +1844,9 @@ async function renderSchedule(container, opts) {
   const o = opts || {};
   if (o.reload !== false || !schedTasks.length) {
     schedTasks = await fetchWbsTasks(null);
-    if (schedState.showLeave) await loadLeaveGrid();
+    // 休業日（wbs 8行目）はカレンダーの影に常に使うので、
+    // 「休み」トグルの有無に関係なく読み込む。失敗しても影なしで続行。
+    try { await loadLeaveGrid(); } catch (e) { /* 影なしで表示 */ }
   }
   schedState.open = {};        // 開くたびに大分類だけの表示に戻す
   drawSchedule(o);
@@ -1755,40 +1880,13 @@ function drawSchedule(o) {
   const totalDays = Math.round((t1 - t0) / 86400000);
   const geomBase = { t0, totalDays, showLeave: schedState.showLeave, showActual: schedState.showActual };
 
-  /* ---- カレンダー表記 ----
-     ・月ラベルは中央寄せで「2026年8月」→以降は「9月」。年は最初と年替わりだけ
-       出すので、12ヶ月表示でも横幅を食わず、どの年か迷わない。
-     ・月ごとに背景を薄く互い違いにして、棒がどの月にあるか目で追えるようにする。
-     ・日付の目盛りは3ヶ月以下のときだけ出す。6・12ヶ月では線が混んで
-       かえって読めないため月ラベルに任せる。
-     ・「今日」は専用の行に出して、月ラベルに重ならないようにする。 */
-  let monthCells = "", monthLines = "", monthBands = "";
-  for (let i = 0; i < schedState.months; i++) {
-    const d = new Date(t0.getFullYear(), t0.getMonth() + i, 1);
-    const n = new Date(t0.getFullYear(), t0.getMonth() + i + 1, 1);
-    const l = schedPct(d, geomBase), w = schedPct(n, geomBase) - l;
-    const showYear = i === 0 || d.getMonth() === 0;
-    const label = showYear ? `${d.getFullYear()}年${d.getMonth() + 1}月` : `${d.getMonth() + 1}月`;
-    monthCells += `<div class="g-mcell" style="left:${l}%;width:${w}%">${label}</div>`;
-    if (i % 2 === 1) monthBands += `<div class="wsc-band" style="left:${l}%;width:${w}%"></div>`;
-    if (i > 0) monthLines += `<div class="g-vline" style="left:${l}%"></div>`;
-  }
-  let dateCells = "";
-  if (schedState.months <= 3) {
-    const f = new Date(t0); f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
-    for (let d = new Date(f); d < t1; d.setDate(d.getDate() + 7)) {
-      if (d < t0) continue;
-      dateCells += `<span class="g-dcell" style="left:${schedPct(d, geomBase)}%">${d.getDate()}</span>`;
-    }
-  }
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  let todayHtml = "", todayChip = "";
-  if (today >= t0 && today < t1) {
-    const lp = schedPct(today, geomBase);
-    todayHtml = `<div class="g-today" style="left:${lp}%"></div>`;
-    todayChip = `<div class="g-today-chip" style="left:${lp}%">今日 ${schedMd(today)}</div>`;
-  }
-  const geom = Object.assign({}, geomBase, { monthLines: monthBands + monthLines, todayHtml });
+  /* ---- カレンダー（共通の案A：密度可変）---- */
+  const cal = schedCalendar({
+    t0, t1, totalDays, monthCount: schedState.months, zoom: schedState.months
+  });
+  const geom = Object.assign({}, geomBase, {
+    monthLines: cal.bg, todayHtml: cal.todayLine
+  });
 
   /* --- 大分類 → 小分類 --- */
   const order = [], map = {};
@@ -1846,7 +1944,7 @@ function drawSchedule(o) {
           ${dl ? `<span class="wsc-warn">遅延${dl}</span>` : ""}</div>
         <div class="wsc-sub2">小分類 ${g1.order.length}件</div>
       </div>
-      <div class="g-track">${monthLines}${todayHtml}${rollHtml(spanOf(all), all.length ? dn / all.length : 0)}</div>
+      <div class="g-track">${cal.bg}${cal.todayLine}${rollHtml(spanOf(all), all.length ? dn / all.length : 0)}</div>
     </div>`;
     if (!open1) return;
 
@@ -1872,7 +1970,7 @@ function drawSchedule(o) {
             <span class="wsc-cnt${sel ? " on" : ""}">${d2}/${list.length}</span>
             ${dl2 ? `<span class="wsc-warn">遅延${dl2}</span>` : ""}</div>
         </div>
-        <div class="g-track">${monthLines}${todayHtml}${rollHtml(sp, list.length ? d2 / list.length : 0)}</div>
+        <div class="g-track">${cal.bg}${cal.todayLine}${rollHtml(sp, list.length ? d2 / list.length : 0)}</div>
       </div>`;
       if (!sel) return;
 
@@ -1921,9 +2019,7 @@ function drawSchedule(o) {
       <div class="g-row g-headrow wsc-head">
         <div class="g-label">大分類 / 小分類</div>
         <div class="wsc-headstack">
-          <div class="g-track wsc-todayrow">${todayChip}</div>
-          <div class="g-track g-head">${monthCells}</div>
-          ${dateCells ? `<div class="g-track g-head g-daterow">${dateCells}</div>` : ""}
+          ${cal.rows.map((r) => `<div class="g-track g-head cal-row" style="height:${r.h}px">${r.html}</div>`).join("")}
         </div>
       </div>
       ${rows || '<div class="wsc-empty2">表示できるタスクがありません</div>'}
@@ -2066,6 +2162,7 @@ Object.assign(window, {
   loadLeaveGrid, leavesOf, setLeave, leaveStyleOf, renderLeaveMatrix, openMyLeave, closeMyLeave,
   // ① スケジュール
   renderSchedule, taskLineRowsHtml, taskListHtml, bindTaskLines, taskStatusKey, schedRestore,
+  schedCalendar, isHolidayDate, loadHolidays,
   // 注入したモーダルの inline onclick から呼ばれる
   closeModal, saveNote, onModalNoteEdited, addSubtask,
   closeTaskAdd, saveTaskAdd, onTaCatChange,
