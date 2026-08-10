@@ -174,6 +174,13 @@ export function createComposer(root, handlers) {
 
   textarea.addEventListener('input', update)
   textarea.addEventListener('paste', (e) => {
+    // スクリーンショットやファイルのペーストを優先して拾う
+    const files = Array.from(e.clipboardData.files ?? [])
+    if (files.length) {
+      e.preventDefault()
+      addFiles(files)
+      return
+    }
     const pasted = e.clipboardData.getData('text')
     if (pasted.length <= PASTE_THRESHOLD) return
     e.preventDefault()
@@ -196,6 +203,7 @@ export function createComposer(root, handlers) {
   update()
 
   return {
+    addFiles,
     setHistoryTokens(n) {
       historyTokens = n
       update()

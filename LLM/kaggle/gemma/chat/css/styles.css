@@ -208,3 +208,37 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 
 .actions { display: flex; align-items: center; gap: 8px; }
 .atts:empty { display: none; }
+
+/* --- ドラッグ＆ドロップ --- */
+.main { position: relative; }
+.dropzone {
+  position: absolute; inset: 0; z-index: 5;
+  display: none; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  pointer-events: none;
+}
+.main.dragging .dropzone { display: flex; }
+.dropzone-inner {
+  border: 2px dashed var(--accent); border-radius: 12px;
+  padding: 28px 44px; font-size: 15px; color: var(--accent);
+  background: var(--bg);
+}
+
+/* --- 画像添付 --- */
+.att .thumb {
+  width: 34px; height: 34px; object-fit: cover;
+  border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0;
+}
+.preview-img { max-width: 100%; max-height: 55vh; border-radius: 8px; display: block; }
+
+/* --- ブロックのコピー --- */
+.msg-tools { margin-top: 6px; height: 22px; }
+.msg.user .msg-tools { text-align: right; }
+.msg-tools .copy {
+  border: none; padding: 2px 8px; font-size: 11px;
+  color: var(--text-muted); opacity: 0; transition: opacity 0.12s;
+}
+.msg:hover .msg-tools .copy, .msg-tools .copy:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .msg-tools .copy { opacity: 1; }
+}

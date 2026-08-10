@@ -15,6 +15,7 @@ import { createMessageList } from './ui/message-list.js'
 import { createComposer } from './ui/composer.js'
 import { openSettings } from './ui/settings-dialog.js'
 import { createStatusBar } from './ui/status-bar.js'
+import { setupDropzone } from './ui/dropzone.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -26,11 +27,30 @@ const statusBar = createStatusBar($('status-bar'), { getSettings: () => settings
 const list = createMessageList($('messages'))
 const composer = createComposer($('composer'), { onSend, onStop, onCompress, onNewChat })
 
-/** 添付を本文に展開してモデルに渡す形にする */
+/**
+ * 添付をモデルに渡す形へ変換する。
+ * テキスト系はタグで囲んで本文に展開し、画像は OpenAI 形式の
+ * image_url パートとして送る（プロキシ側で Ollama の images に変換）。
+ */
 function toWire(m) {
-  if (!m.attachments?.length) return { role: m.role, content: m.content }
-  const blocks = m.attachments.map((a) => `<${a.kind} name="${a.name}">\n${a.text}\n</${a.kind}>`)
-  return { role: 'user', content: `${blocks.join('\n\n')}\n\n${m.content}` }
+  const atts = m.attachments ?? []
+  if (!atts.length) return { role: m.role, content: m.content }
+
+  const docs = atts.filter((a) => a.kind !== 'image')
+  const images = atts.filter((a) => a.kind === 'image' && a.dataUrl)
+
+  const blocks = docs.map((a) => `<${a.kind} name="${a.name}">\n${a.text}\n</${a.kind}>`)
+  const text = blocks.length ? `${blocks.join('\n\n')}\n\n${m.content}` : m.content
+
+  if (!images.length) return { role: 'user', content: text }
+
+  return {
+    role: 'user',
+    content: [
+      { type: 'text', text },
+      ...images.map((a) => ({ type: 'image_url', image_url: { url: a.dataUrl } })),
+    ],
+  }
 }
 
 function renderTopbar() {
@@ -122,7 +142,14 @@ async function onSend(text, atts) {
 
   const prior = await listMessages(convId)
   const wire = [{ role: 'system', content: settings.systemPrompt }, ...prior.map(toWire)]
-  const estimated = wire.reduce((s, w) => s + estimateTokens(w.content), 0)
+  const estimated = wire.reduce(
+    (sum, w) =>
+      sum +
+      (typeof w.content === 'string'
+        ? estimateTokens(w.content)
+        : w.content.reduce((t, part) => t + (part.type === 'text' ? estimateTokens(part.text) : 300), 0)),
+    0,
+  )
 
   controller = new AbortController()
   composer.setBusy(true)
@@ -204,6 +231,8 @@ function applySettings(s) {
   statusBar.refresh()
   refresh()
 }
+
+setupDropzone(document.querySelector('.main'), (files) => composer.addFiles(files))
 
 $('new-chat').addEventListener('click', onNewChat)
 $('open-settings').addEventListener('click', () => openSettings(settings, applySettings))

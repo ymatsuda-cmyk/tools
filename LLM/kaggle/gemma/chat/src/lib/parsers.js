@@ -19,6 +19,36 @@ function pack(name, kind, text) {
   return { id: makeId(), name, kind, chars: text.length, tokens: estimateTokens(text), text }
 }
 
+/**
+ * 画像1枚あたりの概算トークン数。
+ * Gemma 系は固定長のビジョントークンを使うため文字数からは推定できない。
+ * 実測 usage.prompt_tokens と突き合わせて調整すること。
+ */
+export const IMAGE_TOKENS = 300
+
+async function readDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result)
+    r.onerror = () => reject(new Error('画像の読み込みに失敗しました'))
+    r.readAsDataURL(file)
+  })
+}
+
+async function packImage(file, name) {
+  const dataUrl = await readDataUrl(file)
+  return {
+    id: makeId(),
+    name,
+    kind: 'image',
+    chars: 0,
+    tokens: IMAGE_TOKENS,
+    text: '',
+    dataUrl,
+    bytes: file.size,
+  }
+}
+
 async function parsePdf(file) {
   const pdfjs = await import('pdfjs')
   pdfjs.GlobalWorkerOptions.workerSrc =
@@ -57,7 +87,8 @@ async function parseXlsx(file) {
 }
 
 export async function parseFile(file) {
-  const name = file.name
+  const name = file.name || `image-${Date.now()}.png`
+  if (file.type.startsWith('image/')) return packImage(file, name)
   if (/\.pdf$/i.test(name)) return pack(name, 'pdf', await parsePdf(file))
   if (/\.docx$/i.test(name)) return pack(name, 'docx', await parseDocx(file))
   if (/\.(xlsx|xlsm|xls)$/i.test(name)) return pack(name, 'xlsx', await parseXlsx(file))
@@ -75,5 +106,13 @@ export function attachmentTag(kind) {
   if (kind === 'pdf') return 'PDF'
   if (kind === 'docx') return 'DOC'
   if (kind === 'xlsx') return 'XLS'
+  if (kind === 'image') return 'IMG'
   return 'TXT'
+}
+
+export function formatBytes(n) {
+  if (!n) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }

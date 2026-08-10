@@ -1,10 +1,20 @@
 import { h, clear } from '../lib/dom.js'
-import { attachmentTag } from '../lib/parsers.js'
+import { attachmentTag, formatBytes } from '../lib/parsers.js'
 import { formatTokens } from '../lib/tokens.js'
 import { renderMarkdown } from '../lib/markdown.js'
 import { openModal } from './modal.js'
 
 export function attachmentCard(att, { over = false, onRemove = null } = {}) {
+  const thumb =
+    att.kind === 'image' && att.dataUrl
+      ? h('img', { class: 'thumb', src: att.dataUrl, alt: att.name })
+      : h('span', { class: 'tag', text: attachmentTag(att.kind) })
+
+  const meta =
+    att.kind === 'image'
+      ? `${formatBytes(att.bytes)} · 約${formatTokens(att.tokens)} tok`
+      : `${att.chars.toLocaleString()}字 · 約${formatTokens(att.tokens)} tok`
+
   return h(
     'div',
     {
@@ -12,15 +22,12 @@ export function attachmentCard(att, { over = false, onRemove = null } = {}) {
       title: att.name,
       onClick: () => previewAttachment(att),
     },
-    h('span', { class: 'tag', text: attachmentTag(att.kind) }),
+    thumb,
     h(
       'div',
       { style: { minWidth: 0 } },
       h('div', { class: 'name', text: att.name }),
-      h('div', {
-        class: 'meta',
-        text: `${att.chars.toLocaleString()}字 · 約${formatTokens(att.tokens)} tok`,
-      }),
+      h('div', { class: 'meta', text: meta }),
     ),
     onRemove &&
       h('button', {
@@ -44,9 +51,14 @@ function previewAttachment(att) {
       h('div', {
         class: 'hint',
         style: { marginBottom: '10px' },
-        text: `${att.chars.toLocaleString()}字 · 推定 ${att.tokens.toLocaleString()} トークン`,
+        text:
+          att.kind === 'image'
+            ? `${formatBytes(att.bytes)} · 推定 ${att.tokens.toLocaleString()} トークン`
+            : `${att.chars.toLocaleString()}字 · 推定 ${att.tokens.toLocaleString()} トークン`,
       }),
-      h('pre', { class: 'preview', text: att.text }),
+      att.kind === 'image'
+        ? h('img', { class: 'preview-img', src: att.dataUrl, alt: att.name })
+        : h('pre', { class: 'preview', text: att.text }),
       h(
         'div',
         { style: { marginTop: '12px', textAlign: 'right' } },
@@ -54,6 +66,32 @@ function previewAttachment(att) {
       ),
     ),
   )
+}
+
+/** やりとり1ブロックをコピーするボタン */
+function copyButton(getText) {
+  const btn = h('button', { class: 'copy', text: 'コピー' })
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(getText())
+      btn.textContent = 'コピーしました'
+    } catch {
+      btn.textContent = 'コピーできません'
+    }
+    setTimeout(() => {
+      btn.textContent = 'コピー'
+    }, 1500)
+  })
+  return btn
+}
+
+/** 添付を含めた、そのメッセージの全文 */
+function messageAsText(m) {
+  const docs = (m.attachments ?? []).filter((a) => a.kind !== 'image')
+  const parts = docs.map((a) => `--- ${a.name} ---\n${a.text}`)
+  if (m.content) parts.push(m.content)
+  return parts.join('\n\n')
 }
 
 function messageEl(m) {
@@ -82,6 +120,7 @@ function messageEl(m) {
     if (m.error) wrap.append(h('div', { class: 'warn', text: m.error }))
   }
 
+  wrap.append(h('div', { class: 'msg-tools' }, copyButton(() => messageAsText(m))))
   return wrap
 }
 
@@ -96,18 +135,18 @@ export function createMessageList(root) {
   }
 
   return {
-    /** 確定済みメッセージを描き直す */
     render(messages) {
       clear(root)
       if (!messages.length) {
-        root.append(h('div', { class: 'empty', text: 'ファイルを添付するか、質問を入力してください' }))
+        root.append(
+          h('div', { class: 'empty', text: 'ファイルを添付するか、質問を入力してください' }),
+        )
         return
       }
       for (const m of messages) root.append(messageEl(m))
       stick = true
       scrollToEnd()
     },
-    /** ストリーミング用の空要素を末尾に追加して返す */
     beginStream() {
       const body = h('div', { class: 'assistant-body' })
       root.append(h('div', { class: 'msg' }, body))
