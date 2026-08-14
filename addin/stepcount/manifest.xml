@@ -4,7 +4,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
-  xsi:type="StepCount">
+  xsi:type="TaskPaneApp">
 
   <Id>7f3c1a54-9d21-4b6e-b0e7-6a2d55c81f90</Id>
   <Version>1.0.0.0</Version>
