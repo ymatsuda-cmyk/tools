@@ -113,13 +113,29 @@ async function reload() {
     setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
       " 件 / 除外 " + state.excludeMap.size + " 件");
   } catch (e) {
-    toast(String(e && e.message ? e.message : e), true);
-    document.querySelector(".boot-msg").textContent = "読み込みに失敗しました：" + e;
+    var d = describe(e);
+    toast("読み込みに失敗しました：" + d, true);
+    var b = document.querySelector(".boot-msg");
+    if (b) b.textContent = "読み込みに失敗しました：" + d;
+    setStatus("読み込み失敗");
+    console.error(e);
   }
 }
 
+/* Excel for Web は1回の sync で扱えるセル数に上限があるため、
+   1万行規模のシートは CHUNK 行ずつに分けて読む。 */
+var CHUNK = 2000;
+
 async function readWorkbook() {
-  return await Excel.run(async function (ctx) {
+  await ensureSheets();
+  var data = await readArea(SHEET.data, 4);
+  var assign = await readArea(SHEET.assign, 2);
+  var exclude = await readArea(SHEET.exclude, 2);
+  return { data: data, assign: assign, exclude: exclude };
+}
+
+async function ensureSheets() {
+  await Excel.run(async function (ctx) {
     var sheets = ctx.workbook.worksheets;
     sheets.load("items/name");
     await ctx.sync();
@@ -128,26 +144,56 @@ async function readWorkbook() {
     if (names.indexOf(SHEET.data) < 0) {
       throw new Error("シート「" + SHEET.data + "」が見つかりません。");
     }
+    var added = false;
     [SHEET.assign, SHEET.exclude].forEach(function (n) {
-      if (names.indexOf(n) < 0) {
-        var s = sheets.add(n);
-        s.getRange("A1:B1").values = n === SHEET.assign
-          ? [["フォルダパス", "取引先名"]]
-          : [["フォルダパス", "メモ"]];
-      }
+      if (names.indexOf(n) >= 0) return;
+      var s = sheets.add(n);
+      s.getRange("A1:B1").values = n === SHEET.assign
+        ? [["フォルダパス", "取引先名"]]
+        : [["フォルダパス", "メモ"]];
+      added = true;
     });
-    await ctx.sync();
-
-    var d = sheets.getItem(SHEET.data).getUsedRange(true);
-    var a = sheets.getItem(SHEET.assign).getRange("A1:B20000");
-    var x = sheets.getItem(SHEET.exclude).getRange("A1:B20000");
-    d.load("values");
-    a.load("values");
-    x.load("values");
-    await ctx.sync();
-
-    return { data: d.values || [], assign: a.values || [], exclude: x.values || [] };
+    if (added) await ctx.sync();
   });
+}
+
+/* シートの使用範囲の行数を測り、A列から cols 列ぶんを分割して読む */
+async function readArea(sheetName, cols) {
+  var dim = await areaSize(sheetName);
+  if (!dim || !dim.rows) return [];
+
+  var out = [];
+  var read = 0;
+  while (read < dim.rows) {
+    var take = Math.min(CHUNK, dim.rows - read);
+    var offset = read;
+    var chunk = await Excel.run(async function (ctx) {
+      var r = ctx.workbook.worksheets.getItem(sheetName)
+        .getRangeByIndexes(dim.top + offset, 0, take, cols);
+      r.load("values");
+      await ctx.sync();
+      return r.values;
+    });
+    for (var i = 0; i < chunk.length; i++) out.push(chunk[i]);
+    read += take;
+    if (dim.rows > CHUNK) {
+      setStatus("読み込み中… " + fmt(read) + " / " + fmt(dim.rows) + " 行");
+    }
+  }
+  return out;
+}
+
+async function areaSize(sheetName) {
+  try {
+    return await Excel.run(async function (ctx) {
+      var r = ctx.workbook.worksheets.getItem(sheetName).getUsedRange(true);
+      r.load(["rowCount", "columnCount", "rowIndex"]);
+      await ctx.sync();
+      return { rows: r.rowCount, cols: r.columnCount, top: r.rowIndex };
+    });
+  } catch (e) {
+    return null; /* 空シート */
+  }
 }
 
 function buildModel(raw) {
@@ -395,23 +441,47 @@ async function applyAssign(mode) {
     await reload();
     toast(picks.length + " フォルダを更新しました。");
   } catch (e) {
-    toast("書き込みに失敗しました：" + e, true);
+    toast("書き込みに失敗しました：" + describe(e), true);
   }
 }
 
 async function writeMap(sheetName, header, map) {
-  await Excel.run(async function (ctx) {
-    var s = ctx.workbook.worksheets.getItem(sheetName);
-    s.getRange("A1:B20000").clear(Excel.ClearApplyTo.contents);
-    await ctx.sync();
+  var keys = Array.from(map.keys()).sort(cmpJa);
+  var vals = [header];
+  keys.forEach(function (k) { vals.push([k, map.get(k)]); });
 
-    var keys = Array.from(map.keys()).sort(cmpJa);
-    var vals = [header];
-    keys.forEach(function (k) { vals.push([k, map.get(k)]); });
-    s.getRangeByIndexes(0, 0, vals.length, 2).values = vals;
-    s.getRange("A:B").format.autofitColumns();
+  var dim = await areaSize(sheetName);
+  if (dim && dim.rows) {
+    await Excel.run(async function (ctx) {
+      ctx.workbook.worksheets.getItem(sheetName)
+        .getRangeByIndexes(0, 0, dim.top + dim.rows, 2)
+        .clear(Excel.ClearApplyTo.contents);
+      await ctx.sync();
+    });
+  }
+  await writeChunked(sheetName, vals);
+  await Excel.run(async function (ctx) {
+    ctx.workbook.worksheets.getItem(sheetName)
+      .getRangeByIndexes(0, 0, vals.length, 2).format.autofitColumns();
     await ctx.sync();
   });
+}
+
+/* 値を CHUNK 行ずつ書き込む */
+async function writeChunked(sheetName, values) {
+  if (!values.length) return;
+  var cols = values[0].length;
+  var done = 0;
+  while (done < values.length) {
+    var slice = values.slice(done, done + CHUNK);
+    var at = done;
+    await Excel.run(async function (ctx) {
+      ctx.workbook.worksheets.getItem(sheetName)
+        .getRangeByIndexes(at, 0, slice.length, cols).values = slice;
+      await ctx.sync();
+    });
+    done += slice.length;
+  }
 }
 
 /* ---------- 集計 ---------- */
@@ -664,7 +734,7 @@ async function assignFromRest() {
     switchTab("rest");
     toast("割り当てました。");
   } catch (e) {
-    toast("書き込みに失敗しました：" + e, true);
+    toast("書き込みに失敗しました：" + describe(e), true);
   }
 }
 
@@ -695,37 +765,58 @@ async function exportSheets() {
   });
 
   try {
+    setStatus("出力中…");
+    await putSheet(SHEET.outVendor, v, [3]);
+    await putSheet(SHEET.outExt, x, [2]);
+    await putSheet(SHEET.outCross, c, []);
     await Excel.run(async function (ctx) {
-      await putSheet(ctx, SHEET.outVendor, v, [3]);
-      await putSheet(ctx, SHEET.outExt, x, [2]);
-      await putSheet(ctx, SHEET.outCross, c, []);
       ctx.workbook.worksheets.getItem(SHEET.outVendor).activate();
       await ctx.sync();
     });
     toast("3 シートに出力しました。");
   } catch (e) {
-    toast("出力に失敗しました：" + e, true);
+    toast("出力に失敗しました：" + describe(e), true);
   }
 }
 
-async function putSheet(ctx, name, values, pctCols) {
-  var sheets = ctx.workbook.worksheets;
-  sheets.load("items/name");
-  await ctx.sync();
-  var exists = sheets.items.some(function (i) { return i.name === name; });
-  var s = exists ? sheets.getItem(name) : sheets.add(name);
-  if (exists) {
-    s.getRange("A1:Z50000").clear(Excel.ClearApplyTo.all);
+async function putSheet(name, values, pctCols) {
+  await Excel.run(async function (ctx) {
+    var sheets = ctx.workbook.worksheets;
+    sheets.load("items/name");
     await ctx.sync();
-  }
-  var r = s.getRangeByIndexes(0, 0, values.length, values[0].length);
-  r.values = values;
-  s.getRangeByIndexes(0, 0, 1, values[0].length).format.font.bold = true;
-  pctCols.forEach(function (ci) {
-    s.getRangeByIndexes(1, ci, values.length - 1, 1).numberFormat = [["0.0%"]];
+    if (!sheets.items.some(function (i) { return i.name === name; })) {
+      sheets.add(name);
+      await ctx.sync();
+    }
   });
-  s.getRangeByIndexes(0, 0, values.length, values[0].length).format.autofitColumns();
-  await ctx.sync();
+
+  var dim = await areaSize(name);
+  if (dim && dim.rows) {
+    await Excel.run(async function (ctx) {
+      ctx.workbook.worksheets.getItem(name)
+        .getRangeByIndexes(0, 0, dim.top + dim.rows, Math.max(dim.cols, 8))
+        .clear(Excel.ClearApplyTo.all);
+      await ctx.sync();
+    });
+  }
+
+  await writeChunked(name, values);
+
+  await Excel.run(async function (ctx) {
+    var s = ctx.workbook.worksheets.getItem(name);
+    var w = values[0].length;
+    s.getRangeByIndexes(0, 0, 1, w).format.font.bold = true;
+    var n = values.length - 1;
+    if (n > 0) {
+      var pf = [];
+      for (var i = 0; i < n; i++) pf.push(["0.0%"]);
+      pctCols.forEach(function (ci) {
+        s.getRangeByIndexes(1, ci, n, 1).numberFormat = pf;
+      });
+    }
+    s.getRangeByIndexes(0, 0, Math.min(values.length, 200), w).format.autofitColumns();
+    await ctx.sync();
+  });
 }
 
 /* ---------- ユーティリティ ---------- */
@@ -741,6 +832,20 @@ function esc(s) {
   });
 }
 function setStatus(t) { byId("status-count").textContent = t; }
+
+/* Office API のエラーは message だけでは原因が分からないので debugInfo を添える */
+function describe(e) {
+  if (!e) return "不明なエラー";
+  var msg = e.message || String(e);
+  if (e.code) msg = e.code + ": " + msg;
+  if (e.debugInfo) {
+    var d = e.debugInfo;
+    var extra = [d.errorLocation, d.statement, d.surroundingStatements]
+      .filter(function (x) { return x; }).join(" / ");
+    if (extra) msg += "（" + extra + "）";
+  }
+  return msg;
+}
 
 var toastTimer = null;
 function toast(msg, isError) {
