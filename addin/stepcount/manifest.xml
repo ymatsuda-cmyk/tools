@@ -4,7 +4,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
-  xsi:type="TaskPaneApp">
+  xsi:type="StepCount">
 
   <Id>7f3c1a54-9d21-4b6e-b0e7-6a2d55c81f90</Id>
   <Version>1.0.0.0</Version>
@@ -12,9 +12,9 @@
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="ステップ数集計" />
   <Description DefaultValue="フォルダに取引先名を割り当て、取引先別・拡張子別のステップ数を集計します。" />
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
-  <SupportUrl DefaultValue="https://localhost:3000/" />
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
 
   <Hosts>
     <Host Name="Workbook" />
@@ -27,7 +27,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -76,13 +76,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-16.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
-        <bt:Url id="GetStarted.Url" DefaultValue="https://localhost:3000/" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
+        <bt:Url id="GetStarted.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Tab.Label" DefaultValue="ステップ数集計" />
