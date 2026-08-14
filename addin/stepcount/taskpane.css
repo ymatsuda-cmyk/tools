@@ -83,7 +83,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .btn:focus-visible { outline: 2px solid #2f6f5e; outline-offset: 1px; }
 
 /* tree */
-.tree, .drill, .rest { flex: 1 1 auto; overflow-y: auto; padding: 6px 8px; }
+.tree, .drill { flex: 1 1 auto; overflow-y: auto; padding: 6px 8px; }
 
 .node {
   display: flex; align-items: center; gap: 6px;
@@ -103,7 +103,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 }
 .node-num {
   font-variant-numeric: tabular-nums; font-size: 11px; color: #6b6a64;
-  flex: 0 0 auto;
+  flex: 0 0 auto; white-space: nowrap;
 }
 
 .badge {
@@ -125,19 +125,23 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
   border-bottom: 0; border-top: 1px solid #e3e2dd; padding: 8px 4px 4px;
 }
 .dl-head .g, .dl-total .g { flex: 1 1 auto; }
-.dl-head .n, .dl-total .n { width: 68px; text-align: right; font-variant-numeric: tabular-nums; }
+.dl-head .n, .dl-total .n { width: 104px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dl-head .p, .dl-total .p { width: 44px; text-align: right; }
 
 .dl-row { padding: 5px 4px; border-radius: 3px; }
-.dl-row.is-click { cursor: pointer; }
-.dl-row.is-click:hover { background: #f7f7f5; }
 .dl-row.is-open { background: #f7f7f5; }
 .dl-line { display: flex; align-items: center; gap: 6px; }
+.dl-line.is-click { cursor: pointer; }
 .dl-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dl-num { width: 68px; text-align: right; font-variant-numeric: tabular-nums; color: #6b6a64; font-size: 12px; }
+.dl-num { width: 104px; text-align: right; font-variant-numeric: tabular-nums; color: #6b6a64; font-size: 12px; white-space: nowrap; }
 .dl-pct { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: #96958e; font-size: 11px; }
-.bar { height: 7px; background: #f1efe8; border-radius: 3px; margin: 4px 0 0 20px; overflow: hidden; }
-.bar > i { display: block; height: 7px; background: #2f6f5e; border-radius: 3px; }
+.bar {
+  height: 7px; background: #f1efe8; border-radius: 3px;
+  margin: 4px 0 0 20px; overflow: hidden; cursor: pointer;
+}
+.bar:hover { background: #e7e5dc; }
+.bar:focus-visible { outline: 2px solid #2f6f5e; outline-offset: 1px; }
+.bar > i { display: block; height: 7px; background: #2f6f5e; border-radius: 3px; pointer-events: none; }
 .bar.is-rest > i { background: #b8791f; }
 
 .lvl2 { margin: 4px 0 8px 20px; padding-left: 10px; border-left: 1px solid #e3e2dd; }
@@ -149,18 +153,30 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .lvl3 .bar > i { height: 5px; background: #a8b3ac; }
 .mono { font-family: Consolas, "Courier New", monospace; }
 
-/* 未割当 */
-.rest-row {
+/* ファイル一覧（グラフのクリック先） */
+.fl-head { display: flex; align-items: center; gap: 8px; padding: 4px; margin-bottom: 4px; }
+.fl-back {
+  flex: 0 0 auto; padding: 3px 8px; font-size: 12px;
+}
+.fl-title {
+  flex: 1 1 auto; font-weight: 600; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fl-meta {
+  padding: 0 4px 8px; font-size: 11px; color: #96958e;
+  border-bottom: 1px solid #e3e2dd; margin-bottom: 4px;
+}
+.file-row {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 4px; border-bottom: 1px solid #f1efe8;
+  padding: 5px 4px; border-bottom: 1px solid #f1efe8;
 }
-.rest-row:hover { background: #f7f7f5; }
-.rest-path {
+.file-row:hover { background: #f7f7f5; }
+.file-row.is-excluded { color: #96958e; }
+.file-path {
   flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; direction: rtl; text-align: left;
-  font-family: Consolas, "Courier New", monospace; font-size: 11px;
+  white-space: nowrap; direction: rtl; text-align: left; font-size: 11px;
 }
-.rest-num { font-variant-numeric: tabular-nums; font-size: 11px; color: #6b6a64; }
+.file-num { font-variant-numeric: tabular-nums; font-size: 11px; color: #6b6a64; white-space: nowrap; }
 
 .empty { padding: 20px 12px; color: #96958e; font-size: 12px; text-align: center; }
 

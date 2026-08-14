@@ -18,7 +18,6 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" role="tab" data-tab="assign" aria-selected="true">割当</button>
     <button class="tab" role="tab" data-tab="summary" aria-selected="false">集計</button>
-    <button class="tab" role="tab" data-tab="rest" aria-selected="false">未割当</button>
   </nav>
 
   <div class="statusbar">
@@ -69,10 +68,8 @@
       <div class="row row-tight">
         <label class="field-label" for="group-mode">内訳</label>
         <select id="group-mode">
-          <option value="under" selected>取引先 › 割当直下フォルダ › 拡張子</option>
-          <option value="d1">取引先 › 階層1 › 拡張子</option>
-          <option value="d2">取引先 › 階層2 › 拡張子</option>
-          <option value="ext">取引先 › 拡張子</option>
+          <option value="folder" selected>フォルダ</option>
+          <option value="ext">拡張子</option>
         </select>
       </div>
     </div>
@@ -85,26 +82,6 @@
     <div class="actions">
       <button id="btn-export" class="btn btn-primary">シートに出力</button>
       <button id="btn-collapse" class="btn">すべて閉じる</button>
-    </div>
-  </section>
-
-  <!-- 未割当 -->
-  <section id="panel-rest" class="panel" role="tabpanel" hidden>
-    <div class="controls">
-      <div class="row">
-        <label class="field-label" for="rest-depth">粒度</label>
-        <select id="rest-depth">
-          <option value="1">階層1</option>
-          <option value="2" selected>階層2</option>
-          <option value="3">階層3</option>
-        </select>
-        <span class="spacer"></span>
-        <span class="hint" id="rest-total">—</span>
-      </div>
-    </div>
-    <div id="rest" class="rest"></div>
-    <div class="actions">
-      <button id="btn-rest-assign" class="btn btn-primary">選択行に割り当て</button>
     </div>
   </section>
 

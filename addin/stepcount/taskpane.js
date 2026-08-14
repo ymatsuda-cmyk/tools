@@ -19,9 +19,14 @@ var DIRECT = "（直下）";
 /* 相対パス行に直前のUNCルートを引き継ぐ。既に正規化済みのデータなら false のままで良い。 */
 var CARRY_UNC_ROOT = false;
 
+/* Excel for Web は1回の sync で扱えるセル数に上限があるため、
+   1万行規模のシートは CHUNK 行ずつに分けて読み書きする。 */
+var CHUNK = 2000;
+
 var state = {
   rows: [],
   tree: null,
+  nodeIndex: new Map(),
   assignMap: new Map(),
   excludeMap: new Map(),
   vendors: [],
@@ -30,8 +35,8 @@ var state = {
   checked: new Set(),
   openL1: new Set(),
   openL2: new Set(),
-  restChecked: new Set(),
-  summary: null
+  summary: null,
+  fileView: null
 };
 
 /* ---------- 起動 ---------- */
@@ -62,25 +67,31 @@ function bindUi() {
   byId("btn-exclude").addEventListener("click", function () { applyAssign("exclude"); });
   byId("btn-include").addEventListener("click", function () { applyAssign("include"); });
 
-  byId("kind").addEventListener("change", renderSummary);
-  byId("drop-excluded").addEventListener("change", renderSummary);
+  byId("kind").addEventListener("change", function () { state.fileView = null; renderSummary(); });
+  byId("drop-excluded").addEventListener("change", function () { state.fileView = null; renderSummary(); });
   byId("group-mode").addEventListener("change", function () {
     state.openL2 = new Set();
+    state.fileView = null;
     renderSummary();
   });
   byId("btn-collapse").addEventListener("click", function () {
     state.openL1 = new Set();
     state.openL2 = new Set();
+    state.fileView = null;
     renderSummary();
   });
   byId("btn-export").addEventListener("click", exportSheets);
 
-  byId("rest-depth").addEventListener("change", renderRest);
-  byId("btn-rest-assign").addEventListener("click", assignFromRest);
-
   byId("tree").addEventListener("click", onTreeClick);
   byId("drill").addEventListener("click", onDrillClick);
-  byId("rest").addEventListener("change", onRestChange);
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    var t = ev.target.closest("[data-l1],[data-l2],[data-file]");
+    if (!t) return;
+    ev.preventDefault();
+    t.click();
+  });
 }
 
 function switchTab(name) {
@@ -90,11 +101,10 @@ function switchTab(name) {
     b.classList.toggle("is-active", on);
     b.setAttribute("aria-selected", on ? "true" : "false");
   });
-  ["assign", "summary", "rest"].forEach(function (n) {
+  ["assign", "summary"].forEach(function (n) {
     byId("panel-" + n).hidden = n !== name;
   });
   if (name === "summary") renderSummary();
-  if (name === "rest") renderRest();
 }
 
 /* ---------- 読み込み ---------- */
@@ -109,7 +119,6 @@ async function reload() {
     expandTo(parseInt(byId("depth-open").value, 10));
     renderTree();
     if (state.tab === "summary") renderSummary();
-    if (state.tab === "rest") renderRest();
     setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
       " 件 / 除外 " + state.excludeMap.size + " 件");
   } catch (e) {
@@ -121,10 +130,6 @@ async function reload() {
     console.error(e);
   }
 }
-
-/* Excel for Web は1回の sync で扱えるセル数に上限があるため、
-   1万行規模のシートは CHUNK 行ずつに分けて読む。 */
-var CHUNK = 2000;
 
 async function readWorkbook() {
   await ensureSheets();
@@ -234,6 +239,7 @@ function buildModel(raw) {
   }
 
   state.rows = rows;
+  state.nodeIndex = new Map();
   state.tree = buildTree(rows);
   state.vendors = uniq(Array.from(state.assignMap.values())).sort(cmpJa);
   var dl = byId("vendor-list");
@@ -297,6 +303,7 @@ function lookup(map, folderSegs) {
 
 function buildTree(rows) {
   var root = node("", "");
+  state.nodeIndex.set("", root);
   for (var i = 0; i < rows.length; i++) {
     var f = rows[i];
     var cur = root;
@@ -304,8 +311,10 @@ function buildTree(rows) {
       var name = f.folder[d];
       var kid = cur.kids.get(name);
       if (!kid) {
-        kid = node(name, cur.path ? cur.path + "\\" + name : name);
+        var path = cur.path ? cur.path + "\\" + name : name;
+        kid = node(name, path);
         cur.kids.set(name, kid);
+        state.nodeIndex.set(path, kid);
       }
       cur = kid;
       cur.files++;
@@ -355,6 +364,12 @@ function expandTo(depth) {
   })(state.tree, 0);
 }
 
+/* チェック状態を配下すべてに伝播させる */
+function setSubtreeChecked(n, val) {
+  if (val) state.checked.add(n.path); else state.checked.delete(n.path);
+  n.kids.forEach(function (k) { setSubtreeChecked(k, val); });
+}
+
 function renderTree() {
   var host = byId("tree");
   var showAssigned = byId("show-assigned").checked;
@@ -368,7 +383,6 @@ function renderTree() {
     var hidden = !showAssigned && (n.vendor || n.inherited);
     if (hidden) return;
     var open = state.openNodes.has(n.path);
-    var locked = !!(n.vendor || n.inherited);
     var badge = "";
     if (n.vendor) badge = "<span class=\"badge badge-vendor\">" + esc(n.vendor) + "</span>";
     else if (n.inherited) badge = "<span class=\"badge badge-inherit\">継承 " + esc(n.inherited) + "</span>";
@@ -376,14 +390,15 @@ function renderTree() {
     if (n.excluded) badge += "<span class=\"badge badge-excluded\">除外</span>";
 
     html.push(
-      "<div class=\"node" + (locked ? " is-off" : "") + "\" style=\"padding-left:" + (depth * 14 + 4) + "px\">" +
+      "<div class=\"node" + ((n.vendor || n.inherited) ? " is-off" : "") +
+      "\" style=\"padding-left:" + (depth * 14 + 4) + "px\">" +
       "<button class=\"twisty" + (n.kids.size ? "" : " is-leaf") + "\" data-toggle=\"" + esc(n.path) + "\"" +
       " aria-label=\"" + (open ? "折りたたむ" : "展開する") + "\">" + (open ? "▼" : "▶") + "</button>" +
       "<input type=\"checkbox\" data-pick=\"" + esc(n.path) + "\"" +
-      (state.checked.has(n.path) ? " checked" : "") + (locked ? " disabled" : "") + ">" +
+      (state.checked.has(n.path) ? " checked" : "") + ">" +
       "<span class=\"node-name\" title=\"" + esc(n.path) + "\">" + esc(n.name) + "</span>" +
       badge +
-      "<span class=\"node-num\">" + fmt(n.total) + "</span>" +
+      "<span class=\"node-num\">" + fmtPair(n.files, n.total) + "</span>" +
       "</div>"
     );
     if (open) sortKids(n).forEach(function (c) { emit(c, depth + 1); });
@@ -407,31 +422,51 @@ function onTreeClick(ev) {
   }
   var c = ev.target.closest("[data-pick]");
   if (c) {
-    if (c.checked) state.checked.add(c.dataset.pick);
+    var n = state.nodeIndex.get(c.dataset.pick);
+    if (n) setSubtreeChecked(n, c.checked);
+    else if (c.checked) state.checked.add(c.dataset.pick);
     else state.checked.delete(c.dataset.pick);
+    renderTree();
   }
 }
 
 /* ---------- 割当の書き込み ---------- */
 
+/* 選択された経路のうち、祖先も選択されている経路を取り除く
+   （配下を丸ごとチェックしても、割当は最上位のフォルダにだけ書けば済むため） */
+function topmostPicks(paths) {
+  var set = new Set(paths);
+  return paths.filter(function (p) {
+    var segs = p.split("\\");
+    for (var i = 1; i < segs.length; i++) {
+      if (set.has(segs.slice(0, i).join("\\"))) return false;
+    }
+    return true;
+  });
+}
+
 async function applyAssign(mode) {
-  var picks = Array.from(state.checked);
-  if (mode === "unassign" || mode === "include") {
-    picks = picks.length ? picks : [];
-  }
-  if (!picks.length) { toast("フォルダを選択してください。", true); return; }
+  var all = Array.from(state.checked);
+  if (!all.length) { toast("フォルダを選択してください。", true); return; }
 
   var vendor = byId("vendor").value.trim();
   if (mode === "assign" && !vendor) { toast("取引先名を入力してください。", true); return; }
 
+  var count = 0;
   if (mode === "assign") {
+    var picks = topmostPicks(all);
     picks.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
-  } else if (mode === "unassign") {
-    picks.forEach(function (p) { state.assignMap.delete(normKey(p)); });
+    count = picks.length;
   } else if (mode === "exclude") {
-    picks.forEach(function (p) { state.excludeMap.set(normKey(p), "旧版・バックアップ"); });
+    var picksX = topmostPicks(all);
+    picksX.forEach(function (p) { state.excludeMap.set(normKey(p), "旧版・バックアップ"); });
+    count = picksX.length;
+  } else if (mode === "unassign") {
+    all.forEach(function (p) { if (state.assignMap.delete(normKey(p))) count++; });
+    if (!count) { toast("選択した項目に個別の割当がありません。割当元のフォルダを選んでください。", true); return; }
   } else {
-    picks.forEach(function (p) { state.excludeMap.delete(normKey(p)); });
+    all.forEach(function (p) { if (state.excludeMap.delete(normKey(p))) count++; });
+    if (!count) { toast("選択した項目に個別の除外がありません。除外元のフォルダを選んでください。", true); return; }
   }
 
   try {
@@ -439,7 +474,7 @@ async function applyAssign(mode) {
     await writeMap(SHEET.exclude, ["フォルダパス", "メモ"], state.excludeMap);
     state.checked = new Set();
     await reload();
-    toast(picks.length + " フォルダを更新しました。");
+    toast(count + " フォルダを更新しました。");
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }
@@ -485,11 +520,24 @@ async function writeChunked(sheetName, values) {
 }
 
 /* ---------- 集計 ---------- */
+/* group-mode: "ext"（取引先 › 拡張子）/ "folder"（取引先 › フォルダ › 拡張子） */
+
+function currentFilters() {
+  return {
+    kind: byId("kind").value,
+    drop: byId("drop-excluded").checked,
+    mode: byId("group-mode").value
+  };
+}
+
+function groupOf(f) {
+  var d = f.assignDepth;
+  return f.folder.length > d ? f.folder[d] : DIRECT;
+}
 
 function aggregate() {
-  var kind = byId("kind").value;
-  var drop = byId("drop-excluded").checked;
-  var mode = byId("group-mode").value;
+  var opt = currentFilters();
+  var flat = opt.mode === "ext";
 
   var vendors = new Map();
   var extTotals = new Map();
@@ -499,13 +547,13 @@ function aggregate() {
 
   for (var i = 0; i < state.rows.length; i++) {
     var f = state.rows[i];
-    var v = kind === "real" ? f.real : f.total;
+    var v = opt.kind === "real" ? f.real : f.total;
     if (f.excluded) {
       dropped += v;
-      if (drop) continue;
+      if (opt.drop) continue;
     }
     var vName = f.vendor || UNASSIGNED;
-    var gName = groupOf(f, mode);
+    var gName = flat ? null : groupOf(f);
 
     var ve = vendors.get(vName);
     if (!ve) { ve = { name: vName, value: 0, files: 0, groups: new Map() }; vendors.set(vName, ve); }
@@ -515,8 +563,13 @@ function aggregate() {
     if (!ge) { ge = { name: gName, value: 0, files: 0, exts: new Map() }; ve.groups.set(gName, ge); }
     ge.value += v; ge.files++;
 
-    ge.exts.set(f.ext, (ge.exts.get(f.ext) || 0) + v);
-    extTotals.set(f.ext, (extTotals.get(f.ext) || 0) + v);
+    var eb = ge.exts.get(f.ext);
+    if (!eb) { eb = { value: 0, files: 0 }; ge.exts.set(f.ext, eb); }
+    eb.value += v; eb.files++;
+
+    var et = extTotals.get(f.ext);
+    if (!et) { et = { value: 0, files: 0 }; extTotals.set(f.ext, et); }
+    et.value += v; et.files++;
 
     files++; grand += v;
   }
@@ -530,69 +583,83 @@ function aggregate() {
     ve.groupList = Array.from(ve.groups.values()).sort(function (a, b) { return b.value - a.value; });
     ve.groupList.forEach(function (ge) {
       ge.extList = Array.from(ge.exts.entries())
-        .map(function (e) { return { name: e[0] || "(なし)", value: e[1] }; })
+        .map(function (e) { return { name: e[0] || "(なし)", value: e[1].value, files: e[1].files }; })
         .sort(function (a, b) { return b.value - a.value; });
     });
   });
 
   return {
-    kind: kind, mode: mode, vendors: list, grand: grand, files: files, dropped: dropped,
+    kind: opt.kind, drop: opt.drop, mode: opt.mode, flat: flat,
+    vendors: list, grand: grand, files: files, dropped: dropped,
     exts: Array.from(extTotals.entries())
-      .map(function (e) { return { name: e[0] || "(なし)", value: e[1] }; })
+      .map(function (e) { return { name: e[0] || "(なし)", value: e[1].value, files: e[1].files }; })
       .sort(function (a, b) { return b.value - a.value; })
   };
 }
 
-function groupOf(f, mode) {
-  if (mode === "ext") return null;
-  if (mode === "under") {
-    var d = f.assignDepth;
-    return f.folder.length > d ? f.folder[d] : DIRECT;
+/* 指定した取引先・フォルダ・拡張子に絞った実ファイルの一覧を返す。
+   group / ext は null で「絞らない」を表す。 */
+function filesForBucket(vendorName, groupName, extName) {
+  var opt = currentFilters();
+  var out = [];
+  for (var i = 0; i < state.rows.length; i++) {
+    var f = state.rows[i];
+    if (f.excluded && opt.drop) continue;
+    var vName = f.vendor || UNASSIGNED;
+    if (vName !== vendorName) continue;
+    if (groupName !== null && groupOf(f) !== groupName) continue;
+    var extName2 = f.ext || "(なし)";
+    if (extName !== null && extName2 !== extName) continue;
+    out.push({
+      path: f.segs.join("\\"),
+      ext: extName2,
+      value: opt.kind === "real" ? f.real : f.total,
+      excluded: f.excluded
+    });
   }
-  var idx = mode === "d1" ? 0 : 1;
-  return f.folder.length > idx ? f.folder[idx] : DIRECT;
+  out.sort(function (a, b) { return b.value - a.value; });
+  return out;
 }
 
 function renderSummary() {
+  if (state.fileView) { renderFileList(); return; }
+
   var s = aggregate();
   state.summary = s;
   byId("m-steps").textContent = fmt(s.grand);
   byId("m-files").textContent = fmt(s.files);
   byId("m-dropped").textContent = fmt(s.dropped);
 
-  var flat = s.mode === "ext";
   var host = byId("drill");
   if (!s.vendors.length) { host.innerHTML = "<p class=\"empty\">集計対象がありません。</p>"; return; }
 
   var max = s.vendors[0].value || 1;
-  var html = ["<div class=\"dl-head\"><span class=\"g\">取引先" +
-    (flat ? " › 拡張子" : " › " + labelOfMode(s.mode) + " › 拡張子") +
-    "</span><span class=\"n\">ステップ</span><span class=\"p\">構成比</span></div>"];
+  var groupLabel = s.flat ? "" : " › フォルダ";
+  var html = ["<div class=\"dl-head\"><span class=\"g\">取引先" + groupLabel + " › 拡張子</span>" +
+    "<span class=\"n\">件数 / ステップ</span><span class=\"p\">構成比</span></div>"];
 
-  s.vendors.forEach(function (ve, i) {
+  s.vendors.forEach(function (ve) {
     var open = state.openL1.has(ve.name);
     var pct = s.grand ? ve.value / s.grand * 100 : 0;
     var rest = ve.name === UNASSIGNED;
     html.push(
-      "<div class=\"dl-row is-click" + (open ? " is-open" : "") + "\" data-l1=\"" + esc(ve.name) + "\"" +
+      "<div class=\"dl-row" + (open ? " is-open" : "") + "\">" +
+      "<div class=\"dl-line is-click\" data-l1=\"" + esc(ve.name) + "\"" +
       " role=\"button\" tabindex=\"0\" aria-expanded=\"" + open + "\">" +
-      "<div class=\"dl-line\">" +
       "<span class=\"twisty\" aria-hidden=\"true\">" + (open ? "▼" : "▶") + "</span>" +
       "<span class=\"dl-name\">" + esc(ve.name) + "</span>" +
-      "<span class=\"dl-num\">" + fmt(ve.value) + "</span>" +
+      "<span class=\"dl-num\">" + fmtPair(ve.files, ve.value) + "</span>" +
       "<span class=\"dl-pct\">" + pct.toFixed(1) + "%</span>" +
       "</div>" +
-      bar(ve.value / max * 100, rest) +
+      bar(ve.value / max * 100, rest, ve.name, null, null) +
       "</div>"
     );
     if (!open) return;
 
-    if (flat) {
+    if (s.flat) {
       html.push("<div class=\"lvl2\">");
-      var ex = mergeExts(ve);
-      ex.forEach(function (e) {
-        html.push(leafRow(e.name, e.value, ve.value, true));
-      });
+      var el = ve.groupList[0] ? ve.groupList[0].extList : [];
+      el.forEach(function (e) { html.push(leafRow(ve.name, null, e)); });
       html.push("</div>");
       return;
     }
@@ -603,20 +670,20 @@ function renderSummary() {
       var o2 = state.openL2.has(key);
       var p2 = ve.value ? ge.value / ve.value * 100 : 0;
       html.push(
-        "<div class=\"dl-row is-click" + (o2 ? " is-open" : "") + "\" data-l2=\"" + esc(key) + "\"" +
+        "<div class=\"dl-row" + (o2 ? " is-open" : "") + "\">" +
+        "<div class=\"dl-line is-click\" data-l2=\"" + esc(key) + "\"" +
         " role=\"button\" tabindex=\"0\" aria-expanded=\"" + o2 + "\">" +
-        "<div class=\"dl-line\">" +
         "<span class=\"twisty\" aria-hidden=\"true\">" + (o2 ? "▼" : "▶") + "</span>" +
         "<span class=\"dl-name mono\">" + esc(ge.name) + "</span>" +
-        "<span class=\"dl-num\">" + fmt(ge.value) + "</span>" +
+        "<span class=\"dl-num\">" + fmtPair(ge.files, ge.value) + "</span>" +
         "<span class=\"dl-pct\">" + p2.toFixed(1) + "%</span>" +
-        "</div>" + bar(p2, rest) + "</div>"
+        "</div>" +
+        bar(p2, rest, ve.name, ge.name, null) +
+        "</div>"
       );
       if (o2) {
         html.push("<div class=\"lvl3\">");
-        ge.extList.forEach(function (e) {
-          html.push(leafRow(e.name, e.value, ge.value, false));
-        });
+        ge.extList.forEach(function (e) { html.push(leafRow(ve.name, ge.name, e)); });
         html.push("</div>");
       }
     });
@@ -624,41 +691,57 @@ function renderSummary() {
   });
 
   html.push("<div class=\"dl-total\"><span class=\"g\">合計</span><span class=\"n\">" +
-    fmt(s.grand) + "</span><span class=\"p\"></span></div>");
+    fmtPair(s.files, s.grand) + "</span><span class=\"p\"></span></div>");
   host.innerHTML = html.join("");
 }
 
-function leafRow(name, value, denom, indent) {
-  var p = denom ? value / denom * 100 : 0;
+function leafRow(vendorName, groupName, e) {
+  var denom;
+  if (groupName === null) {
+    var ve = state.summary.vendors.filter(function (x) { return x.name === vendorName; })[0];
+    denom = ve ? ve.value : 0;
+  } else {
+    var found = 0;
+    state.summary.vendors.some(function (x) {
+      if (x.name !== vendorName) return false;
+      x.groupList.some(function (g) { if (g.name === groupName) found = g.value; });
+      return true;
+    });
+    denom = found;
+  }
+  var p = denom ? e.value / denom * 100 : 0;
   return "<div class=\"dl-row\">" +
-    "<div class=\"dl-line\">" +
-    (indent ? "<span class=\"twisty is-leaf\" aria-hidden=\"true\"></span>" : "") +
-    "<span class=\"dl-name mono\">" + esc(name) + "</span>" +
-    "<span class=\"dl-num\">" + fmt(value) + "</span>" +
+    "<div class=\"dl-line is-click\" data-file=\"" + esc(vendorName) + "\u0000" +
+    esc(groupName === null ? "" : groupName) + "\u0000" + esc(e.name) + "\">" +
+    "<span class=\"twisty is-leaf\" aria-hidden=\"true\"></span>" +
+    "<span class=\"dl-name mono\">" + esc(e.name) + "</span>" +
+    "<span class=\"dl-num\">" + fmtPair(e.files, e.value) + "</span>" +
     "<span class=\"dl-pct\">" + p.toFixed(1) + "%</span>" +
-    "</div>" + bar(p, false) + "</div>";
+    "</div>" +
+    bar(p, false, vendorName, groupName, e.name) +
+    "</div>";
 }
 
-function mergeExts(ve) {
-  var m = new Map();
-  ve.groupList.forEach(function (ge) {
-    ge.extList.forEach(function (e) { m.set(e.name, (m.get(e.name) || 0) + e.value); });
-  });
-  return Array.from(m.entries())
-    .map(function (e) { return { name: e[0], value: e[1] }; })
-    .sort(function (a, b) { return b.value - a.value; });
-}
-
-function bar(pct, rest) {
+function bar(pct, rest, vendorName, groupName, extName) {
   var w = Math.max(0, Math.min(100, pct));
-  return "<div class=\"bar" + (rest ? " is-rest" : "") + "\"><i style=\"width:" + w.toFixed(1) + "%\"></i></div>";
-}
-
-function labelOfMode(m) {
-  return m === "under" ? "割当直下フォルダ" : m === "d1" ? "階層1" : "階層2";
+  var key = esc(vendorName) + "\u0000" + esc(groupName === null || groupName === undefined ? "" : groupName) +
+    "\u0000" + esc(extName === null || extName === undefined ? "" : extName);
+  return "<div class=\"bar" + (rest ? " is-rest" : "") + "\" role=\"button\" tabindex=\"0\"" +
+    " data-file=\"" + key + "\" aria-label=\"該当ファイルを表示\">" +
+    "<i style=\"width:" + w.toFixed(1) + "%\"></i></div>";
 }
 
 function onDrillClick(ev) {
+  var fb = ev.target.closest("[data-file]");
+  if (fb) {
+    ev.stopPropagation();
+    var parts = fb.dataset.file.split("\u0000");
+    var vendorName = parts[0];
+    var groupName = parts[1] === "" ? null : parts[1];
+    var extName = parts[2] === "" ? null : parts[2];
+    openFileList(vendorName, groupName, extName);
+    return;
+  }
   var l2 = ev.target.closest("[data-l2]");
   if (l2) {
     var k = l2.dataset.l2;
@@ -674,68 +757,46 @@ function onDrillClick(ev) {
   }
 }
 
-document.addEventListener("keydown", function (ev) {
-  if (ev.key !== "Enter" && ev.key !== " ") return;
-  var t = ev.target.closest("[data-l1],[data-l2]");
-  if (!t) return;
-  ev.preventDefault();
-  t.click();
-});
-
-/* ---------- 未割当 ---------- */
-
-function renderRest() {
-  var depth = parseInt(byId("rest-depth").value, 10);
-  var kind = byId("kind").value;
-  var m = new Map();
-  var sum = 0;
-
-  state.rows.forEach(function (f) {
-    if (f.vendor) return;
-    var v = kind === "real" ? f.real : f.total;
-    var key = f.folder.slice(0, Math.min(depth, f.folder.length)).join("\\");
-    var e = m.get(key);
-    if (!e) { e = { path: key, value: 0, files: 0 }; m.set(key, e); }
-    e.value += v; e.files++;
-    sum += v;
-  });
-
-  var list = Array.from(m.values()).sort(function (a, b) { return b.value - a.value; });
-  byId("rest-total").textContent = list.length + " フォルダ / " + fmt(sum);
-
-  var host = byId("rest");
-  if (!list.length) { host.innerHTML = "<p class=\"empty\">未割当はありません。</p>"; return; }
-  host.innerHTML = list.map(function (e) {
-    return "<div class=\"rest-row\">" +
-      "<input type=\"checkbox\" data-rest=\"" + esc(e.path) + "\"" +
-      (state.restChecked.has(e.path) ? " checked" : "") + ">" +
-      "<span class=\"rest-path\" title=\"" + esc(e.path) + "\">" + esc(e.path) + "</span>" +
-      "<span class=\"rest-num\">" + fmt(e.value) + "</span>" +
-      "</div>";
-  }).join("");
+function openFileList(vendorName, groupName, extName) {
+  var rows = filesForBucket(vendorName, groupName, extName);
+  var titleParts = [vendorName];
+  if (groupName !== null) titleParts.push(groupName);
+  if (extName !== null) titleParts.push(extName);
+  state.fileView = {
+    title: titleParts.join(" › "),
+    rows: rows,
+    sum: rows.reduce(function (s, r) { return s + r.value; }, 0)
+  };
+  renderSummary();
 }
 
-function onRestChange(ev) {
-  var c = ev.target.closest("[data-rest]");
-  if (!c) return;
-  if (c.checked) state.restChecked.add(c.dataset.rest);
-  else state.restChecked.delete(c.dataset.rest);
-}
-
-async function assignFromRest() {
-  var vendor = byId("vendor").value.trim();
-  if (!vendor) { toast("「割当」タブで取引先名を入力してください。", true); switchTab("assign"); return; }
-  if (!state.restChecked.size) { toast("フォルダを選択してください。", true); return; }
-  state.restChecked.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
-  state.restChecked = new Set();
-  try {
-    await writeMap(SHEET.assign, ["フォルダパス", "取引先名"], state.assignMap);
-    await reload();
-    switchTab("rest");
-    toast("割り当てました。");
-  } catch (e) {
-    toast("書き込みに失敗しました：" + describe(e), true);
+function renderFileList() {
+  var v = state.fileView;
+  var host = byId("drill");
+  var html = [
+    "<div class=\"fl-head\">" +
+    "<button type=\"button\" id=\"fl-back\" class=\"btn fl-back\">‹ 戻る</button>" +
+    "<span class=\"fl-title\" title=\"" + esc(v.title) + "\">" + esc(v.title) + "</span>" +
+    "</div>",
+    "<div class=\"fl-meta\">" + fmtPair(v.rows.length, v.sum) + "</div>"
+  ];
+  if (!v.rows.length) {
+    html.push("<p class=\"empty\">該当するファイルがありません。</p>");
+  } else {
+    v.rows.forEach(function (r) {
+      html.push(
+        "<div class=\"file-row" + (r.excluded ? " is-excluded" : "") + "\">" +
+        "<span class=\"file-path mono\" title=\"" + esc(r.path) + "\">" + esc(r.path) + "</span>" +
+        "<span class=\"file-num\">" + fmt(r.value) + "</span>" +
+        "</div>"
+      );
+    });
   }
+  host.innerHTML = html.join("");
+  byId("fl-back").addEventListener("click", function () {
+    state.fileView = null;
+    renderSummary();
+  });
 }
 
 /* ---------- 出力 ---------- */
@@ -750,16 +811,16 @@ async function exportSheets() {
   });
   v.push(["合計", s.files, s.grand, 1]);
 
-  var x = [["拡張子", label, "構成比"]];
+  var x = [["拡張子", "ファイル数", label, "構成比"]];
   s.exts.forEach(function (e) {
-    x.push([e.name, e.value, s.grand ? e.value / s.grand : 0]);
+    x.push([e.name, e.files, e.value, s.grand ? e.value / s.grand : 0]);
   });
 
-  var c = [["取引先名", labelOfMode(s.mode), "拡張子", "ファイル数", label]];
+  var c = [["取引先名", "フォルダ", "拡張子", "ファイル数", label]];
   s.vendors.forEach(function (ve) {
     ve.groupList.forEach(function (ge) {
       ge.extList.forEach(function (e) {
-        c.push([ve.name, ge.name, e.name, ge.files, e.value]);
+        c.push([ve.name, ge.name === null ? "" : ge.name, e.name, e.files, e.value]);
       });
     });
   });
@@ -767,7 +828,7 @@ async function exportSheets() {
   try {
     setStatus("出力中…");
     await putSheet(SHEET.outVendor, v, [3]);
-    await putSheet(SHEET.outExt, x, [2]);
+    await putSheet(SHEET.outExt, x, [3]);
     await putSheet(SHEET.outCross, c, []);
     await Excel.run(async function (ctx) {
       ctx.workbook.worksheets.getItem(SHEET.outVendor).activate();
@@ -824,6 +885,7 @@ async function putSheet(name, values, pctCols) {
 function byId(id) { return document.getElementById(id); }
 function num(v) { return typeof v === "number" ? v : (parseFloat(String(v).replace(/,/g, "")) || 0); }
 function fmt(n) { return Math.round(n).toLocaleString("ja-JP"); }
+function fmtPair(files, steps) { return fmt(files) + " / " + fmt(steps); }
 function uniq(a) { return Array.from(new Set(a.filter(function (x) { return x; }))); }
 function cmpJa(a, b) { return String(a).localeCompare(String(b), "ja"); }
 function esc(s) {
