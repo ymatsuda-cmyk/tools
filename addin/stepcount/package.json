@@ -1,0 +1,11 @@
+{
+  "name": "step-count-addin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "フォルダ単位の取引先割当と、取引先別・拡張子別ステップ数集計を行う Excel アドイン",
+  "scripts": {
+    "cert": "npx office-addin-dev-certs install",
+    "start": "npx http-server ./src -p 3000 -S -C \"%USERPROFILE%/.office-addin-dev-certs/localhost.crt\" -K \"%USERPROFILE%/.office-addin-dev-certs/localhost.key\" -c-1",
+    "start:mac": "npx http-server ./src -p 3000 -S -C \"$HOME/.office-addin-dev-certs/localhost.crt\" -K \"$HOME/.office-addin-dev-certs/localhost.key\" -c-1"
+  }
+}

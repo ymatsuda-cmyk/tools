@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ステップ数集計</title>
+<link rel="stylesheet" href="taskpane.css">
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <p class="boot-msg">Excel に接続しています…</p>
+</div>
+
+<div id="app" class="app" hidden>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" role="tab" data-tab="assign" aria-selected="true">割当</button>
+    <button class="tab" role="tab" data-tab="summary" aria-selected="false">集計</button>
+    <button class="tab" role="tab" data-tab="rest" aria-selected="false">未割当</button>
+  </nav>
+
+  <div class="statusbar">
+    <span id="status-count">—</span>
+    <button id="btn-reload" class="icon-btn" title="データを読み直す" aria-label="データを読み直す">↻</button>
+  </div>
+
+  <!-- 割当 -->
+  <section id="panel-assign" class="panel" role="tabpanel">
+    <div class="controls">
+      <label class="field-label" for="vendor">割り当てる取引先</label>
+      <div class="row">
+        <input id="vendor" list="vendor-list" placeholder="取引先名を入力または選択">
+        <datalist id="vendor-list"></datalist>
+      </div>
+      <div class="row row-tight">
+        <label class="check"><input type="checkbox" id="show-assigned" checked>割当済みも表示</label>
+        <span class="spacer"></span>
+        <label class="field-label" for="depth-open">展開</label>
+        <select id="depth-open">
+          <option value="1">1階層</option>
+          <option value="2" selected>2階層</option>
+          <option value="3">3階層</option>
+        </select>
+      </div>
+    </div>
+    <div id="tree" class="tree"></div>
+    <div class="actions">
+      <button id="btn-assign" class="btn btn-primary">割り当て</button>
+      <button id="btn-unassign" class="btn">解除</button>
+      <button id="btn-exclude" class="btn">除外</button>
+      <button id="btn-include" class="btn">除外解除</button>
+    </div>
+  </section>
+
+  <!-- 集計 -->
+  <section id="panel-summary" class="panel" role="tabpanel" hidden>
+    <div class="controls">
+      <div class="row">
+        <label class="field-label" for="kind">基準</label>
+        <select id="kind">
+          <option value="real" selected>実ステップ</option>
+          <option value="total">総ステップ</option>
+        </select>
+        <span class="spacer"></span>
+        <label class="check"><input type="checkbox" id="drop-excluded" checked>除外行を外す</label>
+      </div>
+      <div class="row row-tight">
+        <label class="field-label" for="group-mode">内訳</label>
+        <select id="group-mode">
+          <option value="under" selected>取引先 › 割当直下フォルダ › 拡張子</option>
+          <option value="d1">取引先 › 階層1 › 拡張子</option>
+          <option value="d2">取引先 › 階層2 › 拡張子</option>
+          <option value="ext">取引先 › 拡張子</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><span class="metric-label">合計ステップ</span><span class="metric-value" id="m-steps">—</span></div>
+      <div class="metric"><span class="metric-label">ファイル数</span><span class="metric-value" id="m-files">—</span></div>
+      <div class="metric"><span class="metric-label">除外ステップ</span><span class="metric-value" id="m-dropped">—</span></div>
+    </div>
+    <div id="drill" class="drill"></div>
+    <div class="actions">
+      <button id="btn-export" class="btn btn-primary">シートに出力</button>
+      <button id="btn-collapse" class="btn">すべて閉じる</button>
+    </div>
+  </section>
+
+  <!-- 未割当 -->
+  <section id="panel-rest" class="panel" role="tabpanel" hidden>
+    <div class="controls">
+      <div class="row">
+        <label class="field-label" for="rest-depth">粒度</label>
+        <select id="rest-depth">
+          <option value="1">階層1</option>
+          <option value="2" selected>階層2</option>
+          <option value="3">階層3</option>
+        </select>
+        <span class="spacer"></span>
+        <span class="hint" id="rest-total">—</span>
+      </div>
+    </div>
+    <div id="rest" class="rest"></div>
+    <div class="actions">
+      <button id="btn-rest-assign" class="btn btn-primary">選択行に割り当て</button>
+    </div>
+  </section>
+
+  <p id="toast" class="toast" hidden></p>
+</div>
+
+<script src="taskpane.js"></script>
+</body>
+</html>
