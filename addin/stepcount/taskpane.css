@@ -114,6 +114,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .badge-inherit { background: #f1efe8; color: #6b6a64; }
 .badge-partial { background: #fbf1de; color: #7a4f0d; }
 .badge-excluded { background: #fbeceb; color: #8a2f26; }
+.badge-override { background: #eef0f4; color: #4a5568; }
 
 /* drilldown */
 .dl-head, .dl-total {
@@ -133,6 +134,8 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .dl-line { display: flex; align-items: center; gap: 6px; }
 .dl-line.is-click { cursor: pointer; }
 .dl-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-name.is-click { cursor: pointer; border-radius: 2px; }
+.dl-name.is-click:hover { background: #eef2f0; text-decoration: underline; }
 .dl-num { width: 104px; text-align: right; font-variant-numeric: tabular-nums; color: #6b6a64; font-size: 12px; white-space: nowrap; }
 .dl-pct { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: #96958e; font-size: 11px; }
 .bar {
@@ -167,16 +170,26 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
   border-bottom: 1px solid #e3e2dd; margin-bottom: 4px;
 }
 .file-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 4px; border-bottom: 1px solid #f1efe8;
+  padding: 6px 4px; border-bottom: 1px solid #f1efe8;
 }
 .file-row:hover { background: #f7f7f5; }
 .file-row.is-excluded { color: #96958e; }
+.file-line1 { display: flex; align-items: baseline; gap: 8px; }
+.file-name {
+  flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 12px; font-weight: 600;
+}
+.file-num { font-variant-numeric: tabular-nums; font-size: 12px; color: #1a1a18; white-space: nowrap; }
+.file-line2 { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
 .file-path {
   flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; direction: rtl; text-align: left; font-size: 11px;
+  white-space: nowrap; direction: rtl; text-align: left;
+  font-size: 10.5px; color: #96958e;
 }
-.file-num { font-variant-numeric: tabular-nums; font-size: 11px; color: #6b6a64; white-space: nowrap; }
+.file-ext {
+  flex: 0 0 auto; font-size: 10px; color: #6b6a64;
+  background: #f1efe8; border-radius: 3px; padding: 1px 5px;
+}
 
 .empty { padding: 20px 12px; color: #96958e; font-size: 12px; text-align: center; }
 

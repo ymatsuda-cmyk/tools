@@ -15,6 +15,8 @@ var SHEET = {
 
 var UNASSIGNED = "（未割当）";
 var DIRECT = "（直下）";
+/* 継承を断ち切るための特別マーカー。割当シートには読める形で書き込む。 */
+var UNASSIGN_MARK = "（解除）";
 
 /* 相対パス行に直前のUNCルートを引き継ぐ。既に正規化済みのデータなら false のままで良い。 */
 var CARRY_UNC_ROOT = false;
@@ -233,7 +235,7 @@ function buildModel(raw) {
     var f = rows[j];
     var hitA = lookup(state.assignMap, f.folder);
     var hitX = lookup(state.excludeMap, f.folder);
-    f.vendor = hitA ? hitA.value : null;
+    f.vendor = (hitA && hitA.value !== UNASSIGN_MARK) ? hitA.value : null;
     f.assignDepth = hitA ? hitA.depth : 0;
     f.excluded = !!hitX;
   }
@@ -241,7 +243,8 @@ function buildModel(raw) {
   state.rows = rows;
   state.nodeIndex = new Map();
   state.tree = buildTree(rows);
-  state.vendors = uniq(Array.from(state.assignMap.values())).sort(cmpJa);
+  state.vendors = uniq(Array.from(state.assignMap.values())
+    .filter(function (v) { return v !== UNASSIGN_MARK; })).sort(cmpJa);
   var dl = byId("vendor-list");
   dl.innerHTML = state.vendors.map(function (v) {
     return "<option value=\"" + esc(v) + "\"></option>";
@@ -330,26 +333,29 @@ function node(name, path) {
   return {
     name: name, path: path, kids: new Map(),
     files: 0, total: 0, real: 0,
-    vendor: null, inherited: null, excluded: false, partial: false
+    vendor: null, inherited: null, excluded: false, partial: false, overridden: false
   };
 }
 
 function markTree(root) {
   walk(root, null, false);
   function walk(n, inheritedVendor, inheritedEx) {
-    var own = state.assignMap.has(n.path) ? state.assignMap.get(n.path) : null;
+    var raw = state.assignMap.has(n.path) ? state.assignMap.get(n.path) : null;
+    var isOverride = raw === UNASSIGN_MARK;
+    var own = (raw && !isOverride) ? raw : null;
     var ownEx = state.excludeMap.has(n.path);
     n.vendor = own;
-    n.inherited = own ? null : inheritedVendor;
+    n.overridden = isOverride;
+    n.inherited = (own || isOverride) ? null : inheritedVendor;
     n.excluded = ownEx || inheritedEx;
     n.ownExcluded = ownEx;
-    var vend = own || inheritedVendor;
+    var vend = own || (isOverride ? null : inheritedVendor);
     var any = false;
     n.kids.forEach(function (k) {
       walk(k, vend, n.excluded);
       if (k.vendor || k.partial) any = true;
     });
-    n.partial = !own && !inheritedVendor && any;
+    n.partial = !own && !isOverride && !inheritedVendor && any;
   }
 }
 
@@ -385,6 +391,7 @@ function renderTree() {
     var open = state.openNodes.has(n.path);
     var badge = "";
     if (n.vendor) badge = "<span class=\"badge badge-vendor\">" + esc(n.vendor) + "</span>";
+    else if (n.overridden) badge = "<span class=\"badge badge-override\">解除済み</span>";
     else if (n.inherited) badge = "<span class=\"badge badge-inherit\">継承 " + esc(n.inherited) + "</span>";
     else if (n.partial) badge = "<span class=\"badge badge-partial\">一部割当済</span>";
     if (n.excluded) badge += "<span class=\"badge badge-excluded\">除外</span>";
@@ -462,8 +469,25 @@ async function applyAssign(mode) {
     picksX.forEach(function (p) { state.excludeMap.set(normKey(p), "旧版・バックアップ"); });
     count = picksX.length;
   } else if (mode === "unassign") {
-    all.forEach(function (p) { if (state.assignMap.delete(normKey(p))) count++; });
-    if (!count) { toast("選択した項目に個別の割当がありません。割当元のフォルダを選んでください。", true); return; }
+    var picksU = topmostPicks(all);
+    var removed = 0, cut = 0;
+    picksU.forEach(function (p) {
+      var key = normKey(p);
+      var n = state.nodeIndex.get(p);
+      var raw = state.assignMap.has(key) ? state.assignMap.get(key) : undefined;
+      if (raw !== undefined) {
+        state.assignMap.delete(key);
+        removed++;
+      } else if (n && n.inherited) {
+        state.assignMap.set(key, UNASSIGN_MARK);
+        cut++;
+      }
+    });
+    if (!removed && !cut) {
+      toast("選択した項目には割当も継承もありません。", true);
+      return;
+    }
+    count = removed + cut;
   } else {
     all.forEach(function (p) { if (state.excludeMap.delete(normKey(p))) count++; });
     if (!count) { toast("選択した項目に個別の除外がありません。除外元のフォルダを選んでください。", true); return; }
@@ -532,7 +556,8 @@ function currentFilters() {
 
 function groupOf(f) {
   var d = f.assignDepth;
-  return f.folder.length > d ? f.folder[d] : DIRECT;
+  if (d > 0) return f.folder[d - 1];
+  return f.folder.length ? f.folder[0] : DIRECT;
 }
 
 function aggregate() {
@@ -612,6 +637,8 @@ function filesForBucket(vendorName, groupName, extName) {
     if (extName !== null && extName2 !== extName) continue;
     out.push({
       path: f.segs.join("\\"),
+      relPath: f.folder.join("\\"),
+      name: f.segs[f.segs.length - 1],
       ext: extName2,
       value: opt.kind === "real" ? f.real : f.total,
       excluded: f.excluded
@@ -671,10 +698,12 @@ function renderSummary() {
       var p2 = ve.value ? ge.value / ve.value * 100 : 0;
       html.push(
         "<div class=\"dl-row" + (o2 ? " is-open" : "") + "\">" +
-        "<div class=\"dl-line is-click\" data-l2=\"" + esc(key) + "\"" +
-        " role=\"button\" tabindex=\"0\" aria-expanded=\"" + o2 + "\">" +
-        "<span class=\"twisty\" aria-hidden=\"true\">" + (o2 ? "▼" : "▶") + "</span>" +
-        "<span class=\"dl-name mono\">" + esc(ge.name) + "</span>" +
+        "<div class=\"dl-line\">" +
+        "<button type=\"button\" class=\"twisty is-click\" data-l2=\"" + esc(key) + "\"" +
+        " aria-expanded=\"" + o2 + "\" aria-label=\"" + (o2 ? "折りたたむ" : "拡張子内訳を展開") + "\">" +
+        (o2 ? "▼" : "▶") + "</button>" +
+        "<span class=\"dl-name mono is-click\" data-file=\"" + esc(ve.name) + "\u0000" + esc(ge.name) +
+        "\u0000\" role=\"button\" tabindex=\"0\" title=\"クリックでファイル一覧\">" + esc(ge.name) + "</span>" +
         "<span class=\"dl-num\">" + fmtPair(ge.files, ge.value) + "</span>" +
         "<span class=\"dl-pct\">" + p2.toFixed(1) + "%</span>" +
         "</div>" +
@@ -786,8 +815,14 @@ function renderFileList() {
     v.rows.forEach(function (r) {
       html.push(
         "<div class=\"file-row" + (r.excluded ? " is-excluded" : "") + "\">" +
-        "<span class=\"file-path mono\" title=\"" + esc(r.path) + "\">" + esc(r.path) + "</span>" +
+        "<div class=\"file-line1\">" +
+        "<span class=\"file-name mono\" title=\"" + esc(r.name) + "\">" + esc(r.name) + "</span>" +
         "<span class=\"file-num\">" + fmt(r.value) + "</span>" +
+        "</div>" +
+        "<div class=\"file-line2\">" +
+        "<span class=\"file-path mono\" title=\"" + esc(r.relPath) + "\">" + esc(r.relPath) + "</span>" +
+        "<span class=\"file-ext\">" + esc(r.ext) + "</span>" +
+        "</div>" +
         "</div>"
       );
     });
