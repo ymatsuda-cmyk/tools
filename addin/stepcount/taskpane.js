@@ -425,6 +425,21 @@ function topmostPicks(paths) {
   });
 }
 
+/* topPath 配下を辿り、チェックが外れている枝（＝配下ごと明示的に除外された枝）の
+   最も浅い経路を集める。チェックされている枝はさらに下まで辿る。 */
+function uncheckedBranches(topPath) {
+  var root = state.nodeIndex.get(topPath);
+  var out = [];
+  if (!root) return out;
+  (function walk(n) {
+    n.kids.forEach(function (k) {
+      if (state.checked.has(k.path)) walk(k);
+      else out.push(k.path);
+    });
+  })(root);
+  return out;
+}
+
 async function applyAssign(mode) {
   var all = Array.from(state.checked);
   if (!all.length) { toast("フォルダを選択してください。", true); return; }
@@ -433,9 +448,17 @@ async function applyAssign(mode) {
   if (mode === "assign" && !vendor) { toast("取引先名を入力してください。", true); return; }
 
   var count = 0;
+  var excludedBranches = 0;
   if (mode === "assign") {
     var picks = topmostPicks(all);
-    picks.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
+    picks.forEach(function (p) {
+      state.assignMap.set(normKey(p), vendor);
+      var branches = uncheckedBranches(p);
+      branches.forEach(function (bp) {
+        state.assignMap.set(normKey(bp), UNASSIGN_MARK);
+      });
+      excludedBranches += branches.length;
+    });
     count = picks.length;
   } else if (mode === "exclude") {
     var picksX = topmostPicks(all);
@@ -471,7 +494,8 @@ async function applyAssign(mode) {
     await writeMap(SHEET.exclude, ["フォルダパス", "メモ"], state.excludeMap);
     state.checked = new Set();
     await reload();
-    toast(count + " フォルダを更新しました。");
+    toast(count + " フォルダを更新しました。" +
+      (excludedBranches ? "（チェックを外した " + excludedBranches + " 件は対象外にしました）" : ""));
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }
@@ -542,17 +566,12 @@ function aggregateAll(dropExcluded) {
 
   var vList = Array.from(vendors.entries()).map(function (e) {
     return { name: e[0], files: e[1].files, steps: e[1].steps };
-  });
-  vList.sort(function (a, b) {
-    if (a.name === UNASSIGNED) return 1;
-    if (b.name === UNASSIGNED) return -1;
-    return b.steps - a.steps;
-  });
+  }).filter(function (v) { return v.name !== UNASSIGNED; });
+  vList.sort(function (a, b) { return b.steps - a.steps; });
 
-  var assignedOnly = vList.filter(function (v) { return v.name !== UNASSIGNED; });
-  var grandAssigned = assignedOnly.reduce(function (s, v) { return s + v.steps; }, 0);
-  var totalFiles = assignedOnly.reduce(function (s, v) { return s + v.files; }, 0);
-  var vendorCount = assignedOnly.length;
+  var grandAssigned = vList.reduce(function (s, v) { return s + v.steps; }, 0);
+  var totalFiles = vList.reduce(function (s, v) { return s + v.files; }, 0);
+  var vendorCount = vList.length;
 
   var extList = Array.from(extsAssigned.entries())
     .map(function (e) { return { name: e[0] || "(なし)", steps: e[1] }; })
@@ -571,7 +590,7 @@ function renderDashboard() {
 
   var vMax = d.vendors.length ? Math.max.apply(null, d.vendors.map(function (v) { return v.steps; })) || 1 : 1;
   byId("dash-vendors").innerHTML = d.vendors.length
-    ? d.vendors.map(function (v) { return statRow(v.name, v.files, v.steps, vMax, v.name === UNASSIGNED); }).join("")
+    ? d.vendors.map(function (v) { return statRow(v.name, v.files, v.steps, vMax, false); }).join("")
     : "<p class=\"empty\">データがありません。</p>";
 
   var eMax = d.exts.length ? d.exts[0].steps || 1 : 1;
