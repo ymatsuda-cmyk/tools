@@ -156,23 +156,21 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .lvl3 .bar > i { height: 5px; background: #a8b3ac; }
 .mono { font-family: Consolas, "Courier New", monospace; }
 
-/* ファイル一覧（グラフのクリック先） */
-.fl-head { display: flex; align-items: center; gap: 8px; padding: 4px; margin-bottom: 4px; }
-.fl-back {
-  flex: 0 0 auto; padding: 3px 8px; font-size: 12px;
-}
-.fl-title {
-  flex: 1 1 auto; font-weight: 600; font-size: 12px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ファイル一覧（グラフ／フォルダ名クリックで行の下に展開） */
+.file-list-inline {
+  margin: 4px 0 6px 20px; padding: 6px 8px;
+  background: #fafaf8; border: 1px solid #e3e2dd; border-radius: 4px;
+  max-height: 220px; overflow-y: auto;
 }
 .fl-meta {
-  padding: 0 4px 8px; font-size: 11px; color: #96958e;
+  padding: 0 2px 6px; font-size: 11px; color: #96958e;
   border-bottom: 1px solid #e3e2dd; margin-bottom: 4px;
 }
 .file-row {
   padding: 6px 4px; border-bottom: 1px solid #f1efe8;
 }
-.file-row:hover { background: #f7f7f5; }
+.file-row:last-child { border-bottom: 0; }
+.file-row:hover { background: #f1efe8; }
 .file-row.is-excluded { color: #96958e; }
 .file-line1 { display: flex; align-items: baseline; gap: 8px; }
 .file-name {
@@ -192,6 +190,8 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 }
 
 .empty { padding: 20px 12px; color: #96958e; font-size: 12px; text-align: center; }
+.file-list-inline .empty { padding: 10px 4px; }
+
 
 .toast {
   position: sticky; bottom: 0; margin: 0;

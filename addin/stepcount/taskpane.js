@@ -37,8 +37,8 @@ var state = {
   checked: new Set(),
   openL1: new Set(),
   openL2: new Set(),
-  summary: null,
-  fileView: null
+  openFiles: new Set(),
+  summary: null
 };
 
 /* ---------- 起動 ---------- */
@@ -69,17 +69,17 @@ function bindUi() {
   byId("btn-exclude").addEventListener("click", function () { applyAssign("exclude"); });
   byId("btn-include").addEventListener("click", function () { applyAssign("include"); });
 
-  byId("kind").addEventListener("change", function () { state.fileView = null; renderSummary(); });
-  byId("drop-excluded").addEventListener("change", function () { state.fileView = null; renderSummary(); });
+  byId("kind").addEventListener("change", function () { state.openFiles = new Set(); renderSummary(); });
+  byId("drop-excluded").addEventListener("change", function () { state.openFiles = new Set(); renderSummary(); });
   byId("group-mode").addEventListener("change", function () {
     state.openL2 = new Set();
-    state.fileView = null;
+    state.openFiles = new Set();
     renderSummary();
   });
   byId("btn-collapse").addEventListener("click", function () {
     state.openL1 = new Set();
     state.openL2 = new Set();
-    state.fileView = null;
+    state.openFiles = new Set();
     renderSummary();
   });
   byId("btn-export").addEventListener("click", exportSheets);
@@ -89,7 +89,7 @@ function bindUi() {
 
   document.addEventListener("keydown", function (ev) {
     if (ev.key !== "Enter" && ev.key !== " ") return;
-    var t = ev.target.closest("[data-l1],[data-l2],[data-file]");
+    var t = ev.target.closest("[data-l1],[data-l2],[data-vendor]");
     if (!t) return;
     ev.preventDefault();
     t.click();
@@ -649,8 +649,6 @@ function filesForBucket(vendorName, groupName, extName) {
 }
 
 function renderSummary() {
-  if (state.fileView) { renderFileList(); return; }
-
   var s = aggregate();
   state.summary = s;
   byId("m-steps").textContent = fmt(s.grand);
@@ -679,6 +677,7 @@ function renderSummary() {
       "<span class=\"dl-pct\">" + pct.toFixed(1) + "%</span>" +
       "</div>" +
       bar(ve.value / max * 100, rest, ve.name, null, null) +
+      inlineFiles(ve.name, null, null) +
       "</div>"
     );
     if (!open) return;
@@ -702,12 +701,13 @@ function renderSummary() {
         "<button type=\"button\" class=\"twisty is-click\" data-l2=\"" + esc(key) + "\"" +
         " aria-expanded=\"" + o2 + "\" aria-label=\"" + (o2 ? "折りたたむ" : "拡張子内訳を展開") + "\">" +
         (o2 ? "▼" : "▶") + "</button>" +
-        "<span class=\"dl-name mono is-click\" data-file=\"" + esc(ve.name) + "\u0000" + esc(ge.name) +
-        "\u0000\" role=\"button\" tabindex=\"0\" title=\"クリックでファイル一覧\">" + esc(ge.name) + "</span>" +
+        "<span class=\"dl-name mono is-click\" data-vendor=\"" + esc(ve.name) + "\" data-group=\"" + esc(ge.name) +
+        "\" data-ext=\"\" role=\"button\" tabindex=\"0\" title=\"クリックでファイル一覧\">" + esc(ge.name) + "</span>" +
         "<span class=\"dl-num\">" + fmtPair(ge.files, ge.value) + "</span>" +
         "<span class=\"dl-pct\">" + p2.toFixed(1) + "%</span>" +
         "</div>" +
         bar(p2, rest, ve.name, ge.name, null) +
+        inlineFiles(ve.name, ge.name, null) +
         "</div>"
       );
       if (o2) {
@@ -740,35 +740,72 @@ function leafRow(vendorName, groupName, e) {
   }
   var p = denom ? e.value / denom * 100 : 0;
   return "<div class=\"dl-row\">" +
-    "<div class=\"dl-line is-click\" data-file=\"" + esc(vendorName) + "\u0000" +
-    esc(groupName === null ? "" : groupName) + "\u0000" + esc(e.name) + "\">" +
+    "<div class=\"dl-line is-click\" data-vendor=\"" + esc(vendorName) + "\" data-group=\"" +
+    esc(groupName === null ? "" : groupName) + "\" data-ext=\"" + esc(e.name) + "\">" +
     "<span class=\"twisty is-leaf\" aria-hidden=\"true\"></span>" +
     "<span class=\"dl-name mono\">" + esc(e.name) + "</span>" +
     "<span class=\"dl-num\">" + fmtPair(e.files, e.value) + "</span>" +
     "<span class=\"dl-pct\">" + p.toFixed(1) + "%</span>" +
     "</div>" +
     bar(p, false, vendorName, groupName, e.name) +
+    inlineFiles(vendorName, groupName, e.name) +
     "</div>";
 }
 
 function bar(pct, rest, vendorName, groupName, extName) {
   var w = Math.max(0, Math.min(100, pct));
-  var key = esc(vendorName) + "\u0000" + esc(groupName === null || groupName === undefined ? "" : groupName) +
-    "\u0000" + esc(extName === null || extName === undefined ? "" : extName);
   return "<div class=\"bar" + (rest ? " is-rest" : "") + "\" role=\"button\" tabindex=\"0\"" +
-    " data-file=\"" + key + "\" aria-label=\"該当ファイルを表示\">" +
+    " data-vendor=\"" + esc(vendorName) + "\" data-group=\"" + esc(groupName === null || groupName === undefined ? "" : groupName) +
+    "\" data-ext=\"" + esc(extName === null || extName === undefined ? "" : extName) +
+    "\" aria-label=\"該当ファイルを表示\">" +
     "<i style=\"width:" + w.toFixed(1) + "%\"></i></div>";
 }
 
+/* 集計の各バケットを識別するキー。HTML属性には出さない（Set の管理専用）ので任意の文字が使える。 */
+function fileKey(vendorName, groupName, extName) {
+  return JSON.stringify([vendorName, groupName, extName]);
+}
+
+/* グラフ／フォルダ名／拡張子行のクリックで開閉する、行のすぐ下に差し込むファイル一覧 */
+function inlineFiles(vendorName, groupName, extName) {
+  var key = fileKey(vendorName, groupName, extName);
+  if (!state.openFiles.has(key)) return "";
+
+  var rows = filesForBucket(vendorName, groupName, extName);
+  var sum = rows.reduce(function (s, r) { return s + r.value; }, 0);
+  var html = ["<div class=\"file-list-inline\">", "<div class=\"fl-meta\">" + fmtPair(rows.length, sum) + "</div>"];
+  if (!rows.length) {
+    html.push("<p class=\"empty\">該当するファイルがありません。</p>");
+  } else {
+    rows.forEach(function (r) {
+      html.push(
+        "<div class=\"file-row" + (r.excluded ? " is-excluded" : "") + "\">" +
+        "<div class=\"file-line1\">" +
+        "<span class=\"file-name mono\" title=\"" + esc(r.name) + "\">" + esc(r.name) + "</span>" +
+        "<span class=\"file-num\">" + fmt(r.value) + "</span>" +
+        "</div>" +
+        "<div class=\"file-line2\">" +
+        "<span class=\"file-path mono\" title=\"" + esc(r.relPath) + "\">" + esc(r.relPath) + "</span>" +
+        "<span class=\"file-ext\">" + esc(r.ext) + "</span>" +
+        "</div>" +
+        "</div>"
+      );
+    });
+  }
+  html.push("</div>");
+  return html.join("");
+}
+
 function onDrillClick(ev) {
-  var fb = ev.target.closest("[data-file]");
+  var fb = ev.target.closest("[data-vendor]");
   if (fb) {
     ev.stopPropagation();
-    var parts = fb.dataset.file.split("\u0000");
-    var vendorName = parts[0];
-    var groupName = parts[1] === "" ? null : parts[1];
-    var extName = parts[2] === "" ? null : parts[2];
-    openFileList(vendorName, groupName, extName);
+    var vendorName = fb.dataset.vendor;
+    var groupName = fb.dataset.group === "" ? null : fb.dataset.group;
+    var extName = fb.dataset.ext === "" ? null : fb.dataset.ext;
+    var key = fileKey(vendorName, groupName, extName);
+    if (state.openFiles.has(key)) state.openFiles.delete(key); else state.openFiles.add(key);
+    renderSummary();
     return;
   }
   var l2 = ev.target.closest("[data-l2]");
@@ -784,54 +821,6 @@ function onDrillClick(ev) {
     if (state.openL1.has(n)) state.openL1.delete(n); else state.openL1.add(n);
     renderSummary();
   }
-}
-
-function openFileList(vendorName, groupName, extName) {
-  var rows = filesForBucket(vendorName, groupName, extName);
-  var titleParts = [vendorName];
-  if (groupName !== null) titleParts.push(groupName);
-  if (extName !== null) titleParts.push(extName);
-  state.fileView = {
-    title: titleParts.join(" › "),
-    rows: rows,
-    sum: rows.reduce(function (s, r) { return s + r.value; }, 0)
-  };
-  renderSummary();
-}
-
-function renderFileList() {
-  var v = state.fileView;
-  var host = byId("drill");
-  var html = [
-    "<div class=\"fl-head\">" +
-    "<button type=\"button\" id=\"fl-back\" class=\"btn fl-back\">‹ 戻る</button>" +
-    "<span class=\"fl-title\" title=\"" + esc(v.title) + "\">" + esc(v.title) + "</span>" +
-    "</div>",
-    "<div class=\"fl-meta\">" + fmtPair(v.rows.length, v.sum) + "</div>"
-  ];
-  if (!v.rows.length) {
-    html.push("<p class=\"empty\">該当するファイルがありません。</p>");
-  } else {
-    v.rows.forEach(function (r) {
-      html.push(
-        "<div class=\"file-row" + (r.excluded ? " is-excluded" : "") + "\">" +
-        "<div class=\"file-line1\">" +
-        "<span class=\"file-name mono\" title=\"" + esc(r.name) + "\">" + esc(r.name) + "</span>" +
-        "<span class=\"file-num\">" + fmt(r.value) + "</span>" +
-        "</div>" +
-        "<div class=\"file-line2\">" +
-        "<span class=\"file-path mono\" title=\"" + esc(r.relPath) + "\">" + esc(r.relPath) + "</span>" +
-        "<span class=\"file-ext\">" + esc(r.ext) + "</span>" +
-        "</div>" +
-        "</div>"
-      );
-    });
-  }
-  host.innerHTML = html.join("");
-  byId("fl-back").addEventListener("click", function () {
-    state.fileView = null;
-    renderSummary();
-  });
 }
 
 /* ---------- 出力 ---------- */
