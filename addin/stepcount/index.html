@@ -16,8 +16,9 @@
 <div id="app" class="app" hidden>
 
   <nav class="tabs" role="tablist">
-    <button class="tab is-active" role="tab" data-tab="assign" aria-selected="true">割当</button>
-    <button class="tab" role="tab" data-tab="summary" aria-selected="false">集計</button>
+    <button class="tab is-active" role="tab" data-tab="dashboard" aria-selected="true">ダッシュボード</button>
+    <button class="tab" role="tab" data-tab="source" aria-selected="false">ソース一覧</button>
+    <button class="tab" role="tab" data-tab="assign" aria-selected="false">割当</button>
   </nav>
 
   <div class="statusbar">
@@ -25,8 +26,47 @@
     <button id="btn-reload" class="icon-btn" title="データを読み直す" aria-label="データを読み直す">↻</button>
   </div>
 
+  <!-- ダッシュボード -->
+  <section id="panel-dashboard" class="panel" role="tabpanel">
+    <div class="dash-scroll">
+      <div id="dash-metrics" class="metrics"></div>
+      <div class="dash-section">
+        <div class="dash-title">取引先別</div>
+        <div id="dash-vendors"></div>
+      </div>
+      <div class="dash-section">
+        <div class="dash-title">拡張子別（全体・未割当を除く）</div>
+        <div id="dash-exts"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ソース一覧 -->
+  <section id="panel-source" class="panel" role="tabpanel" hidden>
+    <div class="controls">
+      <div class="field-label">取引先</div>
+      <div id="pv" class="pills"></div>
+      <div class="field-label" style="margin-top:8px">割当フォルダ</div>
+      <div id="pf" class="pills"></div>
+      <div class="field-label" style="margin-top:8px">拡張子</div>
+      <div id="pe" class="pills"></div>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="drop-excluded" checked>除外行を外す</label>
+    </div>
+    <div class="metrics metrics-sm">
+      <div class="metric"><span class="metric-label">ステップ</span><span class="metric-value" id="src-steps">—</span></div>
+      <div class="metric"><span class="metric-label">ファイル数</span><span class="metric-value" id="src-files">—</span></div>
+    </div>
+    <div class="src-head">
+      <span class="g">フォルダ / ファイル名</span><span class="e">拡張子</span><span class="n">ステップ</span>
+    </div>
+    <div id="src-rows" class="src-rows"></div>
+    <div class="actions">
+      <button id="btn-export" class="btn btn-primary">シートに出力</button>
+    </div>
+  </section>
+
   <!-- 割当 -->
-  <section id="panel-assign" class="panel" role="tabpanel">
+  <section id="panel-assign" class="panel" role="tabpanel" hidden>
     <div class="controls">
       <label class="field-label" for="vendor">割り当てる取引先</label>
       <div class="row">
@@ -50,38 +90,6 @@
       <button id="btn-unassign" class="btn">解除</button>
       <button id="btn-exclude" class="btn">除外</button>
       <button id="btn-include" class="btn">除外解除</button>
-    </div>
-  </section>
-
-  <!-- 集計 -->
-  <section id="panel-summary" class="panel" role="tabpanel" hidden>
-    <div class="controls">
-      <div class="row">
-        <label class="field-label" for="kind">基準</label>
-        <select id="kind">
-          <option value="real" selected>実ステップ</option>
-          <option value="total">総ステップ</option>
-        </select>
-        <span class="spacer"></span>
-        <label class="check"><input type="checkbox" id="drop-excluded" checked>除外行を外す</label>
-      </div>
-      <div class="row row-tight">
-        <label class="field-label" for="group-mode">内訳</label>
-        <select id="group-mode">
-          <option value="folder" selected>フォルダ</option>
-          <option value="ext">拡張子</option>
-        </select>
-      </div>
-    </div>
-    <div class="metrics">
-      <div class="metric"><span class="metric-label">合計ステップ</span><span class="metric-value" id="m-steps">—</span></div>
-      <div class="metric"><span class="metric-label">ファイル数</span><span class="metric-value" id="m-files">—</span></div>
-      <div class="metric"><span class="metric-label">除外ステップ</span><span class="metric-value" id="m-dropped">—</span></div>
-    </div>
-    <div id="drill" class="drill"></div>
-    <div class="actions">
-      <button id="btn-export" class="btn btn-primary">シートに出力</button>
-      <button id="btn-collapse" class="btn">すべて閉じる</button>
     </div>
   </section>
 
