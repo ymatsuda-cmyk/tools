@@ -33,7 +33,8 @@ var state = {
   checked: new Set(),
   srcVendor: "すべて",
   srcFolder: "すべて",
-  srcExt: "すべて"
+  srcExt: "すべて",
+  assignFilter: "すべて"
 };
 
 /* ---------- 起動 ---------- */
@@ -348,19 +349,55 @@ function setSubtreeChecked(n, val) {
   n.kids.forEach(function (k) { setSubtreeChecked(k, val); });
 }
 
+function assignFilterOptions() {
+  var order = aggregateAll(false).vendors.map(function (v) { return v.name; });
+  return ["すべて", "未割当のみ"].concat(order);
+}
+
+/* 選択中の絞り込みに一致するノードと、そこに辿り着くための祖先パスだけを集める。
+   「すべて」のときは null を返し、絞り込みなしを表す。 */
+function assignKeepSet(sel) {
+  if (sel === "すべて") return null;
+  var keep = new Set();
+  (function walk(n) {
+    n.kids.forEach(function (k) {
+      var match = sel === "未割当のみ"
+        ? (!k.vendor && !k.inherited)
+        : (k.vendor === sel || k.inherited === sel);
+      if (match) {
+        var segs = k.path.split("\\");
+        for (var i = 1; i <= segs.length; i++) keep.add(segs.slice(0, i).join("\\"));
+      }
+      walk(k);
+    });
+  })(state.tree);
+  return keep;
+}
+
 function renderTree() {
+  pillRow("pav", assignFilterOptions(), state.assignFilter, function (v) {
+    state.assignFilter = v;
+    renderTree();
+  });
+
   var host = byId("tree");
   var showAssigned = byId("show-assigned").checked;
-  var kids = sortKids(state.tree);
-  if (!kids.length) { host.innerHTML = "<p class=\"empty\">データがありません。</p>"; return; }
+  var keepSet = assignKeepSet(state.assignFilter);
+  var kids = sortKids(state.tree).filter(function (k) { return !keepSet || keepSet.has(k.path); });
+  if (!kids.length) {
+    host.innerHTML = "<p class=\"empty\">" +
+      (keepSet ? "絞り込みに一致するフォルダがありません。" : "データがありません。") + "</p>";
+    return;
+  }
   var html = [];
   kids.forEach(function (k) { emit(k, 0); });
   host.innerHTML = html.join("");
 
   function emit(n, depth) {
-    var hidden = !showAssigned && (n.vendor || n.inherited);
+    if (keepSet && !keepSet.has(n.path)) return;
+    var hidden = !showAssigned && (n.vendor || n.inherited) && !keepSet;
     if (hidden) return;
-    var open = state.openNodes.has(n.path);
+    var open = keepSet ? true : state.openNodes.has(n.path);
     var badge = "";
     if (n.vendor) badge = "<span class=\"badge badge-vendor\">" + esc(n.vendor) + "</span>";
     else if (n.inherited) badge = "<span class=\"badge badge-inherit\">継承 " + esc(n.inherited) + "</span>";
@@ -379,7 +416,10 @@ function renderTree() {
       "<span class=\"node-num\">" + fmtPair(n.files, n.total) + "</span>" +
       "</div>"
     );
-    if (open) sortKids(n).forEach(function (c) { emit(c, depth + 1); });
+    if (open) {
+      sortKids(n).filter(function (c) { return !keepSet || keepSet.has(c.path); })
+        .forEach(function (c) { emit(c, depth + 1); });
+    }
   }
 }
 
