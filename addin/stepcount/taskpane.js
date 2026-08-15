@@ -32,6 +32,7 @@ var state = {
   openNodes: new Set(),
   srcVendor: "すべて",
   srcExt: "すべて",
+  srcSort: { col: "folder", dir: "asc" },
   editVendor: "",
   draftChecked: new Set()
 };
@@ -67,6 +68,10 @@ function bindUi() {
 
   byId("drop-excluded").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
+  byId("src-head").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-sort]");
+    if (b) setSourceSort(b.dataset.sort);
+  });
 
   byId("tree").addEventListener("click", onTreeClick);
 }
@@ -676,7 +681,35 @@ function filteredSourceRows(dropExcluded) {
       steps: f.real,
       excluded: f.excluded
     };
-  }).sort(function (a, b) { return b.steps - a.steps; });
+  });
+}
+
+function sortSourceRows(rows) {
+  var col = state.srcSort.col, dir = state.srcSort.dir === "desc" ? -1 : 1;
+  var sorted = rows.slice();
+  sorted.sort(function (a, b) {
+    var cmp;
+    if (col === "steps") cmp = a.steps - b.steps;
+    else if (col === "folder") cmp = cmpJa(a.folder, b.folder) || cmpJa(a.name, b.name);
+    else if (col === "name") cmp = cmpJa(a.name, b.name);
+    else cmp = cmpJa(a.ext, b.ext) || cmpJa(a.name, b.name);
+    return cmp * dir;
+  });
+  return sorted;
+}
+
+function setSourceSort(col) {
+  if (state.srcSort.col === col) {
+    state.srcSort.dir = state.srcSort.dir === "asc" ? "desc" : "asc";
+  } else {
+    state.srcSort = { col: col, dir: "asc" };
+  }
+  renderSourceList();
+}
+
+function sortIndicator(col) {
+  if (state.srcSort.col !== col) return "";
+  return state.srcSort.dir === "asc" ? " ▲" : " ▼";
 }
 
 function renderSourceList() {
@@ -689,18 +722,24 @@ function renderSourceList() {
     state.srcExt = v; renderSourceList();
   });
 
-  var rows = filteredSourceRows(dropExcluded);
+  var rows = sortSourceRows(filteredSourceRows(dropExcluded));
   var sum = rows.reduce(function (s, r) { return s + r.steps; }, 0);
   byId("src-steps").textContent = fmt(sum);
   byId("src-files").textContent = fmt(rows.length);
 
+  byId("src-head").innerHTML =
+    "<button type=\"button\" class=\"src-col folder\" data-sort=\"folder\">フォルダ" + sortIndicator("folder") + "</button>" +
+    "<button type=\"button\" class=\"src-col name\" data-sort=\"name\">ファイル名" + sortIndicator("name") + "</button>" +
+    "<button type=\"button\" class=\"src-col ext\" data-sort=\"ext\">拡張子" + sortIndicator("ext") + "</button>" +
+    "<button type=\"button\" class=\"src-col steps\" data-sort=\"steps\">ステップ数" + sortIndicator("steps") + "</button>";
+
   var host = byId("src-rows");
   host.innerHTML = rows.length ? rows.map(function (r) {
     return "<div class=\"src-row" + (r.excluded ? " is-excluded" : "") + "\">" +
-      "<span class=\"g\"><span class=\"folder\">" + esc(r.folder) + "/</span>" +
-      "<span class=\"name\">" + esc(r.name) + "</span></span>" +
-      "<span class=\"e\">" + esc(r.ext) + "</span>" +
-      "<span class=\"n\">" + fmt(r.steps) + "</span></div>";
+      "<span class=\"src-col folder mono\" title=\"" + esc(r.folder) + "\">" + esc(r.folder) + "</span>" +
+      "<span class=\"src-col name\" title=\"" + esc(r.name) + "\">" + esc(r.name) + "</span>" +
+      "<span class=\"src-col ext mono\">" + esc(r.ext) + "</span>" +
+      "<span class=\"src-col steps\">" + fmt(r.steps) + "</span></div>";
   }).join("") : "<p class=\"empty\">該当するファイルがありません。</p>";
 }
 
