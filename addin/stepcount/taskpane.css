@@ -169,7 +169,6 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .badge-inherit { background: #f1efe8; color: #6b6a64; }
 .badge-partial { background: #fbf1de; color: #7a4f0d; }
 .badge-excluded { background: #fbeceb; color: #8a2f26; }
-.badge-override { background: #eef0f4; color: #4a5568; }
 
 .mono { font-family: Consolas, "Courier New", monospace; }
 .empty { padding: 20px 12px; color: #96958e; font-size: 12px; text-align: center; }

@@ -59,8 +59,10 @@ function bindUi() {
     expandTo(parseInt(this.value, 10));
     renderTree();
   });
-  byId("btn-assign").addEventListener("click", function () { applyAssign("assign"); });
-  byId("btn-unassign").addEventListener("click", function () { applyAssign("unassign"); });
+  byId("btn-assign").addEventListener("click", function () {
+    var vendor = byId("vendor").value.trim();
+    applyAssign(vendor ? "assign" : "unassign");
+  });
   byId("btn-exclude").addEventListener("click", function () { applyAssign("exclude"); });
   byId("btn-include").addEventListener("click", function () { applyAssign("include"); });
 
@@ -365,7 +367,6 @@ function renderTree() {
     var open = state.openNodes.has(n.path);
     var badge = "";
     if (n.vendor) badge = "<span class=\"badge badge-vendor\">" + esc(n.vendor) + "</span>";
-    else if (n.overridden) badge = "<span class=\"badge badge-override\">解除済み</span>";
     else if (n.inherited) badge = "<span class=\"badge badge-inherit\">継承 " + esc(n.inherited) + "</span>";
     else if (n.partial) badge = "<span class=\"badge badge-partial\">一部割当済</span>";
     if (n.excluded) badge += "<span class=\"badge badge-excluded\">除外</span>";
@@ -527,11 +528,9 @@ function groupOf(f) {
 function aggregateAll(dropExcluded) {
   var vendors = new Map();
   var extsAssigned = new Map();
-  var totalFiles = 0;
 
   state.rows.forEach(function (f) {
     if (f.excluded && dropExcluded) return;
-    totalFiles++;
     var vName = f.vendor || UNASSIGNED;
     var ve = vendors.get(vName);
     if (!ve) { ve = { files: 0, steps: 0 }; vendors.set(vName, ve); }
@@ -550,9 +549,10 @@ function aggregateAll(dropExcluded) {
     return b.steps - a.steps;
   });
 
-  var grandAssigned = vList.filter(function (v) { return v.name !== UNASSIGNED; })
-    .reduce(function (s, v) { return s + v.steps; }, 0);
-  var vendorCount = vList.filter(function (v) { return v.name !== UNASSIGNED; }).length;
+  var assignedOnly = vList.filter(function (v) { return v.name !== UNASSIGNED; });
+  var grandAssigned = assignedOnly.reduce(function (s, v) { return s + v.steps; }, 0);
+  var totalFiles = assignedOnly.reduce(function (s, v) { return s + v.files; }, 0);
+  var vendorCount = assignedOnly.length;
 
   var extList = Array.from(extsAssigned.entries())
     .map(function (e) { return { name: e[0] || "(なし)", steps: e[1] }; })
@@ -566,7 +566,7 @@ function renderDashboard() {
 
   byId("dash-metrics").innerHTML =
     metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
-    metricCard("ファイル数", fmt(d.totalFiles), null) +
+    metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く") +
     metricCard("取引先数", fmt(d.vendorCount), null);
 
   var vMax = d.vendors.length ? Math.max.apply(null, d.vendors.map(function (v) { return v.steps; })) || 1 : 1;
@@ -599,15 +599,15 @@ function statRow(name, files, steps, max, rest) {
 function vendorOptions() {
   var names = uniq(state.rows.map(function (f) { return f.vendor; })
     .filter(function (v) { return v; })).sort(cmpJa);
-  return ["すべて"].concat(names).concat([UNASSIGNED]);
+  return ["すべて"].concat(names);
 }
 
 function folderOptions(vendorSel, dropExcluded) {
   var set = [];
   state.rows.forEach(function (f) {
+    if (!f.vendor) return;
     if (dropExcluded && f.excluded) return;
-    var vName = f.vendor || UNASSIGNED;
-    if (vendorSel !== "すべて" && vName !== vendorSel) return;
+    if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
     var g = groupOf(f);
     if (set.indexOf(g) < 0) set.push(g);
   });
@@ -617,9 +617,9 @@ function folderOptions(vendorSel, dropExcluded) {
 function extOptions(vendorSel, folderSel, dropExcluded) {
   var set = [];
   state.rows.forEach(function (f) {
+    if (!f.vendor) return;
     if (dropExcluded && f.excluded) return;
-    var vName = f.vendor || UNASSIGNED;
-    if (vendorSel !== "すべて" && vName !== vendorSel) return;
+    if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
     if (folderSel !== "すべて" && groupOf(f) !== folderSel) return;
     var e = f.ext || "(なし)";
     if (set.indexOf(e) < 0) set.push(e);
@@ -629,9 +629,9 @@ function extOptions(vendorSel, folderSel, dropExcluded) {
 
 function filteredSourceRows(dropExcluded) {
   return state.rows.filter(function (f) {
+    if (!f.vendor) return false;
     if (dropExcluded && f.excluded) return false;
-    var vName = f.vendor || UNASSIGNED;
-    if (state.srcVendor !== "すべて" && vName !== state.srcVendor) return false;
+    if (state.srcVendor !== "すべて" && f.vendor !== state.srcVendor) return false;
     if (state.srcFolder !== "すべて" && groupOf(f) !== state.srcFolder) return false;
     var e = f.ext || "(なし)";
     if (state.srcExt !== "すべて" && e !== state.srcExt) return false;

@@ -73,6 +73,7 @@
         <input id="vendor" list="vendor-list" placeholder="取引先名を入力または選択">
         <datalist id="vendor-list"></datalist>
       </div>
+      <div class="hint" style="margin-top:4px">空欄のまま「割り当て」を押すと、選択したフォルダの割当・継承を解除します。</div>
       <div class="row row-tight">
         <label class="check"><input type="checkbox" id="show-assigned" checked>割当済みも表示</label>
         <span class="spacer"></span>
@@ -87,7 +88,6 @@
     <div id="tree" class="tree"></div>
     <div class="actions">
       <button id="btn-assign" class="btn btn-primary">割り当て</button>
-      <button id="btn-unassign" class="btn">解除</button>
       <button id="btn-exclude" class="btn">除外</button>
       <button id="btn-include" class="btn">除外解除</button>
     </div>
