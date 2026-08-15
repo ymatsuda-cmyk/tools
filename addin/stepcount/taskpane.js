@@ -63,6 +63,7 @@ function bindUi() {
     var v = this.value.trim();
     if (v) switchEditVendor(v);
   });
+  byId("btn-focus").addEventListener("click", focusChecked);
   byId("btn-save").addEventListener("click", saveAssignments);
   byId("btn-discard").addEventListener("click", discardDraft);
 
@@ -358,6 +359,17 @@ function expandTo(depth) {
   })(state.tree, 0);
 }
 
+/* 選択中（チェック済み）のフォルダへ辿り着く経路だけを開き、それ以外は閉じる。 */
+function focusChecked() {
+  var open = new Set();
+  state.draftChecked.forEach(function (path) {
+    var segs = path.split("\\");
+    for (var i = 1; i <= segs.length; i++) open.add(segs.slice(0, i).join("\\"));
+  });
+  state.openNodes = open;
+  renderTree();
+}
+
 /* ツリー全体を1回辿り、各フォルダが実際に集計上どの取引先になるか（祖先からの継承込み）を求める。
    ダッシュボード・ソース一覧の集計ロジック（lookup方式）と同じ考え方をチェックボックスにも適用し、
    画面の状態と実際の集計を一致させる。 */
@@ -382,14 +394,6 @@ function committedSetFor(vendor) {
     if (v === vendor) set.add(path);
   });
   return set;
-}
-
-/* path の親フォルダが実際にどの取引先になるか（継承のみ、path自身のエントリは見ない）。 */
-function ancestorVendorOf(path) {
-  var segs = path.split("\\");
-  if (segs.length <= 1) return null;
-  var hit = lookup(state.assignMap, segs.slice(0, segs.length - 1));
-  return (hit && hit.value !== UNASSIGN_MARK) ? hit.value : null;
 }
 
 function switchEditVendor(vendor) {
@@ -507,20 +511,25 @@ async function saveAssignments() {
   if (!diff.added.length && !diff.removed.length) { toast("変更がありません。", true); return; }
 
   diff.added.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
-  diff.removed.forEach(function (p) {
-    var key = normKey(p);
-    if (ancestorVendorOf(p) === vendor) {
-      state.assignMap.set(key, UNASSIGN_MARK);
-    } else {
-      state.assignMap.delete(key);
+  diff.removed.forEach(function (p) { state.assignMap.delete(normKey(p)); });
+
+  /* 追加・削除を反映した直後のツリー全体を見直し、チェックしていないのに
+     祖先からの継承で editVendor になってしまうフォルダがあれば、そこだけ継承を断ち切る。
+     （新しく上位フォルダへ割り当てたことで、チェックを外していた配下に継承が漏れるケースを防ぐ） */
+  var leaked = [];
+  computeEffectiveVendors().forEach(function (v, path) {
+    if (v === vendor && !state.draftChecked.has(path)) {
+      state.assignMap.set(normKey(path), UNASSIGN_MARK);
+      leaked.push(path);
     }
   });
 
   try {
     setStatus("保存中…");
     await writeMap(SHEET.assign, ["フォルダパス", "取引先名"], state.assignMap);
-    refreshAssignments(diff.added.concat(diff.removed));
-    toast("追加 " + diff.added.length + " 件 / 解除 " + diff.removed.length + " 件を保存しました。");
+    refreshAssignments(diff.added.concat(diff.removed).concat(leaked));
+    toast("追加 " + diff.added.length + " 件 / 解除 " + diff.removed.length + " 件を保存しました。" +
+      (leaked.length ? "（継承を断ち切ったフォルダ " + leaked.length + " 件）" : ""));
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }

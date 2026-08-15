@@ -74,10 +74,12 @@
       <div class="row row-tight">
         <label class="field-label" for="depth-open">展開</label>
         <select id="depth-open">
+          <option value="0">0階層</option>
           <option value="1">1階層</option>
           <option value="2" selected>2階層</option>
           <option value="3">3階層</option>
         </select>
+        <button id="btn-focus" class="btn" style="padding:3px 8px">選択のみ表示</button>
         <span class="spacer"></span>
         <span class="hint" id="diff-count">変更なし</span>
       </div>
