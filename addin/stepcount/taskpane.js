@@ -32,7 +32,6 @@ var state = {
   openNodes: new Set(),
   checked: new Set(),
   srcVendor: "すべて",
-  srcFolder: "すべて",
   srcExt: "すべて",
   assignFilter: "すべて"
 };
@@ -469,9 +468,8 @@ async function applyAssign(mode) {
   if (mode === "assign") {
     var vendor = byId("vendor").value.trim();
     if (!vendor) { toast("取引先名を入力してください。", true); return; }
-    var picks = topmostPicks(all);
-    picks.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
-    count = picks.length;
+    all.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
+    count = all.length;
   } else {
     var picksR = topmostPicks(all);
     var removed = 0, cut = 0;
@@ -616,7 +614,7 @@ function statRow(name, files, steps, max, rest) {
     "<div class=\"stat-bar\"><i style=\"width:" + pct.toFixed(1) + "%\"></i></div></div>";
 }
 
-/* ---------- ソース一覧（取引先 › 割当フォルダ › 拡張子のピルで絞り込み） ---------- */
+/* ---------- ソース一覧（取引先 › 拡張子のピルで絞り込み） ---------- */
 
 function vendorOptions() {
   var names = uniq(state.rows.map(function (f) { return f.vendor; })
@@ -624,25 +622,12 @@ function vendorOptions() {
   return ["すべて"].concat(names);
 }
 
-function folderOptions(vendorSel, dropExcluded) {
+function extOptions(vendorSel, dropExcluded) {
   var set = [];
   state.rows.forEach(function (f) {
     if (!f.vendor) return;
     if (dropExcluded && f.excluded) return;
     if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
-    var g = groupOf(f);
-    if (set.indexOf(g) < 0) set.push(g);
-  });
-  return ["すべて"].concat(set.sort(cmpJa));
-}
-
-function extOptions(vendorSel, folderSel, dropExcluded) {
-  var set = [];
-  state.rows.forEach(function (f) {
-    if (!f.vendor) return;
-    if (dropExcluded && f.excluded) return;
-    if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
-    if (folderSel !== "すべて" && groupOf(f) !== folderSel) return;
     var e = f.ext || "(なし)";
     if (set.indexOf(e) < 0) set.push(e);
   });
@@ -654,7 +639,6 @@ function filteredSourceRows(dropExcluded) {
     if (!f.vendor) return false;
     if (dropExcluded && f.excluded) return false;
     if (state.srcVendor !== "すべて" && f.vendor !== state.srcVendor) return false;
-    if (state.srcFolder !== "すべて" && groupOf(f) !== state.srcFolder) return false;
     var e = f.ext || "(なし)";
     if (state.srcExt !== "すべて" && e !== state.srcExt) return false;
     return true;
@@ -673,12 +657,9 @@ function renderSourceList() {
   var dropExcluded = byId("drop-excluded").checked;
 
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
-    state.srcVendor = v; state.srcFolder = "すべて"; state.srcExt = "すべて"; renderSourceList();
+    state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
   });
-  pillRow("pf", folderOptions(state.srcVendor, dropExcluded), state.srcFolder, function (v) {
-    state.srcFolder = v; state.srcExt = "すべて"; renderSourceList();
-  });
-  pillRow("pe", extOptions(state.srcVendor, state.srcFolder, dropExcluded), state.srcExt, function (v) {
+  pillRow("pe", extOptions(state.srcVendor, dropExcluded), state.srcExt, function (v) {
     state.srcExt = v; renderSourceList();
   });
 
