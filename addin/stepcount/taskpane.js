@@ -358,20 +358,38 @@ function expandTo(depth) {
   })(state.tree, 0);
 }
 
-/* 特定フォルダの「自分自身の」割当（継承ではなく直接の値）。UNASSIGN_MARK は所有者なし扱い。 */
-function ownVendorOf(path) {
-  var raw = state.assignMap.has(path) ? state.assignMap.get(path) : null;
-  return (raw && raw !== UNASSIGN_MARK) ? raw : null;
+/* ツリー全体を1回辿り、各フォルダが実際に集計上どの取引先になるか（祖先からの継承込み）を求める。
+   ダッシュボード・ソース一覧の集計ロジック（lookup方式）と同じ考え方をチェックボックスにも適用し、
+   画面の状態と実際の集計を一致させる。 */
+function computeEffectiveVendors() {
+  var map = new Map();
+  (function walk(n, inherited) {
+    var raw = state.assignMap.has(n.path) ? state.assignMap.get(n.path) : null;
+    var isOverride = raw === UNASSIGN_MARK;
+    var own = (raw && !isOverride) ? raw : null;
+    var effective = own || (isOverride ? null : inherited);
+    map.set(n.path, effective);
+    n.kids.forEach(function (k) { walk(k, effective); });
+  })(state.tree, null);
+  return map;
 }
 
-/* 現在 vendor が直接の所有者になっているパスの集合。 */
+/* 現在 vendor に実際に属している（直接または継承で）パスの集合。 */
 function committedSetFor(vendor) {
   var set = new Set();
   if (!vendor) return set;
-  state.assignMap.forEach(function (val, key) {
-    if (val === vendor) set.add(key);
+  computeEffectiveVendors().forEach(function (v, path) {
+    if (v === vendor) set.add(path);
   });
   return set;
+}
+
+/* path の親フォルダが実際にどの取引先になるか（継承のみ、path自身のエントリは見ない）。 */
+function ancestorVendorOf(path) {
+  var segs = path.split("\\");
+  if (segs.length <= 1) return null;
+  var hit = lookup(state.assignMap, segs.slice(0, segs.length - 1));
+  return (hit && hit.value !== UNASSIGN_MARK) ? hit.value : null;
 }
 
 function switchEditVendor(vendor) {
@@ -427,6 +445,8 @@ function renderTree() {
     : "変更なし";
   byId("diff-count").textContent = diffLabel;
 
+  var effective = computeEffectiveVendors();
+
   var html = [];
   kids.forEach(function (k) { emit(k, 0); });
   host.innerHTML = html.join("");
@@ -435,7 +455,7 @@ function renderTree() {
   function emit(n, depth) {
     var open = state.openNodes.has(n.path);
     var checked = state.draftChecked.has(n.path);
-    var owner = ownVendorOf(n.path);
+    var owner = effective.get(n.path);
     var badge = "";
     if (checked) {
       badge = "<span class=\"badge badge-vendor\">" + esc(state.editVendor) + "</span>";
@@ -487,7 +507,14 @@ async function saveAssignments() {
   if (!diff.added.length && !diff.removed.length) { toast("変更がありません。", true); return; }
 
   diff.added.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
-  diff.removed.forEach(function (p) { state.assignMap.delete(normKey(p)); });
+  diff.removed.forEach(function (p) {
+    var key = normKey(p);
+    if (ancestorVendorOf(p) === vendor) {
+      state.assignMap.set(key, UNASSIGN_MARK);
+    } else {
+      state.assignMap.delete(key);
+    }
+  });
 
   try {
     setStatus("保存中…");
