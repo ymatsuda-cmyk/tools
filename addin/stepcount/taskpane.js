@@ -92,6 +92,7 @@ async function reload() {
     byId("boot").hidden = true;
     byId("app").hidden = false;
     expandTo(parseInt(byId("depth-open").value, 10));
+    renderAssignPills();
     renderTree();
     if (state.tab === "dashboard") renderDashboard();
     if (state.tab === "source") renderSourceList();
@@ -373,13 +374,17 @@ function assignKeepSet(sel) {
   return keep;
 }
 
-function renderTree() {
+function renderAssignPills() {
   pillRow("pav", assignFilterOptions(), state.assignFilter, function (v) {
     state.assignFilter = v;
+    renderAssignPills();
     renderTree();
   });
+}
 
+function renderTree() {
   var host = byId("tree");
+  var keepScroll = host.scrollTop;
   var showAssigned = byId("show-assigned").checked;
   var keepSet = assignKeepSet(state.assignFilter);
   var kids = sortKids(state.tree).filter(function (k) { return !keepSet || keepSet.has(k.path); });
@@ -391,6 +396,7 @@ function renderTree() {
   var html = [];
   kids.forEach(function (k) { emit(k, 0); });
   host.innerHTML = html.join("");
+  host.scrollTop = keepScroll;
 
   function emit(n, depth) {
     if (keepSet && !keepSet.has(n.path)) return;
@@ -465,10 +471,15 @@ async function applyAssign(mode) {
   if (!all.length) { toast("フォルダを選択してください。", true); return; }
 
   var count = 0;
+  var changed = [];
   if (mode === "assign") {
     var vendor = byId("vendor").value.trim();
     if (!vendor) { toast("取引先名を入力してください。", true); return; }
-    all.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
+    all.forEach(function (p) {
+      var key = normKey(p);
+      state.assignMap.set(key, vendor);
+      changed.push(key);
+    });
     count = all.length;
   } else {
     var picksR = topmostPicks(all);
@@ -480,9 +491,11 @@ async function applyAssign(mode) {
       if (raw !== undefined) {
         state.assignMap.delete(key);
         removed++;
+        changed.push(key);
       } else if (n && n.inherited) {
         state.assignMap.set(key, UNASSIGN_MARK);
         cut++;
+        changed.push(key);
       }
     });
     if (!removed && !cut) {
@@ -493,13 +506,47 @@ async function applyAssign(mode) {
   }
 
   try {
+    setStatus("保存中…");
     await writeMap(SHEET.assign, ["フォルダパス", "取引先名"], state.assignMap);
     state.checked = new Set();
-    await reload();
+    refreshAssignments(changed);
     toast(count + " フォルダを更新しました。");
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }
+}
+
+/* 割当を変えたあと、Excel を読み直さずにメモリ上のモデルだけ更新する。
+   changed に含まれるパスの配下だけ再解決すればよいので、行数が多くても軽い。 */
+function refreshAssignments(changed) {
+  var prefixes = changed.map(function (p) { return normKey(p); });
+
+  for (var i = 0; i < state.rows.length; i++) {
+    var f = state.rows[i];
+    var full = f.folder.join("\\");
+    var affected = false;
+    for (var j = 0; j < prefixes.length; j++) {
+      var p = prefixes[j];
+      if (full === p || full.indexOf(p + "\\") === 0) { affected = true; break; }
+    }
+    if (!affected) continue;
+    var hitA = lookup(state.assignMap, f.folder);
+    f.vendor = (hitA && hitA.value !== UNASSIGN_MARK) ? hitA.value : null;
+    f.assignDepth = hitA ? hitA.depth : 0;
+  }
+
+  markTree(state.tree);
+
+  state.vendors = uniq(Array.from(state.assignMap.values())
+    .filter(function (v) { return v !== UNASSIGN_MARK; })).sort(cmpJa);
+  byId("vendor-list").innerHTML = state.vendors.map(function (v) {
+    return "<option value=\"" + esc(v) + "\"></option>";
+  }).join("");
+
+  renderAssignPills();
+  renderTree();
+  setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
+    " 件 / 除外 " + state.excludeMap.size + " 件");
 }
 
 async function writeMap(sheetName, header, map) {
