@@ -12,9 +12,13 @@
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="ステップ数集計" />
   <Description DefaultValue="フォルダに取引先名を割り当て、取引先別・拡張子別のステップ数を集計します。" />
-  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-64.png" />
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/icons/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/icons/icon-80.png" />
   <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
+
+  <AppDomains>
+    <AppDomain>ymatsuda-cmyk.github.io</AppDomain>
+  </AppDomains>
 
   <Hosts>
     <Host Name="Workbook" />
@@ -27,7 +31,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/index.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -36,39 +40,34 @@
     <Hosts>
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
-          <GetStarted>
-            <Title resid="GetStarted.Title" />
-            <Description resid="GetStarted.Desc" />
-            <LearnMoreUrl resid="GetStarted.Url" />
-          </GetStarted>
+          <FunctionFile resid="Commands.Html" />
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
-            <CustomTab id="Writerm.Tab">
-              <Group id="Writerm.Group">
-                <Label resid="Group.Label" />
+            <OfficeTab id="TabHome">
+              <Group id="StepCountGroup">
+                <Label resid="StepCountGroupLabel" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.16" />
-                  <bt:Image size="32" resid="Icon.32" />
-                  <bt:Image size="80" resid="Icon.80" />
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
                 </Icon>
-                <Control xsi:type="Button" id="Writerm.OpenPane">
-                  <Label resid="Button.Label" />
+                <Control xsi:type="Button" id="ShowStepCountButton">
+                  <Label resid="ShowStepCountButtonLabel" />
                   <Supertip>
-                    <Title resid="Button.Label" />
-                    <Description resid="Button.Tip" />
+                    <Title resid="ShowStepCountButtonLabel" />
+                    <Description resid="ShowStepCountButtonTooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16" />
-                    <bt:Image size="32" resid="Icon.32" />
-                    <bt:Image size="80" resid="Icon.80" />
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>Writerm.Taskpane</TaskpaneId>
+                    <TaskpaneId>StepCountTaskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
               </Group>
-              <Label resid="Tab.Label" />
-            </CustomTab>
+            </OfficeTab>
           </ExtensionPoint>
         </DesktopFormFactor>
       </Host>
@@ -76,23 +75,21 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-16.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/icons/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/icons/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/icons/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
-        <bt:Url id="GetStarted.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/index.html" />
+        <bt:Url id="Commands.Html" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/index.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/stepcount/index.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Tab.Label" DefaultValue="ステップ数集計" />
-        <bt:String id="Group.Label" DefaultValue="資産棚卸" />
-        <bt:String id="Button.Label" DefaultValue="作業ウィンドウを開く" />
-        <bt:String id="GetStarted.Title" DefaultValue="ステップ数集計を開きました" />
+        <bt:String id="StepCountGroupLabel" DefaultValue="ステップ数集計" />
+        <bt:String id="ShowStepCountButtonLabel" DefaultValue="集計を表示" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Button.Tip" DefaultValue="フォルダへの取引先割当と、取引先別・拡張子別の集計を行います。" />
-        <bt:String id="GetStarted.Desc" DefaultValue="リボンの「ステップ数集計」タブから作業ウィンドウを開いてください。" />
+        <bt:String id="ShowStepCountButtonTooltip" DefaultValue="フォルダへの取引先割当と、取引先別・拡張子別の集計を行います。" />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
