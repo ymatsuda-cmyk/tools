@@ -66,28 +66,28 @@
   <!-- 割当 -->
   <section id="panel-assign" class="panel" role="tabpanel" hidden>
     <div class="controls">
-      <div class="field-label">取引先で絞り込み</div>
+      <div class="field-label">編集する取引先</div>
       <div id="pav" class="pills" style="margin-bottom:8px"></div>
-      <label class="field-label" for="vendor">割り当てる取引先</label>
       <div class="row">
-        <input id="vendor" list="vendor-list" placeholder="取引先名を入力または選択">
+        <input id="vendor" list="vendor-list" placeholder="取引先名を入力（新規も可）">
         <datalist id="vendor-list"></datalist>
       </div>
+      <div class="hint" style="margin-top:4px">チェックしたフォルダとその配下すべてに、この取引先名を直接書き込みます。</div>
       <div class="row row-tight">
-        <label class="check"><input type="checkbox" id="show-assigned" checked>割当済みも表示</label>
-        <span class="spacer"></span>
         <label class="field-label" for="depth-open">展開</label>
         <select id="depth-open">
           <option value="1">1階層</option>
           <option value="2" selected>2階層</option>
           <option value="3">3階層</option>
         </select>
+        <span class="spacer"></span>
+        <span class="hint" id="diff-count">変更なし</span>
       </div>
     </div>
     <div id="tree" class="tree"></div>
     <div class="actions">
-      <button id="btn-assign" class="btn btn-primary">割り当て</button>
-      <button id="btn-exclude" class="btn" title="選択したフォルダの割当・継承を外します">除外</button>
+      <button id="btn-discard" class="btn">取り消し</button>
+      <button id="btn-save" class="btn btn-primary">保存</button>
     </div>
   </section>
 

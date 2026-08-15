@@ -30,10 +30,10 @@ var state = {
   vendors: [],
   tab: "dashboard",
   openNodes: new Set(),
-  checked: new Set(),
   srcVendor: "すべて",
   srcExt: "すべて",
-  assignFilter: "すべて"
+  editVendor: "",
+  draftChecked: new Set()
 };
 
 /* ---------- 起動 ---------- */
@@ -53,14 +53,17 @@ function bindUi() {
   });
   byId("btn-reload").addEventListener("click", reload);
 
-  byId("show-assigned").addEventListener("change", renderTree);
   byId("depth-open").addEventListener("change", function () {
     state.openNodes = new Set();
     expandTo(parseInt(this.value, 10));
     renderTree();
   });
-  byId("btn-assign").addEventListener("click", function () { applyAssign("assign"); });
-  byId("btn-exclude").addEventListener("click", function () { applyAssign("remove"); });
+  byId("vendor").addEventListener("change", function () {
+    var v = this.value.trim();
+    if (v) switchEditVendor(v);
+  });
+  byId("btn-save").addEventListener("click", saveAssignments);
+  byId("btn-discard").addEventListener("click", discardDraft);
 
   byId("drop-excluded").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
@@ -92,6 +95,12 @@ async function reload() {
     byId("boot").hidden = true;
     byId("app").hidden = false;
     expandTo(parseInt(byId("depth-open").value, 10));
+    if (!state.editVendor) {
+      var order = assignPillOptions();
+      state.editVendor = order.length ? order[0] : "";
+      byId("vendor").value = state.editVendor;
+    }
+    state.draftChecked = committedSetFor(state.editVendor);
     renderAssignPills();
     renderTree();
     if (state.tab === "dashboard") renderDashboard();
@@ -344,87 +353,103 @@ function expandTo(depth) {
   })(state.tree, 0);
 }
 
-function setSubtreeChecked(n, val) {
-  if (val) state.checked.add(n.path); else state.checked.delete(n.path);
-  n.kids.forEach(function (k) { setSubtreeChecked(k, val); });
+/* 特定フォルダの「自分自身の」割当（継承ではなく直接の値）。UNASSIGN_MARK は所有者なし扱い。 */
+function ownVendorOf(path) {
+  var raw = state.assignMap.has(path) ? state.assignMap.get(path) : null;
+  return (raw && raw !== UNASSIGN_MARK) ? raw : null;
 }
 
-function assignFilterOptions() {
-  var order = aggregateAll(false).vendors.map(function (v) { return v.name; });
-  return ["すべて", "未割当のみ"].concat(order);
+/* 現在 vendor が直接の所有者になっているパスの集合。 */
+function committedSetFor(vendor) {
+  var set = new Set();
+  if (!vendor) return set;
+  state.assignMap.forEach(function (val, key) {
+    if (val === vendor) set.add(key);
+  });
+  return set;
 }
 
-/* 選択中の絞り込みに一致するノードと、そこに辿り着くための祖先パスだけを集める。
-   「すべて」のときは null を返し、絞り込みなしを表す。 */
-function assignKeepSet(sel) {
-  if (sel === "すべて") return null;
-  var keep = new Set();
-  (function walk(n) {
-    n.kids.forEach(function (k) {
-      var match = sel === "未割当のみ"
-        ? (!k.vendor && !k.inherited)
-        : (k.vendor === sel || k.inherited === sel);
-      if (match) {
-        var segs = k.path.split("\\");
-        for (var i = 1; i <= segs.length; i++) keep.add(segs.slice(0, i).join("\\"));
-      }
-      walk(k);
-    });
-  })(state.tree);
-  return keep;
+function switchEditVendor(vendor) {
+  state.editVendor = vendor;
+  state.draftChecked = committedSetFor(vendor);
+  byId("vendor").value = vendor;
+  renderAssignPills();
+  renderTree();
+}
+
+function discardDraft() {
+  state.draftChecked = committedSetFor(state.editVendor);
+  renderTree();
+}
+
+function toggleDraft(path) {
+  var n = state.nodeIndex.get(path);
+  if (!n) return;
+  var next = !state.draftChecked.has(path);
+  (function walk(nd) {
+    if (next) state.draftChecked.add(nd.path); else state.draftChecked.delete(nd.path);
+    nd.kids.forEach(walk);
+  })(n);
+  renderTree();
+}
+
+function draftDiff() {
+  var committed = committedSetFor(state.editVendor);
+  var added = [], removed = [];
+  state.draftChecked.forEach(function (p) { if (!committed.has(p)) added.push(p); });
+  committed.forEach(function (p) { if (!state.draftChecked.has(p)) removed.push(p); });
+  return { added: added, removed: removed };
+}
+
+function assignPillOptions() {
+  return aggregateAll(false).vendors.map(function (v) { return v.name; });
 }
 
 function renderAssignPills() {
-  pillRow("pav", assignFilterOptions(), state.assignFilter, function (v) {
-    state.assignFilter = v;
-    renderAssignPills();
-    renderTree();
-  });
+  pillRow("pav", assignPillOptions(), state.editVendor, function (v) { switchEditVendor(v); });
 }
 
 function renderTree() {
   var host = byId("tree");
   var keepScroll = host.scrollTop;
-  var showAssigned = byId("show-assigned").checked;
-  var keepSet = assignKeepSet(state.assignFilter);
-  var kids = sortKids(state.tree).filter(function (k) { return !keepSet || keepSet.has(k.path); });
-  if (!kids.length) {
-    host.innerHTML = "<p class=\"empty\">" +
-      (keepSet ? "絞り込みに一致するフォルダがありません。" : "データがありません。") + "</p>";
-    return;
-  }
+  var kids = sortKids(state.tree);
+  if (!kids.length) { host.innerHTML = "<p class=\"empty\">データがありません。</p>"; return; }
+
+  var diff = draftDiff();
+  var diffLabel = (diff.added.length || diff.removed.length)
+    ? ("未保存の変更 " + (diff.added.length + diff.removed.length) + " 件"
+      + "（追加 " + diff.added.length + " / 解除 " + diff.removed.length + "）")
+    : "変更なし";
+  byId("diff-count").textContent = diffLabel;
+
   var html = [];
   kids.forEach(function (k) { emit(k, 0); });
   host.innerHTML = html.join("");
   host.scrollTop = keepScroll;
 
   function emit(n, depth) {
-    if (keepSet && !keepSet.has(n.path)) return;
-    var hidden = !showAssigned && (n.vendor || n.inherited) && !keepSet;
-    if (hidden) return;
-    var open = keepSet ? true : state.openNodes.has(n.path);
+    var open = state.openNodes.has(n.path);
+    var checked = state.draftChecked.has(n.path);
+    var owner = ownVendorOf(n.path);
     var badge = "";
-    if (n.vendor) badge = "<span class=\"badge badge-vendor\">" + esc(n.vendor) + "</span>";
-    else if (n.inherited) badge = "<span class=\"badge badge-inherit\">継承 " + esc(n.inherited) + "</span>";
-    else if (n.partial) badge = "<span class=\"badge badge-partial\">一部割当済</span>";
-    if (n.excluded) badge += "<span class=\"badge badge-excluded\">除外</span>";
+    if (checked) {
+      badge = "<span class=\"badge badge-vendor\">" + esc(state.editVendor) + "</span>";
+    } else if (owner && owner !== state.editVendor) {
+      badge = "<span class=\"badge badge-inherit\">" + esc(owner) + "</span>";
+    }
 
     html.push(
-      "<div class=\"node" + ((n.vendor || n.inherited) ? " is-off" : "") +
+      "<div class=\"node" + ((owner && owner !== state.editVendor && !checked) ? " is-off" : "") +
       "\" style=\"padding-left:" + (depth * 14 + 4) + "px\">" +
       "<button class=\"twisty" + (n.kids.size ? "" : " is-leaf") + "\" data-toggle=\"" + esc(n.path) + "\"" +
       " aria-label=\"" + (open ? "折りたたむ" : "展開する") + "\">" + (open ? "▼" : "▶") + "</button>" +
-      "<input type=\"checkbox\" data-pick=\"" + esc(n.path) + "\"" +
-      (state.checked.has(n.path) ? " checked" : "") + ">" +
+      "<input type=\"checkbox\" data-pick=\"" + esc(n.path) + "\"" + (checked ? " checked" : "") + ">" +
       "<span class=\"node-name\" title=\"" + esc(n.path) + "\">" + esc(n.name) + "</span>" +
       badge +
       "<span class=\"node-num\">" + fmtPair(n.files, n.total) + "</span>" +
       "</div>"
     );
-    if (open) {
-      sortKids(n).filter(function (c) { return !keepSet || keepSet.has(c.path); })
-        .forEach(function (c) { emit(c, depth + 1); });
-    }
+    if (open) sortKids(n).forEach(function (c) { emit(c, depth + 1); });
   }
 }
 
@@ -444,73 +469,26 @@ function onTreeClick(ev) {
     return;
   }
   var c = ev.target.closest("[data-pick]");
-  if (c) {
-    var n = state.nodeIndex.get(c.dataset.pick);
-    if (n) setSubtreeChecked(n, c.checked);
-    else if (c.checked) state.checked.add(c.dataset.pick);
-    else state.checked.delete(c.dataset.pick);
-    renderTree();
-  }
+  if (c) toggleDraft(c.dataset.pick);
 }
 
-/* ---------- 割当の書き込み ---------- */
+/* ---------- 割当の保存 ---------- */
 
-function topmostPicks(paths) {
-  var set = new Set(paths);
-  return paths.filter(function (p) {
-    var segs = p.split("\\");
-    for (var i = 1; i < segs.length; i++) {
-      if (set.has(segs.slice(0, i).join("\\"))) return false;
-    }
-    return true;
-  });
-}
+async function saveAssignments() {
+  var vendor = state.editVendor;
+  if (!vendor) { toast("編集する取引先を選択または入力してください。", true); return; }
 
-async function applyAssign(mode) {
-  var all = Array.from(state.checked);
-  if (!all.length) { toast("フォルダを選択してください。", true); return; }
+  var diff = draftDiff();
+  if (!diff.added.length && !diff.removed.length) { toast("変更がありません。", true); return; }
 
-  var count = 0;
-  var changed = [];
-  if (mode === "assign") {
-    var vendor = byId("vendor").value.trim();
-    if (!vendor) { toast("取引先名を入力してください。", true); return; }
-    all.forEach(function (p) {
-      var key = normKey(p);
-      state.assignMap.set(key, vendor);
-      changed.push(key);
-    });
-    count = all.length;
-  } else {
-    var picksR = topmostPicks(all);
-    var removed = 0, cut = 0;
-    picksR.forEach(function (p) {
-      var key = normKey(p);
-      var n = state.nodeIndex.get(p);
-      var raw = state.assignMap.has(key) ? state.assignMap.get(key) : undefined;
-      if (raw !== undefined) {
-        state.assignMap.delete(key);
-        removed++;
-        changed.push(key);
-      } else if (n && n.inherited) {
-        state.assignMap.set(key, UNASSIGN_MARK);
-        cut++;
-        changed.push(key);
-      }
-    });
-    if (!removed && !cut) {
-      toast("選択した項目には割当も継承もありません。", true);
-      return;
-    }
-    count = removed + cut;
-  }
+  diff.added.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
+  diff.removed.forEach(function (p) { state.assignMap.delete(normKey(p)); });
 
   try {
     setStatus("保存中…");
     await writeMap(SHEET.assign, ["フォルダパス", "取引先名"], state.assignMap);
-    state.checked = new Set();
-    refreshAssignments(changed);
-    toast(count + " フォルダを更新しました。");
+    refreshAssignments(diff.added.concat(diff.removed));
+    toast("追加 " + diff.added.length + " 件 / 解除 " + diff.removed.length + " 件を保存しました。");
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }
@@ -543,6 +521,7 @@ function refreshAssignments(changed) {
     return "<option value=\"" + esc(v) + "\"></option>";
   }).join("");
 
+  state.draftChecked = committedSetFor(state.editVendor);
   renderAssignPills();
   renderTree();
   setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
