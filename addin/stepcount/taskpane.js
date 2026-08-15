@@ -59,12 +59,8 @@ function bindUi() {
     expandTo(parseInt(this.value, 10));
     renderTree();
   });
-  byId("btn-assign").addEventListener("click", function () {
-    var vendor = byId("vendor").value.trim();
-    applyAssign(vendor ? "assign" : "unassign");
-  });
-  byId("btn-exclude").addEventListener("click", function () { applyAssign("exclude"); });
-  byId("btn-include").addEventListener("click", function () { applyAssign("include"); });
+  byId("btn-assign").addEventListener("click", function () { applyAssign("assign"); });
+  byId("btn-exclude").addEventListener("click", function () { applyAssign("remove"); });
 
   byId("drop-excluded").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
@@ -425,49 +421,21 @@ function topmostPicks(paths) {
   });
 }
 
-/* topPath 配下を辿り、チェックが外れている枝（＝配下ごと明示的に除外された枝）の
-   最も浅い経路を集める。チェックされている枝はさらに下まで辿る。 */
-function uncheckedBranches(topPath) {
-  var root = state.nodeIndex.get(topPath);
-  var out = [];
-  if (!root) return out;
-  (function walk(n) {
-    n.kids.forEach(function (k) {
-      if (state.checked.has(k.path)) walk(k);
-      else out.push(k.path);
-    });
-  })(root);
-  return out;
-}
-
 async function applyAssign(mode) {
   var all = Array.from(state.checked);
   if (!all.length) { toast("フォルダを選択してください。", true); return; }
 
-  var vendor = byId("vendor").value.trim();
-  if (mode === "assign" && !vendor) { toast("取引先名を入力してください。", true); return; }
-
   var count = 0;
-  var excludedBranches = 0;
   if (mode === "assign") {
+    var vendor = byId("vendor").value.trim();
+    if (!vendor) { toast("取引先名を入力してください。", true); return; }
     var picks = topmostPicks(all);
-    picks.forEach(function (p) {
-      state.assignMap.set(normKey(p), vendor);
-      var branches = uncheckedBranches(p);
-      branches.forEach(function (bp) {
-        state.assignMap.set(normKey(bp), UNASSIGN_MARK);
-      });
-      excludedBranches += branches.length;
-    });
+    picks.forEach(function (p) { state.assignMap.set(normKey(p), vendor); });
     count = picks.length;
-  } else if (mode === "exclude") {
-    var picksX = topmostPicks(all);
-    picksX.forEach(function (p) { state.excludeMap.set(normKey(p), "旧版・バックアップ"); });
-    count = picksX.length;
-  } else if (mode === "unassign") {
-    var picksU = topmostPicks(all);
+  } else {
+    var picksR = topmostPicks(all);
     var removed = 0, cut = 0;
-    picksU.forEach(function (p) {
+    picksR.forEach(function (p) {
       var key = normKey(p);
       var n = state.nodeIndex.get(p);
       var raw = state.assignMap.has(key) ? state.assignMap.get(key) : undefined;
@@ -484,18 +452,13 @@ async function applyAssign(mode) {
       return;
     }
     count = removed + cut;
-  } else {
-    all.forEach(function (p) { if (state.excludeMap.delete(normKey(p))) count++; });
-    if (!count) { toast("選択した項目に個別の除外がありません。除外元のフォルダを選んでください。", true); return; }
   }
 
   try {
     await writeMap(SHEET.assign, ["フォルダパス", "取引先名"], state.assignMap);
-    await writeMap(SHEET.exclude, ["フォルダパス", "メモ"], state.excludeMap);
     state.checked = new Set();
     await reload();
-    toast(count + " フォルダを更新しました。" +
-      (excludedBranches ? "（チェックを外した " + excludedBranches + " 件は対象外にしました）" : ""));
+    toast(count + " フォルダを更新しました。");
   } catch (e) {
     toast("書き込みに失敗しました：" + describe(e), true);
   }
