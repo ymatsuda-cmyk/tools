@@ -8,7 +8,6 @@
 var SHEET = {
   data: "データ",
   assign: "割当",
-  exclude: "除外",
   code: "コード",
   outVendor: "集計_取引先",
   outExt: "集計_拡張子",
@@ -27,7 +26,6 @@ var state = {
   tree: null,
   nodeIndex: new Map(),
   assignMap: new Map(),
-  excludeMap: new Map(),
   vendors: [],
   codeVendors: [],
   screenExts: new Set(),
@@ -74,7 +72,6 @@ function bindUi() {
 
   byId("dash-screen").addEventListener("change", renderDashboard);
 
-  byId("drop-excluded").addEventListener("change", renderSourceList);
   byId("src-screen").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
   byId("src-head").addEventListener("click", function (ev) {
@@ -119,7 +116,7 @@ async function reload() {
     if (state.tab === "dashboard") renderDashboard();
     if (state.tab === "source") renderSourceList();
     setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
-      " 件 / 除外 " + state.excludeMap.size + " 件");
+      " 件");
   } catch (e) {
     var d = describe(e);
     toast("読み込みに失敗しました：" + d, true);
@@ -134,9 +131,8 @@ async function readWorkbook() {
   await ensureSheets();
   var data = await readArea(SHEET.data, 4);
   var assign = await readArea(SHEET.assign, 2);
-  var exclude = await readArea(SHEET.exclude, 2);
   var code = await readArea(SHEET.code, 2);
-  return { data: data, assign: assign, exclude: exclude, code: code };
+  return { data: data, assign: assign, code: code };
 }
 
 async function ensureSheets() {
@@ -150,14 +146,11 @@ async function ensureSheets() {
       throw new Error("シート「" + SHEET.data + "」が見つかりません。");
     }
     var added = false;
-    [SHEET.assign, SHEET.exclude].forEach(function (n) {
-      if (names.indexOf(n) >= 0) return;
-      var s = sheets.add(n);
-      s.getRange("A1:B1").values = n === SHEET.assign
-        ? [["フォルダパス", "取引先名"]]
-        : [["フォルダパス", "メモ"]];
+    if (names.indexOf(SHEET.assign) < 0) {
+      var s = sheets.add(SHEET.assign);
+      s.getRange("A1:B1").values = [["フォルダパス", "取引先名"]];
       added = true;
-    });
+    }
     if (names.indexOf(SHEET.code) < 0) {
       var cs = sheets.add(SHEET.code);
       cs.getRange("A1:B1").values = [["取引先", "画面"]];
@@ -207,7 +200,6 @@ async function areaSize(sheetName) {
 
 function buildModel(raw) {
   state.assignMap = pairsToMap(raw.assign);
-  state.excludeMap = pairsToMap(raw.exclude);
 
   var code = parseCodeSheet(raw.code);
   state.codeVendors = code.vendors;
@@ -241,10 +233,8 @@ function buildModel(raw) {
   for (var j = 0; j < rows.length; j++) {
     var f = rows[j];
     var hitA = lookup(state.assignMap, f.folder);
-    var hitX = lookup(state.excludeMap, f.folder);
     f.vendor = (hitA && hitA.value !== UNASSIGN_MARK) ? hitA.value : null;
     f.assignDepth = hitA ? hitA.depth : 0;
-    f.excluded = !!hitX;
   }
 
   state.rows = rows;
@@ -360,26 +350,23 @@ function node(name, path) {
   return {
     name: name, path: path, kids: new Map(),
     files: 0, total: 0, real: 0,
-    vendor: null, inherited: null, excluded: false, partial: false, overridden: false
+    vendor: null, inherited: null, partial: false, overridden: false
   };
 }
 
 function markTree(root) {
-  walk(root, null, false);
-  function walk(n, inheritedVendor, inheritedEx) {
+  walk(root, null);
+  function walk(n, inheritedVendor) {
     var raw = state.assignMap.has(n.path) ? state.assignMap.get(n.path) : null;
     var isOverride = raw === UNASSIGN_MARK;
     var own = (raw && !isOverride) ? raw : null;
-    var ownEx = state.excludeMap.has(n.path);
     n.vendor = own;
     n.overridden = isOverride;
     n.inherited = (own || isOverride) ? null : inheritedVendor;
-    n.excluded = ownEx || inheritedEx;
-    n.ownExcluded = ownEx;
     var vend = own || (isOverride ? null : inheritedVendor);
     var any = false;
     n.kids.forEach(function (k) {
-      walk(k, vend, n.excluded);
+      walk(k, vend);
       if (k.vendor || k.partial) any = true;
     });
     n.partial = !own && !isOverride && !inheritedVendor && any;
@@ -489,7 +476,7 @@ async function addNewVendor() {
     input.value = "";
     switchEditVendor(name);
     setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
-      " 件 / 除外 " + state.excludeMap.size + " 件");
+      " 件");
     toast("取引先「" + name + "」を追加しました。");
   } catch (e) {
     toast("追加に失敗しました：" + describe(e), true);
@@ -634,7 +621,7 @@ function refreshAssignments(changed) {
   renderAssignPills();
   renderTree();
   setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
-    " 件 / 除外 " + state.excludeMap.size + " 件");
+    " 件");
 }
 
 async function writeMap(sheetName, header, map) {
@@ -685,7 +672,7 @@ function groupOf(f) {
 
 /* ---------- ダッシュボード ---------- */
 
-function aggregateAll(dropExcluded, screenMode) {
+function aggregateAll(screenMode) {
   var vendors = new Map();
   state.codeVendors.forEach(function (name) { vendors.set(name, { files: 0, steps: 0 }); });
 
@@ -693,8 +680,10 @@ function aggregateAll(dropExcluded, screenMode) {
   var screens = 0;
 
   state.rows.forEach(function (f) {
-    if (f.excluded && dropExcluded) return;
-    if (screenMode && f.isScreen) { screens++; return; }
+    if (screenMode && f.isScreen) {
+      if (f.vendor) screens++;
+      return;
+    }
     var vName = f.vendor || UNASSIGNED;
     var ve = vendors.get(vName);
     if (!ve) { ve = { files: 0, steps: 0 }; vendors.set(vName, ve); }
@@ -725,11 +714,11 @@ function aggregateAll(dropExcluded, screenMode) {
 
 function renderDashboard() {
   var screenMode = byId("dash-screen").checked;
-  var d = aggregateAll(true, screenMode);
+  var d = aggregateAll(screenMode);
 
   var cards = metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
     metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く");
-  if (screenMode) cards += metricCard("画面数", fmt(d.screens), null);
+  if (screenMode) cards += metricCard("画面数", fmt(d.screens), "未割当を除く");
   cards += metricCard("取引先数", fmt(d.vendorCount), null);
   byId("dash-metrics").innerHTML = cards;
   byId("dash-metrics").className = screenMode ? "metrics metrics-4" : "metrics";
@@ -772,11 +761,10 @@ function vendorOptions() {
   return ["すべて"].concat(allVendorNames().sort(cmpJa));
 }
 
-function extOptions(vendorSel, dropExcluded, screenMode) {
+function extOptions(vendorSel, screenMode) {
   var set = [];
   state.rows.forEach(function (f) {
     if (!f.vendor) return;
-    if (dropExcluded && f.excluded) return;
     if (screenMode && f.isScreen) return;
     if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
     var e = f.ext || "(なし)";
@@ -785,10 +773,9 @@ function extOptions(vendorSel, dropExcluded, screenMode) {
   return ["すべて"].concat(set.sort(cmpJa));
 }
 
-function filteredSourceRows(dropExcluded, screenMode) {
+function filteredSourceRows(screenMode) {
   return state.rows.filter(function (f) {
     if (!f.vendor) return false;
-    if (dropExcluded && f.excluded) return false;
     if (screenMode && f.isScreen) return false;
     if (state.srcVendor !== "すべて" && f.vendor !== state.srcVendor) return false;
     var e = f.ext || "(なし)";
@@ -799,8 +786,7 @@ function filteredSourceRows(dropExcluded, screenMode) {
       folder: f.folder.join("\\"),
       name: f.segs[f.segs.length - 1],
       ext: f.ext || "(なし)",
-      steps: f.real,
-      excluded: f.excluded
+      steps: f.real
     };
   });
 }
@@ -834,20 +820,27 @@ function sortIndicator(col) {
 }
 
 function renderSourceList() {
-  var dropExcluded = byId("drop-excluded").checked;
   var screenMode = byId("src-screen").checked;
 
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
     state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
   });
-  pillRow("pe", extOptions(state.srcVendor, dropExcluded, screenMode), state.srcExt, function (v) {
+  pillRow("pe", extOptions(state.srcVendor, screenMode), state.srcExt, function (v) {
     state.srcExt = v; renderSourceList();
   });
 
-  var rows = sortSourceRows(filteredSourceRows(dropExcluded, screenMode));
+  var rows = sortSourceRows(filteredSourceRows(screenMode));
   var sum = rows.reduce(function (s, r) { return s + r.steps; }, 0);
-  byId("src-steps").textContent = fmt(sum);
-  byId("src-files").textContent = fmt(rows.length);
+
+  var cards = metricCard("ステップ", fmt(sum), null) + metricCard("ファイル数", fmt(rows.length), null);
+  if (screenMode) {
+    var screens = state.rows.filter(function (f) {
+      return f.vendor && f.isScreen &&
+        (state.srcVendor === "すべて" || f.vendor === state.srcVendor);
+    }).length;
+    cards += metricCard("画面数", fmt(screens), null);
+  }
+  byId("src-metrics").innerHTML = cards;
 
   byId("src-head").innerHTML =
     "<button type=\"button\" class=\"src-col folder\" data-sort=\"folder\">フォルダ" + sortIndicator("folder") + "</button>" +
@@ -857,7 +850,7 @@ function renderSourceList() {
 
   var host = byId("src-rows");
   host.innerHTML = rows.length ? rows.map(function (r) {
-    return "<div class=\"src-row" + (r.excluded ? " is-excluded" : "") + "\">" +
+    return "<div class=\"src-row\">" +
       "<span class=\"src-col folder mono\" title=\"" + esc(r.folder) + "\">" + esc(r.folder) + "</span>" +
       "<span class=\"src-col name\" title=\"" + esc(r.name) + "\">" + esc(r.name) + "</span>" +
       "<span class=\"src-col ext mono\">" + esc(r.ext) + "</span>" +
@@ -882,14 +875,13 @@ function pillRow(hostId, options, selected, onPick) {
 
 /* ---------- 出力（ソース一覧の除外設定を使い、全件を集計） ---------- */
 
-function aggregateFull(dropExcluded) {
+function aggregateFull() {
   var vendors = new Map();
   var extTotals = new Map();
-  var totalFiles = 0, grand = 0, dropped = 0;
+  var totalFiles = 0, grand = 0;
 
   state.rows.forEach(function (f) {
     var v = f.real;
-    if (f.excluded) { dropped += v; if (dropExcluded) return; }
     var vName = f.vendor || UNASSIGNED;
     var gName = groupOf(f);
 
@@ -927,7 +919,7 @@ function aggregateFull(dropExcluded) {
   });
 
   return {
-    vendors: list, files: totalFiles, grand: grand, dropped: dropped,
+    vendors: list, files: totalFiles, grand: grand,
     exts: Array.from(extTotals.entries())
       .map(function (e) { return { name: e[0] || "(なし)", files: e[1].files, steps: e[1].steps }; })
       .sort(function (a, b) { return b.steps - a.steps; })
@@ -935,8 +927,7 @@ function aggregateFull(dropExcluded) {
 }
 
 async function exportSheets() {
-  var dropExcluded = byId("drop-excluded").checked;
-  var s = aggregateFull(dropExcluded);
+  var s = aggregateFull();
 
   var v = [["取引先名", "ファイル数", "ステップ", "構成比"]];
   s.vendors.forEach(function (ve) {

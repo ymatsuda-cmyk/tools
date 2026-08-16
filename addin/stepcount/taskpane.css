@@ -133,7 +133,6 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
   border-bottom: 1px solid #f1efe8; font-size: 12px;
 }
 .src-row:hover { background: #f7f7f5; }
-.src-row.is-excluded { color: #96958e; }
 .src-col.folder { flex: 1 1 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #96958e; }
 .src-col.name { flex: 1 1 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding: 0 6px; }
 .src-col.ext { width: 46px; flex: 0 0 auto; color: #6b6a64; }
@@ -171,7 +170,6 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 .badge-vendor { background: #e8f1ee; color: #1f5145; }
 .badge-inherit { background: #f1efe8; color: #6b6a64; }
 .badge-partial { background: #fbf1de; color: #7a4f0d; }
-.badge-excluded { background: #fbeceb; color: #8a2f26; }
 
 .mono { font-family: Consolas, "Courier New", monospace; }
 .empty { padding: 20px 12px; color: #96958e; font-size: 12px; text-align: center; }
