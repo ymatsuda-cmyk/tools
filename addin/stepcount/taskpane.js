@@ -699,18 +699,19 @@ function extCategory(ext) {
 
 /* 取引先が割り当てられているファイルだけを対象に、区分ごとのファイル数を数える。
    4つのボタンに表示する参考値（現在の選択には左右されない）。 */
-function categoryCounts() {
+function categoryCounts(vendorFilter) {
   var counts = { total: 0, source: 0, screen: 0, config: 0 };
   state.rows.forEach(function (f) {
     if (!f.vendor) return;
+    if (vendorFilter && vendorFilter !== "すべて" && f.vendor !== vendorFilter) return;
     counts.total++;
     counts[fileCategory(f)]++;
   });
   return counts;
 }
 
-function renderCategoryButtons(hostId) {
-  var counts = categoryCounts();
+function renderCategoryButtons(hostId, vendorFilter) {
+  var counts = categoryCounts(vendorFilter);
   var host = byId(hostId);
   host.innerHTML = CATEGORIES.map(function (c) {
     var on = state.category === c.key;
@@ -875,7 +876,7 @@ function sortIndicator(col) {
 }
 
 function renderSourceList() {
-  renderCategoryButtons("src-cats");
+  renderCategoryButtons("src-cats", state.srcVendor);
 
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
     state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
