@@ -29,7 +29,7 @@
   <!-- ダッシュボード -->
   <section id="panel-dashboard" class="panel" role="tabpanel">
     <div class="controls">
-      <label class="check"><input type="checkbox" id="dash-screen">画面換算</label>
+      <div id="dash-cats" class="cats"></div>
     </div>
     <div class="dash-scroll">
       <div id="dash-metrics" class="metrics"></div>
@@ -47,11 +47,11 @@
   <!-- ソース一覧 -->
   <section id="panel-source" class="panel" role="tabpanel" hidden>
     <div class="controls">
+      <div id="src-cats" class="cats" style="margin-bottom:8px"></div>
       <div class="field-label">取引先</div>
       <div id="pv" class="pills"></div>
       <div class="field-label" style="margin-top:8px">拡張子</div>
       <div id="pe" class="pills"></div>
-      <label class="check" style="margin-top:4px"><input type="checkbox" id="src-screen">画面換算</label>
     </div>
     <div id="src-metrics" class="metrics metrics-sm"></div>
     <div id="src-head" class="src-head"></div>

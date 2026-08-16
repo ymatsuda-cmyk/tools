@@ -84,7 +84,21 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 
 /* metric cards */
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; flex: 0 0 auto; }
-.metrics-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* 合計／ソースコード／画面定義／設定 の選択ボタン */
+.cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cat-btn {
+  appearance: none; font: inherit; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border-radius: 6px;
+  border: 1px solid #c9c8c1; background: #ffffff; color: #1a1a18;
+}
+.cat-btn:hover { background: #f7f7f5; }
+.cat-btn.is-active { border-color: #2f6f5e; background: #e8f1ee; }
+.cat-btn:focus-visible { outline: 2px solid #2f6f5e; outline-offset: 1px; }
+.cat-label { font-size: 11px; color: #6b6a64; }
+.cat-btn.is-active .cat-label { color: #1f5145; }
+.cat-count { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .metrics-sm { padding: 8px 12px; border-bottom: 1px solid #e3e2dd; }
 .metric { background: #f7f7f5; border-radius: 6px; padding: 8px 10px; }
 .metric-label { display: block; font-size: 11px; color: #6b6a64; }

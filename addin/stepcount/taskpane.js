@@ -29,13 +29,13 @@ var state = {
   vendors: [],
   codeVendors: [],
   screenExts: new Set(),
+  configExts: new Set(),
   tab: "dashboard",
   openNodes: new Set(),
   srcVendor: "すべて",
   srcExt: "すべて",
   srcSort: { col: "folder", dir: "asc" },
-  srcScreen: false,
-  dashScreen: false,
+  category: "total",
   editVendor: "",
   draftChecked: new Set()
 };
@@ -70,9 +70,6 @@ function bindUi() {
   byId("btn-save").addEventListener("click", saveAssignments);
   byId("btn-discard").addEventListener("click", discardDraft);
 
-  byId("dash-screen").addEventListener("change", renderDashboard);
-
-  byId("src-screen").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
   byId("src-head").addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-sort]");
@@ -92,7 +89,10 @@ function switchTab(name) {
   ["dashboard", "source", "assign"].forEach(function (n) {
     byId("panel-" + n).hidden = n !== name;
   });
-  if (name === "dashboard") renderDashboard();
+  if (name === "dashboard") {
+    state.srcExt = "すべて";
+    renderDashboard();
+  }
   if (name === "source") renderSourceList();
 }
 
@@ -131,7 +131,7 @@ async function readWorkbook() {
   await ensureSheets();
   var data = await readArea(SHEET.data, 4);
   var assign = await readArea(SHEET.assign, 2);
-  var code = await readArea(SHEET.code, 2);
+  var code = await readArea(SHEET.code, 3);
   return { data: data, assign: assign, code: code };
 }
 
@@ -153,7 +153,7 @@ async function ensureSheets() {
     }
     if (names.indexOf(SHEET.code) < 0) {
       var cs = sheets.add(SHEET.code);
-      cs.getRange("A1:B1").values = [["取引先", "画面"]];
+      cs.getRange("A1:C1").values = [["取引先", "画面", "定義"]];
       added = true;
     }
     if (added) await ctx.sync();
@@ -204,6 +204,7 @@ function buildModel(raw) {
   var code = parseCodeSheet(raw.code);
   state.codeVendors = code.vendors;
   state.screenExts = code.screenExts;
+  state.configExts = code.configExts;
 
   var rows = [];
   var carry = [];
@@ -226,7 +227,8 @@ function buildModel(raw) {
       ext: ext,
       total: num(r[2]),
       real: num(r[3]),
-      isScreen: state.screenExts.has(ext)
+      isScreen: state.screenExts.has(ext),
+      isConfig: state.configExts.has(ext)
     });
   }
 
@@ -247,10 +249,10 @@ function buildModel(raw) {
 /* コードシート（取引先・画面）を読む。2列は独立したリストとして扱う
    （行が対応している必要はない。どちらかが空でももう一方は読む）。 */
 function parseCodeSheet(values) {
-  var vendors = [], screenExts = new Set();
-  if (!values) return { vendors: vendors, screenExts: screenExts };
+  var vendors = [], screenExts = new Set(), configExts = new Set();
+  if (!values) return { vendors: vendors, screenExts: screenExts, configExts: configExts };
   var start = 0;
-  if (values[0] && (String(values[0][0]) === "取引先" || String(values[0][1]) === "画面")) start = 1;
+  if (values[0] && (String(values[0][0]) === "取引先" || String(values[0][1]) === "画面" || String(values[0][2]) === "定義")) start = 1;
   var seen = new Set();
   for (var i = start; i < values.length; i++) {
     var r = values[i];
@@ -264,8 +266,12 @@ function parseCodeSheet(values) {
     if (e !== null && e !== undefined && String(e).trim() !== "") {
       screenExts.add(String(e).trim().toLowerCase().replace(/^\./, ""));
     }
+    var c = r[2];
+    if (c !== null && c !== undefined && String(c).trim() !== "") {
+      configExts.add(String(c).trim().toLowerCase().replace(/^\./, ""));
+    }
   }
-  return { vendors: vendors, screenExts: screenExts };
+  return { vendors: vendors, screenExts: screenExts, configExts: configExts };
 }
 
 function pairsToMap(values) {
@@ -453,7 +459,7 @@ function draftDiff() {
 }
 
 function assignPillOptions() {
-  return aggregateAll(false).vendors.map(function (v) { return v.name; });
+  return aggregateAll("total").vendors.map(function (v) { return v.name; });
 }
 
 function renderAssignPills() {
@@ -670,20 +676,73 @@ function groupOf(f) {
   return f.folder.length ? f.folder[0] : DIRECT;
 }
 
+/* ---------- 共通：合計／ソースコード／画面定義／設定 の区分 ---------- */
+
+var CATEGORIES = [
+  { key: "total", label: "合計" },
+  { key: "source", label: "ソースコード" },
+  { key: "screen", label: "画面定義" },
+  { key: "config", label: "設定" }
+];
+
+function fileCategory(f) {
+  if (f.isScreen) return "screen";
+  if (f.isConfig) return "config";
+  return "source";
+}
+
+function extCategory(ext) {
+  if (state.screenExts.has(ext)) return "screen";
+  if (state.configExts.has(ext)) return "config";
+  return "source";
+}
+
+/* 取引先が割り当てられているファイルだけを対象に、区分ごとのファイル数を数える。
+   4つのボタンに表示する参考値（現在の選択には左右されない）。 */
+function categoryCounts() {
+  var counts = { total: 0, source: 0, screen: 0, config: 0 };
+  state.rows.forEach(function (f) {
+    if (!f.vendor) return;
+    counts.total++;
+    counts[fileCategory(f)]++;
+  });
+  return counts;
+}
+
+function renderCategoryButtons(hostId) {
+  var counts = categoryCounts();
+  var host = byId(hostId);
+  host.innerHTML = CATEGORIES.map(function (c) {
+    var on = state.category === c.key;
+    return "<button type=\"button\" class=\"cat-btn" + (on ? " is-active" : "") + "\" data-cat=\"" + c.key + "\">" +
+      "<span class=\"cat-label\">" + esc(c.label) + "</span>" +
+      "<span class=\"cat-count\">" + fmt(counts[c.key]) + "</span></button>";
+  }).join("");
+  host.onclick = function (ev) {
+    var b = ev.target.closest("[data-cat]");
+    if (!b) return;
+    setCategory(b.dataset.cat);
+  };
+}
+
+function setCategory(cat) {
+  state.category = cat;
+  if (cat !== "total" && state.srcExt !== "すべて" && extCategory(state.srcExt) !== cat) {
+    state.srcExt = "すべて";
+  }
+  renderDashboard();
+  renderSourceList();
+}
 /* ---------- ダッシュボード ---------- */
 
-function aggregateAll(screenMode) {
+function aggregateAll(category) {
   var vendors = new Map();
   state.codeVendors.forEach(function (name) { vendors.set(name, { files: 0, steps: 0 }); });
 
   var extsAssigned = new Map();
-  var screens = 0;
 
   state.rows.forEach(function (f) {
-    if (screenMode && f.isScreen) {
-      if (f.vendor) screens++;
-      return;
-    }
+    if (category !== "total" && fileCategory(f) !== category) return;
     var vName = f.vendor || UNASSIGNED;
     var ve = vendors.get(vName);
     if (!ve) { ve = { files: 0, steps: 0 }; vendors.set(vName, ve); }
@@ -708,20 +767,17 @@ function aggregateAll(screenMode) {
 
   return {
     vendors: vList, grandAssigned: grandAssigned, vendorCount: vendorCount,
-    totalFiles: totalFiles, screens: screens, exts: extList
+    totalFiles: totalFiles, exts: extList
   };
 }
 
 function renderDashboard() {
-  var screenMode = byId("dash-screen").checked;
-  var d = aggregateAll(screenMode);
+  renderCategoryButtons("dash-cats");
+  var d = aggregateAll(state.category);
 
-  var cards = metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
-    metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く");
-  if (screenMode) cards += metricCard("画面定義ファイル数", fmt(d.screens), "未割当を除く");
-  cards += metricCard("取引先数", fmt(d.vendorCount), null);
-  byId("dash-metrics").innerHTML = cards;
-  byId("dash-metrics").className = screenMode ? "metrics metrics-4" : "metrics";
+  byId("dash-metrics").innerHTML =
+    metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
+    metricCard("取引先数", fmt(d.vendorCount), null);
 
   var vMax = d.vendors.length ? Math.max.apply(null, d.vendors.map(function (v) { return v.steps; })) || 1 : 1;
   byId("dash-vendors").innerHTML = d.vendors.length
@@ -772,10 +828,10 @@ function extOptions(vendorSel) {
   return ["すべて"].concat(set.sort(cmpJa));
 }
 
-function filteredSourceRows(screenMode) {
+function filteredSourceRows() {
   return state.rows.filter(function (f) {
     if (!f.vendor) return false;
-    if (screenMode && f.isScreen) return false;
+    if (state.category !== "total" && fileCategory(f) !== state.category) return false;
     if (state.srcVendor !== "すべて" && f.vendor !== state.srcVendor) return false;
     var e = f.ext || "(なし)";
     if (state.srcExt !== "すべて" && e !== state.srcExt) return false;
@@ -819,31 +875,20 @@ function sortIndicator(col) {
 }
 
 function renderSourceList() {
-  var screenMode = byId("src-screen").checked;
-
-  if (screenMode && state.srcExt !== "すべて" && state.screenExts.has(state.srcExt)) {
-    state.srcExt = "すべて";
-  }
+  renderCategoryButtons("src-cats");
 
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
     state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
   });
   pillRow("pe", extOptions(state.srcVendor), state.srcExt, function (v) {
     state.srcExt = v; renderSourceList();
-  }, function (ext) { return screenMode && state.screenExts.has(ext); });
+  }, function (ext) { return state.category !== "total" && extCategory(ext) !== state.category; });
 
-  var rows = sortSourceRows(filteredSourceRows(screenMode));
+  var rows = sortSourceRows(filteredSourceRows());
   var sum = rows.reduce(function (s, r) { return s + r.steps; }, 0);
 
-  var cards = metricCard("ステップ", fmt(sum), null) + metricCard("ファイル数", fmt(rows.length), null);
-  if (screenMode) {
-    var screens = state.rows.filter(function (f) {
-      return f.vendor && f.isScreen &&
-        (state.srcVendor === "すべて" || f.vendor === state.srcVendor);
-    }).length;
-    cards += metricCard("画面定義ファイル数", fmt(screens), null);
-  }
-  byId("src-metrics").innerHTML = cards;
+  byId("src-metrics").innerHTML =
+    metricCard("ステップ", fmt(sum), null) + metricCard("ファイル数", fmt(rows.length), null);
 
   byId("src-head").innerHTML =
     "<button type=\"button\" class=\"src-col folder\" data-sort=\"folder\">フォルダ" + sortIndicator("folder") + "</button>" +
