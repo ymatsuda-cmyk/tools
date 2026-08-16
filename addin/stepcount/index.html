@@ -28,6 +28,9 @@
 
   <!-- ダッシュボード -->
   <section id="panel-dashboard" class="panel" role="tabpanel">
+    <div class="controls">
+      <label class="check"><input type="checkbox" id="dash-screen">画面換算</label>
+    </div>
     <div class="dash-scroll">
       <div id="dash-metrics" class="metrics"></div>
       <div class="dash-section">
@@ -49,6 +52,7 @@
       <div class="field-label" style="margin-top:8px">拡張子</div>
       <div id="pe" class="pills"></div>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="drop-excluded" checked>除外行を外す</label>
+      <label class="check" style="margin-top:4px"><input type="checkbox" id="src-screen">画面換算</label>
     </div>
     <div class="metrics metrics-sm">
       <div class="metric"><span class="metric-label">ステップ</span><span class="metric-value" id="src-steps">—</span></div>
@@ -67,8 +71,8 @@
       <div class="field-label">編集する取引先</div>
       <div id="pav" class="pills" style="margin-bottom:8px"></div>
       <div class="row">
-        <input id="vendor" list="vendor-list" placeholder="取引先名を入力（新規も可）">
-        <datalist id="vendor-list"></datalist>
+        <input id="new-vendor" placeholder="新しい取引先名">
+        <button id="btn-add-vendor" class="btn">取引先を追加</button>
       </div>
       <div class="hint" style="margin-top:4px">チェックしたフォルダとその配下すべてに、この取引先名を直接書き込みます。</div>
       <div class="row row-tight">

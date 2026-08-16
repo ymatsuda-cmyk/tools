@@ -84,6 +84,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid #2f6f5e; outline-
 
 /* metric cards */
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; flex: 0 0 auto; }
+.metrics-4 { grid-template-columns: repeat(4, 1fr); }
 .metrics-sm { padding: 8px 12px; border-bottom: 1px solid #e3e2dd; }
 .metric { background: #f7f7f5; border-radius: 6px; padding: 8px 10px; }
 .metric-label { display: block; font-size: 11px; color: #6b6a64; }

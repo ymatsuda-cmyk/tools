@@ -9,6 +9,7 @@ var SHEET = {
   data: "データ",
   assign: "割当",
   exclude: "除外",
+  code: "コード",
   outVendor: "集計_取引先",
   outExt: "集計_拡張子",
   outCross: "集計_クロス"
@@ -28,11 +29,15 @@ var state = {
   assignMap: new Map(),
   excludeMap: new Map(),
   vendors: [],
+  codeVendors: [],
+  screenExts: new Set(),
   tab: "dashboard",
   openNodes: new Set(),
   srcVendor: "すべて",
   srcExt: "すべて",
   srcSort: { col: "folder", dir: "asc" },
+  srcScreen: false,
+  dashScreen: false,
   editVendor: "",
   draftChecked: new Set()
 };
@@ -59,15 +64,18 @@ function bindUi() {
     expandTo(parseInt(this.value, 10));
     renderTree();
   });
-  byId("vendor").addEventListener("change", function () {
-    var v = this.value.trim();
-    if (v) switchEditVendor(v);
+  byId("btn-add-vendor").addEventListener("click", addNewVendor);
+  byId("new-vendor").addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") { ev.preventDefault(); addNewVendor(); }
   });
   byId("btn-focus").addEventListener("click", focusChecked);
   byId("btn-save").addEventListener("click", saveAssignments);
   byId("btn-discard").addEventListener("click", discardDraft);
 
+  byId("dash-screen").addEventListener("change", renderDashboard);
+
   byId("drop-excluded").addEventListener("change", renderSourceList);
+  byId("src-screen").addEventListener("change", renderSourceList);
   byId("btn-export").addEventListener("click", exportSheets);
   byId("src-head").addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-sort]");
@@ -104,7 +112,6 @@ async function reload() {
     if (!state.editVendor) {
       var order = assignPillOptions();
       state.editVendor = order.length ? order[0] : "";
-      byId("vendor").value = state.editVendor;
     }
     state.draftChecked = committedSetFor(state.editVendor);
     renderAssignPills();
@@ -128,7 +135,8 @@ async function readWorkbook() {
   var data = await readArea(SHEET.data, 4);
   var assign = await readArea(SHEET.assign, 2);
   var exclude = await readArea(SHEET.exclude, 2);
-  return { data: data, assign: assign, exclude: exclude };
+  var code = await readArea(SHEET.code, 2);
+  return { data: data, assign: assign, exclude: exclude, code: code };
 }
 
 async function ensureSheets() {
@@ -150,6 +158,11 @@ async function ensureSheets() {
         : [["フォルダパス", "メモ"]];
       added = true;
     });
+    if (names.indexOf(SHEET.code) < 0) {
+      var cs = sheets.add(SHEET.code);
+      cs.getRange("A1:B1").values = [["取引先", "画面"]];
+      added = true;
+    }
     if (added) await ctx.sync();
   });
 }
@@ -196,6 +209,10 @@ function buildModel(raw) {
   state.assignMap = pairsToMap(raw.assign);
   state.excludeMap = pairsToMap(raw.exclude);
 
+  var code = parseCodeSheet(raw.code);
+  state.codeVendors = code.vendors;
+  state.screenExts = code.screenExts;
+
   var rows = [];
   var carry = [];
   var body = raw.data;
@@ -216,7 +233,8 @@ function buildModel(raw) {
       folder: segs.slice(0, segs.length - 1),
       ext: ext,
       total: num(r[2]),
-      real: num(r[3])
+      real: num(r[3]),
+      isScreen: state.screenExts.has(ext)
     });
   }
 
@@ -234,10 +252,30 @@ function buildModel(raw) {
   state.tree = buildTree(rows);
   state.vendors = uniq(Array.from(state.assignMap.values())
     .filter(function (v) { return v !== UNASSIGN_MARK; })).sort(cmpJa);
-  var dl = byId("vendor-list");
-  dl.innerHTML = state.vendors.map(function (v) {
-    return "<option value=\"" + esc(v) + "\"></option>";
-  }).join("");
+}
+
+/* コードシート（取引先・画面）を読む。2列は独立したリストとして扱う
+   （行が対応している必要はない。どちらかが空でももう一方は読む）。 */
+function parseCodeSheet(values) {
+  var vendors = [], screenExts = new Set();
+  if (!values) return { vendors: vendors, screenExts: screenExts };
+  var start = 0;
+  if (values[0] && (String(values[0][0]) === "取引先" || String(values[0][1]) === "画面")) start = 1;
+  var seen = new Set();
+  for (var i = start; i < values.length; i++) {
+    var r = values[i];
+    if (!r) continue;
+    var v = r[0];
+    if (v !== null && v !== undefined && String(v).trim() !== "") {
+      var name = String(v).trim();
+      if (!seen.has(name)) { seen.add(name); vendors.push(name); }
+    }
+    var e = r[1];
+    if (e !== null && e !== undefined && String(e).trim() !== "") {
+      screenExts.add(String(e).trim().toLowerCase().replace(/^\./, ""));
+    }
+  }
+  return { vendors: vendors, screenExts: screenExts };
 }
 
 function pairsToMap(values) {
@@ -399,7 +437,6 @@ function committedSetFor(vendor) {
 function switchEditVendor(vendor) {
   state.editVendor = vendor;
   state.draftChecked = committedSetFor(vendor);
-  byId("vendor").value = vendor;
   renderAssignPills();
   renderTree();
 }
@@ -434,6 +471,40 @@ function assignPillOptions() {
 
 function renderAssignPills() {
   pillRow("pav", assignPillOptions(), state.editVendor, function (v) { switchEditVendor(v); });
+}
+
+async function addNewVendor() {
+  var input = byId("new-vendor");
+  var name = input.value.trim();
+  if (!name) { toast("取引先名を入力してください。", true); return; }
+  if (state.codeVendors.indexOf(name) >= 0) {
+    toast("その取引先はすでに登録されています。", true);
+    switchEditVendor(name);
+    return;
+  }
+  try {
+    setStatus("追加中…");
+    await appendCodeVendor(name);
+    state.codeVendors.push(name);
+    input.value = "";
+    switchEditVendor(name);
+    setStatus(fmt(state.rows.length) + " ファイル / 割当 " + state.assignMap.size +
+      " 件 / 除外 " + state.excludeMap.size + " 件");
+    toast("取引先「" + name + "」を追加しました。");
+  } catch (e) {
+    toast("追加に失敗しました：" + describe(e), true);
+  }
+}
+
+/* コードシートのA列（取引先）の末尾に1件だけ追記する。B列（画面）には触れない。 */
+async function appendCodeVendor(name) {
+  var dim = await areaSize(SHEET.code);
+  var nextRow = dim ? dim.top + dim.rows : 1;
+  await Excel.run(async function (ctx) {
+    ctx.workbook.worksheets.getItem(SHEET.code)
+      .getRangeByIndexes(nextRow, 0, 1, 1).values = [[name]];
+    await ctx.sync();
+  });
 }
 
 function renderTree() {
@@ -558,9 +629,6 @@ function refreshAssignments(changed) {
 
   state.vendors = uniq(Array.from(state.assignMap.values())
     .filter(function (v) { return v !== UNASSIGN_MARK; })).sort(cmpJa);
-  byId("vendor-list").innerHTML = state.vendors.map(function (v) {
-    return "<option value=\"" + esc(v) + "\"></option>";
-  }).join("");
 
   state.draftChecked = committedSetFor(state.editVendor);
   renderAssignPills();
@@ -617,12 +685,16 @@ function groupOf(f) {
 
 /* ---------- ダッシュボード ---------- */
 
-function aggregateAll(dropExcluded) {
+function aggregateAll(dropExcluded, screenMode) {
   var vendors = new Map();
+  state.codeVendors.forEach(function (name) { vendors.set(name, { files: 0, steps: 0 }); });
+
   var extsAssigned = new Map();
+  var screens = 0;
 
   state.rows.forEach(function (f) {
     if (f.excluded && dropExcluded) return;
+    if (screenMode && f.isScreen) { screens++; return; }
     var vName = f.vendor || UNASSIGNED;
     var ve = vendors.get(vName);
     if (!ve) { ve = { files: 0, steps: 0 }; vendors.set(vName, ve); }
@@ -635,26 +707,32 @@ function aggregateAll(dropExcluded) {
   var vList = Array.from(vendors.entries()).map(function (e) {
     return { name: e[0], files: e[1].files, steps: e[1].steps };
   }).filter(function (v) { return v.name !== UNASSIGNED; });
-  vList.sort(function (a, b) { return b.steps - a.steps; });
+  vList.sort(function (a, b) { return b.steps - a.steps || cmpJa(a.name, b.name); });
 
   var grandAssigned = vList.reduce(function (s, v) { return s + v.steps; }, 0);
   var totalFiles = vList.reduce(function (s, v) { return s + v.files; }, 0);
-  var vendorCount = vList.length;
+  var vendorCount = vList.filter(function (v) { return v.files > 0; }).length;
 
   var extList = Array.from(extsAssigned.entries())
     .map(function (e) { return { name: e[0] || "(なし)", steps: e[1] }; })
     .sort(function (a, b) { return b.steps - a.steps; });
 
-  return { vendors: vList, grandAssigned: grandAssigned, vendorCount: vendorCount, totalFiles: totalFiles, exts: extList };
+  return {
+    vendors: vList, grandAssigned: grandAssigned, vendorCount: vendorCount,
+    totalFiles: totalFiles, screens: screens, exts: extList
+  };
 }
 
 function renderDashboard() {
-  var d = aggregateAll(true);
+  var screenMode = byId("dash-screen").checked;
+  var d = aggregateAll(true, screenMode);
 
-  byId("dash-metrics").innerHTML =
-    metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
-    metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く") +
-    metricCard("取引先数", fmt(d.vendorCount), null);
+  var cards = metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
+    metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く");
+  if (screenMode) cards += metricCard("画面数", fmt(d.screens), null);
+  cards += metricCard("取引先数", fmt(d.vendorCount), null);
+  byId("dash-metrics").innerHTML = cards;
+  byId("dash-metrics").className = screenMode ? "metrics metrics-4" : "metrics";
 
   var vMax = d.vendors.length ? Math.max.apply(null, d.vendors.map(function (v) { return v.steps; })) || 1 : 1;
   byId("dash-vendors").innerHTML = d.vendors.length
@@ -683,17 +761,23 @@ function statRow(name, files, steps, max, rest) {
 
 /* ---------- ソース一覧（取引先 › 拡張子のピルで絞り込み） ---------- */
 
-function vendorOptions() {
-  var names = uniq(state.rows.map(function (f) { return f.vendor; })
-    .filter(function (v) { return v; })).sort(cmpJa);
-  return ["すべて"].concat(names);
+/* コードシートの取引先一覧と、実際に割当シートで使われている取引先名を統合した一覧。 */
+function allVendorNames() {
+  var set = new Set(state.codeVendors);
+  state.assignMap.forEach(function (v) { if (v && v !== UNASSIGN_MARK) set.add(v); });
+  return Array.from(set);
 }
 
-function extOptions(vendorSel, dropExcluded) {
+function vendorOptions() {
+  return ["すべて"].concat(allVendorNames().sort(cmpJa));
+}
+
+function extOptions(vendorSel, dropExcluded, screenMode) {
   var set = [];
   state.rows.forEach(function (f) {
     if (!f.vendor) return;
     if (dropExcluded && f.excluded) return;
+    if (screenMode && f.isScreen) return;
     if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
     var e = f.ext || "(なし)";
     if (set.indexOf(e) < 0) set.push(e);
@@ -701,10 +785,11 @@ function extOptions(vendorSel, dropExcluded) {
   return ["すべて"].concat(set.sort(cmpJa));
 }
 
-function filteredSourceRows(dropExcluded) {
+function filteredSourceRows(dropExcluded, screenMode) {
   return state.rows.filter(function (f) {
     if (!f.vendor) return false;
     if (dropExcluded && f.excluded) return false;
+    if (screenMode && f.isScreen) return false;
     if (state.srcVendor !== "すべて" && f.vendor !== state.srcVendor) return false;
     var e = f.ext || "(なし)";
     if (state.srcExt !== "すべて" && e !== state.srcExt) return false;
@@ -750,15 +835,16 @@ function sortIndicator(col) {
 
 function renderSourceList() {
   var dropExcluded = byId("drop-excluded").checked;
+  var screenMode = byId("src-screen").checked;
 
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
     state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
   });
-  pillRow("pe", extOptions(state.srcVendor, dropExcluded), state.srcExt, function (v) {
+  pillRow("pe", extOptions(state.srcVendor, dropExcluded, screenMode), state.srcExt, function (v) {
     state.srcExt = v; renderSourceList();
   });
 
-  var rows = sortSourceRows(filteredSourceRows(dropExcluded));
+  var rows = sortSourceRows(filteredSourceRows(dropExcluded, screenMode));
   var sum = rows.reduce(function (s, r) { return s + r.steps; }, 0);
   byId("src-steps").textContent = fmt(sum);
   byId("src-files").textContent = fmt(rows.length);
