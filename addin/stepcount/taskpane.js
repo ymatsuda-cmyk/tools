@@ -718,7 +718,7 @@ function renderDashboard() {
 
   var cards = metricCard("合計ステップ", fmt(d.grandAssigned), "未割当を除く") +
     metricCard("ファイル数", fmt(d.totalFiles), "未割当を除く");
-  if (screenMode) cards += metricCard("画面数", fmt(d.screens), "未割当を除く");
+  if (screenMode) cards += metricCard("画面定義ファイル数", fmt(d.screens), "未割当を除く");
   cards += metricCard("取引先数", fmt(d.vendorCount), null);
   byId("dash-metrics").innerHTML = cards;
   byId("dash-metrics").className = screenMode ? "metrics metrics-4" : "metrics";
@@ -761,11 +761,10 @@ function vendorOptions() {
   return ["すべて"].concat(allVendorNames().sort(cmpJa));
 }
 
-function extOptions(vendorSel, screenMode) {
+function extOptions(vendorSel) {
   var set = [];
   state.rows.forEach(function (f) {
     if (!f.vendor) return;
-    if (screenMode && f.isScreen) return;
     if (vendorSel !== "すべて" && f.vendor !== vendorSel) return;
     var e = f.ext || "(なし)";
     if (set.indexOf(e) < 0) set.push(e);
@@ -822,12 +821,16 @@ function sortIndicator(col) {
 function renderSourceList() {
   var screenMode = byId("src-screen").checked;
 
+  if (screenMode && state.srcExt !== "すべて" && state.screenExts.has(state.srcExt)) {
+    state.srcExt = "すべて";
+  }
+
   pillRow("pv", vendorOptions(), state.srcVendor, function (v) {
     state.srcVendor = v; state.srcExt = "すべて"; renderSourceList();
   });
-  pillRow("pe", extOptions(state.srcVendor, screenMode), state.srcExt, function (v) {
+  pillRow("pe", extOptions(state.srcVendor), state.srcExt, function (v) {
     state.srcExt = v; renderSourceList();
-  });
+  }, function (ext) { return screenMode && state.screenExts.has(ext); });
 
   var rows = sortSourceRows(filteredSourceRows(screenMode));
   var sum = rows.reduce(function (s, r) { return s + r.steps; }, 0);
@@ -838,7 +841,7 @@ function renderSourceList() {
       return f.vendor && f.isScreen &&
         (state.srcVendor === "すべて" || f.vendor === state.srcVendor);
     }).length;
-    cards += metricCard("画面数", fmt(screens), null);
+    cards += metricCard("画面定義ファイル数", fmt(screens), null);
   }
   byId("src-metrics").innerHTML = cards;
 
@@ -858,17 +861,19 @@ function renderSourceList() {
   }).join("") : "<p class=\"empty\">該当するファイルがありません。</p>";
 }
 
-function pillRow(hostId, options, selected, onPick) {
+function pillRow(hostId, options, selected, onPick, isDisabled) {
   var host = byId(hostId);
   host.innerHTML = options.map(function (o) {
-    var on = o === selected;
+    var disabled = isDisabled ? isDisabled(o) : false;
+    var on = o === selected && !disabled;
     var rest = o === UNASSIGNED;
     return "<button type=\"button\" class=\"pill" + (on ? " is-active" : "") + (rest ? " is-rest" : "") +
-      "\" data-v=\"" + esc(o) + "\">" + esc(o) + "</button>";
+      (disabled ? " is-disabled" : "") + "\"" + (disabled ? " disabled" : "") +
+      " data-v=\"" + esc(o) + "\">" + esc(o) + "</button>";
   }).join("");
   host.onclick = function (ev) {
     var b = ev.target.closest("[data-v]");
-    if (!b) return;
+    if (!b || b.disabled) return;
     onPick(b.dataset.v);
   };
 }
