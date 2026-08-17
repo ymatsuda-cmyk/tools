@@ -153,7 +153,7 @@ async function ensureSheets() {
     }
     if (names.indexOf(SHEET.code) < 0) {
       var cs = sheets.add(SHEET.code);
-      cs.getRange("A1:C1").values = [["取引先", "画面", "定義"]];
+      cs.getRange("A1:C1").values = [["取引先", "画面", "設定"]];
       added = true;
     }
     if (added) await ctx.sync();
@@ -252,7 +252,7 @@ function parseCodeSheet(values) {
   var vendors = [], screenExts = new Set(), configExts = new Set();
   if (!values) return { vendors: vendors, screenExts: screenExts, configExts: configExts };
   var start = 0;
-  if (values[0] && (String(values[0][0]) === "取引先" || String(values[0][1]) === "画面" || String(values[0][2]) === "定義")) start = 1;
+  if (values[0] && (String(values[0][0]) === "取引先" || String(values[0][1]) === "画面" || String(values[0][2]) === "設定")) start = 1;
   var seen = new Set();
   for (var i = start; i < values.length; i++) {
     var r = values[i];
@@ -1009,7 +1009,7 @@ async function exportSheets() {
       ctx.workbook.worksheets.getItem(SHEET.outVendor).activate();
       await ctx.sync();
     });
-    toast("3 シートに出力しました。");
+    toast("3 シート（別シート）に出力しました。");
   } catch (e) {
     toast("出力に失敗しました：" + describe(e), true);
   }
