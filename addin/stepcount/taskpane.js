@@ -9,13 +9,10 @@ var SHEET = {
   data: "データ",
   assign: "割当",
   code: "コード",
-  outVendor: "集計_取引先",
-  outExt: "集計_拡張子",
-  outCross: "集計_クロス"
+  output: "出力"
 };
 
 var UNASSIGNED = "（未割当）";
-var DIRECT = "（直下）";
 var UNASSIGN_MARK = "（解除）";
 
 var CARRY_UNC_ROOT = false;
@@ -668,14 +665,6 @@ async function writeChunked(sheetName, values) {
   }
 }
 
-/* ---------- 共通：割当フォルダ名 ---------- */
-
-function groupOf(f) {
-  var d = f.assignDepth;
-  if (d > 0) return f.folder[d - 1];
-  return f.folder.length ? f.folder[0] : DIRECT;
-}
-
 /* ---------- 共通：合計／ソースコード／画面定義／設定 の区分 ---------- */
 
 var CATEGORIES = [
@@ -924,92 +913,24 @@ function pillRow(hostId, options, selected, onPick, isDisabled) {
   };
 }
 
-/* ---------- 出力（ソース一覧の除外設定を使い、全件を集計） ---------- */
-
-function aggregateFull() {
-  var vendors = new Map();
-  var extTotals = new Map();
-  var totalFiles = 0, grand = 0;
-
-  state.rows.forEach(function (f) {
-    var v = f.real;
-    var vName = f.vendor || UNASSIGNED;
-    var gName = groupOf(f);
-
-    var ve = vendors.get(vName);
-    if (!ve) { ve = { name: vName, files: 0, steps: 0, groups: new Map() }; vendors.set(vName, ve); }
-    ve.files++; ve.steps += v;
-
-    var ge = ve.groups.get(gName);
-    if (!ge) { ge = { name: gName, files: 0, steps: 0, exts: new Map() }; ve.groups.set(gName, ge); }
-    ge.files++; ge.steps += v;
-
-    var eb = ge.exts.get(f.ext);
-    if (!eb) { eb = { files: 0, steps: 0 }; ge.exts.set(f.ext, eb); }
-    eb.files++; eb.steps += v;
-
-    var et = extTotals.get(f.ext);
-    if (!et) { et = { files: 0, steps: 0 }; extTotals.set(f.ext, et); }
-    et.files++; et.steps += v;
-
-    totalFiles++; grand += v;
-  });
-
-  var list = Array.from(vendors.values()).sort(function (a, b) {
-    if (a.name === UNASSIGNED) return 1;
-    if (b.name === UNASSIGNED) return -1;
-    return b.steps - a.steps;
-  });
-  list.forEach(function (ve) {
-    ve.groupList = Array.from(ve.groups.values()).sort(function (a, b) { return b.steps - a.steps; });
-    ve.groupList.forEach(function (ge) {
-      ge.extList = Array.from(ge.exts.entries())
-        .map(function (e) { return { name: e[0] || "(なし)", files: e[1].files, steps: e[1].steps }; })
-        .sort(function (a, b) { return b.steps - a.steps; });
-    });
-  });
-
-  return {
-    vendors: list, files: totalFiles, grand: grand,
-    exts: Array.from(extTotals.entries())
-      .map(function (e) { return { name: e[0] || "(なし)", files: e[1].files, steps: e[1].steps }; })
-      .sort(function (a, b) { return b.steps - a.steps; })
-  };
-}
+/* ---------- 出力（今表示しているソース一覧の内容をそのまま） ---------- */
 
 async function exportSheets() {
-  var s = aggregateFull();
+  var rows = sortSourceRows(filteredSourceRows());
 
-  var v = [["取引先名", "ファイル数", "ステップ", "構成比"]];
-  s.vendors.forEach(function (ve) {
-    v.push([ve.name, ve.files, ve.steps, s.grand ? ve.steps / s.grand : 0]);
-  });
-  v.push(["合計", s.files, s.grand, 1]);
-
-  var x = [["拡張子", "ファイル数", "ステップ", "構成比"]];
-  s.exts.forEach(function (e) {
-    x.push([e.name, e.files, e.steps, s.grand ? e.steps / s.grand : 0]);
-  });
-
-  var c = [["取引先名", "フォルダ", "拡張子", "ファイル数", "ステップ"]];
-  s.vendors.forEach(function (ve) {
-    ve.groupList.forEach(function (ge) {
-      ge.extList.forEach(function (e) {
-        c.push([ve.name, ge.name, e.name, e.files, e.steps]);
-      });
-    });
+  var values = [["フォルダ", "ファイル名", "拡張子", "ステップ数"]];
+  rows.forEach(function (r) {
+    values.push([r.folder, r.name, r.ext, r.steps]);
   });
 
   try {
     setStatus("出力中…");
-    await putSheet(SHEET.outVendor, v, [3]);
-    await putSheet(SHEET.outExt, x, [3]);
-    await putSheet(SHEET.outCross, c, []);
+    await putSheet(SHEET.output, values, []);
     await Excel.run(async function (ctx) {
-      ctx.workbook.worksheets.getItem(SHEET.outVendor).activate();
+      ctx.workbook.worksheets.getItem(SHEET.output).activate();
       await ctx.sync();
     });
-    toast("3 シート（別シート）に出力しました。");
+    toast(fmt(rows.length) + " 件を「" + SHEET.output + "」シートに出力しました。");
   } catch (e) {
     toast("出力に失敗しました：" + describe(e), true);
   }
