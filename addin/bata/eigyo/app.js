@@ -1594,6 +1594,7 @@ function onOrderDoneToggle() {
   const on = !!(done && done.checked);
   [
     ["st-deliver", "st-deliver-req"],
+    ["st-book", "st-book-req"],
     ["st-fhours", "st-fhours-req"],
     ["st-famount", "st-famount-req"],
   ].forEach(([inputId, reqId]) => {
@@ -1708,10 +1709,23 @@ function renderStageBody() {
         <input type="text" id="st-dcontact" value="${esc(rec.contact)}" ${dis}></div>
       <div class="form-row"><label>商談状況</label>
         <textarea id="st-deal" rows="5" ${dis}>${esc(rec.deal)}</textarea></div>
+      <div class="form-grid">
+        <div class="form-row"><label>工数（人日）</label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
+        <div class="form-row"><label>価格（税抜・円）</label><input type="number" step="1000" id="st-amount" value="${rec.amount ?? ""}" ${dis} oninput="updateTaxView()"></div>
+      </div>
+      <div class="form-row"><label>税込価格（自動計算）</label>
+        <input type="text" id="st-tax" readonly class="ro" value="${rec.amount != null ? withTax(rec.amount).toLocaleString() + " 円" : ""}"></div>
+      <div class="form-row"><label>根拠</label>
+        <textarea id="st-basis" rows="3" ${dis}>${esc(rec.basis)}</textarea></div>
+      <div class="form-row"><label>見積有効期限
+          <span class="req" id="st-qlimit-req" style="display:none">必須</span>
+          <span class="opt-tag" id="st-qlimit-opt">任意（商談完了にする場合は必須）</span></label>
+        <input type="date" id="st-qlimit" value="${fmtDateInput(rec.quoteLimit)}" ${dis}></div>
       <label class="check-row ${doneDis ? "off" : ""}">
-        <input type="checkbox" id="st-done" ${doneDis}> 商談完了（確認中へ進める）
+        <input type="checkbox" id="st-done" ${doneDis} onchange="onQuoteDoneToggle()"> 商談完了（確認中へ進める）
         ${holdMsg}
       </label>`;
+    onQuoteDoneToggle();
     return;
   }
 
@@ -1745,7 +1759,8 @@ function renderStageBody() {
       <div class="form-grid">
         <div class="form-row"><label>納品日 <span class="req" id="st-deliver-req" style="display:none">必須</span></label>
           <input type="date" id="st-deliver" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
-        <div class="form-row"><label>計上日</label><input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
+        <div class="form-row"><label>計上日 <span class="req" id="st-book-req" style="display:none">必須</span></label>
+          <input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
         <div class="form-row"><label>最終工数（人日） <span class="req" id="st-fhours-req" style="display:none">必須</span></label>
           <input type="number" step="0.5" id="st-fhours" value="${rec.finalHours ?? rec.hours ?? ""}" ${dis}></div>
         <div class="form-row"><label>最終価格（税抜・円） <span class="req" id="st-famount-req" style="display:none">必須</span></label>
@@ -1882,7 +1897,18 @@ async function saveEditRecord() {
           applyStatus(rec, "完了");        // 対応完了日 = 完了日(G)
         }
         else if (t === "見積中") {
-          if (rec.amount == null) { msg.className = "save-msg err"; msg.textContent = "価格を入力してください"; return; }
+          if (rec.hours == null) {
+            msg.className = "save-msg err"; msg.textContent = "見積完了にする場合は「工数（人日）」を入力してください";
+            const inp = document.getElementById("st-hours");
+            if (inp) { inp.classList.add("need"); inp.focus(); }
+            return;
+          }
+          if (rec.amount == null) {
+            msg.className = "save-msg err"; msg.textContent = "見積完了にする場合は「価格」を入力してください";
+            const inp = document.getElementById("st-amount");
+            if (inp) { inp.classList.add("need"); inp.focus(); }
+            return;
+          }
           // 見積完了にする場合のみ、見積有効期限を必須とする
           if (!rec.quoteLimit) {
             msg.className = "save-msg err";
@@ -1903,8 +1929,31 @@ async function saveEditRecord() {
     else if (t === "商談中") {
       rec.contact = document.getElementById("st-dcontact").value;
       rec.deal = document.getElementById("st-deal").value;
+      rec.hours = numOrNull(document.getElementById("st-hours").value);
+      rec.amount = numOrNull(document.getElementById("st-amount").value);
+      rec.basis = document.getElementById("st-basis").value;
+      rec.quoteLimit = fromDateInput(document.getElementById("st-qlimit").value);
       const doneChk = document.getElementById("st-done");
       if (doneChk && doneChk.checked) {
+        if (rec.hours == null) {
+          msg.className = "save-msg err"; msg.textContent = "商談完了にする場合は「工数（人日）」を入力してください";
+          const inp = document.getElementById("st-hours");
+          if (inp) { inp.classList.add("need"); inp.focus(); }
+          return;
+        }
+        if (rec.amount == null) {
+          msg.className = "save-msg err"; msg.textContent = "商談完了にする場合は「価格」を入力してください";
+          const inp = document.getElementById("st-amount");
+          if (inp) { inp.classList.add("need"); inp.focus(); }
+          return;
+        }
+        if (!rec.quoteLimit) {
+          msg.className = "save-msg err";
+          msg.textContent = "商談完了にする場合は「見積有効期限」を入力してください";
+          const inp = document.getElementById("st-qlimit");
+          if (inp) { inp.classList.add("need"); inp.focus(); }
+          return;
+        }
         rec.dealDone = new Date();                                // 商談完了日
         applyStatus(rec, "確認中");
       }
@@ -1939,6 +1988,7 @@ async function saveEditRecord() {
           if (inp) { inp.classList.add("need"); inp.focus(); }
         };
         if (!rec.deliver) { need("st-deliver", "納品日"); return; }
+        if (!rec.book) { need("st-book", "計上日"); return; }
         if (rec.finalHours == null) { need("st-fhours", "最終工数（人日）"); return; }
         if (rec.finalAmount == null) { need("st-famount", "最終価格"); return; }
         if (rec.workHours == null) { need("ed-workhours-top", "対応工数（人日）"); return; }
