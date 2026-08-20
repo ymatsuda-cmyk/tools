@@ -1527,8 +1527,8 @@ function renderHoursTop() {
   const isAccepted = currentStageTab === "受託中";
   const wh = document.getElementById("ed-workhours-top");
   const ah = document.getElementById("ed-accepthours-top");
-  if (wh) { wh.value = rec.workHours ?? ""; wh.disabled = isAccepted; }
-  if (ah) { ah.value = rec.acceptHours ?? ""; ah.disabled = !isAccepted; }
+  if (wh) { wh.value = rec.workHours ?? ""; wh.disabled = isAccepted; wh.classList.remove("need"); }
+  if (ah) { ah.value = rec.acceptHours ?? ""; ah.disabled = !isAccepted; ah.classList.remove("need"); }
 }
 
 /* 保留チェックの切替：状態は変えず、保留フラグのみを更新（登録で確定） */
@@ -1819,7 +1819,16 @@ async function saveEditRecord() {
           msg.className = "save-msg err"; msg.textContent = "対応状況を記入してください"; return;
         }
         if (!rec.stageStart) rec.stageStart = new Date();
-        if (t === "対応中") { applyStatus(rec, "完了"); }        // 対応完了日 = 完了日(G)
+        if (t === "対応中") {
+          if (rec.workHours == null) {
+            msg.className = "save-msg err";
+            msg.textContent = "完了にする場合は「対応工数（人日）」を入力してください";
+            const inp = document.getElementById("st-workhours");
+            if (inp) { inp.classList.add("need"); inp.focus(); }
+            return;
+          }
+          applyStatus(rec, "完了");        // 対応完了日 = 完了日(G)
+        }
         else if (t === "見積中") {
           if (rec.amount == null) { msg.className = "save-msg err"; msg.textContent = "価格を入力してください"; return; }
           // 見積完了にする場合のみ、見積有効期限を必須とする
@@ -1876,6 +1885,8 @@ async function saveEditRecord() {
         if (rec.workHours == null) {
           msg.className = "save-msg err";
           msg.textContent = "対応工数（人日）を入力してから受託中に切り替えてください";
+          const inp = document.getElementById("ed-workhours-top");
+          if (inp) { inp.classList.add("need"); inp.focus(); }
           return;
         }
         const ok = await uiConfirm(
@@ -1911,6 +1922,13 @@ async function saveEditRecord() {
       const doneChk = document.getElementById("st-done");
       if (doneChk && doneChk.checked) {
         if (!workStart) { msg.className = "save-msg err"; msg.textContent = "開始日を入力してください"; return; }
+        if (rec.acceptHours == null) {
+          msg.className = "save-msg err";
+          msg.textContent = "完了にする場合は「受託工数（人日）」を入力してください";
+          const inp = document.getElementById("ed-accepthours-top");
+          if (inp) { inp.classList.add("need"); inp.focus(); }
+          return;
+        }
         applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
       }
     }

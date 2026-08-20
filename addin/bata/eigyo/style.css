@@ -441,7 +441,8 @@ body {
   padding: 12px; background: #fff;
 }
 .stage-info { display: block; font-size: 11px; color: #8a97a0; margin-bottom: 8px; }
-.stage-body input:disabled, .stage-body select:disabled, .stage-body textarea:disabled {
+.stage-body input:disabled, .stage-body select:disabled, .stage-body textarea:disabled,
+.pri-row input:disabled, .pri-row select:disabled, .pri-row textarea:disabled {
   background: #f4f6f7; color: #8a97a0;
 }
 .radio-row { display: flex; gap: 14px; flex-wrap: wrap; }
