@@ -2926,19 +2926,14 @@ function spreadAcrossMonths(hours, start, end, months) {
 /* ---------- 状態 ---------- */
 let kadoView = "capacity";      // capacity(全体キャパ) | hoshu(対応工数) | uketaku(受託工数)
 let kadoHoshuMode = "month";    // month(月次) | cum(累計)
-let kadoHoshuTypes = [];        // 対応工数の種別フィルタ（空=すべて）
+let kadoHoshuType = null;       // 対応工数の種別フィルタ（null=すべて、単一選択）
 let kadoUketakuOpen = null;     // 受託工数：予実一覧を展開中の取引先
 const KADO_HOSHU_TYPES = ["保守対応", "瑕疵対応", "調整"];
 const KADO_TYPE_LABEL = { "保守対応": "保守", "瑕疵対応": "瑕疵", "調整": "調整" };
 
 function switchKadoView(v) { kadoView = v; renderAgg(); }
 function switchKadoHoshuMode(v) { kadoHoshuMode = v; renderAgg(); }
-function toggleKadoType(v) {
-  const i = kadoHoshuTypes.indexOf(v);
-  if (i >= 0) kadoHoshuTypes.splice(i, 1); else kadoHoshuTypes.push(v);
-  renderAgg();
-}
-function clearKadoTypes() { kadoHoshuTypes = []; renderAgg(); }
+function selectKadoType(v) { kadoHoshuType = v; renderAgg(); }
 function toggleKadoClient(name) { kadoUketakuOpen = (kadoUketakuOpen === name) ? null : name; renderAgg(); }
 
 function renderKadoAgg() {
@@ -3084,7 +3079,7 @@ function capacityStackChart(labels, stack, colors, capaSeries, elapsedCount) {
 function renderKadoHoshu() {
   const months = fiscalMonths(currentTerm);
   const elapsed = elapsedMonthsOfTerm(currentTerm, months);
-  const useTypes = kadoHoshuTypes.length ? kadoHoshuTypes : KADO_HOSHU_TYPES;
+  const useTypes = kadoHoshuType ? [kadoHoshuType] : KADO_HOSHU_TYPES;
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   const clientNames = [...new Set(target.map(r => r.client).filter(Boolean))];
   const configured = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
@@ -3107,7 +3102,7 @@ function renderKadoHoshu() {
   sumActual = Math.round(sumActual * 10) / 10;
   sumAllow = Math.round(sumAllow * 10) / 10;
 
-  const chip = (v, on) => `<button class="fchip${on ? " on" : ""}" onclick="toggleKadoType('${esc(v)}')">${esc(KADO_TYPE_LABEL[v])}</button>`;
+  const chip = (v, on) => `<button class="fchip${on ? " on" : ""}" onclick="selectKadoType('${esc(v)}')">${esc(KADO_TYPE_LABEL[v])}</button>`;
 
   const rowsHtml = clientRows.map(({ c, monthly, actualElapsed, allowElapsed, diffYen, overMonthCount }) => {
     const cumOver = actualElapsed > allowElapsed;      // 保守費乖離（金額）の色分け用：常に累計基準
@@ -3116,10 +3111,12 @@ function renderKadoHoshu() {
     const chart = kadoHoshuMode === "month"
       ? bandBarChart(months, monthly, c.hoshuAllow, elapsed)
       : cumulativeBandChart(months, monthly, c.hoshuAllow, elapsed);
+    const feeMan = (c.hoshuFee || 0) / 10000;
+    const allowHours = (c.hoshuAllow || 0) * 8;   // 1人日＝8時間
     return `
     <div class="kado-row">
       <div class="kado-name"><b>${esc(c.name)}</b>
-        <div class="kado-sub">${c.hoshuFee ? Math.round(c.hoshuFee / 10000).toLocaleString() + "万/月" : "－"}　許容 ${c.hoshuAllow}人日/月</div></div>
+        <div class="kado-sub">${feeMan.toFixed(1)}万/月<br>${(c.hoshuAllow || 0).toFixed(1)}人日/月 （${allowHours.toFixed(1)}時間）</div></div>
       <div class="kado-chart">${chart}</div>
       <div class="kado-stat">
         <span class="badge-pill ${badgeOver ? "over" : "ok"}">${badgeOver
@@ -3138,8 +3135,8 @@ function renderKadoHoshu() {
     <div class="agg-filters" style="margin-bottom:10px">
       <div class="af-row"><span class="af-label">分類</span>
         <div class="fchips">
-          <button class="fchip clear${kadoHoshuTypes.length ? "" : " on"}" onclick="clearKadoTypes()">すべて</button>
-          ${KADO_HOSHU_TYPES.map(t => chip(t, kadoHoshuTypes.includes(t))).join("")}
+          <button class="fchip clear${kadoHoshuType ? "" : " on"}" onclick="selectKadoType(null)">すべて</button>
+          ${KADO_HOSHU_TYPES.map(t => chip(t, kadoHoshuType === t)).join("")}
         </div></div>
       <div class="af-row"><span class="af-label">表示</span>
         <div class="seg-inline">
