@@ -176,9 +176,11 @@
       <!-- 対応工数／受託工数（見積り・プリセールスのみ表示）＋WBSタスク連携 -->
       <div class="pri-row" id="ed-pri-row">
         <div class="hours-fld-group" id="ed-hours-group" style="display:none">
-          <div class="form-row"><label>対応工数(人日)</label>
+          <div class="form-row"><label>対応工数(人日)
+              <span class="req" id="ed-workhours-req" style="display:none">必須</span></label>
             <input type="number" step="0.5" id="ed-workhours-top"></div>
-          <div class="form-row"><label>受託工数(人日)</label>
+          <div class="form-row"><label>受託工数(人日)
+              <span class="req" id="ed-accepthours-req" style="display:none">必須</span></label>
             <input type="number" step="0.5" id="ed-accepthours-top"></div>
         </div>
         <div class="task-actions">

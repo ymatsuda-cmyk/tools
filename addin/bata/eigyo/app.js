@@ -1529,6 +1529,13 @@ function renderHoursTop() {
   const ah = document.getElementById("ed-accepthours-top");
   if (wh) { wh.value = rec.workHours ?? ""; wh.disabled = isAccepted; wh.classList.remove("need"); }
   if (ah) { ah.value = rec.acceptHours ?? ""; ah.disabled = !isAccepted; ah.classList.remove("need"); }
+  /* 受託工数：「受託中」タブでは常に必須（対応完了時に検証）。
+     対応工数：「受注」タブで受託確定チェックが入っている時のみ必須（onOrderDoneToggleが制御）。
+     タブを離れたらいったんリセットする。 */
+  const ahReq = document.getElementById("ed-accepthours-req");
+  if (ahReq) ahReq.style.display = isAccepted ? "" : "none";
+  const whReq = document.getElementById("ed-workhours-req");
+  if (whReq && currentStageTab !== "受注") whReq.style.display = "none";
 }
 
 /* 保留チェックの切替：状態は変えず、保留フラグのみを更新（登録で確定） */
@@ -1578,6 +1585,46 @@ function onQuoteDoneToggle() {
   req.style.display = on ? "" : "none";
   opt.style.display = on ? "none" : "";
   if (inp) inp.classList.toggle("need", on && !inp.value);
+}
+
+/* 受注→受託中：納品日／最終工数／最終価格／対応工数を、受託確定チェックが
+   入っている時だけ「必須」表示にする（登録時の必須チェックはsaveEditRecord側）。 */
+function onOrderDoneToggle() {
+  const done = document.getElementById("st-done");
+  const on = !!(done && done.checked);
+  [
+    ["st-deliver", "st-deliver-req"],
+    ["st-fhours", "st-fhours-req"],
+    ["st-famount", "st-famount-req"],
+  ].forEach(([inputId, reqId]) => {
+    const inp = document.getElementById(inputId);
+    const req = document.getElementById(reqId);
+    if (req) req.style.display = on ? "" : "none";
+    if (inp) inp.classList.toggle("need", on && !inp.value);
+  });
+  const whInp = document.getElementById("ed-workhours-top");
+  const whReq = document.getElementById("ed-workhours-req");
+  if (whReq) whReq.style.display = on ? "" : "none";
+  if (whInp) whInp.classList.toggle("need", on && !whInp.value);
+}
+
+/* 受託中→完了：完了予定日／納品日／計上日／受託工数を、対応完了チェックが
+   入っている時だけ「必須」表示にする（登録時の必須チェックはsaveEditRecord側）。 */
+function onWorkDoneToggle() {
+  const done = document.getElementById("st-done");
+  const on = !!(done && done.checked);
+  [
+    ["st-duedate", "st-duedate-req"],
+    ["st-deliver2", "st-deliver2-req"],
+    ["st-book2", "st-book2-req"],
+  ].forEach(([inputId, reqId]) => {
+    const inp = document.getElementById(inputId);
+    const req = document.getElementById(reqId);
+    if (req) req.style.display = on ? "" : "none";
+    if (inp) inp.classList.toggle("need", on && !inp.value);
+  });
+  const ahInp = document.getElementById("ed-accepthours-top");
+  if (ahInp) ahInp.classList.toggle("need", on && !ahInp.value);
 }
 
 function renderStageBody() {
@@ -1696,19 +1743,23 @@ function renderStageBody() {
     body.innerHTML = `
       ${dd ? `<span class="stage-info">受注確定日: ${fmtDate(dd)}</span>` : ""}
       <div class="form-grid">
-        <div class="form-row"><label>納品日</label><input type="date" id="st-deliver" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
-        <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label><input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
-        <div class="form-row"><label>最終工数（人日）</label><input type="number" step="0.5" id="st-fhours" value="${rec.finalHours ?? rec.hours ?? ""}" ${dis}></div>
-        <div class="form-row"><label>最終価格（税抜・円）</label><input type="number" step="1000" id="st-famount" value="${base ?? ""}" ${dis} oninput="updateTaxView2()"></div>
+        <div class="form-row"><label>納品日 <span class="req" id="st-deliver-req" style="display:none">必須</span></label>
+          <input type="date" id="st-deliver" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
+        <div class="form-row"><label>計上日</label><input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
+        <div class="form-row"><label>最終工数（人日） <span class="req" id="st-fhours-req" style="display:none">必須</span></label>
+          <input type="number" step="0.5" id="st-fhours" value="${rec.finalHours ?? rec.hours ?? ""}" ${dis}></div>
+        <div class="form-row"><label>最終価格（税抜・円） <span class="req" id="st-famount-req" style="display:none">必須</span></label>
+          <input type="number" step="1000" id="st-famount" value="${base ?? ""}" ${dis} oninput="updateTaxView2()"></div>
       </div>
       <div class="form-row"><label>税込価格（自動計算）</label>
         <input type="text" id="st-tax2" readonly class="ro" value="${base != null ? withTax(base).toLocaleString() + " 円" : ""}"></div>
       <div class="form-row"><label>受注条件（必要に応じて）</label>
         <textarea id="st-terms" rows="3" ${dis}>${esc(rec.terms)}</textarea></div>
       <label class="check-row ${doneDis ? "off" : ""}">
-        <input type="checkbox" id="st-done" ${doneDis}> この内容で登録し、受注確定する（状態を受託中にする）
+        <input type="checkbox" id="st-done" ${doneDis} onchange="onOrderDoneToggle()"> この内容で登録し、受注確定する（状態を受託中にする）
         ${holdMsg}
       </label>`;
+    onOrderDoneToggle();
     return;
   }
 
@@ -1718,18 +1769,19 @@ function renderStageBody() {
       <div class="form-grid">
         <div class="form-row"><label>開始日 <span class="req">必須</span></label>
           <input type="date" id="st-workstart" value="${fmtDateInput(rec.workStart)}" ${dis}></div>
-        <div class="form-row"><label>完了予定日</label>
+        <div class="form-row"><label>完了予定日 <span class="req" id="st-duedate-req" style="display:none">必須</span></label>
           <input type="date" id="st-duedate" value="${fmtDateInput(rec.dueDate)}" ${dis}></div>
-        <div class="form-row"><label>納品日</label>
+        <div class="form-row"><label>納品日 <span class="req" id="st-deliver2-req" style="display:none">必須</span></label>
           <input type="date" id="st-deliver2" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
-        <div class="form-row"><label>計上日 <span class="req">売上集計に使用</span></label>
+        <div class="form-row"><label>計上日 <span class="req" id="st-book2-req" style="display:none">必須</span></label>
           <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
       </div>
       <div class="date-order-hint">開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日 の順で入力してください</div>
       <label class="check-row ${doneDis ? "off" : ""}">
-        <input type="checkbox" id="st-done" ${doneDis}> 対応完了（完了日を記録し、チケットを完了する）
+        <input type="checkbox" id="st-done" ${doneDis} onchange="onWorkDoneToggle()"> 対応完了（完了日を記録し、チケットを完了する）
         ${holdMsg}
       </label>`;
+    onWorkDoneToggle();
     return;
   }
   body.innerHTML = "";
@@ -1878,17 +1930,18 @@ async function saveEditRecord() {
       rec.terms = document.getElementById("st-terms").value;
       const doneChk = document.getElementById("st-done");
       if (doneChk && doneChk.checked) {
-        if (!rec.book) { msg.className = "save-msg err"; msg.textContent = "計上日を入力してください（売上集計に使用します）"; return; }
-        if (rec.finalAmount == null) { msg.className = "save-msg err"; msg.textContent = "最終価格を入力してください"; return; }
-        /* 受託中へ切り替える前に、対応工数（人日）の値を確認する。
+        /* 受託中へ切り替える場合の必須項目：納品日／最終工数／最終価格／対応工数
            （確認メッセージはタブ切替時ではなく、この登録操作の時にのみ表示する） */
-        if (rec.workHours == null) {
+        const need = (id, label) => {
           msg.className = "save-msg err";
-          msg.textContent = "対応工数（人日）を入力してから受託中に切り替えてください";
-          const inp = document.getElementById("ed-workhours-top");
+          msg.textContent = `受託中に切り替える場合は「${label}」を入力してください`;
+          const inp = document.getElementById(id);
           if (inp) { inp.classList.add("need"); inp.focus(); }
-          return;
-        }
+        };
+        if (!rec.deliver) { need("st-deliver", "納品日"); return; }
+        if (rec.finalHours == null) { need("st-fhours", "最終工数（人日）"); return; }
+        if (rec.finalAmount == null) { need("st-famount", "最終価格"); return; }
+        if (rec.workHours == null) { need("ed-workhours-top", "対応工数（人日）"); return; }
         const ok = await uiConfirm(
           `対応工数（人日）: ${rec.workHours} 人日 で確定します。\nこの内容で登録し、状態を「受託中」にしますか？`);
         if (!ok) {
@@ -1921,14 +1974,18 @@ async function saveEditRecord() {
       rec.book = book;
       const doneChk = document.getElementById("st-done");
       if (doneChk && doneChk.checked) {
-        if (!workStart) { msg.className = "save-msg err"; msg.textContent = "開始日を入力してください"; return; }
-        if (rec.acceptHours == null) {
+        /* 完了にする場合の必須項目：開始日／完了予定日／納品日／計上日／受託工数 */
+        const need = (id, label) => {
           msg.className = "save-msg err";
-          msg.textContent = "完了にする場合は「受託工数（人日）」を入力してください";
-          const inp = document.getElementById("ed-accepthours-top");
+          msg.textContent = `完了にする場合は「${label}」を入力してください`;
+          const inp = document.getElementById(id);
           if (inp) { inp.classList.add("need"); inp.focus(); }
-          return;
-        }
+        };
+        if (!workStart) { need("st-workstart", "開始日"); return; }
+        if (!dueDate) { need("st-duedate", "完了予定日"); return; }
+        if (!deliver) { need("st-deliver2", "納品日"); return; }
+        if (!book) { need("st-book2", "計上日"); return; }
+        if (rec.acceptHours == null) { need("ed-accepthours-top", "受託工数（人日）"); return; }
         applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
       }
     }
