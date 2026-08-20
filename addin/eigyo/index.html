@@ -8,10 +8,10 @@
 
   <!-- 共通モジュール（タスク追加モーダル／タスク詳細・備考編集モーダル／ミニカンバン）
        カンバンアドインと同じファイルを読み込んで共有する -->
-  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806c">
-  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806c"></script>
+  <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260807g">
+  <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260807g"></script>
 
-  <link rel="stylesheet" href="style.css?v=20260806c">
+  <link rel="stylesheet" href="style.css?v=20260819a">
 </head>
 <body>
 
@@ -151,13 +151,18 @@
     <div class="modal-body">
       <div class="stepper" id="ed-stepper"></div>
 
-      <!-- 基本情報 -->
-      <div class="form-grid g3">
+      <!-- 基本情報（担当者の右に優先度を配置） -->
+      <div class="form-grid g4">
         <div class="form-row"><label>案件番号</label><input type="text" id="ed-id" readonly class="ro"></div>
         <div class="form-row"><label>取引先</label><input type="text" id="ed-client" readonly class="ro"></div>
         <div class="form-row"><label>担当者（現在の対応者）</label><select id="ed-owner"></select></div>
+        <div class="form-row"><label>優先度</label>
+          <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
+        </div>
+      </div>
+      <div class="form-grid g-type-status">
         <div class="form-row"><label>種別</label><select id="ed-type"></select></div>
-        <div class="form-row" style="grid-column: span 2;"><label>状態</label>
+        <div class="form-row"><label>状態</label>
           <div class="status-cell">
             <input type="text" id="ed-status" readonly class="ro">
             <label class="hold-check" id="ed-hold-wrap" title="状態は保持したまま保留にします">
@@ -168,11 +173,15 @@
       </div>
       <div class="hold-note" id="ed-hold-note" style="display:none"></div>
 
-      <!-- 優先度＋WBSタスク連携 -->
-      <div class="pri-row">
-        <div class="pri-fld">
-          <label>優先度</label>
-          <select id="ed-priority"><option value=""></option><option>高</option><option>中</option><option>低</option></select>
+      <!-- 対応工数／受託工数（見積り・プリセールスのみ表示）＋WBSタスク連携 -->
+      <div class="pri-row" id="ed-pri-row">
+        <div class="hours-fld-group" id="ed-hours-group" style="display:none">
+          <div class="form-row"><label>対応工数(人日)
+              <span class="req" id="ed-workhours-req" style="display:none">必須</span></label>
+            <input type="number" step="0.5" id="ed-workhours-top"></div>
+          <div class="form-row"><label>受託工数(人日)
+              <span class="req" id="ed-accepthours-req" style="display:none">必須</span></label>
+            <input type="number" step="0.5" id="ed-accepthours-top"></div>
         </div>
         <div class="task-actions">
           <button class="btn-tasklist" id="ed-tasklist-btn" onclick="toggleEdTaskPanel()">タスク一覧</button>
@@ -242,6 +251,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260806c"></script>
+<script src="app.js?v=20260819a"></script>
 </body>
 </html>
