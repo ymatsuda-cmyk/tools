@@ -120,13 +120,18 @@ body {
 }
 /* 案件番号／取引先／担当者を1行に並べる3列バリアント（案件編集モーダル用） */
 .form-grid.g3 { grid-template-columns: 1fr 1fr 1fr; }
+/* 案件番号／取引先／担当者／優先度を1行に並べる4列バリアント（案件編集モーダル用） */
+.form-grid.g4 { grid-template-columns: 1.1fr 1.3fr 1fr .62fr; }
+/* 種別／状態を1行に並べる（状態側を広めに） */
+.form-grid.g-type-status { grid-template-columns: 1fr 3fr; margin-bottom: 10px; }
 
-/* ---------- 優先度行＋WBSタスク連携ボタン ---------- */
+/* ---------- 対応工数／受託工数＋WBSタスク連携ボタン ---------- */
 .pri-row {
   display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap;
   margin-bottom: 10px;
 }
-.pri-row .pri-fld { width: 140px; flex: 0 0 auto; }
+.pri-row .hours-fld-group { display: flex; align-items: flex-end; gap: 8px; }
+.pri-row .hours-fld-group .form-row { margin-bottom: 0; width: 132px; }
 .pri-row .task-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 
 .btn-tasklist {

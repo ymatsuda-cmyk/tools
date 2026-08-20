@@ -17,10 +17,14 @@
  * 【更新管理】       AJ:最終更新日（保存の都度、自動打刻）
  * 【追加】           AK:見積有効期限（見積完了時は必須）
  *                    AL:保留（TRUE/空。状態(E)は本来の進捗を保持したまま保留を表す）
+ * 【工数（改修）】   AM:対応工数（人日）　AN:受託工数（人日）
+ *   ・保守対応／瑕疵対応／調整の「対応工数」は、旧K列（見積工数）の流用をやめ
+ *     AM列を専用に使用する（K列は見積り／プリセールスの見積工数のまま）。
+ *   ・受託工数（AN）は見積り／プリセールスの「受託中」ステージでのみ使用する。
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260807_g8d14c3";
+const APP_VERSION = "rev_20260819_b3f7a01";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const MAX_ROWS = 500;
@@ -83,9 +87,10 @@ const SHEET_COLUMNS = [
   "起票者", "見積完了日", "検討完了日", "商談完了日", "確認完了日",
   "受注確定日", "受託開始日", "完了予定日", "最終更新日",
   "見積有効期限", "保留",
+  "対応工数（人日）", "受託工数（人日）",
 ];
 /* シート範囲の最終列（列を増やすときはここだけ変える） */
-const LAST_COL = "AL";
+const LAST_COL = "AN";
 /* 旧バージョンで使っていた見出し文言（読み込み時の判定に使用、書込みはしない） */
 const EXT_HEADERS = SHEET_COLUMNS.slice(18); // S列以降（互換維持用）
 
@@ -412,6 +417,7 @@ async function loadAll() {
       }
     });
     await migrateHoldFlags();
+    await migrateWorkHours();
     await ensureCustomerSheet();
     await loadConfidenceRates();
     demoMode = false;
@@ -439,6 +445,29 @@ async function migrateHoldFlags() {
     console.info(`保留フラグを移行しました（${targets.length}件）。状態(E列)は手作業で本来の状態に戻してください。`);
   } catch (e) {
     console.warn("保留フラグの移行に失敗しました。", e);
+  }
+}
+
+/* ---------- 旧データ移行：対応工数（K列→AM列） ----------
+ * 保守対応／瑕疵対応／調整は、これまで見積工数（K列）を対応工数として
+ * 流用していたが、専用列（AM）へ移行する。AMが未入力の行のみK列の値を
+ * コピーする（既にAMに値がある行は上書きしない＝安全な移行）。 */
+async function migrateWorkHours() {
+  const targets = records.filter(r =>
+    ["保守対応", "瑕疵対応", "調整"].includes(r.type) &&
+    r.workHours == null && r.hours != null && r.row
+  );
+  if (!targets.length) return;
+  try {
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(SHEET_NAME);
+      targets.forEach(r => { sheet.getRange(`AM${r.row}`).values = [[r.hours]]; });
+      await ctx.sync();
+    });
+    targets.forEach(r => { r.workHours = r.hours; });
+    console.info(`対応工数（AM列）へ見積工数（K列）の値を移行しました（${targets.length}件）。`);
+  } catch (e) {
+    console.warn("対応工数の移行に失敗しました。", e);
   }
 }
 
@@ -471,6 +500,8 @@ function parseRows(values) {
       hold: holdCell || holdLegacy,
       holdLegacy,                    // 状態(E列)の手直しが必要な行
       holdWritten: holdCell,         // AL列に既にTRUEが入っているか
+      workHours: numOrNull(r[38]),   // AM: 対応工数（人日）
+      acceptHours: numOrNull(r[39]), // AN: 受託工数（人日）
     });
   });
   return out;
@@ -573,6 +604,7 @@ function recToRow(rec) {
     toSerial(rec.lastUpdate),
     toSerial(rec.quoteLimit),
     rec.hold ? "TRUE" : "",
+    rec.workHours ?? "", rec.acceptHours ?? "",
   ]];
 }
 
@@ -1476,8 +1508,27 @@ function refreshEditModal() {
       ? `保留中です。旧データのため<b>保留前の状態が不明</b>です。状態(E列)を本来の状態に直してください。`
       : `保留中です。本来の状態「<b>${esc(rec.status)}</b>」は保持されているので、保留を解除すればそのまま再開できます。`;
   }
+  renderHoursTop();
   renderStageTabs();
   renderStageBody();
+}
+
+/* 見積り／プリセールス：対応工数(人日)・受託工数(人日)（担当者行の右下、
+   タスク一覧／タスク追加ボタンと同じ並びに表示）
+   ・対応工数：「受託中」タブ以外で入力可（受託中はグレーアウト）
+   ・受託工数：「受託中」タブでのみ入力可（それ以外はグレーアウト） */
+function renderHoursTop() {
+  const rec = editingRec;
+  const group = document.getElementById("ed-hours-group");
+  if (!group) return;
+  const isQuote = QUOTE_TYPES.includes(rec.type);
+  group.style.display = isQuote ? "" : "none";
+  if (!isQuote) return;
+  const isAccepted = currentStageTab === "受託中";
+  const wh = document.getElementById("ed-workhours-top");
+  const ah = document.getElementById("ed-accepthours-top");
+  if (wh) { wh.value = rec.workHours ?? ""; wh.disabled = isAccepted; }
+  if (ah) { ah.value = rec.acceptHours ?? ""; ah.disabled = !isAccepted; }
 }
 
 /* 保留チェックの切替：状態は変えず、保留フラグのみを更新（登録で確定） */
@@ -1502,7 +1553,7 @@ function renderStageTabs() {
       onclick="setStageTab('${esc(t)}')">${esc(label)}${enabled || t === "起票" || dd ? "" : " 🔒"}</button>`;
   }).join("");
 }
-function setStageTab(t) { currentStageTab = t; renderStageTabs(); renderStageBody(); }
+function setStageTab(t) { currentStageTab = t; renderHoursTop(); renderStageTabs(); renderStageBody(); }
 
 /* ステージ担当者の変更を担当者欄に即時反映 */
 function syncOwner(sel) {
@@ -1580,7 +1631,7 @@ function renderStageBody() {
         <textarea id="st-progress" rows="4" ${dis}>${esc(rec.progress)}</textarea></div>
       ${t === "対応中" ? `
       <div class="form-row"><label>対応工数（人日）</label>
-        <input type="number" step="0.5" id="st-workhours" value="${rec.hours ?? ""}" ${dis}></div>` : ""}
+        <input type="number" step="0.5" id="st-workhours" value="${rec.workHours ?? ""}" ${dis}></div>` : ""}
       ${isQuote ? `
       <div class="form-grid">
         <div class="form-row"><label>工数（人日）</label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
@@ -1703,6 +1754,12 @@ async function saveEditRecord() {
   rec.owner = document.getElementById("ed-owner").value;
   rec.priority = document.getElementById("ed-priority").value;
   rec.note = document.getElementById("ed-note").value;
+  if (QUOTE_TYPES.includes(rec.type)) {
+    const whTop = document.getElementById("ed-workhours-top");
+    const ahTop = document.getElementById("ed-accepthours-top");
+    if (whTop) rec.workHours = numOrNull(whTop.value);
+    if (ahTop) rec.acceptHours = numOrNull(ahTop.value);
+  }
   const holdCb = document.getElementById("ed-hold");
   if (holdCb && QUOTE_TYPES.includes(rec.type)) rec.hold = holdCb.checked;
   /* 状態が本来の値に直されたら、旧データ目印は外す */
@@ -1747,7 +1804,7 @@ async function saveEditRecord() {
       }
       if (t === "対応中") {
         const wh = document.getElementById("st-workhours");
-        if (wh) rec.hours = numOrNull(wh.value);   // 対応工数（人日）
+        if (wh) rec.workHours = numOrNull(wh.value);   // 対応工数（人日）※AM列。旧K列(見積工数)とは別管理
       }
       if (rec.status === "新規" && progress.trim() && !isHold(rec)) {
         rec.status = t;
@@ -1814,6 +1871,20 @@ async function saveEditRecord() {
       if (doneChk && doneChk.checked) {
         if (!rec.book) { msg.className = "save-msg err"; msg.textContent = "計上日を入力してください（売上集計に使用します）"; return; }
         if (rec.finalAmount == null) { msg.className = "save-msg err"; msg.textContent = "最終価格を入力してください"; return; }
+        /* 受託中へ切り替える前に、対応工数（人日）の値を確認する。
+           （確認メッセージはタブ切替時ではなく、この登録操作の時にのみ表示する） */
+        if (rec.workHours == null) {
+          msg.className = "save-msg err";
+          msg.textContent = "対応工数（人日）を入力してから受託中に切り替えてください";
+          return;
+        }
+        const ok = await uiConfirm(
+          `対応工数（人日）: ${rec.workHours} 人日 で確定します。\nこの内容で登録し、状態を「受託中」にしますか？`);
+        if (!ok) {
+          msg.className = "save-msg";
+          msg.textContent = "登録を中止しました";
+          return;
+        }
         rec.orderDone = new Date();          // 受注確定日
         applyStatus(rec, "受託中");          // 状態=受託中（受託中タブが活性化）
       }
@@ -1966,7 +2037,7 @@ function renderHoshuAgg() {
   const doneSeries = countByMonth(target, "done", months);
 
   // 対応工数（人日）の月次集計：着手日ベース（無ければ完了日→発生日）
-  const hours = sumByMonth(target, "hours", "stageStart", months);
+  const hours = sumByMonth(target, "workHours", "stageStart", months);
   const totalHoursR = Math.round(hours.reduce((a, v) => a + v, 0) * 10) / 10;
 
   return `
@@ -2029,7 +2100,7 @@ function renderMaintList(target) {
     (!maintF.month || (r.occur && monthKey(r.occur) === maintF.month))
   ).sort((a, b) => (b.occur || 0) - (a.occur || 0));
 
-  const hoursSum = Math.round(rows.reduce((a, r) => a + (Number(r.hours) || 0), 0) * 10) / 10;
+  const hoursSum = Math.round(rows.reduce((a, r) => a + (Number(r.workHours) || 0), 0) * 10) / 10;
   const cnt = k => rows.filter(r => maintKindOf(r) === k).length;
 
   const chip = (which, v, on) =>
@@ -2067,7 +2138,7 @@ function renderMaintList(target) {
           <td class="l">${esc(shorten(r.content, 26))}</td>
           <td>${r.occur ? monthKey(r.occur) : '<span class="muted">－</span>'}</td>
           <td><span class="kind-tag k-${esc(maintKindOf(r))}">${esc(maintKindOf(r))}</span></td>
-          <td class="r">${r.hours != null && r.hours !== "" ? r.hours : '<span class="muted">－</span>'}</td>
+          <td class="r">${r.workHours != null && r.workHours !== "" ? r.workHours : '<span class="muted">－</span>'}</td>
           <td><span class="status-pill st-${esc(effectiveStatus(r))}">${esc(statusLabel(r))}</span></td>
         </tr>`).join("") : `<tr><td colspan="7" class="muted">条件に一致する案件がありません</td></tr>`}
       </table>
@@ -2597,7 +2668,8 @@ function loadDemo() {
     finalHours: null, finalAmount: null, terms: "", reporter: "",
     quoteDone: null, considerDone: null, dealDone: null, confirmDone: null,
     orderDone: null, workStart: null, dueDate: null, lastUpdate: null,
-    quoteLimit: null, hold: false, holdLegacy: false, holdWritten: false };
+    quoteLimit: null, hold: false, holdLegacy: false, holdWritten: false,
+    workHours: null, acceptHours: null };
   const today = new Date();
   const daysAgo = n => { const dd = new Date(today); dd.setDate(dd.getDate() - n); return dd; };
   const daysFromNow = n => { const dd = new Date(today); dd.setDate(dd.getDate() + n); return dd; };
@@ -2608,17 +2680,17 @@ function loadDemo() {
     { row: 5, code: "EX", name: "エキスプレス", contact: "中道様", note: "" },
   ];
   records = [
-    { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1), amount: 480000, quoteLimit: daysAgo(12) },
+    { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1), amount: 480000, quoteLimit: daysAgo(12), workHours: 3 },
     { ...blank, row: 3, id: "KM-02", client: "kakimoto arms", no: 2, type: "見積り", status: "確認中", occur: d(2026, 6, 18), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: 8, amount: 600000, order: "受注", deliver: d(2026, 7, 17), content: "ネット予約LINEログイン連携", progress: "60万で提示", note: "", memo: "", stageStart: d(2026, 6, 20), quoteDone: d(2026, 7, 1), confirmDone: d(2026, 7, 8), confirm: "受注の内諾。最終登録待ち", book: d(2026, 7, 31), finalAmount: 600000, finalHours: 8 },
-    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", hours: 0.5, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
-    { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
-    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", hours: 2, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
-    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", hours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
+    { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", workHours: 0.5, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
+    { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
+    { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", workHours: 2, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
+    { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", workHours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
     { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定", hold: true },
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日", quoteLimit: daysFromNow(5) },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
-    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31) },
+    { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31), workHours: 6, acceptHours: 4 },
     { ...blank, row: 13, id: "HN-04", client: "ハンター製菓", no: 4, type: "見積り", status: "保留", occur: d(2026, 5, 12), done: null, owner: "紺谷", reporter: "紺谷", contact: "柳澤様", priority: "中", hours: 3, amount: 220000, order: "", deliver: null, content: "旧データ：状態が保留のまま移行された案件", progress: "先方都合で一旦停止", note: "", memo: "", stageStart: d(2026, 5, 14), hold: true, holdLegacy: true },
     { ...blank, row: 14, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20) },
   ];
