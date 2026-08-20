@@ -22,11 +22,22 @@
  *     AM列を専用に使用する（K列は見積り／プリセールスの見積工数のまま）。
  *   ・受託工数（AN）は見積り／プリセールスの「受託中」ステージでのみ使用する。
  * 顧客マスタ: 「顧客マスタ」シート（無ければ自動作成）
+ *   A:顧客コード B:取引先名 C:窓口 D:備考
+ *   E:保守費（月額・円）　F:許容工数（人日/月）　… 稼働状況「対応工数（保守）」で使用
+ * 体制: 「体制」シート（無ければ自動作成、要員数の月次算出に使用）
+ *   A:氏名 B:稼働開始日 C:稼働終了日（空欄=在籍中）
+ * 祝日: 「祝日」シート（無ければ自動作成、営業日数の月次算出に使用）
+ *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260819_b3f7a01";
+const APP_VERSION = "rev_20260820_c1e9d02";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
+const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
+const STAFF_SHEET = "体制";
+const STAFF_COLUMNS = ["氏名", "稼働開始日", "稼働終了日"];
+const HOLIDAY_SHEET = "祝日";
+const HOLIDAY_COLUMNS = ["日付", "名称"];
 const MAX_ROWS = 500;
 const TAX_RATE = 0.10;
 
@@ -115,6 +126,8 @@ let currentTerm = termOfDate(new Date());
 /* ---------- 状態 ---------- */
 let records = [];
 let customers = [];
+let staff = [];              // 体制シート: {row, name, start, end}
+let holidays = new Set();    // 祝日シート: "YYYY-MM-DD" のSet
 let demoMode = false;
 let editingRec = null;
 let currentStageTab = null;
@@ -419,6 +432,8 @@ async function loadAll() {
     await migrateHoldFlags();
     await migrateWorkHours();
     await ensureCustomerSheet();
+    await ensureStaffSheet();
+    await ensureHolidaySheet();
     await loadConfidenceRates();
     demoMode = false;
   } catch (e) {
@@ -524,24 +539,91 @@ async function ensureCustomerSheet() {
     let ws = sheets.items.find(s => s.name === CUST_SHEET);
     if (!ws) {
       const ns = sheets.add(CUST_SHEET);
-      ns.getRange("A1:D1").values = [["顧客コード", "取引先名", "窓口", "備考"]];
-      ns.getRange("A1:D1").format.fill.color = "#44546A";
-      ns.getRange("A1:D1").format.font.color = "#FFFFFF";
+      ns.getRange("A1:F1").values = [CUST_COLUMNS];
+      ns.getRange("A1:F1").format.fill.color = "#44546A";
+      ns.getRange("A1:F1").format.font.color = "#FFFFFF";
       const seed = {};
       records.forEach(r => {
         const code = (r.id || "").split("-")[0];
         if (code && r.client && !seed[code]) seed[code] = r.client;
       });
-      const rows = Object.entries(seed).map(([code, name]) => [code, name, "", ""]);
-      if (rows.length) ns.getRange(`A2:D${rows.length + 1}`).values = rows;
+      const rows = Object.entries(seed).map(([code, name]) => [code, name, "", "", "", ""]);
+      if (rows.length) ns.getRange(`A2:F${rows.length + 1}`).values = rows;
       await ctx.sync();
+    } else {
+      // 旧バージョン（A〜D列のみ）からの見出し整備: E・F列が無ければ追加する
+      const hdr = ctx.workbook.worksheets.getItem(CUST_SHEET).getRange("A1:F1");
+      hdr.load("values");
+      await ctx.sync();
+      const cur = hdr.values[0];
+      const mismatch = CUST_COLUMNS.some((h, i) => (cur[i] || "").toString().trim() !== h);
+      if (mismatch) {
+        hdr.values = [CUST_COLUMNS];
+        hdr.format.fill.color = "#44546A";
+        hdr.format.font.color = "#FFFFFF";
+        await ctx.sync();
+      }
     }
-    const rng = ctx.workbook.worksheets.getItem(CUST_SHEET).getRange("A2:D200");
+    const rng = ctx.workbook.worksheets.getItem(CUST_SHEET).getRange("A2:F200");
     rng.load("values");
     await ctx.sync();
     customers = rng.values
-      .map((r, i) => ({ row: i + 2, code: str(r[0]), name: str(r[1]), contact: str(r[2]), note: str(r[3]) }))
+      .map((r, i) => ({
+        row: i + 2, code: str(r[0]), name: str(r[1]), contact: str(r[2]), note: str(r[3]),
+        hoshuFee: numOrNull(r[4]), hoshuAllow: numOrNull(r[5]),
+      }))
       .filter(c => c.code && c.name);
+  });
+}
+
+/* ---------- 体制シート（要員数） ----------
+ * 1行=1名。稼働終了日が空欄の場合は在籍中として扱う。
+ * 月の要員数は、その月に稼働期間が重なる人数でカウントする。 */
+async function ensureStaffSheet() {
+  await Excel.run(async ctx => {
+    const sheets = ctx.workbook.worksheets;
+    sheets.load("items/name");
+    await ctx.sync();
+    let ws = sheets.items.find(s => s.name === STAFF_SHEET);
+    if (!ws) {
+      const ns = sheets.add(STAFF_SHEET);
+      ns.getRange("A1:C1").values = [STAFF_COLUMNS];
+      ns.getRange("A1:C1").format.fill.color = "#44546A";
+      ns.getRange("A1:C1").format.font.color = "#FFFFFF";
+      await ctx.sync();
+    }
+    const rng = ctx.workbook.worksheets.getItem(STAFF_SHEET).getRange("A2:C300");
+    rng.load("values");
+    await ctx.sync();
+    staff = rng.values
+      .map((r, i) => ({ row: i + 2, name: str(r[0]), start: toDate(r[1]), end: toDate(r[2]) }))
+      .filter(s => s.name);
+  });
+}
+
+/* ---------- 祝日シート ----------
+ * A列に日付を列挙する（B列は任意の名称メモ）。土日祝を除いた営業日数の算出に使用。 */
+async function ensureHolidaySheet() {
+  await Excel.run(async ctx => {
+    const sheets = ctx.workbook.worksheets;
+    sheets.load("items/name");
+    await ctx.sync();
+    let ws = sheets.items.find(s => s.name === HOLIDAY_SHEET);
+    if (!ws) {
+      const ns = sheets.add(HOLIDAY_SHEET);
+      ns.getRange("A1:B1").values = [HOLIDAY_COLUMNS];
+      ns.getRange("A1:B1").format.fill.color = "#44546A";
+      ns.getRange("A1:B1").format.font.color = "#FFFFFF";
+      await ctx.sync();
+    }
+    const rng = ctx.workbook.worksheets.getItem(HOLIDAY_SHEET).getRange("A2:B1000");
+    rng.load("values");
+    await ctx.sync();
+    holidays = new Set();
+    rng.values.forEach(r => {
+      const d = toDate(r[0]);
+      if (d) holidays.add(dateKey(d));
+    });
   });
 }
 
@@ -2110,27 +2192,30 @@ function switchMitsuSub(v) {
 function switchAgg(k) {
   currentAgg = k;
   if (k !== "mitsu") { mitsuOpenStatus = null; mitsuOpenPri = null; }
+  if (k !== "kado") kadoUketakuOpen = null;
   document.querySelectorAll(".agg-seg .seg").forEach(b => b.classList.toggle("active", b.dataset.agg === k));
   renderAgg();
 }
 function toggleHours(cb) { showHours = cb.checked; renderAgg(); }
 function shiftTerm(d) { currentTerm += d; renderAgg(); }
-function termBarHtml() {
+function termBarHtml(showHoursToggle) {
+  if (showHoursToggle === undefined) showHoursToggle = true;
   return `<div class="term-bar">
     <button class="term-btn" onclick="shiftTerm(-1)">◀</button>
     <span class="term-label">${esc(termLabel(currentTerm))}</span>
     <button class="term-btn" onclick="shiftTerm(1)">▶</button>
-    <span class="term-bar-sep"></span>
+    ${showHoursToggle ? `<span class="term-bar-sep"></span>
     <label class="hours-toggle" title="保守状況の対応工数の表示を切り替え">
       <input type="checkbox" id="hours-toggle-cb" ${showHours ? "checked" : ""} onchange="toggleHours(this)"> 工数表示
-    </label>
+    </label>` : ""}
   </div>`;
 }
 function renderAgg() {
   const cont = document.getElementById("agg-container");
   if (currentAgg === "hoshu") cont.innerHTML = termBarHtml() + renderHoshuAgg();
   else if (currentAgg === "mitsu") cont.innerHTML = renderMitsuAgg();
-  else cont.innerHTML = termBarHtml() + renderJuchuAgg();
+  else if (currentAgg === "uriage") cont.innerHTML = termBarHtml() + renderJuchuAgg();
+  else cont.innerHTML = termBarHtml(false) + renderKadoAgg();
 }
 
 /* --- 保守状況 --- */
@@ -2779,6 +2864,473 @@ function sumByMonth(recs, valField, dateField, months) {
 }
 
 /* ============================================================
+   稼働状況（全体キャパ／対応工数(保守)／受託工数）
+   ------------------------------------------------------------
+   ・全体キャパ: 基本稼働（体制シートの要員数 × 祝日シート反映後の営業日数）に対し、
+     対応工数(保守・瑕疵・調整)と受託工数(見積り/プリセールスの受託中・完了)の
+     積み上げがどれだけ収まっているか／溢れているかを月次で可視化する。
+   ・対応工数(保守): 顧客マスタの保守費・許容工数(月次)と対応工数(AM列)の実績を
+     取引先別に「月次」（グレー帯超過表示）／「累計」（貯金・借金）で比較する。
+   ・受託工数: 見積り/プリセールスの受託中・完了案件を取引先別に集約し、
+     受注額・見積工数(AM列＝受注確定時点の見積)・実績工数(AN列)から消化率を示す。
+     行をクリックすると案件別の予実一覧を下に展開する。
+   ============================================================ */
+
+/* ---------- 日付・営業日ユーティリティ ---------- */
+function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function isBusinessDay(d) {
+  const wd = d.getDay();
+  if (wd === 0 || wd === 6) return false;
+  return !holidays.has(dateKey(d));
+}
+function businessDaysInMonth(y, m) {
+  let c = 0;
+  const last = new Date(y, m, 0).getDate();
+  for (let day = 1; day <= last; day++) if (isBusinessDay(new Date(y, m - 1, day))) c++;
+  return c;
+}
+function staffCountInMonth(y, m) {
+  const mStart = new Date(y, m - 1, 1), mEnd = new Date(y, m, 0);
+  return staff.filter(s => (!s.start || s.start <= mEnd) && (!s.end || s.end >= mStart)).length;
+}
+function ymOfKey(key) { const [y, m] = key.split("/").map(Number); return { y, m }; }
+function capacityOfMonthKey(key) {
+  const { y, m } = ymOfKey(key);
+  return businessDaysInMonth(y, m) * staffCountInMonth(y, m);
+}
+/* 期のうち既に経過した月数（未来の期は0、過去の期は12＝全月経過扱い） */
+function elapsedMonthsOfTerm(term, months) {
+  const curTerm = termOfDate(new Date());
+  if (term < curTerm) return months.length;
+  if (term > curTerm) return 0;
+  const idx = months.indexOf(monthKey(new Date()));
+  return idx >= 0 ? idx + 1 : months.length;
+}
+/* start〜end の工数を、月毎の重なり日数の比で按分する */
+function spreadAcrossMonths(hours, start, end, months) {
+  const out = Object.fromEntries(months.map(m => [m, 0]));
+  if (!start || !hours) return out;
+  const e = end && end >= start ? end : start;
+  const totalDays = Math.max(1, Math.round((e - start) / 86400000) + 1);
+  months.forEach(key => {
+    const { y, m } = ymOfKey(key);
+    const mStart = new Date(y, m - 1, 1), mEnd = new Date(y, m, 0);
+    const ovStart = start > mStart ? start : mStart;
+    const ovEnd = e < mEnd ? e : mEnd;
+    const days = Math.round((ovEnd - ovStart) / 86400000) + 1;
+    if (days > 0) out[key] += hours * days / totalDays;
+  });
+  return out;
+}
+
+/* ---------- 状態 ---------- */
+let kadoView = "capacity";      // capacity(全体キャパ) | hoshu(対応工数) | uketaku(受託工数)
+let kadoHoshuMode = "month";    // month(月次) | cum(累計)
+let kadoHoshuTypes = [];        // 対応工数の種別フィルタ（空=すべて）
+let kadoUketakuOpen = null;     // 受託工数：予実一覧を展開中の取引先
+const KADO_HOSHU_TYPES = ["保守対応", "瑕疵対応", "調整"];
+const KADO_TYPE_LABEL = { "保守対応": "保守", "瑕疵対応": "瑕疵", "調整": "調整" };
+
+function switchKadoView(v) { kadoView = v; renderAgg(); }
+function switchKadoHoshuMode(v) { kadoHoshuMode = v; renderAgg(); }
+function toggleKadoType(v) {
+  const i = kadoHoshuTypes.indexOf(v);
+  if (i >= 0) kadoHoshuTypes.splice(i, 1); else kadoHoshuTypes.push(v);
+  renderAgg();
+}
+function clearKadoTypes() { kadoHoshuTypes = []; renderAgg(); }
+function toggleKadoClient(name) { kadoUketakuOpen = (kadoUketakuOpen === name) ? null : name; renderAgg(); }
+
+function renderKadoAgg() {
+  const seg = `<div class="sched-seg kado-view-seg">
+    <button class="seg${kadoView === "capacity" ? " active" : ""}" onclick="switchKadoView('capacity')">全体キャパ</button>
+    <button class="seg${kadoView === "hoshu" ? " active" : ""}" onclick="switchKadoView('hoshu')">対応工数（保守）</button>
+    <button class="seg${kadoView === "uketaku" ? " active" : ""}" onclick="switchKadoView('uketaku')">受託工数</button>
+  </div>`;
+  if (kadoView === "hoshu") return seg + renderKadoHoshu();
+  if (kadoView === "uketaku") return seg + renderKadoUketaku();
+  return seg + renderKadoCapacity();
+}
+
+/* --- 全体キャパ --- */
+function kadoHoshuMonthly(months, types) {
+  const useTypes = types && types.length ? types : KADO_HOSHU_TYPES;
+  const target = activeRecords().filter(r => useTypes.includes(r.type));
+  return sumByMonth(target, "workHours", "stageStart", months);
+}
+/* 受託工数の月次分布: 完了は実績(AN)、受託中は見積(AM)を、受託開始日〜完了(予定)日で按分 */
+function kadoUketakuMonthly(months) {
+  const totals = Object.fromEntries(months.map(m => [m, 0]));
+  const target = activeRecords().filter(r =>
+    QUOTE_TYPES.includes(r.type) && ["受託中", "完了"].includes(r.status) && r.workStart);
+  target.forEach(r => {
+    const isDone = r.status === "完了";
+    const hours = isDone ? r.acceptHours : r.workHours;
+    if (hours == null) return;
+    const end = isDone ? (r.done || r.workStart) : (r.dueDate || r.workStart);
+    const dist = spreadAcrossMonths(hours, r.workStart, end, months);
+    months.forEach(m => totals[m] += dist[m]);
+  });
+  return months.map(m => Math.round(totals[m] * 10) / 10);
+}
+function renderKadoCapacity() {
+  const months = fiscalMonths(currentTerm);
+  const hoshuSeries = kadoHoshuMonthly(months, []);
+  const uketakuSeries = kadoUketakuMonthly(months);
+  const capaSeries = months.map(m => capacityOfMonthKey(m));
+  const elapsed = elapsedMonthsOfTerm(currentTerm, months);
+  const noStaff = staff.length === 0;
+
+  let overMonths = 0, overSum = 0;
+  const rows = months.map((m, i) => {
+    const hoshu = hoshuSeries[i], uketaku = uketakuSeries[i];
+    const total = Math.round((hoshu + uketaku) * 10) / 10;
+    const capa = capaSeries[i];
+    const diff = Math.round((total - capa) * 10) / 10;
+    const elap = i < elapsed;
+    if (elap && diff > 0) { overMonths++; overSum += diff; }
+    return { m, hoshu, uketaku, total, capa, diff, elap };
+  });
+  const totalActual = Math.round(rows.filter(r => r.elap).reduce((a, r) => a + r.total, 0) * 10) / 10;
+  const totalCapa = Math.round(rows.filter(r => r.elap).reduce((a, r) => a + r.capa, 0) * 10) / 10;
+
+  const warn = noStaff ? `<div class="agg-card kado-warn">
+      <b>「体制」シートに要員データがありません。</b> 氏名・稼働開始日（・稼働終了日）を入力すると、
+      基本稼働（営業日数×要員数）が算出されます。現在は要員数0人として扱われるため、基本稼働は0人日と表示されています。
+    </div>` : "";
+
+  return `
+    ${warn}
+    <div class="kpi-row">
+      <div class="kpi"><div class="kv">${totalCapa}</div><div class="kl">基本稼働（人日・経過${elapsed}ヶ月）</div></div>
+      <div class="kpi"><div class="kv">${totalActual}</div><div class="kl">実績合計（保守＋受託・人日）</div></div>
+      <div class="kpi ${overMonths ? "kpi-alert" : ""}"><div class="kv">${overMonths}</div><div class="kl">溢れた月数（経過月中）</div></div>
+      <div class="kpi ${overSum > 0 ? "kpi-alert" : ""}"><div class="kv">${overMonths ? "+" + (Math.round(overSum * 10) / 10) : 0}</div><div class="kl">溢れ合計（人日）</div></div>
+    </div>
+    <div class="agg-card">
+      <h3>月次キャパシティ（対応工数＋受託工数 vs 基本稼働）</h3>
+      ${legendHtml({ "対応工数（保守）": "#2c6e9b", "受託工数": "#b7791f" }, { "基本稼働（営業日×要員数）": "line:#44546A" })}
+      <div class="chart-wrap">${capacityStackChart(months,
+        { "対応工数（保守）": hoshuSeries, "受託工数": uketakuSeries },
+        { "対応工数（保守）": "#2c6e9b", "受託工数": "#b7791f" }, capaSeries, elapsed)}</div>
+      <p style="font-size:10px;color:#a9b2ba;margin-top:4px">
+        基本稼働＝その月の営業日数（祝日シート反映・土日祝を除く）×体制シートの稼働人数（1人日＝8時間換算）。<br>
+        対応工数は保守対応・瑕疵対応・調整の対応工数（着手月ベース）。受託工数は見積り/プリセールスの受託中・完了案件の工数を、受託開始日〜完了(予定)日の日数比で按分（受託中は見積工数、完了は実績工数を使用。開始日未確定の案件は含まれません）。<br>
+        「その他（社内業務・営業活動等）」の工数は現状未計上のため、実際の基本稼働との差はここに表示される値より小さくなる場合があります。
+      </p>
+    </div>
+    <div class="agg-card">
+      <h3>月別内訳</h3>
+      <table class="agg-table">
+        <tr><th>月</th><th>営業日</th><th>要員数</th><th>基本稼働</th><th>対応工数(保守)</th><th>受託工数</th><th>合計</th><th>差分</th></tr>
+        ${rows.map(r => {
+          const { y, m } = ymOfKey(r.m);
+          return `<tr${r.elap ? "" : ' style="color:#b5bbc2"'}>
+            <td>${m}月</td><td>${businessDaysInMonth(y, m)}</td><td>${staffCountInMonth(y, m)}</td>
+            <td>${r.capa}</td><td class="r">${Math.round(r.hoshu * 10) / 10}</td>
+            <td class="r">${Math.round(r.uketaku * 10) / 10}</td><td class="r"><b>${r.total}</b></td>
+            <td class="r" style="color:${r.diff > 0 ? '#c0392b' : '#0e7a5f'};font-weight:bold">${r.diff > 0 ? "+" + r.diff : r.diff}</td>
+          </tr>`;
+        }).join("")}
+      </table>
+    </div>`;
+}
+/* --- SVG 積み上げ棒（対応工数＋受託工数）＋ 基本稼働ライン ＋ 溢れ表示 --- */
+function capacityStackChart(labels, stack, colors, capaSeries, elapsedCount) {
+  const names = Object.keys(stack);
+  const W = Math.max(560, labels.length * 48), H = 210;
+  const padL = 30, padR = 8, padT = 22, padB = 26;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const totals = labels.map((_, i) => names.reduce((a, n) => a + (stack[n][i] || 0), 0));
+  const maxV = Math.max(1, ...totals, ...capaSeries) * 1.12;
+  const step = chartW / labels.length;
+  const bw = Math.min(26, step * 0.56);
+  const cx = i => padL + step * (i + 0.5);
+  const y = v => padT + chartH - chartH * v / maxV;
+  let grid = "", bars = "", xlab = "", overs = "";
+  for (let g = 0; g <= 4; g++) {
+    const yy = padT + chartH - chartH * g / 4;
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#eceff2"/>` +
+      `<text x="${padL - 4}" y="${yy + 3}" font-size="8" text-anchor="end" fill="#999">${Math.round(maxV * g / 4)}</text>`;
+  }
+  labels.forEach((lb, i) => {
+    let acc = 0;
+    const isFuture = i >= elapsedCount;
+    names.forEach(n => {
+      const v = stack[n][i] || 0;
+      if (!v) return;
+      const top = y(acc + v), bot = y(acc);
+      bars += `<rect x="${cx(i) - bw / 2}" y="${top}" width="${bw}" height="${Math.max(bot - top, 0.5)}"
+        fill="${colors[n]}" opacity="${isFuture ? 0.35 : 1}"><title>${lb} ${n}: ${Math.round(v * 10) / 10}人日</title></rect>`;
+      acc += v;
+    });
+    const capa = capaSeries[i];
+    if (!isFuture && acc > capa + 0.05) {
+      overs += `<rect x="${cx(i) - bw / 2 - 2}" y="${y(acc) - 1}" width="${bw + 4}" height="${Math.max(y(capa) - y(acc), 0) + 2}"
+        fill="none" stroke="#c0392b" stroke-width="1.4" rx="3"/>`;
+      overs += `<text x="${cx(i)}" y="${y(acc) - 14}" font-size="8.5" text-anchor="middle" fill="#c0392b" font-weight="bold">溢れ</text>`;
+      overs += `<text x="${cx(i)}" y="${y(acc) - 5}" font-size="8" text-anchor="middle" fill="#c0392b">+${Math.round((acc - capa) * 10) / 10}</text>`;
+    }
+    xlab += `<text x="${cx(i)}" y="${H - 8}" font-size="8.5" text-anchor="middle" fill="#667">${lb.slice(2)}</text>`;
+  });
+  const pts = capaSeries.map((v, i) => `${cx(i)},${y(v)}`).join(" ");
+  const line = `<polyline points="${pts}" fill="none" stroke="#44546A" stroke-width="2" stroke-dasharray="5 3"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%">
+    ${grid}${bars}${line}${overs}${xlab}
+    <line x1="${padL}" y1="${padT + chartH}" x2="${W - padR}" y2="${padT + chartH}" stroke="#c5d2d8"/></svg>`;
+}
+
+/* --- 対応工数（保守）: 取引先別 月次／累計 --- */
+function renderKadoHoshu() {
+  const months = fiscalMonths(currentTerm);
+  const elapsed = elapsedMonthsOfTerm(currentTerm, months);
+  const useTypes = kadoHoshuTypes.length ? kadoHoshuTypes : KADO_HOSHU_TYPES;
+  const target = activeRecords().filter(r => useTypes.includes(r.type));
+  const clientNames = [...new Set(target.map(r => r.client).filter(Boolean))];
+  const configured = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
+  const unconfiguredCount = clientNames.filter(name => !configured.some(c => c.name === name)).length;
+
+  let sumActual = 0, sumAllow = 0, sumDiffYen = 0;
+  const overClients = [];
+  const clientRows = configured.map(c => {
+    const recs = target.filter(r => r.client === c.name);
+    const monthly = sumByMonth(recs, "workHours", "stageStart", months);
+    const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
+    const allowElapsed = Math.round(c.hoshuAllow * elapsed * 10) / 10;
+    const unit = c.hoshuAllow > 0 ? (c.hoshuFee || 0) / c.hoshuAllow : 0;
+    const diffYen = Math.round((allowElapsed - actualElapsed) * unit);
+    sumActual += actualElapsed; sumAllow += allowElapsed; sumDiffYen += diffYen;
+    const overMonthCount = monthly.slice(0, elapsed).filter(v => v > c.hoshuAllow + 0.001).length;
+    if (actualElapsed > allowElapsed) overClients.push(c.name);
+    return { c, monthly, actualElapsed, allowElapsed, diffYen, overMonthCount };
+  });
+  sumActual = Math.round(sumActual * 10) / 10;
+  sumAllow = Math.round(sumAllow * 10) / 10;
+
+  const chip = (v, on) => `<button class="fchip${on ? " on" : ""}" onclick="toggleKadoType('${esc(v)}')">${esc(KADO_TYPE_LABEL[v])}</button>`;
+
+  const rowsHtml = clientRows.map(({ c, monthly, actualElapsed, allowElapsed, diffYen, overMonthCount }) => {
+    const cumOver = actualElapsed > allowElapsed;      // 保守費乖離（金額）の色分け用：常に累計基準
+    const badgeOver = kadoHoshuMode === "month" ? overMonthCount > 0 : cumOver;  // バッジは表示モードに応じて基準を切替
+    const pct = allowElapsed > 0 ? Math.round(actualElapsed / allowElapsed * 100) : 0;
+    const chart = kadoHoshuMode === "month"
+      ? bandBarChart(months, monthly, c.hoshuAllow, elapsed)
+      : cumulativeBandChart(months, monthly, c.hoshuAllow, elapsed);
+    return `
+    <div class="kado-row">
+      <div class="kado-name"><b>${esc(c.name)}</b>
+        <div class="kado-sub">${c.hoshuFee ? Math.round(c.hoshuFee / 10000).toLocaleString() + "万/月" : "－"}　許容 ${c.hoshuAllow}人日/月</div></div>
+      <div class="kado-chart">${chart}</div>
+      <div class="kado-stat">
+        <span class="badge-pill ${badgeOver ? "over" : "ok"}">${badgeOver
+          ? (kadoHoshuMode === "month" ? `月次超過 ${overMonthCount}回` : "累計 超過")
+          : (kadoHoshuMode === "month" ? "全月 範囲内" : "累計 範囲内")}</span>
+        <div class="kado-t">${kadoHoshuMode === "month"
+          ? `月次で許容超えた回数 ${overMonthCount}回`
+          : `累計 ${actualElapsed} / ${allowElapsed} 人日（${pct}%）`}</div>
+        <div class="kado-d" style="color:${cumOver ? "#c0392b" : "#0e7a5f"}">
+          ${cumOver ? `保守費 超過 ${Math.abs(diffYen).toLocaleString()}円` : `保守費 残 ${diffYen.toLocaleString()}円`}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+    <div class="agg-filters" style="margin-bottom:10px">
+      <div class="af-row"><span class="af-label">分類</span>
+        <div class="fchips">
+          <button class="fchip clear${kadoHoshuTypes.length ? "" : " on"}" onclick="clearKadoTypes()">すべて</button>
+          ${KADO_HOSHU_TYPES.map(t => chip(t, kadoHoshuTypes.includes(t))).join("")}
+        </div></div>
+      <div class="af-row"><span class="af-label">表示</span>
+        <div class="seg-inline">
+          <button class="seg${kadoHoshuMode === "month" ? " active" : ""}" onclick="switchKadoHoshuMode('month')">月次</button>
+          <button class="seg${kadoHoshuMode === "cum" ? " active" : ""}" onclick="switchKadoHoshuMode('cum')">累計</button>
+        </div></div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kv">${sumActual}<span style="font-size:12px"> / ${sumAllow}</span></div><div class="kl">実績 / 許容（人日・経過${elapsed}ヶ月）</div></div>
+      <div class="kpi ${sumDiffYen < 0 ? "kpi-alert" : ""}"><div class="kv">${sumDiffYen >= 0 ? "+" : ""}${sumDiffYen.toLocaleString()}</div><div class="kl">保守費との乖離（円）</div></div>
+      <div class="kpi ${overClients.length ? "kpi-alert" : ""}"><div class="kv">${overClients.length}</div><div class="kl">超過している取引先</div></div>
+      <div class="kpi"><div class="kv">${configured.length}</div><div class="kl">保守費設定済み取引先</div></div>
+    </div>
+    ${unconfiguredCount ? `<p class="kado-note">「顧客マスタ」シートに許容工数が未設定の取引先が ${unconfiguredCount} 件あります（一覧には表示されません）。E・F列に保守費・許容工数を入力してください。</p>` : ""}
+    <div class="agg-card">
+      <h3>取引先別 ${kadoHoshuMode === "month" ? "月次" : "累計"} 対応工数</h3>
+      <div class="legend">
+        <span><span class="sw" style="background:#9fd9c8"></span>許容範囲内</span>
+        <span><span class="sw" style="background:#dd5a55"></span>超過分</span>
+        <span><span class="sw sw-line" style="border-top-color:#9fb0b9"></span>許容ライン</span>
+      </div>
+      ${rowsHtml || `<p class="muted">対象となる取引先がありません。</p>`}
+      <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
+        対応工数は着手日（着手日が無ければ完了日→発生日）を基準に月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
+        「見積」「プリセールス」は受注確定前の対応工数を記録する項目が現状の帳票にないため、本タブの集計対象外です（受注後の工数は「受託工数」タブで扱います）。
+      </p>
+    </div>`;
+}
+/* --- SVG 月次帯グラフ（許容帯＋超過ハイライト・取引先1行分） --- */
+function bandBarChart(labels, values, allow, elapsedCount) {
+  const W = 460, H = 60;
+  const padL = 4, padR = 4, padT = 8, padB = 14;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const slot = chartW / labels.length;
+  const maxV = Math.max(allow * 1.9, ...values, 0.01) * 1.05;
+  const y = v => padT + chartH - chartH * v / maxV;
+  const bandTop = y(allow);
+  let svg = `<rect x="${padL}" y="${bandTop}" width="${chartW}" height="${(padT + chartH) - bandTop}" fill="#eef3f5" rx="2"/>`;
+  labels.forEach((lb, i) => {
+    const v = values[i] || 0;
+    const cx = padL + slot * i + slot / 2, bw = Math.min(slot * 0.56, 20);
+    const isFuture = i >= elapsedCount;
+    const inPart = Math.min(v, allow);
+    if (inPart > 0) svg += `<rect x="${cx - bw / 2}" y="${y(inPart)}" width="${bw}" height="${(padT + chartH) - y(inPart)}"
+      rx="2.5" fill="#9fd9c8" opacity="${isFuture ? 0.35 : 1}"><title>${lb} ${v}人日</title></rect>`;
+    if (v > allow + 0.001) {
+      svg += `<rect x="${cx - bw / 2}" y="${y(v)}" width="${bw}" height="${y(allow) - y(v)}" rx="2.5" fill="#dd5a55" opacity="${isFuture ? 0.35 : 1}"/>`;
+      svg += `<text x="${cx}" y="${y(v) - 2}" font-size="7.5" text-anchor="middle" fill="#c0392b">+${Math.round((v - allow) * 10) / 10}</text>`;
+    }
+  });
+  svg += `<line x1="${padL}" y1="${bandTop}" x2="${W - padR}" y2="${bandTop}" stroke="#9fb0b9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  labels.forEach((lb, i) => {
+    const cx = padL + slot * i + slot / 2;
+    svg += `<text x="${cx}" y="${H - 3}" font-size="7.5" text-anchor="middle" fill="${i < elapsedCount ? "#8a97a0" : "#c9d3d8"}">${Number(lb.slice(5))}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;max-width:100%">${svg}</svg>`;
+}
+/* --- SVG 累計帯グラフ（貯金・借金・取引先1行分） --- */
+function cumulativeBandChart(labels, values, allow, elapsedCount) {
+  const W = 460, H = 60;
+  const padL = 4, padR = 4, padT = 10, padB = 14;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const slot = chartW / labels.length;
+  let acc = 0;
+  const accSeries = values.map(v => (acc += v));
+  const allowSeries = labels.map((_, i) => Math.round(allow * (i + 1) * 100) / 100);
+  const maxV = Math.max(...accSeries, ...allowSeries, 0.01) * 1.12;
+  const y = v => padT + chartH - chartH * v / maxV;
+  const cx = i => padL + slot * i + slot / 2;
+  const ptsL = allowSeries.map((v, i) => `${cx(i)},${y(v)}`).join(" ");
+  let svg = "";
+  if (elapsedCount > 0) {
+    const overFinal = accSeries[elapsedCount - 1] > allowSeries[elapsedCount - 1];
+    const ptsAarr = accSeries.slice(0, elapsedCount).map((v, i) => [cx(i), y(v)]);
+    const ptsLarr = allowSeries.slice(0, elapsedCount).map((v, i) => [cx(i), y(v)]);
+    let d = `M${ptsAarr[0][0]},${ptsAarr[0][1]}`;
+    ptsAarr.forEach(p => d += ` L${p[0]},${p[1]}`);
+    for (let i = ptsLarr.length - 1; i >= 0; i--) d += ` L${ptsLarr[i][0]},${ptsLarr[i][1]}`;
+    d += " Z";
+    svg += `<path d="${d}" fill="${overFinal ? "#dd5a55" : "#2fa37a"}" opacity=".18"/>`;
+    svg += `<polyline points="${ptsAarr.map(p => p.join(",")).join(" ")}" fill="none" stroke="${overFinal ? "#dd5a55" : "#0e7a5f"}" stroke-width="2"/>`;
+    let cross = -1;
+    for (let i = 0; i < elapsedCount; i++) if (accSeries[i] > allowSeries[i]) { cross = i; break; }
+    if (cross >= 0) {
+      svg += `<line x1="${cx(cross)}" x2="${cx(cross)}" y1="${padT}" y2="${padT + chartH}" stroke="#dd5a55" stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>`;
+      svg += `<text x="${cx(cross) + 3}" y="${padT + 8}" font-size="7" fill="#c0392b">${Number(labels[cross].slice(5))}月で突破</text>`;
+    }
+  }
+  svg += `<polyline points="${ptsL}" fill="none" stroke="#9fb0b9" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+  labels.forEach((lb, i) => {
+    svg += `<text x="${cx(i)}" y="${H - 3}" font-size="7.5" text-anchor="middle" fill="${i < elapsedCount ? "#8a97a0" : "#c9d3d8"}">${Number(lb.slice(5))}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;max-width:100%">${svg}</svg>`;
+}
+
+/* --- 受託工数: 取引先別 集約（案1）＋案件別ドリルダウン --- */
+function kadoUketakuTarget() {
+  const tStart = termStartDate(currentTerm), tEnd = termEndDate(currentTerm);
+  return activeRecords().filter(r => QUOTE_TYPES.includes(r.type) &&
+    ["受託中", "完了"].includes(r.status) &&
+    (!r.book || (r.book >= tStart && r.book < tEnd)));
+}
+function renderKadoUketaku() {
+  const target = kadoUketakuTarget();
+  const byClient = {};
+  target.forEach(r => {
+    if (!r.client) return;
+    if (!byClient[r.client]) byClient[r.client] = { client: r.client, amt: 0, est: 0, act: 0, n: 0 };
+    const g = byClient[r.client];
+    g.amt += (r.finalAmount ?? r.amount) || 0;
+    g.est += Number(r.workHours) || 0;
+    g.act += Number(r.acceptHours) || 0;
+    g.n++;
+  });
+  const rows = Object.values(byClient).sort((a, b) => b.amt - a.amt);
+  const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
+  const totalEst = Math.round(rows.reduce((a, r) => a + r.est, 0) * 10) / 10;
+  const totalAct = Math.round(rows.reduce((a, r) => a + r.act, 0) * 10) / 10;
+  const overRows = target.filter(r => r.workHours != null && r.acceptHours != null && r.acceptHours > r.workHours);
+  const overClients = [...new Set(overRows.map(r => r.client))];
+
+  const rowsHtml = rows.map(g => {
+    const burn = g.est > 0 ? Math.round(g.act / g.est * 100) : (g.act > 0 ? 999 : null);
+    const st = burn == null ? "" : burn > 100 ? "over" : burn >= 80 ? "warn" : "ok";
+    const stLabel = st === "over" ? "見積超過" : st === "warn" ? "要注意" : st === "ok" ? "順調" : "見積未確定";
+    const open = kadoUketakuOpen === g.client;
+    return `
+    <div class="kado-row kado-row-click${open ? " open" : ""}" onclick="toggleKadoClient('${esc(g.client)}')">
+      <div class="kado-name"><b>${esc(g.client)}</b><div class="kado-sub">受注 ${Math.round(g.amt / 10000).toLocaleString()}万 / ${g.n}件</div></div>
+      <div class="kado-chart">
+        <div class="pbar"><i style="width:${Math.min(burn || 0, 100)}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
+        <div class="kado-t">消化 ${burn == null ? "－" : burn + "%"}（${Math.round(g.act * 10) / 10}人日） / 見積 ${Math.round(g.est * 10) / 10}人日</div>
+      </div>
+      <div class="kado-stat">
+        <span class="badge-pill ${st || "muted"}">${stLabel}</span>
+        <div class="kado-d" style="color:${st === "over" ? "#c0392b" : "#1f2933"}">
+          ${g.est > g.act ? `残 ${Math.round((g.est - g.act) * 10) / 10}人日` : g.act > g.est ? `見積超過 +${Math.round((g.act - g.est) * 10) / 10}人日` : "－"}</div>
+        <div class="kado-t">詳細 ${open ? "▲" : "▶"}</div>
+      </div>
+    </div>
+    ${open ? kadoUketakuDetail(target.filter(r => r.client === g.client)) : ""}`;
+  }).join("");
+
+  return `
+    <div class="kpi-row">
+      <div class="kpi"><div class="kv">${Math.round(totalAmt / 10000).toLocaleString()}万</div><div class="kl">受注額合計</div></div>
+      <div class="kpi"><div class="kv">${totalEst}<span style="font-size:12px"> / ${totalAct}</span></div><div class="kl">見積 / 実績 工数（人日）</div></div>
+      <div class="kpi ${overRows.length ? "kpi-alert" : ""}"><div class="kv">${overRows.length}</div><div class="kl">見積超過の案件</div></div>
+      <div class="kpi"><div class="kv">${rows.length}</div><div class="kl">対象取引先数</div></div>
+    </div>
+    <div class="agg-card">
+      <h3>取引先別 受託工数（受託中・完了案件）</h3>
+      ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
+      <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
+        対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。<br>
+        見積工数＝受注確定時に入力する対応工数（AM列）、実績工数＝受託完了時に入力する受託工数（AN列）。行をクリックすると案件別の予実一覧を展開します。
+      </p>
+    </div>`;
+}
+function kadoUketakuDetail(recs) {
+  const rowsHtml = recs.map(r => {
+    const est = r.workHours, act = r.acceptHours;
+    const burn = (est != null && est > 0) ? Math.round((act || 0) / est * 100) : null;
+    return `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}"
+        onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
+      <td>${esc(r.id)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
+      <td class="r">${(((r.finalAmount ?? r.amount)) || 0).toLocaleString()}円</td>
+      <td class="r">${est != null ? est : '<span class="muted">－</span>'}</td>
+      <td class="r">${act != null ? act : '<span class="muted">－</span>'}</td>
+      <td class="r">${burn != null ? burn + "%" : "－"}</td>
+      <td class="r">${est != null && act != null ? (Math.round((est - act) * 10) / 10) : "－"}</td>
+      <td><span class="status-pill st-${esc(effectiveStatus(r))}">${esc(statusLabel(r))}</span></td>
+    </tr>`;
+  }).join("");
+  const t = recs.reduce((a, r) => ({
+    amt: a.amt + (((r.finalAmount ?? r.amount)) || 0),
+    est: a.est + (Number(r.workHours) || 0), act: a.act + (Number(r.acceptHours) || 0),
+  }), { amt: 0, est: 0, act: 0 });
+  return `<div class="kado-detail">
+    <table class="agg-table drill-table">
+      <tr><th>ID</th><th>内容</th><th>受注額</th><th>見積</th><th>実績</th><th>消化率</th><th>見積残</th><th>状態</th></tr>
+      ${rowsHtml}
+      <tr class="total"><td colspan="2">合計</td><td class="r">${t.amt.toLocaleString()}円</td>
+        <td class="r">${Math.round(t.est * 10) / 10}</td><td class="r">${Math.round(t.act * 10) / 10}</td>
+        <td colspan="3"></td></tr>
+    </table>
+    <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
+  </div>`;
+}
+
+/* ============================================================
    デモモード
    ============================================================ */
 function loadDemo() {
@@ -2794,17 +3346,31 @@ function loadDemo() {
   const daysAgo = n => { const dd = new Date(today); dd.setDate(dd.getDate() - n); return dd; };
   const daysFromNow = n => { const dd = new Date(today); dd.setDate(dd.getDate() + n); return dd; };
   customers = [
-    { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "" },
-    { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "" },
-    { row: 4, code: "AG", name: "アサヒグラント", contact: "川野様", note: "" },
-    { row: 5, code: "EX", name: "エキスプレス", contact: "中道様", note: "" },
+    { row: 2, code: "KM", name: "kakimoto arms", contact: "佐竹様", note: "", hoshuFee: 300000, hoshuAllow: 5 },
+    { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "", hoshuFee: 150000, hoshuAllow: 2.5 },
+    { row: 4, code: "AG", name: "アサヒグラント", contact: "川野様", note: "", hoshuFee: 240000, hoshuAllow: 4 },
+    { row: 5, code: "EX", name: "エキスプレス", contact: "中道様", note: "", hoshuFee: 120000, hoshuAllow: 2 },
   ];
+  /* 体制（デモ）: 中田は期中に途中参加、西野は期中に離任した想定 */
+  staff = [
+    { row: 2, name: "小川", start: d(2023, 4, 1), end: null },
+    { row: 3, name: "紺谷", start: d(2024, 10, 1), end: null },
+    { row: 4, name: "西野", start: d(2025, 10, 1), end: d(2026, 3, 31) },
+    { row: 5, name: "中田", start: d(2026, 2, 1), end: null },
+  ];
+  /* 祝日（デモ・第37期分の一部） */
+  holidays = new Set([
+    "2025-10-13", "2025-11-03", "2025-11-23", "2025-11-24", "2026-01-01", "2026-01-12",
+    "2026-02-11", "2026-02-23", "2026-03-20", "2026-04-29", "2026-05-04", "2026-05-05", "2026-05-06",
+    "2026-07-20", "2026-08-11",
+  ]);
   records = [
     { ...blank, row: 2, id: "KM-01", client: "kakimoto arms", no: 1, type: "見積り", status: "見積中", occur: d(2026, 6, 29), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "中", hours: 10, amount: null, order: "", deliver: null, content: "ネット予約でフリースタッフを選択できるようにしたい", progress: "調査中", note: "", memo: "", stageStart: d(2026, 7, 1), amount: 480000, quoteLimit: daysAgo(12), workHours: 3 },
     { ...blank, row: 3, id: "KM-02", client: "kakimoto arms", no: 2, type: "見積り", status: "確認中", occur: d(2026, 6, 18), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", hours: 8, amount: 600000, order: "受注", deliver: d(2026, 7, 17), content: "ネット予約LINEログイン連携", progress: "60万で提示", note: "", memo: "", stageStart: d(2026, 6, 20), quoteDone: d(2026, 7, 1), confirmDone: d(2026, 7, 8), confirm: "受注の内諾。最終登録待ち", book: d(2026, 7, 31), finalAmount: 600000, finalHours: 8 },
     { ...blank, row: 4, id: "KM-03", client: "kakimoto arms", no: 3, type: "保守対応", status: "完了", occur: d(2026, 7, 2), done: d(2026, 7, 2), owner: "小川", reporter: "小川", contact: "西野様", priority: "", workHours: 0.5, amount: null, order: "", deliver: null, content: "スタッフ指名予約で店舗が正しく選択されない", progress: "外部サイト側の設定が原因", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 7, 2) },
     { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
     { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", workHours: 2, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
+    { ...blank, row: 15, id: "KM-06", client: "kakimoto arms", no: 6, type: "保守対応", status: "完了", occur: d(2026, 7, 10), done: d(2026, 7, 10), owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: 4, amount: null, order: "", deliver: null, content: "夏季キャンペーン特設ページの緊急改修", progress: "対応完了", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 10) },
     { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", workHours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
     { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定", hold: true },
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日", quoteLimit: daysFromNow(5) },
@@ -2812,7 +3378,7 @@ function loadDemo() {
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
     { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31), workHours: 6, acceptHours: 4 },
     { ...blank, row: 13, id: "HN-04", client: "ハンター製菓", no: 4, type: "見積り", status: "保留", occur: d(2026, 5, 12), done: null, owner: "紺谷", reporter: "紺谷", contact: "柳澤様", priority: "中", hours: 3, amount: 220000, order: "", deliver: null, content: "旧データ：状態が保留のまま移行された案件", progress: "先方都合で一旦停止", note: "", memo: "", stageStart: d(2026, 5, 14), hold: true, holdLegacy: true },
-    { ...blank, row: 14, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20) },
+    { ...blank, row: 14, id: "IH-02", client: "一広", no: 2, type: "見積り", status: "完了", occur: d(2026, 4, 10), done: d(2026, 6, 5), owner: "小川", reporter: "小川", contact: "宮崎様", priority: "", hours: 4, amount: 300000, order: "受注", deliver: d(2026, 5, 25), content: "取引先マスタ一括登録機能", progress: "対応完了", note: "", memo: "", stageStart: d(2026, 4, 12), quoteDone: d(2026, 4, 18), confirmDone: d(2026, 4, 25), confirm: "正式発注", book: d(2026, 5, 25), finalAmount: 300000, finalHours: 4, orderDone: d(2026, 4, 26), workStart: d(2026, 5, 1), dueDate: d(2026, 5, 20), workHours: 4, acceptHours: 5 },
   ];
   const lw = lastWeekRange();
   const midLastWeek = new Date(lw.start); midLastWeek.setDate(midLastWeek.getDate() + 2);

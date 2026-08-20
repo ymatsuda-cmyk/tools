@@ -854,3 +854,46 @@ body {
 .wbs-badge.all-done { background: #0e7a5f; border-color: #0e7a5f; color: #fff; }
 .wbs-badge.none { background: #f4f6f7; color: #a8b2b8; border-color: #e3e8eb; font-weight: normal; }
 .list-table td .wbs-badge { font-size: 10px; }
+
+/* ---------- 稼働状況（全体キャパ／対応工数(保守)／受託工数） ---------- */
+.seg-inline { display: flex; gap: 0; }
+.seg-inline .seg { border-radius: 0; margin-left: -1px; }
+.seg-inline .seg:first-child { border-radius: 14px 0 0 14px; margin-left: 0; }
+.seg-inline .seg:last-child { border-radius: 0 14px 14px 0; }
+
+.kado-warn {
+  border-color: #f0dfae; background: #fffaf0; color: #7a6220; font-size: 12px;
+}
+.kado-note { font-size: 11px; color: #b7791f; margin: -4px 0 12px; }
+
+.kado-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 4px;
+  border-bottom: 1px solid #eef1f3; flex-wrap: wrap;
+}
+.kado-row:last-child { border-bottom: none; }
+.kado-row-click { cursor: pointer; border-radius: 6px; margin: 0 -4px; padding: 10px 8px; }
+.kado-row-click:hover { background: #f7fbfa; }
+.kado-row-click.open { background: #eef7f3; }
+.kado-name { flex: 0 0 150px; min-width: 120px; }
+.kado-name b { font-size: 12.5px; color: #1f2933; }
+.kado-sub { font-size: 10.5px; color: #8a97a0; line-height: 1.4; margin-top: 1px; }
+.kado-chart { flex: 1 1 260px; min-width: 220px; }
+.kado-stat { flex: 0 0 200px; min-width: 170px; }
+.kado-t { font-size: 10.5px; color: #52616b; margin-top: 3px; }
+.kado-d { font-size: 12px; font-weight: bold; margin-top: 2px; }
+.kado-detail {
+  flex: 1 1 100%; width: 100%; margin: 0 0 6px; padding: 10px;
+  background: #f7fbfa; border: 1px solid #b8dcd0; border-radius: 6px;
+}
+
+.badge-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 10.5px; font-weight: bold; white-space: nowrap;
+}
+.badge-pill.ok { background: #e4f1ec; color: #0e7a5f; }
+.badge-pill.over { background: #f9e6e5; color: #c0392b; }
+.badge-pill.warn { background: #fdf6e3; color: #b7791f; }
+.badge-pill.muted { background: #eef1f3; color: #8a97a0; }
+
+.pbar { height: 14px; background: #eef1f3; border-radius: 4px; position: relative; overflow: hidden; }
+.pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
