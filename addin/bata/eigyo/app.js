@@ -1142,7 +1142,7 @@ async function saveNewRecord() {
     owner: reporter,          // 担当者の初期値 = 起票者
     reporter,                 // 起票者
     contact: cust.contact || "",
-    priority: document.getElementById("in-priority").value,
+    priority: document.getElementById("in-priority").value || "中",
     hours: null, amount: null, order: "", deliver: null,
     content,
     progress: "",
@@ -1525,17 +1525,18 @@ function renderHoursTop() {
   group.style.display = isQuote ? "" : "none";
   if (!isQuote) return;
   const isAccepted = currentStageTab === "受託中";
+  const isOrder = currentStageTab === "受注";
   const wh = document.getElementById("ed-workhours-top");
   const ah = document.getElementById("ed-accepthours-top");
   if (wh) { wh.value = rec.workHours ?? ""; wh.disabled = isAccepted; wh.classList.remove("need"); }
   if (ah) { ah.value = rec.acceptHours ?? ""; ah.disabled = !isAccepted; ah.classList.remove("need"); }
-  /* 受託工数：「受託中」タブでは常に必須（対応完了時に検証）。
-     対応工数：「受注」タブで受託確定チェックが入っている時のみ必須（onOrderDoneToggleが制御）。
-     タブを離れたらいったんリセットする。 */
+  /* 「必須」バッジは、その項目が実際に入力対象となるタブにいる間は常時表示する。
+     対応工数：「受注」タブ（受託中へ切り替える時に必須）
+     受託工数：「受託中」タブ（完了にする時に必須） */
   const ahReq = document.getElementById("ed-accepthours-req");
   if (ahReq) ahReq.style.display = isAccepted ? "" : "none";
   const whReq = document.getElementById("ed-workhours-req");
-  if (whReq && currentStageTab !== "受注") whReq.style.display = "none";
+  if (whReq) whReq.style.display = isOrder ? "" : "none";
 }
 
 /* 保留チェックの切替：状態は変えず、保留フラグのみを更新（登録で確定） */
@@ -1574,54 +1575,36 @@ function syncOwner(sel) {
   ed.value = sel.value;
 }
 
-/* 見積完了チェックのON/OFFで「見積有効期限」の必須表示を切り替える */
+/* 見積完了／商談完了チェックのON/OFFで、未入力の必須項目に赤枠で気づけるようにする */
 function onQuoteDoneToggle() {
   const done = document.getElementById("st-done");
-  const req = document.getElementById("st-qlimit-req");
-  const opt = document.getElementById("st-qlimit-opt");
-  const inp = document.getElementById("st-qlimit");
-  if (!req || !opt) return;
   const on = !!(done && done.checked);
-  req.style.display = on ? "" : "none";
-  opt.style.display = on ? "none" : "";
-  if (inp) inp.classList.toggle("need", on && !inp.value);
+  ["st-hours", "st-amount", "st-qlimit"].forEach(id => {
+    const inp = document.getElementById(id);
+    if (inp) inp.classList.toggle("need", on && !inp.value);
+  });
 }
 
-/* 受注→受託中：納品日／最終工数／最終価格／対応工数を、受託確定チェックが
-   入っている時だけ「必須」表示にする（登録時の必須チェックはsaveEditRecord側）。 */
+/* 受注→受託中：納品日／計上日／最終工数／最終価格／対応工数が必須（バッジは常時表示）。
+   受託確定チェックが入っている時、未入力の項目に赤枠で気づけるようにする。 */
 function onOrderDoneToggle() {
   const done = document.getElementById("st-done");
   const on = !!(done && done.checked);
-  [
-    ["st-deliver", "st-deliver-req"],
-    ["st-book", "st-book-req"],
-    ["st-fhours", "st-fhours-req"],
-    ["st-famount", "st-famount-req"],
-  ].forEach(([inputId, reqId]) => {
-    const inp = document.getElementById(inputId);
-    const req = document.getElementById(reqId);
-    if (req) req.style.display = on ? "" : "none";
+  ["st-deliver", "st-book", "st-fhours", "st-famount"].forEach(id => {
+    const inp = document.getElementById(id);
     if (inp) inp.classList.toggle("need", on && !inp.value);
   });
   const whInp = document.getElementById("ed-workhours-top");
-  const whReq = document.getElementById("ed-workhours-req");
-  if (whReq) whReq.style.display = on ? "" : "none";
   if (whInp) whInp.classList.toggle("need", on && !whInp.value);
 }
 
-/* 受託中→完了：完了予定日／納品日／計上日／受託工数を、対応完了チェックが
-   入っている時だけ「必須」表示にする（登録時の必須チェックはsaveEditRecord側）。 */
+/* 受託中→完了：開始日／完了予定日／納品日／計上日／受託工数が必須（バッジは常時表示）。
+   対応完了チェックが入っている時、未入力の項目に赤枠で気づけるようにする。 */
 function onWorkDoneToggle() {
   const done = document.getElementById("st-done");
   const on = !!(done && done.checked);
-  [
-    ["st-duedate", "st-duedate-req"],
-    ["st-deliver2", "st-deliver2-req"],
-    ["st-book2", "st-book2-req"],
-  ].forEach(([inputId, reqId]) => {
-    const inp = document.getElementById(inputId);
-    const req = document.getElementById(reqId);
-    if (req) req.style.display = on ? "" : "none";
+  ["st-workstart", "st-duedate", "st-deliver2", "st-book2"].forEach(id => {
+    const inp = document.getElementById(id);
     if (inp) inp.classList.toggle("need", on && !inp.value);
   });
   const ahInp = document.getElementById("ed-accepthours-top");
@@ -1678,20 +1661,18 @@ function renderStageBody() {
       <div class="form-row"><label>${esc(progressLabel)}</label>
         <textarea id="st-progress" rows="4" ${dis}>${esc(rec.progress)}</textarea></div>
       ${t === "対応中" ? `
-      <div class="form-row"><label>対応工数（人日）</label>
+      <div class="form-row"><label>対応工数（人日） <span class="req">必須</span></label>
         <input type="number" step="0.5" id="st-workhours" value="${rec.workHours ?? ""}" ${dis}></div>` : ""}
       ${isQuote ? `
       <div class="form-grid">
-        <div class="form-row"><label>工数（人日）</label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
-        <div class="form-row"><label>価格（税抜・円）</label><input type="number" step="1000" id="st-amount" value="${rec.amount ?? ""}" ${dis} oninput="updateTaxView()"></div>
+        <div class="form-row"><label>工数（人日） <span class="req">必須</span></label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
+        <div class="form-row"><label>価格（税抜・円） <span class="req">必須</span></label><input type="number" step="1000" id="st-amount" value="${rec.amount ?? ""}" ${dis} oninput="updateTaxView()"></div>
       </div>
       <div class="form-row"><label>税込価格（自動計算）</label>
         <input type="text" id="st-tax" readonly class="ro" value="${rec.amount != null ? withTax(rec.amount).toLocaleString() + " 円" : ""}"></div>
       <div class="form-row"><label>根拠</label>
         <textarea id="st-basis" rows="3" ${dis}>${esc(rec.basis)}</textarea></div>
-      <div class="form-row"><label>見積有効期限
-          <span class="req" id="st-qlimit-req" style="display:none">必須</span>
-          <span class="opt-tag" id="st-qlimit-opt">任意（見積完了にする場合は必須）</span></label>
+      <div class="form-row"><label>見積有効期限 <span class="req">必須</span></label>
         <input type="date" id="st-qlimit" value="${fmtDateInput(rec.quoteLimit)}" ${dis}></div>` : ""}
       <label class="check-row ${doneDis ? "off" : ""}">
         <input type="checkbox" id="st-done" ${doneDis} ${isQuote ? `onchange="onQuoteDoneToggle()"` : ""}> ${esc(doneLabel)}
@@ -1710,16 +1691,14 @@ function renderStageBody() {
       <div class="form-row"><label>商談状況</label>
         <textarea id="st-deal" rows="5" ${dis}>${esc(rec.deal)}</textarea></div>
       <div class="form-grid">
-        <div class="form-row"><label>工数（人日）</label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
-        <div class="form-row"><label>価格（税抜・円）</label><input type="number" step="1000" id="st-amount" value="${rec.amount ?? ""}" ${dis} oninput="updateTaxView()"></div>
+        <div class="form-row"><label>工数（人日） <span class="req">必須</span></label><input type="number" step="0.5" id="st-hours" value="${rec.hours ?? ""}" ${dis}></div>
+        <div class="form-row"><label>価格（税抜・円） <span class="req">必須</span></label><input type="number" step="1000" id="st-amount" value="${rec.amount ?? ""}" ${dis} oninput="updateTaxView()"></div>
       </div>
       <div class="form-row"><label>税込価格（自動計算）</label>
         <input type="text" id="st-tax" readonly class="ro" value="${rec.amount != null ? withTax(rec.amount).toLocaleString() + " 円" : ""}"></div>
       <div class="form-row"><label>根拠</label>
         <textarea id="st-basis" rows="3" ${dis}>${esc(rec.basis)}</textarea></div>
-      <div class="form-row"><label>見積有効期限
-          <span class="req" id="st-qlimit-req" style="display:none">必須</span>
-          <span class="opt-tag" id="st-qlimit-opt">任意（商談完了にする場合は必須）</span></label>
+      <div class="form-row"><label>見積有効期限 <span class="req">必須</span></label>
         <input type="date" id="st-qlimit" value="${fmtDateInput(rec.quoteLimit)}" ${dis}></div>
       <label class="check-row ${doneDis ? "off" : ""}">
         <input type="checkbox" id="st-done" ${doneDis} onchange="onQuoteDoneToggle()"> 商談完了（確認中へ進める）
@@ -1757,13 +1736,13 @@ function renderStageBody() {
     body.innerHTML = `
       ${dd ? `<span class="stage-info">受注確定日: ${fmtDate(dd)}</span>` : ""}
       <div class="form-grid">
-        <div class="form-row"><label>納品日 <span class="req" id="st-deliver-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>納品日 <span class="req">必須</span></label>
           <input type="date" id="st-deliver" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
-        <div class="form-row"><label>計上日 <span class="req" id="st-book-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>計上日 <span class="req">必須</span></label>
           <input type="date" id="st-book" value="${fmtDateInput(rec.book)}" ${dis}></div>
-        <div class="form-row"><label>最終工数（人日） <span class="req" id="st-fhours-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>最終工数（人日） <span class="req">必須</span></label>
           <input type="number" step="0.5" id="st-fhours" value="${rec.finalHours ?? rec.hours ?? ""}" ${dis}></div>
-        <div class="form-row"><label>最終価格（税抜・円） <span class="req" id="st-famount-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>最終価格（税抜・円） <span class="req">必須</span></label>
           <input type="number" step="1000" id="st-famount" value="${base ?? ""}" ${dis} oninput="updateTaxView2()"></div>
       </div>
       <div class="form-row"><label>税込価格（自動計算）</label>
@@ -1784,11 +1763,11 @@ function renderStageBody() {
       <div class="form-grid">
         <div class="form-row"><label>開始日 <span class="req">必須</span></label>
           <input type="date" id="st-workstart" value="${fmtDateInput(rec.workStart)}" ${dis}></div>
-        <div class="form-row"><label>完了予定日 <span class="req" id="st-duedate-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>完了予定日 <span class="req">必須</span></label>
           <input type="date" id="st-duedate" value="${fmtDateInput(rec.dueDate)}" ${dis}></div>
-        <div class="form-row"><label>納品日 <span class="req" id="st-deliver2-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>納品日 <span class="req">必須</span></label>
           <input type="date" id="st-deliver2" value="${fmtDateInput(rec.deliver)}" ${dis}></div>
-        <div class="form-row"><label>計上日 <span class="req" id="st-book2-req" style="display:none">必須</span></label>
+        <div class="form-row"><label>計上日 <span class="req">必須</span></label>
           <input type="date" id="st-book2" value="${fmtDateInput(rec.book)}" ${dis}></div>
       </div>
       <div class="date-order-hint">開始日 ≦ 完了予定日 ≦ 納品日 ≦ 計上日 の順で入力してください</div>
@@ -1819,7 +1798,7 @@ async function saveEditRecord() {
   msg.className = "save-msg"; msg.textContent = "";
 
   rec.owner = document.getElementById("ed-owner").value;
-  rec.priority = document.getElementById("ed-priority").value;
+  rec.priority = document.getElementById("ed-priority").value || "中";
   rec.note = document.getElementById("ed-note").value;
   if (QUOTE_TYPES.includes(rec.type)) {
     const whTop = document.getElementById("ed-workhours-top");
@@ -1892,6 +1871,14 @@ async function saveEditRecord() {
             msg.textContent = "完了にする場合は「対応工数（人日）」を入力してください";
             const inp = document.getElementById("st-workhours");
             if (inp) { inp.classList.add("need"); inp.focus(); }
+            return;
+          }
+          /* 完了へ切り替える前に、対応工数（人日）の値を確認する。 */
+          const ok = await uiConfirm(
+            `対応工数（人日）: ${rec.workHours} 人日 で確定します。\nこの内容で登録し、状態を「完了」にしますか？`);
+          if (!ok) {
+            msg.className = "save-msg";
+            msg.textContent = "登録を中止しました";
             return;
           }
           applyStatus(rec, "完了");        // 対応完了日 = 完了日(G)
@@ -2036,6 +2023,14 @@ async function saveEditRecord() {
         if (!deliver) { need("st-deliver2", "納品日"); return; }
         if (!book) { need("st-book2", "計上日"); return; }
         if (rec.acceptHours == null) { need("ed-accepthours-top", "受託工数（人日）"); return; }
+        /* 完了へ切り替える前に、受託工数（人日）の値を確認する。 */
+        const ok = await uiConfirm(
+          `受託工数（人日）: ${rec.acceptHours} 人日 で確定します。\nこの内容で登録し、状態を「完了」にしますか？`);
+        if (!ok) {
+          msg.className = "save-msg";
+          msg.textContent = "登録を中止しました";
+          return;
+        }
         applyStatus(rec, "完了");           // 完了日(G列)が記録されチケット完了
       }
     }

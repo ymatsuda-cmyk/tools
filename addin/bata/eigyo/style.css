@@ -755,10 +755,6 @@ body {
   border-radius: 0 5px 5px 0;
 }
 .hold-lock { margin-left: auto; font-size: 11px; font-weight: normal; color: #c05c14; }
-.opt-tag {
-  display: inline-block; margin-left: 5px; padding: 0 5px; font-size: 10px; font-weight: normal;
-  color: #8a97a0; border: 1px solid #dde3e7; border-radius: 3px;
-}
 .form-row input.need { border-color: #c0392b; background: #fdecea; }
 
 /* ステッパー：保留中は現在ステージをオレンジに */
