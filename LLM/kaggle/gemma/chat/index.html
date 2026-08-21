@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>gemma chat</title>
 <link rel="stylesheet" href="./css/styles.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2/dist/tabler-icons.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" />
 <script type="importmap">
 {
@@ -21,6 +22,7 @@
 <body>
 <div class="app">
   <aside class="sidebar">
+    <div id="endpoint-panel"></div>
     <button id="new-chat">＋ 新規チャット</button>
     <h1>会話</h1>
     <div id="conv-list"></div>
@@ -28,8 +30,6 @@
   <main class="main">
     <div class="topbar">
       <strong id="model-name">—</strong>
-      <div id="status-bar" class="status-bar"></div>
-      <div id="quota-bar" class="quota-bar"></div>
       <span class="spacer"></span>
       <button id="open-settings">設定</button>
     </div>

@@ -1,4 +1,4 @@
-const TIMEOUT_MS = 20000
+const TIMEOUT_MS = 25000
 
 /**
  * GAS web app を JSONP で呼ぶ。
@@ -8,7 +8,7 @@ const TIMEOUT_MS = 20000
  * ブラウザからの CORS が環境によって不安定になる。
  * JSONP なら CORS の対象外なので確実に通る。
  * その代わり CONTROL_TOKEN が URL に載るので、
- * このトークンで守っているのは「GPU の起動」だけに留めること。
+ * このトークンで守るのは「GPU の起動」だけに留めること。
  */
 export function callGas(settings, action, params = {}) {
   return new Promise((resolve, reject) => {
@@ -56,9 +56,14 @@ export function callGas(settings, action, params = {}) {
   })
 }
 
-export const getStatus = (s) => callGas(s, 'status')
-export const startKernel = (s) => callGas(s, 'start')
-export const stopKernel = (s) => callGas(s, 'stop')
+/** 全エンドポイントの状態。ダッシュボード用 */
+export const getStatusAll = (s) => callGas(s, 'statusAll')
+
+/** 単一エンドポイントの状態。通常のポーリング用 */
+export const getStatus = (s, id) => callGas(s, 'status', { id })
+
+export const startKernel = (s, id) => callGas(s, 'start', { id })
+export const stopKernel = (s, id) => callGas(s, 'stop', { id })
 
 /**
  * Kaggle の status と proxyAlive から表示用の状態を決める。
@@ -82,31 +87,7 @@ export function deriveState(st) {
   return { key: 'stopped', label: '停止中', tone: 'ng', canStart: true, canStop: false }
 }
 
-
-export function formatQuota(st) {
-  if (!st || typeof st.weeklyRemainMin !== 'number') return null
-  return `週残 ${(st.weeklyRemainMin / 60).toFixed(1)}h`
+export function formatHours(min) {
+  if (typeof min !== 'number') return '—'
+  return `${(min / 60).toFixed(1)}h`
 }
-
-/**
-export function formatQuota(st) {
-
-  if (!st?.gpuQuota)
-    return null
-
-  const q = st.gpuQuota
-
-  const blocks =
-    Math.round(q.remainPct / 10)
-
-  const bar =
-    '■'.repeat(blocks) +
-    '□'.repeat(10 - blocks)
-
-  return [
-    'GPU',
-    `${bar} ${q.remainPct}%`,
-    `${q.remainHour.toFixed(1)}h / ${q.totalHour.toFixed(0)}h`
-  ].join(' ')
-}
-*/

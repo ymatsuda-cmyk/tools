@@ -1,5 +1,5 @@
 import { h, clear } from './lib/dom.js'
-import { loadSettings, saveSettings } from './lib/settings.js'
+import { activeProfile, connectionOf, loadSettings, saveSettings } from './lib/settings.js'
 import {
   createConversation,
   db,
@@ -9,12 +9,12 @@ import {
   touchConversation,
 } from './lib/db.js'
 import { streamChat } from './lib/client.js'
-import { estimateTokens } from './lib/tokens.js'
+import { estimateTokens, recordCalibration } from './lib/tokens.js'
 import { createThrottledRenderer } from './lib/markdown.js'
 import { createMessageList } from './ui/message-list.js'
 import { createComposer } from './ui/composer.js'
 import { openSettings } from './ui/settings-dialog.js'
-import { createStatusBar } from './ui/status-bar.js'
+import { createEndpointPanel } from './ui/endpoint-panel.js'
 import { setupDropzone } from './ui/dropzone.js'
 
 const $ = (id) => document.getElementById(id)
@@ -23,7 +23,15 @@ let settings = loadSettings()
 let convId = null
 let controller = null
 
-const statusBar = createStatusBar($('status-bar'), { getSettings: () => settings })
+const endpointPanel = createEndpointPanel($('endpoint-panel'), {
+  getSettings: () => settings,
+  onSelect: (id) => {
+    settings.activeId = id
+    saveSettings(settings)
+    renderTopbar()
+    refresh()
+  },
+})
 const list = createMessageList($('messages'))
 const composer = createComposer($('composer'), { onSend, onStop, onCompress, onNewChat })
 
@@ -54,14 +62,58 @@ function toWire(m) {
 }
 
 function renderTopbar() {
-  $('model-name').textContent = settings.model
+  const p = activeProfile(settings)
+  $('model-name').textContent = p?.model || '—'
 }
+
+let renamingId = null
 
 async function renderSidebar() {
   const root = $('conv-list')
   const convs = await listConversations()
   clear(root)
+
   for (const c of convs) {
+    if (c.id === renamingId) {
+      const input = h('input', { value: c.title })
+      const commit = async () => {
+        const title = input.value.trim()
+        renamingId = null
+        if (title && title !== c.title) await touchConversation(c.id, title)
+        await renderSidebar()
+      }
+      root.append(
+        h(
+          'div',
+          { class: 'conv renaming' },
+          input,
+          h('button', {
+            class: 'icon',
+            'aria-label': '確定',
+            onClick: commit,
+          }, h('i', { class: 'ti ti-check', 'aria-hidden': 'true' })),
+          h('button', {
+            class: 'icon',
+            'aria-label': 'キャンセル',
+            onClick: () => {
+              renamingId = null
+              renderSidebar()
+            },
+          }, h('i', { class: 'ti ti-x', 'aria-hidden': 'true' })),
+        ),
+      )
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') {
+          renamingId = null
+          renderSidebar()
+        }
+      })
+      input.focus()
+      input.select()
+      continue
+    }
+
     root.append(
       h(
         'div',
@@ -70,17 +122,30 @@ async function renderSidebar() {
           onClick: () => selectConversation(c.id),
         },
         h('span', { text: c.title }),
-        h('button', {
-          class: 'icon',
-          'aria-label': '削除',
-          text: '×',
-          onClick: async (e) => {
-            e.stopPropagation()
-            await deleteConversation(c.id)
-            if (c.id === convId) convId = null
-            await refresh()
-          },
-        }),
+        h(
+          'div',
+          { class: 'conv-tools' },
+          h('button', {
+            class: 'icon',
+            'aria-label': '名前を変更',
+            onClick: (e) => {
+              e.stopPropagation()
+              renamingId = c.id
+              renderSidebar()
+            },
+          }, h('i', { class: 'ti ti-pencil', 'aria-hidden': 'true' })),
+          h('button', {
+            class: 'icon',
+            'aria-label': '削除',
+            onClick: async (e) => {
+              e.stopPropagation()
+              if (!confirm(`「${c.title}」を削除しますか？`)) return
+              await deleteConversation(c.id)
+              if (c.id === convId) convId = null
+              await refresh()
+            },
+          }, h('i', { class: 'ti ti-trash', 'aria-hidden': 'true' })),
+        ),
       ),
     )
   }
@@ -116,13 +181,14 @@ function onStop() {
 }
 
 async function onSend(text, atts) {
-  if (!settings.apiKey) {
+  const conn = connectionOf(settings)
+  if (!conn || !conn.apiKey || !conn.baseUrl) {
     openSettings(settings, applySettings)
     return
   }
   // 起動制御を設定している場合、停止中なら先に知らせる
-  if (settings.gasUrl && statusBar.getState().key === 'stopped') {
-    list.showNotice('バックエンドが停止しています。上部の「起動」を押してから、3〜5分待って再送してください。')
+  if (settings.gasUrl && endpointPanel.activeIsStopped()) {
+    list.showNotice('バックエンドが停止しています。サイドバーの「起動」を押してから、3〜5分待って再送してください。')
     return
   }
   if (convId === null) convId = await createConversation()
@@ -180,8 +246,15 @@ async function onSend(text, atts) {
 
   renderer.finish(acc)
 
-  // 実測が推定の 7 割を下回っていたら切り捨てを疑う
-  const truncated = promptTokens !== undefined && promptTokens < estimated * 0.7
+  // 画像を含まない場合のみ、実測値で推定係数を較正する
+  const hadImage = prior.some((m) => (m.attachments ?? []).some((a) => a.kind === 'image'))
+  if (!hadImage) recordCalibration(estimated, promptTokens)
+
+  // 推定は必ず誤差を持つので、割合と絶対量の両方を満たしたときだけ警告する
+  const truncated =
+    promptTokens !== undefined &&
+    promptTokens < estimated * 0.6 &&
+    estimated - promptTokens > 500
 
   await db.messages.add({
     convId,
@@ -228,7 +301,8 @@ function applySettings(s) {
   settings = s
   saveSettings(s)
   renderTopbar()
-  statusBar.refresh()
+  endpointPanel.rerender()
+  endpointPanel.refresh()
   refresh()
 }
 
@@ -242,4 +316,4 @@ statusBar.refresh()
 const convs = await listConversations()
 if (convs.length) convId = convs[0].id
 await refresh()
-if (!settings.apiKey) openSettings(settings, applySettings)
+if (!connectionOf(settings)?.apiKey) openSettings(settings, applySettings)
