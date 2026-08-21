@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_d4a2f19";
+const APP_VERSION = "rev_20260821_f2b9a41";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2933,7 +2933,7 @@ let kadoUketakuOpen = null;     // 受託工数：予実一覧を展開中の取
 let kadoUketakuStatus = "all";  // 受託工数：状態フィルタ（all | 受託中 | 完了）
 /* 全体キャパの「対応工数（保守）」集計は保守対応/瑕疵対応/調整の3種のみ（従来通り・固定） */
 const MAINT_TYPES = ["保守対応", "瑕疵対応", "調整"];
-/* 対応工数（保守）タブの分類フィルタ選択肢（見積り・プリセールスは受注前の見積工数=K列を対象） */
+/* 対応工数（保守）タブの分類フィルタ選択肢（見積り・プリセールスも他種別と同じ対応工数=AM列を集計） */
 const KADO_HOSHU_TYPES = ["保守対応", "瑕疵対応", "見積り", "プリセールス", "調整"];
 const KADO_TYPE_LABEL = { "保守対応": "保守", "瑕疵対応": "瑕疵", "見積り": "見積り", "プリセールス": "プリセールス", "調整": "調整" };
 
@@ -2960,20 +2960,6 @@ function clearKadoTypes() {
 function toggleKadoClient(name) { kadoUketakuOpen = (kadoUketakuOpen === name) ? null : name; renderAgg(); }
 function switchKadoUketakuStatus(v) { kadoUketakuStatus = v; renderAgg(); }
 
-/* 対応工数（保守）タブ用：種別ごとに対応する工数フィールドを返す
-   （保守対応/瑕疵対応/調整＝AM列 対応工数、見積り/プリセールス＝K列 見積工数） */
-function kadoHoursOf(r) {
-  return QUOTE_TYPES.includes(r.type) ? (Number(r.hours) || 0) : (Number(r.workHours) || 0);
-}
-function sumKadoHoursByMonth(recs, dateField, months) {
-  const map = Object.fromEntries(months.map(m => [m, 0]));
-  recs.forEach(r => {
-    const dt = r[dateField] || r.done || r.occur;
-    const v = kadoHoursOf(r);
-    if (dt && map[monthKey(dt)] != null) map[monthKey(dt)] += v;
-  });
-  return months.map(m => Math.round(map[m] * 10) / 10);
-}
 
 function renderKadoAgg() {
   const sticky = `<div class="kado-sticky">
@@ -2999,14 +2985,14 @@ function kadoHoshuMonthly(months, types) {
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   return sumByMonth(target, "workHours", "stageStart", months);
 }
-/* 受託工数の月次分布: 完了は実績(AN)、受託中は見積(AM)を、受託開始日〜完了(予定)日で按分 */
+/* 受託工数の月次分布: 完了は実績(AN)、受託中は見積(Y:最終工数)を、受託開始日〜完了(予定)日で按分 */
 function kadoUketakuMonthly(months) {
   const totals = Object.fromEntries(months.map(m => [m, 0]));
   const target = activeRecords().filter(r =>
     QUOTE_TYPES.includes(r.type) && ["受託中", "完了"].includes(r.status) && r.workStart);
   target.forEach(r => {
     const isDone = r.status === "完了";
-    const hours = isDone ? r.acceptHours : r.workHours;
+    const hours = isDone ? r.acceptHours : r.finalHours;
     if (hours == null) return;
     const end = isDone ? (r.done || r.workStart) : (r.dueDate || r.workStart);
     const dist = spreadAcrossMonths(hours, r.workStart, end, months);
@@ -3056,7 +3042,7 @@ function renderKadoCapacity() {
         { "対応工数（保守）": "#2c6e9b", "受託工数": "#b7791f" }, capaSeries, elapsed)}</div>
       <p style="font-size:10px;color:#a9b2ba;margin-top:4px">
         基本稼働＝その月の営業日数（祝日シート反映・土日祝を除く）×体制シートの稼働人数（1人日＝8時間換算）。<br>
-        対応工数は保守対応・瑕疵対応・調整の対応工数（着手月ベース）。受託工数は見積り/プリセールスの受託中・完了案件の工数を、受託開始日〜完了(予定)日の日数比で按分（受託中は見積工数、完了は実績工数を使用。開始日未確定の案件は含まれません）。<br>
+        対応工数は保守対応・瑕疵対応・調整の対応工数（着手月ベース）。受託工数は見積り/プリセールスの受託中・完了案件の工数を、受託開始日〜完了(予定)日の日数比で按分（受託中は見積工数=最終工数(Y列)、完了は実績工数を使用。開始日未確定の案件は含まれません）。<br>
         「その他（社内業務・営業活動等）」の工数は現状未計上のため、実際の基本稼働との差はここに表示される値より小さくなる場合があります。
       </p>
     </div>
@@ -3127,6 +3113,7 @@ function renderKadoHoshu() {
   const elapsed = elapsedMonthsOfTerm(currentTerm, months);
   const activeList = kadoHoshuMulti ? kadoHoshuTypes : (kadoHoshuType ? [kadoHoshuType] : []);
   const useTypes = activeList.length ? activeList : KADO_HOSHU_TYPES;
+  /* 見積り／プリセールスも状態を問わず対応工数（AM列）を計上する（保守対応/瑕疵対応/調整と同様） */
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   const clientNames = [...new Set(target.map(r => r.client).filter(Boolean))];
   const configured = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
@@ -3135,7 +3122,7 @@ function renderKadoHoshu() {
   const overClients = [];
   const clientRows = configured.map(c => {
     const recs = target.filter(r => r.client === c.name);
-    const monthly = sumKadoHoursByMonth(recs, "stageStart", months);
+    const monthly = sumByMonth(recs, "workHours", "stageStart", months);
     const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
     const allowElapsed = Math.round(c.hoshuAllow * elapsed * 10) / 10;
     const unit = c.hoshuAllow > 0 ? (c.hoshuFee || 0) / c.hoshuAllow : 0;
@@ -3152,7 +3139,7 @@ function renderKadoHoshu() {
   const unconfNames = clientNames.filter(name => !configured.some(c => c.name === name));
   const unconfRows = unconfNames.map(name => {
     const recs = target.filter(r => r.client === name);
-    const monthly = sumKadoHoursByMonth(recs, "stageStart", months);
+    const monthly = sumByMonth(recs, "workHours", "stageStart", months);
     const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
     return { name, monthly, actualElapsed };
   }).filter(r => r.actualElapsed > 0 || r.monthly.some(v => v > 0));
@@ -3241,8 +3228,8 @@ function renderKadoHoshu() {
       ${rowsHtml || `<p class="muted">対象となる取引先がありません。</p>`}
       ${unconfRows.length ? `<div class="section-h">保守費 未設定の取引先（比較対象外・実績のみ表示）</div>${unconfHtml}` : ""}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
-        対応工数は着手日（着手日が無ければ完了日→発生日）を基準に月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
-        見積り／プリセールスを分類に含めた場合は、受注確定前の見積工数（K列）を対応工数として集計します（受注後の工数は「受託工数」タブで扱います）。<br>
+        対応工数は着手日（着手日が無ければ完了日→発生日）を基準に、対応工数（人日・AM列）を月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
+        見積り／プリセールスを分類に含めた場合も、状態を問わず同じ対応工数（AM列）を集計します。受注確定後（受注・受託中・完了）の案件は「受託工数」タブ（見積工数=Y列・実績工数=AN列）にも別途表示されるため、同じ案件が両方のタブに数字を持つ場合があります。<br>
         保守費・許容工数が未設定の取引先は「保守費 未設定の取引先」欄に実績のみ表示します（乖離は算出しません）。
       </p>
     </div>`;
@@ -3352,7 +3339,7 @@ function renderKadoUketaku() {
     if (!byClient[r.client]) byClient[r.client] = { client: r.client, amt: 0, est: 0, act: 0, n: 0 };
     const g = byClient[r.client];
     g.amt += (r.finalAmount ?? r.amount) || 0;
-    g.est += Number(r.workHours) || 0;
+    g.est += Number(r.finalHours) || 0;
     g.act += Number(r.acceptHours) || 0;
     g.n++;
   });
@@ -3360,7 +3347,7 @@ function renderKadoUketaku() {
   const totalAmt = rows.reduce((a, r) => a + r.amt, 0);
   const totalEst = Math.round(rows.reduce((a, r) => a + r.est, 0) * 10) / 10;
   const totalAct = Math.round(rows.reduce((a, r) => a + r.act, 0) * 10) / 10;
-  const overRows = target.filter(r => r.workHours != null && r.acceptHours != null && r.acceptHours > r.workHours);
+  const overRows = target.filter(r => r.finalHours != null && r.acceptHours != null && r.acceptHours > r.finalHours);
   const overClients = [...new Set(overRows.map(r => r.client))];
 
   const rowsHtml = rows.map(g => {
@@ -3406,13 +3393,13 @@ function renderKadoUketaku() {
       ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。状態フィルタで絞り込めます。<br>
-        見積工数＝受注確定時に入力する対応工数（AM列）、実績工数＝受託完了時に入力する受託工数（AN列）。行をクリックすると案件別の予実一覧を展開します。
+        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。行をクリックすると案件別の予実一覧を展開します。
       </p>
     </div>`;
 }
 function kadoUketakuDetail(recs) {
   const rowsHtml = recs.map(r => {
-    const est = r.workHours, act = r.acceptHours;
+    const est = r.finalHours, act = r.acceptHours;
     const burn = (est != null && est > 0) ? Math.round((act || 0) / est * 100) : null;
     return `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}"
         onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
@@ -3427,7 +3414,7 @@ function kadoUketakuDetail(recs) {
   }).join("");
   const t = recs.reduce((a, r) => ({
     amt: a.amt + (((r.finalAmount ?? r.amount)) || 0),
-    est: a.est + (Number(r.workHours) || 0), act: a.act + (Number(r.acceptHours) || 0),
+    est: a.est + (Number(r.finalHours) || 0), act: a.act + (Number(r.acceptHours) || 0),
   }), { amt: 0, est: 0, act: 0 });
   return `<div class="kado-detail">
     <table class="agg-table drill-table">
@@ -3485,8 +3472,8 @@ function loadDemo() {
     { ...blank, row: 15, id: "KM-06", client: "kakimoto arms", no: 6, type: "保守対応", status: "完了", occur: d(2026, 7, 10), done: d(2026, 7, 10), owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: 4, amount: null, order: "", deliver: null, content: "夏季キャンペーン特設ページの緊急改修", progress: "対応完了", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 10) },
     { ...blank, row: 16, id: "OF-01", client: "桜楓会", no: 1, type: "保守対応", status: "完了", occur: d(2026, 8, 3), done: d(2026, 8, 3), owner: "紺谷", reporter: "紺谷", contact: "", priority: "", workHours: 0.3, amount: null, order: "", deliver: null, content: "問合せフォームの文言修正", progress: "対応完了", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 8, 3) },
     { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", workHours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
-    { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定", hold: true },
-    { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日", quoteLimit: daysFromNow(5) },
+    { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定", hold: true, workHours: 2.5 },
+    { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日", quoteLimit: daysFromNow(5), workHours: 1 },
     { ...blank, row: 10, id: "EX-01", client: "エキスプレス", no: 1, type: "見積り", status: "新規", occur: d(2026, 7, 6), done: null, owner: "紺谷", reporter: "紺谷", contact: "中道様", priority: "", hours: null, amount: null, order: "", deliver: null, content: "削除した請求書を参照できる機能の見積", progress: "", note: "", memo: "" },
     { ...blank, row: 11, id: "HN-03", client: "ハンター製菓", no: 3, type: "プリセールス", status: "新規", occur: d(2026, 7, 9), done: null, owner: "小川", reporter: "小川", contact: "", priority: "低", hours: null, amount: null, order: "", deliver: null, content: "加工所日報のモバイル入力の提案", progress: "", note: "", memo: "" },
     { ...blank, row: 12, id: "AG-02", client: "アサヒグラント", no: 2, type: "見積り", status: "受託中", occur: d(2026, 5, 20), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 6, amount: 480000, order: "受注", deliver: d(2026, 6, 30), content: "受注管理の帳票カスタマイズ", progress: "承認いただき受注確定", note: "", memo: "", stageStart: d(2026, 5, 22), quoteDone: d(2026, 5, 28), confirmDone: d(2026, 6, 10), confirm: "正式発注", book: d(2026, 8, 20), finalAmount: 480000, finalHours: 6, orderDone: d(2026, 6, 12), workStart: d(2026, 6, 20), dueDate: d(2026, 7, 31), workHours: 6, acceptHours: 4 },
