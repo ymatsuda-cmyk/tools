@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_c3d09e6";
+const APP_VERSION = "rev_20260821_d8f21b5";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -3171,9 +3171,9 @@ function renderKadoHoshu() {
     const feeMan = (c.hoshuFee || 0) / 10000;
     const allowHours = (c.hoshuAllow || 0) * 8;   // 1人日＝8時間
     return `
-    <div class="kado-row">
+    <div class="kado-grid-row">
       <div class="kado-name"><b>${esc(c.name)}</b>
-        <div class="kado-sub">${feeMan.toFixed(1)}万/月<br>${(c.hoshuAllow || 0).toFixed(1)}人日/月 （${allowHours.toFixed(1)}時間）</div></div>
+        <div class="kado-sub">${feeMan.toFixed(1)}万/月<br>${(c.hoshuAllow || 0).toFixed(1)}人日/月（${allowHours.toFixed(1)}時間）</div></div>
       <div class="kado-chart">${chart}</div>
       <div class="kado-stat">
         <span class="badge-pill ${badgeOver ? "over" : "ok"}">${badgeOver
@@ -3191,7 +3191,7 @@ function renderKadoHoshu() {
   }).join("");
 
   const unconfHtml = unconfRows.map(({ name, monthly, actualElapsed }) => `
-    <div class="kado-row">
+    <div class="kado-grid-row">
       <div class="kado-name"><b>${esc(name)}</b><span class="unset-tag">未設定</span>
         <div class="kado-sub" style="color:#c9d3d8">保守費・許容工数 未入力</div></div>
       <div class="kado-chart">${plainBarChart(months, monthly, elapsed)}</div>
@@ -3243,8 +3243,10 @@ function renderKadoHoshu() {
         <span><span class="sw" style="background:#dd5a55"></span>超過分</span>
         <span><span class="sw sw-line" style="border-top-color:#9fb0b9"></span>許容ライン</span>
       </div>
-      ${rowsHtml || `<p class="muted">対象となる取引先がありません。</p>`}
-      ${unconfRows.length ? `<div class="section-h">保守費 未設定の取引先（比較対象外・実績のみ表示）</div>${unconfHtml}` : ""}
+      <div class="kado-grid-wrap">
+        ${rowsHtml ? `<div class="kado-grid-head"><span>取引先</span><span>推移</span><span class="r">消化状況</span><span class="r">保守費乖離</span></div>${rowsHtml}` : `<p class="muted">対象となる取引先がありません。</p>`}
+        ${unconfRows.length ? `<div class="section-h">保守費 未設定の取引先（比較対象外・実績のみ表示）</div>${unconfHtml}` : ""}
+      </div>
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対応工数は着手日（着手日が無ければ完了日→発生日）を基準に、対応工数（人日・AM列）を月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
         見積り／プリセールスを分類に含めた場合も、状態を問わず同じ対応工数（AM列）を集計します。受注確定後（受注・受託中・完了）の案件は「受託工数」タブ（見積工数=Y列・実績工数=AN列）にも別途表示されるため、同じ案件が両方のタブに数字を持つ場合があります。<br>

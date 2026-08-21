@@ -925,6 +925,34 @@ body {
 .kado-diff-col .amt { font-size: 12px; font-weight: bold; }
 .kado-diff-col .lbl { font-size: 10px; color: #8a97a0; margin-top: 1px; }
 
+/* 対応工数（保守）：取引先別 対応工数のグリッド整列表示（列位置を固定して縦に揃える） */
+.kado-grid-wrap { overflow-x: auto; }
+.kado-grid-head, .kado-grid-row {
+  display: grid; grid-template-columns: 150px minmax(180px, 1fr) 160px 150px;
+  gap: 12px; align-items: center; min-width: 640px;
+}
+.kado-grid-head { padding: 0 4px 6px; border-bottom: 1px solid #dde3e7; margin-bottom: 2px; }
+.kado-grid-head span { font-size: 10px; color: #8a97a0; font-weight: bold; }
+.kado-grid-head span.r { text-align: right; }
+.kado-grid-row { padding: 9px 4px; border-bottom: 1px solid #eef1f3; }
+.kado-grid-row:last-child { border-bottom: none; }
+.kado-grid-row .kado-stat { text-align: right; }
+/* Excelタスクペイン相当の狭い幅では横スクロールで列が隠れてしまうため、
+   名前＋乖離額を1行目・グラフ・消化状況を縦積みにするレイアウトへ切り替える */
+@media (max-width: 700px) {
+  .kado-grid-head { display: none; }
+  .kado-grid-wrap { overflow-x: visible; }
+  .kado-grid-row {
+    display: grid; min-width: 0; gap: 4px 12px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "name amt" "chart chart" "stat stat";
+  }
+  .kado-grid-row .kado-name { grid-area: name; }
+  .kado-grid-row .kado-chart { grid-area: chart; }
+  .kado-grid-row .kado-stat { grid-area: stat; text-align: left; }
+  .kado-grid-row .kado-diff-col { grid-area: amt; }
+}
+
 /* 分類フィルタ：複数選択トグル */
 .multi-toggle {
   display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #52616b;
