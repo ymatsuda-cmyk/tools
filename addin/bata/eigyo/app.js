@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_b3d6f19";
+const APP_VERSION = "rev_20260821_c9e14a7";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2931,6 +2931,8 @@ let kadoHoshuType = null;       // 単一選択モードでの選択値（null=�
 let kadoHoshuTypes = [];        // 複数選択モードでの選択値（空=すべて）
 let kadoUketakuOpen = null;     // 受託工数：予実一覧を展開中の取引先
 let kadoUketakuStatus = "all";  // 受託工数：状態フィルタ（all | 受託中 | 完了）
+let kadoHoshuClient = "";       // 対応工数（保守）：取引先フィルタ（空=すべて）
+let kadoUketakuClient = "";     // 受託工数：取引先フィルタ（空=すべて）
 /* 全体キャパの「対応工数（保守）」集計は保守対応/瑕疵対応/調整の3種のみ（従来通り・固定） */
 const MAINT_TYPES = ["保守対応", "瑕疵対応", "調整"];
 /* 対応工数（保守）タブの分類フィルタ選択肢（見積り・プリセールスも他種別と同じ対応工数=AM列を集計） */
@@ -2959,6 +2961,8 @@ function clearKadoTypes() {
 }
 function toggleKadoClient(name) { kadoUketakuOpen = (kadoUketakuOpen === name) ? null : name; renderAgg(); }
 function switchKadoUketakuStatus(v) { kadoUketakuStatus = v; renderAgg(); }
+function selectKadoHoshuClient(v) { kadoHoshuClient = v; renderAgg(); }
+function selectKadoUketakuClient(v) { kadoUketakuClient = v; renderAgg(); }
 
 
 function renderKadoAgg() {
@@ -3116,7 +3120,10 @@ function renderKadoHoshu() {
   /* 見積り／プリセールスも状態を問わず対応工数（AM列）を計上する（保守対応/瑕疵対応/調整と同様） */
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   const clientNames = [...new Set(target.map(r => r.client).filter(Boolean))];
-  const configured = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
+  const configuredAll = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
+  /* 取引先フィルタ：選択肢は現在の分類フィルタに該当する取引先（保守費設定済み＋未設定の両方） */
+  const clientOptions = [...new Set([...configuredAll.map(c => c.name), ...clientNames])].sort((a, b) => a.localeCompare(b, "ja"));
+  const configured = kadoHoshuClient ? configuredAll.filter(c => c.name === kadoHoshuClient) : configuredAll;
 
   let sumActual = 0, sumAllow = 0, sumDiffYen = 0;
   const overClients = [];
@@ -3136,7 +3143,8 @@ function renderKadoHoshu() {
   sumAllow = Math.round(sumAllow * 10) / 10;
 
   /* 保守費・許容工数が未設定の取引先：比較対象外。実績のみ表示する */
-  const unconfNames = clientNames.filter(name => !configured.some(c => c.name === name));
+  const unconfNamesAll = clientNames.filter(name => !configuredAll.some(c => c.name === name));
+  const unconfNames = kadoHoshuClient ? unconfNamesAll.filter(name => name === kadoHoshuClient) : unconfNamesAll;
   const unconfRows = unconfNames.map(name => {
     const recs = target.filter(r => r.client === name);
     const monthly = sumByMonth(recs, "workHours", "stageStart", months);
@@ -3205,6 +3213,12 @@ function renderKadoHoshu() {
         <label class="multi-toggle${kadoHoshuMulti ? " on" : ""}" onclick="toggleKadoMulti()">
           <span class="switch"><i></i></span>複数選択
         </label>
+      </div>
+      <div class="af-row"><span class="af-label">取引先</span>
+        <select class="af-select" onchange="selectKadoHoshuClient(this.value)">
+          <option value="">すべて</option>
+          ${clientOptions.map(name => `<option value="${esc(name)}"${kadoHoshuClient === name ? " selected" : ""}>${esc(name)}</option>`).join("")}
+        </select>
       </div>
       <div class="af-row"><span class="af-label">表示</span>
         <div class="seg-inline">
@@ -3332,7 +3346,9 @@ function kadoUketakuTarget() {
     (!r.book || (r.book >= tStart && r.book < tEnd)));
 }
 function renderKadoUketaku() {
-  const target = kadoUketakuTarget();
+  let target = kadoUketakuTarget();
+  const clientOptions = [...new Set(target.map(r => r.client).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  if (kadoUketakuClient) target = target.filter(r => r.client === kadoUketakuClient);
   const byClient = {};
   target.forEach(r => {
     if (!r.client) return;
@@ -3381,6 +3397,12 @@ function renderKadoUketaku() {
           <button class="fchip${kadoUketakuStatus === "受託中" ? " on" : ""}" onclick="switchKadoUketakuStatus('受託中')">受託中</button>
           <button class="fchip${kadoUketakuStatus === "完了" ? " on" : ""}" onclick="switchKadoUketakuStatus('完了')">完了</button>
         </div></div>
+      <div class="af-row"><span class="af-label">取引先</span>
+        <select class="af-select" onchange="selectKadoUketakuClient(this.value)">
+          <option value="">すべて</option>
+          ${clientOptions.map(name => `<option value="${esc(name)}"${kadoUketakuClient === name ? " selected" : ""}>${esc(name)}</option>`).join("")}
+        </select>
+      </div>
     </div>
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${Math.round(totalAmt / 10000).toLocaleString()}万</div><div class="kl">受注額合計</div></div>

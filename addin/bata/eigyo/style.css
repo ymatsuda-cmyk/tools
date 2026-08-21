@@ -329,7 +329,9 @@ body {
 .agg-seg {
   display: flex; gap: 2px; align-items: flex-end;
   border-bottom: 1px solid #dde3e7; margin-bottom: 12px;
-  position: sticky; top: 0; z-index: 6; background: #f7f8f9;
+  /* .pane の padding-top(10px)分、sticky時に隙間ができて下の内容が透けるため
+     top を -10px にして .pane の最上部（padding含む）まで詰めて固定する */
+  position: sticky; top: -10px; z-index: 6; background: #f7f8f9;
 }
 /* margin-bottom は背景が塗られないため、固定表示時に下の要素がスクロールで透けて見える。
    ::after で margin 分（12px）を同じ背景色で埋めて隙間を消す。 */
@@ -907,9 +909,9 @@ body {
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 
 /* 稼働状況：期セレクタ＋ビュータブ（固定表示） */
-/* .agg-seg（固定表示・高さ33px＋下マージン12px＝45px）の直下に重ならず固定 */
+/* .agg-seg（固定表示・高さ33px＋下マージン12px＝45px、.agg-seg側のtop:-10pxに合わせて-10した値）の直下に重ならず固定 */
 .kado-sticky {
-  position: sticky; top: 45px; z-index: 5; background: #f7f8f9;
+  position: sticky; top: 35px; z-index: 5; background: #f7f8f9;
   padding-top: 2px; margin: 0 0 8px;
 }
 .kado-tabs { display: flex; gap: 22px; border-bottom: 1px solid #dde3e7; margin-top: 8px; }
