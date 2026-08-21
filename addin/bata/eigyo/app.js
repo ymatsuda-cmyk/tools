@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_d5f8b30";
+const APP_VERSION = "rev_20260821_c3d09e6";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2212,10 +2212,11 @@ function termBarHtml(showHoursToggle) {
 }
 function renderAgg() {
   const cont = document.getElementById("agg-container");
-  if (currentAgg === "hoshu") cont.innerHTML = termBarHtml() + renderHoshuAgg();
-  else if (currentAgg === "mitsu") cont.innerHTML = renderMitsuAgg();
-  else if (currentAgg === "uriage") cont.innerHTML = termBarHtml() + renderJuchuAgg();
-  else cont.innerHTML = renderKadoAgg();   // renderKadoAgg()が期セレクタ＋タブ（固定表示）を内包
+  const fixed = document.getElementById("agg-subfixed");
+  if (currentAgg === "hoshu") { fixed.innerHTML = ""; cont.innerHTML = termBarHtml() + renderHoshuAgg(); }
+  else if (currentAgg === "mitsu") { fixed.innerHTML = ""; cont.innerHTML = renderMitsuAgg(); }
+  else if (currentAgg === "uriage") { fixed.innerHTML = ""; cont.innerHTML = termBarHtml() + renderJuchuAgg(); }
+  else { fixed.innerHTML = renderKadoFixed(); cont.innerHTML = renderKadoContent(); }   // 稼働状況：期セレクタ＋タブは #agg-subfixed（固定表示）、本体は #agg-container（スクロール）
 }
 
 /* --- 保守状況 --- */
@@ -2965,8 +2966,9 @@ function selectKadoHoshuClient(v) { kadoHoshuClient = v; renderAgg(); }
 function selectKadoUketakuClient(v) { kadoUketakuClient = v; renderAgg(); }
 
 
-function renderKadoAgg() {
-  const sticky = `<div class="kado-sticky">
+/* 稼働状況の「期セレクタ＋ビュータブ」：#agg-subfixed に入る固定表示部分（スクロールしない） */
+function renderKadoFixed() {
+  return `<div class="kado-fixed">
     <div class="term-bar">
       <button class="term-btn" onclick="shiftTerm(-1)">◀</button>
       <span class="term-label">${esc(termLabel(currentTerm))}</span>
@@ -2978,9 +2980,12 @@ function renderKadoAgg() {
       <button class="${kadoView === "uketaku" ? "active" : ""}" onclick="switchKadoView('uketaku')">受託工数</button>
     </div>
   </div>`;
-  if (kadoView === "hoshu") return sticky + renderKadoHoshu();
-  if (kadoView === "uketaku") return sticky + renderKadoUketaku();
-  return sticky + renderKadoCapacity();
+}
+/* 稼働状況の選択ビューの本体：#agg-container に入るスクロール対象部分 */
+function renderKadoContent() {
+  if (kadoView === "hoshu") return renderKadoHoshu();
+  if (kadoView === "uketaku") return renderKadoUketaku();
+  return renderKadoCapacity();
 }
 
 /* --- 全体キャパ --- */
@@ -3202,23 +3207,22 @@ function renderKadoHoshu() {
 
   return `
     <div class="agg-filters" style="margin-bottom:10px">
-      <div class="af-row" style="justify-content:space-between;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="af-label">分類</span>
-          <div class="fchips">
-            <button class="fchip clear${clearOn ? " on" : ""}" onclick="clearKadoTypes()">すべて</button>
-            ${KADO_HOSHU_TYPES.map(t => chip(t, chipOn(t))).join("")}
-          </div>
+      <div class="af-row">
+        <span class="af-label">分類</span>
+        <div class="fchips">
+          <button class="fchip clear${clearOn ? " on" : ""}" onclick="clearKadoTypes()">すべて</button>
+          ${KADO_HOSHU_TYPES.map(t => chip(t, chipOn(t))).join("")}
         </div>
-        <label class="multi-toggle${kadoHoshuMulti ? " on" : ""}" onclick="toggleKadoMulti()">
+        <label class="multi-toggle${kadoHoshuMulti ? " on" : ""}" onclick="toggleKadoMulti()" style="margin-left:auto">
           <span class="switch"><i></i></span>複数選択
         </label>
       </div>
-      <div class="af-row"><span class="af-label">取引先</span>
-        <select class="af-select" onchange="selectKadoHoshuClient(this.value)">
-          <option value="">すべて</option>
-          ${clientOptions.map(name => `<option value="${esc(name)}"${kadoHoshuClient === name ? " selected" : ""}>${esc(name)}</option>`).join("")}
-        </select>
+      <div class="af-row">
+        <span class="af-label">取引先</span>
+        <div class="fchips">
+          <button class="fchip clear${!kadoHoshuClient ? " on" : ""}" onclick="selectKadoHoshuClient('')">すべて</button>
+          ${clientOptions.map(name => `<button class="fchip${kadoHoshuClient === name ? " on" : ""}" onclick="selectKadoHoshuClient('${esc(name)}')">${esc(name)}</button>`).join("")}
+        </div>
       </div>
       <div class="af-row"><span class="af-label">表示</span>
         <div class="seg-inline">
@@ -3397,11 +3401,12 @@ function renderKadoUketaku() {
           <button class="fchip${kadoUketakuStatus === "受託中" ? " on" : ""}" onclick="switchKadoUketakuStatus('受託中')">受託中</button>
           <button class="fchip${kadoUketakuStatus === "完了" ? " on" : ""}" onclick="switchKadoUketakuStatus('完了')">完了</button>
         </div></div>
-      <div class="af-row"><span class="af-label">取引先</span>
-        <select class="af-select" onchange="selectKadoUketakuClient(this.value)">
-          <option value="">すべて</option>
-          ${clientOptions.map(name => `<option value="${esc(name)}"${kadoUketakuClient === name ? " selected" : ""}>${esc(name)}</option>`).join("")}
-        </select>
+      <div class="af-row">
+        <span class="af-label">取引先</span>
+        <div class="fchips">
+          <button class="fchip clear${!kadoUketakuClient ? " on" : ""}" onclick="selectKadoUketakuClient('')">すべて</button>
+          ${clientOptions.map(name => `<button class="fchip${kadoUketakuClient === name ? " on" : ""}" onclick="selectKadoUketakuClient('${esc(name)}')">${esc(name)}</button>`).join("")}
+        </div>
       </div>
     </div>
     <div class="kpi-row">

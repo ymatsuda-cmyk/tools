@@ -324,24 +324,18 @@ body {
 .card.t-調整         { border-left-color: #6b7780; }
 
 /* ---------- 集計 ---------- */
-/* 保守状況／見積状況／受注状況 はタブ表現 */
-/* スクロールしても常に見えるよう固定表示（.pane 内でのスクロールに対して sticky） */
+/* 保守状況／見積状況／受注状況 はタブ表現。
+   #pane-agg は「固定ヘッダー（.agg-seg＋#agg-subfixed）／スクロール領域（.agg-scroll）」の
+   2段構成。position:sticky ではなく実際にレイアウトを分離しているため、
+   スクロールバーは .agg-scroll の範囲（サブタブより下）だけに表示される。 */
+#pane-agg { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .agg-seg {
   display: flex; gap: 2px; align-items: flex-end;
-  border-bottom: 1px solid #dde3e7; margin-bottom: 12px;
-  /* .pane の padding-top(10px)分の隙間を margin-top:-10px で打ち消し、
-     同じ幅を padding-top として自分の（背景色付きの）ボックス内に取り込む。
-     これにより、スクロール前／後で見た目の隙間の大きさが変わらず、
-     隙間部分も常に背景色で塗られる（透けない）。 */
-  margin-top: -10px; padding-top: 10px;
-  position: sticky; top: 0; z-index: 6; background: #f7f8f9;
+  border-bottom: 1px solid #dde3e7;
+  flex: 0 0 auto; margin: 10px 10px 12px; background: #f7f8f9;
 }
-/* margin-bottom は背景が塗られないため、固定表示時に下の要素がスクロールで透けて見える。
-   ::after で margin 分（12px）を同じ背景色で埋めて隙間を消す。 */
-.agg-seg::after {
-  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 12px;
-  background: #f7f8f9;
-}
+#agg-subfixed { flex: 0 0 auto; }
+.agg-scroll { flex: 1 1 auto; overflow: auto; padding: 0 10px 10px; }
 .agg-seg .seg {
   border: 1px solid #dde3e7; border-bottom: none; background: #eef2f4;
   color: #52616b; border-radius: 5px 5px 0 0; padding: 7px 16px;
@@ -795,6 +789,9 @@ body {
   min-width: 94px; flex: 0 0 auto; padding-top: 3px;
   font-size: 11px; font-weight: bold; color: #0e7a5f;
 }
+/* 取引先など、選択肢が多く折り返す想定のフィルタ行：ラベルを上・チップ群を下に積む */
+.af-row-col { flex-direction: column; align-items: stretch; gap: 4px; }
+.af-row-col .af-label { min-width: auto; padding-top: 0; }
 .fchips { display: flex; gap: 4px; flex-wrap: wrap; }
 .fchip {
   border: 1px solid #c5d2d8; background: #fff; color: #52616b;
@@ -911,11 +908,9 @@ body {
 .pbar { height: 14px; background: #eef1f3; border-radius: 4px; position: relative; overflow: hidden; }
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 
-/* 稼働状況：期セレクタ＋ビュータブ（固定表示） */
-/* .agg-seg（固定表示・高さ43px＋下マージン12px＝55px）の直下に重ならず固定 */
-.kado-sticky {
-  position: sticky; top: 55px; z-index: 5; background: #f7f8f9;
-  padding-top: 2px; margin: 0 0 8px;
+/* 稼働状況：期セレクタ＋ビュータブ（#agg-subfixed内・実際に固定領域にあるため sticky 不要） */
+.kado-fixed {
+  background: #f7f8f9; margin: 0 10px 8px;
 }
 .kado-tabs { display: flex; gap: 22px; border-bottom: 1px solid #dde3e7; margin-top: 8px; }
 .kado-tabs button {
