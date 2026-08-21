@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_a5c72f8";
+const APP_VERSION = "rev_20260821_b91e5d3";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2240,21 +2240,16 @@ function renderHoshuAgg() {
   };
   const doneSeries = countByMonth(target, "done", months);
 
-  // 対応工数（人日）の月次集計：着手日ベース（無ければ完了日→発生日）
-  const hours = sumByMonth(target, "workHours", "stageStart", months);
-  const totalHoursR = Math.round(hours.reduce((a, v) => a + v, 0) * 10) / 10;
-
   return `
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${target.length}</div><div class="kl">保守・瑕疵 総件数</div></div>
       <div class="kpi"><div class="kv">${open}</div><div class="kl">未完了件数</div></div>
-      <div class="kpi"><div class="kv">${totalHoursR}</div><div class="kl">対応工数計（人日）</div></div>
     </div>
     <div class="agg-card">
-      <h3>保守・瑕疵 月次推移（発生の内訳・完了＋対応工数）</h3>
-      ${legendHtml(stackColors, { "完了件数": "line:#548235", "対応工数（人日・右軸）": "area:#ed7d31" })}
-      <div class="chart-wrap">${hoshuTrendChart(months, stack, stackColors, doneSeries, hours)}</div>
-      <p style="font-size:10px;color:#a9b2ba;margin-top:4px">積み上げ棒＝発生件数（左軸）／実線＝完了件数（左軸）／面＝対応工数 人日（右軸・着手月ベース）</p>
+      <h3>保守・瑕疵 月次推移（発生の内訳・完了）</h3>
+      ${legendHtml(stackColors, { "完了件数": "line:#548235" })}
+      <div class="chart-wrap">${hoshuTrendChart(months, stack, stackColors, doneSeries, null)}</div>
+      <p style="font-size:10px;color:#a9b2ba;margin-top:4px">積み上げ棒＝発生件数（左軸）／実線＝完了件数（左軸）</p>
     </div>
     ${renderMaintList(target)}`;
 }
@@ -3027,8 +3022,7 @@ function renderKadoCapacity() {
   return `
     ${warn}
     <div class="kpi-row">
-      <div class="kpi"><div class="kv">${totalCapa}</div><div class="kl">基本稼働（人日・経過${elapsed}ヶ月）</div></div>
-      <div class="kpi"><div class="kv">${totalActual}</div><div class="kl">実績合計（保守＋受託・人日）</div></div>
+      <div class="kpi"><div class="kv">${fmt1(totalActual)}<span style="font-size:12px"> / ${fmt1(totalCapa)}</span></div><div class="kl">実績／ベース稼働（人日）</div></div>
       <div class="kpi ${overMonths ? "kpi-alert" : ""}"><div class="kv">${overMonths}</div><div class="kl">溢れた月数（経過月中）</div></div>
       <div class="kpi ${overSum > 0 ? "kpi-alert" : ""}"><div class="kv">${overMonths ? "+" + (Math.round(overSum * 10) / 10) : 0}</div><div class="kl">溢れ合計（人日）</div></div>
     </div>
@@ -3223,10 +3217,10 @@ function renderKadoHoshu() {
         </div></div>
     </div>
     <div class="kpi-row">
+      <div class="kpi"><div class="kv">${configured.length}</div><div class="kl">保守契約済み取引先</div></div>
       <div class="kpi ${sumDiffYen < 0 ? "kpi-alert" : ""}"><div class="kv">${sumDiffYen >= 0 ? "+" : ""}${sumDiffYen.toLocaleString()}</div><div class="kl">残予算（円）</div></div>
       <div class="kpi"><div class="kv">${fmt1(sumActual)}<span style="font-size:12px"> / ${fmt1(sumAllow)}</span></div><div class="kl">実績 / 総工数（人日・経過${elapsed}ヶ月）</div></div>
       <div class="kpi ${overClients.length ? "kpi-alert" : ""}"><div class="kv">${overClients.length}</div><div class="kl">超過している取引先</div></div>
-      <div class="kpi"><div class="kv">${configured.length}</div><div class="kl">保守契約済み取引先</div></div>
       <div class="kpi kpi-alert"><div class="kv">${fmt1(sumUnconf)}</div><div class="kl">保守契約外（人日・経過${elapsed}ヶ月）</div></div>
     </div>
     <div class="agg-card">
@@ -3405,10 +3399,10 @@ function renderKadoUketaku() {
       </div>
     </div>
     <div class="kpi-row">
+      <div class="kpi"><div class="kv">${rows.length}</div><div class="kl">対象取引先数</div></div>
       <div class="kpi"><div class="kv">${Math.round(totalAmt / 10000).toLocaleString()}万</div><div class="kl">受注額合計</div></div>
       <div class="kpi"><div class="kv">${fmt1(totalAct)}<span style="font-size:12px"> / ${fmt1(totalEst)}</span></div><div class="kl">実績 / 見積 工数（人日）</div></div>
       <div class="kpi ${overRows.length ? "kpi-alert" : ""}"><div class="kv">${overRows.length}</div><div class="kl">見積超過の案件</div></div>
-      <div class="kpi"><div class="kv">${rows.length}</div><div class="kl">対象取引先数</div></div>
     </div>
     <div class="agg-card">
       <h3>取引先別 受託工数（${esc(statusLabel2)}）</h3>
