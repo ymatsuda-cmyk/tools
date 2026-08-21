@@ -23,6 +23,8 @@ const DOT_COLOR = {
 export function createEndpointPanel(root, ctx) {
   let open = localStorage.getItem(OPEN_KEY) === '1'
   let list = []
+  let loaded = false
+  let lastError = null
   let busy = null
   let timer = null
 
@@ -133,8 +135,25 @@ export function createEndpointPanel(root, ctx) {
       return
     }
 
-    if (!list.length) {
+    if (!loaded) {
       root.append(h('div', { class: 'ep-panel ep-loading', text: '読み込み中…' }))
+      return
+    }
+
+    if (lastError) {
+      root.append(
+        h(
+          'div',
+          { class: 'ep-panel warn' },
+          h('div', { text: lastError }),
+          h('button', { class: 'ep-btn', text: '再試行', onClick: load }),
+        ),
+      )
+      return
+    }
+
+    if (!list.length) {
+      root.append(h('div', { class: 'ep-panel ep-loading', text: 'エンドポイントがありません' }))
       return
     }
 
@@ -163,11 +182,13 @@ export function createEndpointPanel(root, ctx) {
     clearTimeout(timer)
     try {
       const res = await getStatusAll(ctx.getSettings())
+      if (!res.success) throw new Error(res.error || 'エンドポイントの取得に失敗しました')
       list = res.endpoints ?? []
+      lastError = null
     } catch (e) {
-      list = []
-      root.replaceChildren(h('div', { class: 'ep-panel warn', text: e.message }))
+      lastError = e.message
     }
+    loaded = true
     render()
     timer = setTimeout(load, POLL_MS)
   }

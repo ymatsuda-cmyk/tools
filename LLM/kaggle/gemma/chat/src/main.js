@@ -312,7 +312,7 @@ $('new-chat').addEventListener('click', onNewChat)
 $('open-settings').addEventListener('click', () => openSettings(settings, applySettings))
 
 renderTopbar()
-statusBar.refresh()
+endpointPanel.refresh()
 const convs = await listConversations()
 if (convs.length) convId = convs[0].id
 await refresh()
