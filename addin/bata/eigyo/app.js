@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_f2b9a41";
+const APP_VERSION = "rev_20260821_a8c7e52";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];

@@ -325,9 +325,11 @@ body {
 
 /* ---------- 集計 ---------- */
 /* 保守状況／見積状況／受注状況 はタブ表現 */
+/* スクロールしても常に見えるよう固定表示（.pane 内でのスクロールに対して sticky） */
 .agg-seg {
   display: flex; gap: 2px; align-items: flex-end;
   border-bottom: 1px solid #dde3e7; margin-bottom: 12px;
+  position: sticky; top: 0; z-index: 6; background: #f7f8f9;
 }
 .agg-seg .seg {
   border: 1px solid #dde3e7; border-bottom: none; background: #eef2f4;
@@ -899,8 +901,9 @@ body {
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 
 /* 稼働状況：期セレクタ＋ビュータブ（固定表示） */
+/* .agg-seg（固定表示・高さ33px＋下マージン12px＝45px）の直下に重ならず固定 */
 .kado-sticky {
-  position: sticky; top: 0; z-index: 5; background: #f7f8f9;
+  position: sticky; top: 45px; z-index: 5; background: #f7f8f9;
   padding-top: 2px; margin: 0 0 8px;
 }
 .kado-tabs { display: flex; gap: 22px; border-bottom: 1px solid #dde3e7; margin-top: 8px; }
