@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_d8f21b5";
+const APP_VERSION = "rev_20260821_f83d16e";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2990,24 +2990,15 @@ function renderKadoContent() {
 
 /* --- 全体キャパ --- */
 function kadoHoshuMonthly(months, types) {
-  const useTypes = types && types.length ? types : MAINT_TYPES;
+  const useTypes = types && types.length ? types : KADO_HOSHU_TYPES;
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   return sumByMonth(target, "workHours", "stageStart", months);
 }
-/* 受託工数の月次分布: 完了は実績(AN)、受託中は見積(Y:最終工数)を、受託開始日〜完了(予定)日で按分 */
+/* 受託工数の月次分布: 受託中・完了とも実績工数(AN列)を、受託開始日の月に計上 */
 function kadoUketakuMonthly(months) {
-  const totals = Object.fromEntries(months.map(m => [m, 0]));
   const target = activeRecords().filter(r =>
     QUOTE_TYPES.includes(r.type) && ["受託中", "完了"].includes(r.status) && r.workStart);
-  target.forEach(r => {
-    const isDone = r.status === "完了";
-    const hours = isDone ? r.acceptHours : r.finalHours;
-    if (hours == null) return;
-    const end = isDone ? (r.done || r.workStart) : (r.dueDate || r.workStart);
-    const dist = spreadAcrossMonths(hours, r.workStart, end, months);
-    months.forEach(m => totals[m] += dist[m]);
-  });
-  return months.map(m => Math.round(totals[m] * 10) / 10);
+  return sumByMonth(target, "acceptHours", "workStart", months);
 }
 function renderKadoCapacity() {
   const months = fiscalMonths(currentTerm);
@@ -3051,7 +3042,8 @@ function renderKadoCapacity() {
         { "対応工数（保守）": "#2c6e9b", "受託工数": "#b7791f" }, capaSeries, elapsed)}</div>
       <p style="font-size:10px;color:#a9b2ba;margin-top:4px">
         基本稼働＝その月の営業日数（祝日シート反映・土日祝を除く）×体制シートの稼働人数（1人日＝8時間換算）。<br>
-        対応工数は保守対応・瑕疵対応・調整の対応工数（着手月ベース）。受託工数は見積り/プリセールスの受託中・完了案件の工数を、受託開始日〜完了(予定)日の日数比で按分（受託中は見積工数=最終工数(Y列)、完了は実績工数を使用。開始日未確定の案件は含まれません）。<br>
+        対応工数は保守対応・瑕疵対応・見積り・プリセールス・調整の対応工数（AM列・着手月ベース）。受託工数は見積り/プリセールスの受託中・完了案件の実績工数（AN列）を、受託開始日の月に計上（開始日未確定の案件は含まれません）。<br>
+        見積り/プリセールス案件が受託中・完了まで進んでいる場合、対応工数（AM列）と受託工数（AN列）の両方に数字が乗るため、同じ案件の工数が合計に二重計上されることがあります。<br>
         「その他（社内業務・営業活動等）」の工数は現状未計上のため、実際の基本稼働との差はここに表示される値より小さくなる場合があります。
       </p>
     </div>
@@ -3147,15 +3139,17 @@ function renderKadoHoshu() {
   sumActual = Math.round(sumActual * 10) / 10;
   sumAllow = Math.round(sumAllow * 10) / 10;
 
-  /* 保守費・許容工数が未設定の取引先：比較対象外。実績のみ表示する */
+  /* 保守費・許容工数が未設定の取引先（＝保守契約外）：比較対象外。実績のみ表示する */
   const unconfNamesAll = clientNames.filter(name => !configuredAll.some(c => c.name === name));
   const unconfNames = kadoHoshuClient ? unconfNamesAll.filter(name => name === kadoHoshuClient) : unconfNamesAll;
-  const unconfRows = unconfNames.map(name => {
+  const unconfRowsAll = unconfNames.map(name => {
     const recs = target.filter(r => r.client === name);
     const monthly = sumByMonth(recs, "workHours", "stageStart", months);
     const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
     return { name, monthly, actualElapsed };
-  }).filter(r => r.actualElapsed > 0 || r.monthly.some(v => v > 0));
+  });
+  const sumUnconf = Math.round(unconfRowsAll.reduce((a, r) => a + r.actualElapsed, 0) * 10) / 10;
+  const unconfRows = unconfRowsAll.filter(r => r.actualElapsed > 0 || r.monthly.some(v => v > 0));
 
   const chip = (v, on) => `<button class="fchip${on ? " on" : ""}" onclick="selectKadoType('${esc(v)}')">${esc(KADO_TYPE_LABEL[v])}</button>`;
   const clearOn = kadoHoshuMulti ? !kadoHoshuTypes.length : !kadoHoshuType;
@@ -3231,10 +3225,11 @@ function renderKadoHoshu() {
         </div></div>
     </div>
     <div class="kpi-row">
-      <div class="kpi ${sumDiffYen < 0 ? "kpi-alert" : ""}"><div class="kv">${sumDiffYen >= 0 ? "+" : ""}${sumDiffYen.toLocaleString()}</div><div class="kl">保守費との乖離（円）</div></div>
-      <div class="kpi"><div class="kv">${sumActual}<span style="font-size:12px"> / ${sumAllow}</span></div><div class="kl">実績 / 許容（人日・経過${elapsed}ヶ月）</div></div>
+      <div class="kpi ${sumDiffYen < 0 ? "kpi-alert" : ""}"><div class="kv">${sumDiffYen >= 0 ? "+" : ""}${sumDiffYen.toLocaleString()}</div><div class="kl">残予算（円）</div></div>
+      <div class="kpi"><div class="kv">${sumActual}<span style="font-size:12px"> / ${sumAllow}</span></div><div class="kl">実績 / 総工数（人日・経過${elapsed}ヶ月）</div></div>
       <div class="kpi ${overClients.length ? "kpi-alert" : ""}"><div class="kv">${overClients.length}</div><div class="kl">超過している取引先</div></div>
       <div class="kpi"><div class="kv">${configured.length}</div><div class="kl">保守費設定済み取引先</div></div>
+      <div class="kpi kpi-alert"><div class="kv">${sumUnconf}</div><div class="kl">保守契約外（人日・経過${elapsed}ヶ月）</div></div>
     </div>
     <div class="agg-card">
       <h3>取引先別 ${kadoHoshuMode === "month" ? "月次" : "累計"} 対応工数</h3>
@@ -3250,7 +3245,7 @@ function renderKadoHoshu() {
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対応工数は着手日（着手日が無ければ完了日→発生日）を基準に、対応工数（人日・AM列）を月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
         見積り／プリセールスを分類に含めた場合も、状態を問わず同じ対応工数（AM列）を集計します。受注確定後（受注・受託中・完了）の案件は「受託工数」タブ（見積工数=Y列・実績工数=AN列）にも別途表示されるため、同じ案件が両方のタブに数字を持つ場合があります。<br>
-        保守費・許容工数が未設定の取引先は「保守費 未設定の取引先」欄に実績のみ表示します（乖離は算出しません）。
+        保守費・許容工数が未設定の取引先は「保守費 未設定の取引先」欄に実績のみ表示します（乖離は算出しません）。「保守契約外（人日）」は、この未設定取引先の実績（経過月分）を合計したものです。
       </p>
     </div>`;
 }
