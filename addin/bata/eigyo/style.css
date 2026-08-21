@@ -897,3 +897,35 @@ body {
 
 .pbar { height: 14px; background: #eef1f3; border-radius: 4px; position: relative; overflow: hidden; }
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+
+/* 稼働状況：期セレクタ＋ビュータブ（固定表示） */
+.kado-sticky {
+  position: sticky; top: 0; z-index: 5; background: #f7f8f9;
+  padding-top: 2px; margin: 0 0 8px;
+}
+.kado-tabs { display: flex; gap: 22px; border-bottom: 1px solid #dde3e7; margin-top: 8px; }
+.kado-tabs button {
+  background: none; border: none; padding: 8px 1px 9px; font-size: 13px; color: #697680;
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.kado-tabs button:hover { color: #0e7a5f; }
+.kado-tabs button.active { color: #0e7a5f; font-weight: bold; border-bottom-color: #0e7a5f; }
+
+/* 対応工数（保守）：乖離を独立列に */
+.kado-diff-col { flex: 0 0 150px; min-width: 130px; text-align: right; }
+.kado-diff-col .amt { font-size: 12px; font-weight: bold; }
+.kado-diff-col .lbl { font-size: 10px; color: #8a97a0; margin-top: 1px; }
+
+/* 分類フィルタ：複数選択トグル */
+.multi-toggle {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #52616b;
+  cursor: pointer; border: 1px solid #c5d2d8; border-radius: 12px; padding: 3px 10px 3px 6px; background: #fff;
+}
+.multi-toggle .switch { position: relative; width: 28px; height: 16px; background: #c5d2d8; border-radius: 9px; transition: .15s; flex: 0 0 auto; }
+.multi-toggle .switch i { position: absolute; top: 1.5px; left: 1.5px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.multi-toggle.on .switch { background: #0e7a5f; }
+.multi-toggle.on .switch i { left: 13.5px; }
+
+/* 保守費未設定の取引先セクション見出し／タグ */
+.section-h { font-size: 11.5px; color: #8a97a0; font-weight: bold; margin: 14px 0 4px; padding-top: 8px; border-top: 1px dashed #dde3e7; }
+.unset-tag { font-size: 10px; background: #eef1f3; color: #8a97a0; border-radius: 3px; padding: 1px 5px; margin-left: 5px; }

@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260820_c1e9d02";
+const APP_VERSION = "rev_20260821_d4a2f19";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -2215,7 +2215,7 @@ function renderAgg() {
   if (currentAgg === "hoshu") cont.innerHTML = termBarHtml() + renderHoshuAgg();
   else if (currentAgg === "mitsu") cont.innerHTML = renderMitsuAgg();
   else if (currentAgg === "uriage") cont.innerHTML = termBarHtml() + renderJuchuAgg();
-  else cont.innerHTML = termBarHtml(false) + renderKadoAgg();
+  else cont.innerHTML = renderKadoAgg();   // renderKadoAgg()が期セレクタ＋タブ（固定表示）を内包
 }
 
 /* --- 保守状況 --- */
@@ -2926,30 +2926,76 @@ function spreadAcrossMonths(hours, start, end, months) {
 /* ---------- 状態 ---------- */
 let kadoView = "capacity";      // capacity(全体キャパ) | hoshu(対応工数) | uketaku(受託工数)
 let kadoHoshuMode = "month";    // month(月次) | cum(累計)
-let kadoHoshuType = null;       // 対応工数の種別フィルタ（null=すべて、単一選択）
+let kadoHoshuMulti = false;     // 分類フィルタ：複数選択モード（false=単一選択／true=複数選択）
+let kadoHoshuType = null;       // 単一選択モードでの選択値（null=すべて）
+let kadoHoshuTypes = [];        // 複数選択モードでの選択値（空=すべて）
 let kadoUketakuOpen = null;     // 受託工数：予実一覧を展開中の取引先
-const KADO_HOSHU_TYPES = ["保守対応", "瑕疵対応", "調整"];
-const KADO_TYPE_LABEL = { "保守対応": "保守", "瑕疵対応": "瑕疵", "調整": "調整" };
+let kadoUketakuStatus = "all";  // 受託工数：状態フィルタ（all | 受託中 | 完了）
+/* 全体キャパの「対応工数（保守）」集計は保守対応/瑕疵対応/調整の3種のみ（従来通り・固定） */
+const MAINT_TYPES = ["保守対応", "瑕疵対応", "調整"];
+/* 対応工数（保守）タブの分類フィルタ選択肢（見積り・プリセールスは受注前の見積工数=K列を対象） */
+const KADO_HOSHU_TYPES = ["保守対応", "瑕疵対応", "見積り", "プリセールス", "調整"];
+const KADO_TYPE_LABEL = { "保守対応": "保守", "瑕疵対応": "瑕疵", "見積り": "見積り", "プリセールス": "プリセールス", "調整": "調整" };
 
 function switchKadoView(v) { kadoView = v; renderAgg(); }
 function switchKadoHoshuMode(v) { kadoHoshuMode = v; renderAgg(); }
-function selectKadoType(v) { kadoHoshuType = v; renderAgg(); }
+function toggleKadoMulti() {
+  kadoHoshuMulti = !kadoHoshuMulti;
+  kadoHoshuType = null; kadoHoshuTypes = [];
+  renderAgg();
+}
+function selectKadoType(v) {
+  if (kadoHoshuMulti) {
+    const i = kadoHoshuTypes.indexOf(v);
+    if (i >= 0) kadoHoshuTypes.splice(i, 1); else kadoHoshuTypes.push(v);
+  } else {
+    kadoHoshuType = v;
+  }
+  renderAgg();
+}
+function clearKadoTypes() {
+  if (kadoHoshuMulti) kadoHoshuTypes = []; else kadoHoshuType = null;
+  renderAgg();
+}
 function toggleKadoClient(name) { kadoUketakuOpen = (kadoUketakuOpen === name) ? null : name; renderAgg(); }
+function switchKadoUketakuStatus(v) { kadoUketakuStatus = v; renderAgg(); }
+
+/* 対応工数（保守）タブ用：種別ごとに対応する工数フィールドを返す
+   （保守対応/瑕疵対応/調整＝AM列 対応工数、見積り/プリセールス＝K列 見積工数） */
+function kadoHoursOf(r) {
+  return QUOTE_TYPES.includes(r.type) ? (Number(r.hours) || 0) : (Number(r.workHours) || 0);
+}
+function sumKadoHoursByMonth(recs, dateField, months) {
+  const map = Object.fromEntries(months.map(m => [m, 0]));
+  recs.forEach(r => {
+    const dt = r[dateField] || r.done || r.occur;
+    const v = kadoHoursOf(r);
+    if (dt && map[monthKey(dt)] != null) map[monthKey(dt)] += v;
+  });
+  return months.map(m => Math.round(map[m] * 10) / 10);
+}
 
 function renderKadoAgg() {
-  const seg = `<div class="sched-seg kado-view-seg">
-    <button class="seg${kadoView === "capacity" ? " active" : ""}" onclick="switchKadoView('capacity')">全体キャパ</button>
-    <button class="seg${kadoView === "hoshu" ? " active" : ""}" onclick="switchKadoView('hoshu')">対応工数（保守）</button>
-    <button class="seg${kadoView === "uketaku" ? " active" : ""}" onclick="switchKadoView('uketaku')">受託工数</button>
+  const sticky = `<div class="kado-sticky">
+    <div class="term-bar">
+      <button class="term-btn" onclick="shiftTerm(-1)">◀</button>
+      <span class="term-label">${esc(termLabel(currentTerm))}</span>
+      <button class="term-btn" onclick="shiftTerm(1)">▶</button>
+    </div>
+    <div class="kado-tabs">
+      <button class="${kadoView === "capacity" ? "active" : ""}" onclick="switchKadoView('capacity')">全体キャパ</button>
+      <button class="${kadoView === "hoshu" ? "active" : ""}" onclick="switchKadoView('hoshu')">対応工数（保守）</button>
+      <button class="${kadoView === "uketaku" ? "active" : ""}" onclick="switchKadoView('uketaku')">受託工数</button>
+    </div>
   </div>`;
-  if (kadoView === "hoshu") return seg + renderKadoHoshu();
-  if (kadoView === "uketaku") return seg + renderKadoUketaku();
-  return seg + renderKadoCapacity();
+  if (kadoView === "hoshu") return sticky + renderKadoHoshu();
+  if (kadoView === "uketaku") return sticky + renderKadoUketaku();
+  return sticky + renderKadoCapacity();
 }
 
 /* --- 全体キャパ --- */
 function kadoHoshuMonthly(months, types) {
-  const useTypes = types && types.length ? types : KADO_HOSHU_TYPES;
+  const useTypes = types && types.length ? types : MAINT_TYPES;
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   return sumByMonth(target, "workHours", "stageStart", months);
 }
@@ -3079,17 +3125,17 @@ function capacityStackChart(labels, stack, colors, capaSeries, elapsedCount) {
 function renderKadoHoshu() {
   const months = fiscalMonths(currentTerm);
   const elapsed = elapsedMonthsOfTerm(currentTerm, months);
-  const useTypes = kadoHoshuType ? [kadoHoshuType] : KADO_HOSHU_TYPES;
+  const activeList = kadoHoshuMulti ? kadoHoshuTypes : (kadoHoshuType ? [kadoHoshuType] : []);
+  const useTypes = activeList.length ? activeList : KADO_HOSHU_TYPES;
   const target = activeRecords().filter(r => useTypes.includes(r.type));
   const clientNames = [...new Set(target.map(r => r.client).filter(Boolean))];
   const configured = customers.filter(c => c.hoshuAllow != null && c.hoshuAllow > 0);
-  const unconfiguredCount = clientNames.filter(name => !configured.some(c => c.name === name)).length;
 
   let sumActual = 0, sumAllow = 0, sumDiffYen = 0;
   const overClients = [];
   const clientRows = configured.map(c => {
     const recs = target.filter(r => r.client === c.name);
-    const monthly = sumByMonth(recs, "workHours", "stageStart", months);
+    const monthly = sumKadoHoursByMonth(recs, "stageStart", months);
     const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
     const allowElapsed = Math.round(c.hoshuAllow * elapsed * 10) / 10;
     const unit = c.hoshuAllow > 0 ? (c.hoshuFee || 0) / c.hoshuAllow : 0;
@@ -3102,7 +3148,18 @@ function renderKadoHoshu() {
   sumActual = Math.round(sumActual * 10) / 10;
   sumAllow = Math.round(sumAllow * 10) / 10;
 
+  /* 保守費・許容工数が未設定の取引先：比較対象外。実績のみ表示する */
+  const unconfNames = clientNames.filter(name => !configured.some(c => c.name === name));
+  const unconfRows = unconfNames.map(name => {
+    const recs = target.filter(r => r.client === name);
+    const monthly = sumKadoHoursByMonth(recs, "stageStart", months);
+    const actualElapsed = Math.round(monthly.slice(0, elapsed).reduce((a, v) => a + v, 0) * 10) / 10;
+    return { name, monthly, actualElapsed };
+  }).filter(r => r.actualElapsed > 0 || r.monthly.some(v => v > 0));
+
   const chip = (v, on) => `<button class="fchip${on ? " on" : ""}" onclick="selectKadoType('${esc(v)}')">${esc(KADO_TYPE_LABEL[v])}</button>`;
+  const clearOn = kadoHoshuMulti ? !kadoHoshuTypes.length : !kadoHoshuType;
+  const chipOn = t => kadoHoshuMulti ? kadoHoshuTypes.includes(t) : kadoHoshuType === t;
 
   const rowsHtml = clientRows.map(({ c, monthly, actualElapsed, allowElapsed, diffYen, overMonthCount }) => {
     const cumOver = actualElapsed > allowElapsed;      // 保守費乖離（金額）の色分け用：常に累計基準
@@ -3125,19 +3182,43 @@ function renderKadoHoshu() {
         <div class="kado-t">${kadoHoshuMode === "month"
           ? `月次で許容超えた回数 ${overMonthCount}回`
           : `累計 ${actualElapsed} / ${allowElapsed} 人日（${pct}%）`}</div>
-        <div class="kado-d" style="color:${cumOver ? "#c0392b" : "#0e7a5f"}">
-          ${cumOver ? `保守費 超過 ${Math.abs(diffYen).toLocaleString()}円` : `保守費 残 ${diffYen.toLocaleString()}円`}</div>
+      </div>
+      <div class="kado-diff-col">
+        <div class="amt" style="color:${cumOver ? "#c0392b" : "#0e7a5f"}">${cumOver ? `保守費 超過 ${Math.abs(diffYen).toLocaleString()}円` : `保守費 残 ${diffYen.toLocaleString()}円`}</div>
+        <div class="lbl">保守費乖離</div>
       </div>
     </div>`;
   }).join("");
 
+  const unconfHtml = unconfRows.map(({ name, monthly, actualElapsed }) => `
+    <div class="kado-row">
+      <div class="kado-name"><b>${esc(name)}</b><span class="unset-tag">未設定</span>
+        <div class="kado-sub" style="color:#c9d3d8">保守費・許容工数 未入力</div></div>
+      <div class="kado-chart">${plainBarChart(months, monthly, elapsed)}</div>
+      <div class="kado-stat">
+        <span class="badge-pill muted">許容未設定</span>
+        <div class="kado-t">実績 ${actualElapsed}人日（経過${elapsed}ヶ月）</div>
+      </div>
+      <div class="kado-diff-col">
+        <div class="amt" style="color:#c9d3d8">－</div>
+        <div class="lbl">保守費乖離</div>
+      </div>
+    </div>`).join("");
+
   return `
     <div class="agg-filters" style="margin-bottom:10px">
-      <div class="af-row"><span class="af-label">分類</span>
-        <div class="fchips">
-          <button class="fchip clear${kadoHoshuType ? "" : " on"}" onclick="selectKadoType(null)">すべて</button>
-          ${KADO_HOSHU_TYPES.map(t => chip(t, kadoHoshuType === t)).join("")}
-        </div></div>
+      <div class="af-row" style="justify-content:space-between;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="af-label">分類</span>
+          <div class="fchips">
+            <button class="fchip clear${clearOn ? " on" : ""}" onclick="clearKadoTypes()">すべて</button>
+            ${KADO_HOSHU_TYPES.map(t => chip(t, chipOn(t))).join("")}
+          </div>
+        </div>
+        <label class="multi-toggle${kadoHoshuMulti ? " on" : ""}" onclick="toggleKadoMulti()">
+          <span class="switch"><i></i></span>複数選択
+        </label>
+      </div>
       <div class="af-row"><span class="af-label">表示</span>
         <div class="seg-inline">
           <button class="seg${kadoHoshuMode === "month" ? " active" : ""}" onclick="switchKadoHoshuMode('month')">月次</button>
@@ -3145,12 +3226,11 @@ function renderKadoHoshu() {
         </div></div>
     </div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kv">${sumActual}<span style="font-size:12px"> / ${sumAllow}</span></div><div class="kl">実績 / 許容（人日・経過${elapsed}ヶ月）</div></div>
       <div class="kpi ${sumDiffYen < 0 ? "kpi-alert" : ""}"><div class="kv">${sumDiffYen >= 0 ? "+" : ""}${sumDiffYen.toLocaleString()}</div><div class="kl">保守費との乖離（円）</div></div>
+      <div class="kpi"><div class="kv">${sumActual}<span style="font-size:12px"> / ${sumAllow}</span></div><div class="kl">実績 / 許容（人日・経過${elapsed}ヶ月）</div></div>
       <div class="kpi ${overClients.length ? "kpi-alert" : ""}"><div class="kv">${overClients.length}</div><div class="kl">超過している取引先</div></div>
       <div class="kpi"><div class="kv">${configured.length}</div><div class="kl">保守費設定済み取引先</div></div>
     </div>
-    ${unconfiguredCount ? `<p class="kado-note">「顧客マスタ」シートに許容工数が未設定の取引先が ${unconfiguredCount} 件あります（一覧には表示されません）。E・F列に保守費・許容工数を入力してください。</p>` : ""}
     <div class="agg-card">
       <h3>取引先別 ${kadoHoshuMode === "month" ? "月次" : "累計"} 対応工数</h3>
       <div class="legend">
@@ -3159,11 +3239,35 @@ function renderKadoHoshu() {
         <span><span class="sw sw-line" style="border-top-color:#9fb0b9"></span>許容ライン</span>
       </div>
       ${rowsHtml || `<p class="muted">対象となる取引先がありません。</p>`}
+      ${unconfRows.length ? `<div class="section-h">保守費 未設定の取引先（比較対象外・実績のみ表示）</div>${unconfHtml}` : ""}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対応工数は着手日（着手日が無ければ完了日→発生日）を基準に月次集計。単価＝保守費(月額)÷許容工数(人日/月)。乖離＝(許容−実績)×単価。<br>
-        「見積」「プリセールス」は受注確定前の対応工数を記録する項目が現状の帳票にないため、本タブの集計対象外です（受注後の工数は「受託工数」タブで扱います）。
+        見積り／プリセールスを分類に含めた場合は、受注確定前の見積工数（K列）を対応工数として集計します（受注後の工数は「受託工数」タブで扱います）。<br>
+        保守費・許容工数が未設定の取引先は「保守費 未設定の取引先」欄に実績のみ表示します（乖離は算出しません）。
       </p>
     </div>`;
+}
+/* --- SVG 実績のみバー（許容未設定の取引先用・超過判定なし） --- */
+function plainBarChart(labels, values, elapsedCount) {
+  const W = 460, H = 60;
+  const padL = 4, padR = 4, padT = 8, padB = 14;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const slot = chartW / labels.length;
+  const maxV = Math.max(...values, 0.01) * 1.15;
+  const y = v => padT + chartH - chartH * v / maxV;
+  let svg = "";
+  labels.forEach((lb, i) => {
+    const v = values[i] || 0;
+    const cx = padL + slot * i + slot / 2, bw = Math.min(slot * 0.56, 20);
+    const isFuture = i >= elapsedCount;
+    if (v > 0) svg += `<rect x="${cx - bw / 2}" y="${y(v)}" width="${bw}" height="${(padT + chartH) - y(v)}"
+      rx="2.5" fill="#c5d2d8" opacity="${isFuture ? 0.35 : 1}"><title>${lb} ${v}人日</title></rect>`;
+  });
+  labels.forEach((lb, i) => {
+    const cx = padL + slot * i + slot / 2;
+    svg += `<text x="${cx}" y="${H - 3}" font-size="7.5" text-anchor="middle" fill="${i < elapsedCount ? "#8a97a0" : "#c9d3d8"}">${Number(lb.slice(5))}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;max-width:100%">${svg}</svg>`;
 }
 /* --- SVG 月次帯グラフ（許容帯＋超過ハイライト・取引先1行分） --- */
 function bandBarChart(labels, values, allow, elapsedCount) {
@@ -3235,8 +3339,9 @@ function cumulativeBandChart(labels, values, allow, elapsedCount) {
 /* --- 受託工数: 取引先別 集約（案1）＋案件別ドリルダウン --- */
 function kadoUketakuTarget() {
   const tStart = termStartDate(currentTerm), tEnd = termEndDate(currentTerm);
+  const statuses = kadoUketakuStatus === "all" ? ["受託中", "完了"] : [kadoUketakuStatus];
   return activeRecords().filter(r => QUOTE_TYPES.includes(r.type) &&
-    ["受託中", "完了"].includes(r.status) &&
+    statuses.includes(r.status) &&
     (!r.book || (r.book >= tStart && r.book < tEnd)));
 }
 function renderKadoUketaku() {
@@ -3280,18 +3385,27 @@ function renderKadoUketaku() {
     ${open ? kadoUketakuDetail(target.filter(r => r.client === g.client)) : ""}`;
   }).join("");
 
+  const statusLabel2 = kadoUketakuStatus === "all" ? "受託中・完了案件" : kadoUketakuStatus;
   return `
+    <div class="agg-filters" style="margin-bottom:10px">
+      <div class="af-row"><span class="af-label">状態</span>
+        <div class="fchips">
+          <button class="fchip clear${kadoUketakuStatus === "all" ? " on" : ""}" onclick="switchKadoUketakuStatus('all')">すべて</button>
+          <button class="fchip${kadoUketakuStatus === "受託中" ? " on" : ""}" onclick="switchKadoUketakuStatus('受託中')">受託中</button>
+          <button class="fchip${kadoUketakuStatus === "完了" ? " on" : ""}" onclick="switchKadoUketakuStatus('完了')">完了</button>
+        </div></div>
+    </div>
     <div class="kpi-row">
       <div class="kpi"><div class="kv">${Math.round(totalAmt / 10000).toLocaleString()}万</div><div class="kl">受注額合計</div></div>
-      <div class="kpi"><div class="kv">${totalEst}<span style="font-size:12px"> / ${totalAct}</span></div><div class="kl">見積 / 実績 工数（人日）</div></div>
+      <div class="kpi"><div class="kv">${totalAct}<span style="font-size:12px"> / ${totalEst}</span></div><div class="kl">実績 / 見積 工数（人日）</div></div>
       <div class="kpi ${overRows.length ? "kpi-alert" : ""}"><div class="kv">${overRows.length}</div><div class="kl">見積超過の案件</div></div>
       <div class="kpi"><div class="kv">${rows.length}</div><div class="kl">対象取引先数</div></div>
     </div>
     <div class="agg-card">
-      <h3>取引先別 受託工数（受託中・完了案件）</h3>
+      <h3>取引先別 受託工数（${esc(statusLabel2)}）</h3>
       ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
-        対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。<br>
+        対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。状態フィルタで絞り込めます。<br>
         見積工数＝受注確定時に入力する対応工数（AM列）、実績工数＝受託完了時に入力する受託工数（AN列）。行をクリックすると案件別の予実一覧を展開します。
       </p>
     </div>`;
@@ -3347,6 +3461,7 @@ function loadDemo() {
     { row: 3, code: "HN", name: "ハンター製菓", contact: "鈴木様", note: "", hoshuFee: 150000, hoshuAllow: 2.5 },
     { row: 4, code: "AG", name: "アサヒグラント", contact: "川野様", note: "", hoshuFee: 240000, hoshuAllow: 4 },
     { row: 5, code: "EX", name: "エキスプレス", contact: "中道様", note: "", hoshuFee: 120000, hoshuAllow: 2 },
+    { row: 6, code: "OF", name: "桜楓会", contact: "", note: "", hoshuFee: null, hoshuAllow: null },
   ];
   /* 体制（デモ）: 中田は期中に途中参加、西野は期中に離任した想定 */
   staff = [
@@ -3368,6 +3483,7 @@ function loadDemo() {
     { ...blank, row: 5, id: "KM-04", client: "kakimoto arms", no: 4, type: "調整", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: null, amount: null, order: "", deliver: null, content: "会社体制変更に伴うご挨拶のスケジュール調整", progress: "日程調整中", note: "", memo: "", stageStart: d(2026, 7, 3) },
     { ...blank, row: 6, id: "KM-05", client: "kakimoto arms", no: 5, type: "保守対応", status: "対応中", occur: d(2026, 7, 7), done: null, owner: "小川", reporter: "紺谷", contact: "中田様", priority: "低", workHours: 2, amount: null, order: "", deliver: null, content: "メンズ予約時の注意事項表示・メール文面変更", progress: "設定変更で対応可能", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 8) },
     { ...blank, row: 15, id: "KM-06", client: "kakimoto arms", no: 6, type: "保守対応", status: "完了", occur: d(2026, 7, 10), done: d(2026, 7, 10), owner: "小川", reporter: "小川", contact: "佐竹様", priority: "", workHours: 4, amount: null, order: "", deliver: null, content: "夏季キャンペーン特設ページの緊急改修", progress: "対応完了", note: "", memo: "", kind: "改修", stageStart: d(2026, 7, 10) },
+    { ...blank, row: 16, id: "OF-01", client: "桜楓会", no: 1, type: "保守対応", status: "完了", occur: d(2026, 8, 3), done: d(2026, 8, 3), owner: "紺谷", reporter: "紺谷", contact: "", priority: "", workHours: 0.3, amount: null, order: "", deliver: null, content: "問合せフォームの文言修正", progress: "対応完了", note: "", memo: "", kind: "問合せ", stageStart: d(2026, 8, 3) },
     { ...blank, row: 7, id: "HN-01", client: "ハンター製菓", no: 1, type: "瑕疵対応", status: "対応中", occur: d(2026, 7, 3), done: null, owner: "小川", reporter: "小川", contact: "鈴木様", priority: "低", workHours: 1.5, amount: null, order: "", deliver: null, content: "在庫管理伝票一覧画面バグ対応", progress: "修正済み、次回リリースで反映", note: "", memo: "", stageStart: d(2026, 7, 4) },
     { ...blank, row: 8, id: "HN-02", client: "ハンター製菓", no: 2, type: "プリセールス", status: "商談中", occur: d(2026, 7, 6), done: null, owner: "小川", reporter: "小川", contact: "柳澤様", priority: "高", hours: null, amount: 2500000, order: "", deliver: null, content: "原価計算の改修", progress: "提案書作成済み", note: "9月本稼働目標", memo: "", stageStart: d(2026, 7, 7), considerDone: d(2026, 7, 15), deal: "7/22打ち合わせ予定", hold: true },
     { ...blank, row: 9, id: "AG-01", client: "アサヒグラント", no: 1, type: "見積り", status: "確認中", occur: d(2026, 6, 30), done: null, owner: "紺谷", reporter: "紺谷", contact: "川野様", priority: "中", hours: 5, amount: 350000, order: "", deliver: null, content: "インフォマートデータ交換の仕様変更", progress: "再見積提出済み", note: "", memo: "", stageStart: d(2026, 7, 1), quoteDone: d(2026, 7, 5), basis: "設計2人日＋実装2人日＋試験1人日", quoteLimit: daysFromNow(5) },
