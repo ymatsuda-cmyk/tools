@@ -331,6 +331,12 @@ body {
   border-bottom: 1px solid #dde3e7; margin-bottom: 12px;
   position: sticky; top: 0; z-index: 6; background: #f7f8f9;
 }
+/* margin-bottom は背景が塗られないため、固定表示時に下の要素がスクロールで透けて見える。
+   ::after で margin 分（12px）を同じ背景色で埋めて隙間を消す。 */
+.agg-seg::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 12px;
+  background: #f7f8f9;
+}
 .agg-seg .seg {
   border: 1px solid #dde3e7; border-bottom: none; background: #eef2f4;
   color: #52616b; border-radius: 5px 5px 0 0; padding: 7px 16px;
