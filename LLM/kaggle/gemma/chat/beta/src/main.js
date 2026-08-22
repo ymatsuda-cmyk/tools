@@ -229,7 +229,7 @@ async function onSend(text, atts) {
   let error
 
   try {
-    for await (const ev of streamChat(settings, wire, controller.signal)) {
+    for await (const ev of streamChat(conn, wire, controller.signal)) {
       if (ev.delta) {
         acc += ev.delta
         renderer.update(acc)
