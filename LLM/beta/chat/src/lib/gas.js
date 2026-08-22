@@ -71,12 +71,17 @@ export function deriveState(st) {
     return { key: 'stopping', label: '停止処理中', tone: 'wait', canStart: false, canStop: false }
   }
   const live = st.status === 'running' || st.status === 'queued'
-  if (live && st.proxyAlive) {
+  // proxyAlive だけでなく modelReady（Ollama が実際に応答できるか）も見る。
+  // ハートビートは届いていてもモデルのロード中はチャットが通らないため。
+  if (live && st.proxyAlive && st.modelReady) {
     return { key: 'ready', label: '稼働中', tone: 'ok', canStart: false, canStop: true }
   }
   // Kaggle 上は動いているのに応答がない。停止を押せば GAS が強制停止に切り替える。
   if (st.zombie) {
     return { key: 'zombie', label: '応答なし', tone: 'ng', canStart: false, canStop: true }
+  }
+  if (live && st.proxyAlive && !st.modelReady) {
+    return { key: 'loading', label: 'モデル読込中', tone: 'wait', canStart: false, canStop: true }
   }
   if (live) {
     return { key: 'booting', label: '起動中', tone: 'wait', canStart: false, canStop: true }
