@@ -1,0 +1,165 @@
+import { h, clear } from '../lib/dom.js'
+import { attachmentTag, formatBytes } from '../lib/parsers.js'
+import { formatTokens } from '../lib/tokens.js'
+import { renderMarkdown } from '../lib/markdown.js'
+import { openModal } from './modal.js'
+
+export function attachmentCard(att, { over = false, onRemove = null } = {}) {
+  const thumb =
+    att.kind === 'image' && att.dataUrl
+      ? h('img', { class: 'thumb', src: att.dataUrl, alt: att.name })
+      : h('span', { class: 'tag', text: attachmentTag(att.kind) })
+
+  const meta =
+    att.kind === 'image'
+      ? `${formatBytes(att.bytes)} · 約${formatTokens(att.tokens)} tok`
+      : `${att.chars.toLocaleString()}字 · 約${formatTokens(att.tokens)} tok`
+
+  return h(
+    'div',
+    {
+      class: over ? 'att over' : 'att',
+      title: att.name,
+      onClick: () => previewAttachment(att),
+    },
+    thumb,
+    h(
+      'div',
+      { style: { minWidth: 0 } },
+      h('div', { class: 'name', text: att.name }),
+      h('div', { class: 'meta', text: meta }),
+    ),
+    onRemove &&
+      h('button', {
+        class: 'icon',
+        'aria-label': '削除',
+        text: '×',
+        onClick: (e) => {
+          e.stopPropagation()
+          onRemove()
+        },
+      }),
+  )
+}
+
+function previewAttachment(att) {
+  openModal(({ close }) =>
+    h(
+      'div',
+      { class: 'modal', style: { maxWidth: '720px' } },
+      h('h2', { text: att.name }),
+      h('div', {
+        class: 'hint',
+        style: { marginBottom: '10px' },
+        text:
+          att.kind === 'image'
+            ? `${formatBytes(att.bytes)} · 推定 ${att.tokens.toLocaleString()} トークン`
+            : `${att.chars.toLocaleString()}字 · 推定 ${att.tokens.toLocaleString()} トークン`,
+      }),
+      att.kind === 'image'
+        ? h('img', { class: 'preview-img', src: att.dataUrl, alt: att.name })
+        : h('pre', { class: 'preview', text: att.text }),
+      h(
+        'div',
+        { style: { marginTop: '12px', textAlign: 'right' } },
+        h('button', { text: '閉じる', onClick: close }),
+      ),
+    ),
+  )
+}
+
+/** やりとり1ブロックをコピーするボタン */
+function copyButton(getText) {
+  const btn = h('button', { class: 'copy', text: 'コピー' })
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(getText())
+      btn.textContent = 'コピーしました'
+    } catch {
+      btn.textContent = 'コピーできません'
+    }
+    setTimeout(() => {
+      btn.textContent = 'コピー'
+    }, 1500)
+  })
+  return btn
+}
+
+/** 添付を含めた、そのメッセージの全文 */
+function messageAsText(m) {
+  const docs = (m.attachments ?? []).filter((a) => a.kind !== 'image')
+  const parts = docs.map((a) => `--- ${a.name} ---\n${a.text}`)
+  if (m.content) parts.push(m.content)
+  return parts.join('\n\n')
+}
+
+function messageEl(m) {
+  const wrap = h('div', { class: m.role === 'user' ? 'msg user' : 'msg' })
+
+  if (m.attachments?.length) {
+    wrap.append(h('div', { class: 'atts' }, m.attachments.map((a) => attachmentCard(a))))
+  }
+
+  if (m.role === 'user') {
+    wrap.append(h('div', { class: 'bubble', text: m.content }))
+  } else {
+    const body = h('div', { class: 'assistant-body' })
+    renderMarkdown(body, m.content)
+    wrap.append(body)
+
+    if (m.truncated) {
+      wrap.append(
+        h('div', {
+          class: 'warn',
+          style: { marginTop: '8px' },
+          text: `入力の一部が処理されていない可能性があります。実際に読み込まれたのは ${m.promptTokens?.toLocaleString()} トークンでした。`,
+        }),
+      )
+    }
+    if (m.error) wrap.append(h('div', { class: 'warn', text: m.error }))
+  }
+
+  wrap.append(h('div', { class: 'msg-tools' }, copyButton(() => messageAsText(m))))
+  return wrap
+}
+
+export function createMessageList(root) {
+  let stick = true
+  root.addEventListener('scroll', () => {
+    stick = root.scrollHeight - root.scrollTop - root.clientHeight < 80
+  })
+
+  const scrollToEnd = () => {
+    if (stick) root.scrollTop = root.scrollHeight
+  }
+
+  return {
+    render(messages) {
+      clear(root)
+      if (!messages.length) {
+        root.append(
+          h('div', { class: 'empty', text: 'ファイルを添付するか、質問を入力してください' }),
+        )
+        return
+      }
+      for (const m of messages) root.append(messageEl(m))
+      stick = true
+      scrollToEnd()
+    },
+    beginStream() {
+      const body = h('div', { class: 'assistant-body' })
+      root.append(h('div', { class: 'msg' }, body))
+      stick = true
+      scrollToEnd()
+      return body
+    },
+    /** 一時的な案内を末尾に出す（DB には保存しない） */
+    showNotice(text) {
+      root.append(h('div', { class: 'msg' }, h('div', { class: 'warn', text })))
+      stick = true
+      scrollToEnd()
+    },
+    scrollToEnd,
+  }
+}

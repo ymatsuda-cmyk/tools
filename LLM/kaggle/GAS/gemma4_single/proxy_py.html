@@ -1,0 +1,313 @@
+import os, subprocess, time, json, threading, datetime
+import urllib.request, urllib.error, urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# ===== GAS が push 直前に差し込むプレースホルダ =====
+API_KEY       = '__PROXY_KEY__'
+GAS_URL       = '__GAS_URL__'
+CONTROL_TOKEN = '__CONTROL_TOKEN__'
+NGROK_DOMAIN  = '__NGROK_DOMAIN__'
+
+# ===== 設定 =====
+DEFAULT_MODEL   = 'gemma4:12b'
+DEFAULT_NUM_CTX = 32768
+OL              = 'http://localhost:11434'
+MAX_MINUTES     = 540
+
+# ===== Ollama / ngrok セットアップ =====
+os.system('apt-get install -y zstd -q')
+os.system('curl -fsSL https://ollama.com/install.sh | sh')
+os.system('tar xzf /kaggle/input/datasets/ymatsuda2025/ngrok-binary/'
+          'ngrok-v3-stable-linux-amd64.tgz -C /usr/local/bin')
+os.system('chmod +x /usr/local/bin/ngrok')
+
+subprocess.run(['pkill', '-f', 'ollama'], capture_output=True)
+time.sleep(3)
+
+# データセットの階層構造に依存せず、blobs と manifests を持つ場所を探す。
+# v1 は直下、v2 は 1 段深い位置にあるため決め打ちにしない。
+def find_models_dir():
+    for root, dirs, _ in os.walk('/kaggle/input'):
+        if 'blobs' in dirs and 'manifests' in dirs:
+            return root
+    raise SystemExit('モデルディレクトリが見つかりません。データセットの添付を確認してください')
+
+base = find_models_dir()
+print('models source:', base, flush=True)
+
+os.makedirs('/root/.ollama/models', exist_ok=True)
+for item in ('blobs', 'manifests'):
+    src = os.path.join(base, item)
+    dst = '/root/.ollama/models/' + item
+    if not os.path.exists(dst):
+        subprocess.run(['cp', '-r', src, dst])
+        print('Copied:', item, flush=True)
+
+env = os.environ.copy()
+env['OLLAMA_HOST']            = '0.0.0.0:11434'
+env['OLLAMA_ORIGINS']         = '*'
+env['OLLAMA_FLASH_ATTENTION'] = '1'
+env['OLLAMA_KV_CACHE_TYPE']   = 'q8_0'
+env['OLLAMA_KEEP_ALIVE']      = '-1'
+subprocess.Popen(['ollama', 'serve'], env=env)
+time.sleep(8)
+print('Ollama started', flush=True)
+
+# モデルがビジョン対応かをここで確定させる。
+# False の場合、画像を送っても Ollama は無言で捨てる。
+r = subprocess.run(['ollama', 'show', DEFAULT_MODEL],
+                   capture_output=True, text=True, env=env)
+print(r.stdout, flush=True)
+print('VISION:', 'vision' in r.stdout.lower(), flush=True)
+
+
+# ===== OpenAI 互換プロキシ =====
+def cors(h):
+    h.send_header('Access-Control-Allow-Origin', '*')
+    h.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    h.send_header('Access-Control-Allow-Headers',
+                  'Content-Type,Authorization,ngrok-skip-browser-warning')
+
+
+def flatten(content):
+    """OpenAI 形式の content からテキストと画像(base64)を分離する"""
+    if isinstance(content, str):
+        return content, []
+    if isinstance(content, list):
+        texts, images = [], []
+        for x in content:
+            if not isinstance(x, dict):
+                continue
+            if x.get('type') == 'text':
+                texts.append(x.get('text', ''))
+            elif x.get('type') == 'image_url':
+                url = (x.get('image_url') or {}).get('url', '')
+                # data:image/png;base64,xxxx -> xxxx
+                if ',' in url:
+                    images.append(url.split(',', 1)[1])
+        return '\n'.join(texts), images
+    return str(content), []
+
+
+def to_chunk(o, model, first):
+    delta = {'role': 'assistant'} if first else {}
+    delta['content'] = o.get('message', {}).get('content', '')
+    chunk = {'id': 'chatcmpl-1', 'object': 'chat.completion.chunk',
+             'created': int(time.time()), 'model': model,
+             'choices': [{'index': 0, 'delta': delta,
+                          'finish_reason': 'stop' if o.get('done') else None}]}
+    # 最終チャンクに usage を載せる。クライアントはこの実測値と推定値を突き合わせ、
+    # num_ctx 超過による無言の切り捨てを検出する。
+    if o.get('done'):
+        pt = o.get('prompt_eval_count', 0)
+        ct = o.get('eval_count', 0)
+        chunk['usage'] = {'prompt_tokens': pt, 'completion_tokens': ct,
+                          'total_tokens': pt + ct}
+    return chunk
+
+
+class P(BaseHTTPRequestHandler):
+    def _authorized(self):
+        if not API_KEY or API_KEY.startswith('__'):
+            return True
+        got = self.headers.get('Authorization', '').replace('Bearer', '').strip()
+        return got == API_KEY
+
+    def _deny(self):
+        self.send_response(401)
+        self.send_header('Content-Type', 'application/json')
+        cors(self)
+        self.end_headers()
+        self.wfile.write(b'{"error":"unauthorized"}')
+
+    def do_OPTIONS(self):
+        # 204 は中継を挟むと扱いが不安定になることがあるため 200 + 明示的な長さで返す。
+        # Max-Age を付けると preflight が 24 時間キャッシュされ、往復が減る。
+        self.send_response(200)
+        self.send_header('Content-Length', '0')
+        self.send_header('Access-Control-Max-Age', '86400')
+        cors(self)
+        self.end_headers()
+
+    def do_GET(self):
+        if not self._authorized():
+            return self._deny()
+        try:
+            with urllib.request.urlopen(OL + self.path) as r:
+                data = r.read()
+                ctype = r.headers.get('Content-Type', 'application/json')
+        except Exception as e:
+            self.send_response(502)
+            cors(self)
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': str(e)}).encode())
+            return
+        self.send_response(200)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(data)))
+        cors(self)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        if not self._authorized():
+            return self._deny()
+
+        length = int(self.headers.get('Content-Length', 0))
+        try:
+            body = json.loads(self.rfile.read(length) or b'{}')
+        except Exception:
+            body = {}
+
+        model  = body.get('model') or DEFAULT_MODEL
+        stream = body.get('stream', True)
+
+        messages = []
+        for m in body.get('messages', []):
+            text, images = flatten(m.get('content', ''))
+            msg = {'role': m.get('role', 'user'), 'content': text}
+            if images:
+                msg['images'] = images   # Ollama のマルチモーダル形式
+            messages.append(msg)
+
+        options = {
+            'num_ctx': int(body.get('num_ctx') or DEFAULT_NUM_CTX),
+            'temperature': body.get('temperature', 0.7),
+        }
+        if body.get('max_tokens'):
+            options['num_predict'] = int(body['max_tokens'])
+
+        payload = {'model': model, 'messages': messages,
+                   'stream': stream, 'think': False, 'options': options}
+
+        chars = sum(len(m['content']) for m in messages)
+        imgs = sum(len(m.get('images', [])) for m in messages)
+        print(f'[chat] model={model} msgs={len(messages)} chars={chars} '
+              f'images={imgs} num_ctx={options["num_ctx"]}', flush=True)
+
+        req = urllib.request.Request(
+            OL + '/api/chat', data=json.dumps(payload).encode(),
+            headers={'Content-Type': 'application/json'}, method='POST')
+        try:
+            r = urllib.request.urlopen(req)
+        except urllib.error.HTTPError as e:
+            data = e.read()
+            self.send_response(e.code)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(data)))
+            cors(self)
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        if not stream:
+            o = json.loads(r.read())
+            pt = o.get('prompt_eval_count', 0)
+            ct = o.get('eval_count', 0)
+            out = {'id': 'chatcmpl-1', 'object': 'chat.completion',
+                   'created': int(time.time()), 'model': model,
+                   'choices': [{'index': 0, 'finish_reason': 'stop',
+                                'message': {'role': 'assistant',
+                                            'content': o.get('message', {}).get('content', '')}}],
+                   'usage': {'prompt_tokens': pt, 'completion_tokens': ct,
+                             'total_tokens': pt + ct}}
+            data = json.dumps(out, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(data)))
+            cors(self)
+            self.end_headers()
+            self.wfile.write(data)
+            print(f'  -> prompt_tokens={pt} completion_tokens={ct}', flush=True)
+            return
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('X-Accel-Buffering', 'no')
+        cors(self)
+        self.end_headers()
+
+        first = True
+        while True:
+            line = r.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                o = json.loads(line)
+            except Exception:
+                continue
+            chunk = to_chunk(o, model, first)
+            first = False
+            if chunk['choices'][0]['delta'].get('content') or o.get('done'):
+                try:
+                    self.wfile.write(b'data: ' +
+                                     json.dumps(chunk, ensure_ascii=False).encode() +
+                                     b'\n\n')
+                    self.wfile.flush()
+                except Exception:
+                    break
+            if o.get('done'):
+                try:
+                    self.wfile.write(b'data: [DONE]\n\n')
+                    self.wfile.flush()
+                except Exception:
+                    pass
+                print(f'  -> prompt_tokens={o.get("prompt_eval_count")} '
+                      f'completion_tokens={o.get("eval_count")}', flush=True)
+                break
+
+    def log_message(self, *a):
+        pass
+
+
+server = ThreadingHTTPServer(('0.0.0.0', 11435), P)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+print('Proxy started on :11435', flush=True)
+
+
+# ===== ngrok =====
+from kaggle_secrets import UserSecretsClient
+token = UserSecretsClient().get_secret('NGROK_AUTHTOKEN')
+os.system(f'ngrok config add-authtoken {token}')
+log = open('/tmp/ngrok.log', 'w')
+subprocess.Popen(['ngrok', 'http', '--url', NGROK_DOMAIN, '11435'],
+                 stdout=log, stderr=subprocess.STDOUT)
+time.sleep(5)
+print(open('/tmp/ngrok.log').read())
+print(f'Base URL: https://{NGROK_DOMAIN}/v1', flush=True)
+
+
+# ===== GAS 連携：停止ポーリングと使用時間記録 =====
+start_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def gas(action, **params):
+    if GAS_URL.startswith('__'):
+        return {}
+    params.update({'action': action, 'token': CONTROL_TOKEN})
+    url = GAS_URL + '?' + urllib.parse.urlencode(params)
+    with urllib.request.urlopen(url, timeout=15) as r:
+        return json.loads(r.read())
+
+
+gas('started', startTime=start_iso)
+
+for i in range(MAX_MINUTES * 2):
+    time.sleep(30)
+    try:
+        if gas('shouldStop').get('stop'):
+            print('Stop requested by GAS', flush=True)
+            break
+    except Exception as e:
+        print('poll error:', e, flush=True)
+    if i % 20 == 0:
+        print(f'{i // 2}min alive | https://{NGROK_DOMAIN}', flush=True)
+
+try:
+    print('record:', gas('record', startTime=start_iso), flush=True)
+except Exception as e:
+    print('record failed:', e, flush=True)

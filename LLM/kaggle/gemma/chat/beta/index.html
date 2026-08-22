@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>gemma chat</title>
+<link rel="stylesheet" href="./css/styles.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" />
+<script type="importmap">
+{
+  "imports": {
+    "dexie": "https://cdn.jsdelivr.net/npm/dexie@4.0.11/+esm",
+    "marked": "https://cdn.jsdelivr.net/npm/marked@15.0.7/+esm",
+    "dompurify": "https://cdn.jsdelivr.net/npm/dompurify@3.2.4/+esm",
+    "highlight.js": "https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/+esm",
+    "pdfjs": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"
+  }
+}
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div id="endpoint-panel"></div>
+    <button id="new-chat">＋ 新規チャット</button>
+    <h1>会話</h1>
+    <div id="conv-list"></div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <strong id="model-name">—</strong>
+      <span class="spacer"></span>
+      <button id="open-settings">設定</button>
+    </div>
+    <div id="messages" class="messages"></div>
+    <div id="composer" class="composer"></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
