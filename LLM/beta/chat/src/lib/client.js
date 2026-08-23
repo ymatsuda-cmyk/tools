@@ -33,6 +33,9 @@ export async function* streamChat(s, messages, signal) {
       stream: true,
       num_ctx: s.numCtx,
       temperature: s.temperature,
+      // qwen3 系はデフォルトで思考モードが有効。オフにすると応答開始が大きく速くなる。
+      // プロキシ側は think があればそのまま Ollama に転送する実装。
+      ...(typeof s.think === 'boolean' ? { think: s.think } : {}),
     }),
   })
 

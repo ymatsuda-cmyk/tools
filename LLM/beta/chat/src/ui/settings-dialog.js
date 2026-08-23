@@ -102,6 +102,7 @@ export function openSettings(settings, onSave) {
       p.numCtx = Number(inputs.numCtx.value) || 32768
       p.gasUrl = normalizeBaseUrl(inputs.gasUrl.value)
       p.controlToken = inputs.controlToken.value.trim()
+      p.think = inputs.think.value === 'default' ? null : inputs.think.value === 'on'
     }
 
     function renderForm() {
@@ -124,7 +125,15 @@ export function openSettings(settings, onSave) {
           value: p.controlToken,
           placeholder: 'CONTROL_TOKEN',
         }),
+        think: h(
+          'select',
+          {},
+          h('option', { value: 'default', text: 'サーバー既定に任せる' }),
+          h('option', { value: 'off', text: 'オフ（応答速度優先）' }),
+          h('option', { value: 'on', text: 'オン（思考過程を出力）' }),
+        ),
       }
+      inputs.think.value = p.think === null ? 'default' : p.think ? 'on' : 'off'
       const keyErr = h('div', { class: 'err' })
 
       const testBtn = h('button', {
@@ -155,6 +164,16 @@ export function openSettings(settings, onSave) {
         field('ベースURL', inputs.baseUrl),
         field('APIキー', inputs.apiKey, keyErr),
         h('div', { class: 'row' }, field('モデル', inputs.model), field('num_ctx', inputs.numCtx)),
+        field(
+          '思考モード（think）',
+          inputs.think,
+          h('div', {
+            class: 'hint',
+            style: { marginTop: '4px' },
+            text:
+              'qwen3 系はデフォルトで思考モードが有効です。応答開始までの時間を優先するなら「オフ」推奨。',
+          }),
+        ),
         h(
           'div',
           { class: 'row', style: { marginBottom: '18px' } },

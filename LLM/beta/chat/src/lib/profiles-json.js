@@ -5,7 +5,7 @@ import { newProfile } from './settings.js'
  * newProfile() の内部キーと一部名前を変え、人が書きやすい形にしている。
  */
 const FIELDS = [
-  'id', 'label', 'baseUrl', 'apiKey', 'model', 'numCtx', 'gasUrl', 'controlToken',
+  'id', 'label', 'baseUrl', 'apiKey', 'model', 'numCtx', 'gasUrl', 'controlToken', 'think',
 ]
 
 /** プロファイル配列 → 貼り付け・保存しやすい JSON 文字列 */
@@ -51,6 +51,8 @@ export function jsonToProfiles(text) {
       numCtx: Number(item.numCtx) || 32768,
       gasUrl: String(item.gasUrl ?? '').trim(),
       controlToken: String(item.controlToken ?? '').trim(),
+      // 未指定 / null / 不正値はサーバー既定（think を送らない）扱いにする
+      think: typeof item.think === 'boolean' ? item.think : null,
     })
   })
 
@@ -70,6 +72,7 @@ export function sampleProfilesJson() {
         numCtx: 32768,
         gasUrl: 'https://script.google.com/macros/s/xxx/exec',
         controlToken: 'CONTROL_TOKEN',
+        think: null, // null=サーバー既定 / true=オン / false=オフ
       },
     ],
     null,

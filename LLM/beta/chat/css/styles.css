@@ -115,6 +115,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .chip.ng { background: var(--danger-bg); color: var(--danger); }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
+.think-toggle {
+  font-size: 11px; padding: 3px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-sub);
+  cursor: pointer;
+}
+.think-toggle.off { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+.think-toggle.on { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+.think-toggle[hidden] { display: none; }
+
 .messages { flex: 1; overflow-y: auto; padding: 18px 20px; }
 .msg { margin-bottom: 20px; max-width: 760px; }
 .msg.user { margin-left: auto; }

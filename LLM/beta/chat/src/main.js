@@ -61,9 +61,32 @@ function toWire(m) {
   }
 }
 
+const THINK_LABEL = { true: '思考: オン', false: '思考: オフ', null: '思考: 既定' }
+
 function renderTopbar() {
   const p = activeProfile(settings)
   $('model-name').textContent = p?.model || '—'
+
+  const btn = $('think-toggle')
+  if (!p) {
+    btn.hidden = true
+    return
+  }
+  btn.hidden = false
+  const state = p.think === null || p.think === undefined ? null : p.think
+  btn.textContent = THINK_LABEL[state]
+  btn.classList.toggle('on', state === true)
+  btn.classList.toggle('off', state === false)
+}
+
+/** 既定 → オフ → オン → 既定 の順で切り替える。qwen3 系は既定でオンなので「オフ」を経由させる */
+function cycleThink() {
+  const p = activeProfile(settings)
+  if (!p) return
+  const cur = p.think === null || p.think === undefined ? null : p.think
+  p.think = cur === null ? false : cur === false ? true : null
+  saveSettings(settings)
+  renderTopbar()
 }
 
 let renamingId = null
@@ -310,6 +333,7 @@ setupDropzone(document.querySelector('.main'), (files) => composer.addFiles(file
 
 $('new-chat').addEventListener('click', onNewChat)
 $('open-settings').addEventListener('click', () => openSettings(settings, applySettings))
+$('think-toggle').addEventListener('click', cycleThink)
 
 renderTopbar()
 endpointPanel.refresh()

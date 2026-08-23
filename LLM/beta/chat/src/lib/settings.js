@@ -19,6 +19,9 @@ export function newProfile(over = {}) {
     numCtx: 32768,
     gasUrl: '',
     controlToken: '',
+    // null = サーバー既定に任せる（think を送らない）。true/false で明示指定。
+    // qwen3 系はデフォルトで思考モードが有効なため、応答速度を優先するなら false 推奨。
+    think: null,
     ...over,
   }
 }
@@ -96,6 +99,7 @@ export function connectionOf(s) {
     model: p.model,
     numCtx: p.numCtx,
     temperature: s.temperature,
+    think: p.think ?? null,
   }
 }
 
