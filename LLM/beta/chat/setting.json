@@ -14,9 +14,9 @@
     "label": "Qwen3.8",
     "baseUrl": "https://smartly-overflow-unleash.ngrok-free.dev/v1",
     "apiKey": "bb3d602bc2a2499993a97e1bf9cf98f2",
-    "model": "Qwen3.8:27b",
+    "model": "qwen3.8:27b",
     "numCtx": 32768,
-    "gasUrl": "https://script.google.com/macros/s/AKfycbz99O4QPiR25FVt9QIcg8u37CrBIJnLY9AcXnZdM2v2NA04jm1Viml6HqGZDqPsnOu1CA/exec",
+    "gasUrl": "https://script.google.com/macros/s/AKfycbz08SCS4i23ENcrXiqEBhU7apJh6PkcKvIs9IOqUZVQfjaMXc7rfRwd2GyqK4aMQhM/exec",
     "controlToken": "d01a12382aa70e61420a6e87682e3f67"
   }
 ]

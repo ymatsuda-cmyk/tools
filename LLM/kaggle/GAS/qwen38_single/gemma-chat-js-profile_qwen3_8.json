@@ -1,0 +1,10 @@
+{
+  "id": "b",
+  "label": "qwen3.8",
+  "baseUrl": "https://smartly-overflow-unleash.ngrok-free.dev/v1",
+  "apiKey": "★CONFIG.proxyApiKeyと同じ値",
+  "model": "qwen3.8:27b",
+  "numCtx": 32768,
+  "gasUrl": "https://script.google.com/macros/s/AKfycbz99O4QPiR25FVt9QIcg8u37CrBIJnLY9AcXnZdM2v2NA04jm1Viml6HqGZDqPsnOu1CA/exec",
+  "controlToken": "★CONFIG.controlTokenと同じ値"
+}
