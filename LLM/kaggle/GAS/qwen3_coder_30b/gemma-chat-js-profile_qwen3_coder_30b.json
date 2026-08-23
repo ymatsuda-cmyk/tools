@@ -1,0 +1,10 @@
+{
+  "id": "coder",
+  "label": "Qwen3-Coder",
+  "baseUrl": "https://issuing-alphabet-jockey.ngrok-free.dev/v1",
+  "apiKey": "bb3d602bc2a2499993a97e1bf9cf98f2",
+  "model": "qwen3-coder:30b",
+  "numCtx": 32768,
+  "gasUrl": "★CONFIG.gasWebappUrlと同じ値",
+  "controlToken": "d01a12382aa70e61420a6e87682e3f67"
+}

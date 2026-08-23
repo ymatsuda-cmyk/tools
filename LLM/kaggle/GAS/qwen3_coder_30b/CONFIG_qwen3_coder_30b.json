@@ -1,0 +1,12 @@
+{
+  "kaggleUsername": "matsuda2026",
+  "kaggleApiKey": "ba3d745bc74fdeb98634a9f365a765f8",
+  "kaggleKernel": "matsuda2026/qwen3-coder-30b",
+  "kernelTitle": "qwen3-coder 30b",
+  "model": "qwen3-coder:30b",
+  "ngrokDomain": "issuing-alphabet-jockey.ngrok-free.dev",
+  "proxyApiKey": "bb3d602bc2a2499993a97e1bf9cf98f2",
+  "controlToken": "d01a12382aa70e61420a6e87682e3f67",
+  "datasets": ["matsuda2026/ngrok-binary", "matsuda2026/ollama-qwen3-coder-30b"],
+  "gasWebappUrl": "https://script.google.com/macros/s/AKfycbxZcx2lumJFU_Eu-CMzY-btxGkOaknS--7F6S_Qo8iMnChrg7KA04z-Q-ZgsuXgc2-Q/exec"
+}
