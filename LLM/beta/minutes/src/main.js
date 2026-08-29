@@ -4,7 +4,7 @@ import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
-import { filterByMonth, filterBySearch, filterByTags, buildTagOptions, allKnownTags } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -61,13 +61,13 @@ async function loadIndex() {
  * タグの選択可否は「月・検索を適用した後、AND追加しても0件にならないか」で判定する。
  */
 function currentFilteredItems() {
-  const byMonth = filterByMonth(items, currentMonthKey)
+  const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
   return filterByTags(byMonthAndSearch, selectedTags)
 }
 
 function refresh() {
-  const byMonth = filterByMonth(items, currentMonthKey)
+  const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
   const baseItems = filterBySearch(byMonth, searchQuery) // タグ絞り込み前(タグ候補の母集団)
   const filteredItems = filterByTags(baseItems, selectedTags)
   const tagOptions = buildTagOptions(baseItems, selectedTags)
@@ -541,23 +541,57 @@ let bulkCancelled = false
 let bulkRunning = false
 
 /**
- * 現在の絞り込み結果のうち、状態が「文字起こし」のものをまとめて要約する。
- * LLMエンドポイントの同時実行を避けるため直列に処理し、1件失敗しても続行する。
+ * 現在の絞り込み結果のうち、議事(agenda)が空のものをまとめて要約する。
+ * 「議事が空」かどうかはNotion側の実データを見ないと分からないため、
+ * 生成の前に対象確認フェーズ(fetchSummaryを1件ずつ呼ぶだけの軽い問い合わせ)を挟む。
+ * LLMエンドポイントの同時実行を避けるため生成は直列に処理し、1件失敗しても続行する。
  */
 async function runBulkSummarize() {
   if (bulkRunning) { bulkCancelled = true; return }
 
-  const targets = currentFilteredItems().filter((i) => i.status === '文字起こし')
-  if (!targets.length) {
-    alert('対象がありません(状態が「文字起こし」の議事録が現在の絞り込みに含まれていません)')
+  const candidates = currentFilteredItems()
+  if (!candidates.length) {
+    alert('現在の絞り込みに議事録がありません')
     return
   }
-  if (!confirm(`${targets.length}件を要約します。よろしいですか?`)) return
 
   bulkRunning = true
   bulkCancelled = false
-  const results = { done: 0, failed: 0, errors: [] }
 
+  // --- フェーズ1: 議事が空のものだけを対象に絞る ---
+  const targets = []
+  for (let i = 0; i < candidates.length; i++) {
+    if (bulkCancelled) break
+    paintBulkChecking(i + 1, candidates.length)
+    try {
+      const remote = await fetchSummary(candidates[i].notionPageId)
+      if (!remote.generatedAt || !(remote.detail?.agenda?.length)) {
+        targets.push(candidates[i])
+      }
+    } catch {
+      // 確認に失敗したものは対象外にする(生成フェーズで無駄打ちしない)
+    }
+  }
+
+  if (bulkCancelled) {
+    bulkRunning = false
+    bulkProgressEl.innerHTML = ''
+    return
+  }
+  if (!targets.length) {
+    bulkRunning = false
+    bulkProgressEl.innerHTML = ''
+    alert('対象がありません(議事が空の議事録が現在の絞り込みに含まれていません)')
+    return
+  }
+  if (!confirm(`${targets.length}件を要約します。よろしいですか?`)) {
+    bulkRunning = false
+    bulkProgressEl.innerHTML = ''
+    return
+  }
+
+  // --- フェーズ2: 生成 ---
+  const results = { done: 0, failed: 0, errors: [] }
   for (let i = 0; i < targets.length; i++) {
     if (bulkCancelled) break
     const item = targets[i]
@@ -576,6 +610,20 @@ async function runBulkSummarize() {
   bulkRunning = false
   paintBulkProgress({ finished: true, cancelled: bulkCancelled, total: targets.length, ...results })
   refresh()
+}
+
+function paintBulkChecking(current, total) {
+  const pct = Math.round((current / total) * 100)
+  bulkProgressEl.innerHTML = `
+    <div class="bulk-bar">
+      <div class="bulk-track"><div class="bulk-fill" style="width:${pct}%"></div></div>
+      <span class="bulk-status">対象を確認中 ${current} / ${total}</span>
+      <button class="btn bulk-cancel">中断</button>
+    </div>
+  `
+  bulkProgressEl.querySelector('.bulk-cancel').addEventListener('click', () => {
+    bulkCancelled = true
+  })
 }
 
 function paintBulkProgress(state) {

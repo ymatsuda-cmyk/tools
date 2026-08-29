@@ -7,6 +7,11 @@ export function allKnownTags(items) {
   return [...set].sort()
 }
 
+/** 状態が「削除」のものを除外する */
+export function excludeDeleted(items) {
+  return items.filter((i) => i.status !== '削除')
+}
+
 /** items のうち year-month(0始まりではなく "YYYY-MM") が一致するものだけ */
 export function filterByMonth(items, monthKey) {
   return items.filter((i) => i.date.slice(0, 7) === monthKey)
