@@ -28,7 +28,7 @@ DEBUG_LOG_DIR = SCRIPT_DIR / "logs" / "transcribe_debug"
 # ★ ローカルの tools リポジトリのクローン先に合わせて変更してください
 MINUTES_INDEX_PATH = Path(os.environ.get(
     "MINUTES_INDEX_PATH",
-    str(Path.home() / "repos" / "tools" / "data" / "minutes" / "index.json")
+    str(Path.home() / "tools" / "data" / "minutes" / "index.json")
 ))
 GIT_AUTO_PUSH = os.environ.get("MINUTES_GIT_PUSH", "0") == "1"
 
@@ -431,7 +431,10 @@ def main():
     new_files.sort(key=lambda x: x.get("start_time", 0))
     print(f"    未登録: {len(new_files)}件")
     if not new_files:
-        print("\n✅ 新規ファイルなし。完了。"); return
+        print("\n✅ 新規ファイルなし。index.json を更新して終了します。")
+        print("\n[4] index.json を更新中...")
+        build_index(notion_pages)
+        return
 
     print(f"\n[4] {len(new_files)}件を処理中...")
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -459,6 +462,10 @@ def main():
             page_id = create_notion_page(f, transcript)
             if page_id:
                 print(f"  ✅ Notion登録完了")
+
+    print("\n[5] 最新のNotionページから index.json を更新中...")
+    latest_notion_pages = fetch_notion_pages()
+    build_index(latest_notion_pages)
 
     print(f"\n{'='*60}\n✅ 全処理完了: {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S JST')}\n{'='*60}\n")
 
