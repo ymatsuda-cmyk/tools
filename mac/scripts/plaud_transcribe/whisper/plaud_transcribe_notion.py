@@ -427,4 +427,40 @@ def main():
         print("❌ PLAUDからファイルを取得できませんでした"); return
 
     print("\n[3] 未登録ファイルを抽出中...")
-    new_files = [f for f in plaud_files if f["id"] not in
+    new_files = [f for f in plaud_files if f["id"] not in registered_ids]
+    new_files.sort(key=lambda x: x.get("start_time", 0))
+    print(f"    未登録: {len(new_files)}件")
+    if not new_files:
+        print("\n✅ 新規ファイルなし。完了。"); return
+
+    print(f"\n[4] {len(new_files)}件を処理中...")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for i, f in enumerate(new_files, 1):
+            file_id = f["id"]
+            filename = f.get("fullname", f"{file_id}.ogg")
+            name = f.get("filename", file_id)
+            print(f"\n  [{i}/{len(new_files)}] {name}")
+
+            temp_url = get_download_url(file_id)
+            if not temp_url:
+                print(f"  ❌ URL取得失敗。スキップ"); continue
+
+            audio_path = Path(tmpdir) / filename
+            print(f"  → ダウンロード中... ({filename})")
+            if not download_audio(temp_url, str(audio_path)):
+                print(f"  ❌ ダウンロード失敗。スキップ"); continue
+            print(f"  ✅ {audio_path.stat().st_size/1024/1024:.1f} MB")
+
+            transcript = transcribe(str(audio_path))
+            if not transcript:
+                print(f"  ❌ 文字起こし失敗。スキップ"); continue
+            print(f"  ✅ 文字起こし完了 ({len(transcript)}文字)")
+
+            page_id = create_notion_page(f, transcript)
+            if page_id:
+                print(f"  ✅ Notion登録完了")
+
+    print(f"\n{'='*60}\n✅ 全処理完了: {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S JST')}\n{'='*60}\n")
+
+if __name__ == "__main__":
+    main()
