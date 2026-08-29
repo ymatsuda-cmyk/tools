@@ -1,0 +1,36 @@
+{
+  "defaultLabel": "whisper",
+  "speakerDbPath": "~/.plaud_speakers.json",
+  "normalizeDictPath": "normalize_dict.json",
+  "fillers": [
+    "えー", "えーと", "ええと", "えっと", "あー", "あのー", "そのー",
+    "まあその", "なんていうか", "はいはい", "うーん"
+  ],
+  "engines": [
+    {
+      "id": "w",
+      "label": "whisper",
+      "type": "whisper",
+      "model": "mlx-community/whisper-large-v2-mlx",
+      "language": "ja"
+    },
+    {
+      "id": "q",
+      "label": "qwen3-asr",
+      "type": "qwen3-asr",
+      "model": "Qwen/Qwen3-ASR-1.7B",
+      "language": "Japanese",
+      "diarize": true,
+      "minSpeakers": 2,
+      "maxSpeakers": 8,
+      "gapSec": 0.7,
+      "maxChars": 60,
+      "diarization": {
+        "enabled": true,
+        "namePrefix": "担当者",
+        "matchThreshold": 0.72,
+        "minSegmentSec": 0.7
+      }
+    }
+  ]
+}
