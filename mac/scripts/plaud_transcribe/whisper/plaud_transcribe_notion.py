@@ -391,6 +391,15 @@ def write_minutes_index(pages):
 
 def push_minutes_index():
     repo = str(MINUTES_INDEX_PATH.parent)
+    branch = "main"
+    branch_result = subprocess.run(
+        ["git", "-C", repo, "branch", "--show-current"],
+        capture_output=True,
+        text=True,
+    )
+    if branch_result.returncode == 0 and branch_result.stdout.strip():
+        branch = branch_result.stdout.strip()
+
     try:
         subprocess.run(["git", "-C", repo, "add", str(MINUTES_INDEX_PATH)],
                        check=True, capture_output=True, text=True)
@@ -399,8 +408,24 @@ def push_minutes_index():
             print("    差分なしのためcommitをスキップ"); return
         msg = f"chore: update minutes index ({datetime.now(JST).strftime('%Y-%m-%d %H:%M')})"
         subprocess.run(["git", "-C", repo, "commit", "-m", msg], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "-C", repo, "push"], check=True, capture_output=True, text=True, timeout=180)
-        print("    ✅ git push 完了")
+        try:
+            subprocess.run(["git", "-C", repo, "push", "origin", branch], check=True, capture_output=True, text=True, timeout=180)
+            print("    ✅ git push 完了")
+        except subprocess.CalledProcessError as e:
+            err = (e.stderr or "")
+            non_ff = ("fetch first" in err.lower() or "non-fast-forward" in err.lower())
+            if not non_ff:
+                raise
+            print("    ℹ️ リモートが先行しているため rebase 後に再 push します")
+            subprocess.run(
+                ["git", "-C", repo, "pull", "--rebase", "--autostash", "origin", branch],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            subprocess.run(["git", "-C", repo, "push", "origin", branch], check=True, capture_output=True, text=True, timeout=180)
+            print("    ✅ git push 完了 (rebase後)")
     except subprocess.CalledProcessError as e:
         print(f"    ⚠️ git操作に失敗: {(e.stderr or '')[:200]}")
     except subprocess.TimeoutExpired:
