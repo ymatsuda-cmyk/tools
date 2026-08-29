@@ -52,3 +52,8 @@ export function saveTags(pageId, tags) {
 export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }
+
+/** 人手編集の保存。要約日時・モデル・状態は変更されない */
+export function saveDetail(pageId, cardSummary, detail) {
+  return callGas('saveDetail', { pageId, cardSummary, detail })
+}

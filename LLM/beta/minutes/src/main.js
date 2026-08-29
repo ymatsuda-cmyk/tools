@@ -1,10 +1,10 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
-import { filterByMonth, filterBySearch, filterByTags, buildTagOptions } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, buildTagOptions, allKnownTags } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -114,6 +114,13 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
 
+  target.querySelectorAll('.btn-edit').forEach((el) => {
+    el.addEventListener('click', () => openFieldEditor(target, item, state, el.dataset.field))
+  })
+  target.querySelectorAll('.todo-check').forEach((el) => {
+    el.addEventListener('change', () => toggleTodo(target, item, state, Number(el.dataset.index), el.checked))
+  })
+
   target.querySelectorAll('.tag-remove').forEach((el) => {
     el.addEventListener('click', (e) => {
       const tag = e.target.closest('.tag-chip').dataset.tag
@@ -122,13 +129,199 @@ function paintDetail(target, item, state) {
     })
   })
   target.querySelector('.tag-add-btn')?.addEventListener('click', () => {
-    const input = prompt('追加するタグを入力してください')
-    const tag = input?.trim()
-    if (!tag) return
-    const current = tagsByKey[item.notionPageId] || []
-    if (current.includes(tag)) return
-    commitTags(target, item, state, [...current, tag])
+    openTagPicker(target, item, state)
   })
+}
+
+/** ToDoのチェック状態を変更してNotionに保存する */
+async function toggleTodo(target, item, state, index, done) {
+  const summary = state.summary
+  const prev = summary.detail.todos
+  const next = prev.map((t, i) => (i === index ? { ...t, done } : t))
+
+  const apply = (todos) => {
+    const updated = { ...summary, detail: { ...summary.detail, todos } }
+    setDetailCache(item.key, updated)
+    paintDetail(target, item, { ...state, summary: updated })
+    return updated
+  }
+
+  const updated = apply(next)
+  try {
+    await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+  } catch (err) {
+    apply(prev)
+    alert('ToDoの更新に失敗しました: ' + (err.message || err))
+  }
+}
+
+/**
+ * 項目ごとの編集モーダル。
+ * 配列項目は1行1件のテキストとして編集させ、保存時に配列へ戻す。
+ * 議事だけは入れ子構造のためJSONを直接編集する。
+ */
+function openFieldEditor(target, item, state, field) {
+  const summary = state.summary
+  const labels = {
+    cardSummary: 'サマリ',
+    agenda: '議事',
+    decisions: '決定事項',
+    todos: 'ToDo',
+    topics: '論点',
+  }
+
+  let initial
+  let hint
+  if (field === 'cardSummary') {
+    initial = summary.cardSummary || ''
+    hint = '一覧カードにも表示されます'
+  } else if (field === 'agenda') {
+    initial = JSON.stringify(summary.detail.agenda || [], null, 2)
+    hint = '議題ごとの入れ子構造のため、JSON形式で編集します'
+  } else if (field === 'todos') {
+    initial = (summary.detail.todos || []).map((t) => t.text).join('\n')
+    hint = '1行に1件。チェック状態は保持されます'
+  } else {
+    initial = (summary.detail[field] || []).join('\n')
+    hint = '1行に1件'
+  }
+
+  const root = document.getElementById('modal-root')
+  root.innerHTML = `
+    <div class="raw-modal-overlay">
+      <div class="raw-modal" style="width:min(560px,100%)">
+        <div class="raw-modal-header">
+          <span>${labels[field]}を編集</span>
+          <button id="edit-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="raw-modal-body">
+          <p class="edit-hint">${hint}</p>
+          <textarea id="edit-textarea" class="edit-textarea" rows="14">${escapeHtml(initial)}</textarea>
+          <p id="edit-error" class="error-text" style="display:none"></p>
+        </div>
+        <div class="raw-modal-footer">
+          <button id="edit-cancel" class="btn">キャンセル</button>
+          <button id="edit-save" class="btn">保存</button>
+        </div>
+      </div>
+    </div>
+  `
+
+  const close = () => (root.innerHTML = '')
+  root.querySelector('#edit-close').addEventListener('click', close)
+  root.querySelector('#edit-cancel').addEventListener('click', close)
+
+  root.querySelector('#edit-save').addEventListener('click', async () => {
+    const raw = root.querySelector('#edit-textarea').value
+    const errorEl = root.querySelector('#edit-error')
+
+    let updated
+    if (field === 'cardSummary') {
+      updated = { ...summary, cardSummary: raw.trim() }
+    } else if (field === 'agenda') {
+      try {
+        const parsed = JSON.parse(raw)
+        if (!Array.isArray(parsed)) throw new Error('配列である必要があります')
+        updated = { ...summary, detail: { ...summary.detail, agenda: parsed } }
+      } catch (err) {
+        errorEl.textContent = 'JSONの形式が不正です: ' + (err.message || err)
+        errorEl.style.display = 'block'
+        return
+      }
+    } else if (field === 'todos') {
+      const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+      const prevTodos = summary.detail.todos || []
+      // 同じ本文のToDoが残っていればチェック状態を引き継ぐ
+      const next = lines.map((text) => {
+        const found = prevTodos.find((t) => t.text === text)
+        return { text, done: found ? found.done : false }
+      })
+      updated = { ...summary, detail: { ...summary.detail, todos: next } }
+    } else {
+      const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+      updated = { ...summary, detail: { ...summary.detail, [field]: lines } }
+    }
+
+    close()
+    setDetailCache(item.key, updated)
+    paintDetail(target, item, { ...state, summary: updated })
+
+    try {
+      await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+    } catch (err) {
+      setDetailCache(item.key, summary)
+      paintDetail(target, item, { ...state, summary })
+      alert('保存に失敗しました: ' + (err.message || err))
+    }
+  })
+}
+
+/**
+ * 既存タグから複数選択できるモーダル。新規タグの追加もここで行う。
+ * 候補は index.json 全体から集めるため、Notionへの追加問い合わせは不要。
+ */
+function openTagPicker(target, item, state) {
+  const root = document.getElementById('modal-root')
+  const current = new Set(tagsByKey[item.notionPageId] || [])
+  const candidates = allKnownTags(items)
+  // 他レコードに存在しない独自タグも候補に含める
+  current.forEach((t) => { if (!candidates.includes(t)) candidates.push(t) })
+
+  const draft = new Set(current)
+
+  function paint() {
+    root.innerHTML = `
+      <div class="raw-modal-overlay">
+        <div class="raw-modal" style="width:min(420px,100%)">
+          <div class="raw-modal-header">
+            <span>タグを選択</span>
+            <button id="tag-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
+          </div>
+          <div class="raw-modal-body">
+            <div class="tag-picker-list">
+              ${candidates.map((t) => `
+                <span class="tag-chip picker-chip ${draft.has(t) ? 'selected' : ''}" data-tag="${escapeHtml(t)}">
+                  ${draft.has(t) ? '<i class="ti ti-check" aria-hidden="true"></i>' : ''}${escapeHtml(t)}
+                </span>
+              `).join('')}
+            </div>
+            <div class="tag-new-row">
+              <input type="text" id="tag-new-input" placeholder="新しいタグを追加" />
+              <button id="tag-new-add" class="btn">追加</button>
+            </div>
+          </div>
+          <div class="raw-modal-footer">
+            <button id="tag-cancel" class="btn">キャンセル</button>
+            <button id="tag-save" class="btn">保存</button>
+          </div>
+        </div>
+      </div>
+    `
+
+    root.querySelectorAll('.picker-chip').forEach((el) => {
+      el.addEventListener('click', () => {
+        const t = el.dataset.tag
+        draft.has(t) ? draft.delete(t) : draft.add(t)
+        paint()
+      })
+    })
+    root.querySelector('#tag-close').addEventListener('click', () => (root.innerHTML = ''))
+    root.querySelector('#tag-cancel').addEventListener('click', () => (root.innerHTML = ''))
+    root.querySelector('#tag-new-add').addEventListener('click', () => {
+      const input = root.querySelector('#tag-new-input')
+      const t = input.value.trim()
+      if (!t) return
+      if (!candidates.includes(t)) candidates.push(t)
+      draft.add(t)
+      paint()
+    })
+    root.querySelector('#tag-save').addEventListener('click', () => {
+      root.innerHTML = ''
+      commitTags(target, item, state, [...draft])
+    })
+  }
+
+  paint()
 }
 
 async function editTitle(target, item, state) {
@@ -158,13 +351,22 @@ function updateRowTitle(item) {
 
 async function commitTags(target, item, state, nextTags) {
   const prev = tagsByKey[item.notionPageId]
-  tagsByKey[item.notionPageId] = nextTags // 楽観的に即反映
-  paintDetail(target, item, state)
+  const prevItemTags = item.tags
+
+  const apply = (tags, itemTags) => {
+    tagsByKey[item.notionPageId] = tags
+    item.tags = itemTags
+    refresh() // 一覧のタグ表示・フィルタを更新(モバイルではインライン詳細が消える)
+    const t = detailTarget(findRow(item.key))
+    paintDetail(t, item, state)
+    return t
+  }
+
+  apply(nextTags, nextTags) // 楽観的に即反映
   try {
     await saveTags(item.notionPageId, nextTags)
   } catch (err) {
-    tagsByKey[item.notionPageId] = prev // 失敗したら元に戻す
-    paintDetail(target, item, state)
+    apply(prev, prevItemTags) // 失敗したら元に戻す
     alert('タグの保存に失敗しました: ' + (err.message || err))
   }
 }
@@ -211,35 +413,44 @@ async function onSelect(item, rowEl) {
   }
 }
 
-async function runGenerate(target, item) {
-  paintDetail(target, item, { phase: 'generating' })
-  try {
-    const { text } = await fetchTranscript(item.notionPageId)
-    const result = await generateSummary(text, (partial) => {
-      paintDetail(target, item, { phase: 'generating', progress: partial.slice(0, 200) })
-    })
-    await saveSummary(item.notionPageId, result.cardSummary, {
+/**
+ * 1件分の要約を生成してNotionに保存し、キャッシュも更新する。
+ * 単体実行(runGenerate)と一括実行(runBulkSummarize)の共通処理。
+ * @param {(partial: string) => void} [onProgress]
+ */
+async function generateAndSave(item, onProgress) {
+  const { text } = await fetchTranscript(item.notionPageId)
+  const result = await generateSummary(text, onProgress)
+
+  await saveSummary(item.notionPageId, result.cardSummary, {
+    agenda: result.agenda,
+    decisions: result.decisions,
+    todos: result.todos,
+    topics: result.topics,
+  }, result.model)
+
+  item.status = '要約'
+
+  return setDetailCache(item.key, {
+    cardSummary: result.cardSummary,
+    detail: {
       agenda: result.agenda,
       decisions: result.decisions,
       todos: result.todos,
       topics: result.topics,
-    }, result.model)
+    },
+    model: result.model,
+    generatedAt: new Date().toISOString(),
+  })
+}
 
-    // Notion側の状態も"要約"に変わっているはずなので、画面側も合わせる
-    item.status = '要約'
-    updateRowBadge(item)
-
-    const saved = setDetailCache(item.key, {
-      cardSummary: result.cardSummary,
-      detail: {
-        agenda: result.agenda,
-        decisions: result.decisions,
-        todos: result.todos,
-        topics: result.topics,
-      },
-      model: result.model,
-      generatedAt: new Date().toISOString(),
+async function runGenerate(target, item) {
+  paintDetail(target, item, { phase: 'generating' })
+  try {
+    const saved = await generateAndSave(item, (partial) => {
+      paintDetail(target, item, { phase: 'generating', progress: partial.slice(0, 200) })
     })
+    updateRowBadge(item)
     paintDetail(target, item, { phase: 'ready', summary: saved })
   } catch (err) {
     paintDetail(target, item, { phase: 'error', message: String(err.message || err) })
@@ -323,6 +534,81 @@ function openSettings() {
     root.innerHTML = ''
   })
 }
+
+// --- 一括要約 ---
+const bulkProgressEl = document.getElementById('bulk-progress')
+let bulkCancelled = false
+let bulkRunning = false
+
+/**
+ * 現在の絞り込み結果のうち、状態が「文字起こし」のものをまとめて要約する。
+ * LLMエンドポイントの同時実行を避けるため直列に処理し、1件失敗しても続行する。
+ */
+async function runBulkSummarize() {
+  if (bulkRunning) { bulkCancelled = true; return }
+
+  const targets = currentFilteredItems().filter((i) => i.status === '文字起こし')
+  if (!targets.length) {
+    alert('対象がありません(状態が「文字起こし」の議事録が現在の絞り込みに含まれていません)')
+    return
+  }
+  if (!confirm(`${targets.length}件を要約します。よろしいですか?`)) return
+
+  bulkRunning = true
+  bulkCancelled = false
+  const results = { done: 0, failed: 0, errors: [] }
+
+  for (let i = 0; i < targets.length; i++) {
+    if (bulkCancelled) break
+    const item = targets[i]
+    paintBulkProgress({ current: i + 1, total: targets.length, title: item.title, ...results })
+
+    try {
+      await generateAndSave(item)
+      results.done++
+      updateRowBadge(item)
+    } catch (err) {
+      results.failed++
+      results.errors.push(`${item.title}: ${err.message || err}`)
+    }
+  }
+
+  bulkRunning = false
+  paintBulkProgress({ finished: true, cancelled: bulkCancelled, total: targets.length, ...results })
+  refresh()
+}
+
+function paintBulkProgress(state) {
+  if (state.finished) {
+    const label = state.cancelled ? '中断しました' : '完了しました'
+    bulkProgressEl.innerHTML = `
+      <div class="bulk-bar">
+        <span class="bulk-status">${label} — 成功 ${state.done}件 / 失敗 ${state.failed}件</span>
+        ${state.errors.length ? `<button class="btn bulk-errors">失敗を表示</button>` : ''}
+        <button class="btn bulk-close">閉じる</button>
+      </div>
+    `
+    bulkProgressEl.querySelector('.bulk-close').addEventListener('click', () => (bulkProgressEl.innerHTML = ''))
+    bulkProgressEl.querySelector('.bulk-errors')?.addEventListener('click', () => {
+      alert(state.errors.join('\n'))
+    })
+    return
+  }
+
+  const pct = Math.round((state.current / state.total) * 100)
+  bulkProgressEl.innerHTML = `
+    <div class="bulk-bar">
+      <div class="bulk-track"><div class="bulk-fill" style="width:${pct}%"></div></div>
+      <span class="bulk-status">${state.current} / ${state.total} — ${escapeHtml(state.title)}</span>
+      <button class="btn bulk-cancel">中断</button>
+    </div>
+  `
+  bulkProgressEl.querySelector('.bulk-cancel').addEventListener('click', () => {
+    bulkCancelled = true
+  })
+}
+
+document.getElementById('bulk-summarize').addEventListener('click', runBulkSummarize)
 
 // 検索欄とタグ表示トグルは再生成しない永続DOMなので、初回に一度だけ結線する。
 // (毎回 innerHTML で作り直すと入力のたびにフォーカスが外れ、1文字しか打てなくなる)

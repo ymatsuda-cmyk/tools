@@ -6,7 +6,14 @@ const DETAIL_PREFIX = 'minutes:detail:'
 export function getDetailCache(pageId) {
   try {
     const raw = localStorage.getItem(DETAIL_PREFIX + pageId)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    // 旧形式(ToDoが文字列配列)のキャッシュを新形式に揃える
+    const todos = parsed.detail?.todos
+    if (Array.isArray(todos) && typeof todos[0] === 'string') {
+      parsed.detail.todos = todos.map((text) => ({ text, done: false }))
+    }
+    return parsed
   } catch {
     return null
   }

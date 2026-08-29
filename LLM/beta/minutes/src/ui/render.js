@@ -139,11 +139,11 @@ export function renderDetailHtml(item, state) {
   const s = state.summary
   const agenda = s.detail?.agenda || []
   const decisions = s.detail?.decisions || []
-  const todos = s.detail?.todos || []
+  const todos = (s.detail?.todos || []).map((t) => (typeof t === 'string' ? { text: t, done: false } : t))
   const topics = s.detail?.topics || []
 
   const agendaHtml = agenda.length ? `
-    <div class="section-label">議事</div>
+    <div class="section-label">議事<button class="btn-ghost btn-edit" data-field="agenda" aria-label="議事を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
@@ -153,20 +153,31 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}
     </div>
-  ` : ''
+  ` : `<div class="section-label">議事<button class="btn-ghost btn-edit" data-field="agenda" aria-label="議事を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+       <p class="empty-section">未登録</p>`
+
+  const doneCount = todos.filter((t) => t.done).length
 
   return header + `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">決定事項</div><div class="stat-value">${decisions.length}</div></div>
-      <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${todos.length}</div></div>
+      <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
       <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
     </div>
-    <div class="section-label">サマリ</div>
+    <div class="section-label">サマリ<button class="btn-ghost btn-edit" data-field="cardSummary" aria-label="サマリを編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
     <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
     ${agendaHtml}
-    ${decisions.length ? `<div class="section-label">決定事項</div><ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
-    ${todos.length ? `<div class="section-label">ToDo</div><div class="todo-box">${todos.map((t) => `<div class="todo-row"><i class="ti ti-square" aria-hidden="true"></i><span>${escapeHtml(t)}</span></div>`).join('')}</div>` : ''}
-    ${topics.length ? `<div class="section-label">論点</div><ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
+    <div class="section-label">決定事項<button class="btn-ghost btn-edit" data-field="decisions" aria-label="決定事項を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+    <div class="section-label">ToDo<button class="btn-ghost btn-edit" data-field="todos" aria-label="ToDoを編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
+      <label class="todo-row ${t.done ? 'done' : ''}">
+        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} />
+        <span>${escapeHtml(t.text)}</span>
+      </label>
+    `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
+    <div class="section-label">論点<button class="btn-ghost btn-edit" data-field="topics" aria-label="論点を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     <div class="actions-row">
       <button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>

@@ -62,7 +62,7 @@ export async function generateSummary(transcriptText, onProgress) {
     cardSummary: String(parsed.cardSummary || ''),
     agenda: Array.isArray(parsed.agenda) ? parsed.agenda : [],
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
-    todos: Array.isArray(parsed.todos) ? parsed.todos : [],
+    todos: (Array.isArray(parsed.todos) ? parsed.todos : []).map((t) => ({ text: String(t), done: false })),
     topics: Array.isArray(parsed.topics) ? parsed.topics : [],
     model: profile?.model || connection.model || 'unknown',
   }

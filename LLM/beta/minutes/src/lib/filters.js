@@ -1,5 +1,12 @@
 import { getDetailCache } from './cache.js'
 
+/** index.json 全体から既知のタグを集める(タグ選択モーダルの候補に使う) */
+export function allKnownTags(items) {
+  const set = new Set()
+  items.forEach((i) => (i.tags || []).forEach((t) => set.add(t)))
+  return [...set].sort()
+}
+
 /** items のうち year-month(0始まりではなく "YYYY-MM") が一致するものだけ */
 export function filterByMonth(items, monthKey) {
   return items.filter((i) => i.date.slice(0, 7) === monthKey)

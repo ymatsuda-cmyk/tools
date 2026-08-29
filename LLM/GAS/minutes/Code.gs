@@ -31,6 +31,8 @@ var PROP_GENERATED = '要約日時';   // 生成日時、鮮度判定に使用 (
 var PROP_STATUS    = '状態';       // 進捗ステータス (select)
 var STATUS_SUMMARIZED = '要約';    // 要約生成完了時にセットする値
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
+var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
+var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 
 // ============ エントリーポイント ============
 
@@ -52,6 +54,12 @@ function doPost(e) {
         break;
       case 'saveTags':
         result = saveTags_(body.pageId, body.tags);
+        break;
+      case 'saveTitle':
+        result = saveTitle_(body.pageId, body.title);
+        break;
+      case 'saveDetail':
+        result = saveDetail_(body.pageId, body.cardSummary, body.detail);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -177,14 +185,77 @@ function fetchSummary_(pageId) {
     cardSummary: richTextOf_(props, PROP_SUMMARY) || null,
     detail: {
       decisions: splitLines_(richTextOf_(props, PROP_DECISIONS)),
-      todos: splitLines_(richTextOf_(props, PROP_TODOS)),
+      todos: parseTodos_(richTextOf_(props, PROP_TODOS)),
       topics: splitLines_(richTextOf_(props, PROP_TOPICS)),
+      agenda: parseAgenda_(richTextOf_(props, PROP_AGENDA)),
     },
     model: richTextOf_(props, PROP_MODEL) || null,
     generatedAt: generatedAt,
     updatedAt: page.last_edited_time,
     tags: tagsOf_(props),
   };
+}
+
+/**
+ * ToDo行をパースする。"[x] 内容" / "[ ] 内容" / "内容"(マーカー無し=未完了) に対応。
+ * @returns {{text: string, done: boolean}[]}
+ */
+function parseTodos_(text) {
+  return splitLines_(text).map(function (line) {
+    var m = line.match(/^\[([ xX])\]\s?(.*)$/);
+    if (m) {
+      return { text: m[2], done: m[1].toLowerCase() === 'x' };
+    }
+    return { text: line, done: false };
+  });
+}
+
+/** ToDo配列を "[x] 内容" 形式の改行区切り文字列にする */
+function serializeTodos_(todos) {
+  if (!Array.isArray(todos)) return '';
+  return todos.map(function (t) {
+    if (typeof t === 'string') return '[ ] ' + t;
+    return (t.done ? '[x] ' : '[ ] ') + (t.text || '');
+  }).join('\n');
+}
+
+/** 議事JSONをパースする。壊れていれば空配列を返す */
+function parseAgenda_(text) {
+  if (!text) return [];
+  try {
+    var parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * 人手による編集内容を保存する。
+ * saveSummary_ と違い、要約日時・要約モデル・状態は変更しない
+ * (AIが生成した時刻とモデルの記録を、手編集で上書きしないため)。
+ */
+function saveDetail_(pageId, cardSummary, detail) {
+  detail = detail || {};
+  var props = {};
+  props[PROP_SUMMARY]   = richTextProp_(cardSummary);
+  props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
+  props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
+  props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
+  props[PROP_AGENDA]    = richTextProp_(detail.agenda ? JSON.stringify(detail.agenda) : '');
+
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/** ミーティング名(title プロパティ)を更新する */
+function saveTitle_(pageId, title) {
+  var props = {};
+  props[PROP_TITLE] = {
+    title: [{ text: { content: String(title || '').slice(0, 2000) } }],
+  };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, title: title };
 }
 
 /** multi_select プロパティから選択肢名の配列を取り出す */
@@ -212,8 +283,11 @@ function saveSummary_(pageId, cardSummary, detail, model) {
   var props = {};
   props[PROP_SUMMARY]   = richTextProp_(cardSummary);
   props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
-  props[PROP_TODOS]     = richTextProp_(joinLines_(detail.todos));
+  props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
   props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
+  // 議事は「議題ごとに複数の経緯を持つ」入れ子構造のため、行区切りでは表現できない。
+  // Notion上での可読性より構造保持を優先し、JSON文字列として保存する。
+  props[PROP_AGENDA]    = richTextProp_(detail.agenda ? JSON.stringify(detail.agenda) : '');
   props[PROP_MODEL]     = richTextProp_(model);
   props[PROP_GENERATED] = { date: { start: new Date().toISOString() } };
   props[PROP_STATUS]    = { select: { name: STATUS_SUMMARIZED } };
