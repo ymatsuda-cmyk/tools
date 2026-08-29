@@ -333,6 +333,10 @@ def _rich_text(props, name):
     items = props.get(name, {}).get("rich_text", [])
     return items[0].get("plain_text", "") if items else ""
 
+def _multi_select_tags(props, name):
+    items = props.get(name, {}).get("multi_select", [])
+    return [it.get("name", "") for it in items if it.get("name")]
+
 def to_iso_z(s):
     if not s: return ""
     try:
@@ -355,6 +359,7 @@ def page_to_entry(page):
         "date": to_iso_z((props.get("日時", {}).get("date") or {}).get("start") or ""),
         "duration": _rich_text(props, "会議時間"),
         "status": (props.get("状態", {}).get("select") or {}).get("name", ""),
+        "tags": _multi_select_tags(props, "カテゴリー"),
         "notionPageId": page.get("id", ""),
         "updatedAt": None,
     }
@@ -373,7 +378,7 @@ def write_minutes_index(pages):
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     for e in entries:
         old = previous.get(e["key"])
-        unchanged = old and all(old.get(k) == e[k] for k in ("title", "date", "duration", "status", "notionPageId"))
+        unchanged = old and all(old.get(k) == e[k] for k in ("title", "date", "duration", "status", "tags", "notionPageId"))
         e["updatedAt"] = (old.get("updatedAt") or now_iso) if unchanged else now_iso
 
     entries.sort(key=lambda e: e["date"], reverse=True)
