@@ -1,3 +1,42 @@
+/**
+ * ツールバー(月ナビ / 検索 / タグフィルタ / タグ表示切替)を描画する。
+ * handlers: { onPrevMonth, onNextMonth, onSearch(query), onToggleTag(tag), onToggleShowTags(bool) }
+ */
+export function renderToolbar(container, state, handlers) {
+  container.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <div class="month-nav">
+          <button class="month-prev btn-ghost" aria-label="前月"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+          <span class="month-label">${escapeHtml(state.monthLabel)}</span>
+          <button class="month-next btn-ghost" aria-label="翌月"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+        </div>
+        <div class="search-box">
+          <i class="ti ti-search" aria-hidden="true"></i>
+          <input type="text" class="search-input" placeholder="要約を検索" value="${escapeHtml(state.query)}" />
+        </div>
+        <label class="show-tags-toggle">
+          <input type="checkbox" class="show-tags-checkbox" ${state.showTags ? 'checked' : ''} />
+          <span>タグ表示</span>
+        </label>
+      </div>
+      ${state.tagOptions.length ? `<div class="tag-filter-row">${state.tagOptions.map((o) => `
+        <span class="tag-chip filter-chip ${o.selected ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}" data-tag="${escapeHtml(o.tag)}">
+          ${escapeHtml(o.tag)}${o.selected ? '<i class="ti ti-x" aria-hidden="true"></i>' : ''}
+        </span>
+      `).join('')}</div>` : ''}
+    </div>
+  `
+
+  container.querySelector('.month-prev').addEventListener('click', handlers.onPrevMonth)
+  container.querySelector('.month-next').addEventListener('click', handlers.onNextMonth)
+  container.querySelector('.search-input').addEventListener('input', (e) => handlers.onSearch(e.target.value))
+  container.querySelector('.show-tags-checkbox').addEventListener('change', (e) => handlers.onToggleShowTags(e.target.checked))
+  container.querySelectorAll('.filter-chip:not(.disabled)').forEach((el) => {
+    el.addEventListener('click', () => handlers.onToggleTag(el.dataset.tag))
+  })
+}
+
 function fmtDate(iso) {
   const d = new Date(iso)
   return d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
@@ -13,7 +52,7 @@ function groupKey(iso) {
 /**
  * 一覧を描画する。onSelect(item, itemEl) がクリック時に呼ばれる。
  */
-export function renderList(container, items, selectedKey, onSelect) {
+export function renderList(container, items, selectedKey, onSelect, showTags = false) {
   container.innerHTML = ''
   const sorted = [...items].sort((a, b) => new Date(b.date) - new Date(a.date))
 
@@ -28,6 +67,10 @@ export function renderList(container, items, selectedKey, onSelect) {
       lastGroup = g
     }
 
+    const tagsLine = showTags && item.tags?.length
+      ? `<div class="list-item-tags">${item.tags.map((t) => `<span class="tag-chip small">${escapeHtml(t)}</span>`).join('')}</div>`
+      : ''
+
     const row = document.createElement('div')
     row.className = 'list-item' + (item.key === selectedKey ? ' selected' : '')
     row.dataset.key = item.key
@@ -39,6 +82,7 @@ export function renderList(container, items, selectedKey, onSelect) {
           <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
           ${escapeHtml(item.duration || '')}
         </div>
+        ${tagsLine}
       </div>
     `
     row.addEventListener('click', () => onSelect(item, row))
@@ -46,7 +90,7 @@ export function renderList(container, items, selectedKey, onSelect) {
   }
 
   if (!sorted.length) {
-    container.innerHTML = '<div class="empty-state"><i class="ti ti-inbox" aria-hidden="true"></i><p>議事録がありません</p></div>'
+    container.innerHTML = '<div class="empty-state"><i class="ti ti-inbox" aria-hidden="true"></i><p>該当する議事録がありません</p></div>'
   }
 }
 

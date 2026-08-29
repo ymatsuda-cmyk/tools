@@ -1,0 +1,44 @@
+import { getDetailCache } from './cache.js'
+
+/** items のうち year-month(0始まりではなく "YYYY-MM") が一致するものだけ */
+export function filterByMonth(items, monthKey) {
+  return items.filter((i) => i.date.slice(0, 7) === monthKey)
+}
+
+/** タイトルとキャッシュ済み要約(cardSummary)だけを対象にした検索。本文は含まない */
+export function filterBySearch(items, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return items
+  return items.filter((i) => {
+    if (i.title.toLowerCase().includes(q)) return true
+    const cache = getDetailCache(i.key)
+    return Boolean(cache?.cardSummary?.toLowerCase().includes(q))
+  })
+}
+
+/** 選択タグをすべて含む(AND)アイテムのみ */
+export function filterByTags(items, selectedTags) {
+  if (!selectedTags.size) return items
+  return items.filter((i) => {
+    const tags = i.tags || []
+    return [...selectedTags].every((t) => tags.includes(t))
+  })
+}
+
+/**
+ * ツールバー用のタグ候補を、選択可否付きで組み立てる。
+ * baseItems(タグ絞り込み前、月・検索は適用済み)から
+ * 「そのタグを追加選択したら該当件数」を数え、0件なら選択不可にする。
+ */
+export function buildTagOptions(baseItems, selectedTags) {
+  const allTags = new Set()
+  baseItems.forEach((i) => (i.tags || []).forEach((t) => allTags.add(t)))
+
+  return [...allTags].sort().map((tag) => {
+    const selected = selectedTags.has(tag)
+    const candidate = new Set(selectedTags)
+    candidate.add(tag)
+    const count = filterByTags(baseItems, candidate).length
+    return { tag, selected, disabled: !selected && count === 0 }
+  })
+}

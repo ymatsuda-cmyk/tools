@@ -68,6 +68,53 @@ body {
   color: var(--text-secondary);
 }
 
+.toolbar { padding: 9px 12px; border-bottom: 0.5px solid var(--border); }
+.toolbar-row { display: flex; align-items: center; gap: 6px; }
+
+.month-nav { display: flex; align-items: center; gap: 2px; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 2px; flex-shrink: 0; }
+.month-label { font-size: 12px; font-weight: 500; padding: 0 3px; white-space: nowrap; }
+
+.search-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+}
+.search-box i { font-size: 13px; color: var(--text-muted); flex-shrink: 0; }
+.search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  width: 100%;
+  color: var(--text-primary);
+}
+
+.show-tags-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.show-tags-toggle input { cursor: pointer; }
+
+.tag-filter-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.filter-chip { cursor: pointer; user-select: none; }
+.filter-chip.selected { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); }
+.filter-chip.selected i { font-size: 11px; }
+.filter-chip.disabled { opacity: 0.35; cursor: default; }
+
+.tag-chip.small { font-size: 10px; padding: 1px 7px; }
+.list-item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+
 .list-item {
   display: grid;
   grid-template-columns: 40px 1fr;
@@ -93,8 +140,9 @@ body {
   padding: 1px 7px;
   border-radius: 99px;
 }
-.badge.status-完了 { background: var(--success-bg); color: var(--success-text); }
+.badge.status-要約, .badge.status-完了 { background: var(--success-bg); color: var(--success-text); }
 .badge.status-要約待ち, .badge.status-文字起こし { background: var(--warning-bg); color: var(--warning-text); }
+.badge.status-削除 { background: var(--surface-1); color: var(--text-muted); }
 
 .detail-pane { flex: 1; overflow-y: auto; padding: 18px; }
 

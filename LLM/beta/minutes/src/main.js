@@ -1,17 +1,39 @@
-import { renderList, renderDetailHtml, escapeHtml } from './ui/render.js'
+import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
 import { fetchSummary, fetchTranscript, saveSummary, saveTags } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
+import { filterByMonth, filterBySearch, filterByTags, buildTagOptions } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
+const listItemsEl = document.getElementById('list-items')
+const toolbarEl = document.getElementById('toolbar')
 const detailEl = document.getElementById('detail')
 const syncStatusEl = document.getElementById('sync-status')
 
 let items = []
 let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
+
+// --- 一覧の絞り込み状態 ---
+let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
+let searchQuery = ''
+const selectedTags = new Set()
+let showTags = false
+
+function monthKeyOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+function monthLabelOf(monthKey) {
+  const [y, m] = monthKey.split('-')
+  return `${y}年${Number(m)}月`
+}
+function shiftMonth(monthKey, delta) {
+  const [y, m] = monthKey.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return monthKeyOf(d)
+}
 
 const MOBILE_BREAKPOINT = 720
 
@@ -27,12 +49,47 @@ async function loadIndex() {
     const res = await fetch(INDEX_URL, { cache: 'no-store' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     items = await res.json()
-    syncStatusEl.textContent = `${items.length}件`
   } catch (err) {
     syncStatusEl.textContent = 'index.json の読み込みに失敗しました'
     items = []
   }
-  renderList(listEl, items, selectedKey, onSelect)
+  refresh()
+}
+
+/**
+ * フィルタ状態(月・検索・タグ)に基づいて一覧とツールバーを再描画する。
+ * タグの選択可否は「月・検索を適用した後、AND追加しても0件にならないか」で判定する。
+ */
+function currentFilteredItems() {
+  const byMonth = filterByMonth(items, currentMonthKey)
+  const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
+  return filterByTags(byMonthAndSearch, selectedTags)
+}
+
+function refresh() {
+  const byMonth = filterByMonth(items, currentMonthKey)
+  const baseItems = filterBySearch(byMonth, searchQuery) // タグ絞り込み前(タグ候補の母集団)
+  const filteredItems = filterByTags(baseItems, selectedTags)
+  const tagOptions = buildTagOptions(baseItems, selectedTags)
+
+  renderToolbar(toolbarEl, {
+    monthLabel: monthLabelOf(currentMonthKey),
+    query: searchQuery,
+    showTags,
+    tagOptions,
+  }, {
+    onPrevMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
+    onNextMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
+    onSearch: (q) => { searchQuery = q; refresh() },
+    onToggleTag: (tag) => {
+      selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
+      refresh()
+    },
+    onToggleShowTags: (v) => { showTags = v; refresh() },
+  })
+
+  renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags)
+  syncStatusEl.textContent = `${filteredItems.length}件`
 }
 
 /**
@@ -94,9 +151,18 @@ function findRow(key) {
   return listEl.querySelector(`.list-item[data-key="${key}"]`)
 }
 
+/** 一覧全体を作り直さず、指定アイテムの行のバッジ表示だけを更新する */
+function updateRowBadge(item) {
+  const row = findRow(item.key)
+  const badge = row?.querySelector('.badge')
+  if (!badge) return
+  badge.textContent = item.status
+  badge.className = `badge status-${item.status}`
+}
+
 async function onSelect(item, rowEl) {
   selectedKey = item.key
-  renderList(listEl, items, selectedKey, onSelect)
+  renderList(listItemsEl, currentFilteredItems(), selectedKey, onSelect, showTags)
   const target = detailTarget(isMobile() ? findRow(item.key) : rowEl)
 
   paintDetail(target, item, { phase: 'loading' })
@@ -135,6 +201,10 @@ async function runGenerate(target, item) {
       todos: result.todos,
       topics: result.topics,
     }, result.model)
+
+    // Notion側の状態も"要約"に変わっているはずなので、画面側も合わせる
+    item.status = '要約'
+    updateRowBadge(item)
 
     const saved = setDetailCache(item.key, {
       cardSummary: result.cardSummary,
