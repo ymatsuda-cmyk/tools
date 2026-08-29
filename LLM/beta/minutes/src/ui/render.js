@@ -54,6 +54,14 @@ export function renderList(container, items, selectedKey, onSelect) {
  * 詳細ペインの中身を組み立てて返す(HTML文字列)。
  * state.phase: 'loading' | 'no-summary' | 'ready' | 'generating' | 'error'
  */
+function tagsHtml(tags) {
+  if (tags === undefined) return ''
+  const chips = tags.map((t) =>
+    `<span class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<i class="ti ti-x tag-remove" aria-hidden="true"></i></span>`
+  ).join('')
+  return `<div class="tag-row">${chips}<button class="tag-add-btn" aria-label="タグを追加"><i class="ti ti-plus" aria-hidden="true"></i></button></div>`
+}
+
 export function renderDetailHtml(item, state) {
   const header = `
     <div class="detail-header">
@@ -61,6 +69,7 @@ export function renderDetailHtml(item, state) {
       <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
     </div>
     <div class="detail-meta">${fmtDate(item.date)} ${fmtTime(item.date)} · ${escapeHtml(item.duration || '')}</div>
+    ${tagsHtml(state.tags)}
   `
 
   if (state.phase === 'loading') {

@@ -42,3 +42,8 @@ export function fetchSummary(pageId) {
 export function saveSummary(pageId, cardSummary, detail, model) {
   return callGas('saveSummary', { pageId, cardSummary, detail, model })
 }
+
+/** @returns {Promise<{saved: true, tags: string[]}>} */
+export function saveTags(pageId, tags) {
+  return callGas('saveTags', { pageId, tags })
+}

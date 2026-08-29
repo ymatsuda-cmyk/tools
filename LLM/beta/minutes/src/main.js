@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
@@ -11,6 +11,7 @@ const syncStatusEl = document.getElementById('sync-status')
 
 let items = []
 let selectedKey = null
+const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 
 const MOBILE_BREAKPOINT = 720
 
@@ -53,11 +54,40 @@ function detailTarget(rowEl) {
 }
 
 function paintDetail(target, item, state) {
-  target.innerHTML = renderDetailHtml(item, state)
+  target.innerHTML = renderDetailHtml(item, { ...state, tags: tagsByKey[item.notionPageId] })
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
+
+  target.querySelectorAll('.tag-remove').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const tag = e.target.closest('.tag-chip').dataset.tag
+      const next = (tagsByKey[item.notionPageId] || []).filter((t) => t !== tag)
+      commitTags(target, item, state, next)
+    })
+  })
+  target.querySelector('.tag-add-btn')?.addEventListener('click', () => {
+    const input = prompt('追加するタグを入力してください')
+    const tag = input?.trim()
+    if (!tag) return
+    const current = tagsByKey[item.notionPageId] || []
+    if (current.includes(tag)) return
+    commitTags(target, item, state, [...current, tag])
+  })
+}
+
+async function commitTags(target, item, state, nextTags) {
+  const prev = tagsByKey[item.notionPageId]
+  tagsByKey[item.notionPageId] = nextTags // 楽観的に即反映
+  paintDetail(target, item, state)
+  try {
+    await saveTags(item.notionPageId, nextTags)
+  } catch (err) {
+    tagsByKey[item.notionPageId] = prev // 失敗したら元に戻す
+    paintDetail(target, item, state)
+    alert('タグの保存に失敗しました: ' + (err.message || err))
+  }
 }
 
 function findRow(key) {
@@ -74,6 +104,7 @@ async function onSelect(item, rowEl) {
   const cache = getDetailCache(item.key)
   try {
     const remote = await fetchSummary(item.notionPageId)
+    tagsByKey[item.notionPageId] = remote.tags || []
 
     if (!remote.generatedAt) {
       paintDetail(target, item, { phase: 'no-summary' })
@@ -83,7 +114,7 @@ async function onSelect(item, rowEl) {
     const fresh = isCacheFresh(cache, remote.generatedAt) ? cache : setDetailCache(item.key, remote)
     paintDetail(target, item, { phase: 'ready', summary: fresh })
   } catch (err) {
-    // 通信に失敗してもキャッシュがあればそれを出す
+    // 通信に失敗してもキャッシュがあればそれを出す(タグは未確定のため編集UIは出さない)
     if (cache) {
       paintDetail(target, item, { phase: 'ready', summary: cache })
     } else {
