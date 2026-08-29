@@ -1,6 +1,8 @@
 /**
- * ツールバー(月ナビ / 検索 / タグフィルタ / タグ表示切替)を描画する。
- * handlers: { onPrevMonth, onNextMonth, onSearch(query), onToggleTag(tag), onToggleShowTags(bool) }
+ * ツールバー(月ナビ / タグフィルタ)を描画する。
+ * 検索欄とタグ表示トグルはトップバーの永続DOMに移したためここには含まない
+ * (毎回作り直すと入力中にフォーカスが外れるため)。
+ * handlers: { onPrevMonth, onNextMonth, onToggleTag(tag) }
  */
 export function renderToolbar(container, state, handlers) {
   container.innerHTML = `
@@ -11,14 +13,6 @@ export function renderToolbar(container, state, handlers) {
           <span class="month-label">${escapeHtml(state.monthLabel)}</span>
           <button class="month-next btn-ghost" aria-label="翌月"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
-        <div class="search-box">
-          <i class="ti ti-search" aria-hidden="true"></i>
-          <input type="text" class="search-input" placeholder="要約を検索" value="${escapeHtml(state.query)}" />
-        </div>
-        <label class="show-tags-toggle">
-          <input type="checkbox" class="show-tags-checkbox" ${state.showTags ? 'checked' : ''} />
-          <span>タグ表示</span>
-        </label>
       </div>
       ${state.tagOptions.length ? `<div class="tag-filter-row">${state.tagOptions.map((o) => `
         <span class="tag-chip filter-chip ${o.selected ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}" data-tag="${escapeHtml(o.tag)}">
@@ -30,8 +24,6 @@ export function renderToolbar(container, state, handlers) {
 
   container.querySelector('.month-prev').addEventListener('click', handlers.onPrevMonth)
   container.querySelector('.month-next').addEventListener('click', handlers.onNextMonth)
-  container.querySelector('.search-input').addEventListener('input', (e) => handlers.onSearch(e.target.value))
-  container.querySelector('.show-tags-checkbox').addEventListener('change', (e) => handlers.onToggleShowTags(e.target.checked))
   container.querySelectorAll('.filter-chip:not(.disabled)').forEach((el) => {
     el.addEventListener('click', () => handlers.onToggleTag(el.dataset.tag))
   })
@@ -110,6 +102,7 @@ export function renderDetailHtml(item, state) {
   const header = `
     <div class="detail-header">
       <span class="detail-title">${escapeHtml(item.title)}</span>
+      <button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>
       <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
     </div>
     <div class="detail-meta">${fmtDate(item.date)} ${fmtTime(item.date)} · ${escapeHtml(item.duration || '')}</div>
@@ -144,9 +137,23 @@ export function renderDetailHtml(item, state) {
 
   // ready
   const s = state.summary
+  const agenda = s.detail?.agenda || []
   const decisions = s.detail?.decisions || []
   const todos = s.detail?.todos || []
   const topics = s.detail?.topics || []
+
+  const agendaHtml = agenda.length ? `
+    <div class="section-label">議事</div>
+    <div class="agenda-list">
+      ${agenda.map((a, i) => `
+        <div class="agenda-item">
+          <div class="agenda-topic"><span class="agenda-num">${i + 1}</span>${escapeHtml(a.topic || '')}</div>
+          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
+          ${a.outcome ? `<div class="agenda-outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${escapeHtml(a.outcome)}</div>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : ''
 
   return header + `
     <div class="stat-grid">
@@ -156,6 +163,7 @@ export function renderDetailHtml(item, state) {
     </div>
     <div class="section-label">サマリ</div>
     <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
+    ${agendaHtml}
     ${decisions.length ? `<div class="section-label">決定事項</div><ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
     ${todos.length ? `<div class="section-label">ToDo</div><div class="todo-box">${todos.map((t) => `<div class="todo-row"><i class="ti ti-square" aria-hidden="true"></i><span>${escapeHtml(t)}</span></div>`).join('')}</div>` : ''}
     ${topics.length ? `<div class="section-label">論点</div><ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}

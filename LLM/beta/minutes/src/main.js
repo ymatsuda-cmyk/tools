@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
@@ -74,18 +74,14 @@ function refresh() {
 
   renderToolbar(toolbarEl, {
     monthLabel: monthLabelOf(currentMonthKey),
-    query: searchQuery,
-    showTags,
     tagOptions,
   }, {
     onPrevMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
     onNextMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
-    onSearch: (q) => { searchQuery = q; refresh() },
     onToggleTag: (tag) => {
       selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
       refresh()
     },
-    onToggleShowTags: (v) => { showTags = v; refresh() },
   })
 
   renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags)
@@ -116,6 +112,7 @@ function paintDetail(target, item, state) {
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
+  target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
 
   target.querySelectorAll('.tag-remove').forEach((el) => {
     el.addEventListener('click', (e) => {
@@ -132,6 +129,31 @@ function paintDetail(target, item, state) {
     if (current.includes(tag)) return
     commitTags(target, item, state, [...current, tag])
   })
+}
+
+async function editTitle(target, item, state) {
+  const next = prompt('ミーティング名を入力してください', item.title)?.trim()
+  if (!next || next === item.title) return
+
+  const prev = item.title
+  item.title = next // 楽観的に即反映
+  paintDetail(target, item, state)
+  updateRowTitle(item)
+
+  try {
+    await saveTitle(item.notionPageId, next)
+  } catch (err) {
+    item.title = prev
+    paintDetail(target, item, state)
+    updateRowTitle(item)
+    alert('タイトルの保存に失敗しました: ' + (err.message || err))
+  }
+}
+
+/** 一覧の該当行のタイトル表示だけを更新する */
+function updateRowTitle(item) {
+  const titleEl = findRow(item.key)?.querySelector('.list-item-title')
+  if (titleEl) titleEl.textContent = item.title
 }
 
 async function commitTags(target, item, state, nextTags) {
@@ -197,6 +219,7 @@ async function runGenerate(target, item) {
       paintDetail(target, item, { phase: 'generating', progress: partial.slice(0, 200) })
     })
     await saveSummary(item.notionPageId, result.cardSummary, {
+      agenda: result.agenda,
       decisions: result.decisions,
       todos: result.todos,
       topics: result.topics,
@@ -208,7 +231,12 @@ async function runGenerate(target, item) {
 
     const saved = setDetailCache(item.key, {
       cardSummary: result.cardSummary,
-      detail: { decisions: result.decisions, todos: result.todos, topics: result.topics },
+      detail: {
+        agenda: result.agenda,
+        decisions: result.decisions,
+        todos: result.todos,
+        topics: result.topics,
+      },
       model: result.model,
       generatedAt: new Date().toISOString(),
     })
@@ -295,5 +323,16 @@ function openSettings() {
     root.innerHTML = ''
   })
 }
+
+// 検索欄とタグ表示トグルは再生成しない永続DOMなので、初回に一度だけ結線する。
+// (毎回 innerHTML で作り直すと入力のたびにフォーカスが外れ、1文字しか打てなくなる)
+document.getElementById('search-input').addEventListener('input', (e) => {
+  searchQuery = e.target.value
+  refresh()
+})
+document.getElementById('show-tags-checkbox').addEventListener('change', (e) => {
+  showTags = e.target.checked
+  refresh()
+})
 
 loadIndex()

@@ -6,11 +6,20 @@ const SYSTEM_PROMPT = `あなたは会議の文字起こしを要約するアシ
 
 {
   "cardSummary": "一覧カードに表示する100字程度の要約",
+  "agenda": [
+    {
+      "topic": "議題名",
+      "points": ["その議題で話された経緯や論拠を、時系列に沿って1件1文字列で"],
+      "outcome": "その議題の結論。結論が出ていなければ「継続検討」等と書く"
+    }
+  ],
   "decisions": ["決定事項を1件1文字列で"],
   "todos": ["ToDoを1件1文字列で。担当者や期限が分かれば含める"],
   "topics": ["未解決の論点や気になる点を1件1文字列で"]
 }
 
+agenda は議題ごとに分けてください。points には「なぜそうなったか」が後から追える
+よう、背景・提起された問題・検討された選択肢を順に並べてください。
 該当する項目が無い場合は空配列にしてください。日本語で出力してください。`
 
 function extractJson(text) {
@@ -51,6 +60,7 @@ export async function generateSummary(transcriptText, onProgress) {
   const parsed = extractJson(full)
   return {
     cardSummary: String(parsed.cardSummary || ''),
+    agenda: Array.isArray(parsed.agenda) ? parsed.agenda : [],
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
     todos: Array.isArray(parsed.todos) ? parsed.todos : [],
     topics: Array.isArray(parsed.topics) ? parsed.topics : [],
