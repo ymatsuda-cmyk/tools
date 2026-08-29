@@ -18,10 +18,13 @@ function isMobile() {
   return window.innerWidth <= MOBILE_BREAKPOINT
 }
 
+const INDEX_URL = 'https://ymatsuda-cmyk.github.io/tools/data/minutes/index.json'
+
 async function loadIndex() {
   syncStatusEl.textContent = '読み込み中...'
   try {
-    const res = await fetch('./data/index.json', { cache: 'no-store' })
+    const res = await fetch(INDEX_URL, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     items = await res.json()
     syncStatusEl.textContent = `${items.length}件`
   } catch (err) {
