@@ -1,4 +1,4 @@
-import { renderList, renderDetailHtml } from './ui/render.js'
+import { renderList, renderDetailHtml, escapeHtml } from './ui/render.js'
 import { fetchSummary, fetchTranscript, saveSummary } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
@@ -54,6 +54,7 @@ function paintDetail(target, item, state) {
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
+  target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
 }
 
 function findRow(key) {
@@ -110,6 +111,34 @@ async function runGenerate(target, item) {
     paintDetail(target, item, { phase: 'ready', summary: saved })
   } catch (err) {
     paintDetail(target, item, { phase: 'error', message: String(err.message || err) })
+  }
+}
+
+// --- 原文表示モーダル ---
+async function showRawTranscript(item) {
+  const root = document.getElementById('modal-root')
+  root.innerHTML = `
+    <div class="raw-modal-overlay">
+      <div class="raw-modal">
+        <div class="raw-modal-header">
+          <span>${escapeHtml(item.title)} — 原文</span>
+          <button id="raw-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div id="raw-body" class="raw-modal-body">
+          <p style="color:var(--text-muted);font-size:13px">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  `
+  document.getElementById('raw-close').addEventListener('click', () => (root.innerHTML = ''))
+
+  try {
+    const { text } = await fetchTranscript(item.notionPageId)
+    document.getElementById('raw-body').innerHTML =
+      `<pre class="raw-text">${escapeHtml(text || '(本文が空です)')}</pre>`
+  } catch (err) {
+    document.getElementById('raw-body').innerHTML =
+      `<p class="error-text">${escapeHtml(String(err.message || err))}</p>`
   }
 }
 

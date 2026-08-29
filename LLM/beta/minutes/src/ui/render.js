@@ -69,7 +69,10 @@ export function renderDetailHtml(item, state) {
 
   if (state.phase === 'error') {
     return header + `<p class="error-text">${escapeHtml(state.message)}</p>
-      <div class="actions-row"><button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button></div>`
+      <div class="actions-row">
+        <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
+        <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+      </div>`
   }
 
   if (state.phase === 'generating') {
@@ -79,7 +82,10 @@ export function renderDetailHtml(item, state) {
   if (state.phase === 'no-summary') {
     return header + `
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
-      <div class="actions-row"><button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button></div>
+      <div class="actions-row">
+        <button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>
+        <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+      </div>
     `
   }
 
@@ -102,13 +108,14 @@ export function renderDetailHtml(item, state) {
     ${topics.length ? `<div class="section-label">論点</div><ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
     <div class="actions-row">
       <button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>
+      <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       <span style="flex:1"></span>
       <span style="font-size:11px;color:var(--text-muted);align-self:center">${escapeHtml(s.model || '')}</span>
     </div>
   `
 }
 
-function escapeHtml(str) {
+export function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]))
