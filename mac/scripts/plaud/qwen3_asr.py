@@ -95,8 +95,12 @@ def transcribe_segments(audio_path, cfg, context="", verbose=True):
             print("  ⚠️ pyannoteが未導入のため話者分離をスキップします"
                   "（pip install \"mlx-qwen3-asr[diarize]\"）")
         want_diarize = False
+
+    # want_diarizeがFalseの場合も明示的に diarize=False を渡す。
+    # キー自体を省略すると session.transcribe() 側のデフォルト値に委ねられてしまい、
+    # settings.json で diarize:false を指定しても無視されるバグがあったため。
+    kwargs["diarize"] = want_diarize
     if want_diarize:
-        kwargs["diarize"] = True
         if cfg.get("numSpeakers"):
             kwargs["diarization_num_speakers"] = int(cfg["numSpeakers"])
         else:
@@ -113,9 +117,10 @@ def transcribe_segments(audio_path, cfg, context="", verbose=True):
             if verbose:
                 print(f"  ⚠️ 話者分離付きの実行に失敗: {type(e).__name__}: {e}")
                 print("     話者分離なしで再試行します")
-            for k in ("diarize", "diarization_num_speakers",
+            for k in ("diarization_num_speakers",
                       "diarization_min_speakers", "diarization_max_speakers"):
                 kwargs.pop(k, None)
+            kwargs["diarize"] = False
             want_diarize = False
             try:
                 result = session.transcribe(str(audio_path), **kwargs)

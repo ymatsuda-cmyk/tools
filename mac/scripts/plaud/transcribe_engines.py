@@ -65,6 +65,39 @@ def get_engine(settings, label=None):
     raise ValueError(f"label '{label}' が見つかりません。利用可能: {labels}")
 
 
+def choose_engine(settings, label=None, interactive=True):
+    """labelが未指定の場合、対話端末なら選択メニューを表示する。
+
+    cron等の非対話実行（標準入力がttyでない）では、従来通り
+    settings.json の defaultLabel / 環境変数 TRANSCRIBE_LABEL にフォールバックする。
+    """
+    if label or os.environ.get("TRANSCRIBE_LABEL"):
+        return get_engine(settings, label)
+
+    engines = settings.get("engines", [])
+    if not engines:
+        raise ValueError("settings.json に engines がありません")
+
+    if not (interactive and sys.stdin.isatty()):
+        return get_engine(settings, None)
+
+    default_label = settings.get("defaultLabel")
+    default_idx = next((i for i, e in enumerate(engines, 1)
+                       if e.get("label") == default_label), 1)
+
+    print("文字起こしエンジンを選択してください:")
+    for i, e in enumerate(engines, 1):
+        mark = "（既定）" if e.get("label") == default_label else ""
+        print(f"  {i}. {e.get('label')}  (type={e.get('type')}){mark}")
+
+    raw = input(f"番号またはlabelを入力 [{default_idx}]: ").strip()
+    if not raw:
+        return engines[default_idx - 1]
+    if raw.isdigit() and 1 <= int(raw) <= len(engines):
+        return engines[int(raw) - 1]
+    return get_engine(settings, raw)
+
+
 def load_dictionary(settings):
     rel = settings.get("normalizeDictPath")
     if not rel:

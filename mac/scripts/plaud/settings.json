@@ -20,7 +20,7 @@
       "type": "qwen3-asr",
       "model": "Qwen/Qwen3-ASR-1.7B",
       "language": "Japanese",
-      "diarize": true,
+      "diarize": false,
       "minSpeakers": 2,
       "maxSpeakers": 8,
       "gapSec": 0.7,

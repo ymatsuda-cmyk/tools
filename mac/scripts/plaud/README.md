@@ -10,7 +10,6 @@
 | `speaker_diarize.py` | 声紋登録・照合。クラスタリング版と名前付けのみの版 |
 | `llm_refine.py` | フィラー除去・表記統一（ルールベース） |
 | `bench_asr.py` | whisper と Qwen3-ASR の比較検証 |
-| `retranscribe.py` | 特定ページ／状態=再取得の再文字起こし |
 | `settings.json` | エンジン定義 |
 | `normalize_dict.json` | 表記揺れ辞書 |
 
@@ -52,35 +51,6 @@ python3 plaud_transcribe_notion.py --label whisper     # 従来通りのプレ�
 ```
 
 cron はコマンド末尾に `--label qwen3-asr` を足すだけです。
-
-## 再文字起こし
-
-Notionの`状態`を「再取得」に変更したページ、または特定の1ページを対象に、
-PLAUDから音声を再ダウンロードして文字起こしをやり直せます。
-
-```bash
-# 状態が「再取得」のページをまとめて処理（既定の状態）
-python3 retranscribe.py --label qwen3-asr
-
-# 対象を確認するだけ（何も変更しない）
-python3 retranscribe.py --dry-run
-
-# 特定の1ページだけ指定
-python3 retranscribe.py --page-id 1a2b3c4d5e6f... --label qwen3-asr
-
-# 別の状態値を対象にする場合
-python3 retranscribe.py --status 再取得 見直し --label qwen3-asr
-```
-
-**動作:**
-1. ページの `URL` プロパティからPLAUDのファイルIDを取得し、音声を再ダウンロード
-2. 指定したエンジンで再文字起こし
-3. ページ本文の既存ブロックをすべてアーカイブ（旧内容を除去）
-4. 新しい文字起こし結果を「🔁 再文字起こし: 日時（エンジン名）」の見出し付きで追記
-5. `状態` を `--set-status`（既定: 文字起こし）に更新
-
-ミーティング名・日時・会議時間などのプロパティは変更しません。
-`--set-status ""`（空文字）を指定すると状態は更新されません。
 
 ## エンジン設定
 
