@@ -1,183 +1,293 @@
 [
   {
+    "key": "a18ae215e78a4f072f71d0bb90be2a7f",
+    "title": "新規録音 19",
+    "date": "2026-08-29T16:03:00.000Z",
+    "duration": "34分 5秒",
+    "status": "要約",
+    "tags": [],
+    "permissions": [],
+    "notionPageId": "3cb0e7a5-35dc-8189-b1f8-e3e81547f92d",
+    "updatedAt": "2026-08-30T13:27:45.790Z"
+  },
+  {
     "key": "81d66fee2db5bb14c16241750890954b",
-    "title": "2026-08-28 17:02:27",
+    "title": "共有（e-労基）",
     "date": "2026-08-28T08:02:00.000Z",
     "duration": "33分 17秒",
     "status": "文字起こし",
+    "tags": [
+      "基準",
+      "e-労基"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3cb0e7a5-35dc-8156-80a0-f0252bf38231",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b8550ea837ea68aa409a1a4cf5c1bcfa",
     "title": "2026-08-27 17:14:25",
     "date": "2026-08-27T08:14:00.000Z",
     "duration": "4秒",
-    "status": "文字起こし",
+    "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3cb0e7a5-35dc-810e-a74f-c39afc077c8c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "63fa789bfba72856a349300ae5601fc9",
-    "title": "2026-08-27 16:01:02",
+    "title": "基準定例",
     "date": "2026-08-27T07:01:00.000Z",
     "duration": "1時間 1分 11秒",
-    "status": "文字起こし",
+    "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3cb0e7a5-35dc-81f0-9a6f-c105acd0805e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a6a77c9074c60f63ebf2e5640b329242",
-    "title": "2026-08-27 11:00:40",
+    "title": "面談",
     "date": "2026-08-27T02:00:00.000Z",
     "duration": "1時間 1分 19秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3c90e7a5-35dc-8102-8e7a-dc79cae99b65",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1a60563bbf9f4d724d5fe9e42b03386e",
-    "title": "2026-08-26 18:05:31",
+    "title": "月例会議",
     "date": "2026-08-26T09:05:00.000Z",
     "duration": "45分 21秒",
     "status": "要約",
+    "tags": [
+      "月例"
+    ],
+    "permissions": [],
     "notionPageId": "3c80e7a5-35dc-812d-b9f0-f377c84dbcc9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "081109a16aaa0ccfe2c45f5610e278be",
-    "title": "2026-08-26 16:31:36",
+    "title": "アクション会議（佐野）",
     "date": "2026-08-26T07:31:00.000Z",
     "duration": "1時間 33分 50秒",
     "status": "要約",
+    "tags": [
+      "基準",
+      "クレーム"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3c80e7a5-35dc-810c-beb3-c1b2e4356752",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9d30de0c9582fa6a266b201cc9573092",
-    "title": "2026-08-26 15:59:56",
+    "title": "定例報告",
     "date": "2026-08-26T06:59:00.000Z",
     "duration": "31分 27秒",
     "status": "要約",
+    "tags": [
+      "JBA経営"
+    ],
+    "permissions": [],
     "notionPageId": "3c80e7a5-35dc-81be-8c2e-dba589ad318b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dd2316ab30a40600b3d1cf49d21a6e84",
-    "title": "2026-08-26 10:01:43",
+    "title": "定例会議",
     "date": "2026-08-26T01:01:00.000Z",
     "duration": "1時間 23分 57秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3c80e7a5-35dc-817a-b5f3-ff360b54542e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "62131a8848f32216c920d669984e281d",
-    "title": "2026-08-24 17:00:15",
+    "title": "アクション会議（佐野）",
     "date": "2026-08-24T08:00:00.000Z",
     "duration": "31分 23秒",
     "status": "要約",
+    "tags": [
+      "基準",
+      "クレーム"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3c60e7a5-35dc-8120-9072-f1a7ba30288c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c5b97750a5884a3a86e124878338c2aa",
-    "title": "2026-08-24 10:05:07",
+    "title": "定例会議",
     "date": "2026-08-24T01:05:00.000Z",
     "duration": "43分 13秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3c60e7a5-35dc-81a3-b4bd-df2463495d2c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ae8277d02a05cc5fffc609b3f4631117",
-    "title": "2026-08-23 15:05:17",
+    "title": "実家電話",
     "date": "2026-08-23T06:05:00.000Z",
     "duration": "22分 42秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3c60e7a5-35dc-8166-88dd-daa298379590",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0031bd86b864342796c314ffb5e4e0cf",
-    "title": "2026-08-20 15:58:37",
+    "title": "基準定例",
     "date": "2026-08-20T06:58:00.000Z",
     "duration": "1時間 4分 29秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3c20e7a5-35dc-81fd-b2aa-cc64be1d2eeb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "44933d07d64445b158b6b61410bf0270",
-    "title": "2026-08-19 13:28:59",
+    "title": "経営会議",
     "date": "2026-08-19T04:28:00.000Z",
     "duration": "36分 55秒",
     "status": "要約",
+    "tags": [
+      "JBA経営"
+    ],
+    "permissions": [],
     "notionPageId": "3c10e7a5-35dc-813f-bb90-e974e3dbcb4d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "414ac77ef4a46e4ce30fa28500d59eff",
-    "title": "2026-08-18 11:38:35",
+    "title": "育成面談",
     "date": "2026-08-18T02:38:00.000Z",
     "duration": "23分 36秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3c00e7a5-35dc-8193-88bc-eba6071c51d4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1007c90e18898bcce425ace7f7214517",
-    "title": "2026-08-18 10:59:42",
+    "title": "育成面談",
     "date": "2026-08-18T01:59:00.000Z",
     "duration": "38分 48秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3c00e7a5-35dc-8132-877e-e9edd9a56431",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cbb6d2583d1cdee3ed472d5591df78b1",
-    "title": "2026-08-17 10:08:46",
+    "title": "定例会議",
     "date": "2026-08-17T01:08:00.000Z",
     "duration": "1時間 51分 48秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3bf0e7a5-35dc-8162-801b-ddd23b5c14b0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "73f99b2416817bbfcdfb449bf749e999",
-    "title": "2026-08-13 18:34:52",
+    "title": "定例報告",
     "date": "2026-08-13T09:34:00.000Z",
     "duration": "1時間 26分 2秒",
     "status": "要約",
+    "tags": [
+      "JBA経営"
+    ],
+    "permissions": [],
     "notionPageId": "3bb0e7a5-35dc-81c7-81c0-ef69b27b77ea",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5b5db67b1a9e4d89b7906228a38e522c",
-    "title": "2026-08-13 16:16:56",
+    "title": "定例会議",
     "date": "2026-08-13T07:16:00.000Z",
     "duration": "2時間 13分 33秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3bb0e7a5-35dc-8165-8c1a-d2bc88a49020",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "32cf4215c95623baf13c07f9bfa83328",
-    "title": "2026-08-13 10:20:21",
+    "title": "共有（e-労基）",
     "date": "2026-08-13T01:20:00.000Z",
     "duration": "35分 45秒",
     "status": "要約",
+    "tags": [
+      "基準",
+      "e-労基"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3bb0e7a5-35dc-81b2-aff8-c38c68add180",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d5c607b211c51d1a51b58a644f7f027f",
-    "title": "2026-08-07 15:43:54",
+    "title": "共有（e-労基）",
     "date": "2026-08-07T06:43:00.000Z",
     "duration": "7分 20秒",
     "status": "要約",
+    "tags": [
+      "e-労基",
+      "基準"
+    ],
+    "permissions": [],
     "notionPageId": "3b50e7a5-35dc-811c-9e16-c6caf0e1de79",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "19934e22bd4b4498f2d05f04ff180517",
@@ -185,8 +295,10 @@
     "date": "2026-08-07T02:00:00.000Z",
     "duration": "1時間 59分 32秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b50e7a5-35dc-81f7-8997-ee78ebef1c79",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bdffe4f5bd190864adc36981f5f340af",
@@ -194,8 +306,10 @@
     "date": "2026-08-07T00:41:00.000Z",
     "duration": "7分 37秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b50e7a5-35dc-8136-9994-db4625ecc419",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d782d760577eecd78d424bb274875bec",
@@ -203,8 +317,10 @@
     "date": "2026-08-06T06:59:00.000Z",
     "duration": "1時間 5分 41秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b40e7a5-35dc-81fd-87f8-da6fdec539d0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5b143786a35403fe4e2e891d08c74067",
@@ -212,8 +328,10 @@
     "date": "2026-08-06T06:55:00.000Z",
     "duration": "1分 2秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b40e7a5-35dc-81d4-8b68-e32296a2e412",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4f750982d901111df3d965e784062907",
@@ -221,17 +339,24 @@
     "date": "2026-08-06T03:50:00.000Z",
     "duration": "12分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b40e7a5-35dc-814e-a958-d41492904005",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "31687281e0f73f0928fe3acdffebfa87",
-    "title": "2026-08-05 14:05:20",
+    "title": "定例報告",
     "date": "2026-08-05T05:05:00.000Z",
     "duration": "58分 12秒",
-    "status": "要約",
+    "status": "文字起こし",
+    "tags": [
+      "経営",
+      "JBA経営"
+    ],
+    "permissions": [],
     "notionPageId": "3b30e7a5-35dc-8199-894e-ce471a691a2c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2d734a8da0df112e51c19544ce290e8a",
@@ -239,8 +364,10 @@
     "date": "2026-08-03T10:04:00.000Z",
     "duration": "2時間 6分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-813f-87b2-e90836c71707",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4553626b0ce3b4a51010b4f076801e64",
@@ -248,8 +375,10 @@
     "date": "2026-08-03T08:59:00.000Z",
     "duration": "1時間 3分 27秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-8111-b546-eab83f24529e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b1bbc2c3da2a0ba27376868b36dac016",
@@ -257,8 +386,12 @@
     "date": "2026-08-03T04:31:00.000Z",
     "duration": "9分 42秒",
     "status": "要約",
+    "tags": [
+      "ハンター製菓"
+    ],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81d5-ae3c-df9f5345dc42",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ab14bdcdb71570ce9447999534bf5480",
@@ -266,8 +399,10 @@
     "date": "2026-08-03T04:29:00.000Z",
     "duration": "32秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-8103-94bd-c1c68d478d76",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "311b5f20192e6d6c6318a7774ffe3eaa",
@@ -275,8 +410,14 @@
     "date": "2026-08-03T04:02:00.000Z",
     "duration": "24分 47秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3b10e7a5-35dc-81fb-8711-eb40d50e8fb2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b2626baf5bc62a90b3d7b1c65dcd6903",
@@ -284,44 +425,73 @@
     "date": "2026-08-03T02:37:00.000Z",
     "duration": "1分 9秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-8190-a776-f980849c9b11",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
+  },
+  {
+    "key": "09dda44c0d95575f885745b9be75784f",
+    "title": "2026-08-03 11:36:47",
+    "date": "2026-08-03T02:36:00.000Z",
+    "duration": "28秒",
+    "status": "削除",
+    "tags": [],
+    "permissions": [],
+    "notionPageId": "3cb0e7a5-35dc-81b9-b811-d14e4d7dc61a",
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "573c65604f205418ea9feb03b9df0d0f",
-    "title": "2026-07-31 16:39:29",
+    "title": "Google Cloud Expo④",
     "date": "2026-07-31T07:39:00.000Z",
     "duration": "1時間 6分 54秒",
     "status": "要約",
+    "tags": [
+      "雑談"
+    ],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81e4-860b-de2bd10231ef",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0b5ff7a46a411de7973a0cb9374ec87d",
-    "title": "2026-07-31 15:12:40",
+    "title": "Google Cloud Expo③",
     "date": "2026-07-31T06:12:00.000Z",
     "duration": "48分 11秒",
     "status": "要約",
+    "tags": [
+      "雑談"
+    ],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81e4-9aae-f717ce573fc5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "959a6026c4ee26e7cb0d8307bde49efa",
-    "title": "2026-07-31 13:52:17",
+    "title": "Google Cloud Expo②",
     "date": "2026-07-31T04:52:00.000Z",
     "duration": "1時間 20分 19秒",
     "status": "要約",
+    "tags": [
+      "雑談"
+    ],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81bf-ae78-d2b1c405a2ef",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4a4dfbe5a7e9471cf44f7a8294f342b1",
-    "title": "2026-07-31 10:54:56",
+    "title": "Google Cloud Expo①",
     "date": "2026-07-31T01:54:00.000Z",
     "duration": "1時間 52分 16秒",
     "status": "要約",
+    "tags": [
+      "雑談"
+    ],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-8100-b25f-ff8228dcae1b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "413fe0c8d29614417f03af7122b672a2",
@@ -329,8 +499,10 @@
     "date": "2026-07-31T01:26:00.000Z",
     "duration": "2分 17秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81ba-b98b-ef129190b0c4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c15b27af27b9a48b2322333aea3e732b",
@@ -338,26 +510,38 @@
     "date": "2026-07-31T01:24:00.000Z",
     "duration": "37秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3b10e7a5-35dc-81bc-b783-e3e5c491bf85",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6d43e4987aaf8ea5c5f2fbc0dd031b28",
-    "title": "2026-07-30 16:01:35",
+    "title": "基準定例",
     "date": "2026-07-30T07:01:00.000Z",
     "duration": "1時間 10分 15秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3b30e7a5-35dc-8161-bc19-c17c07763d72",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4d47d924468de80f16af3f467023548d",
-    "title": "2026-07-29 17:56:21",
+    "title": "月例会議",
     "date": "2026-07-29T08:56:00.000Z",
     "duration": "1時間 0分 42秒",
     "status": "要約",
+    "tags": [
+      "全体"
+    ],
+    "permissions": [],
     "notionPageId": "3ae0e7a5-35dc-816f-9468-c948b73f63fc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f97c2bb4f09adb34dd7f56e9e551967f",
@@ -365,8 +549,12 @@
     "date": "2026-07-29T05:39:00.000Z",
     "duration": "42分 26秒",
     "status": "要約",
+    "tags": [
+      "JBA（週次）"
+    ],
+    "permissions": [],
     "notionPageId": "3ae0e7a5-35dc-811d-8ca6-f4b791eb35ad",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "84f5ae1e4d4ff17856d502fa0b84f93e",
@@ -374,8 +562,10 @@
     "date": "2026-07-29T05:31:00.000Z",
     "duration": "6分 18秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ac0e7a5-35dc-81be-ba07-cc0a973ffcea",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ff5cb8ac4f5076126c8b4c2c46eedd24",
@@ -383,8 +573,10 @@
     "date": "2026-07-29T05:22:00.000Z",
     "duration": "41秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ac0e7a5-35dc-81fe-b28a-d83a9f7f8b51",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5cc53475b78bcd5cf3a44f56b1056a77",
@@ -392,8 +584,10 @@
     "date": "2026-07-28T02:21:00.000Z",
     "duration": "36分 9秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-81fc-817d-df30c791a084",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "142fd1ae8fb82e9c46f95432dff11ec2",
@@ -401,8 +595,10 @@
     "date": "2026-07-28T01:03:00.000Z",
     "duration": "1時間 16分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-816a-907a-f297f5c816a4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bf54a012cc0debcd5c55c09426eafb15",
@@ -410,8 +606,10 @@
     "date": "2026-07-24T14:16:00.000Z",
     "duration": "6分 30秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a80e7a5-35dc-8113-aa3a-c6c7dc09226d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "174c8ee54f44c557ee29185464b4cd67",
@@ -419,8 +617,10 @@
     "date": "2026-07-24T07:37:00.000Z",
     "duration": "5分 26秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-8135-ba76-f61dc3dc4327",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e5723de5a9d637e0e57753d1a2cca490",
@@ -428,8 +628,10 @@
     "date": "2026-07-24T07:36:00.000Z",
     "duration": "39秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-814f-94b4-de4c3e9ad893",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "810d8ec3d3667f6c50e9a7bb697cd85e",
@@ -437,8 +639,10 @@
     "date": "2026-07-24T05:29:00.000Z",
     "duration": "9分 15秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-81e4-8f3b-e41479d596c6",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "520332a785c763567cd9f963c47a9ebd",
@@ -446,8 +650,10 @@
     "date": "2026-07-24T02:29:00.000Z",
     "duration": "3分 48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a70e7a5-35dc-8107-8907-c06dc9ad5ec0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "133cdaebbf8904272f4a3495361f6a80",
@@ -455,8 +661,10 @@
     "date": "2026-07-24T02:27:00.000Z",
     "duration": "2分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a70e7a5-35dc-8158-b9cd-dffcdc865773",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a106c4c3b83bca4b2a2df9923ef1e0d1",
@@ -464,8 +672,10 @@
     "date": "2026-07-24T02:18:00.000Z",
     "duration": "7分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a70e7a5-35dc-81a3-b296-c31f5092c6ad",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7c727c781e87c728d4778e57fd7d3c96",
@@ -473,8 +683,10 @@
     "date": "2026-07-24T02:05:00.000Z",
     "duration": "12分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a70e7a5-35dc-8195-8c0c-de0297b63e36",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "db1f986b60a560ec9116ffaed5dfa988",
@@ -482,17 +694,23 @@
     "date": "2026-07-24T00:44:00.000Z",
     "duration": "1時間 2分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a70e7a5-35dc-8179-912f-d45dc0c9df5d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "14945b5bcf283eea180945c9206bbbb1",
-    "title": "2026-07-23 14:59:58",
+    "title": "定例会議",
     "date": "2026-07-23T05:59:00.000Z",
     "duration": "1時間 21分 3秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [],
     "notionPageId": "3a60e7a5-35dc-81af-a817-c93313260921",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4762fc226dcea3796756cc04719ea171",
@@ -500,8 +718,10 @@
     "date": "2026-07-23T00:34:00.000Z",
     "duration": "1時間 22分 47秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a60e7a5-35dc-817d-981d-e22a4a3ebe70",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "97f91b3b611f81ea0567c818a407b4bd",
@@ -509,8 +729,10 @@
     "date": "2026-07-22T08:56:00.000Z",
     "duration": "1分 8秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a50e7a5-35dc-81d7-858c-d1b750d6cda0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "10b9ef65220120e8c36cd4f244839e4f",
@@ -518,8 +740,10 @@
     "date": "2026-07-22T05:00:00.000Z",
     "duration": "1時間 0分 11秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a50e7a5-35dc-81fc-958f-d0f4395f4a2e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f4c0cc978601e710d8ad22819c72988e",
@@ -527,8 +751,15 @@
     "date": "2026-07-22T01:58:00.000Z",
     "duration": "1時間 24分 58秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "ハンター製菓"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3a50e7a5-35dc-81e6-895d-d0870e395785",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "31a00bf9bf3bf240a82c33cf8a9eef0e",
@@ -536,8 +767,15 @@
     "date": "2026-07-21T05:50:00.000Z",
     "duration": "46分 9秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "キャスト"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3a40e7a5-35dc-811d-a280-e9dcd3a64dc5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6d32322ca8b1cd5da89034a3029cfd65",
@@ -545,8 +783,12 @@
     "date": "2026-07-21T02:01:00.000Z",
     "duration": "2時間 25分 48秒",
     "status": "要約",
+    "tags": [
+      "JBA（週次）"
+    ],
+    "permissions": [],
     "notionPageId": "3a40e7a5-35dc-8148-9f4a-f2ac7d8c44f0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "99dbd6d1eb656939c85a261b10ae3fc8",
@@ -554,17 +796,25 @@
     "date": "2026-07-21T01:00:00.000Z",
     "duration": "49分 50秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3a40e7a5-35dc-816a-bfd0-f390866d3643",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e3f8aa3364b59897541ade0d2d764d97",
-    "title": "うなぎ川秀 2",
+    "title": "サフランカフェ",
     "date": "2026-07-19T09:20:00.000Z",
     "duration": "1時間 53分 36秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-81a1-af59-c4190a1b4a12",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "914c38e54344df35acce9b559647aa91",
@@ -572,35 +822,51 @@
     "date": "2026-07-19T09:19:00.000Z",
     "duration": "1時間 0分 51秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-81a5-9355-ca90152a2092",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "72ce4c9eaf9ef22a7d02db9656f1fff8",
-    "title": "新規録音 25",
+    "title": "お墓参り",
     "date": "2026-07-19T09:18:00.000Z",
     "duration": "46分 8秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-815f-a6a7-f7d66d5a0ac1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9710a919aa4628b9d79cafdfe0b100aa",
-    "title": "2026-07-18 12:07:22",
+    "title": "実家電話②",
     "date": "2026-07-18T03:07:00.000Z",
     "duration": "6分 16秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-816c-89c9-dc607e0ce6e3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1c875bc39c24f2d9d4bb29833f35255e",
-    "title": "2026-07-18 11:44:58",
+    "title": "実家電話①",
     "date": "2026-07-18T02:44:00.000Z",
     "duration": "6分 30秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-8146-9958-fbeea1471e1b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7f337e2c6272a70547b0f6b22cb91533",
@@ -608,8 +874,10 @@
     "date": "2026-07-18T02:44:00.000Z",
     "duration": "8秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3a20e7a5-35dc-818d-9c77-d6e6f2515a0c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "68e9ce8cccb5ec419889c077cce2a99c",
@@ -617,8 +885,13 @@
     "date": "2026-07-17T09:23:00.000Z",
     "duration": "2時間 52分 17秒",
     "status": "要約",
+    "tags": [
+      "雑談",
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3a00e7a5-35dc-815f-a97d-e6163b1e8255",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a55d9250b594e7adc69a7c6cdd45ba8b",
@@ -626,8 +899,12 @@
     "date": "2026-07-17T04:03:00.000Z",
     "duration": "48分 53秒",
     "status": "要約",
+    "tags": [
+      "エキスプレス"
+    ],
+    "permissions": [],
     "notionPageId": "3a00e7a5-35dc-8100-826e-fd3842383549",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a55d9250b594e7adc69a7c6cdd45ba8b",
@@ -635,8 +912,12 @@
     "date": "2026-07-17T04:03:00.000Z",
     "duration": "48分 53秒",
     "status": "要約",
+    "tags": [
+      "エキスプレス"
+    ],
+    "permissions": [],
     "notionPageId": "3a00e7a5-35dc-8133-a0c5-fb55630451e3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3dd896250d6e89bc02a2e515eba0cb1f",
@@ -644,8 +925,14 @@
     "date": "2026-07-17T02:10:00.000Z",
     "duration": "1時間 16分 5秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3a00e7a5-35dc-81ee-bb6c-f96537338bd2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3dd896250d6e89bc02a2e515eba0cb1f",
@@ -653,8 +940,14 @@
     "date": "2026-07-17T02:10:00.000Z",
     "duration": "1時間 16分 5秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3a00e7a5-35dc-8114-a201-f8a4c62a9fae",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8679c2460ab73e9ad22a9d8426a6630d",
@@ -662,8 +955,10 @@
     "date": "2026-07-16T07:59:00.000Z",
     "duration": "1分 9秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "39f0e7a5-35dc-81ba-a6f4-fa41ba958fbf",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b2805c3f1e9fbb6a8b0d18da50e4bdab",
@@ -671,8 +966,14 @@
     "date": "2026-07-16T07:05:00.000Z",
     "duration": "53分 13秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "39f0e7a5-35dc-819a-a6e5-c4b45d85bb24",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "728e5e6db138d4c9b0512e1490e46855",
@@ -680,8 +981,10 @@
     "date": "2026-07-16T07:00:00.000Z",
     "duration": "4分 26秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "39f0e7a5-35dc-817e-9864-e8fa27565b46",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "70e7714e93b268e679aaf7b733bafb21",
@@ -689,8 +992,15 @@
     "date": "2026-07-15T04:49:00.000Z",
     "duration": "46分 3秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "ハンター製菓"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "39e0e7a5-35dc-815f-98b6-d07f037998c3",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "70e7714e93b268e679aaf7b733bafb21",
@@ -698,8 +1008,15 @@
     "date": "2026-07-15T04:49:00.000Z",
     "duration": "46分 3秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "ハンター製菓"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "39e0e7a5-35dc-81d8-9254-f1cb4db38324",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "33f8f604a430b53bc55062cd8d68c460",
@@ -707,8 +1024,13 @@
     "date": "2026-07-15T02:07:00.000Z",
     "duration": "10分 30秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "問合せ"
+    ],
+    "permissions": [],
     "notionPageId": "39e0e7a5-35dc-819f-ad8b-f11555d45377",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0000e90343a84f29e758d0621b194a7f",
@@ -716,8 +1038,15 @@
     "date": "2026-07-14T04:57:00.000Z",
     "duration": "1時間 13分 20秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "ハンター製菓"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "39d0e7a5-35dc-81dd-abb3-ff5af8d2195a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bcdb33d2b5166c1aaf32bccf9476b11c",
@@ -725,8 +1054,12 @@
     "date": "2026-07-14T02:00:00.000Z",
     "duration": "36分 44秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "39d0e7a5-35dc-81ca-81cf-ea13ba5cf937",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2eaba5f8779c6e7e1bbaa4a2cedef5fc",
@@ -734,8 +1067,15 @@
     "date": "2026-07-14T00:58:00.000Z",
     "duration": "55分 10秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "見積り判定"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "39d0e7a5-35dc-81bc-b91e-ebdafc6af8fa",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b9e100cf3db469f97c8e44d73881ce92",
@@ -743,8 +1083,12 @@
     "date": "2026-07-13T10:43:00.000Z",
     "duration": "2時間 28分 53秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "39d0e7a5-35dc-81bd-a8f9-e1091dbe17fb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "98345200d219fb6f85eeee9b31276b7f",
@@ -752,8 +1096,12 @@
     "date": "2026-07-13T06:59:00.000Z",
     "duration": "48分 21秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "39c0e7a5-35dc-8170-a240-d3a65dd12e42",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ef4e4a49fb03a7c6e1e35869944fc895",
@@ -761,8 +1109,12 @@
     "date": "2026-07-13T05:39:00.000Z",
     "duration": "47分 27秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "39c0e7a5-35dc-8158-9a6d-d7f5334cfed2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f48c9b97fd049fb53601120a6fd6f7c8",
@@ -770,8 +1122,14 @@
     "date": "2026-07-13T04:32:00.000Z",
     "duration": "46分 18秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "39c0e7a5-35dc-81ba-8dd0-eac1b48fb686",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "27f8e3a66f65507147ff75bdcbf32845",
@@ -779,8 +1137,15 @@
     "date": "2026-07-13T02:16:00.000Z",
     "duration": "21分 6秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "カキモトアームズ"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "39c0e7a5-35dc-81f8-97a8-c916575d0dc5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dc9bbfe5bb831dcb5dce890ce0db0490",
@@ -788,17 +1153,25 @@
     "date": "2026-07-13T01:00:00.000Z",
     "duration": "1時間 15分 20秒",
     "status": "要約",
+    "tags": [
+      "JBA（週次）"
+    ],
+    "permissions": [],
     "notionPageId": "39c0e7a5-35dc-8196-8ab7-e662e7633b79",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "05c13c8a515c17bed8a18365064692c5",
-    "title": "2026-07-12 15:59:43",
+    "title": "実家電話",
     "date": "2026-07-12T06:59:00.000Z",
     "duration": "5分 8秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "39c0e7a5-35dc-81ca-b007-ea55ae6d19b7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4d6ff96e81915260e151d26e82862709",
@@ -806,8 +1179,12 @@
     "date": "2026-07-10T04:21:00.000Z",
     "duration": "20分 48秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "39c0e7a5-35dc-8140-a3df-e2e48abff504",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "da213673fccbc02136c6b01854bec535",
@@ -815,8 +1192,14 @@
     "date": "2026-07-09T11:06:00.000Z",
     "duration": "4分 4秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3980e7a5-35dc-81c3-9501-cc6857a15db9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9a95b31149bda392e839d328dd568d2a",
@@ -824,8 +1207,14 @@
     "date": "2026-07-09T07:00:00.000Z",
     "duration": "1時間 1分 44秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3980e7a5-35dc-8119-8f39-e9b8c7e88f10",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c903a670d114afe989653ad16132c646",
@@ -833,8 +1222,12 @@
     "date": "2026-07-08T08:06:00.000Z",
     "duration": "34分 58秒",
     "status": "要約",
+    "tags": [
+      "事業部"
+    ],
+    "permissions": [],
     "notionPageId": "3970e7a5-35dc-81c8-9acc-eb16a73d0992",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ea219d7db7eee00d63a6afc3b41cc426",
@@ -842,8 +1235,12 @@
     "date": "2026-07-08T07:02:00.000Z",
     "duration": "1時間 3分 22秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3970e7a5-35dc-819a-a6d9-d556c38e68a2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3a90644bc287c81a9f7c43e5f138f0f9",
@@ -851,8 +1248,12 @@
     "date": "2026-07-08T06:30:00.000Z",
     "duration": "32分 3秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3970e7a5-35dc-8137-a4db-d2bd36d76bde",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8c66439ac0e93e88032e0d5d5f00f980",
@@ -860,8 +1261,10 @@
     "date": "2026-07-07T04:11:00.000Z",
     "duration": "13分 22秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3980e7a5-35dc-8137-b207-c6fbe608544e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a93eeafa9e82861d6e83757d6777cbfb",
@@ -869,8 +1272,15 @@
     "date": "2026-07-07T01:19:00.000Z",
     "duration": "1時間 38分 43秒",
     "status": "要約",
+    "tags": [
+      "JBA",
+      "ハンター製菓"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3980e7a5-35dc-81e4-ad7d-daba8020c78e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7767495907b13bd659b53b814c46eb26",
@@ -878,8 +1288,13 @@
     "date": "2026-07-06T10:47:00.000Z",
     "duration": "2時間 42分 35秒",
     "status": "要約",
+    "tags": [
+      "雑談",
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3960e7a5-35dc-816a-bd78-d2571d9541fe",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5eb3fe524e2ec12f04c87d3fca14eb43",
@@ -887,8 +1302,12 @@
     "date": "2026-07-06T07:07:00.000Z",
     "duration": "1時間 12分 5秒",
     "status": "要約",
+    "tags": [
+      "JBA（週次）"
+    ],
+    "permissions": [],
     "notionPageId": "3960e7a5-35dc-81ea-aa12-c969f2cda3b1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "92de11abb5e94b742f3ff6d914934520",
@@ -896,8 +1315,10 @@
     "date": "2026-07-06T06:00:00.000Z",
     "duration": "11分 35秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3950e7a5-35dc-8100-bfce-c9f12fc47ece",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b16f94b8f9df6c245e56cdc83afc620a",
@@ -905,8 +1326,12 @@
     "date": "2026-07-03T08:02:00.000Z",
     "duration": "43分 0秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3920e7a5-35dc-81a4-8084-d61e0c64c7ea",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c727224acb56e59bb9b7db8820e0fa80",
@@ -914,8 +1339,12 @@
     "date": "2026-07-03T04:01:00.000Z",
     "duration": "1時間 14分 50秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3920e7a5-35dc-81e9-85c4-c3b0845297f9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9a274e9a0c950e2678202f138f5fb262",
@@ -923,8 +1352,12 @@
     "date": "2026-07-03T02:01:00.000Z",
     "duration": "1時間 16分 24秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3920e7a5-35dc-81ee-a3aa-fdc32175aff5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6ae7aa7da30fa0bd00b0d123a28865ad",
@@ -932,8 +1365,12 @@
     "date": "2026-07-03T01:01:00.000Z",
     "duration": "16分 55秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3920e7a5-35dc-8192-a011-dea041133e63",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "853be001815fa564b989dc5284ababe4",
@@ -941,8 +1378,14 @@
     "date": "2026-07-02T07:00:00.000Z",
     "duration": "1時間 5分 37秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3910e7a5-35dc-8141-a689-d1e651424a0a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "32defb928d084ecb0415c0ab6205a138",
@@ -950,8 +1393,12 @@
     "date": "2026-07-02T01:00:00.000Z",
     "duration": "1時間 17分 52秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3910e7a5-35dc-8128-804a-e0b830264673",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f40f6ad99ad8130324a546d9db0a2572",
@@ -959,8 +1406,10 @@
     "date": "2026-07-01T10:18:00.000Z",
     "duration": "16秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-81fe-ae41-d10a64af2638",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bd8ec9fc4a41e2f71b3cc7e9e404c609",
@@ -968,8 +1417,10 @@
     "date": "2026-07-01T10:16:00.000Z",
     "duration": "1秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-813a-8e92-da8309d5ff48",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0c5ce38935f75b7acbdef55143377017",
@@ -977,8 +1428,10 @@
     "date": "2026-07-01T10:11:00.000Z",
     "duration": "2秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-8109-9ea2-fd603450f466",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2147746f46b297735d027b1586eb784e",
@@ -986,8 +1439,10 @@
     "date": "2026-07-01T07:32:00.000Z",
     "duration": "4秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-81e3-8654-c6eca2bb3efe",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d362e0a0f42b204865db8fbf7743977d",
@@ -995,8 +1450,12 @@
     "date": "2026-07-01T07:05:00.000Z",
     "duration": "29分 19秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-8164-b15d-c9cfd1916a00",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5ff0fa4bad858fd5f1feacd90ca8ee7f",
@@ -1004,8 +1463,12 @@
     "date": "2026-07-01T06:28:00.000Z",
     "duration": "36分 48秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-818d-b947-fd2c9c9bca3f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b6f446849e59ebbdd5765b82a34980fc",
@@ -1013,8 +1476,14 @@
     "date": "2026-07-01T01:01:00.000Z",
     "duration": "2時間 4分 47秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3920e7a5-35dc-8150-951a-ce4f8651fd1d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "54be2d1d7ac3c1f31ff8172041138672",
@@ -1022,8 +1491,12 @@
     "date": "2026-07-01T00:40:00.000Z",
     "duration": "10分 59秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3900e7a5-35dc-8105-ba0c-f319be706775",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fc1e902781b50b565e7bba82a02799da",
@@ -1031,8 +1504,14 @@
     "date": "2026-06-30T10:36:00.000Z",
     "duration": "1時間 48分 8秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "38f0e7a5-35dc-8125-939a-cdcaaac92012",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9f1d5acac84a345f29a435d8052f6ff4",
@@ -1040,8 +1519,12 @@
     "date": "2026-06-30T04:14:00.000Z",
     "duration": "2時間 21分 46秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38f0e7a5-35dc-812c-9514-f90287d1aefc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "735b003d2500cb11274ed81de2376dd7",
@@ -1049,8 +1532,12 @@
     "date": "2026-06-29T06:13:00.000Z",
     "duration": "8分 24秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "38e0e7a5-35dc-8130-ad50-c23d737140ec",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "06530913500c89f724149fcd8c35872f",
@@ -1058,8 +1545,12 @@
     "date": "2026-06-29T06:00:00.000Z",
     "duration": "13分 0秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "38e0e7a5-35dc-81f9-8242-ddae299e7ca8",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fcc07aa2f6f257f19163f522a3499ea8",
@@ -1067,8 +1558,12 @@
     "date": "2026-06-29T04:52:00.000Z",
     "duration": "49分 28秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38e0e7a5-35dc-81be-9f64-c5b70df8485c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0b3b30f80c4861889114e589961c45ca",
@@ -1076,8 +1571,12 @@
     "date": "2026-06-29T03:29:00.000Z",
     "duration": "1時間 25分 58秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38e0e7a5-35dc-819f-a858-f9eda6b7069c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2713afc28f1283c33487d4c945b63912",
@@ -1085,8 +1584,12 @@
     "date": "2026-06-27T10:45:00.000Z",
     "duration": "1時間 5分 31秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38c0e7a5-35dc-81d0-ac5d-e6777d6193b1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "576e03e7fcedc071105639ecd8075fff",
@@ -1094,8 +1597,12 @@
     "date": "2026-06-26T06:40:00.000Z",
     "duration": "1時間 43分 1秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38b0e7a5-35dc-81e3-b4ab-e920e936fc45",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "eafb2ead15aebd4cbbfbb8e8258be240",
@@ -1103,8 +1610,12 @@
     "date": "2026-06-26T02:05:00.000Z",
     "duration": "2時間 15分 30秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38b0e7a5-35dc-81c8-aa65-cce35936e3a7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8cfe1dedeaa81df42e7b2d5c78884378",
@@ -1112,8 +1623,12 @@
     "date": "2026-06-26T01:01:00.000Z",
     "duration": "34分 39秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "38b0e7a5-35dc-8125-92bf-f2434639c967",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ac701ee8017e4f0cc7e6e30162b0e259",
@@ -1121,8 +1636,10 @@
     "date": "2026-06-25T08:53:00.000Z",
     "duration": "2時間 10分 47秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "38a0e7a5-35dc-81b6-b90c-e3e9667091ef",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "74dd92059f6e2c1a4980d98ced858713",
@@ -1130,8 +1647,14 @@
     "date": "2026-06-25T07:01:00.000Z",
     "duration": "1時間 3分 16秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "38a0e7a5-35dc-81ec-a441-f103123f0f2c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "80961c0c345224a1093d54f68887becf",
@@ -1139,8 +1662,10 @@
     "date": "2026-06-25T07:00:00.000Z",
     "duration": "5分 4秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "38a0e7a5-35dc-8129-98c2-eb9254447867",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bff509931e491196ec43c826a570edbb",
@@ -1148,8 +1673,12 @@
     "date": "2026-06-25T01:04:00.000Z",
     "duration": "2時間 6分 14秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "38b0e7a5-35dc-8168-ad0d-ed1b2739a1b9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0ab457759fc11fc5287d5fc6792c7a9b",
@@ -1157,8 +1686,12 @@
     "date": "2026-06-24T09:02:00.000Z",
     "duration": "1時間 0分 22秒",
     "status": "要約",
+    "tags": [
+      "全体"
+    ],
+    "permissions": [],
     "notionPageId": "3890e7a5-35dc-816c-b503-dfa79a3f4901",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0ed6a504a844ae0a6dd1ff43f3e3bceb",
@@ -1166,8 +1699,12 @@
     "date": "2026-06-24T04:12:00.000Z",
     "duration": "1時間 46分 16秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3890e7a5-35dc-8131-ba81-e56c72963e42",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "869b0037a35660f7b472be4648bd0abf",
@@ -1175,8 +1712,12 @@
     "date": "2026-06-24T00:57:00.000Z",
     "duration": "39分 38秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3890e7a5-35dc-81c4-b3e7-e6f8e9eac45e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1f20e6277423580585488560ca036eba",
@@ -1184,8 +1725,10 @@
     "date": "2026-06-23T08:07:00.000Z",
     "duration": "52分 19秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3890e7a5-35dc-813b-a8fe-e00b35144af5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0543608bef0d2ad20b7475a54e3b91b3",
@@ -1193,8 +1736,10 @@
     "date": "2026-06-23T07:31:00.000Z",
     "duration": "27分 40秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3890e7a5-35dc-8134-82c9-dfaedd879577",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b1b1a51c342f22c2289ec61bcf1eaabb",
@@ -1202,8 +1747,12 @@
     "date": "2026-06-23T04:30:00.000Z",
     "duration": "17分 51秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3880e7a5-35dc-810c-a04b-d74df43972ca",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e6d9f58c283e83e9f0a05822a801ea61",
@@ -1211,8 +1760,10 @@
     "date": "2026-06-23T04:28:00.000Z",
     "duration": "1分 49秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3880e7a5-35dc-81a1-8a4f-d02830c2f8e1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b40fcc1af015f0e6e16b580e6af8aae3",
@@ -1220,8 +1771,12 @@
     "date": "2026-06-23T01:22:00.000Z",
     "duration": "27分 26秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3880e7a5-35dc-8185-8015-cced69a4fe5f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5f7204ef44398adc9eebcfdd950dd9e1",
@@ -1229,8 +1784,12 @@
     "date": "2026-06-22T02:37:00.000Z",
     "duration": "1分 50秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3870e7a5-35dc-8135-a679-e41e69c965b2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "80ac186528732acbba15bec51c52a4ac",
@@ -1238,8 +1797,12 @@
     "date": "2026-06-22T01:25:00.000Z",
     "duration": "15分 27秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3870e7a5-35dc-818f-8d03-ed1abbdd83c5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b7048036392f67473ba3e3c0e974e1e0",
@@ -1247,8 +1810,12 @@
     "date": "2026-06-21T02:34:00.000Z",
     "duration": "38分 5秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3860e7a5-35dc-8112-8594-f242b66e49ab",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6abded8f5fd9be418d62931524dad715",
@@ -1256,8 +1823,12 @@
     "date": "2026-06-20T23:59:00.000Z",
     "duration": "1時間 9分 35秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3860e7a5-35dc-8107-803c-df8b7073a418",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "aea7e405cb0d537e5db20c9d1a4ff00d",
@@ -1265,8 +1836,14 @@
     "date": "2026-06-19T10:52:00.000Z",
     "duration": "1時間 12分 18秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3860e7a5-35dc-8134-86be-e0a5a7c634a6",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0e1ee99bb4096d70b9ed80e7696d5e90",
@@ -1274,8 +1851,12 @@
     "date": "2026-06-19T04:36:00.000Z",
     "duration": "18分 10秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3840e7a5-35dc-814f-92ba-faed9743c96a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bb0aaf21211075fab937a595443a6183",
@@ -1283,8 +1864,14 @@
     "date": "2026-06-19T02:00:00.000Z",
     "duration": "37分 10秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3840e7a5-35dc-8171-982a-f467abd85da4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "13085761956612d8f3ffb80121d374ea",
@@ -1292,8 +1879,12 @@
     "date": "2026-06-18T08:34:00.000Z",
     "duration": "34分 28秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3830e7a5-35dc-8116-a80e-f8596919de9f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7e9533828c2d7f0ddcfea1c369832b5e",
@@ -1301,8 +1892,10 @@
     "date": "2026-06-18T08:17:00.000Z",
     "duration": "5分 5秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3830e7a5-35dc-81e0-ac56-d7579c274bc7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7bd253ee7bf86e2e944e169e4aa1dc86",
@@ -1310,8 +1903,14 @@
     "date": "2026-06-18T06:59:00.000Z",
     "duration": "39分 9秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3830e7a5-35dc-813c-b79f-c3c1044f1eef",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "601eb381fd2792a2afb6afc8e7d07ff0",
@@ -1319,8 +1918,14 @@
     "date": "2026-06-17T08:34:00.000Z",
     "duration": "59分 30秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3820e7a5-35dc-81e4-b98c-e6348c439052",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fa1803769b176d8f937443015f90914a",
@@ -1328,8 +1933,12 @@
     "date": "2026-06-17T06:39:00.000Z",
     "duration": "40分 52秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3820e7a5-35dc-81be-98a5-faeac07ad318",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "edd80a34a62f5bcac957d6d061aab78d",
@@ -1337,8 +1946,12 @@
     "date": "2026-06-17T06:01:00.000Z",
     "duration": "37分 54秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3820e7a5-35dc-8176-9743-df8edd4b2df2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "667e7b2ff4251489ef5e58bd0f3d811d",
@@ -1346,8 +1959,12 @@
     "date": "2026-06-17T05:14:00.000Z",
     "duration": "41分 11秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3820e7a5-35dc-81c3-9c16-fed3257f9bd3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "21542a5f776cc9174cd677a352f8cd12",
@@ -1355,8 +1972,12 @@
     "date": "2026-06-17T01:00:00.000Z",
     "duration": "12分 26秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3820e7a5-35dc-8164-b2f3-e86c52f2e23d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "107518cb7bfebd136afae04c83f40821",
@@ -1364,8 +1985,12 @@
     "date": "2026-06-16T08:24:00.000Z",
     "duration": "45分 38秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "3820e7a5-35dc-81ad-9316-ccd9f2808bef",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7bcf0a1729c6b2c0c488aadb918c825c",
@@ -1373,8 +1998,12 @@
     "date": "2026-06-16T02:02:00.000Z",
     "duration": "19分 32秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3810e7a5-35dc-81c3-9235-f26891de4942",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "316a42cb232eb53f426745b3ea146bdf",
@@ -1382,8 +2011,14 @@
     "date": "2026-06-16T00:59:00.000Z",
     "duration": "1時間 2分 23秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3810e7a5-35dc-811f-a4db-e09172f8ffbb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c0d0dc25368e3bf7b1c09e3ff16e25bf",
@@ -1391,8 +2026,12 @@
     "date": "2026-06-15T08:59:00.000Z",
     "duration": "1時間 4分 13秒",
     "status": "要約",
+    "tags": [
+      "MM"
+    ],
+    "permissions": [],
     "notionPageId": "3800e7a5-35dc-81cb-8f36-e8a77a7017dd",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "462106ec17c0a629b8a6c394ebdef430",
@@ -1400,8 +2039,14 @@
     "date": "2026-06-15T08:00:00.000Z",
     "duration": "55分 33秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3800e7a5-35dc-8133-a2c4-d20d47aa9f25",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4fefec53621ff6644fa1dff545d3d7dc",
@@ -1409,8 +2054,12 @@
     "date": "2026-06-15T02:04:00.000Z",
     "duration": "23分 23秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3800e7a5-35dc-816f-b740-c7df0c89b301",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d9401ffa024d40c4274bc3f9dfcd37aa",
@@ -1418,8 +2067,14 @@
     "date": "2026-06-15T01:41:00.000Z",
     "duration": "22分 24秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3800e7a5-35dc-8175-81a9-e7490d62029e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "71310720d04320cbd6050d98f52f7fbc",
@@ -1427,8 +2082,14 @@
     "date": "2026-06-15T01:02:00.000Z",
     "duration": "38分 39秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3800e7a5-35dc-816d-89a4-e123093de73a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "568edcff91a3224079fb15c9bea33be9",
@@ -1436,8 +2097,10 @@
     "date": "2026-06-15T01:00:00.000Z",
     "duration": "7秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3800e7a5-35dc-816c-8cbd-dc0cec97da95",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f002f7b1383216e32fe60ba24e75e0a2",
@@ -1445,8 +2108,14 @@
     "date": "2026-06-12T10:24:00.000Z",
     "duration": "51分 32秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37d0e7a5-35dc-8120-a7e4-d4403e436bc5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7f173208a1c05c7c600efe2dc32d3bce",
@@ -1454,8 +2123,14 @@
     "date": "2026-06-12T10:01:00.000Z",
     "duration": "21分 39秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37d0e7a5-35dc-817a-8a0b-d1def47c6e62",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5c390329b38b78bb86d9e76a65b65020",
@@ -1463,8 +2138,14 @@
     "date": "2026-06-12T08:50:00.000Z",
     "duration": "13分 37秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37d0e7a5-35dc-8186-9f50-cd9367d14a99",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1267f9d1bf0f417418d4a3ac38a5387e",
@@ -1472,8 +2153,14 @@
     "date": "2026-06-12T05:39:00.000Z",
     "duration": "31分 50秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37d0e7a5-35dc-81a2-a722-ea3c60f7a8cc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2b7a70a8947a5028355c0b71de0111e5",
@@ -1481,8 +2168,10 @@
     "date": "2026-06-12T05:38:00.000Z",
     "duration": "30秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37d0e7a5-35dc-8123-8ffc-fd010df064df",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "11870d4d906f35f7f4c7e10d0edf2c2d",
@@ -1490,8 +2179,14 @@
     "date": "2026-06-12T05:05:00.000Z",
     "duration": "32分 30秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37d0e7a5-35dc-815d-9532-c6f26be73e14",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f98e250d7c51ac8d7bec4745dcf0c712",
@@ -1499,8 +2194,10 @@
     "date": "2026-06-12T04:51:00.000Z",
     "duration": "2秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37d0e7a5-35dc-81f2-9b4a-faff3eaf9b26",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5d9e9ff18637a63f29c2065b7932b0a9",
@@ -1508,8 +2205,12 @@
     "date": "2026-06-12T00:51:00.000Z",
     "duration": "9分 39秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "37d0e7a5-35dc-81ba-8f02-ede4907f7748",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3b69d0239c937fc31fb737d35664cf3c",
@@ -1517,8 +2218,14 @@
     "date": "2026-06-11T07:45:00.000Z",
     "duration": "48分 11秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37c0e7a5-35dc-8168-95e4-d5a11ad8d24a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2d7fb2a04c87ba0ae42409bc721084ab",
@@ -1526,8 +2233,12 @@
     "date": "2026-06-11T07:30:00.000Z",
     "duration": "13分 42秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8180-a7eb-eac847be1bdc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a4911d53bbdc6c7c288ac0f8af57d1a7",
@@ -1535,8 +2246,10 @@
     "date": "2026-06-11T07:29:00.000Z",
     "duration": "1分 6秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8199-bb50-efb96b4777df",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "438792e1fab401c63c515339b8375ad8",
@@ -1544,8 +2257,12 @@
     "date": "2026-06-11T06:51:00.000Z",
     "duration": "37分 12秒",
     "status": "要約",
+    "tags": [
+      "GMO定例"
+    ],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8179-a3f3-dafb7d50da30",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "12b32af9beece2c779c26cfbf6052de9",
@@ -1553,8 +2270,10 @@
     "date": "2026-06-11T06:24:00.000Z",
     "duration": "6分 12秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8189-acab-cb4743591803",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "92836e7fadeafa8f61d47251a9e760ef",
@@ -1562,8 +2281,12 @@
     "date": "2026-06-11T05:02:00.000Z",
     "duration": "5分 35秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-817c-a7a0-da50de16ec82",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4dd7fbab06dcdd862aeb769fbd295e7e",
@@ -1571,8 +2294,10 @@
     "date": "2026-06-10T08:05:00.000Z",
     "duration": "1時間 5分 7秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37b0e7a5-35dc-81c9-a53c-e232b39420f1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "70998eed983740d25324b42b38af83cc",
@@ -1580,8 +2305,10 @@
     "date": "2026-06-10T07:59:00.000Z",
     "duration": "7秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8161-a029-ea2754403b57",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "91182f2e58c14ee5d871ccd029afb2b4",
@@ -1589,8 +2316,10 @@
     "date": "2026-06-10T04:42:00.000Z",
     "duration": "2秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-8153-b4bb-f460b4565b7e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e577c89327a8d8eb6cbe2a43c0901b01",
@@ -1598,8 +2327,14 @@
     "date": "2026-06-10T04:31:00.000Z",
     "duration": "11分 43秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "37c0e7a5-35dc-8171-a653-de336c7931db",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "703e02cbb73ce66b7b09417eee795302",
@@ -1607,8 +2342,10 @@
     "date": "2026-06-10T04:31:00.000Z",
     "duration": "6秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-81eb-9922-ff3b288d36ce",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "31fe43ed3fb0c4f38d3628bd33805f22",
@@ -1616,8 +2353,12 @@
     "date": "2026-06-10T01:59:00.000Z",
     "duration": "41分 9秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "37b0e7a5-35dc-81ee-83c9-ff0ea90a8101",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "08e761769de2566d6232859721ac8a28",
@@ -1625,8 +2366,12 @@
     "date": "2026-06-10T00:45:00.000Z",
     "duration": "19分 53秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "37b0e7a5-35dc-81c6-999d-e2d1896fc4d1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4a90bd44fac1d462ea9fb28b875f52e9",
@@ -1634,8 +2379,10 @@
     "date": "2026-06-09T02:00:00.000Z",
     "duration": "48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-814c-a89a-c00148189deb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cae5a3305098eb1ce207b2d75b1ebe44",
@@ -1643,8 +2390,12 @@
     "date": "2026-06-09T01:04:00.000Z",
     "duration": "26分 13秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "37a0e7a5-35dc-818c-b1a4-f0ba797b5ad8",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "de0829419694e251c0584fa4b8c03bd4",
@@ -1652,8 +2403,12 @@
     "date": "2026-06-08T05:24:00.000Z",
     "duration": "37分 38秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3790e7a5-35dc-8176-95ba-dfc7b2c4d3b8",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8d496a0b971be34d2932e6a6c567a462",
@@ -1661,8 +2416,12 @@
     "date": "2026-06-08T04:28:00.000Z",
     "duration": "56分 26秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3790e7a5-35dc-815c-a6e8-d67c7d83b988",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "827d13c9a8d12813c957fab45b584cd7",
@@ -1670,8 +2429,12 @@
     "date": "2026-06-08T01:00:00.000Z",
     "duration": "20分 18秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3790e7a5-35dc-813e-9a7a-da528c7873ae",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9fa2e84172e73ca015b92a3fdd117bcf",
@@ -1679,8 +2442,12 @@
     "date": "2026-06-07T13:04:00.000Z",
     "duration": "3時間 19分 45秒",
     "status": "要約",
+    "tags": [
+      "プライベート"
+    ],
+    "permissions": [],
     "notionPageId": "3790e7a5-35dc-818b-ab06-dc6dd0e89637",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "38d651690a52653edb292c63b3f51b06",
@@ -1688,8 +2455,12 @@
     "date": "2026-06-05T01:14:00.000Z",
     "duration": "21分 21秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3760e7a5-35dc-811d-841c-e7aab6977d30",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a841953f2820220016ecf23c1ea0116b",
@@ -1697,8 +2468,14 @@
     "date": "2026-06-04T07:00:00.000Z",
     "duration": "1時間 28分 8秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3750e7a5-35dc-817d-b31b-ddd541ad4482",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "43cc6ae87af4b652d8868bf04a0da37e",
@@ -1706,8 +2483,12 @@
     "date": "2026-06-04T01:05:00.000Z",
     "duration": "26分 32秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3750e7a5-35dc-81d2-a1f4-d4a9ead6a3ec",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0084e879ef04a9e083d4a32400274c49",
@@ -1715,8 +2496,14 @@
     "date": "2026-06-03T10:39:00.000Z",
     "duration": "11分 47秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3740e7a5-35dc-8142-9f62-c8fa0a40e8bb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e80f05455cce42cc7f27f2afb92eed53",
@@ -1724,8 +2511,14 @@
     "date": "2026-06-03T10:27:00.000Z",
     "duration": "10分 5秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3740e7a5-35dc-8197-8c2d-e3fb3e60a165",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d9f48ce36664e1f5885b181d2c95c0a2",
@@ -1733,8 +2526,14 @@
     "date": "2026-06-03T09:44:00.000Z",
     "duration": "6分 6秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3740e7a5-35dc-816c-82a6-fffcc452b450",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f3b2800890ae98d0f728c540ef9a815d",
@@ -1742,8 +2541,12 @@
     "date": "2026-06-03T05:06:00.000Z",
     "duration": "58分 57秒",
     "status": "要約",
+    "tags": [
+      "GMO定例"
+    ],
+    "permissions": [],
     "notionPageId": "3740e7a5-35dc-81a3-9a84-fad8847bdc08",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0fa9d3dee98477fe63c6536b8df281a7",
@@ -1751,8 +2554,12 @@
     "date": "2026-06-03T01:17:00.000Z",
     "duration": "18分 5秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "37c0e7a5-35dc-81ec-b511-c8e38b69d8f8",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "15c37b1913f12312db2ec8f8691e9df3",
@@ -1760,8 +2567,12 @@
     "date": "2026-06-02T01:31:00.000Z",
     "duration": "34分 40秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-818a-b1c3-d47a328f2f1c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "451f130d7cd3a3ab5562c3779c40150e",
@@ -1769,8 +2580,12 @@
     "date": "2026-06-02T01:00:00.000Z",
     "duration": "29分 53秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d5-802b-e0de270819b5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "afe07e5929bea4a004696791a409e96e",
@@ -1778,8 +2593,10 @@
     "date": "2026-06-01T09:00:00.000Z",
     "duration": "51分 53秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3720e7a5-35dc-81a1-b16e-d14d4c59da2a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "99c74e2cbacab7e9a8820710c1fb9a7c",
@@ -1787,8 +2604,10 @@
     "date": "2026-06-01T07:39:00.000Z",
     "duration": "33分 34秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3720e7a5-35dc-8118-8fa5-e86b28c403c7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ad1633e240996f08fb6b074ea0d227d8",
@@ -1796,8 +2615,10 @@
     "date": "2026-06-01T07:30:00.000Z",
     "duration": "8分 49秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3720e7a5-35dc-81a2-9900-e3ec32af5c5a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6d589aa997fb7ed877b3477074606ba7",
@@ -1805,8 +2626,10 @@
     "date": "2026-06-01T00:30:00.000Z",
     "duration": "20分 39秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3720e7a5-35dc-81cd-bfdf-c5c136e619d2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fd9dddd789cc256696088dcdcc3a3e22",
@@ -1814,8 +2637,10 @@
     "date": "2026-05-28T08:41:00.000Z",
     "duration": "1時間 11分 27秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "36e0e7a5-35dc-81b5-b5ce-dda975b1d8eb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2acd3ddb69c55639f8217ecf2b9e7944",
@@ -1823,8 +2648,14 @@
     "date": "2026-05-28T07:00:00.000Z",
     "duration": "59分 26秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36e0e7a5-35dc-81fe-92de-db93b5bccca2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "038b622d70a73a68ed85d6ac925c1403",
@@ -1832,8 +2663,12 @@
     "date": "2026-05-28T03:59:00.000Z",
     "duration": "1時間 12分 14秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "36e0e7a5-35dc-813a-b4c9-c9a0ccdc48a7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "78a5a9ba6abc40b727903d363285d32d",
@@ -1841,8 +2676,14 @@
     "date": "2026-05-28T00:59:00.000Z",
     "duration": "14分 46秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36e0e7a5-35dc-81cb-96a0-f1f4d646bd68",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e2ee625872392e4e56da8e06785667c0",
@@ -1850,8 +2691,15 @@
     "date": "2026-05-28T00:29:00.000Z",
     "duration": "18分 1秒",
     "status": "要約",
+    "tags": [
+      "新人",
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36e0e7a5-35dc-815c-98b1-d2e0c2f74387",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "996862da5df3ba9af074e3182c43e68a",
@@ -1859,8 +2707,12 @@
     "date": "2026-05-27T09:02:00.000Z",
     "duration": "57分 57秒",
     "status": "要約",
+    "tags": [
+      "全体"
+    ],
+    "permissions": [],
     "notionPageId": "36d0e7a5-35dc-81d9-91c5-ee0f84e04d33",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "be9715728aa94d428a7ba3a3a1a5c88e",
@@ -1868,8 +2720,14 @@
     "date": "2026-05-27T07:32:00.000Z",
     "duration": "55分 58秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36d0e7a5-35dc-815f-92fb-ee10f3a70c97",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cd68afa4d3373b2d9e68add58bf51f9d",
@@ -1877,8 +2735,12 @@
     "date": "2026-05-27T01:23:00.000Z",
     "duration": "28分 40秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "36d0e7a5-35dc-81f7-953d-ffc2b022ea3f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2cd94932577684b2ff6f49b9fc78c50c",
@@ -1886,8 +2748,12 @@
     "date": "2026-05-27T00:30:00.000Z",
     "duration": "19分 24秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "36d0e7a5-35dc-81db-bae8-c6c3d474fcc7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6f814a8338fa5cf5a78e97f3acb87c68",
@@ -1895,8 +2761,12 @@
     "date": "2026-05-26T04:05:00.000Z",
     "duration": "1時間 33分 3秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "36c0e7a5-35dc-816a-9849-ee060509cec2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8de11470aafed9c47b7b2fa32e000c33",
@@ -1904,8 +2774,12 @@
     "date": "2026-05-26T00:53:00.000Z",
     "duration": "45分 9秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "36c0e7a5-35dc-815c-b062-da48ab85139a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e8a1ca5203f41b45ba2aa36154f28448",
@@ -1913,8 +2787,12 @@
     "date": "2026-05-26T00:31:00.000Z",
     "duration": "15分 5秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "36c0e7a5-35dc-81bd-9e93-c8cdbde0f87c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bfdbd008a9268775a09695c84bbb599d",
@@ -1922,8 +2800,12 @@
     "date": "2026-05-25T06:15:00.000Z",
     "duration": "51分 34秒",
     "status": "要約",
+    "tags": [
+      "JBA"
+    ],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-81a9-84a9-ff511146f7cd",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8481c6f1c148258127f1df8f1220da2d",
@@ -1931,8 +2813,12 @@
     "date": "2026-05-25T02:02:00.000Z",
     "duration": "37分 6秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8187-82ff-d609fabd3db2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8481c6f1c148258127f1df8f1220da2d",
@@ -1940,8 +2826,10 @@
     "date": "2026-05-25T02:02:00.000Z",
     "duration": "37分 6秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-818b-b019-c1d3f1b433fc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5c77b0f85e044587c141787d32adf565",
@@ -1949,8 +2837,14 @@
     "date": "2026-05-25T01:33:00.000Z",
     "duration": "27分 9秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36b0e7a5-35dc-81b2-b805-ca4583b1d7bf",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5c77b0f85e044587c141787d32adf565",
@@ -1958,8 +2852,12 @@
     "date": "2026-05-25T01:33:00.000Z",
     "duration": "27分 9秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "36b0e7a5-35dc-8150-9925-d51baf33f028",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4b79351a384a82845306775686295033",
@@ -1967,8 +2865,12 @@
     "date": "2026-05-25T01:12:00.000Z",
     "duration": "20分 4秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8114-ab86-cc8f5bebd499",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4b79351a384a82845306775686295033",
@@ -1976,8 +2878,10 @@
     "date": "2026-05-25T01:12:00.000Z",
     "duration": "20分 4秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-81e1-994f-c7170e702fa1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "813c0a8160404d941a2764a69497b11f",
@@ -1985,8 +2889,12 @@
     "date": "2026-05-25T00:33:00.000Z",
     "duration": "16分 1秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8195-b77b-dcb85df642e2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "813c0a8160404d941a2764a69497b11f",
@@ -1994,8 +2902,10 @@
     "date": "2026-05-25T00:33:00.000Z",
     "duration": "16分 1秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8112-9e5d-e467d35699ba",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "60e33efa192d93b5f61b33dc0cf0c47a",
@@ -2003,8 +2913,10 @@
     "date": "2026-05-25T00:31:00.000Z",
     "duration": "18秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "36b0e7a5-35dc-81a5-b345-e3d6c8dc565f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "78f5df3b8f5e2336458516a6304e7d69",
@@ -2012,8 +2924,14 @@
     "date": "2026-05-21T07:00:00.000Z",
     "duration": "1時間 1分 52秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3670e7a5-35dc-8149-9c56-fb7279534955",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "49670cfa2eb02f17e5e8c1c7ba7aefbd",
@@ -2021,8 +2939,12 @@
     "date": "2026-05-21T01:06:00.000Z",
     "duration": "26分 18秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3670e7a5-35dc-8127-a52f-d9e790d6ee5c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "43317a17fcd4de8bb0eec2575ca17b02",
@@ -2030,8 +2952,12 @@
     "date": "2026-05-21T00:35:00.000Z",
     "duration": "9分 57秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3670e7a5-35dc-819a-966f-c726623e23b1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "06ea5c8ad5da0dd4a2f5cc93d134b05e",
@@ -2039,8 +2965,12 @@
     "date": "2026-05-20T01:20:00.000Z",
     "duration": "45分 32秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3660e7a5-35dc-81cb-b98c-f63ce11e9dd2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f81a5834e2e25774263c79dbc3ec22f9",
@@ -2048,8 +2978,12 @@
     "date": "2026-05-20T00:29:00.000Z",
     "duration": "17分 11秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3660e7a5-35dc-8163-9e8c-d7d1b6f9571e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fb0cc97b98e1961a325aa0671e8f9a1e",
@@ -2057,8 +2991,12 @@
     "date": "2026-05-19T01:16:00.000Z",
     "duration": "22分 53秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3650e7a5-35dc-8194-959f-dc3a12a3a55a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0a52484f65c56406ad197e61ac8e8e69",
@@ -2066,8 +3004,12 @@
     "date": "2026-05-19T00:30:00.000Z",
     "duration": "19分 17秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3650e7a5-35dc-81dd-ac4f-e9ccbb85e78e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f0a4ecf6c56d5cfbf94e01621716282f",
@@ -2075,8 +3017,12 @@
     "date": "2026-05-18T08:59:00.000Z",
     "duration": "1時間 1分 13秒",
     "status": "要約",
+    "tags": [
+      "MM"
+    ],
+    "permissions": [],
     "notionPageId": "3640e7a5-35dc-8131-a480-ea136c2c6e38",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2a41b9a30e6acda8a5f0ee4b257dbb0b",
@@ -2084,8 +3030,14 @@
     "date": "2026-05-18T05:59:00.000Z",
     "duration": "26分 7秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3640e7a5-35dc-81d0-a47a-dcc50f556448",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d3c9f7b823491c67cffabe6bf8b4b40b",
@@ -2093,8 +3045,12 @@
     "date": "2026-05-18T05:01:00.000Z",
     "duration": "40分 54秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3640e7a5-35dc-8122-81bc-c38699db68b5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a442c16e4a0066eee206aec9e9a65b97",
@@ -2102,8 +3058,12 @@
     "date": "2026-05-18T02:04:00.000Z",
     "duration": "44分 3秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3640e7a5-35dc-8177-a664-fbcf4c9ac856",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "320e138efae18355d970fa2270056c60",
@@ -2111,8 +3071,12 @@
     "date": "2026-05-18T00:30:00.000Z",
     "duration": "19分 5秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3640e7a5-35dc-8153-b890-edc65a467c39",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b40ea1b426fe0ceaeb2e5d513f8075bd",
@@ -2120,8 +3084,14 @@
     "date": "2026-05-15T08:59:00.000Z",
     "duration": "55分 59秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3610e7a5-35dc-812d-9143-c2fc3ff3dc39",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9183b4190c41f310b26d957cd92d83ef",
@@ -2129,8 +3099,14 @@
     "date": "2026-05-15T05:01:00.000Z",
     "duration": "13分 43秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3610e7a5-35dc-816b-97aa-d9cb6e29505f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a2f9d1ed910d43054f037185df02246b",
@@ -2138,8 +3114,14 @@
     "date": "2026-05-15T02:43:00.000Z",
     "duration": "52分 59秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3610e7a5-35dc-8136-94e8-ebb605236c82",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3ba165499d33a596aa67677661fd7e82",
@@ -2147,8 +3129,14 @@
     "date": "2026-05-15T02:41:00.000Z",
     "duration": "1分 17秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3610e7a5-35dc-8149-94a3-d2faab1aac67",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2d95b08a4fe0253847a06fefb05f118f",
@@ -2156,8 +3144,14 @@
     "date": "2026-05-15T02:31:00.000Z",
     "duration": "9分 13秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3610e7a5-35dc-810f-8368-c79435d2a8de",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "617d703db40bd09f6a8072db821bb511",
@@ -2165,8 +3159,10 @@
     "date": "2026-05-15T01:59:00.000Z",
     "duration": "2分 34秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3610e7a5-35dc-8159-8be5-d4174d7bdadf",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6e6578f0a4ace7a891a75a9a2d64864e",
@@ -2174,8 +3170,12 @@
     "date": "2026-05-15T01:17:00.000Z",
     "duration": "23分 23秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3610e7a5-35dc-8157-8d45-f4d8289f048b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "664a96ea4a86a7b84429d0afceeabe06",
@@ -2183,8 +3183,12 @@
     "date": "2026-05-15T00:29:00.000Z",
     "duration": "19分 8秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3610e7a5-35dc-81ae-8e6f-cb6949998ce2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a2db54b7010a38703a97746e1fd1b815",
@@ -2192,8 +3196,12 @@
     "date": "2026-05-14T04:20:00.000Z",
     "duration": "35分 29秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3730e7a5-35dc-815d-87c6-c0206f6c0cae",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a2db54b7010a38703a97746e1fd1b815",
@@ -2201,8 +3209,14 @@
     "date": "2026-05-14T04:20:00.000Z",
     "duration": "35分 29秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81a5-8da2-edd5a2af0ca8",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cf28998f46816699d14c20571498f921",
@@ -2210,8 +3224,10 @@
     "date": "2026-05-14T04:10:00.000Z",
     "duration": "49秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c4-a70b-f8a5697bf4c5",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cf28998f46816699d14c20571498f921",
@@ -2219,8 +3235,10 @@
     "date": "2026-05-14T04:10:00.000Z",
     "duration": "49秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8136-900a-f08f00602ffa",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a6dea402d5b437a3d90fd04a1fe15426",
@@ -2228,8 +3246,10 @@
     "date": "2026-05-14T01:33:00.000Z",
     "duration": "15分 39秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b6-b9b8-ce63afb2d2c7",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a6dea402d5b437a3d90fd04a1fe15426",
@@ -2237,8 +3257,12 @@
     "date": "2026-05-14T01:33:00.000Z",
     "duration": "15分 39秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-819b-91ee-cfbe0e4ffdbb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "38ff14b4ed8b778093a4e98da5749217",
@@ -2246,8 +3270,10 @@
     "date": "2026-05-14T00:29:00.000Z",
     "duration": "17分 43秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ed-abaf-daa5e11f1f7e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "38ff14b4ed8b778093a4e98da5749217",
@@ -2255,8 +3281,12 @@
     "date": "2026-05-14T00:29:00.000Z",
     "duration": "17分 43秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b2-9630-e0a6af249441",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "01a50cb08c4854ce3d4311689ddd6d18",
@@ -2264,8 +3294,14 @@
     "date": "2026-05-13T22:00:00.000Z",
     "duration": "1時間 21分 4秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-8136-9fd3-d08a84c90e28",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5ac2a8a85af78d33ddad05ecc032a537",
@@ -2273,8 +3309,10 @@
     "date": "2026-05-13T08:02:00.000Z",
     "duration": "51分 35秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e0-9a4a-fa0ede10eeb1",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5ac2a8a85af78d33ddad05ecc032a537",
@@ -2282,8 +3320,12 @@
     "date": "2026-05-13T08:02:00.000Z",
     "duration": "51分 35秒",
     "status": "要約",
+    "tags": [
+      "事業部"
+    ],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-81f9-9f9b-cef36fb892f6",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "25afeb883aa01b3f20f4cba158e14183",
@@ -2291,8 +3333,12 @@
     "date": "2026-05-13T07:14:00.000Z",
     "duration": "11分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3730e7a5-35dc-81ce-af80-e1927dd9ee1f",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "25afeb883aa01b3f20f4cba158e14183",
@@ -2300,8 +3346,14 @@
     "date": "2026-05-13T07:14:00.000Z",
     "duration": "11分 36秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-813b-9abd-ce4dc3df7acc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "71456ae864b4ba26340ee373f7403740",
@@ -2309,8 +3361,12 @@
     "date": "2026-05-13T02:34:00.000Z",
     "duration": "9分 11秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3730e7a5-35dc-8193-9b09-c36b48ccd62e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "71456ae864b4ba26340ee373f7403740",
@@ -2318,8 +3374,14 @@
     "date": "2026-05-13T02:34:00.000Z",
     "duration": "9分 11秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-8155-91a4-c610216c6785",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c9f5193995bad85b46cff06144020eb4",
@@ -2327,8 +3389,10 @@
     "date": "2026-05-13T02:15:00.000Z",
     "duration": "24分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-811f-9ce0-efd2ee10eca7",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c9f5193995bad85b46cff06144020eb4",
@@ -2336,8 +3400,12 @@
     "date": "2026-05-13T02:15:00.000Z",
     "duration": "24分 38秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8121-bd64-d35f47abae48",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3aa0771b51c82584c2ab850e289c7dea",
@@ -2345,8 +3413,10 @@
     "date": "2026-05-13T01:04:00.000Z",
     "duration": "41分 25秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f5-87e9-d7aa70c8f976",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3aa0771b51c82584c2ab850e289c7dea",
@@ -2354,8 +3424,12 @@
     "date": "2026-05-13T01:04:00.000Z",
     "duration": "41分 25秒",
     "status": "要約",
+    "tags": [
+      "GMO定例"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8138-b4ea-c163f784d93f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a5ec1b5e25d199608958a917fa6c4be6",
@@ -2363,8 +3437,10 @@
     "date": "2026-05-13T00:29:00.000Z",
     "duration": "21分 22秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8162-811d-d62046d5dad6",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a5ec1b5e25d199608958a917fa6c4be6",
@@ -2372,8 +3448,12 @@
     "date": "2026-05-13T00:29:00.000Z",
     "duration": "21分 22秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8178-b07f-fab8c215d5d1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e7240fe425e43164edf30509a6ebb8b7",
@@ -2381,8 +3461,12 @@
     "date": "2026-05-12T01:17:00.000Z",
     "duration": "31分 5秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-816c-bbf8-d9c75675e536",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c068818b72f633316f4451a439ba6c99",
@@ -2390,8 +3474,12 @@
     "date": "2026-05-12T00:29:00.000Z",
     "duration": "22分 19秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81cb-8a8d-cbd43077c15c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a25b664c1c62dc5783c9bc3e4c567a42",
@@ -2399,8 +3487,12 @@
     "date": "2026-05-11T01:16:00.000Z",
     "duration": "17分 56秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8117-bc0e-e6a28a7ae3e7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8d4d991b2c48a92ce441827fcf2d054c",
@@ -2408,8 +3500,12 @@
     "date": "2026-05-11T01:02:00.000Z",
     "duration": "13分 5秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8145-b3d6-dded344e7c50",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ce1d87f9f2ed29ab13b53f64925356b5",
@@ -2417,8 +3513,12 @@
     "date": "2026-05-11T00:30:00.000Z",
     "duration": "21分 48秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f1-a3e2-d441ee0b4d14",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "260d22332eca35fb391ecc1b126ced18",
@@ -2426,8 +3526,10 @@
     "date": "2026-05-01T08:33:00.000Z",
     "duration": "1時間 7分 3秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a1-925b-f0e7af4036bf",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "260d22332eca35fb391ecc1b126ced18",
@@ -2435,8 +3537,12 @@
     "date": "2026-05-01T08:33:00.000Z",
     "duration": "1時間 7分 3秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b5-838d-d2d246c0adaa",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8d2d82dc5a87bc86da2dd0538cc49356",
@@ -2444,8 +3550,12 @@
     "date": "2026-05-01T01:01:00.000Z",
     "duration": "37分 57秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8163-a444-d051799f231a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ac8ebbf66f6e45450467ba9328e7a087",
@@ -2453,8 +3563,12 @@
     "date": "2026-05-01T00:30:00.000Z",
     "duration": "19分 22秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810b-ab66-f4849edf3e6f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "52696e9746e2c4d41783023582e0e1e8",
@@ -2462,8 +3576,14 @@
     "date": "2026-04-30T07:02:00.000Z",
     "duration": "1時間 0分 29秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81f9-94b2-c064bc90c486",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "822e493b5b3afe1cd91f2be992d57464",
@@ -2471,8 +3591,10 @@
     "date": "2026-04-30T01:03:00.000Z",
     "duration": "29分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8160-a63c-e7b8fc67c1d1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7267a5ce9fc46e818bc66c4150e495bc",
@@ -2480,8 +3602,12 @@
     "date": "2026-04-30T00:30:00.000Z",
     "duration": "19分 41秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8138-b55c-f2c292df5d35",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0773e5d8f9cc07dfcf143f44cef28adb",
@@ -2489,8 +3615,12 @@
     "date": "2026-04-27T01:01:00.000Z",
     "duration": "40分 54秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81db-8395-c45910697dcb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6f80d84b55340a2d51541cb7c442adcb",
@@ -2498,8 +3628,12 @@
     "date": "2026-04-27T00:31:00.000Z",
     "duration": "19分 5秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-813d-88b7-cdbc8f74a1c9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "15c5813d211a9375b54185e38cd58643",
@@ -2507,8 +3641,12 @@
     "date": "2026-04-24T00:28:00.000Z",
     "duration": "20分 56秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f4-8800-fe11f9381b8c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f2d14189386889638fb2dada8a53aa8d",
@@ -2516,8 +3654,10 @@
     "date": "2026-04-23T08:40:00.000Z",
     "duration": "41分 2秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-811d-82db-f2fbc71273f9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bd6cfad4e7912491e7ca0247d7b3bba3",
@@ -2525,8 +3665,14 @@
     "date": "2026-04-23T07:00:00.000Z",
     "duration": "1時間 0分 24秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81f2-bfa0-c7fdcf2916f9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cc0040a02f4d32047d2fd835722f4b86",
@@ -2534,8 +3680,12 @@
     "date": "2026-04-23T00:52:00.000Z",
     "duration": "1時間 36分 16秒",
     "status": "要約",
+    "tags": [
+      "自動化"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81db-b841-e7a185723a65",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d3343370d4a367210b19548713d93d94",
@@ -2543,8 +3693,12 @@
     "date": "2026-04-23T00:32:00.000Z",
     "duration": "18分 47秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b7-a5e9-ebdfee1f3188",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "162395d55ff2a85c3ac840261b6e0f4c",
@@ -2552,8 +3706,10 @@
     "date": "2026-04-22T05:03:00.000Z",
     "duration": "15分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8195-ad2c-db513a0c4107",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "68204692fc7d5ab62a048b557fc2ca50",
@@ -2561,8 +3717,10 @@
     "date": "2026-04-22T00:28:00.000Z",
     "duration": "16分 9秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8187-a1a8-dadcade1c9a1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "61fe0d626a73094f56bdd05f2a24a2df",
@@ -2570,8 +3728,12 @@
     "date": "2026-04-20T09:00:00.000Z",
     "duration": "57分 10秒",
     "status": "要約",
+    "tags": [
+      "MM"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f9-820e-cb02abfd89ea",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b9f8063ac0926e53d2eabd811048144d",
@@ -2579,8 +3741,10 @@
     "date": "2026-04-20T06:46:00.000Z",
     "duration": "18分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8183-b90d-c2a97644b1d0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "16a2fc46d22000aca276d71869912fd6",
@@ -2588,8 +3752,10 @@
     "date": "2026-04-20T06:36:00.000Z",
     "duration": "5分 38秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8170-ba97-f55005c0691a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "873ae86f23e6127e04d1d1b0b048410b",
@@ -2597,8 +3763,10 @@
     "date": "2026-04-20T06:21:00.000Z",
     "duration": "14分 0秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8146-9f1d-f3888a99b5ae",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "025799f61049ed081349e8ca382475ac",
@@ -2606,8 +3774,10 @@
     "date": "2026-04-20T06:00:00.000Z",
     "duration": "15分 42秒",
     "status": "削除",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f2-8246-c0f79836c4fa",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0b915464e68f9644fdab2398e7f0dc8d",
@@ -2615,8 +3785,12 @@
     "date": "2026-04-20T00:29:00.000Z",
     "duration": "15分 37秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8191-99a9-fd2ef389ba16",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ec27fae42e8cce17471ddc61e8305f04",
@@ -2624,8 +3798,14 @@
     "date": "2026-04-17T08:01:00.000Z",
     "duration": "53分 5秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81e0-8d9c-c71ffea2df79",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ff5e2c3c02081ff8562c0a05d4c01ad2",
@@ -2633,8 +3813,12 @@
     "date": "2026-04-17T07:00:00.000Z",
     "duration": "57分 41秒",
     "status": "要約",
+    "tags": [
+      "GMO定例"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8114-a423-d5b09a42bd75",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b5ee1cda0f66398a53f95eab22caa236",
@@ -2642,8 +3826,12 @@
     "date": "2026-04-17T02:00:00.000Z",
     "duration": "1時間 2分 37秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3730e7a5-35dc-8135-9c67-f0f573a3ade1",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b5ee1cda0f66398a53f95eab22caa236",
@@ -2651,8 +3839,14 @@
     "date": "2026-04-17T02:00:00.000Z",
     "duration": "1時間 2分 37秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81f7-87c0-c1fa7c6a167f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e399f5af5a8e46eec7edc846ea0bee8d",
@@ -2660,8 +3854,10 @@
     "date": "2026-04-17T00:29:00.000Z",
     "duration": "17分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f6-8798-d7fe9bb5a88d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e399f5af5a8e46eec7edc846ea0bee8d",
@@ -2669,8 +3865,12 @@
     "date": "2026-04-17T00:29:00.000Z",
     "duration": "17分 36秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81bf-b6f0-d007453947a4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8e560d0d88c7817bbd3ede7121bd1bcf",
@@ -2678,8 +3878,14 @@
     "date": "2026-04-16T07:00:00.000Z",
     "duration": "1時間 59分 42秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-8134-8a1e-cd0f4d6b1f59",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a738b00b56b2ca6ddde22ad3948daa26",
@@ -2687,8 +3893,10 @@
     "date": "2026-04-16T00:29:00.000Z",
     "duration": "20分 49秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b5-bf5b-cabb8ac12093",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a738b00b56b2ca6ddde22ad3948daa26",
@@ -2696,8 +3904,12 @@
     "date": "2026-04-16T00:29:00.000Z",
     "duration": "20分 49秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e8-b384-c59e3671ac48",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "912b76a2e04e426dac865d43f0f8b342",
@@ -2705,8 +3917,10 @@
     "date": "2026-04-15T00:31:00.000Z",
     "duration": "17分 4秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-814f-a7f1-ce6c3a2a19ff",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "912b76a2e04e426dac865d43f0f8b342",
@@ -2714,8 +3928,10 @@
     "date": "2026-04-15T00:31:00.000Z",
     "duration": "17分 4秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-816e-9e68-c3acb8872b7e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "81e79b7024c73e46db6bfda6a3f29165",
@@ -2723,8 +3939,12 @@
     "date": "2026-04-14T07:33:00.000Z",
     "duration": "1時間 34分 32秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3730e7a5-35dc-81c7-88a2-c4b8cd6852a2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "81e79b7024c73e46db6bfda6a3f29165",
@@ -2732,8 +3952,14 @@
     "date": "2026-04-14T07:33:00.000Z",
     "duration": "1時間 34分 32秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-811b-b850-c800c0459d07",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "52e3dbda74eecb0a00bd064c3959d4ef",
@@ -2741,8 +3967,10 @@
     "date": "2026-04-14T00:31:00.000Z",
     "duration": "17分 34秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8152-abdb-d1620def6af0",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "52e3dbda74eecb0a00bd064c3959d4ef",
@@ -2750,8 +3978,10 @@
     "date": "2026-04-14T00:31:00.000Z",
     "duration": "17分 34秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-819e-a2a3-d8a9d971fb4e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "385240d07b5deaccd533c4de741f56ac",
@@ -2759,8 +3989,10 @@
     "date": "2026-04-13T11:12:00.000Z",
     "duration": "1時間 2分 3秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d1-a375-f80ba980350d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "385240d07b5deaccd533c4de741f56ac",
@@ -2768,8 +4000,10 @@
     "date": "2026-04-13T11:12:00.000Z",
     "duration": "1時間 2分 3秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81a9-a4cb-c69f88783ffb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "de78663e422441c3a0e959ac3fbd7100",
@@ -2777,8 +4011,10 @@
     "date": "2026-04-13T00:28:00.000Z",
     "duration": "20分 35秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815d-a7b5-d80d4ba8469d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "de78663e422441c3a0e959ac3fbd7100",
@@ -2786,8 +4022,12 @@
     "date": "2026-04-13T00:28:00.000Z",
     "duration": "20分 35秒",
     "status": "要約",
+    "tags": [
+      "新人"
+    ],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b5-bee0-f935af722476",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c632e9dcf84f298213ea40ee5436c28e",
@@ -2795,8 +4035,14 @@
     "date": "2026-04-10T06:59:00.000Z",
     "duration": "50分 42秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-8146-9cf8-e0f5b189184e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c5c749993921a669d447283261277799",
@@ -2804,8 +4050,14 @@
     "date": "2026-04-09T06:59:00.000Z",
     "duration": "1時間 14分 47秒",
     "status": "要約",
+    "tags": [
+      "基準"
+    ],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3600e7a5-35dc-81ec-af9e-f235acfc9a9f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4d19e137a387e437d8468bcdde9e6714",
@@ -2813,8 +4065,10 @@
     "date": "2026-04-06T08:57:00.000Z",
     "duration": "1時間 1分 48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8147-be28-f533eb6c035f",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4d19e137a387e437d8468bcdde9e6714",
@@ -2822,8 +4076,10 @@
     "date": "2026-04-06T08:57:00.000Z",
     "duration": "1時間 1分 48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8151-8c98-f3886263d3e3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "67bace683abda03611ce4faa6061a9f2",
@@ -2831,8 +4087,10 @@
     "date": "2026-04-06T07:52:00.000Z",
     "duration": "37分 39秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8160-877a-c0d97a038486",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "67bace683abda03611ce4faa6061a9f2",
@@ -2840,8 +4098,10 @@
     "date": "2026-04-06T07:52:00.000Z",
     "duration": "37分 39秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e1-967a-d73e7b67eac5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "39521182e1d7db532900c335f7396d2f",
@@ -2849,8 +4109,10 @@
     "date": "2026-04-03T06:00:00.000Z",
     "duration": "1時間 25分 41秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f6-bc10-c64f5663563b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "39521182e1d7db532900c335f7396d2f",
@@ -2858,8 +4120,10 @@
     "date": "2026-04-03T06:00:00.000Z",
     "duration": "1時間 25分 41秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81de-b079-fba50d159e50",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0a9b7e0ef70a1c5f1ec0cebbf2505533",
@@ -2867,8 +4131,10 @@
     "date": "2026-04-02T07:00:00.000Z",
     "duration": "41分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8108-b63f-dd6eaa70e177",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "0a9b7e0ef70a1c5f1ec0cebbf2505533",
@@ -2876,8 +4142,10 @@
     "date": "2026-04-02T07:00:00.000Z",
     "duration": "41分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8136-af64-d76d7f5b10d9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "09ab609ac1b591921a6bc39ef150231d",
@@ -2885,8 +4153,10 @@
     "date": "2026-04-01T07:16:00.000Z",
     "duration": "10分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c1-94ba-f8dcf7120f8b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "09ab609ac1b591921a6bc39ef150231d",
@@ -2894,8 +4164,10 @@
     "date": "2026-04-01T07:16:00.000Z",
     "duration": "10分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8170-a6a0-e3cd1e3af919",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ace9ce19df8ae69c4efcf821e3a3ecdb",
@@ -2903,8 +4175,10 @@
     "date": "2026-03-31T04:30:00.000Z",
     "duration": "1時間 13分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8122-9571-cee6f2c4fae1",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ace9ce19df8ae69c4efcf821e3a3ecdb",
@@ -2912,8 +4186,10 @@
     "date": "2026-03-31T04:30:00.000Z",
     "duration": "1時間 13分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81d7-8507-c7bf9a3fb260",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "87868eb7eb3ca38a7f43d9f5bd15f860",
@@ -2921,8 +4197,10 @@
     "date": "2026-03-30T06:59:00.000Z",
     "duration": "23分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b9-ad41-f9dd9d67a98f",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "87868eb7eb3ca38a7f43d9f5bd15f860",
@@ -2930,8 +4208,10 @@
     "date": "2026-03-30T06:59:00.000Z",
     "duration": "23分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81a6-bfe2-f9a837bfceca",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "deee694fc3b67793b81c8a24a8651760",
@@ -2939,8 +4219,10 @@
     "date": "2026-03-30T04:31:00.000Z",
     "duration": "36分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-814b-9c82-e5408ee5306a",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "deee694fc3b67793b81c8a24a8651760",
@@ -2948,8 +4230,10 @@
     "date": "2026-03-30T04:31:00.000Z",
     "duration": "36分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-812e-863b-d113ae7661af",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "92cb92ab014e00eefb5c542581eec4ca",
@@ -2957,8 +4241,10 @@
     "date": "2026-03-24T04:35:00.000Z",
     "duration": "45分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e7-9cc2-dc012b356a7b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "92cb92ab014e00eefb5c542581eec4ca",
@@ -2966,8 +4252,10 @@
     "date": "2026-03-24T04:35:00.000Z",
     "duration": "45分 6秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-814c-a4ba-cd30c4659d44",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b33d8726fc3537ee77a53558fdc36e74",
@@ -2975,8 +4263,10 @@
     "date": "2026-03-23T10:11:00.000Z",
     "duration": "6分 27秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a5-8507-fde9adabcc93",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b33d8726fc3537ee77a53558fdc36e74",
@@ -2984,8 +4274,10 @@
     "date": "2026-03-23T10:11:00.000Z",
     "duration": "6分 27秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81c8-b93d-d347a8b6fa7f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "82f478239eb7839d1e53644f0235d0b3",
@@ -2993,8 +4285,10 @@
     "date": "2026-03-23T04:01:00.000Z",
     "duration": "1時間 33分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f2-b698-d85b801816bb",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "82f478239eb7839d1e53644f0235d0b3",
@@ -3002,8 +4296,10 @@
     "date": "2026-03-23T04:01:00.000Z",
     "duration": "1時間 33分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-814a-8898-d0536a1bcee2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d43d1db436cf07dcccc0214742e66036",
@@ -3011,8 +4307,10 @@
     "date": "2026-03-19T08:16:00.000Z",
     "duration": "41分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-813d-99b5-f66c3ae7ba97",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d43d1db436cf07dcccc0214742e66036",
@@ -3020,8 +4318,10 @@
     "date": "2026-03-19T08:16:00.000Z",
     "duration": "41分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-817b-bcd0-c721d6f8697b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "34941bfa5c16926cc22e1ea192bc4744",
@@ -3029,8 +4329,10 @@
     "date": "2026-03-19T07:59:00.000Z",
     "duration": "39分 13秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e5-b7aa-fb8b8a9bd53b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "63978c023c20491727b0b835052a1c0f",
@@ -3038,8 +4340,10 @@
     "date": "2026-03-18T01:03:00.000Z",
     "duration": "18分 17秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8138-80a3-db28ac875aa9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "6bb47ce7d4659d153fec7b5a8cff15d9",
@@ -3047,8 +4351,10 @@
     "date": "2026-03-17T08:02:00.000Z",
     "duration": "52分 53秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81d5-8508-d57dd77dc3f3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f358b44321a5d36334485239aceafa8f",
@@ -3056,8 +4362,10 @@
     "date": "2026-03-17T01:20:00.000Z",
     "duration": "19分 8秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8113-9881-f60292db2915",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5f3bc4628a53eadeba993a513b55c8b9",
@@ -3065,8 +4373,10 @@
     "date": "2026-03-16T07:53:00.000Z",
     "duration": "10分 17秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-816d-8da4-cf1f2197c5e0",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5f3bc4628a53eadeba993a513b55c8b9",
@@ -3074,8 +4384,10 @@
     "date": "2026-03-16T07:53:00.000Z",
     "duration": "10分 17秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-817b-895b-dabbacb97350",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dacd49816f7e121363c22c389d727214",
@@ -3083,8 +4395,10 @@
     "date": "2026-03-16T06:02:00.000Z",
     "duration": "30分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815e-89e3-c806136b3835",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dacd49816f7e121363c22c389d727214",
@@ -3092,8 +4406,10 @@
     "date": "2026-03-16T06:02:00.000Z",
     "duration": "30分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b1-bd90-c7b8837c0263",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c804c19d8958f2baf9088ad1ba388d78",
@@ -3101,8 +4417,10 @@
     "date": "2026-03-12T04:04:00.000Z",
     "duration": "1時間 5分 31秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81fd-910b-cc524d9afff5",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c804c19d8958f2baf9088ad1ba388d78",
@@ -3110,8 +4428,10 @@
     "date": "2026-03-12T04:04:00.000Z",
     "duration": "1時間 5分 31秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81c0-bf75-f8c2aef032b9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9d55ef6a122ef492f8dd42a990d30b9c",
@@ -3119,8 +4439,10 @@
     "date": "2026-03-11T04:01:00.000Z",
     "duration": "49分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-812a-a356-d9c98c9afc2a",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9d55ef6a122ef492f8dd42a990d30b9c",
@@ -3128,8 +4450,10 @@
     "date": "2026-03-11T04:01:00.000Z",
     "duration": "49分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b9-8a7a-cface48a53df",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "39497d0e3dc372e23eaea4763211a976",
@@ -3137,8 +4461,10 @@
     "date": "2026-03-11T00:28:00.000Z",
     "duration": "42分 44秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815e-a29f-da3fea8e9d96",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "39497d0e3dc372e23eaea4763211a976",
@@ -3146,8 +4472,10 @@
     "date": "2026-03-11T00:28:00.000Z",
     "duration": "42分 44秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-811c-b042-caa39a31a7c3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "eabb7cab948f59c1e76b774313664d86",
@@ -3155,8 +4483,10 @@
     "date": "2026-03-10T06:03:00.000Z",
     "duration": "57分 45秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-812c-b86b-e24876e74ee1",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "eabb7cab948f59c1e76b774313664d86",
@@ -3164,8 +4494,10 @@
     "date": "2026-03-10T06:03:00.000Z",
     "duration": "57分 45秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-812b-9e9c-cbf27be08af3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3be1c1fa19a87aeb3247a030f122b06e",
@@ -3173,8 +4505,10 @@
     "date": "2026-03-10T03:59:00.000Z",
     "duration": "1時間 6分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-811c-80e4-d2c2ae23e2b7",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3be1c1fa19a87aeb3247a030f122b06e",
@@ -3182,8 +4516,10 @@
     "date": "2026-03-10T03:59:00.000Z",
     "duration": "1時間 6分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8165-a781-dc68409b7f0c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe7d1f862770bc5bded2f1f92484edf4",
@@ -3191,8 +4527,10 @@
     "date": "2026-03-10T01:09:00.000Z",
     "duration": "10分 18秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8173-8e7a-cfafc25098ff",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe7d1f862770bc5bded2f1f92484edf4",
@@ -3200,8 +4538,10 @@
     "date": "2026-03-10T01:09:00.000Z",
     "duration": "10分 18秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f9-bdc8-fc8acd833b0f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bcb9e58afb8b27ad3c6d4a9751a7cdd4",
@@ -3209,8 +4549,10 @@
     "date": "2026-03-09T06:01:00.000Z",
     "duration": "37分 3秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810a-9732-c3dc7a838714",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "08830dafbd81d8787c5129169992f12d",
@@ -3218,8 +4560,10 @@
     "date": "2026-03-09T04:30:00.000Z",
     "duration": "8分 15秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-818d-868a-ed04d7ba09f4",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "08830dafbd81d8787c5129169992f12d",
@@ -3227,8 +4571,10 @@
     "date": "2026-03-09T04:30:00.000Z",
     "duration": "8分 15秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8198-b7d5-c04a7cabfa36",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f3b402e83433943c842a6638da211a71",
@@ -3236,8 +4582,10 @@
     "date": "2026-03-07T04:06:00.000Z",
     "duration": "2時間 51分 12秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-b0b3-ed5cbd92f937",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f3b402e83433943c842a6638da211a71",
@@ -3245,8 +4593,10 @@
     "date": "2026-03-07T04:06:00.000Z",
     "duration": "2時間 51分 12秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e7-9ad7-ef380063df0c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "106571ce88fc8853c08e6183f1bc2eaa",
@@ -3254,8 +4604,10 @@
     "date": "2026-03-06T23:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81bb-bae7-f555f3005f62",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "106571ce88fc8853c08e6183f1bc2eaa",
@@ -3263,8 +4615,10 @@
     "date": "2026-03-06T23:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e2-aa99-cee6f7a15282",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2b4e0d5f09872138f5cf7933045927a9",
@@ -3272,8 +4626,10 @@
     "date": "2026-03-06T18:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8133-b8d5-f0f16c8b6e11",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2b4e0d5f09872138f5cf7933045927a9",
@@ -3281,8 +4637,10 @@
     "date": "2026-03-06T18:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8128-b0cd-c801272f12d5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "56188358fb8736b787da78ecc49bef21",
@@ -3290,8 +4648,10 @@
     "date": "2026-03-06T13:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-813f-be48-d8d5997c0f7b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "56188358fb8736b787da78ecc49bef21",
@@ -3299,8 +4659,10 @@
     "date": "2026-03-06T13:06:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8153-9cfc-d54dda86380a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "691ac2abf2c47f6c1b79631f8114d75d",
@@ -3308,8 +4670,10 @@
     "date": "2026-03-05T07:00:00.000Z",
     "duration": "1時間 21分 28秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81ef-ab8f-d606c02fdc87",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1ef376430c6e10e2770ce6629e11ee85",
@@ -3317,8 +4681,10 @@
     "date": "2026-03-05T05:03:00.000Z",
     "duration": "33分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ec-bd4c-ef932b57d5f5",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1ef376430c6e10e2770ce6629e11ee85",
@@ -3326,8 +4692,10 @@
     "date": "2026-03-05T05:03:00.000Z",
     "duration": "33分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8133-bc00-c4ffeaaaeaea",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f225f72942a7252d741280afc3be85bf",
@@ -3335,8 +4703,10 @@
     "date": "2026-03-04T04:08:00.000Z",
     "duration": "1時間 8分 56秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8128-869d-ea80316971c2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f225f72942a7252d741280afc3be85bf",
@@ -3344,8 +4714,10 @@
     "date": "2026-03-04T04:08:00.000Z",
     "duration": "1時間 8分 56秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8108-8e4e-e95c0492b6cc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "506cb6623134983ce2009ae9852964f9",
@@ -3353,8 +4725,10 @@
     "date": "2026-03-04T01:54:00.000Z",
     "duration": "1時間 4分 48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a2-99ac-cb30340a6c97",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "506cb6623134983ce2009ae9852964f9",
@@ -3362,8 +4736,10 @@
     "date": "2026-03-04T01:54:00.000Z",
     "duration": "1時間 4分 48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f3-b828-d3506d96507f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4e0f9f2b19b4e10caa0876b699a9b872",
@@ -3371,8 +4747,10 @@
     "date": "2026-03-04T00:31:00.000Z",
     "duration": "25分 11秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810a-b63f-ffbc48e10cab",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e3281f8795ce934e47aae0ef10f74ca3",
@@ -3380,8 +4758,10 @@
     "date": "2026-03-03T06:03:00.000Z",
     "duration": "53分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8164-b13e-cb45c1c08718",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "128efc3372fecba87e20afaf07dbaa93",
@@ -3389,8 +4769,10 @@
     "date": "2026-03-02T04:29:00.000Z",
     "duration": "1時間 5分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-814a-814d-d301c855c8c0",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "128efc3372fecba87e20afaf07dbaa93",
@@ -3398,8 +4780,10 @@
     "date": "2026-03-02T04:29:00.000Z",
     "duration": "1時間 5分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81a2-95ee-c51c13dd418f",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f13d5575b6f83ce6d201af2e1d1f6b5a",
@@ -3407,8 +4791,10 @@
     "date": "2026-03-02T02:14:00.000Z",
     "duration": "1時間 2分 30秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e3-abd6-e9191f93769e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f13d5575b6f83ce6d201af2e1d1f6b5a",
@@ -3416,8 +4802,10 @@
     "date": "2026-03-02T02:14:00.000Z",
     "duration": "1時間 2分 30秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8150-8380-e8f74f72474c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1319a37e9246947828839bbf21cdded7",
@@ -3425,8 +4813,10 @@
     "date": "2026-02-27T07:18:00.000Z",
     "duration": "32分 26秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8133-89ec-fd5a9aecc6fb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2f3a56777eb578d7480b7a26f4ba757b",
@@ -3434,8 +4824,10 @@
     "date": "2026-02-26T07:00:00.000Z",
     "duration": "1時間 35分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-817c-903a-cefd310da209",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3651ebb39408568eb937d8d14633840b",
@@ -3443,8 +4835,10 @@
     "date": "2026-02-26T05:01:00.000Z",
     "duration": "1時間 1分 10秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8185-827f-f5429ab2b331",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "618b25576b37bcb139c207c737cb4917",
@@ -3452,8 +4846,10 @@
     "date": "2026-02-26T02:16:00.000Z",
     "duration": "28分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8156-ad66-f32db7e9dca6",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1d1f6428afc235dc01c5cb9b73227adc",
@@ -3461,8 +4857,10 @@
     "date": "2026-02-25T07:06:00.000Z",
     "duration": "1時間 40分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819d-a4d9-c230c632c99a",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1d1f6428afc235dc01c5cb9b73227adc",
@@ -3470,8 +4868,10 @@
     "date": "2026-02-25T07:06:00.000Z",
     "duration": "1時間 40分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81c8-9c21-fd3587c52bae",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b5243836d1a73482b559d8e951b0b009",
@@ -3479,8 +4879,10 @@
     "date": "2026-02-24T08:19:00.000Z",
     "duration": "51分 50秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f4-8d10-ed40857a4424",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4a8358c6d77c848436e46cba61bc1681",
@@ -3488,8 +4890,10 @@
     "date": "2026-02-20T01:39:00.000Z",
     "duration": "55分 40秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-812e-8d13-e726ebf91741",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4a8358c6d77c848436e46cba61bc1681",
@@ -3497,8 +4901,10 @@
     "date": "2026-02-20T01:39:00.000Z",
     "duration": "55分 40秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8142-9c69-c056d1098798",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "81b613542ec626dedd0f356445a8ccc4",
@@ -3506,8 +4912,10 @@
     "date": "2026-02-19T07:01:00.000Z",
     "duration": "53分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8144-a237-f00bb1eac982",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "81b613542ec626dedd0f356445a8ccc4",
@@ -3515,8 +4923,10 @@
     "date": "2026-02-19T07:01:00.000Z",
     "duration": "53分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8130-a203-cfab60d5f2db",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "153a4fa3f5b0418e3e076f10cc16c588",
@@ -3524,8 +4934,10 @@
     "date": "2026-02-18T05:07:00.000Z",
     "duration": "1時間 57分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f2-a45d-e6e01afd0dc4",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "153a4fa3f5b0418e3e076f10cc16c588",
@@ -3533,8 +4945,10 @@
     "date": "2026-02-18T05:07:00.000Z",
     "duration": "1時間 57分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-818f-b449-f06b4423fa15",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4c4f505f2ee0e714f76b3647372b0b70",
@@ -3542,8 +4956,10 @@
     "date": "2026-02-18T02:28:00.000Z",
     "duration": "52分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8119-8ac8-de51c33e49a6",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4c4f505f2ee0e714f76b3647372b0b70",
@@ -3551,8 +4967,10 @@
     "date": "2026-02-18T02:28:00.000Z",
     "duration": "52分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f9-94ac-edcbe2576f2b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "19a834e5888df54890edd7a2472b5035",
@@ -3560,8 +4978,10 @@
     "date": "2026-02-17T05:01:00.000Z",
     "duration": "58分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-810b-80ab-ea5dacdd211b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "19a834e5888df54890edd7a2472b5035",
@@ -3569,8 +4989,10 @@
     "date": "2026-02-17T05:01:00.000Z",
     "duration": "58分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81cb-8ba2-ead8adb21b32",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "965e5d25b4ad2a2a318349ca1a0f5690",
@@ -3578,8 +5000,10 @@
     "date": "2026-02-17T04:37:00.000Z",
     "duration": "15分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ab-8598-d776d99a9422",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "965e5d25b4ad2a2a318349ca1a0f5690",
@@ -3587,8 +5011,10 @@
     "date": "2026-02-17T04:37:00.000Z",
     "duration": "15分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810d-b095-f94a836c6427",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "51eba97840003f1310a98923ccdbd632",
@@ -3596,8 +5022,10 @@
     "date": "2026-02-13T06:42:00.000Z",
     "duration": "17分 8秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8166-9517-df8ab34f4e52",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "51eba97840003f1310a98923ccdbd632",
@@ -3605,8 +5033,10 @@
     "date": "2026-02-13T06:42:00.000Z",
     "duration": "17分 8秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8156-bffe-cd8c4c7db824",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1963f6e9a4b98d4c5207bbbf5b881ee5",
@@ -3614,8 +5044,10 @@
     "date": "2026-02-13T06:01:00.000Z",
     "duration": "2分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8147-aedd-ea63a3d83e9e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1963f6e9a4b98d4c5207bbbf5b881ee5",
@@ -3623,8 +5055,10 @@
     "date": "2026-02-13T06:01:00.000Z",
     "duration": "2分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8107-b68f-e3d492ca2aeb",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b9db870722940b1252cd61fb33d3a419",
@@ -3632,8 +5066,10 @@
     "date": "2026-02-13T04:23:00.000Z",
     "duration": "26分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8130-b3b1-dbe3034a44a4",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b9db870722940b1252cd61fb33d3a419",
@@ -3641,8 +5077,10 @@
     "date": "2026-02-13T04:23:00.000Z",
     "duration": "26分 23秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8127-b245-cae89ee01ea9",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "11eeb99c8410ce35cab87bed012ae841",
@@ -3650,8 +5088,10 @@
     "date": "2026-02-09T05:27:00.000Z",
     "duration": "52分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d4-81f4-c5521c90d8ed",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "11eeb99c8410ce35cab87bed012ae841",
@@ -3659,8 +5099,10 @@
     "date": "2026-02-09T05:27:00.000Z",
     "duration": "52分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8140-964e-d55c82ff4906",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3b40d85848e9849c2ff34ae11d367811",
@@ -3668,8 +5110,10 @@
     "date": "2026-02-06T02:08:00.000Z",
     "duration": "51分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-814d-8c92-fa8cf0b6e1f2",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3b40d85848e9849c2ff34ae11d367811",
@@ -3677,8 +5121,10 @@
     "date": "2026-02-06T02:08:00.000Z",
     "duration": "51分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-812e-8866-d4d6c7b528a5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7c8dfcb739a65c44c5a6ff918b4d1232",
@@ -3686,8 +5132,10 @@
     "date": "2026-02-05T09:09:00.000Z",
     "duration": "1時間 23分 43秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8120-a745-f3db712e050e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7c8dfcb739a65c44c5a6ff918b4d1232",
@@ -3695,8 +5143,10 @@
     "date": "2026-02-05T09:09:00.000Z",
     "duration": "1時間 23分 43秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-813d-bd1b-c959103f381e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c28107a5a052cf4a5db0be57fd6283bc",
@@ -3704,8 +5154,10 @@
     "date": "2026-02-05T07:02:00.000Z",
     "duration": "53分 37秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-9358-d4b816a1f368",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c28107a5a052cf4a5db0be57fd6283bc",
@@ -3713,8 +5165,10 @@
     "date": "2026-02-05T07:02:00.000Z",
     "duration": "53分 37秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81c8-abbf-e7f695921570",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "517b1f2338390f42b497c3aa8fe97fe5",
@@ -3722,8 +5176,10 @@
     "date": "2026-02-05T05:01:00.000Z",
     "duration": "1時間 2分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815b-901e-c2a0754c34a6",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "517b1f2338390f42b497c3aa8fe97fe5",
@@ -3731,8 +5187,10 @@
     "date": "2026-02-05T05:01:00.000Z",
     "duration": "1時間 2分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-815a-8cb9-f6ee02b4f65d",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9f77f3988bfd8b2c36e9af58f1b3c4d4",
@@ -3740,8 +5198,10 @@
     "date": "2026-02-04T12:31:00.000Z",
     "duration": "20分 49秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815f-a776-da56b29374a4",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9f77f3988bfd8b2c36e9af58f1b3c4d4",
@@ -3749,8 +5209,10 @@
     "date": "2026-02-04T12:31:00.000Z",
     "duration": "20分 49秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f9-bcf5-e93d69d05e76",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d4231ef83b54ed274abcfa5e1272dcac",
@@ -3758,8 +5220,10 @@
     "date": "2026-02-04T07:31:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8154-8b40-eff79cf5e804",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d4231ef83b54ed274abcfa5e1272dcac",
@@ -3767,8 +5231,10 @@
     "date": "2026-02-04T07:31:00.000Z",
     "duration": "5時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8134-9fae-d3a2dd285a48",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b5e9f78d800fe14134227c34adbb6150",
@@ -3776,8 +5242,10 @@
     "date": "2026-02-03T04:08:00.000Z",
     "duration": "1時間 45分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8173-987b-c38e1c83e20a",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b5e9f78d800fe14134227c34adbb6150",
@@ -3785,8 +5253,10 @@
     "date": "2026-02-03T04:08:00.000Z",
     "duration": "1時間 45分 51秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b0-a590-e7bf87df6bf5",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "90d84965b496fa3472efa72c5b660b3c",
@@ -3794,8 +5264,10 @@
     "date": "2026-01-30T08:03:00.000Z",
     "duration": "1時間 7分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c5-95fb-f0e9d64d8415",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "90d84965b496fa3472efa72c5b660b3c",
@@ -3803,8 +5275,10 @@
     "date": "2026-01-30T08:03:00.000Z",
     "duration": "1時間 7分 38秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81dd-9dc7-cc2938a6de68",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2e348326741feaca92753304f2feb664",
@@ -3812,8 +5286,10 @@
     "date": "2026-01-30T05:08:00.000Z",
     "duration": "1時間 36分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8155-9917-f28a0dd1fe7e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2e348326741feaca92753304f2feb664",
@@ -3821,8 +5297,10 @@
     "date": "2026-01-30T05:08:00.000Z",
     "duration": "1時間 36分 20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8175-b0e6-f576e48f2f54",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d3bde8daf407269b205f705eeda1e67f",
@@ -3830,8 +5308,10 @@
     "date": "2026-01-29T07:00:00.000Z",
     "duration": "53分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8164-b901-c2e4b51dd777",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "68940a4a0eb3a8aea43ff7b48cee6108",
@@ -3839,8 +5319,10 @@
     "date": "2026-01-29T06:01:00.000Z",
     "duration": "5分 35秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810d-8bba-d93952743159",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3db1e112d07b06e61993c3f2d9ca1666",
@@ -3848,8 +5330,10 @@
     "date": "2026-01-29T05:29:00.000Z",
     "duration": "30分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81f3-bba9-ce9f54d017e4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "033afbfcbcecd0521c429dab7675755e",
@@ -3857,8 +5341,10 @@
     "date": "2026-01-28T08:50:00.000Z",
     "duration": "15分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a6-8fea-f9af81c54f71",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "033afbfcbcecd0521c429dab7675755e",
@@ -3866,8 +5352,10 @@
     "date": "2026-01-28T08:50:00.000Z",
     "duration": "15分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81bc-948d-fee4b11e2e1e",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "7c5b245c7c86e6cf354a873ceeb73a51",
@@ -3875,8 +5363,10 @@
     "date": "2026-01-28T05:02:00.000Z",
     "duration": "27分 25秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-812b-84d4-c30d4ff78fde",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a2d47848ffce7f3838e30a1ce56f03c1",
@@ -3884,8 +5374,10 @@
     "date": "2026-01-28T01:04:00.000Z",
     "duration": "1時間 57分 57秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-816c-a386-c978042ad4d0",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "a7bf2faa2f484fccd56bfed942448021",
@@ -3893,8 +5385,10 @@
     "date": "2026-01-27T09:17:00.000Z",
     "duration": "38分 24秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8181-bf2d-d2cdeb04e587",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "10a0816965971c58778b016c5b6cea5d",
@@ -3902,8 +5396,10 @@
     "date": "2026-01-27T04:51:00.000Z",
     "duration": "1時間 14分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8186-ac52-fbdbd7e81f30",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "10a0816965971c58778b016c5b6cea5d",
@@ -3911,8 +5407,10 @@
     "date": "2026-01-27T04:51:00.000Z",
     "duration": "1時間 14分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-817c-82de-c3e1fca4d344",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ff9390e30bab0aa3f822f65bb62f2c0f",
@@ -3920,8 +5418,10 @@
     "date": "2026-01-27T04:07:00.000Z",
     "duration": "19分 7秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819e-9415-d45563cc6bf7",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ff9390e30bab0aa3f822f65bb62f2c0f",
@@ -3929,8 +5429,10 @@
     "date": "2026-01-27T04:07:00.000Z",
     "duration": "19分 7秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8181-bb55-cc579ca56c83",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "717860292af6250d2df05947b86323dc",
@@ -3938,8 +5440,10 @@
     "date": "2026-01-23T09:03:00.000Z",
     "duration": "1時間 39分 26秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f7-8857-c28a1faff5a8",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "717860292af6250d2df05947b86323dc",
@@ -3947,8 +5451,10 @@
     "date": "2026-01-23T09:03:00.000Z",
     "duration": "1時間 39分 26秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81ee-892e-ca90a1063c38",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4ecc01f7a6a6e68dfd35a94e84a2b07b",
@@ -3956,8 +5462,10 @@
     "date": "2026-01-22T04:01:00.000Z",
     "duration": "3時間 4分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8157-8ef9-c02e5c06eab6",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "4ecc01f7a6a6e68dfd35a94e84a2b07b",
@@ -3965,8 +5473,10 @@
     "date": "2026-01-22T04:01:00.000Z",
     "duration": "3時間 4分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8128-9198-eef77f0f4787",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2d219cf2e4b497328d5d5e5a69d4691a",
@@ -3974,8 +5484,10 @@
     "date": "2026-01-22T02:03:00.000Z",
     "duration": "59分 35秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8134-a594-ed6cc9c629ea",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "2d219cf2e4b497328d5d5e5a69d4691a",
@@ -3983,8 +5495,10 @@
     "date": "2026-01-22T02:03:00.000Z",
     "duration": "59分 35秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8195-8e99-c5cc723f25a2",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cb3de3714285dd1998474df683b7c46c",
@@ -3992,8 +5506,10 @@
     "date": "2026-01-22T00:23:00.000Z",
     "duration": "1時間 29分 4秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c9-ad04-d437f7a65160",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "cb3de3714285dd1998474df683b7c46c",
@@ -4001,8 +5517,10 @@
     "date": "2026-01-22T00:23:00.000Z",
     "duration": "1時間 29分 4秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e8-92b7-c4dd484dec15",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f188c590e3ab53f748e8f967e8323d5e",
@@ -4010,8 +5528,10 @@
     "date": "2026-01-21T06:31:00.000Z",
     "duration": "49分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-815b-b58b-cf9a48580ba9",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f188c590e3ab53f748e8f967e8323d5e",
@@ -4019,8 +5539,10 @@
     "date": "2026-01-21T06:31:00.000Z",
     "duration": "49分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8106-9fbc-e2e6177d0804",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8bb0886e4216f172361e062b97302334",
@@ -4028,8 +5550,10 @@
     "date": "2026-01-21T05:01:00.000Z",
     "duration": "1時間 19分 57秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-818c-aa79-c86edca5b8d7",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "8bb0886e4216f172361e062b97302334",
@@ -4037,8 +5561,10 @@
     "date": "2026-01-21T05:01:00.000Z",
     "duration": "1時間 19分 57秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8179-9ae7-f16e085e5047",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "69ae35ddee61f4134618e2184dd5bd8c",
@@ -4046,8 +5572,10 @@
     "date": "2026-01-21T04:02:00.000Z",
     "duration": "47分 12秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8116-b8d9-ec80f437514d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "69ae35ddee61f4134618e2184dd5bd8c",
@@ -4055,8 +5583,10 @@
     "date": "2026-01-21T04:02:00.000Z",
     "duration": "47分 12秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8176-991a-ef5e325916ae",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e16114a8b607c8259037520f9509e9a1",
@@ -4064,8 +5594,10 @@
     "date": "2026-01-20T06:29:00.000Z",
     "duration": "1時間 8分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-813b-aade-ebf2d2bc505d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e16114a8b607c8259037520f9509e9a1",
@@ -4073,8 +5605,10 @@
     "date": "2026-01-20T06:29:00.000Z",
     "duration": "1時間 8分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81cf-86a3-e51401d76223",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fd39010a76cd1ba4cacd6021149e87e4",
@@ -4082,8 +5616,10 @@
     "date": "2026-01-20T05:06:00.000Z",
     "duration": "1時間 7分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8174-95c1-c8be92ee4972",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fd39010a76cd1ba4cacd6021149e87e4",
@@ -4091,8 +5627,10 @@
     "date": "2026-01-20T05:06:00.000Z",
     "duration": "1時間 7分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8166-b21f-f869ff474b13",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3d758976839a73916da42428bdbfcd33",
@@ -4100,8 +5638,10 @@
     "date": "2026-01-20T03:59:00.000Z",
     "duration": "56分 17秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d1-9a64-c87d9ffcb21b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3d758976839a73916da42428bdbfcd33",
@@ -4109,8 +5649,10 @@
     "date": "2026-01-20T03:59:00.000Z",
     "duration": "56分 17秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e3-a24d-f2419f4a6549",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "66fa558215d96cf3b9bc01e5df1c8a68",
@@ -4118,8 +5660,10 @@
     "date": "2026-01-19T01:00:00.000Z",
     "duration": "36分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b2-9bb1-f83f90f6c098",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "66fa558215d96cf3b9bc01e5df1c8a68",
@@ -4127,8 +5671,10 @@
     "date": "2026-01-19T01:00:00.000Z",
     "duration": "36分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81bb-8594-f327e770f407",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe0c0b69c5a7bc042c6ccc721473e38c",
@@ -4136,8 +5682,10 @@
     "date": "2026-01-16T09:00:00.000Z",
     "duration": "6分 50秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-bcab-d57c447c1f34",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe0c0b69c5a7bc042c6ccc721473e38c",
@@ -4145,8 +5693,10 @@
     "date": "2026-01-16T09:00:00.000Z",
     "duration": "6分 50秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8184-b5f2-d54e59237faa",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "54b4e676d8a4dc046ed077d2ccfb1eaf",
@@ -4154,8 +5704,10 @@
     "date": "2026-01-16T06:13:00.000Z",
     "duration": "2時間 0分 56秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f3-970a-ff18827c7b84",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "54b4e676d8a4dc046ed077d2ccfb1eaf",
@@ -4163,8 +5715,10 @@
     "date": "2026-01-16T06:13:00.000Z",
     "duration": "2時間 0分 56秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8174-92e4-f56eac9b3280",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d16eaa70876080dd75762eeb4fd32fce",
@@ -4172,8 +5726,10 @@
     "date": "2026-01-16T05:05:00.000Z",
     "duration": "1時間 7分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-818f-87d7-d1a2cdb6ae03",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d16eaa70876080dd75762eeb4fd32fce",
@@ -4181,8 +5737,10 @@
     "date": "2026-01-16T05:05:00.000Z",
     "duration": "1時間 7分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-816c-9def-c1da4da60866",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "27cd6acb1c867c54b505451b986326ee",
@@ -4190,8 +5748,10 @@
     "date": "2026-01-16T04:39:00.000Z",
     "duration": "15分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c0-847c-f8dc9c0ca58f",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "27cd6acb1c867c54b505451b986326ee",
@@ -4199,8 +5759,10 @@
     "date": "2026-01-16T04:39:00.000Z",
     "duration": "15分 55秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-819a-8e25-cc8ba406ba49",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "469e47b9c3cb6edc9fab0538f35685ae",
@@ -4208,8 +5770,10 @@
     "date": "2026-01-15T04:04:00.000Z",
     "duration": "54分 11秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c3-92cf-d57db4f0d2d8",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "469e47b9c3cb6edc9fab0538f35685ae",
@@ -4217,8 +5781,10 @@
     "date": "2026-01-15T04:04:00.000Z",
     "duration": "54分 11秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8160-8fa6-fed0bd23e4b3",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e6be992dd0bf7c7306b844541b9a3073",
@@ -4226,8 +5792,10 @@
     "date": "2025-12-24T04:05:00.000Z",
     "duration": "28分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c0-a53b-e62709639aad",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "e6be992dd0bf7c7306b844541b9a3073",
@@ -4235,8 +5803,10 @@
     "date": "2025-12-24T04:05:00.000Z",
     "duration": "28分 54秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b2-83f5-e74d8ea32f6a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "36ff002a7a3475b6aea12f9baccb7513",
@@ -4244,8 +5814,10 @@
     "date": "2025-12-23T01:13:00.000Z",
     "duration": "45分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819c-93a3-c071e576a67b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "36ff002a7a3475b6aea12f9baccb7513",
@@ -4253,8 +5825,10 @@
     "date": "2025-12-23T01:13:00.000Z",
     "duration": "45分 36秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81b8-a871-de3c08238e66",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fa5d069788ab4ab98507fee72a3b4875",
@@ -4262,8 +5836,10 @@
     "date": "2025-12-18T05:45:00.000Z",
     "duration": "1時間 25分 24秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8171-a2e0-d60f2a14f2bb",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fa5d069788ab4ab98507fee72a3b4875",
@@ -4271,8 +5847,10 @@
     "date": "2025-12-18T05:45:00.000Z",
     "duration": "1時間 25分 24秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81a7-90a7-d14418325a06",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "13ff9c09f4accc7f9d04b3479146004e",
@@ -4280,8 +5858,10 @@
     "date": "2025-12-18T01:29:00.000Z",
     "duration": "2時間 15分 30秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-8237-f29f01db913b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "13ff9c09f4accc7f9d04b3479146004e",
@@ -4289,8 +5869,10 @@
     "date": "2025-12-18T01:29:00.000Z",
     "duration": "2時間 15分 30秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8143-85f2-d51a79b69197",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bd10fb36272c3404aee85cea1d4958e6",
@@ -4298,8 +5880,10 @@
     "date": "2025-12-17T07:07:00.000Z",
     "duration": "2時間 31分 31秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a5-9bf9-ceda1b8829b9",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bd10fb36272c3404aee85cea1d4958e6",
@@ -4307,8 +5891,10 @@
     "date": "2025-12-17T07:07:00.000Z",
     "duration": "2時間 31分 31秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-814e-ab2a-fff9717c6233",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ddc746acfa153fc65ca5d2d86800f093",
@@ -4316,8 +5902,10 @@
     "date": "2025-12-17T07:03:00.000Z",
     "duration": "1時間 13分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-817c-ba1d-d41b5e152321",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "31e38e56d700d0d6b8aec068c55e6607",
@@ -4325,8 +5913,10 @@
     "date": "2025-12-17T07:03:00.000Z",
     "duration": "20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-816b-b8de-c2a6ef887edc",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ddc746acfa153fc65ca5d2d86800f093",
@@ -4334,8 +5924,10 @@
     "date": "2025-12-17T07:03:00.000Z",
     "duration": "1時間 13分 58秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8148-883c-e49ee9eb8788",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "31e38e56d700d0d6b8aec068c55e6607",
@@ -4343,8 +5935,10 @@
     "date": "2025-12-17T07:03:00.000Z",
     "duration": "20秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81d1-8681-fbd1cdcd1496",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3e7288b48619d8cbd0201b956e65ba06",
@@ -4352,8 +5946,10 @@
     "date": "2025-12-17T06:02:00.000Z",
     "duration": "8分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b5-bd8e-ea41ce4efb4a",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3e7288b48619d8cbd0201b956e65ba06",
@@ -4361,8 +5957,10 @@
     "date": "2025-12-17T06:02:00.000Z",
     "duration": "8分 14秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81bb-9bdb-d24009eead80",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe95ec70144585510da226ce7d907fca",
@@ -4370,8 +5968,10 @@
     "date": "2025-12-17T06:00:00.000Z",
     "duration": "48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d8-a475-cb5c87a689a5",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "fe95ec70144585510da226ce7d907fca",
@@ -4379,8 +5979,10 @@
     "date": "2025-12-17T06:00:00.000Z",
     "duration": "48秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-814c-aa34-c0e71a9939a1",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f594595097006784abeb4ea0e7868ef4",
@@ -4388,8 +5990,10 @@
     "date": "2025-12-15T05:11:00.000Z",
     "duration": "33分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-ac81-cc179d539908",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "f594595097006784abeb4ea0e7868ef4",
@@ -4397,8 +6001,10 @@
     "date": "2025-12-15T05:11:00.000Z",
     "duration": "33分 42秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8184-b2e1-f3213b7821af",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ca84b1524e7fd16f375bc50f60183903",
@@ -4406,8 +6012,10 @@
     "date": "2025-12-05T06:01:00.000Z",
     "duration": "45分 9秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ac-8847-f3c445d7b65e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "ca84b1524e7fd16f375bc50f60183903",
@@ -4415,8 +6023,10 @@
     "date": "2025-12-05T06:01:00.000Z",
     "duration": "45分 9秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8117-922d-ff08de7e6193",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "518d6dfcf10182a4e7c075f3419c3381",
@@ -4424,8 +6034,10 @@
     "date": "2025-12-03T04:42:00.000Z",
     "duration": "52分 13秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-bc40-f43e709f933f",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "518d6dfcf10182a4e7c075f3419c3381",
@@ -4433,8 +6045,10 @@
     "date": "2025-12-03T04:42:00.000Z",
     "duration": "52分 13秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8188-853b-ff0f133e7f39",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dee3cd7dd49c6306ee4fceafbadffc83",
@@ -4442,8 +6056,10 @@
     "date": "2025-12-01T08:32:00.000Z",
     "duration": "19分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8164-87a9-c3901f811718",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "dee3cd7dd49c6306ee4fceafbadffc83",
@@ -4451,8 +6067,10 @@
     "date": "2025-12-01T08:32:00.000Z",
     "duration": "19分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-810a-9a42-daf882b5c223",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3b01908fbfe2e65a074972104c4fa941",
@@ -4460,8 +6078,10 @@
     "date": "2025-11-30T04:01:00.000Z",
     "duration": "52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-a2e0-f9e6cf2e6051",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "3b01908fbfe2e65a074972104c4fa941",
@@ -4469,8 +6089,10 @@
     "date": "2025-11-30T04:01:00.000Z",
     "duration": "52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81a7-a21f-d4dc463ae936",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c2bfdc3bf8fcd2675462b12bb40e5097",
@@ -4478,8 +6100,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "1時間 21分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-818f-964a-d963f1a08fa8",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1edfa9c4d11e12461aa89b9c24436f1e",
@@ -4487,8 +6111,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "6分 10秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c6-b003-db8b92846a7e",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bbc92a148ba3d8186e347bb3b4af8091",
@@ -4496,8 +6122,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "4分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e7-8862-ff59fe2c6a93",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c2bfdc3bf8fcd2675462b12bb40e5097",
@@ -4505,8 +6133,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "1時間 21分 5秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81cf-ac5b-d2a766d63f92",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "1edfa9c4d11e12461aa89b9c24436f1e",
@@ -4514,8 +6144,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "6分 10秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-810d-9384-feeadd570452",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bbc92a148ba3d8186e347bb3b4af8091",
@@ -4523,8 +6155,10 @@
     "date": "2025-11-22T05:11:00.000Z",
     "duration": "4分 52秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-81c6-89c4-f9462e3a3ff7",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c1bc4c02101ba8904b86462e100bcd72",
@@ -4532,8 +6166,10 @@
     "date": "2025-11-20T07:23:00.000Z",
     "duration": "8分 44秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8183-b37c-ff8d6bc16874",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "c1bc4c02101ba8904b86462e100bcd72",
@@ -4541,8 +6177,10 @@
     "date": "2025-11-20T07:23:00.000Z",
     "duration": "8分 44秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-8176-8b62-c4ef3096c04c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "546d949a2de91b5f31555b120a2ddfb9",
@@ -4550,8 +6188,10 @@
     "date": "2025-11-20T07:02:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8118-a901-ff807051e28d",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "546d949a2de91b5f31555b120a2ddfb9",
@@ -4559,8 +6199,10 @@
     "date": "2025-11-20T07:02:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-8111-b12f-faf23c2c952c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bc16df6c941a6be10cd28a6b580f5004",
@@ -4568,8 +6210,10 @@
     "date": "2025-11-17T13:53:00.000Z",
     "duration": "10分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-810c-8482-d0147356318b",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "bc16df6c941a6be10cd28a6b580f5004",
@@ -4577,8 +6221,10 @@
     "date": "2025-11-17T13:53:00.000Z",
     "duration": "10分 33秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-81e9-bb31-cfc957ac3f8b",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d33ce4a0decdd8f66f6ac891c44c8ae3",
@@ -4586,8 +6232,10 @@
     "date": "2025-11-17T13:52:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-9e19-f5e41dd2dd31",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "d33ce4a0decdd8f66f6ac891c44c8ae3",
@@ -4595,8 +6243,10 @@
     "date": "2025-11-17T13:52:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-8115-bfd2-e1d5043dc8dc",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "283bed4dfdbf5c6591314d191c22cc9e",
@@ -4604,8 +6254,10 @@
     "date": "2025-11-13T07:20:00.000Z",
     "duration": "39分 7秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8153-ab9e-c2a143117231",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "283bed4dfdbf5c6591314d191c22cc9e",
@@ -4613,8 +6265,10 @@
     "date": "2025-11-13T07:20:00.000Z",
     "duration": "39分 7秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-817a-8ad2-fc43c876493c",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "91e2b1944bda7684fa9071ad2dc4cce7",
@@ -4622,8 +6276,10 @@
     "date": "2025-11-13T06:30:00.000Z",
     "duration": "33分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ce-b98e-d034438d4395",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "91e2b1944bda7684fa9071ad2dc4cce7",
@@ -4631,8 +6287,10 @@
     "date": "2025-11-13T06:30:00.000Z",
     "duration": "33分 1秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-816e-b388-f30bb5966b20",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9f20f451ee7bb050e0353f6a463aab0c",
@@ -4640,8 +6298,10 @@
     "date": "2025-11-13T05:49:00.000Z",
     "duration": "46分 25秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-810b-9e10-fb55db957053",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "9f20f451ee7bb050e0353f6a463aab0c",
@@ -4649,8 +6309,10 @@
     "date": "2025-11-13T05:49:00.000Z",
     "duration": "46分 25秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-812f-b9d2-d0ac9da01563",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5b6b20f89237f686e85e92b03dbfef53",
@@ -4658,8 +6320,10 @@
     "date": "2025-11-12T14:23:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-83be-e7c900d29761",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "5b6b20f89237f686e85e92b03dbfef53",
@@ -4667,8 +6331,10 @@
     "date": "2025-11-12T14:23:00.000Z",
     "duration": "1時間 0分 0秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "35f0e7a5-35dc-814e-a298-c42416e37eb4",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b51629d842a957fda9b1f84e1b242e32",
@@ -4676,8 +6342,10 @@
     "date": "2025-11-12T14:18:00.000Z",
     "duration": "45分 2秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3730e7a5-35dc-8106-816f-fd4269036898",
-    "updatedAt": "2026-08-29T09:18:55.609Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   },
   {
     "key": "b51629d842a957fda9b1f84e1b242e32",
@@ -4685,7 +6353,9 @@
     "date": "2025-11-12T14:18:00.000Z",
     "duration": "45分 2秒",
     "status": "要約",
+    "tags": [],
+    "permissions": [],
     "notionPageId": "3600e7a5-35dc-8152-9c09-d04b5a07187a",
-    "updatedAt": "2026-08-29T08:42:07.521Z"
+    "updatedAt": "2026-08-30T13:27:45.790Z"
   }
 ]
