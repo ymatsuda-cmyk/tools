@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
@@ -113,6 +113,7 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
+  target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, state))
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, state, el.dataset.field))
@@ -347,6 +348,29 @@ async function editTitle(target, item, state) {
 function updateRowTitle(item) {
   const titleEl = findRow(item.key)?.querySelector('.list-item-title')
   if (titleEl) titleEl.textContent = item.title
+}
+
+/**
+ * 状態を「再取得」にし、Mac mini側のバッチ処理(retranscribe.py)による
+ * 文字起こしのやり直しをリクエストする。楽観的に即バッジを更新し、
+ * 失敗時は元の状態に戻す。
+ */
+async function retranscribeItem(target, item, state) {
+  if (!confirm(`「${item.title}」を再文字起こし対象にしますか?\n状態が「再取得」に変わり、次回のバッチ処理で音声から文字起こしをやり直します。`)) return
+
+  const prev = item.status
+  item.status = '再取得' // 楽観的に即反映
+  updateRowBadge(item)
+  paintDetail(target, item, state)
+
+  try {
+    await requestRetranscribe(item.notionPageId)
+  } catch (err) {
+    item.status = prev
+    updateRowBadge(item)
+    paintDetail(target, item, state)
+    alert('状態の更新に失敗しました: ' + (err.message || err))
+  }
 }
 
 async function commitTags(target, item, state, nextTags) {

@@ -53,6 +53,11 @@ export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }
 
+/** 状態を「再取得」にし、次回バッチでの文字起こしやり直しをリクエストする */
+export function requestRetranscribe(pageId) {
+  return callGas('requestRetranscribe', { pageId })
+}
+
 /** 人手編集の保存。要約日時・モデル・状態は変更されない */
 export function saveDetail(pageId, cardSummary, detail) {
   return callGas('saveDetail', { pageId, cardSummary, detail })

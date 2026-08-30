@@ -117,6 +117,7 @@ export function renderDetailHtml(item, state) {
     return header + `<p class="error-text">${escapeHtml(state.message)}</p>
       <div class="actions-row">
         <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
+        <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       </div>`
   }
@@ -130,6 +131,7 @@ export function renderDetailHtml(item, state) {
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
       <div class="actions-row">
         <button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>
+        <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       </div>
     `
@@ -180,6 +182,7 @@ export function renderDetailHtml(item, state) {
     ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     <div class="actions-row">
       <button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>
+      <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       <span style="flex:1"></span>
       <span style="font-size:11px;color:var(--text-muted);align-self:center">${escapeHtml(s.model || '')}</span>
