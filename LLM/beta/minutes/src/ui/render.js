@@ -1,8 +1,8 @@
 /**
- * ツールバー(月ナビ / タグフィルタ)を描画する。
+ * ツールバー(月ナビ / 権限フィルタ[管理者のみ] / タグフィルタ)を描画する。
  * 検索欄とタグ表示トグルはトップバーの永続DOMに移したためここには含まない
  * (毎回作り直すと入力中にフォーカスが外れるため)。
- * handlers: { onPrevMonth, onNextMonth, onToggleTag(tag) }
+ * handlers: { onPrevMonth, onNextMonth, onToggleTag(tag), onTogglePermission(perm) }
  */
 export function renderToolbar(container, state, handlers) {
   container.innerHTML = `
@@ -14,6 +14,11 @@ export function renderToolbar(container, state, handlers) {
           <button class="month-next btn-ghost" aria-label="翌月"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
+      ${state.permissionOptions?.length ? `<div class="tag-filter-row permission-filter-row">${state.permissionOptions.map((o) => `
+        <span class="tag-chip filter-chip perm-filter-chip ${o.selected ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}" data-perm="${escapeHtml(o.tag)}">
+          ${escapeHtml(o.tag)}${o.selected ? '<i class="ti ti-x" aria-hidden="true"></i>' : ''}
+        </span>
+      `).join('')}</div>` : ''}
       ${state.tagOptions.length ? `<div class="tag-filter-row">${state.tagOptions.map((o) => `
         <span class="tag-chip filter-chip ${o.selected ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}" data-tag="${escapeHtml(o.tag)}">
           ${escapeHtml(o.tag)}${o.selected ? '<i class="ti ti-x" aria-hidden="true"></i>' : ''}
@@ -24,8 +29,11 @@ export function renderToolbar(container, state, handlers) {
 
   container.querySelector('.month-prev').addEventListener('click', handlers.onPrevMonth)
   container.querySelector('.month-next').addEventListener('click', handlers.onNextMonth)
-  container.querySelectorAll('.filter-chip:not(.disabled)').forEach((el) => {
+  container.querySelectorAll('.filter-chip:not(.perm-filter-chip):not(.disabled)').forEach((el) => {
     el.addEventListener('click', () => handlers.onToggleTag(el.dataset.tag))
+  })
+  container.querySelectorAll('.perm-filter-chip:not(.disabled)').forEach((el) => {
+    el.addEventListener('click', () => handlers.onTogglePermission(el.dataset.perm))
   })
 }
 
@@ -91,7 +99,13 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
       </div>
     `
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('row-select')) return
+      if (selectable) {
+        if (e.target.classList.contains('row-select')) return // チェックボックス自身のクリックはブラウザ標準の動作に任せる
+        const checkbox = row.querySelector('.row-select')
+        checkbox.checked = !checkbox.checked
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }))
+        return
+      }
       onSelect(item, row)
     })
     container.appendChild(row)
@@ -122,7 +136,7 @@ function tagsHtml(tags, canEdit) {
 
 export function renderDetailHtml(item, state) {
   const editBtn = (field, label) =>
-    state.canEdit
+    state.canEditContent
       ? `<button class="btn-ghost btn-edit" data-field="${field}" aria-label="${label}を編集"><i class="ti ti-edit" aria-hidden="true"></i></button>`
       : ''
 
@@ -157,7 +171,7 @@ export function renderDetailHtml(item, state) {
     return header + `
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
       <div class="actions-row">
-        <button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>
+        ${state.canEdit ? '<button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       </div>
@@ -201,14 +215,14 @@ export function renderDetailHtml(item, state) {
     <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
     ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
       <label class="todo-row ${t.done ? 'done' : ''}">
-        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEdit ? '' : 'disabled'} />
+        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
         <span>${escapeHtml(t.text)}</span>
       </label>
     `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     <div class="section-label">論点${editBtn('topics', '論点')}</div>
     ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     <div class="actions-row">
-      <button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>
+      ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
       ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       <span style="flex:1"></span>

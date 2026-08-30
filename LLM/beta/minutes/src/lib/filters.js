@@ -7,6 +7,26 @@ export function allKnownTags(items) {
   return [...set].sort()
 }
 
+/** 一覧に出ている権限の候補をAND絞り込み用に組み立てる(タグ候補と同じロジック) */
+export function buildPermissionOptions(baseItems, selectedPermissions) {
+  const all = new Set()
+  baseItems.forEach((i) => (i.permissions || []).forEach((p) => all.add(p)))
+
+  return [...all].sort().map((perm) => {
+    const selected = selectedPermissions.has(perm)
+    const candidate = new Set(selectedPermissions)
+    candidate.add(perm)
+    const count = baseItems.filter((i) => [...candidate].every((p) => (i.permissions || []).includes(p))).length
+    return { tag: perm, selected, disabled: !selected && count === 0 }
+  })
+}
+
+/** 選択した権限をすべて含む(AND)アイテムのみ。管理者の絞り込み専用UIで使う */
+export function filterByPermissionTags(items, selectedPermissions) {
+  if (!selectedPermissions.size) return items
+  return items.filter((i) => [...selectedPermissions].every((p) => (i.permissions || []).includes(p)))
+}
+
 /** 選択した状態のいずれかに一致するものだけ(未選択なら全件通す) */
 export function filterByStatus(items, selectedStatuses) {
   if (!selectedStatuses.size) return items

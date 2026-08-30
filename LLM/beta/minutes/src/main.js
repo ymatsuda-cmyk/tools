@@ -4,7 +4,7 @@ import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
-import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -20,6 +20,7 @@ const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
 let searchQuery = ''
 const selectedTags = new Set()
+const selectedPermissionFilters = new Set() // 管理者専用の権限フィルタ(タグの前段)
 const selectedStatuses = new Set() // 空 = 全ステータス表示
 let assignMode = false // 管理者の権限一括割り当てモード
 const selectedIds = new Set() // 一括割り当ての選択中キー(全期間をまたいで保持する)
@@ -71,8 +72,9 @@ function visibleItems() {
 function currentFilteredItems() {
   const byMonth = filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
-  const byTags = filterByTags(byMonthAndSearch, selectedTags)
-  return filterByStatus(byTags, selectedStatuses)
+  const byStatus = filterByStatus(byMonthAndSearch, selectedStatuses)
+  const byPerm = filterByPermissionTags(byStatus, selectedPermissionFilters)
+  return filterByTags(byPerm, selectedTags)
 }
 
 function refresh() {
@@ -88,17 +90,24 @@ function refresh() {
   const scoped = assignMode ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(scoped, searchQuery)
   const baseItems = filterByStatus(byMonthAndSearch, selectedStatuses) // タグ絞り込み前(タグ候補の母集団)
-  const filteredItems = filterByTags(baseItems, selectedTags)
-  const tagOptions = buildTagOptions(baseItems, selectedTags)
+  const byPerm = admin ? filterByPermissionTags(baseItems, selectedPermissionFilters) : baseItems
+  const filteredItems = filterByTags(byPerm, selectedTags)
+  const tagOptions = buildTagOptions(byPerm, selectedTags)
+  const permissionOptions = admin ? buildPermissionOptions(baseItems, selectedPermissionFilters) : []
 
   renderToolbar(toolbarEl, {
     monthLabel: assignMode ? '全期間' : monthLabelOf(currentMonthKey),
     tagOptions,
+    permissionOptions,
   }, {
     onPrevMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
     onNextMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
     onToggleTag: (tag) => {
       selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
+      refresh()
+    },
+    onTogglePermission: (perm) => {
+      selectedPermissionFilters.has(perm) ? selectedPermissionFilters.delete(perm) : selectedPermissionFilters.add(perm)
       refresh()
     },
   })
@@ -162,7 +171,8 @@ function paintDetail(target, item, state) {
   target.innerHTML = renderDetailHtml(item, {
     ...state,
     tags: tagsByKey[item.notionPageId],
-    canEdit: isAdmin(loadConfig()),
+    canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
+    canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
   })
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
@@ -594,6 +604,14 @@ function openSettings() {
         <input id="cfg-llm-key" value="${profile.apiKey}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
         <label style="font-size:12px;color:var(--text-secondary)">モデル名</label>
         <input id="cfg-llm-model" value="${profile.model}" style="width:100%;margin-bottom:16px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+        <details style="margin-bottom:12px">
+          <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
+          <textarea id="cfg-json" rows="6" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button id="cfg-json-export" class="btn" style="font-size:12px">現在の設定を書き出す</button>
+            <button id="cfg-json-import" class="btn" style="font-size:12px">この内容を反映</button>
+          </div>
+        </details>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button id="cfg-cancel" class="btn">キャンセル</button>
           <button id="cfg-save" class="btn">保存</button>
@@ -602,6 +620,38 @@ function openSettings() {
     </div>
   `
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
+
+  document.getElementById('cfg-json-export').addEventListener('click', () => {
+    const json = {
+      gasUrl: document.getElementById('cfg-gas').value.trim(),
+      notionToken: document.getElementById('cfg-token').value.trim(),
+      code: document.getElementById('cfg-code').value.trim(),
+      llm: {
+        baseUrl: document.getElementById('cfg-llm-url').value.trim(),
+        apiKey: document.getElementById('cfg-llm-key').value.trim(),
+        model: document.getElementById('cfg-llm-model').value.trim(),
+      },
+    }
+    document.getElementById('cfg-json').value = JSON.stringify(json, null, 2)
+  })
+
+  document.getElementById('cfg-json-import').addEventListener('click', () => {
+    let parsed
+    try {
+      parsed = JSON.parse(document.getElementById('cfg-json').value)
+    } catch (err) {
+      alert('JSONの形式が不正です: ' + (err.message || err))
+      return
+    }
+    if (parsed.gasUrl !== undefined) document.getElementById('cfg-gas').value = parsed.gasUrl
+    if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
+    if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
+    if (parsed.llm?.baseUrl !== undefined) document.getElementById('cfg-llm-url').value = parsed.llm.baseUrl
+    if (parsed.llm?.apiKey !== undefined) document.getElementById('cfg-llm-key').value = parsed.llm.apiKey
+    if (parsed.llm?.model !== undefined) document.getElementById('cfg-llm-model').value = parsed.llm.model
+    if (parsed.code) document.getElementById('cfg-verify').click()
+    alert('反映しました。内容を確認して「保存」を押してください。')
+  })
 
   let verifiedRole = config.role
   document.getElementById('cfg-verify').addEventListener('click', async () => {
@@ -817,18 +867,22 @@ async function applyPermissions(mode) {
 
   // GASの6分上限に収まるよう小さめに分割して送る
   const CHUNK = 20
+  const chunks = []
+  for (let i = 0; i < targets.length; i += CHUNK) chunks.push(targets.slice(i, i + CHUNK))
+
   let updated = 0
   const errors = []
-  for (let i = 0; i < targets.length; i += CHUNK) {
-    const chunk = targets.slice(i, i + CHUNK)
+  for (let i = 0; i < chunks.length; i++) {
+    paintBulkProgress({ current: i + 1, total: chunks.length, title: `${label}中(${chunks[i].length}件ずつ処理)`, done: updated, failed: errors.length, errors: [] })
     try {
-      const res = await savePermissions(chunk.map((t) => t.notionPageId), [value], mode)
+      const res = await savePermissions(chunks[i].map((t) => t.notionPageId), [value], mode)
       updated += res.updated
       if (res.errors?.length) errors.push(...res.errors)
     } catch (err) {
       errors.push(String(err.message || err))
     }
   }
+  paintBulkProgress({ finished: true, total: targets.length, done: updated, failed: errors.length, errors })
 
   // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
   targets.forEach((t) => {
@@ -841,7 +895,6 @@ async function applyPermissions(mode) {
   selectedIds.clear()
   refresh()
   paintAssignBar()
-  alert(errors.length ? `${updated}件を更新、${errors.length}件失敗\n${errors.slice(0, 5).join('\n')}` : `${updated}件を更新しました`)
 }
 
 document.getElementById('assign-permission').addEventListener('click', toggleAssignMode)

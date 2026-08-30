@@ -171,6 +171,8 @@ body {
 }
 .show-tags-toggle input { cursor: pointer; }
 
+.perm-filter-chip.selected { background: #EEEDFE; border-color: #7F77DD; color: #3C3489; }
+
 .tag-filter-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .filter-chip { cursor: pointer; user-select: none; }
 .filter-chip.selected { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); }
