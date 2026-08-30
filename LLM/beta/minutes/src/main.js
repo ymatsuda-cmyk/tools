@@ -4,7 +4,7 @@ import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
-import { filterByMonth, filterBySearch, filterByTags, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, filterByStatus, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -20,6 +20,7 @@ const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
 let searchQuery = ''
 const selectedTags = new Set()
+const selectedStatuses = new Set() // 空 = 全ステータス表示
 let showTags = false
 
 function monthKeyOf(date) {
@@ -63,12 +64,14 @@ async function loadIndex() {
 function currentFilteredItems() {
   const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
-  return filterByTags(byMonthAndSearch, selectedTags)
+  const byTags = filterByTags(byMonthAndSearch, selectedTags)
+  return filterByStatus(byTags, selectedStatuses)
 }
 
 function refresh() {
   const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
-  const baseItems = filterBySearch(byMonth, searchQuery) // タグ絞り込み前(タグ候補の母集団)
+  const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
+  const baseItems = filterByStatus(byMonthAndSearch, selectedStatuses) // タグ絞り込み前(タグ候補の母集団)
   const filteredItems = filterByTags(baseItems, selectedTags)
   const tagOptions = buildTagOptions(baseItems, selectedTags)
 
@@ -691,6 +694,14 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 document.getElementById('show-tags-checkbox').addEventListener('change', (e) => {
   showTags = e.target.checked
   refresh()
+})
+document.querySelectorAll('.status-filter-chip').forEach((el) => {
+  el.addEventListener('click', () => {
+    const status = el.dataset.status
+    selectedStatuses.has(status) ? selectedStatuses.delete(status) : selectedStatuses.add(status)
+    el.classList.toggle('selected')
+    refresh()
+  })
 })
 
 loadIndex()

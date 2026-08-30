@@ -7,6 +7,12 @@ export function allKnownTags(items) {
   return [...set].sort()
 }
 
+/** 選択した状態のいずれかに一致するものだけ(未選択なら全件通す) */
+export function filterByStatus(items, selectedStatuses) {
+  if (!selectedStatuses.size) return items
+  return items.filter((i) => selectedStatuses.has(i.status))
+}
+
 /** 状態が「削除」のものを除外する */
 export function excludeDeleted(items) {
   return items.filter((i) => i.status !== '削除')
