@@ -30,6 +30,7 @@ var PROP_MODEL     = '要約モデル'; // 生成に使ったモデル名 (rich_
 var PROP_GENERATED = '要約日時';   // 生成日時、鮮度判定に使用 (date)
 var PROP_STATUS    = '状態';       // 進捗ステータス (select)
 var STATUS_SUMMARIZED = '要約';    // 要約生成完了時にセットする値
+var STATUS_RETRANSCRIBE = '再取得'; // 再文字起こしをMac mini側バッチに依頼する際にセットする値
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
@@ -60,6 +61,9 @@ function doPost(e) {
         break;
       case 'saveDetail':
         result = saveDetail_(body.pageId, body.cardSummary, body.detail);
+        break;
+      case 'requestRetranscribe':
+        result = requestRetranscribe_(body.pageId);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -246,6 +250,17 @@ function saveDetail_(pageId, cardSummary, detail) {
 
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true };
+}
+
+/**
+ * 状態を「再取得」に変更する。実際の音声再取得・再文字起こしはここでは行わず、
+ * Mac mini側のバッチ処理がこの状態を見て後続処理を行う想定。
+ */
+function requestRetranscribe_(pageId) {
+  var props = {};
+  props[PROP_STATUS] = { select: { name: STATUS_RETRANSCRIBE } };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, status: STATUS_RETRANSCRIBE };
 }
 
 /** ミーティング名(title プロパティ)を更新する */
