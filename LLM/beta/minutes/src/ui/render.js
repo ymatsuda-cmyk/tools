@@ -44,7 +44,8 @@ function groupKey(iso) {
 /**
  * 一覧を描画する。onSelect(item, itemEl) がクリック時に呼ばれる。
  */
-export function renderList(container, items, selectedKey, onSelect, showTags = false) {
+export function renderList(container, items, selectedKey, onSelect, showTags = false, opts = {}) {
+  const { showPermissions = false, selectable = false, selectedIds = new Set() } = opts
   container.innerHTML = ''
   const sorted = [...items].sort((a, b) => new Date(b.date) - new Date(a.date))
 
@@ -63,13 +64,25 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
       ? `<div class="list-item-tags">${item.tags.map((t) => `<span class="tag-chip small">${escapeHtml(t)}</span>`).join('')}</div>`
       : ''
 
+    const permBadge = showPermissions
+      ? ((item.permissions || []).length
+          ? (item.permissions || []).map((p) => `<span class="perm-chip">${escapeHtml(p)}</span>`).join('')
+          : '<span class="perm-chip none">未設定</span>')
+      : ''
+
+    const checkbox = selectable
+      ? `<input type="checkbox" class="row-select" data-key="${escapeHtml(item.key)}" ${selectedIds.has(item.key) ? 'checked' : ''} />`
+      : ''
+
     const row = document.createElement('div')
     row.className = 'list-item' + (item.key === selectedKey ? ' selected' : '')
     row.dataset.key = item.key
+    if (selectable) row.classList.add('selectable')
     row.innerHTML = `
+      ${checkbox}
       <div class="list-item-time">${fmtTime(item.date)}</div>
       <div class="list-item-body">
-        <div class="list-item-title">${escapeHtml(item.title)}</div>
+        <div class="list-item-title">${escapeHtml(item.title)}${permBadge}</div>
         <div class="list-item-meta">
           <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
           ${escapeHtml(item.duration || '')}
@@ -77,7 +90,10 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
         ${tagsLine}
       </div>
     `
-    row.addEventListener('click', () => onSelect(item, row))
+    row.addEventListener('click', (e) => {
+      if (e.target.classList.contains('row-select')) return
+      onSelect(item, row)
+    })
     container.appendChild(row)
   }
 
@@ -90,23 +106,34 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
  * 詳細ペインの中身を組み立てて返す(HTML文字列)。
  * state.phase: 'loading' | 'no-summary' | 'ready' | 'generating' | 'error'
  */
-function tagsHtml(tags) {
+function tagsHtml(tags, canEdit) {
   if (tags === undefined) return ''
   const chips = tags.map((t) =>
-    `<span class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<i class="ti ti-x tag-remove" aria-hidden="true"></i></span>`
+    canEdit
+      ? `<span class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<i class="ti ti-x tag-remove" aria-hidden="true"></i></span>`
+      : `<span class="tag-chip">${escapeHtml(t)}</span>`
   ).join('')
-  return `<div class="tag-row">${chips}<button class="tag-add-btn" aria-label="タグを追加"><i class="ti ti-plus" aria-hidden="true"></i></button></div>`
+  const addBtn = canEdit
+    ? '<button class="tag-add-btn" aria-label="タグを追加"><i class="ti ti-plus" aria-hidden="true"></i></button>'
+    : ''
+  if (!chips && !addBtn) return ''
+  return `<div class="tag-row">${chips}${addBtn}</div>`
 }
 
 export function renderDetailHtml(item, state) {
+  const editBtn = (field, label) =>
+    state.canEdit
+      ? `<button class="btn-ghost btn-edit" data-field="${field}" aria-label="${label}を編集"><i class="ti ti-edit" aria-hidden="true"></i></button>`
+      : ''
+
   const header = `
     <div class="detail-header">
       <span class="detail-title">${escapeHtml(item.title)}</span>
-      <button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>
+      ${state.canEdit ? '<button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>' : ''}
       <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
     </div>
     <div class="detail-meta">${fmtDate(item.date)} ${fmtTime(item.date)} · ${escapeHtml(item.duration || '')}</div>
-    ${tagsHtml(state.tags)}
+    ${tagsHtml(state.tags, state.canEdit)}
   `
 
   if (state.phase === 'loading') {
@@ -117,7 +144,7 @@ export function renderDetailHtml(item, state) {
     return header + `<p class="error-text">${escapeHtml(state.message)}</p>
       <div class="actions-row">
         <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
-        <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
+        ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       </div>`
   }
@@ -131,7 +158,7 @@ export function renderDetailHtml(item, state) {
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
       <div class="actions-row">
         <button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>
-        <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
+        ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       </div>
     `
@@ -145,7 +172,7 @@ export function renderDetailHtml(item, state) {
   const topics = s.detail?.topics || []
 
   const agendaHtml = agenda.length ? `
-    <div class="section-label">議事<button class="btn-ghost btn-edit" data-field="agenda" aria-label="議事を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    <div class="section-label">議事${editBtn('agenda', '議事')}</div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
@@ -155,7 +182,7 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}
     </div>
-  ` : `<div class="section-label">議事<button class="btn-ghost btn-edit" data-field="agenda" aria-label="議事を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+  ` : `<div class="section-label">議事${editBtn('agenda', '議事')}</div>
        <p class="empty-section">未登録</p>`
 
   const doneCount = todos.filter((t) => t.done).length
@@ -166,23 +193,23 @@ export function renderDetailHtml(item, state) {
       <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
       <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
     </div>
-    <div class="section-label">サマリ<button class="btn-ghost btn-edit" data-field="cardSummary" aria-label="サマリを編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
     <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
     ${agendaHtml}
-    <div class="section-label">決定事項<button class="btn-ghost btn-edit" data-field="decisions" aria-label="決定事項を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
     ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
-    <div class="section-label">ToDo<button class="btn-ghost btn-edit" data-field="todos" aria-label="ToDoを編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
     ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
       <label class="todo-row ${t.done ? 'done' : ''}">
-        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} />
+        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEdit ? '' : 'disabled'} />
         <span>${escapeHtml(t.text)}</span>
       </label>
     `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
-    <div class="section-label">論点<button class="btn-ghost btn-edit" data-field="topics" aria-label="論点を編集"><i class="ti ti-edit" aria-hidden="true"></i></button></div>
+    <div class="section-label">論点${editBtn('topics', '論点')}</div>
     ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     <div class="actions-row">
       <button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>
-      <button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>
+      ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
       <span style="flex:1"></span>
       <span style="font-size:11px;color:var(--text-muted);align-self:center">${escapeHtml(s.model || '')}</span>

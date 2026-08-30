@@ -34,6 +34,8 @@ var STATUS_RETRANSCRIBE = '再取得'; // 再文字起こしをMac mini側バッ
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
+var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
+var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
 
 // ============ エントリーポイント ============
 
@@ -41,6 +43,13 @@ function doPost(e) {
   var result;
   try {
     var body = JSON.parse(e.postData.contents);
+
+    // コード検証だけは共有トークン不要で受ける
+    // (初回はまだトークンが手元に無い状態で権限を問い合わせるため)
+    if (body.action === 'verifyCode') {
+      return jsonOutput_({ ok: true, data: verifyCode_(body.code) });
+    }
+
     assertToken_(body);
 
     switch (body.action) {
@@ -64,6 +73,9 @@ function doPost(e) {
         break;
       case 'requestRetranscribe':
         result = requestRetranscribe_(body.pageId);
+        break;
+      case 'savePermissions':
+        result = savePermissions_(body.pageIds, body.permissions, body.mode);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -261,6 +273,81 @@ function requestRetranscribe_(pageId) {
   props[PROP_STATUS] = { select: { name: STATUS_RETRANSCRIBE } };
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true, status: STATUS_RETRANSCRIBE };
+}
+
+/**
+ * スクリプトプロパティ "code" からコードと権限の対応を引く。
+ * 書式は1行1組の "コード:権限"。該当が無ければ 'err' を返す。
+ *   xynekgo:jba
+ *   sdajoihn:kijun
+ *   dfkjnga:xYz
+ */
+function verifyCode_(code) {
+  var raw = PropertiesService.getScriptProperties().getProperty('code') || '';
+  var input = String(code || '').trim();
+  if (!input) return { role: 'err' };
+
+  var lines = raw.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var sep = line.indexOf(':');
+    if (sep === -1) continue;
+    if (line.slice(0, sep).trim() === input) {
+      var role = line.slice(sep + 1).trim();
+      return { role: role, isAdmin: role === ADMIN_ROLE };
+    }
+  }
+  return { role: 'err' };
+}
+
+/** multi_select プロパティから権限名の配列を取り出す */
+function permissionsOf_(properties) {
+  var prop = properties[PROP_PERMISSION];
+  if (!prop || !prop.multi_select) return [];
+  return prop.multi_select.map(function (o) { return o.name; });
+}
+
+/**
+ * 複数ページの権限をまとめて更新する。
+ * mode: 'add' 既存に追加 / 'remove' 指定分を除去 / 'replace' 置き換え
+ * 6分の実行上限に収めるため、フロント側から適度な件数で分割して呼ぶこと。
+ */
+function savePermissions_(pageIds, permissions, mode) {
+  var ids = Array.isArray(pageIds) ? pageIds : [];
+  var names = (Array.isArray(permissions) ? permissions : []).filter(Boolean);
+  var op = mode || 'add';
+  var updated = 0;
+  var errors = [];
+
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      var next;
+      if (op === 'replace') {
+        next = names;
+      } else {
+        var page = notionFetch_('pages/' + ids[i], 'get');
+        var current = permissionsOf_(page.properties);
+        if (op === 'remove') {
+          next = current.filter(function (c) { return names.indexOf(c) === -1; });
+        } else {
+          next = current.slice();
+          names.forEach(function (n) { if (next.indexOf(n) === -1) next.push(n); });
+        }
+      }
+
+      var props = {};
+      props[PROP_PERMISSION] = {
+        multi_select: next.map(function (name) { return { name: name }; }),
+      };
+      notionFetch_('pages/' + ids[i], 'patch', { properties: props });
+      updated++;
+    } catch (err) {
+      errors.push(ids[i] + ': ' + (err.message || err));
+    }
+  }
+
+  return { updated: updated, failed: errors.length, errors: errors };
 }
 
 /** ミーティング名(title プロパティ)を更新する */

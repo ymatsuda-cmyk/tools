@@ -180,6 +180,20 @@ body {
 .tag-chip.small { font-size: 10px; padding: 1px 7px; }
 .list-item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 
+.perm-chip {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: #EEEDFE;
+  color: #3C3489;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.perm-chip.none { background: transparent; border: 0.5px dashed var(--border-strong); color: var(--text-muted); }
+
+.list-item.selectable { grid-template-columns: 22px 40px minmax(0, 1fr); }
+.row-select { margin-top: 11px; cursor: pointer; }
+
 .list-item {
   display: grid;
   grid-template-columns: 40px 1fr;

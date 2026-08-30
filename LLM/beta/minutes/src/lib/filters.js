@@ -13,6 +13,16 @@ export function filterByStatus(items, selectedStatuses) {
   return items.filter((i) => selectedStatuses.has(i.status))
 }
 
+/**
+ * 閲覧権限による絞り込み。管理者(xYz)は全件通す。
+ * 表示上の出し分けであり、セキュリティ境界ではない点に注意。
+ */
+export function filterByPermission(items, role) {
+  if (role === 'xYz') return items
+  if (!role || role === 'err') return []
+  return items.filter((i) => (i.permissions || []).includes(role))
+}
+
 /** 状態が「削除」のものを除外する */
 export function excludeDeleted(items) {
   return items.filter((i) => i.status !== '削除')

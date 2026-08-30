@@ -53,6 +53,27 @@ export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }
 
+/**
+ * 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため)。
+ * @returns {Promise<{role: string, isAdmin: boolean}>}
+ */
+export async function verifyCode(gasUrl, code) {
+  const res = await fetch(gasUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'verifyCode', code }),
+  })
+  if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
+  const json = await res.json()
+  if (!json.ok) throw new Error(json.error || 'GAS がエラーを返しました')
+  return json.data
+}
+
+/** 複数ページの権限をまとめて更新する。mode: 'add' | 'remove' | 'replace' */
+export function savePermissions(pageIds, permissions, mode = 'add') {
+  return callGas('savePermissions', { pageIds, permissions, mode })
+}
+
 /** 状態を「再取得」にし、次回バッチでの文字起こしやり直しをリクエストする */
 export function requestRetranscribe(pageId) {
   return callGas('requestRetranscribe', { pageId })

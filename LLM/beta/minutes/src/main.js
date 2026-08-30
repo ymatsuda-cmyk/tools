@@ -1,10 +1,10 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
-import { loadConfig, saveConfig, isConfigured } from './lib/minutes-config.js'
+import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
-import { filterByMonth, filterBySearch, filterByTags, filterByStatus, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, buildTagOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -21,6 +21,8 @@ let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
 let searchQuery = ''
 const selectedTags = new Set()
 const selectedStatuses = new Set() // 空 = 全ステータス表示
+let assignMode = false // 管理者の権限一括割り当てモード
+const selectedIds = new Set() // 一括割り当ての選択中キー(全期間をまたいで保持する)
 let showTags = false
 
 function monthKeyOf(date) {
@@ -61,34 +63,81 @@ async function loadIndex() {
  * フィルタ状態(月・検索・タグ)に基づいて一覧とツールバーを再描画する。
  * タグの選択可否は「月・検索を適用した後、AND追加しても0件にならないか」で判定する。
  */
+/** 権限フィルタと削除除外を適用した、この利用者が見てよい全期間の議事録 */
+function visibleItems() {
+  return filterByPermission(excludeDeleted(items), loadConfig().role)
+}
+
 function currentFilteredItems() {
-  const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
+  const byMonth = filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
   const byTags = filterByTags(byMonthAndSearch, selectedTags)
   return filterByStatus(byTags, selectedStatuses)
 }
 
 function refresh() {
-  const byMonth = filterByMonth(excludeDeleted(items), currentMonthKey)
-  const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
+  const config = loadConfig()
+  const admin = isAdmin(config)
+
+  if (isDenied(config)) {
+    renderDenied()
+    return
+  }
+
+  // 割り当てモードでは全期間から選べるようにするため月フィルタを外す
+  const scoped = assignMode ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
+  const byMonthAndSearch = filterBySearch(scoped, searchQuery)
   const baseItems = filterByStatus(byMonthAndSearch, selectedStatuses) // タグ絞り込み前(タグ候補の母集団)
   const filteredItems = filterByTags(baseItems, selectedTags)
   const tagOptions = buildTagOptions(baseItems, selectedTags)
 
   renderToolbar(toolbarEl, {
-    monthLabel: monthLabelOf(currentMonthKey),
+    monthLabel: assignMode ? '全期間' : monthLabelOf(currentMonthKey),
     tagOptions,
   }, {
-    onPrevMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
-    onNextMonth: () => { currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
+    onPrevMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
+    onNextMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
     onToggleTag: (tag) => {
       selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
       refresh()
     },
   })
 
-  renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags)
+  renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags, {
+    showPermissions: admin,
+    selectable: assignMode,
+    selectedIds,
+  })
+
+  if (assignMode) {
+    listItemsEl.querySelectorAll('.row-select').forEach((el) => {
+      el.addEventListener('change', () => {
+        el.checked ? selectedIds.add(el.dataset.key) : selectedIds.delete(el.dataset.key)
+        paintAssignBar()
+      })
+    })
+  }
+
+  document.getElementById('bulk-summarize').style.display = admin ? '' : 'none'
+  document.getElementById('assign-permission').style.display = admin ? '' : 'none'
+
   syncStatusEl.textContent = `${filteredItems.length}件`
+}
+
+/** 権限が無いときは一覧・詳細を出さずメッセージのみ表示する */
+function renderDenied() {
+  toolbarEl.innerHTML = ''
+  listItemsEl.innerHTML = ''
+  detailEl.innerHTML = `
+    <div class="empty-state">
+      <i class="ti ti-lock" aria-hidden="true"></i>
+      <p>権限がないため表示できません</p>
+      <p style="font-size:12px">設定画面でコードを入力してください</p>
+    </div>
+  `
+  syncStatusEl.textContent = ''
+  document.getElementById('bulk-summarize').style.display = 'none'
+  document.getElementById('assign-permission').style.display = 'none'
 }
 
 /**
@@ -110,7 +159,11 @@ function detailTarget(rowEl) {
 }
 
 function paintDetail(target, item, state) {
-  target.innerHTML = renderDetailHtml(item, { ...state, tags: tagsByKey[item.notionPageId] })
+  target.innerHTML = renderDetailHtml(item, {
+    ...state,
+    tags: tagsByKey[item.notionPageId],
+    canEdit: isAdmin(loadConfig()),
+  })
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
@@ -529,6 +582,12 @@ function openSettings() {
         <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
         <label style="font-size:12px;color:var(--text-secondary)">共有トークン</label>
         <input id="cfg-token" value="${config.notionToken}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+        <label style="font-size:12px;color:var(--text-secondary)">コード</label>
+        <div style="display:flex;gap:6px;margin-bottom:4px">
+          <input id="cfg-code" value="${config.code}" style="flex:1;min-width:0;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+          <button id="cfg-verify" class="btn">確認</button>
+        </div>
+        <div id="cfg-role" style="font-size:11px;margin-bottom:10px">${roleLabel(config.role)}</div>
         <label style="font-size:12px;color:var(--text-secondary)">LLM baseUrl</label>
         <input id="cfg-llm-url" value="${profile.baseUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
         <label style="font-size:12px;color:var(--text-secondary)">LLM APIキー</label>
@@ -543,11 +602,29 @@ function openSettings() {
     </div>
   `
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
+
+  let verifiedRole = config.role
+  document.getElementById('cfg-verify').addEventListener('click', async () => {
+    const gasUrl = document.getElementById('cfg-gas').value.trim()
+    const code = document.getElementById('cfg-code').value.trim()
+    const roleEl = document.getElementById('cfg-role')
+    if (!gasUrl) { roleEl.innerHTML = '<span style="color:var(--text-danger)">GAS URLを先に入力してください</span>'; return }
+    roleEl.textContent = '確認中...'
+    try {
+      const res = await verifyCode(gasUrl, code)
+      verifiedRole = res.role
+      roleEl.innerHTML = roleLabel(res.role)
+    } catch (err) {
+      roleEl.innerHTML = `<span style="color:var(--text-danger)">${escapeHtml(String(err.message || err))}</span>`
+    }
+  })
   document.getElementById('cfg-save').addEventListener('click', () => {
     saveConfig({
       ...config,
       gasUrl: document.getElementById('cfg-gas').value.trim(),
       notionToken: document.getElementById('cfg-token').value.trim(),
+      code: document.getElementById('cfg-code').value.trim(),
+      role: verifiedRole,
     })
 
     const p = { ...profile,
@@ -559,7 +636,16 @@ function openSettings() {
     saveSettings({ ...settings, profiles: nextProfiles, activeId: p.id })
 
     root.innerHTML = ''
+    refresh()
   })
+}
+
+/** 認証結果の表示ラベル */
+function roleLabel(role) {
+  if (!role) return '<span style="color:var(--text-muted)">未確認</span>'
+  if (role === 'err') return '<span style="color:var(--text-danger)">権限がありません</span>'
+  if (role === 'xYz') return '<span style="color:var(--text-accent)">管理者 — 全機能</span>'
+  return `<span style="color:var(--text-success)">権限: ${escapeHtml(role)}</span>`
 }
 
 // --- 一括要約 ---
@@ -684,6 +770,81 @@ function paintBulkProgress(state) {
 }
 
 document.getElementById('bulk-summarize').addEventListener('click', runBulkSummarize)
+
+// --- 権限の一括割り当て(管理者のみ) ---
+const assignBarEl = document.getElementById('assign-bar')
+
+function toggleAssignMode() {
+  assignMode = !assignMode
+  selectedIds.clear()
+  refresh()
+  paintAssignBar()
+}
+
+function paintAssignBar() {
+  if (!assignMode) {
+    assignBarEl.innerHTML = ''
+    return
+  }
+  // 権限の選択肢は既存データから集め、新規入力もできるようにする
+  const known = new Set(['xYz'])
+  items.forEach((i) => (i.permissions || []).forEach((p) => known.add(p)))
+
+  assignBarEl.innerHTML = `
+    <div class="bulk-bar">
+      <span class="bulk-status">${selectedIds.size}件を選択中 — 全期間から選べます</span>
+      <div style="flex:1"></div>
+      <input id="assign-value" list="assign-options" placeholder="権限" style="width:110px;font-size:12px;padding:5px 8px" />
+      <datalist id="assign-options">${[...known].sort().map((p) => `<option value="${escapeHtml(p)}"></option>`).join('')}</datalist>
+      <button class="btn" id="assign-add">割り当て</button>
+      <button class="btn" id="assign-remove">解除</button>
+      <button class="btn" id="assign-exit">終了</button>
+    </div>
+  `
+  document.getElementById('assign-add').addEventListener('click', () => applyPermissions('add'))
+  document.getElementById('assign-remove').addEventListener('click', () => applyPermissions('remove'))
+  document.getElementById('assign-exit').addEventListener('click', toggleAssignMode)
+}
+
+async function applyPermissions(mode) {
+  const value = document.getElementById('assign-value').value.trim()
+  if (!value) { alert('権限を入力してください'); return }
+  if (!selectedIds.size) { alert('対象を選択してください'); return }
+
+  const targets = items.filter((i) => selectedIds.has(i.key))
+  const label = mode === 'add' ? '割り当て' : '解除'
+  if (!confirm(`${targets.length}件に「${value}」を${label}します。よろしいですか?`)) return
+
+  // GASの6分上限に収まるよう小さめに分割して送る
+  const CHUNK = 20
+  let updated = 0
+  const errors = []
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const chunk = targets.slice(i, i + CHUNK)
+    try {
+      const res = await savePermissions(chunk.map((t) => t.notionPageId), [value], mode)
+      updated += res.updated
+      if (res.errors?.length) errors.push(...res.errors)
+    } catch (err) {
+      errors.push(String(err.message || err))
+    }
+  }
+
+  // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
+  targets.forEach((t) => {
+    const current = t.permissions || []
+    t.permissions = mode === 'add'
+      ? [...new Set([...current, value])]
+      : current.filter((p) => p !== value)
+  })
+
+  selectedIds.clear()
+  refresh()
+  paintAssignBar()
+  alert(errors.length ? `${updated}件を更新、${errors.length}件失敗\n${errors.slice(0, 5).join('\n')}` : `${updated}件を更新しました`)
+}
+
+document.getElementById('assign-permission').addEventListener('click', toggleAssignMode)
 
 // 検索欄とタグ表示トグルは再生成しない永続DOMなので、初回に一度だけ結線する。
 // (毎回 innerHTML で作り直すと入力のたびにフォーカスが外れ、1文字しか打てなくなる)
