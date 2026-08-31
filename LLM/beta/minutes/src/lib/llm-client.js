@@ -23,6 +23,8 @@ export async function fetchModels(s, signal) {
 }
 
 export async function* streamChat(s, messages, signal) {
+  const isOllamaLike = s.baseUrl?.includes('ngrok')
+
   const res = await fetch(`${s.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: headers(s),
@@ -31,9 +33,11 @@ export async function* streamChat(s, messages, signal) {
       model: s.model,
       messages,
       stream: true,
-      num_ctx: s.numCtx,
       temperature: s.temperature,
-      ...(typeof s.think === 'boolean' ? { think: s.think } : {}),
+      // num_ctx はOllama独自のパラメータ。OpenAI互換API標準には存在せず、
+      // Gemini等に送ると「Unknown name "num_ctx"」でHTTP 400になる。
+      ...(isOllamaLike ? { num_ctx: s.numCtx } : {}),
+      ...(isOllamaLike && typeof s.think === 'boolean' ? { think: s.think } : {}),
     }),
   })
 
