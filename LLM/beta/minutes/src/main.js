@@ -1055,12 +1055,6 @@ function setupResizeHandle() {
   handle.addEventListener('touchstart', onDown, { passive: true })
 }
 
-restoreListWidth()
-setupResizeHandle()
-setupDetailZoom()
-
-loadIndex()
-
 // --- 詳細エリアのズーム(他のエリアには影響させない) ---
 const DETAIL_ZOOM_KEY = 'minutes:detailZoom'
 const ZOOM_MIN = 0.8
@@ -1088,3 +1082,9 @@ function setupDetailZoom() {
     apply()
   })
 }
+
+restoreListWidth()
+setupResizeHandle()
+setupDetailZoom()
+
+loadIndex()
