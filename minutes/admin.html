@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>議事録ビューア</title>
+<link rel="stylesheet" href="./css/styles.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2/dist/tabler-icons.min.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <i class="ti ti-microphone" aria-hidden="true"></i>
+    <span class="app-title">議事録</span>
+    <span id="sync-status" class="sync-status"></span>
+    <div class="search-box">
+      <i class="ti ti-search" aria-hidden="true"></i>
+      <input type="text" id="search-input" class="search-input" placeholder="要約を検索" />
+    </div>
+    <label class="show-tags-toggle">
+      <input type="checkbox" id="show-tags-checkbox" />
+      <span>タグ表示</span>
+    </label>
+    <button id="bulk-summarize" class="btn-ghost" aria-label="一括要約"><i class="ti ti-sparkles" aria-hidden="true"></i></button>
+    <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
+  </header>
+
+  <div id="bulk-progress"></div>
+
+  <main class="layout">
+    <aside id="list" class="list-pane">
+      <div id="toolbar"></div>
+      <div id="list-items"></div>
+    </aside>
+    <section id="detail" class="detail-pane">
+      <div class="empty-state">
+        <i class="ti ti-file-text" aria-hidden="true"></i>
+        <p>左の一覧から議事録を選んでください</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

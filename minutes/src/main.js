@@ -581,14 +581,12 @@ document.getElementById('open-settings').addEventListener('click', openSettings)
 function openSettings() {
   const config = loadConfig()
   const settings = loadSettings()
-  // 下書き。ここで編集し、保存時にまとめて反映する(キャンセル時は破棄)
-  const draftProfiles = settings.profiles.length ? settings.profiles.map((p) => ({ ...p })) : [newProfile()]
-  let draftActiveId = settings.activeId || draftProfiles[0].id
+  const profile = settings.profiles[0] || newProfile()
 
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10">
-      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:380px;max-width:90vw;max-height:85vh;overflow-y:auto">
+      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:320px;max-width:90vw">
         <h2 style="font-size:15px;margin:0 0 12px">設定</h2>
         <label style="font-size:12px;color:var(--text-secondary)">GAS URL</label>
         <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
@@ -599,17 +597,16 @@ function openSettings() {
           <input id="cfg-code" value="${config.code}" style="flex:1;min-width:0;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
           <button id="cfg-verify" class="btn">確認</button>
         </div>
-        <div id="cfg-role" style="font-size:11px;margin-bottom:14px">${roleLabel(config.role)}</div>
-
-        <div style="display:flex;align-items:center;margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text-secondary);flex:1">AI接続プロファイル</label>
-          <button id="cfg-llm-add" class="btn" style="font-size:11px;padding:3px 9px">+ 追加</button>
-        </div>
-        <div id="cfg-llm-list"></div>
-
-        <details style="margin:12px 0">
+        <div id="cfg-role" style="font-size:11px;margin-bottom:10px">${roleLabel(config.role)}</div>
+        <label style="font-size:12px;color:var(--text-secondary)">LLM baseUrl</label>
+        <input id="cfg-llm-url" value="${profile.baseUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+        <label style="font-size:12px;color:var(--text-secondary)">LLM APIキー</label>
+        <input id="cfg-llm-key" value="${profile.apiKey}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+        <label style="font-size:12px;color:var(--text-secondary)">モデル名</label>
+        <input id="cfg-llm-model" value="${profile.model}" style="width:100%;margin-bottom:16px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
+        <details style="margin-bottom:12px">
           <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
-          <textarea id="cfg-json" rows="8" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
+          <textarea id="cfg-json" rows="6" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
           <div style="display:flex;gap:8px;margin-top:6px">
             <button id="cfg-json-export" class="btn" style="font-size:12px">現在の設定を書き出す</button>
             <button id="cfg-json-import" class="btn" style="font-size:12px">この内容を反映</button>
@@ -622,58 +619,6 @@ function openSettings() {
       </div>
     </div>
   `
-
-  /** プロファイル一覧を描画。各カードは開閉式で、使用中はラジオで選ぶ */
-  function paintProfiles() {
-    const listEl = document.getElementById('cfg-llm-list')
-    listEl.innerHTML = draftProfiles.map((p, i) => `
-      <div class="profile-card ${p.id === draftActiveId ? 'active' : ''}" style="border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <input type="radio" name="cfg-active" class="profile-active" data-id="${p.id}" ${p.id === draftActiveId ? 'checked' : ''} />
-          <input type="text" class="profile-label" data-id="${p.id}" value="${escapeHtml(p.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
-          ${draftProfiles.length > 1 ? `<button class="btn profile-delete" data-id="${p.id}" style="font-size:11px;padding:3px 7px">削除</button>` : ''}
-        </div>
-        <input type="text" class="profile-baseurl" data-id="${p.id}" value="${escapeHtml(p.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-apikey" data-id="${p.id}" value="${escapeHtml(p.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-model" data-id="${p.id}" value="${escapeHtml(p.model)}" placeholder="モデル名 (例: gemini-2.5-flash)" style="width:100%;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-      </div>
-    `).join('')
-
-    listEl.querySelectorAll('.profile-active').forEach((el) => {
-      el.addEventListener('change', () => {
-        draftActiveId = el.dataset.id
-        listEl.querySelectorAll('.profile-card').forEach((c) => c.classList.remove('active'))
-        el.closest('.profile-card').classList.add('active')
-      })
-    })
-    listEl.querySelectorAll('.profile-label, .profile-baseurl, .profile-apikey, .profile-model').forEach((el) => {
-      el.addEventListener('input', () => {
-        const p = draftProfiles.find((p) => p.id === el.dataset.id)
-        if (!p) return
-        if (el.classList.contains('profile-label')) p.label = el.value
-        if (el.classList.contains('profile-baseurl')) p.baseUrl = el.value
-        if (el.classList.contains('profile-apikey')) p.apiKey = el.value
-        if (el.classList.contains('profile-model')) p.model = el.value
-      })
-    })
-    listEl.querySelectorAll('.profile-delete').forEach((el) => {
-      el.addEventListener('click', () => {
-        const idx = draftProfiles.findIndex((p) => p.id === el.dataset.id)
-        if (idx === -1) return
-        draftProfiles.splice(idx, 1)
-        if (draftActiveId === el.dataset.id) draftActiveId = draftProfiles[0].id
-        paintProfiles()
-      })
-    })
-  }
-  paintProfiles()
-
-  document.getElementById('cfg-llm-add').addEventListener('click', () => {
-    const p = newProfile({ label: `プロファイル${draftProfiles.length + 1}` })
-    draftProfiles.push(p)
-    paintProfiles()
-  })
-
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
 
   document.getElementById('cfg-json-export').addEventListener('click', () => {
@@ -681,8 +626,11 @@ function openSettings() {
       gasUrl: document.getElementById('cfg-gas').value.trim(),
       notionToken: document.getElementById('cfg-token').value.trim(),
       code: document.getElementById('cfg-code').value.trim(),
-      llmProfiles: draftProfiles.map(({ label, baseUrl, apiKey, model }) => ({ label, baseUrl, apiKey, model })),
-      activeLlmLabel: draftProfiles.find((p) => p.id === draftActiveId)?.label,
+      llm: {
+        baseUrl: document.getElementById('cfg-llm-url').value.trim(),
+        apiKey: document.getElementById('cfg-llm-key').value.trim(),
+        model: document.getElementById('cfg-llm-model').value.trim(),
+      },
     }
     document.getElementById('cfg-json').value = JSON.stringify(json, null, 2)
   })
@@ -698,15 +646,9 @@ function openSettings() {
     if (parsed.gasUrl !== undefined) document.getElementById('cfg-gas').value = parsed.gasUrl
     if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
     if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
-
-    if (Array.isArray(parsed.llmProfiles) && parsed.llmProfiles.length) {
-      draftProfiles.length = 0
-      parsed.llmProfiles.forEach((p) => draftProfiles.push(newProfile(p)))
-      const match = draftProfiles.find((p) => p.label === parsed.activeLlmLabel)
-      draftActiveId = match ? match.id : draftProfiles[0].id
-      paintProfiles()
-    }
-
+    if (parsed.llm?.baseUrl !== undefined) document.getElementById('cfg-llm-url').value = parsed.llm.baseUrl
+    if (parsed.llm?.apiKey !== undefined) document.getElementById('cfg-llm-key').value = parsed.llm.apiKey
+    if (parsed.llm?.model !== undefined) document.getElementById('cfg-llm-model').value = parsed.llm.model
     if (parsed.code) document.getElementById('cfg-verify').click()
     alert('反映しました。内容を確認して「保存」を押してください。')
   })
@@ -735,7 +677,13 @@ function openSettings() {
       role: verifiedRole,
     })
 
-    saveSettings({ ...settings, profiles: draftProfiles, activeId: draftActiveId })
+    const p = { ...profile,
+      baseUrl: document.getElementById('cfg-llm-url').value.trim(),
+      apiKey: document.getElementById('cfg-llm-key').value.trim(),
+      model: document.getElementById('cfg-llm-model').value.trim(),
+    }
+    const nextProfiles = settings.profiles.length ? [p, ...settings.profiles.slice(1)] : [p]
+    saveSettings({ ...settings, profiles: nextProfiles, activeId: p.id })
 
     root.innerHTML = ''
     refresh()

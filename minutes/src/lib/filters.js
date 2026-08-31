@@ -1,0 +1,92 @@
+import { getDetailCache } from './cache.js'
+
+/** index.json 全体から既知のタグを集める(タグ選択モーダルの候補に使う) */
+export function allKnownTags(items) {
+  const set = new Set()
+  items.forEach((i) => (i.tags || []).forEach((t) => set.add(t)))
+  return [...set].sort()
+}
+
+/** 一覧に出ている権限の候補をAND絞り込み用に組み立てる(タグ候補と同じロジック) */
+export function buildPermissionOptions(baseItems, selectedPermissions) {
+  const all = new Set()
+  baseItems.forEach((i) => (i.permissions || []).forEach((p) => all.add(p)))
+
+  return [...all].sort().map((perm) => {
+    const selected = selectedPermissions.has(perm)
+    const candidate = new Set(selectedPermissions)
+    candidate.add(perm)
+    const count = baseItems.filter((i) => [...candidate].every((p) => (i.permissions || []).includes(p))).length
+    return { tag: perm, selected, disabled: !selected && count === 0 }
+  })
+}
+
+/** 選択した権限をすべて含む(AND)アイテムのみ。管理者の絞り込み専用UIで使う */
+export function filterByPermissionTags(items, selectedPermissions) {
+  if (!selectedPermissions.size) return items
+  return items.filter((i) => [...selectedPermissions].every((p) => (i.permissions || []).includes(p)))
+}
+
+/** 選択した状態のいずれかに一致するものだけ(未選択なら全件通す) */
+export function filterByStatus(items, selectedStatuses) {
+  if (!selectedStatuses.size) return items
+  return items.filter((i) => selectedStatuses.has(i.status))
+}
+
+/**
+ * 閲覧権限による絞り込み。管理者(xYz)は全件通す。
+ * 表示上の出し分けであり、セキュリティ境界ではない点に注意。
+ */
+export function filterByPermission(items, role) {
+  if (role === 'xYz') return items
+  if (!role || role === 'err') return []
+  return items.filter((i) => (i.permissions || []).includes(role))
+}
+
+/** 状態が「削除」のものを除外する */
+export function excludeDeleted(items) {
+  return items.filter((i) => i.status !== '削除')
+}
+
+/** items のうち year-month(0始まりではなく "YYYY-MM") が一致するものだけ */
+export function filterByMonth(items, monthKey) {
+  return items.filter((i) => i.date.slice(0, 7) === monthKey)
+}
+
+/** タイトルとキャッシュ済み要約(cardSummary)だけを対象にした検索。本文は含まない */
+export function filterBySearch(items, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return items
+  return items.filter((i) => {
+    if (i.title.toLowerCase().includes(q)) return true
+    const cache = getDetailCache(i.key)
+    return Boolean(cache?.cardSummary?.toLowerCase().includes(q))
+  })
+}
+
+/** 選択タグをすべて含む(AND)アイテムのみ */
+export function filterByTags(items, selectedTags) {
+  if (!selectedTags.size) return items
+  return items.filter((i) => {
+    const tags = i.tags || []
+    return [...selectedTags].every((t) => tags.includes(t))
+  })
+}
+
+/**
+ * ツールバー用のタグ候補を、選択可否付きで組み立てる。
+ * baseItems(タグ絞り込み前、月・検索は適用済み)から
+ * 「そのタグを追加選択したら該当件数」を数え、0件なら選択不可にする。
+ */
+export function buildTagOptions(baseItems, selectedTags) {
+  const allTags = new Set()
+  baseItems.forEach((i) => (i.tags || []).forEach((t) => allTags.add(t)))
+
+  return [...allTags].sort().map((tag) => {
+    const selected = selectedTags.has(tag)
+    const candidate = new Set(selectedTags)
+    candidate.add(tag)
+    const count = filterByTags(baseItems, candidate).length
+    return { tag, selected, disabled: !selected && count === 0 }
+  })
+}

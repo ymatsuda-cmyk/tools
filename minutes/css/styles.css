@@ -376,8 +376,6 @@ body {
 .bulk-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
 .bulk-status { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
 
-.profile-card.active { border-color: var(--accent) !important; background: var(--accent-bg); }
-
 .raw-modal-overlay {
   position: fixed;
   inset: 0;
