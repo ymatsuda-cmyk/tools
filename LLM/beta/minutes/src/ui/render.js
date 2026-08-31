@@ -144,6 +144,7 @@ export function renderDetailHtml(item, state) {
     <div class="detail-header">
       <span class="detail-title">${escapeHtml(item.title)}</span>
       ${state.canEdit ? '<button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>' : ''}
+      ${state.summary?.model ? `<span class="model-badge" title="要約生成モデル">${escapeHtml(state.summary.model)}</span>` : ''}
       <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
     </div>
     <div class="detail-meta">${fmtDate(item.date)} ${fmtTime(item.date)} · ${escapeHtml(item.duration || '')}</div>
@@ -225,8 +226,6 @@ export function renderDetailHtml(item, state) {
       ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
       ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
-      <span style="flex:1"></span>
-      <span style="font-size:11px;color:var(--text-muted);align-self:center">${escapeHtml(s.model || '')}</span>
     </div>
   `
 }

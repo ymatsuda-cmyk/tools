@@ -33,14 +33,36 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 10px;
   padding: 10px 14px;
   border-bottom: 0.5px solid var(--border);
   background: var(--surface-1);
+  overflow: hidden; /* 最大幅は変えず、はみ出す分だけ内側でスクロールさせる */
 }
-.app-title { font-size: 14px; font-weight: 500; }
-.sync-status { font-size: 11px; color: var(--text-muted); }
+.app-title { font-size: 14px; font-weight: 500; flex-shrink: 0; }
+.sync-status { font-size: 11px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
+
+.topbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.topbar-scroll::-webkit-scrollbar { height: 4px; }
+.topbar-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+
+.active-model {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 4px;
+}
 .spacer { flex: 1; }
 .btn-ghost {
   border: 0.5px solid var(--border);
@@ -69,7 +91,7 @@ body {
   color: var(--text-secondary);
 }
 
-.topbar .search-box { flex: 1; max-width: 220px; }
+.topbar .search-box { flex-shrink: 0; width: 180px; }
 .status-filter { display: flex; gap: 5px; flex-shrink: 0; }
 .status-filter-chip {
   font-size: 11px;
@@ -239,6 +261,16 @@ body {
   font-size: 13px;
 }
 .empty-state i { font-size: 28px; }
+
+.model-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--surface-1);
+  border: 0.5px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 
 .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .detail-title { font-size: 18px; font-weight: 500; }

@@ -3,7 +3,7 @@ import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDe
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
-import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
+import { loadSettings, saveSettings, newProfile, activeProfile } from './lib/llm-settings.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
@@ -77,7 +77,16 @@ function currentFilteredItems() {
   return filterByTags(byPerm, selectedTags)
 }
 
+/** タイトルバー右端に、現在アクティブなAI接続プロファイルのモデル名を表示する */
+function paintActiveModel() {
+  const settings = loadSettings()
+  const p = activeProfile(settings)
+  const el = document.getElementById('active-model')
+  el.textContent = p?.model ? `AI: ${p.model}` : ''
+}
+
 function refresh() {
+  paintActiveModel()
   const config = loadConfig()
   const admin = isAdmin(config)
 
