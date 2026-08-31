@@ -1,9 +1,15 @@
 function headers(s) {
-  return {
+  const h = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${s.apiKey}`,
-    'ngrok-skip-browser-warning': 'true',
   }
+  // ngrok経由の自前ホスト環境でのみ必要なヘッダー。
+  // Gemini等の外部APIに付けるとCORSプリフライトで許可されず、
+  // Access-Control-Allow-Originが一切返らずリクエストが即失敗する。
+  if (s.baseUrl?.includes('ngrok')) {
+    h['ngrok-skip-browser-warning'] = 'true'
+  }
+  return h
 }
 
 export async function fetchModels(s, signal) {
