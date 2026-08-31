@@ -74,6 +74,11 @@ export function savePermissions(pageIds, permissions, mode = 'add') {
   return callGas('savePermissions', { pageIds, permissions, mode })
 }
 
+/** メモ(自由記述)を更新する */
+export function saveMemo(pageId, memo) {
+  return callGas('saveMemo', { pageId, memo })
+}
+
 /** 状態を「再取得」にし、次回バッチでの文字起こしやり直しをリクエストする */
 export function requestRetranscribe(pageId) {
   return callGas('requestRetranscribe', { pageId })

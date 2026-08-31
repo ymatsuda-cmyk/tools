@@ -42,10 +42,18 @@
       <div id="toolbar"></div>
       <div id="list-items"></div>
     </aside>
+    <div id="resize-handle" class="resize-handle" role="separator" aria-orientation="vertical" aria-label="一覧の幅を変更"></div>
     <section id="detail" class="detail-pane">
-      <div class="empty-state">
-        <i class="ti ti-file-text" aria-hidden="true"></i>
-        <p>左の一覧から議事録を選んでください</p>
+      <div class="detail-zoom-bar">
+        <button id="detail-zoom-out" class="btn-ghost" aria-label="縮小"><i class="ti ti-minus" aria-hidden="true"></i></button>
+        <span id="detail-zoom-level">100%</span>
+        <button id="detail-zoom-in" class="btn-ghost" aria-label="拡大"><i class="ti ti-plus" aria-hidden="true"></i></button>
+      </div>
+      <div id="detail-content">
+        <div class="empty-state">
+          <i class="ti ti-file-text" aria-hidden="true"></i>
+          <p>左の一覧から議事録を選んでください</p>
+        </div>
       </div>
     </section>
   </main>

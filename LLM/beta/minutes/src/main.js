@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -15,6 +15,8 @@ const syncStatusEl = document.getElementById('sync-status')
 let items = []
 let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
+const memoByKey = {} // pageId(notionPageId) -> string、メモの楽観更新用
+const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
@@ -165,7 +167,7 @@ function renderDenied() {
 function detailTarget(rowEl) {
   if (!isMobile()) {
     detailEl.classList.add('side-panel')
-    return detailEl
+    return document.getElementById('detail-content')
   }
   // 既存のインライン展開を除去してから作り直す
   document.querySelectorAll('.inline-detail').forEach((el) => el.remove())
@@ -180,6 +182,8 @@ function paintDetail(target, item, state) {
   target.innerHTML = renderDetailHtml(item, {
     ...state,
     tags: tagsByKey[item.notionPageId],
+    memo: memoByKey[item.notionPageId],
+    activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
   })
@@ -189,6 +193,14 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
   target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, state))
+
+  target.querySelectorAll('.detail-tab').forEach((el) => {
+    el.addEventListener('click', () => {
+      activeTabByKey[item.key] = el.dataset.tab
+      paintDetail(target, item, state)
+    })
+  })
+  target.querySelector('.btn-memo-save')?.addEventListener('click', () => saveMemoField(target, item, state))
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, state, el.dataset.field))
@@ -400,6 +412,27 @@ function openTagPicker(target, item, state) {
   paint()
 }
 
+/** メモを保存する。要約とは独立した項目なので単独でNotionへ反映する */
+async function saveMemoField(target, item, state) {
+  const textarea = target.querySelector('.memo-textarea')
+  const statusEl = target.querySelector('#memo-save-status')
+  const value = textarea.value
+  const prev = memoByKey[item.notionPageId]
+
+  memoByKey[item.notionPageId] = value // 楽観的に即反映
+  if (statusEl) statusEl.textContent = '保存中...'
+
+  try {
+    await saveMemo(item.notionPageId, value)
+    if (statusEl) statusEl.textContent = '保存しました'
+    setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
+  } catch (err) {
+    memoByKey[item.notionPageId] = prev
+    if (statusEl) statusEl.textContent = ''
+    alert('メモの保存に失敗しました: ' + (err.message || err))
+  }
+}
+
 async function editTitle(target, item, state) {
   const next = prompt('ミーティング名を入力してください', item.title)?.trim()
   if (!next || next === item.title) return
@@ -494,6 +527,7 @@ async function onSelect(item, rowEl) {
   try {
     const remote = await fetchSummary(item.notionPageId)
     tagsByKey[item.notionPageId] = remote.tags || []
+    memoByKey[item.notionPageId] = remote.memo || ''
 
     if (!remote.generatedAt) {
       paintDetail(target, item, { phase: 'no-summary' })
@@ -979,4 +1013,78 @@ document.querySelectorAll('.status-filter-chip').forEach((el) => {
   })
 })
 
+// --- 一覧の幅リサイズ ---
+const LIST_WIDTH_KEY = 'minutes:listWidth'
+const LIST_WIDTH_MIN = 200
+const LIST_WIDTH_MAX = 600
+
+function restoreListWidth() {
+  const saved = Number(localStorage.getItem(LIST_WIDTH_KEY))
+  if (saved) listEl.style.width = `${saved}px`
+}
+
+function setupResizeHandle() {
+  const handle = document.getElementById('resize-handle')
+  let startX = 0
+  let startWidth = 0
+
+  const onMove = (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const next = Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, startWidth + (clientX - startX)))
+    listEl.style.width = `${next}px`
+  }
+  const onUp = () => {
+    handle.classList.remove('dragging')
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.removeEventListener('touchmove', onMove)
+    document.removeEventListener('touchend', onUp)
+    localStorage.setItem(LIST_WIDTH_KEY, String(listEl.getBoundingClientRect().width))
+  }
+  const onDown = (e) => {
+    startX = e.touches ? e.touches[0].clientX : e.clientX
+    startWidth = listEl.getBoundingClientRect().width
+    handle.classList.add('dragging')
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    document.addEventListener('touchmove', onMove, { passive: true })
+    document.addEventListener('touchend', onUp)
+  }
+
+  handle.addEventListener('mousedown', onDown)
+  handle.addEventListener('touchstart', onDown, { passive: true })
+}
+
+restoreListWidth()
+setupResizeHandle()
+setupDetailZoom()
+
 loadIndex()
+
+// --- 詳細エリアのズーム(他のエリアには影響させない) ---
+const DETAIL_ZOOM_KEY = 'minutes:detailZoom'
+const ZOOM_MIN = 0.8
+const ZOOM_MAX = 2.0
+const ZOOM_STEP = 0.1
+
+function setupDetailZoom() {
+  const content = document.getElementById('detail-content')
+  const levelEl = document.getElementById('detail-zoom-level')
+  let zoom = Number(localStorage.getItem(DETAIL_ZOOM_KEY)) || 1
+
+  const apply = () => {
+    content.style.zoom = zoom
+    levelEl.textContent = `${Math.round(zoom * 100)}%`
+    localStorage.setItem(DETAIL_ZOOM_KEY, String(zoom))
+  }
+  apply()
+
+  document.getElementById('detail-zoom-in').addEventListener('click', () => {
+    zoom = Math.min(ZOOM_MAX, Math.round((zoom + ZOOM_STEP) * 10) / 10)
+    apply()
+  })
+  document.getElementById('detail-zoom-out').addEventListener('click', () => {
+    zoom = Math.max(ZOOM_MIN, Math.round((zoom - ZOOM_STEP) * 10) / 10)
+    apply()
+  })
+}
