@@ -577,77 +577,104 @@ ${transcriptCache.slice(0, 30000)}`
 }
 
 // --- サマリのマーカー(選択範囲に色を付ける) ---
+// document側に1度だけリスナーを登録し、現在アクティブなマーカー対象を
+// currentMarkerContext に持たせる方式にしている。再描画のたびにリスナーを
+// 積み増すと、古い(DOMから外れた)要素への参照が溜まり続けて不安定になるため。
+let currentMarkerContext = null
+let markerUIBound = false
+
 function setupMarkerUI(target, item, state) {
   const textEl = target.querySelector('#marker-target')
   const toolbar = target.querySelector('#marker-toolbar')
-  if (!textEl || !toolbar || !state.canEditContent || state.searchQuery) return
-  // 検索中はハイライト表示を優先しているため、マーカー編集はここでは無効にする
-
-  const getOffsets = () => {
-    const sel = window.getSelection()
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
-    const range = sel.getRangeAt(0)
-    if (!textEl.contains(range.startContainer) || !textEl.contains(range.endContainer)) return null
-
-    const walker = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT)
-    let offset = 0
-    let start = null
-    let end = null
-    let node
-    while ((node = walker.nextNode())) {
-      const len = node.textContent.length
-      if (node === range.startContainer) start = offset + range.startOffset
-      if (node === range.endContainer) end = offset + range.endOffset
-      offset += len
-    }
-    if (start === null || end === null || start === end) return null
-    return { start: Math.min(start, end), end: Math.max(start, end), rect: range.getBoundingClientRect() }
+  if (!textEl || !toolbar || !state.canEditContent || state.searchQuery) {
+    currentMarkerContext = null
+    return
   }
-
-  let pending = null
-
-  textEl.addEventListener('mouseup', () => {
-    const offsets = getOffsets()
-    if (!offsets) { toolbar.style.display = 'none'; pending = null; return }
-    pending = offsets
-    toolbar.style.display = 'flex'
-    toolbar.style.position = 'fixed'
-    toolbar.style.left = `${offsets.rect.left}px`
-    toolbar.style.top = `${offsets.rect.top - 38}px`
-  })
-
-  document.addEventListener('click', (e) => {
-    if (!toolbar.contains(e.target) && !textEl.contains(e.target)) toolbar.style.display = 'none'
-  })
-
-  const applyAndSave = async (raw) => {
-    const summary = state.summary
-    const updated = { ...summary, cardSummary: raw }
-    setDetailCache(item.key, updated)
-    toolbar.style.display = 'none'
-    window.getSelection()?.removeAllRanges()
-    paintDetail(target, item, { ...state, summary: updated })
-    try {
-      await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
-    } catch (err) {
-      setDetailCache(item.key, summary)
-      paintDetail(target, item, { ...state, summary })
-      alert('マーカーの保存に失敗しました: ' + (err.message || err))
-    }
-  }
+  currentMarkerContext = { target, item, state, textEl, toolbar, pending: null }
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
     el.addEventListener('click', () => {
-      if (!pending) return
+      if (!currentMarkerContext?.pending) return
+      const { pending, item, state } = currentMarkerContext
       const raw = applyMarkerRange(state.summary.cardSummary || '', pending.start, pending.end, Number(el.dataset.color))
-      applyAndSave(raw)
+      applyMarkerAndSave(raw)
     })
   })
   toolbar.querySelector('.marker-erase')?.addEventListener('click', () => {
-    if (!pending) return
+    if (!currentMarkerContext?.pending) return
+    const { pending, state } = currentMarkerContext
     const raw = eraseMarkerRange(state.summary.cardSummary || '', pending.start, pending.end)
-    applyAndSave(raw)
+    applyMarkerAndSave(raw)
   })
+
+  if (!markerUIBound) {
+    markerUIBound = true
+    document.addEventListener('mouseup', handleMarkerMouseUp)
+    document.addEventListener('click', handleMarkerDocumentClick)
+  }
+}
+
+function getSelectionOffsets(container) {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) return null
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let start = null
+  let end = null
+  let node
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length
+    if (node === range.startContainer) start = offset + range.startOffset
+    if (node === range.endContainer) end = offset + range.endOffset
+    offset += len
+  }
+  if (start === null || end === null || start === end) return null
+  return { start: Math.min(start, end), end: Math.max(start, end), rect: range.getBoundingClientRect() }
+}
+
+function handleMarkerMouseUp(e) {
+  const ctx = currentMarkerContext
+  if (!ctx || !ctx.textEl.contains(e.target)) return
+  const offsets = getSelectionOffsets(ctx.textEl)
+  if (!offsets) {
+    ctx.toolbar.style.display = 'none'
+    ctx.pending = null
+    return
+  }
+  ctx.pending = offsets
+  ctx.toolbar.style.display = 'flex'
+  ctx.toolbar.style.position = 'fixed'
+  ctx.toolbar.style.left = `${offsets.rect.left}px`
+  ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
+}
+
+function handleMarkerDocumentClick(e) {
+  const ctx = currentMarkerContext
+  if (!ctx) return
+  if (ctx.toolbar.contains(e.target) || ctx.textEl.contains(e.target)) return
+  ctx.toolbar.style.display = 'none'
+}
+
+async function applyMarkerAndSave(raw) {
+  const ctx = currentMarkerContext
+  if (!ctx) return
+  const { target, item, state } = ctx
+  const summary = state.summary
+  const updated = { ...summary, cardSummary: raw }
+  setDetailCache(item.key, updated)
+  ctx.toolbar.style.display = 'none'
+  window.getSelection()?.removeAllRanges()
+  paintDetail(target, item, { ...state, summary: updated })
+  try {
+    await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+  } catch (err) {
+    setDetailCache(item.key, summary)
+    paintDetail(target, item, { ...state, summary })
+    alert('マーカーの保存に失敗しました: ' + (err.message || err))
+  }
 }
 
 async function editTitle(target, item, state) {
