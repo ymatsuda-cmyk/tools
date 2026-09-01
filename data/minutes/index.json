@@ -89,10 +89,12 @@
     "date": "2026-08-27T02:00:00.000Z",
     "duration": "1時間 1分 19秒",
     "status": "文字起こし",
-    "tags": [],
+    "tags": [
+      "新人"
+    ],
     "permissions": [],
     "notionPageId": "3c90e7a5-35dc-8102-8e7a-dc79cae99b65",
-    "updatedAt": "2026-08-30T14:31:30.346Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "1a60563bbf9f4d724d5fe9e42b03386e",
@@ -217,11 +219,12 @@
     "duration": "36分 55秒",
     "status": "要約",
     "tags": [
-      "JBA経営"
+      "JBA",
+      "経営"
     ],
     "permissions": [],
     "notionPageId": "3c10e7a5-35dc-813f-bb90-e974e3dbcb4d",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "414ac77ef4a46e4ce30fa28500d59eff",
@@ -271,11 +274,12 @@
     "duration": "1時間 26分 2秒",
     "status": "要約",
     "tags": [
-      "JBA経営"
+      "JBA",
+      "経営"
     ],
     "permissions": [],
     "notionPageId": "3bb0e7a5-35dc-81c7-81c0-ef69b27b77ea",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5b5db67b1a9e4d89b7906228a38e522c",
@@ -331,9 +335,11 @@
     "tags": [
       "JBA"
     ],
-    "permissions": [],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3b50e7a5-35dc-81f7-8997-ee78ebef1c79",
-    "updatedAt": "2026-08-30T23:35:09.003Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "bdffe4f5bd190864adc36981f5f340af",
@@ -355,9 +361,11 @@
     "tags": [
       "基準"
     ],
-    "permissions": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3b40e7a5-35dc-81fd-87f8-da6fdec539d0",
-    "updatedAt": "2026-08-30T23:35:09.003Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5b143786a35403fe4e2e891d08c74067",
@@ -608,14 +616,17 @@
   },
   {
     "key": "84f5ae1e4d4ff17856d502fa0b84f93e",
-    "title": "2026-07-29 14:31:46",
+    "title": "定例報告",
     "date": "2026-07-29T05:31:00.000Z",
     "duration": "6分 18秒",
     "status": "要約",
-    "tags": [],
+    "tags": [
+      "JBA",
+      "経営"
+    ],
     "permissions": [],
     "notionPageId": "3ac0e7a5-35dc-81be-ba07-cc0a973ffcea",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "ff5cb8ac4f5076126c8b4c2c46eedd24",
@@ -650,20 +661,22 @@
     "tags": [
       "JBA"
     ],
-    "permissions": [],
+    "permissions": [
+      "jba"
+    ],
     "notionPageId": "3ab0e7a5-35dc-816a-907a-f297f5c816a4",
-    "updatedAt": "2026-08-31T00:05:08.027Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "bf54a012cc0debcd5c55c09426eafb15",
     "title": "2026-07-24 23:16:46",
     "date": "2026-07-24T14:16:00.000Z",
     "duration": "6分 30秒",
-    "status": "要約",
+    "status": "再取得",
     "tags": [],
     "permissions": [],
     "notionPageId": "3a80e7a5-35dc-8113-aa3a-c6c7dc09226d",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "174c8ee54f44c557ee29185464b4cd67",
@@ -692,25 +705,27 @@
   },
   {
     "key": "810d8ec3d3667f6c50e9a7bb697cd85e",
-    "title": "2026-07-24 14:29:53",
+    "title": "要望（町田部長）",
     "date": "2026-07-24T05:29:00.000Z",
     "duration": "9分 15秒",
     "status": "要約",
-    "tags": [],
+    "tags": [
+      "基準"
+    ],
     "permissions": [],
     "notionPageId": "3ab0e7a5-35dc-81e4-8f3b-e41479d596c6",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "520332a785c763567cd9f963c47a9ebd",
     "title": "2026-07-24 11:29:50",
     "date": "2026-07-24T02:29:00.000Z",
     "duration": "3分 48秒",
-    "status": "要約",
+    "status": "再取得",
     "tags": [],
     "permissions": [],
     "notionPageId": "3a70e7a5-35dc-8107-8907-c06dc9ad5ec0",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "133cdaebbf8904272f4a3495361f6a80",
@@ -765,9 +780,11 @@
     "tags": [
       "基準"
     ],
-    "permissions": [],
+    "permissions": [
+      "kijun"
+    ],
     "notionPageId": "3a60e7a5-35dc-81af-a817-c93313260921",
-    "updatedAt": "2026-08-30T13:35:04.477Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4762fc226dcea3796756cc04719ea171",
@@ -963,7 +980,7 @@
       "jba"
     ],
     "notionPageId": "3a00e7a5-35dc-8100-826e-fd3842383549",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "a55d9250b594e7adc69a7c6cdd45ba8b",
@@ -993,7 +1010,7 @@
       "kijun"
     ],
     "notionPageId": "3a00e7a5-35dc-81ee-bb6c-f96537338bd2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3dd896250d6e89bc02a2e515eba0cb1f",
@@ -1061,7 +1078,7 @@
       "jba"
     ],
     "notionPageId": "39e0e7a5-35dc-815f-98b6-d07f037998c3",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "70e7714e93b268e679aaf7b733bafb21",
@@ -2879,7 +2896,7 @@
     ],
     "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8187-82ff-d609fabd3db2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "8481c6f1c148258127f1df8f1220da2d",
@@ -2905,7 +2922,7 @@
       "kijun"
     ],
     "notionPageId": "36b0e7a5-35dc-81b2-b805-ca4583b1d7bf",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5c77b0f85e044587c141787d32adf565",
@@ -2931,7 +2948,7 @@
     ],
     "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8114-ab86-cc8f5bebd499",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4b79351a384a82845306775686295033",
@@ -2955,7 +2972,7 @@
     ],
     "permissions": [],
     "notionPageId": "36b0e7a5-35dc-8195-b77b-dcb85df642e2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "813c0a8160404d941a2764a69497b11f",
@@ -3262,7 +3279,7 @@
       "kijun"
     ],
     "notionPageId": "3730e7a5-35dc-815d-87c6-c0206f6c0cae",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "a2db54b7010a38703a97746e1fd1b815",
@@ -3288,7 +3305,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c4-a70b-f8a5697bf4c5",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "cf28998f46816699d14c20571498f921",
@@ -3310,7 +3327,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b6-b9b8-ce63afb2d2c7",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "a6dea402d5b437a3d90fd04a1fe15426",
@@ -3334,7 +3351,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ed-abaf-daa5e11f1f7e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "38ff14b4ed8b778093a4e98da5749217",
@@ -3373,7 +3390,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e0-9a4a-fa0ede10eeb1",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5ac2a8a85af78d33ddad05ecc032a537",
@@ -3399,7 +3416,7 @@
       "kijun"
     ],
     "notionPageId": "3730e7a5-35dc-81ce-af80-e1927dd9ee1f",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "25afeb883aa01b3f20f4cba158e14183",
@@ -3427,7 +3444,7 @@
       "kijun"
     ],
     "notionPageId": "3730e7a5-35dc-8193-9b09-c36b48ccd62e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "71456ae864b4ba26340ee373f7403740",
@@ -3453,7 +3470,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-811f-9ce0-efd2ee10eca7",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "c9f5193995bad85b46cff06144020eb4",
@@ -3477,7 +3494,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f5-87e9-d7aa70c8f976",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3aa0771b51c82584c2ab850e289c7dea",
@@ -3501,7 +3518,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8162-811d-d62046d5dad6",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "a5ec1b5e25d199608958a917fa6c4be6",
@@ -3590,7 +3607,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a1-925b-f0e7af4036bf",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "260d22332eca35fb391ecc1b126ced18",
@@ -3892,7 +3909,7 @@
       "kijun"
     ],
     "notionPageId": "3730e7a5-35dc-8135-9c67-f0f573a3ade1",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "b5ee1cda0f66398a53f95eab22caa236",
@@ -3918,7 +3935,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f6-8798-d7fe9bb5a88d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "e399f5af5a8e46eec7edc846ea0bee8d",
@@ -3957,7 +3974,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b5-bf5b-cabb8ac12093",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "a738b00b56b2ca6ddde22ad3948daa26",
@@ -3981,7 +3998,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-814f-a7f1-ce6c3a2a19ff",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "912b76a2e04e426dac865d43f0f8b342",
@@ -4005,7 +4022,7 @@
       "kijun"
     ],
     "notionPageId": "3730e7a5-35dc-81c7-88a2-c4b8cd6852a2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "81e79b7024c73e46db6bfda6a3f29165",
@@ -4031,7 +4048,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8152-abdb-d1620def6af0",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "52e3dbda74eecb0a00bd064c3959d4ef",
@@ -4053,7 +4070,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d1-a375-f80ba980350d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "385240d07b5deaccd533c4de741f56ac",
@@ -4075,7 +4092,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815d-a7b5-d80d4ba8469d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "de78663e422441c3a0e959ac3fbd7100",
@@ -4129,7 +4146,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8147-be28-f533eb6c035f",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4d19e137a387e437d8468bcdde9e6714",
@@ -4151,7 +4168,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8160-877a-c0d97a038486",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "67bace683abda03611ce4faa6061a9f2",
@@ -4173,7 +4190,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f6-bc10-c64f5663563b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "39521182e1d7db532900c335f7396d2f",
@@ -4195,7 +4212,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8108-b63f-dd6eaa70e177",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "0a9b7e0ef70a1c5f1ec0cebbf2505533",
@@ -4217,7 +4234,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c1-94ba-f8dcf7120f8b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "09ab609ac1b591921a6bc39ef150231d",
@@ -4239,7 +4256,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8122-9571-cee6f2c4fae1",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "ace9ce19df8ae69c4efcf821e3a3ecdb",
@@ -4261,7 +4278,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b9-ad41-f9dd9d67a98f",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "87868eb7eb3ca38a7f43d9f5bd15f860",
@@ -4283,7 +4300,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-814b-9c82-e5408ee5306a",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "deee694fc3b67793b81c8a24a8651760",
@@ -4305,7 +4322,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e7-9cc2-dc012b356a7b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "92cb92ab014e00eefb5c542581eec4ca",
@@ -4327,7 +4344,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a5-8507-fde9adabcc93",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "b33d8726fc3537ee77a53558fdc36e74",
@@ -4349,7 +4366,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f2-b698-d85b801816bb",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "82f478239eb7839d1e53644f0235d0b3",
@@ -4371,7 +4388,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-813d-99b5-f66c3ae7ba97",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "d43d1db436cf07dcccc0214742e66036",
@@ -4437,7 +4454,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-816d-8da4-cf1f2197c5e0",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5f3bc4628a53eadeba993a513b55c8b9",
@@ -4459,7 +4476,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815e-89e3-c806136b3835",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "dacd49816f7e121363c22c389d727214",
@@ -4481,7 +4498,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81fd-910b-cc524d9afff5",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "c804c19d8958f2baf9088ad1ba388d78",
@@ -4503,7 +4520,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-812a-a356-d9c98c9afc2a",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "9d55ef6a122ef492f8dd42a990d30b9c",
@@ -4525,7 +4542,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815e-a29f-da3fea8e9d96",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "39497d0e3dc372e23eaea4763211a976",
@@ -4547,7 +4564,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-812c-b86b-e24876e74ee1",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "eabb7cab948f59c1e76b774313664d86",
@@ -4569,7 +4586,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-811c-80e4-d2c2ae23e2b7",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3be1c1fa19a87aeb3247a030f122b06e",
@@ -4591,7 +4608,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8173-8e7a-cfafc25098ff",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "fe7d1f862770bc5bded2f1f92484edf4",
@@ -4624,7 +4641,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-818d-868a-ed04d7ba09f4",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "08830dafbd81d8787c5129169992f12d",
@@ -4646,7 +4663,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-b0b3-ed5cbd92f937",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "f3b402e83433943c842a6638da211a71",
@@ -4668,7 +4685,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81bb-bae7-f555f3005f62",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "106571ce88fc8853c08e6183f1bc2eaa",
@@ -4690,7 +4707,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8133-b8d5-f0f16c8b6e11",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "2b4e0d5f09872138f5cf7933045927a9",
@@ -4712,7 +4729,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-813f-be48-d8d5997c0f7b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "56188358fb8736b787da78ecc49bef21",
@@ -4745,7 +4762,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ec-bd4c-ef932b57d5f5",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "1ef376430c6e10e2770ce6629e11ee85",
@@ -4767,7 +4784,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8128-869d-ea80316971c2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "f225f72942a7252d741280afc3be85bf",
@@ -4789,7 +4806,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a2-99ac-cb30340a6c97",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "506cb6623134983ce2009ae9852964f9",
@@ -4833,7 +4850,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-814a-814d-d301c855c8c0",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "128efc3372fecba87e20afaf07dbaa93",
@@ -4855,7 +4872,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e3-abd6-e9191f93769e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "f13d5575b6f83ce6d201af2e1d1f6b5a",
@@ -4921,7 +4938,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819d-a4d9-c230c632c99a",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "1d1f6428afc235dc01c5cb9b73227adc",
@@ -4954,7 +4971,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-812e-8d13-e726ebf91741",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4a8358c6d77c848436e46cba61bc1681",
@@ -4976,7 +4993,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8144-a237-f00bb1eac982",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "81b613542ec626dedd0f356445a8ccc4",
@@ -4998,7 +5015,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f2-a45d-e6e01afd0dc4",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "153a4fa3f5b0418e3e076f10cc16c588",
@@ -5020,7 +5037,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8119-8ac8-de51c33e49a6",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4c4f505f2ee0e714f76b3647372b0b70",
@@ -5042,7 +5059,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-810b-80ab-ea5dacdd211b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "19a834e5888df54890edd7a2472b5035",
@@ -5064,7 +5081,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ab-8598-d776d99a9422",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "965e5d25b4ad2a2a318349ca1a0f5690",
@@ -5086,7 +5103,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8166-9517-df8ab34f4e52",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "51eba97840003f1310a98923ccdbd632",
@@ -5108,7 +5125,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8147-aedd-ea63a3d83e9e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "1963f6e9a4b98d4c5207bbbf5b881ee5",
@@ -5130,7 +5147,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8130-b3b1-dbe3034a44a4",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "b9db870722940b1252cd61fb33d3a419",
@@ -5152,7 +5169,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d4-81f4-c5521c90d8ed",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "11eeb99c8410ce35cab87bed012ae841",
@@ -5174,7 +5191,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-814d-8c92-fa8cf0b6e1f2",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3b40d85848e9849c2ff34ae11d367811",
@@ -5196,7 +5213,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8120-a745-f3db712e050e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "7c8dfcb739a65c44c5a6ff918b4d1232",
@@ -5218,7 +5235,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-9358-d4b816a1f368",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "c28107a5a052cf4a5db0be57fd6283bc",
@@ -5240,7 +5257,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815b-901e-c2a0754c34a6",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "517b1f2338390f42b497c3aa8fe97fe5",
@@ -5262,7 +5279,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815f-a776-da56b29374a4",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "9f77f3988bfd8b2c36e9af58f1b3c4d4",
@@ -5284,7 +5301,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8154-8b40-eff79cf5e804",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "d4231ef83b54ed274abcfa5e1272dcac",
@@ -5306,7 +5323,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8173-987b-c38e1c83e20a",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "b5e9f78d800fe14134227c34adbb6150",
@@ -5328,7 +5345,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c5-95fb-f0e9d64d8415",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "90d84965b496fa3472efa72c5b660b3c",
@@ -5350,7 +5367,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8155-9917-f28a0dd1fe7e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "2e348326741feaca92753304f2feb664",
@@ -5405,7 +5422,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a6-8fea-f9af81c54f71",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "033afbfcbcecd0521c429dab7675755e",
@@ -5460,7 +5477,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8186-ac52-fbdbd7e81f30",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "10a0816965971c58778b016c5b6cea5d",
@@ -5482,7 +5499,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819e-9415-d45563cc6bf7",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "ff9390e30bab0aa3f822f65bb62f2c0f",
@@ -5504,7 +5521,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f7-8857-c28a1faff5a8",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "717860292af6250d2df05947b86323dc",
@@ -5526,7 +5543,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8157-8ef9-c02e5c06eab6",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "4ecc01f7a6a6e68dfd35a94e84a2b07b",
@@ -5548,7 +5565,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8134-a594-ed6cc9c629ea",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "2d219cf2e4b497328d5d5e5a69d4691a",
@@ -5570,7 +5587,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c9-ad04-d437f7a65160",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "cb3de3714285dd1998474df683b7c46c",
@@ -5592,7 +5609,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-815b-b58b-cf9a48580ba9",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "f188c590e3ab53f748e8f967e8323d5e",
@@ -5614,7 +5631,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-818c-aa79-c86edca5b8d7",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "8bb0886e4216f172361e062b97302334",
@@ -5636,7 +5653,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8116-b8d9-ec80f437514d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "69ae35ddee61f4134618e2184dd5bd8c",
@@ -5658,7 +5675,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-813b-aade-ebf2d2bc505d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "e16114a8b607c8259037520f9509e9a1",
@@ -5680,7 +5697,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8174-95c1-c8be92ee4972",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "fd39010a76cd1ba4cacd6021149e87e4",
@@ -5702,7 +5719,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d1-9a64-c87d9ffcb21b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3d758976839a73916da42428bdbfcd33",
@@ -5724,7 +5741,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b2-9bb1-f83f90f6c098",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "66fa558215d96cf3b9bc01e5df1c8a68",
@@ -5746,7 +5763,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-bcab-d57c447c1f34",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "fe0c0b69c5a7bc042c6ccc721473e38c",
@@ -5768,7 +5785,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81f3-970a-ff18827c7b84",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "54b4e676d8a4dc046ed077d2ccfb1eaf",
@@ -5790,7 +5807,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-818f-87d7-d1a2cdb6ae03",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "d16eaa70876080dd75762eeb4fd32fce",
@@ -5812,7 +5829,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c0-847c-f8dc9c0ca58f",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "27cd6acb1c867c54b505451b986326ee",
@@ -5834,7 +5851,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c3-92cf-d57db4f0d2d8",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "469e47b9c3cb6edc9fab0538f35685ae",
@@ -5856,7 +5873,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c0-a53b-e62709639aad",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "e6be992dd0bf7c7306b844541b9a3073",
@@ -5878,7 +5895,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819c-93a3-c071e576a67b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "36ff002a7a3475b6aea12f9baccb7513",
@@ -5900,7 +5917,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8171-a2e0-d60f2a14f2bb",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "fa5d069788ab4ab98507fee72a3b4875",
@@ -5922,7 +5939,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-8237-f29f01db913b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "13ff9c09f4accc7f9d04b3479146004e",
@@ -5944,7 +5961,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81a5-9bf9-ceda1b8829b9",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "bd10fb36272c3404aee85cea1d4958e6",
@@ -5966,7 +5983,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-817c-ba1d-d41b5e152321",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "31e38e56d700d0d6b8aec068c55e6607",
@@ -5977,7 +5994,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-816b-b8de-c2a6ef887edc",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "ddc746acfa153fc65ca5d2d86800f093",
@@ -6010,7 +6027,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81b5-bd8e-ea41ce4efb4a",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3e7288b48619d8cbd0201b956e65ba06",
@@ -6032,7 +6049,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d8-a475-cb5c87a689a5",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "fe95ec70144585510da226ce7d907fca",
@@ -6054,7 +6071,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-ac81-cc179d539908",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "f594595097006784abeb4ea0e7868ef4",
@@ -6076,7 +6093,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ac-8847-f3c445d7b65e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "ca84b1524e7fd16f375bc50f60183903",
@@ -6098,7 +6115,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-bc40-f43e709f933f",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "518d6dfcf10182a4e7c075f3419c3381",
@@ -6120,7 +6137,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8164-87a9-c3901f811718",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "dee3cd7dd49c6306ee4fceafbadffc83",
@@ -6142,7 +6159,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-819b-a2e0-f9e6cf2e6051",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "3b01908fbfe2e65a074972104c4fa941",
@@ -6164,7 +6181,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-818f-964a-d963f1a08fa8",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "1edfa9c4d11e12461aa89b9c24436f1e",
@@ -6175,7 +6192,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81c6-b003-db8b92846a7e",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "bbc92a148ba3d8186e347bb3b4af8091",
@@ -6186,7 +6203,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81e7-8862-ff59fe2c6a93",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "c2bfdc3bf8fcd2675462b12bb40e5097",
@@ -6230,7 +6247,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8183-b37c-ff8d6bc16874",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "c1bc4c02101ba8904b86462e100bcd72",
@@ -6252,7 +6269,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8118-a901-ff807051e28d",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "546d949a2de91b5f31555b120a2ddfb9",
@@ -6274,7 +6291,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-810c-8482-d0147356318b",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "bc16df6c941a6be10cd28a6b580f5004",
@@ -6296,7 +6313,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8199-9e19-f5e41dd2dd31",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "d33ce4a0decdd8f66f6ac891c44c8ae3",
@@ -6318,7 +6335,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8153-ab9e-c2a143117231",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "283bed4dfdbf5c6591314d191c22cc9e",
@@ -6340,7 +6357,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81ce-b98e-d034438d4395",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "91e2b1944bda7684fa9071ad2dc4cce7",
@@ -6362,7 +6379,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-810b-9e10-fb55db957053",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "9f20f451ee7bb050e0353f6a463aab0c",
@@ -6384,7 +6401,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-81d7-83be-e7c900d29761",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "5b6b20f89237f686e85e92b03dbfef53",
@@ -6406,7 +6423,7 @@
     "tags": [],
     "permissions": [],
     "notionPageId": "3730e7a5-35dc-8106-816f-fd4269036898",
-    "updatedAt": "2026-09-01T02:05:15.191Z"
+    "updatedAt": "2026-09-01T02:35:10.357Z"
   },
   {
     "key": "b51629d842a957fda9b1f84e1b242e32",
