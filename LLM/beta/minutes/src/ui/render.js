@@ -1,3 +1,5 @@
+import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
+
 /**
  * ツールバー(月ナビ / 権限フィルタ[管理者のみ] / タグフィルタ)を描画する。
  * 検索欄とタグ表示トグルはトップバーの永続DOMに移したためここには含まない
@@ -53,7 +55,7 @@ function groupKey(iso) {
  * 一覧を描画する。onSelect(item, itemEl) がクリック時に呼ばれる。
  */
 export function renderList(container, items, selectedKey, onSelect, showTags = false, opts = {}) {
-  const { showPermissions = false, selectable = false, selectedIds = new Set() } = opts
+  const { showPermissions = false, selectable = false, selectedIds = new Set(), searchQuery = '' } = opts
   container.innerHTML = ''
   const sorted = [...items].sort((a, b) => new Date(b.date) - new Date(a.date))
 
@@ -90,7 +92,7 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
       ${checkbox}
       <div class="list-item-time">${fmtTime(item.date)}</div>
       <div class="list-item-body">
-        <div class="list-item-title">${escapeHtml(item.title)}${permBadge}</div>
+        <div class="list-item-title">${highlightText(item.title, searchQuery, escapeHtml)}${permBadge}</div>
         <div class="list-item-meta">
           <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
           ${escapeHtml(item.duration || '')}
@@ -120,6 +122,15 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
  * 詳細ペインの中身を組み立てて返す(HTML文字列)。
  * state.phase: 'loading' | 'no-summary' | 'ready' | 'generating' | 'error'
  */
+/** 検索語を大文字小文字区別なくハイライトしたhtmlを返す */
+export function highlightText(text, query, escapeHtml) {
+  const safe = escapeHtml(text ?? '')
+  const q = (query ?? '').trim()
+  if (!q) return safe
+  const escapedQuery = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return safe.replace(new RegExp(escapedQuery, 'gi'), (m) => `<mark class="search-hit">${m}</mark>`)
+}
+
 function tagsHtml(tags, canEdit) {
   if (tags === undefined) return ''
   const chips = tags.map((t) =>
@@ -161,6 +172,8 @@ export function renderDetailHtml(item, state) {
         <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
       </div>`
   }
 
@@ -181,6 +194,8 @@ export function renderDetailHtml(item, state) {
         ${state.canEdit ? '<button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
       </div>
     `
   }
@@ -213,7 +228,16 @@ export function renderDetailHtml(item, state) {
   const tabPanels = {
     summary: `
       <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
-      <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
+      <p class="summary-text" id="marker-target">${state.searchQuery
+        ? highlightText(plainTextOf(s.cardSummary || ''), state.searchQuery, escapeHtml)
+        : renderMarkedHtml(s.cardSummary || '', escapeHtml)}</p>
+      ${state.canEditContent ? `<div class="marker-toolbar" id="marker-toolbar" style="display:none">
+        <span class="marker-swatch" data-color="1" style="background:${MARKER_COLORS[1]}"></span>
+        <span class="marker-swatch" data-color="2" style="background:${MARKER_COLORS[2]}"></span>
+        <span class="marker-swatch" data-color="3" style="background:${MARKER_COLORS[3]}"></span>
+        <span class="marker-sep"></span>
+        <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
+      </div>` : ''}
       <div class="section-label">論点${editBtn('topics', '論点')}</div>
       ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
@@ -239,6 +263,15 @@ export function renderDetailHtml(item, state) {
         <button class="btn btn-memo-save">保存</button>
       </div>
     `,
+    chat: `
+      <div class="section-label">原文チャット</div>
+      <div id="rawchat-messages" class="rawchat-messages"></div>
+      <div class="rawchat-input-row">
+        <textarea id="rawchat-input" class="rawchat-textarea" rows="1" placeholder="この議事録の原文について質問する(Shift+Enterで改行)"></textarea>
+        <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+      </div>
+      <p class="rawchat-hint">この議事録の文字起こし全文が対象です</p>
+    `,
   }
 
   return header + `
@@ -253,12 +286,15 @@ export function renderDetailHtml(item, state) {
       <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
       <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
       <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
+      <button class="detail-tab ${tab('chat')}" data-tab="chat">チャット</button>
     </div>
     <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
     <div class="actions-row">
       ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
       ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+      <span style="flex:1"></span>
+      ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
     </div>
   `
 }

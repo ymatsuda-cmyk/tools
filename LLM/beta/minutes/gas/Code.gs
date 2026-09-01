@@ -31,6 +31,7 @@ var PROP_GENERATED = '要約日時';   // 生成日時、鮮度判定に使用 (
 var PROP_STATUS    = '状態';       // 進捗ステータス (select)
 var STATUS_SUMMARIZED = '要約';    // 要約生成完了時にセットする値
 var STATUS_RETRANSCRIBE = '再取得'; // 再文字起こしをMac mini側バッチに依頼する際にセットする値
+var STATUS_DELETED = '削除';       // 削除ボタン押下時にセットする値(Notionページ自体は残す)
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
@@ -74,6 +75,9 @@ function doPost(e) {
         break;
       case 'requestRetranscribe':
         result = requestRetranscribe_(body.pageId);
+        break;
+      case 'deleteItem':
+        result = deleteItem_(body.pageId);
         break;
       case 'savePermissions':
         result = savePermissions_(body.pageIds, body.permissions, body.mode);
@@ -359,6 +363,17 @@ function saveMemo_(pageId, memo) {
   props[PROP_MEMO] = richTextProp_(memo);
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true };
+}
+
+/**
+ * 状態を「削除」に変更する。Notionページ自体は削除しない
+ * (アプリの一覧から除外するだけの論理削除)。
+ */
+function deleteItem_(pageId) {
+  var props = {};
+  props[PROP_STATUS] = { select: { name: STATUS_DELETED } };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, status: STATUS_DELETED };
 }
 
 /** ミーティング名(title プロパティ)を更新する */
