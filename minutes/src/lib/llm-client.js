@@ -50,28 +50,39 @@ export async function* streamChat(s, messages, signal) {
   const decoder = new TextDecoder()
   let buf = ''
 
+  const processLine = function* (line) {
+    line = line.trim()
+    if (!line.startsWith('data:')) return
+    const payload = line.slice(5).trim()
+    if (payload === '[DONE]' || !payload) return
+    try {
+      const json = JSON.parse(payload)
+      const delta = json?.choices?.[0]?.delta?.content ?? ''
+      if (delta) yield { delta }
+      if (json?.usage) yield { usage: json.usage }
+    } catch {
+      // 不完全な行は次のチャンクで補完されるため無視
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      // ストリーム終了時にバッファへ残っている最終行(末尾に改行が来る前に
+      // 接続が閉じた場合の最後のチャンク)を処理する。ここを素通りすると
+      // 応答の末尾が欠けたまま表示されてしまう。
+      buf += decoder.decode() // flush残りのバイト列を確定させる
+      if (buf.trim()) yield* processLine(buf)
+      break
+    }
     buf += decoder.decode(value, { stream: true })
 
     let nl
     while ((nl = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, nl).trim()
+      const line = buf.slice(0, nl)
       buf = buf.slice(nl + 1)
-      if (!line.startsWith('data:')) continue
-
-      const payload = line.slice(5).trim()
-      if (payload === '[DONE]') return
-
-      try {
-        const json = JSON.parse(payload)
-        const delta = json?.choices?.[0]?.delta?.content ?? ''
-        if (delta) yield { delta }
-        if (json?.usage) yield { usage: json.usage }
-      } catch {
-        // 不完全な行は次のチャンクで補完されるため無視
-      }
+      if (line.trim().startsWith('data:') && line.slice(line.indexOf(':') + 1).trim() === '[DONE]') return
+      yield* processLine(line)
     }
   }
 }

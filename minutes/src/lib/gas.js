@@ -84,6 +84,11 @@ export function requestRetranscribe(pageId) {
   return callGas('requestRetranscribe', { pageId })
 }
 
+/** 状態を「削除」に変更する。Notionページ自体は削除しない */
+export function deleteItem(pageId) {
+  return callGas('deleteItem', { pageId })
+}
+
 /** 人手編集の保存。要約日時・モデル・状態は変更されない */
 export function saveDetail(pageId, cardSummary, detail) {
   return callGas('saveDetail', { pageId, cardSummary, detail })

@@ -1,3 +1,5 @@
+import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
+
 /**
  * ツールバー(月ナビ / 権限フィルタ[管理者のみ] / タグフィルタ)を描画する。
  * 検索欄とタグ表示トグルはトップバーの永続DOMに移したためここには含まない
@@ -53,7 +55,7 @@ function groupKey(iso) {
  * 一覧を描画する。onSelect(item, itemEl) がクリック時に呼ばれる。
  */
 export function renderList(container, items, selectedKey, onSelect, showTags = false, opts = {}) {
-  const { showPermissions = false, selectable = false, selectedIds = new Set() } = opts
+  const { showPermissions = false, selectable = false, selectedIds = new Set(), searchQuery = '' } = opts
   container.innerHTML = ''
   const sorted = [...items].sort((a, b) => new Date(b.date) - new Date(a.date))
 
@@ -90,7 +92,7 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
       ${checkbox}
       <div class="list-item-time">${fmtTime(item.date)}</div>
       <div class="list-item-body">
-        <div class="list-item-title">${escapeHtml(item.title)}${permBadge}</div>
+        <div class="list-item-title">${highlightText(item.title, searchQuery, escapeHtml)}${permBadge}</div>
         <div class="list-item-meta">
           <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
           ${escapeHtml(item.duration || '')}
@@ -120,6 +122,15 @@ export function renderList(container, items, selectedKey, onSelect, showTags = f
  * 詳細ペインの中身を組み立てて返す(HTML文字列)。
  * state.phase: 'loading' | 'no-summary' | 'ready' | 'generating' | 'error'
  */
+/** 検索語を大文字小文字区別なくハイライトしたhtmlを返す */
+export function highlightText(text, query, escapeHtml) {
+  const safe = escapeHtml(text ?? '')
+  const q = (query ?? '').trim()
+  if (!q) return safe
+  const escapedQuery = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return safe.replace(new RegExp(escapedQuery, 'gi'), (m) => `<mark class="search-hit">${m}</mark>`)
+}
+
 function tagsHtml(tags, canEdit) {
   if (tags === undefined) return ''
   const chips = tags.map((t) =>
@@ -152,24 +163,28 @@ export function renderDetailHtml(item, state) {
   `
 
   if (state.phase === 'loading') {
-    return header + `<p class="summary-text">読み込み中...</p>`
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll"><p class="summary-text">読み込み中...</p></div>`
   }
 
   if (state.phase === 'error') {
-    return header + `<p class="error-text">${escapeHtml(state.message)}</p>
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll">
+      <p class="error-text">${escapeHtml(state.message)}</p>
       <div class="actions-row">
         <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
-      </div>`
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+      </div>
+    </div>`
   }
 
   if (state.phase === 'generating') {
-    return header + `<p class="summary-text">${escapeHtml(state.progress || '要約を生成しています...')}</p>`
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll"><p class="summary-text">${escapeHtml(state.progress || '要約を生成しています...')}</p></div>`
   }
 
   if (state.phase === 'no-summary') {
-    return header + `
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll">
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
       <div class="section-label">メモ</div>
       <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
@@ -181,8 +196,10 @@ export function renderDetailHtml(item, state) {
         ${state.canEdit ? '<button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
       </div>
-    `
+    </div>`
   }
 
   // ready
@@ -192,14 +209,23 @@ export function renderDetailHtml(item, state) {
   const todos = (s.detail?.todos || []).map((t) => (typeof t === 'string' ? { text: t, done: false } : t))
   const topics = s.detail?.topics || []
 
+  /** マーカー対応テキスト。検索中はハイライト、それ以外はマーカー表示にする */
+  const markerText = (text) => state.searchQuery
+    ? highlightText(plainTextOf(text || ''), state.searchQuery, escapeHtml)
+    : renderMarkedHtml(text || '', escapeHtml)
+
+  /** マーカー選択の対象になる要素を作るためのdata属性 */
+  const markerAttrs = (field, index, sub) =>
+    `class="marker-target" data-field="${field}" data-index="${index}" data-sub="${sub || ''}"`
+
   const agendaHtml = agenda.length ? `
     <div class="section-label">議事${editBtn('agenda', '議事')}</div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
-          <div class="agenda-topic"><span class="agenda-num">${i + 1}</span>${escapeHtml(a.topic || '')}</div>
-          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
-          ${a.outcome ? `<div class="agenda-outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${escapeHtml(a.outcome)}</div>` : ''}
+          <div class="agenda-topic" ${markerAttrs('agenda', i, 'topic')}><span class="agenda-num">${i + 1}</span>${markerText(a.topic)}</div>
+          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p, j) => `<li ${markerAttrs('agenda', i, `point:${j}`)}>${markerText(p)}</li>`).join('')}</ul>` : ''}
+          ${a.outcome ? `<div class="agenda-outcome" ${markerAttrs('agenda', i, 'outcome')}><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${markerText(a.outcome)}</div>` : ''}
         </div>
       `).join('')}
     </div>
@@ -210,25 +236,35 @@ export function renderDetailHtml(item, state) {
   const activeTab = state.activeTab || 'summary'
   const tab = (id) => (id === activeTab ? 'active' : '')
 
+  const markerToolbarHtml = state.canEditContent ? `
+    <div class="marker-toolbar" id="marker-toolbar" style="display:none">
+      <span class="marker-swatch" data-color="1" style="background:${MARKER_COLORS[1]}"></span>
+      <span class="marker-swatch" data-color="2" style="background:${MARKER_COLORS[2]}"></span>
+      <span class="marker-swatch" data-color="3" style="background:${MARKER_COLORS[3]}"></span>
+      <span class="marker-sep"></span>
+      <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
+    </div>
+  ` : ''
+
   const tabPanels = {
     summary: `
       <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
-      <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
+      <p class="summary-text" ${markerAttrs('cardSummary', 0)}>${markerText(s.cardSummary)}</p>
       <div class="section-label">論点${editBtn('topics', '論点')}</div>
-      ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${topics.length ? `<ul class="plain-list">${topics.map((t, i) => `<li ${markerAttrs('topics', i)}>${markerText(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     agenda: agendaHtml,
     decisions: `
       <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
-      ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${decisions.length ? `<ul class="plain-list">${decisions.map((d, i) => `<li ${markerAttrs('decisions', i)}>${markerText(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     todos: `
       <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
       ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
-        <label class="todo-row ${t.done ? 'done' : ''}">
+        <div class="todo-row ${t.done ? 'done' : ''}">
           <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
-          <span>${escapeHtml(t.text)}</span>
-        </label>
+          <span ${markerAttrs('todos', i)}>${markerText(t.text)}</span>
+        </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
     memo: `
@@ -239,26 +275,45 @@ export function renderDetailHtml(item, state) {
         <button class="btn btn-memo-save">保存</button>
       </div>
     `,
+    chat: `
+      <div class="chat-panel">
+        <div id="rawchat-messages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <textarea id="rawchat-input" class="chat-textarea" rows="1" placeholder="この議事録の原文について質問する(Shift+Enterで改行)"></textarea>
+          <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+        </div>
+        <p class="chat-hint">この議事録の文字起こし全文が対象です</p>
+      </div>
+    `,
   }
 
-  return header + `
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">決定事項</div><div class="stat-value">${decisions.length}</div></div>
-      <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
-      <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
+  return `
+    <div class="detail-fixed">
+      ${header}
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">決定事項</div><div class="stat-value">${decisions.length}</div></div>
+        <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
+        <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
+      </div>
+      <div class="detail-tabs">
+        <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
+        <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
+        <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
+        <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
+        <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
+        <button class="detail-tab ${tab('chat')}" data-tab="chat">チャット</button>
+      </div>
     </div>
-    <div class="detail-tabs">
-      <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
-      <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
-      <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
-      <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
-      <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
-    </div>
-    <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
-    <div class="actions-row">
-      ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
-      ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
-      <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+    <div class="detail-scroll">
+      <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
+      ${markerToolbarHtml}
+      <div class="actions-row">
+        ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
+        ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
+        <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+      </div>
     </div>
   `
 }
