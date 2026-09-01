@@ -586,14 +586,22 @@ let markerDocClickBound = false
 function setupMarkerUI(target, item, state) {
   const textEl = target.querySelector('#marker-target')
   const toolbar = target.querySelector('#marker-toolbar')
+  console.log('[marker] setupMarkerUI called', {
+    hasTextEl: !!textEl,
+    hasToolbar: !!toolbar,
+    canEditContent: state.canEditContent,
+    searchQuery: state.searchQuery,
+  })
   if (!textEl || !toolbar || !state.canEditContent || state.searchQuery) {
     currentMarkerContext = null
     return
   }
   currentMarkerContext = { target, item, state, textEl, toolbar, pending: null }
+  console.log('[marker] context set, textEl text length =', textEl.textContent.length)
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
     el.addEventListener('click', () => {
+      console.log('[marker] swatch clicked', { hasPending: !!currentMarkerContext?.pending })
       if (!currentMarkerContext?.pending) return
       const { pending, state } = currentMarkerContext
       const raw = applyMarkerRange(state.summary.cardSummary || '', pending.start, pending.end, Number(el.dataset.color))
@@ -643,10 +651,18 @@ function handleMarkerMouseUp(e) {
   // 直接バインドしているelementは常に最新のcurrentMarkerContextを参照する
   // (setupMarkerUIが再描画のたびにcurrentMarkerContextを更新しているため)
   const ctx = currentMarkerContext
+  console.log('[marker] mouseup fired on textEl, ctx exists =', !!ctx)
   if (!ctx) return
   // 少し遅延させて、ブラウザが選択範囲を確定させた後に読み取る
   setTimeout(() => {
+    const sel = window.getSelection()
+    console.log('[marker] selection check', {
+      hasSelection: !!sel,
+      isCollapsed: sel?.isCollapsed,
+      text: sel?.toString().slice(0, 30),
+    })
     const offsets = getSelectionOffsets(ctx.textEl)
+    console.log('[marker] offsets =', offsets)
     if (!offsets) {
       ctx.toolbar.style.display = 'none'
       ctx.pending = null
@@ -657,6 +673,7 @@ function handleMarkerMouseUp(e) {
     ctx.toolbar.style.position = 'fixed'
     ctx.toolbar.style.left = `${offsets.rect.left}px`
     ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
+    console.log('[marker] toolbar shown at', ctx.toolbar.style.left, ctx.toolbar.style.top)
   }, 0)
 }
 
