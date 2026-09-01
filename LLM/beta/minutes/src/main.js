@@ -281,13 +281,13 @@ function openFieldEditor(target, item, state, field) {
     hint = '一覧カードにも表示されます。マーカーは保持されますが、文言を変えた箇所は外れます'
   } else if (field === 'agenda') {
     initial = JSON.stringify(summary.detail.agenda || [], null, 2)
-    hint = '議題ごとの入れ子構造のため、JSON形式で編集します'
+    hint = '議題ごとの入れ子構造のため、JSON形式で編集します。マーカーは <m1> のようなタグとしてそのまま見えます'
   } else if (field === 'todos') {
-    initial = (summary.detail.todos || []).map((t) => t.text).join('\n')
-    hint = '1行に1件。チェック状態は保持されます'
+    initial = (summary.detail.todos || []).map((t) => plainTextOf(t.text || '')).join('\n')
+    hint = '1行に1件。チェック状態とマーカーは、文言が変わらなければ引き継がれます'
   } else {
-    initial = (summary.detail[field] || []).join('\n')
-    hint = '1行に1件'
+    initial = (summary.detail[field] || []).map((v) => plainTextOf(v || '')).join('\n')
+    hint = '1行に1件。マーカーは、文言が変わらなければ引き継がれます'
   }
 
   const root = document.getElementById('modal-root')
@@ -335,15 +335,21 @@ function openFieldEditor(target, item, state, field) {
     } else if (field === 'todos') {
       const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
       const prevTodos = summary.detail.todos || []
-      // 同じ本文のToDoが残っていればチェック状態を引き継ぐ
+      // 同じ本文(プレーンテキスト比較)のToDoが残っていれば、チェック状態とマーカーを引き継ぐ
       const next = lines.map((text) => {
-        const found = prevTodos.find((t) => t.text === text)
-        return { text, done: found ? found.done : false }
+        const found = prevTodos.find((t) => plainTextOf(t.text || '') === text)
+        return { text: found ? reconcileMarkers(found.text, text) : text, done: found ? found.done : false }
       })
       updated = { ...summary, detail: { ...summary.detail, todos: next } }
     } else {
       const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
-      updated = { ...summary, detail: { ...summary.detail, [field]: lines } }
+      const prevLines = summary.detail[field] || []
+      // 同じ本文(プレーンテキスト比較)の行が残っていればマーカーを引き継ぐ
+      const next = lines.map((text) => {
+        const found = prevLines.find((v) => plainTextOf(v || '') === text)
+        return found ? reconcileMarkers(found, text) : text
+      })
+      updated = { ...summary, detail: { ...summary.detail, [field]: next } }
     }
 
     close()
@@ -577,42 +583,93 @@ ${transcriptCache.slice(0, 30000)}`
   }
 }
 
-// --- サマリのマーカー(選択範囲に色を付ける) ---
-// mouseupはtextEl自身に直接バインドする(再描画のたびに新しいDOM要素になるため、
-// WeakSetで「既にバインド済みの要素」を記録し、二重登録だけを防ぐ)。
+// --- マーカー(サマリ・論点・議事・決定事項・ToDoの各項目に色を付ける) ---
+// ツールバーは1つだけ共通で使い、どの項目(field/index/sub)を選択したかを
+// data属性で判定する。ツールバーはタブ切替でDOMごと作り直されるため
+// #marker-toolbarのidは常に「今表示中のタブのもの」を指す。
 let currentMarkerContext = null
 const markerBoundElements = new WeakSet()
 let markerDocClickBound = false
 
+/** state.summary から、指定したfield/index/subの生テキスト(マーカータグ込み)を取得する */
+function getMarkerText(summary, field, index, sub) {
+  if (field === 'cardSummary') return summary.cardSummary || ''
+  const detail = summary.detail || {}
+  if (field === 'topics') return detail.topics?.[index] || ''
+  if (field === 'decisions') return detail.decisions?.[index] || ''
+  if (field === 'todos') return detail.todos?.[index]?.text || ''
+  if (field === 'agenda') {
+    const a = detail.agenda?.[index]
+    if (!a) return ''
+    if (sub === 'topic') return a.topic || ''
+    if (sub === 'outcome') return a.outcome || ''
+    if (sub?.startsWith('point:')) return a.points?.[Number(sub.split(':')[1])] || ''
+  }
+  return ''
+}
+
+/** getMarkerTextの書き込み版。更新後のsummaryを新しいオブジェクトとして返す */
+function setMarkerText(summary, field, index, sub, value) {
+  if (field === 'cardSummary') return { ...summary, cardSummary: value }
+  const detail = { ...summary.detail }
+  if (field === 'topics') {
+    const arr = [...(detail.topics || [])]; arr[index] = value; detail.topics = arr
+  } else if (field === 'decisions') {
+    const arr = [...(detail.decisions || [])]; arr[index] = value; detail.decisions = arr
+  } else if (field === 'todos') {
+    detail.todos = (detail.todos || []).map((t, i) => (i === index ? { ...t, text: value } : t))
+  } else if (field === 'agenda') {
+    detail.agenda = (detail.agenda || []).map((a, i) => {
+      if (i !== index) return a
+      if (sub === 'topic') return { ...a, topic: value }
+      if (sub === 'outcome') return { ...a, outcome: value }
+      if (sub?.startsWith('point:')) {
+        const pj = Number(sub.split(':')[1])
+        const points = [...(a.points || [])]; points[pj] = value
+        return { ...a, points }
+      }
+      return a
+    })
+  }
+  return { ...summary, detail }
+}
+
 function setupMarkerUI(target, item, state) {
-  const textEl = target.querySelector('#marker-target')
-  const toolbar = target.querySelector('#marker-toolbar')
-  if (!textEl || !toolbar || !state.canEditContent || state.searchQuery) {
+  if (!state.canEditContent || state.searchQuery || !state.summary) {
     currentMarkerContext = null
     return
   }
-  currentMarkerContext = { target, item, state, textEl, toolbar, pending: null }
+  const toolbar = target.querySelector('#marker-toolbar')
+  const markerEls = target.querySelectorAll('.marker-target')
+  if (!toolbar || !markerEls.length) {
+    currentMarkerContext = null
+    return
+  }
+  currentMarkerContext = { target, item, state, toolbar, pending: null }
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
     el.addEventListener('click', () => {
       if (!currentMarkerContext?.pending) return
-      const { pending, state } = currentMarkerContext
-      const raw = applyMarkerRange(state.summary.cardSummary || '', pending.start, pending.end, Number(el.dataset.color))
-      applyMarkerAndSave(raw)
+      const { pending, item, state } = currentMarkerContext
+      const raw = getMarkerText(state.summary, pending.field, pending.index, pending.sub)
+      const next = applyMarkerRange(raw, pending.start, pending.end, Number(el.dataset.color))
+      applyMarkerAndSave(pending.field, pending.index, pending.sub, next)
     })
   })
   toolbar.querySelector('.marker-erase')?.addEventListener('click', () => {
     if (!currentMarkerContext?.pending) return
     const { pending, state } = currentMarkerContext
-    const raw = eraseMarkerRange(state.summary.cardSummary || '', pending.start, pending.end)
-    applyMarkerAndSave(raw)
+    const raw = getMarkerText(state.summary, pending.field, pending.index, pending.sub)
+    const next = eraseMarkerRange(raw, pending.start, pending.end)
+    applyMarkerAndSave(pending.field, pending.index, pending.sub, next)
   })
 
-  if (!markerBoundElements.has(textEl)) {
-    markerBoundElements.add(textEl)
-    textEl.addEventListener('mouseup', handleMarkerMouseUp)
-    textEl.addEventListener('touchend', handleMarkerMouseUp)
-  }
+  markerEls.forEach((el) => {
+    if (markerBoundElements.has(el)) return
+    markerBoundElements.add(el)
+    el.addEventListener('mouseup', () => handleMarkerMouseUp(el))
+    el.addEventListener('touchend', () => handleMarkerMouseUp(el))
+  })
   if (!markerDocClickBound) {
     markerDocClickBound = true
     document.addEventListener('click', handleMarkerDocumentClick)
@@ -640,20 +697,24 @@ function getSelectionOffsets(container) {
   return { start: Math.min(start, end), end: Math.max(start, end), rect: range.getBoundingClientRect() }
 }
 
-function handleMarkerMouseUp(e) {
-  // 直接バインドしているelementは常に最新のcurrentMarkerContextを参照する
-  // (setupMarkerUIが再描画のたびにcurrentMarkerContextを更新しているため)
+function handleMarkerMouseUp(el) {
   const ctx = currentMarkerContext
   if (!ctx) return
   // 少し遅延させて、ブラウザが選択範囲を確定させた後に読み取る
   setTimeout(() => {
-    const offsets = getSelectionOffsets(ctx.textEl)
+    const offsets = getSelectionOffsets(el)
     if (!offsets) {
       ctx.toolbar.style.display = 'none'
       ctx.pending = null
       return
     }
-    ctx.pending = offsets
+    ctx.pending = {
+      field: el.dataset.field,
+      index: Number(el.dataset.index),
+      sub: el.dataset.sub || null,
+      start: offsets.start,
+      end: offsets.end,
+    }
     ctx.toolbar.style.display = 'flex'
     ctx.toolbar.style.position = 'fixed'
     ctx.toolbar.style.left = `${offsets.rect.left}px`
@@ -664,16 +725,17 @@ function handleMarkerMouseUp(e) {
 function handleMarkerDocumentClick(e) {
   const ctx = currentMarkerContext
   if (!ctx) return
-  if (ctx.toolbar.contains(e.target) || ctx.textEl.contains(e.target)) return
+  if (ctx.toolbar.contains(e.target)) return
+  if (e.target.closest?.('.marker-target')) return
   ctx.toolbar.style.display = 'none'
 }
 
-async function applyMarkerAndSave(raw) {
+async function applyMarkerAndSave(field, index, sub, newText) {
   const ctx = currentMarkerContext
   if (!ctx) return
   const { target, item, state } = ctx
   const summary = state.summary
-  const updated = { ...summary, cardSummary: raw }
+  const updated = setMarkerText(summary, field, index, sub, newText)
   setDetailCache(item.key, updated)
   ctx.toolbar.style.display = 'none'
   window.getSelection()?.removeAllRanges()

@@ -428,6 +428,7 @@ body {
 }
 .marker-erase:hover { color: var(--text-danger); }
 .marker { border-radius: 2px; padding: 0 1px; }
+.marker-target { cursor: text; }
 
 .detail-tabs {
   display: flex;

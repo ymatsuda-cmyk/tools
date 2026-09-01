@@ -209,14 +209,23 @@ export function renderDetailHtml(item, state) {
   const todos = (s.detail?.todos || []).map((t) => (typeof t === 'string' ? { text: t, done: false } : t))
   const topics = s.detail?.topics || []
 
+  /** マーカー対応テキスト。検索中はハイライト、それ以外はマーカー表示にする */
+  const markerText = (text) => state.searchQuery
+    ? highlightText(plainTextOf(text || ''), state.searchQuery, escapeHtml)
+    : renderMarkedHtml(text || '', escapeHtml)
+
+  /** マーカー選択の対象になる要素を作るためのdata属性 */
+  const markerAttrs = (field, index, sub) =>
+    `class="marker-target" data-field="${field}" data-index="${index}" data-sub="${sub || ''}"`
+
   const agendaHtml = agenda.length ? `
     <div class="section-label">議事${editBtn('agenda', '議事')}</div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
-          <div class="agenda-topic"><span class="agenda-num">${i + 1}</span>${highlightText(a.topic || '', state.searchQuery, escapeHtml)}</div>
-          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p) => `<li>${highlightText(p, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : ''}
-          ${a.outcome ? `<div class="agenda-outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${highlightText(a.outcome, state.searchQuery, escapeHtml)}</div>` : ''}
+          <div class="agenda-topic" ${markerAttrs('agenda', i, 'topic')}><span class="agenda-num">${i + 1}</span>${markerText(a.topic)}</div>
+          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p, j) => `<li ${markerAttrs('agenda', i, `point:${j}`)}>${markerText(p)}</li>`).join('')}</ul>` : ''}
+          ${a.outcome ? `<div class="agenda-outcome" ${markerAttrs('agenda', i, 'outcome')}><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${markerText(a.outcome)}</div>` : ''}
         </div>
       `).join('')}
     </div>
@@ -227,34 +236,35 @@ export function renderDetailHtml(item, state) {
   const activeTab = state.activeTab || 'summary'
   const tab = (id) => (id === activeTab ? 'active' : '')
 
+  const markerToolbarHtml = state.canEditContent ? `
+    <div class="marker-toolbar" id="marker-toolbar" style="display:none">
+      <span class="marker-swatch" data-color="1" style="background:${MARKER_COLORS[1]}"></span>
+      <span class="marker-swatch" data-color="2" style="background:${MARKER_COLORS[2]}"></span>
+      <span class="marker-swatch" data-color="3" style="background:${MARKER_COLORS[3]}"></span>
+      <span class="marker-sep"></span>
+      <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
+    </div>
+  ` : ''
+
   const tabPanels = {
     summary: `
       <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
-      <p class="summary-text" id="marker-target">${state.searchQuery
-        ? highlightText(plainTextOf(s.cardSummary || ''), state.searchQuery, escapeHtml)
-        : renderMarkedHtml(s.cardSummary || '', escapeHtml)}</p>
-      ${state.canEditContent ? `<div class="marker-toolbar" id="marker-toolbar" style="display:none">
-        <span class="marker-swatch" data-color="1" style="background:${MARKER_COLORS[1]}"></span>
-        <span class="marker-swatch" data-color="2" style="background:${MARKER_COLORS[2]}"></span>
-        <span class="marker-swatch" data-color="3" style="background:${MARKER_COLORS[3]}"></span>
-        <span class="marker-sep"></span>
-        <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
-      </div>` : ''}
+      <p class="summary-text" ${markerAttrs('cardSummary', 0)}>${markerText(s.cardSummary)}</p>
       <div class="section-label">論点${editBtn('topics', '論点')}</div>
-      ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${highlightText(t, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${topics.length ? `<ul class="plain-list">${topics.map((t, i) => `<li ${markerAttrs('topics', i)}>${markerText(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     agenda: agendaHtml,
     decisions: `
       <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
-      ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${highlightText(d, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${decisions.length ? `<ul class="plain-list">${decisions.map((d, i) => `<li ${markerAttrs('decisions', i)}>${markerText(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     todos: `
       <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
       ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
-        <label class="todo-row ${t.done ? 'done' : ''}">
+        <div class="todo-row ${t.done ? 'done' : ''}">
           <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
-          <span>${highlightText(t.text, state.searchQuery, escapeHtml)}</span>
-        </label>
+          <span ${markerAttrs('todos', i)}>${markerText(t.text)}</span>
+        </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
     memo: `
@@ -296,6 +306,7 @@ export function renderDetailHtml(item, state) {
     </div>
     <div class="detail-scroll">
       <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
+      ${markerToolbarHtml}
       <div class="actions-row">
         ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
