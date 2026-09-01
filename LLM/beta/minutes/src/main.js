@@ -577,11 +577,11 @@ ${transcriptCache.slice(0, 30000)}`
 }
 
 // --- サマリのマーカー(選択範囲に色を付ける) ---
-// document側に1度だけリスナーを登録し、現在アクティブなマーカー対象を
-// currentMarkerContext に持たせる方式にしている。再描画のたびにリスナーを
-// 積み増すと、古い(DOMから外れた)要素への参照が溜まり続けて不安定になるため。
+// mouseupはtextEl自身に直接バインドする(再描画のたびに新しいDOM要素になるため、
+// WeakSetで「既にバインド済みの要素」を記録し、二重登録だけを防ぐ)。
 let currentMarkerContext = null
-let markerUIBound = false
+const markerBoundElements = new WeakSet()
+let markerDocClickBound = false
 
 function setupMarkerUI(target, item, state) {
   const textEl = target.querySelector('#marker-target')
@@ -595,7 +595,7 @@ function setupMarkerUI(target, item, state) {
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
     el.addEventListener('click', () => {
       if (!currentMarkerContext?.pending) return
-      const { pending, item, state } = currentMarkerContext
+      const { pending, state } = currentMarkerContext
       const raw = applyMarkerRange(state.summary.cardSummary || '', pending.start, pending.end, Number(el.dataset.color))
       applyMarkerAndSave(raw)
     })
@@ -607,9 +607,13 @@ function setupMarkerUI(target, item, state) {
     applyMarkerAndSave(raw)
   })
 
-  if (!markerUIBound) {
-    markerUIBound = true
-    document.addEventListener('mouseup', handleMarkerMouseUp)
+  if (!markerBoundElements.has(textEl)) {
+    markerBoundElements.add(textEl)
+    textEl.addEventListener('mouseup', handleMarkerMouseUp)
+    textEl.addEventListener('touchend', handleMarkerMouseUp)
+  }
+  if (!markerDocClickBound) {
+    markerDocClickBound = true
     document.addEventListener('click', handleMarkerDocumentClick)
   }
 }
@@ -636,19 +640,24 @@ function getSelectionOffsets(container) {
 }
 
 function handleMarkerMouseUp(e) {
+  // 直接バインドしているelementは常に最新のcurrentMarkerContextを参照する
+  // (setupMarkerUIが再描画のたびにcurrentMarkerContextを更新しているため)
   const ctx = currentMarkerContext
-  if (!ctx || !ctx.textEl.contains(e.target)) return
-  const offsets = getSelectionOffsets(ctx.textEl)
-  if (!offsets) {
-    ctx.toolbar.style.display = 'none'
-    ctx.pending = null
-    return
-  }
-  ctx.pending = offsets
-  ctx.toolbar.style.display = 'flex'
-  ctx.toolbar.style.position = 'fixed'
-  ctx.toolbar.style.left = `${offsets.rect.left}px`
-  ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
+  if (!ctx) return
+  // 少し遅延させて、ブラウザが選択範囲を確定させた後に読み取る
+  setTimeout(() => {
+    const offsets = getSelectionOffsets(ctx.textEl)
+    if (!offsets) {
+      ctx.toolbar.style.display = 'none'
+      ctx.pending = null
+      return
+    }
+    ctx.pending = offsets
+    ctx.toolbar.style.display = 'flex'
+    ctx.toolbar.style.position = 'fixed'
+    ctx.toolbar.style.left = `${offsets.rect.left}px`
+    ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
+  }, 0)
 }
 
 function handleMarkerDocumentClick(e) {
