@@ -1309,7 +1309,12 @@ loadIndex()
 
 // ============ 横断チャット ============
 
-let crossChatSelection = { fromMonth: '', toMonth: '', tags: new Set(), excluded: new Set() }
+let crossChatSelection = {
+  fromMonth: monthKeyOf(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
+  toMonth: monthKeyOf(new Date()),
+  tags: new Set(),
+  excluded: new Set(),
+}
 let activeSpaceId = null
 let crossChatBusy = false
 
@@ -1404,7 +1409,8 @@ function paintCrossChatSelect() {
       <div style="flex:1"></div>
       <span id="cc-filtered-count" style="font-size:11px;color:var(--text-muted)">${filtered.length}件中 <span id="cc-selected-count">${selectedCount}</span>件を選択</span>
     </div>
-    <div id="cc-item-list" style="max-height:280px;overflow-y:auto;padding:4px 16px">
+    <div id="cc-item-list" class="cc-item-list">
+      <div style="padding:4px 16px 4px">
       ${filtered.map((i) => {
         const ok = i.status === '要約'
         const checked = ok && !crossChatSelection.excluded.has(i.key)
@@ -1418,6 +1424,7 @@ function paintCrossChatSelect() {
           </label>
         `
       }).join('') || '<p style="font-size:12px;color:var(--text-muted);padding:12px 0">該当する議事録がありません</p>'}
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:0.5px solid var(--border);background:var(--surface-1);flex-wrap:wrap">
       <span id="cc-selected-note" style="font-size:11px;color:var(--text-secondary);flex:1">${selectedCount}件を選択中(データ作成後に正確な文字数を表示します)</span>
@@ -1549,7 +1556,10 @@ function renderCrossChatMode() {
     </div>
     ${spaces.map((s) => `
       <div class="cc-space-item ${s.id === activeSpaceId ? 'selected' : ''}" data-id="${s.id}">
-        <div class="cc-space-name">${escapeHtml(s.name)}</div>
+        <div class="cc-space-row">
+          <div class="cc-space-name">${escapeHtml(s.name)}</div>
+          <button class="btn-ghost cc-space-rename" data-id="${s.id}" aria-label="スペース名を変更"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        </div>
         <div class="cc-space-meta">${s.messages.length}件のやり取り</div>
       </div>
     `).join('') || '<p style="font-size:12px;color:var(--text-muted);padding:12px">まだスペースがありません</p>'}
@@ -1561,6 +1571,18 @@ function renderCrossChatMode() {
     saveSpaces([...spaces, s])
     activeSpaceId = s.id
     renderCrossChatMode()
+  })
+  listItemsEl.querySelectorAll('.cc-space-rename').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const target = spaces.find((s) => s.id === el.dataset.id)
+      if (!target) return
+      const next = prompt('スペース名を入力してください', target.name)?.trim()
+      if (!next) return
+      target.name = next
+      saveSpaces(spaces)
+      renderCrossChatMode()
+    })
   })
   listItemsEl.querySelectorAll('.cc-space-item').forEach((el) => {
     el.addEventListener('click', () => { activeSpaceId = el.dataset.id; renderCrossChatMode() })

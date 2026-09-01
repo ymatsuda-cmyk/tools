@@ -163,26 +163,28 @@ export function renderDetailHtml(item, state) {
   `
 
   if (state.phase === 'loading') {
-    return header + `<p class="summary-text">読み込み中...</p>`
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll"><p class="summary-text">読み込み中...</p></div>`
   }
 
   if (state.phase === 'error') {
-    return header + `<p class="error-text">${escapeHtml(state.message)}</p>
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll">
+      <p class="error-text">${escapeHtml(state.message)}</p>
       <div class="actions-row">
         <button class="btn btn-retry"><i class="ti ti-refresh" aria-hidden="true"></i>再試行</button>
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
         <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
         <span style="flex:1"></span>
         ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
-      </div>`
+      </div>
+    </div>`
   }
 
   if (state.phase === 'generating') {
-    return header + `<p class="summary-text">${escapeHtml(state.progress || '要約を生成しています...')}</p>`
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll"><p class="summary-text">${escapeHtml(state.progress || '要約を生成しています...')}</p></div>`
   }
 
   if (state.phase === 'no-summary') {
-    return header + `
+    return `<div class="detail-fixed">${header}</div><div class="detail-scroll">
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
       <div class="section-label">メモ</div>
       <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
@@ -197,7 +199,7 @@ export function renderDetailHtml(item, state) {
         <span style="flex:1"></span>
         ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
       </div>
-    `
+    </div>`
   }
 
   // ready
@@ -212,9 +214,9 @@ export function renderDetailHtml(item, state) {
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
-          <div class="agenda-topic"><span class="agenda-num">${i + 1}</span>${escapeHtml(a.topic || '')}</div>
-          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
-          ${a.outcome ? `<div class="agenda-outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${escapeHtml(a.outcome)}</div>` : ''}
+          <div class="agenda-topic"><span class="agenda-num">${i + 1}</span>${highlightText(a.topic || '', state.searchQuery, escapeHtml)}</div>
+          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p) => `<li>${highlightText(p, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : ''}
+          ${a.outcome ? `<div class="agenda-outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${highlightText(a.outcome, state.searchQuery, escapeHtml)}</div>` : ''}
         </div>
       `).join('')}
     </div>
@@ -239,19 +241,19 @@ export function renderDetailHtml(item, state) {
         <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
       </div>` : ''}
       <div class="section-label">論点${editBtn('topics', '論点')}</div>
-      ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${highlightText(t, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     agenda: agendaHtml,
     decisions: `
       <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
-      ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+      ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${highlightText(d, state.searchQuery, escapeHtml)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,
     todos: `
       <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
       ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
         <label class="todo-row ${t.done ? 'done' : ''}">
           <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
-          <span>${escapeHtml(t.text)}</span>
+          <span>${highlightText(t.text, state.searchQuery, escapeHtml)}</span>
         </label>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
@@ -264,37 +266,43 @@ export function renderDetailHtml(item, state) {
       </div>
     `,
     chat: `
-      <div class="section-label">原文チャット</div>
-      <div id="rawchat-messages" class="rawchat-messages"></div>
-      <div class="rawchat-input-row">
-        <textarea id="rawchat-input" class="rawchat-textarea" rows="1" placeholder="この議事録の原文について質問する(Shift+Enterで改行)"></textarea>
-        <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+      <div class="chat-panel">
+        <div id="rawchat-messages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <textarea id="rawchat-input" class="chat-textarea" rows="1" placeholder="この議事録の原文について質問する(Shift+Enterで改行)"></textarea>
+          <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+        </div>
+        <p class="chat-hint">この議事録の文字起こし全文が対象です</p>
       </div>
-      <p class="rawchat-hint">この議事録の文字起こし全文が対象です</p>
     `,
   }
 
-  return header + `
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">決定事項</div><div class="stat-value">${decisions.length}</div></div>
-      <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
-      <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
+  return `
+    <div class="detail-fixed">
+      ${header}
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">決定事項</div><div class="stat-value">${decisions.length}</div></div>
+        <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
+        <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
+      </div>
+      <div class="detail-tabs">
+        <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
+        <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
+        <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
+        <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
+        <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
+        <button class="detail-tab ${tab('chat')}" data-tab="chat">チャット</button>
+      </div>
     </div>
-    <div class="detail-tabs">
-      <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
-      <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
-      <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
-      <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
-      <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
-      <button class="detail-tab ${tab('chat')}" data-tab="chat">チャット</button>
-    </div>
-    <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
-    <div class="actions-row">
-      ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
-      ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
-      <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
-      <span style="flex:1"></span>
-      ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+    <div class="detail-scroll">
+      <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
+      <div class="actions-row">
+        ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
+        ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
+        <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+      </div>
     </div>
   `
 }
