@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>議事録ビューア</title>
+<link rel="icon" href="data:," />
 <link rel="stylesheet" href="./css/styles.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 </head>
@@ -13,22 +14,25 @@
     <i class="ti ti-microphone" aria-hidden="true"></i>
     <span class="app-title">議事録</span>
     <span id="sync-status" class="sync-status"></span>
-    <div class="search-box">
-      <i class="ti ti-search" aria-hidden="true"></i>
-      <input type="text" id="search-input" class="search-input" placeholder="要約を検索" />
+    <div class="topbar-scroll">
+      <div class="search-box">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input type="text" id="search-input" class="search-input" placeholder="要約を検索" />
+      </div>
+      <div class="status-filter" id="status-filter">
+        <span class="status-filter-chip" data-status="文字起こし">文字起こし</span>
+        <span class="status-filter-chip" data-status="再取得">再取得</span>
+        <span class="status-filter-chip" data-status="要約">要約</span>
+      </div>
+      <label class="show-tags-toggle">
+        <input type="checkbox" id="show-tags-checkbox" />
+        <span>タグ表示</span>
+      </label>
+      <button id="assign-permission" class="btn-ghost" aria-label="権限を割り当て"><i class="ti ti-users" aria-hidden="true"></i></button>
+      <button id="bulk-summarize" class="btn-ghost" aria-label="一括要約"><i class="ti ti-sparkles" aria-hidden="true"></i></button>
+      <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
+      <span id="active-model" class="active-model"></span>
     </div>
-    <div class="status-filter" id="status-filter">
-      <span class="status-filter-chip" data-status="文字起こし">文字起こし</span>
-      <span class="status-filter-chip" data-status="再取得">再取得</span>
-      <span class="status-filter-chip" data-status="要約">要約</span>
-    </div>
-    <label class="show-tags-toggle">
-      <input type="checkbox" id="show-tags-checkbox" />
-      <span>タグ表示</span>
-    </label>
-    <button id="assign-permission" class="btn-ghost" aria-label="権限を割り当て"><i class="ti ti-users" aria-hidden="true"></i></button>
-    <button id="bulk-summarize" class="btn-ghost" aria-label="一括要約"><i class="ti ti-sparkles" aria-hidden="true"></i></button>
-    <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
   </header>
 
   <div id="assign-bar"></div>
@@ -39,10 +43,18 @@
       <div id="toolbar"></div>
       <div id="list-items"></div>
     </aside>
+    <div id="resize-handle" class="resize-handle" role="separator" aria-orientation="vertical" aria-label="一覧の幅を変更"></div>
     <section id="detail" class="detail-pane">
-      <div class="empty-state">
-        <i class="ti ti-file-text" aria-hidden="true"></i>
-        <p>左の一覧から議事録を選んでください</p>
+      <div class="detail-zoom-bar">
+        <button id="detail-zoom-out" class="btn-ghost" aria-label="縮小"><i class="ti ti-minus" aria-hidden="true"></i></button>
+        <span id="detail-zoom-level">100%</span>
+        <button id="detail-zoom-in" class="btn-ghost" aria-label="拡大"><i class="ti ti-plus" aria-hidden="true"></i></button>
+      </div>
+      <div id="detail-content">
+        <div class="empty-state">
+          <i class="ti ti-file-text" aria-hidden="true"></i>
+          <p>左の一覧から議事録を選んでください</p>
+        </div>
       </div>
     </section>
   </main>

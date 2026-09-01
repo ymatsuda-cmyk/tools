@@ -144,6 +144,7 @@ export function renderDetailHtml(item, state) {
     <div class="detail-header">
       <span class="detail-title">${escapeHtml(item.title)}</span>
       ${state.canEdit ? '<button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>' : ''}
+      ${state.summary?.model ? `<span class="model-badge" title="要約生成モデル">${escapeHtml(state.summary.model)}</span>` : ''}
       <span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
     </div>
     <div class="detail-meta">${fmtDate(item.date)} ${fmtTime(item.date)} · ${escapeHtml(item.duration || '')}</div>
@@ -170,6 +171,12 @@ export function renderDetailHtml(item, state) {
   if (state.phase === 'no-summary') {
     return header + `
       <p class="summary-text" style="color:var(--text-muted)">この議事録の要約はまだありません。</p>
+      <div class="section-label">メモ</div>
+      <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
+      <div class="memo-actions">
+        <span id="memo-save-status" class="memo-save-status"></span>
+        <button class="btn btn-memo-save">保存</button>
+      </div>
       <div class="actions-row">
         ${state.canEdit ? '<button class="btn btn-generate"><i class="ti ti-sparkles" aria-hidden="true"></i>要約を生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
@@ -200,6 +207,39 @@ export function renderDetailHtml(item, state) {
        <p class="empty-section">未登録</p>`
 
   const doneCount = todos.filter((t) => t.done).length
+  const activeTab = state.activeTab || 'summary'
+  const tab = (id) => (id === activeTab ? 'active' : '')
+
+  const tabPanels = {
+    summary: `
+      <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
+      <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
+      <div class="section-label">論点${editBtn('topics', '論点')}</div>
+      ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+    `,
+    agenda: agendaHtml,
+    decisions: `
+      <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
+      ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+    `,
+    todos: `
+      <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
+      ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
+        <label class="todo-row ${t.done ? 'done' : ''}">
+          <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
+          <span>${escapeHtml(t.text)}</span>
+        </label>
+      `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
+    `,
+    memo: `
+      <div class="section-label">メモ</div>
+      <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
+      <div class="memo-actions">
+        <span id="memo-save-status" class="memo-save-status"></span>
+        <button class="btn btn-memo-save">保存</button>
+      </div>
+    `,
+  }
 
   return header + `
     <div class="stat-grid">
@@ -207,26 +247,18 @@ export function renderDetailHtml(item, state) {
       <div class="stat-card"><div class="stat-label">ToDo</div><div class="stat-value">${doneCount}/${todos.length}</div></div>
       <div class="stat-card"><div class="stat-label">論点</div><div class="stat-value">${topics.length}</div></div>
     </div>
-    <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
-    <p class="summary-text">${escapeHtml(s.cardSummary || '')}</p>
-    ${agendaHtml}
-    <div class="section-label">決定事項${editBtn('decisions', '決定事項')}</div>
-    ${decisions.length ? `<ul class="plain-list">${decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
-    <div class="section-label">ToDo${editBtn('todos', 'ToDo')}</div>
-    ${todos.length ? `<div class="todo-box">${todos.map((t, i) => `
-      <label class="todo-row ${t.done ? 'done' : ''}">
-        <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
-        <span>${escapeHtml(t.text)}</span>
-      </label>
-    `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
-    <div class="section-label">論点${editBtn('topics', '論点')}</div>
-    ${topics.length ? `<ul class="plain-list">${topics.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
+    <div class="detail-tabs">
+      <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
+      <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
+      <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
+      <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>
+      <button class="detail-tab ${tab('memo')}" data-tab="memo">メモ</button>
+    </div>
+    <div class="detail-tab-panel">${tabPanels[activeTab] || tabPanels.summary}</div>
     <div class="actions-row">
       ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
       ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
       <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
-      <span style="flex:1"></span>
-      <span style="font-size:11px;color:var(--text-muted);align-self:center">${escapeHtml(s.model || '')}</span>
     </div>
   `
 }

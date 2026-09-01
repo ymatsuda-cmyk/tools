@@ -33,6 +33,7 @@ var STATUS_SUMMARIZED = '要約';    // 要約生成完了時にセットする�
 var STATUS_RETRANSCRIBE = '再取得'; // 再文字起こしをMac mini側バッチに依頼する際にセットする値
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
+var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
 var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
@@ -76,6 +77,9 @@ function doPost(e) {
         break;
       case 'savePermissions':
         result = savePermissions_(body.pageIds, body.permissions, body.mode);
+        break;
+      case 'saveMemo':
+        result = saveMemo_(body.pageId, body.memo);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -194,6 +198,7 @@ function fetchSummary_(pageId) {
       generatedAt: null,
       updatedAt: page.last_edited_time,
       tags: tagsOf_(props),
+      memo: richTextOf_(props, PROP_MEMO),
     };
   }
 
@@ -209,6 +214,7 @@ function fetchSummary_(pageId) {
     generatedAt: generatedAt,
     updatedAt: page.last_edited_time,
     tags: tagsOf_(props),
+    memo: richTextOf_(props, PROP_MEMO),
   };
 }
 
@@ -277,28 +283,25 @@ function requestRetranscribe_(pageId) {
 
 /**
  * スクリプトプロパティ "code" からコードと権限の対応を引く。
- * 書式は1行1組の "コード:権限"。該当が無ければ 'err' を返す。
- *   xynekgo:jba
- *   sdajoihn:kijun
- *   dfkjnga:xYz
+ * JSON形式: {"コード": "権限", ...}
+ * 該当が無い、またはJSON自体が壊れていれば 'err' を返す。
+ *   {"xynekgo":"jba","sdajoihn":"kijun","dfkjnga":"xYz"}
  */
 function verifyCode_(code) {
   var raw = PropertiesService.getScriptProperties().getProperty('code') || '';
   var input = String(code || '').trim();
   if (!input) return { role: 'err' };
 
-  var lines = raw.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].trim();
-    if (!line) continue;
-    var sep = line.indexOf(':');
-    if (sep === -1) continue;
-    if (line.slice(0, sep).trim() === input) {
-      var role = line.slice(sep + 1).trim();
-      return { role: role, isAdmin: role === ADMIN_ROLE };
-    }
+  var map;
+  try {
+    map = JSON.parse(raw);
+  } catch (e) {
+    return { role: 'err' };
   }
-  return { role: 'err' };
+
+  var role = map[input];
+  if (!role) return { role: 'err' };
+  return { role: role, isAdmin: role === ADMIN_ROLE };
 }
 
 /** multi_select プロパティから権限名の配列を取り出す */
@@ -348,6 +351,14 @@ function savePermissions_(pageIds, permissions, mode) {
   }
 
   return { updated: updated, failed: errors.length, errors: errors };
+}
+
+/** メモ(自由記述)を更新する。要約とは独立した項目なので単独で保存する */
+function saveMemo_(pageId, memo) {
+  var props = {};
+  props[PROP_MEMO] = richTextProp_(memo);
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
 }
 
 /** ミーティング名(title プロパティ)を更新する */

@@ -1,9 +1,9 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
-import { loadSettings, saveSettings, newProfile } from './lib/llm-settings.js'
+import { loadSettings, saveSettings, newProfile, activeProfile } from './lib/llm-settings.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 
 const listEl = document.getElementById('list')
@@ -15,6 +15,8 @@ const syncStatusEl = document.getElementById('sync-status')
 let items = []
 let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
+const memoByKey = {} // pageId(notionPageId) -> string、メモの楽観更新用
+const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
@@ -77,7 +79,16 @@ function currentFilteredItems() {
   return filterByTags(byPerm, selectedTags)
 }
 
+/** タイトルバー右端に、現在アクティブなAI接続プロファイルのモデル名を表示する */
+function paintActiveModel() {
+  const settings = loadSettings()
+  const p = activeProfile(settings)
+  const el = document.getElementById('active-model')
+  el.textContent = p?.model ? `AI: ${p.model}` : ''
+}
+
 function refresh() {
+  paintActiveModel()
   const config = loadConfig()
   const admin = isAdmin(config)
 
@@ -156,7 +167,7 @@ function renderDenied() {
 function detailTarget(rowEl) {
   if (!isMobile()) {
     detailEl.classList.add('side-panel')
-    return detailEl
+    return document.getElementById('detail-content')
   }
   // 既存のインライン展開を除去してから作り直す
   document.querySelectorAll('.inline-detail').forEach((el) => el.remove())
@@ -171,6 +182,8 @@ function paintDetail(target, item, state) {
   target.innerHTML = renderDetailHtml(item, {
     ...state,
     tags: tagsByKey[item.notionPageId],
+    memo: memoByKey[item.notionPageId],
+    activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
   })
@@ -180,6 +193,14 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
   target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, state))
+
+  target.querySelectorAll('.detail-tab').forEach((el) => {
+    el.addEventListener('click', () => {
+      activeTabByKey[item.key] = el.dataset.tab
+      paintDetail(target, item, state)
+    })
+  })
+  target.querySelector('.btn-memo-save')?.addEventListener('click', () => saveMemoField(target, item, state))
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, state, el.dataset.field))
@@ -391,6 +412,27 @@ function openTagPicker(target, item, state) {
   paint()
 }
 
+/** メモを保存する。要約とは独立した項目なので単独でNotionへ反映する */
+async function saveMemoField(target, item, state) {
+  const textarea = target.querySelector('.memo-textarea')
+  const statusEl = target.querySelector('#memo-save-status')
+  const value = textarea.value
+  const prev = memoByKey[item.notionPageId]
+
+  memoByKey[item.notionPageId] = value // 楽観的に即反映
+  if (statusEl) statusEl.textContent = '保存中...'
+
+  try {
+    await saveMemo(item.notionPageId, value)
+    if (statusEl) statusEl.textContent = '保存しました'
+    setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
+  } catch (err) {
+    memoByKey[item.notionPageId] = prev
+    if (statusEl) statusEl.textContent = ''
+    alert('メモの保存に失敗しました: ' + (err.message || err))
+  }
+}
+
 async function editTitle(target, item, state) {
   const next = prompt('ミーティング名を入力してください', item.title)?.trim()
   if (!next || next === item.title) return
@@ -485,6 +527,7 @@ async function onSelect(item, rowEl) {
   try {
     const remote = await fetchSummary(item.notionPageId)
     tagsByKey[item.notionPageId] = remote.tags || []
+    memoByKey[item.notionPageId] = remote.memo || ''
 
     if (!remote.generatedAt) {
       paintDetail(target, item, { phase: 'no-summary' })
@@ -581,12 +624,14 @@ document.getElementById('open-settings').addEventListener('click', openSettings)
 function openSettings() {
   const config = loadConfig()
   const settings = loadSettings()
-  const profile = settings.profiles[0] || newProfile()
+  // 下書き。ここで編集し、保存時にまとめて反映する(キャンセル時は破棄)
+  const draftProfiles = settings.profiles.length ? settings.profiles.map((p) => ({ ...p })) : [newProfile()]
+  let draftActiveId = settings.activeId || draftProfiles[0].id
 
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10">
-      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:320px;max-width:90vw">
+      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:380px;max-width:90vw;max-height:85vh;overflow-y:auto">
         <h2 style="font-size:15px;margin:0 0 12px">設定</h2>
         <label style="font-size:12px;color:var(--text-secondary)">GAS URL</label>
         <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
@@ -597,16 +642,17 @@ function openSettings() {
           <input id="cfg-code" value="${config.code}" style="flex:1;min-width:0;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
           <button id="cfg-verify" class="btn">確認</button>
         </div>
-        <div id="cfg-role" style="font-size:11px;margin-bottom:10px">${roleLabel(config.role)}</div>
-        <label style="font-size:12px;color:var(--text-secondary)">LLM baseUrl</label>
-        <input id="cfg-llm-url" value="${profile.baseUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
-        <label style="font-size:12px;color:var(--text-secondary)">LLM APIキー</label>
-        <input id="cfg-llm-key" value="${profile.apiKey}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
-        <label style="font-size:12px;color:var(--text-secondary)">モデル名</label>
-        <input id="cfg-llm-model" value="${profile.model}" style="width:100%;margin-bottom:16px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
-        <details style="margin-bottom:12px">
+        <div id="cfg-role" style="font-size:11px;margin-bottom:14px">${roleLabel(config.role)}</div>
+
+        <div style="display:flex;align-items:center;margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text-secondary);flex:1">AI接続プロファイル</label>
+          <button id="cfg-llm-add" class="btn" style="font-size:11px;padding:3px 9px">+ 追加</button>
+        </div>
+        <div id="cfg-llm-list"></div>
+
+        <details style="margin:12px 0">
           <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
-          <textarea id="cfg-json" rows="6" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
+          <textarea id="cfg-json" rows="8" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
           <div style="display:flex;gap:8px;margin-top:6px">
             <button id="cfg-json-export" class="btn" style="font-size:12px">現在の設定を書き出す</button>
             <button id="cfg-json-import" class="btn" style="font-size:12px">この内容を反映</button>
@@ -619,6 +665,58 @@ function openSettings() {
       </div>
     </div>
   `
+
+  /** プロファイル一覧を描画。各カードは開閉式で、使用中はラジオで選ぶ */
+  function paintProfiles() {
+    const listEl = document.getElementById('cfg-llm-list')
+    listEl.innerHTML = draftProfiles.map((p, i) => `
+      <div class="profile-card ${p.id === draftActiveId ? 'active' : ''}" style="border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <input type="radio" name="cfg-active" class="profile-active" data-id="${p.id}" ${p.id === draftActiveId ? 'checked' : ''} />
+          <input type="text" class="profile-label" data-id="${p.id}" value="${escapeHtml(p.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
+          ${draftProfiles.length > 1 ? `<button class="btn profile-delete" data-id="${p.id}" style="font-size:11px;padding:3px 7px">削除</button>` : ''}
+        </div>
+        <input type="text" class="profile-baseurl" data-id="${p.id}" value="${escapeHtml(p.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="profile-apikey" data-id="${p.id}" value="${escapeHtml(p.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="profile-model" data-id="${p.id}" value="${escapeHtml(p.model)}" placeholder="モデル名 (例: gemini-2.5-flash)" style="width:100%;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+      </div>
+    `).join('')
+
+    listEl.querySelectorAll('.profile-active').forEach((el) => {
+      el.addEventListener('change', () => {
+        draftActiveId = el.dataset.id
+        listEl.querySelectorAll('.profile-card').forEach((c) => c.classList.remove('active'))
+        el.closest('.profile-card').classList.add('active')
+      })
+    })
+    listEl.querySelectorAll('.profile-label, .profile-baseurl, .profile-apikey, .profile-model').forEach((el) => {
+      el.addEventListener('input', () => {
+        const p = draftProfiles.find((p) => p.id === el.dataset.id)
+        if (!p) return
+        if (el.classList.contains('profile-label')) p.label = el.value
+        if (el.classList.contains('profile-baseurl')) p.baseUrl = el.value
+        if (el.classList.contains('profile-apikey')) p.apiKey = el.value
+        if (el.classList.contains('profile-model')) p.model = el.value
+      })
+    })
+    listEl.querySelectorAll('.profile-delete').forEach((el) => {
+      el.addEventListener('click', () => {
+        const idx = draftProfiles.findIndex((p) => p.id === el.dataset.id)
+        if (idx === -1) return
+        draftProfiles.splice(idx, 1)
+        if (draftActiveId === el.dataset.id) draftActiveId = draftProfiles[0].id
+        paintProfiles()
+      })
+    })
+  }
+  paintProfiles()
+
+  document.getElementById('cfg-llm-add').addEventListener('click', () => {
+    const p = newProfile({ label: `プロファイル${draftProfiles.length + 1}` })
+    draftProfiles.push(p)
+    paintProfiles()
+  })
+
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
 
   document.getElementById('cfg-json-export').addEventListener('click', () => {
@@ -626,11 +724,8 @@ function openSettings() {
       gasUrl: document.getElementById('cfg-gas').value.trim(),
       notionToken: document.getElementById('cfg-token').value.trim(),
       code: document.getElementById('cfg-code').value.trim(),
-      llm: {
-        baseUrl: document.getElementById('cfg-llm-url').value.trim(),
-        apiKey: document.getElementById('cfg-llm-key').value.trim(),
-        model: document.getElementById('cfg-llm-model').value.trim(),
-      },
+      llmProfiles: draftProfiles.map(({ label, baseUrl, apiKey, model }) => ({ label, baseUrl, apiKey, model })),
+      activeLlmLabel: draftProfiles.find((p) => p.id === draftActiveId)?.label,
     }
     document.getElementById('cfg-json').value = JSON.stringify(json, null, 2)
   })
@@ -646,9 +741,15 @@ function openSettings() {
     if (parsed.gasUrl !== undefined) document.getElementById('cfg-gas').value = parsed.gasUrl
     if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
     if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
-    if (parsed.llm?.baseUrl !== undefined) document.getElementById('cfg-llm-url').value = parsed.llm.baseUrl
-    if (parsed.llm?.apiKey !== undefined) document.getElementById('cfg-llm-key').value = parsed.llm.apiKey
-    if (parsed.llm?.model !== undefined) document.getElementById('cfg-llm-model').value = parsed.llm.model
+
+    if (Array.isArray(parsed.llmProfiles) && parsed.llmProfiles.length) {
+      draftProfiles.length = 0
+      parsed.llmProfiles.forEach((p) => draftProfiles.push(newProfile(p)))
+      const match = draftProfiles.find((p) => p.label === parsed.activeLlmLabel)
+      draftActiveId = match ? match.id : draftProfiles[0].id
+      paintProfiles()
+    }
+
     if (parsed.code) document.getElementById('cfg-verify').click()
     alert('反映しました。内容を確認して「保存」を押してください。')
   })
@@ -677,13 +778,7 @@ function openSettings() {
       role: verifiedRole,
     })
 
-    const p = { ...profile,
-      baseUrl: document.getElementById('cfg-llm-url').value.trim(),
-      apiKey: document.getElementById('cfg-llm-key').value.trim(),
-      model: document.getElementById('cfg-llm-model').value.trim(),
-    }
-    const nextProfiles = settings.profiles.length ? [p, ...settings.profiles.slice(1)] : [p]
-    saveSettings({ ...settings, profiles: nextProfiles, activeId: p.id })
+    saveSettings({ ...settings, profiles: draftProfiles, activeId: draftActiveId })
 
     root.innerHTML = ''
     refresh()
@@ -917,5 +1012,79 @@ document.querySelectorAll('.status-filter-chip').forEach((el) => {
     refresh()
   })
 })
+
+// --- 一覧の幅リサイズ ---
+const LIST_WIDTH_KEY = 'minutes:listWidth'
+const LIST_WIDTH_MIN = 200
+const LIST_WIDTH_MAX = 600
+
+function restoreListWidth() {
+  const saved = Number(localStorage.getItem(LIST_WIDTH_KEY))
+  if (saved) listEl.style.width = `${saved}px`
+}
+
+function setupResizeHandle() {
+  const handle = document.getElementById('resize-handle')
+  let startX = 0
+  let startWidth = 0
+
+  const onMove = (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const next = Math.min(LIST_WIDTH_MAX, Math.max(LIST_WIDTH_MIN, startWidth + (clientX - startX)))
+    listEl.style.width = `${next}px`
+  }
+  const onUp = () => {
+    handle.classList.remove('dragging')
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.removeEventListener('touchmove', onMove)
+    document.removeEventListener('touchend', onUp)
+    localStorage.setItem(LIST_WIDTH_KEY, String(listEl.getBoundingClientRect().width))
+  }
+  const onDown = (e) => {
+    startX = e.touches ? e.touches[0].clientX : e.clientX
+    startWidth = listEl.getBoundingClientRect().width
+    handle.classList.add('dragging')
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    document.addEventListener('touchmove', onMove, { passive: true })
+    document.addEventListener('touchend', onUp)
+  }
+
+  handle.addEventListener('mousedown', onDown)
+  handle.addEventListener('touchstart', onDown, { passive: true })
+}
+
+// --- 詳細エリアのズーム(他のエリアには影響させない) ---
+const DETAIL_ZOOM_KEY = 'minutes:detailZoom'
+const ZOOM_MIN = 0.8
+const ZOOM_MAX = 2.0
+const ZOOM_STEP = 0.1
+
+function setupDetailZoom() {
+  const content = document.getElementById('detail-content')
+  const levelEl = document.getElementById('detail-zoom-level')
+  let zoom = Number(localStorage.getItem(DETAIL_ZOOM_KEY)) || 1
+
+  const apply = () => {
+    content.style.zoom = zoom
+    levelEl.textContent = `${Math.round(zoom * 100)}%`
+    localStorage.setItem(DETAIL_ZOOM_KEY, String(zoom))
+  }
+  apply()
+
+  document.getElementById('detail-zoom-in').addEventListener('click', () => {
+    zoom = Math.min(ZOOM_MAX, Math.round((zoom + ZOOM_STEP) * 10) / 10)
+    apply()
+  })
+  document.getElementById('detail-zoom-out').addEventListener('click', () => {
+    zoom = Math.max(ZOOM_MIN, Math.round((zoom - ZOOM_STEP) * 10) / 10)
+    apply()
+  })
+}
+
+restoreListWidth()
+setupResizeHandle()
+setupDetailZoom()
 
 loadIndex()

@@ -1,9 +1,15 @@
 function headers(s) {
-  return {
+  const h = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${s.apiKey}`,
-    'ngrok-skip-browser-warning': 'true',
   }
+  // ngrok経由の自前ホスト環境でのみ必要なヘッダー。
+  // Gemini等の外部APIに付けるとCORSプリフライトで許可されず、
+  // Access-Control-Allow-Originが一切返らずリクエストが即失敗する。
+  if (s.baseUrl?.includes('ngrok')) {
+    h['ngrok-skip-browser-warning'] = 'true'
+  }
+  return h
 }
 
 export async function fetchModels(s, signal) {
@@ -17,6 +23,8 @@ export async function fetchModels(s, signal) {
 }
 
 export async function* streamChat(s, messages, signal) {
+  const isOllamaLike = s.baseUrl?.includes('ngrok')
+
   const res = await fetch(`${s.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: headers(s),
@@ -25,9 +33,11 @@ export async function* streamChat(s, messages, signal) {
       model: s.model,
       messages,
       stream: true,
-      num_ctx: s.numCtx,
       temperature: s.temperature,
-      ...(typeof s.think === 'boolean' ? { think: s.think } : {}),
+      // num_ctx はOllama独自のパラメータ。OpenAI互換API標準には存在せず、
+      // Gemini等に送ると「Unknown name "num_ctx"」でHTTP 400になる。
+      ...(isOllamaLike ? { num_ctx: s.numCtx } : {}),
+      ...(isOllamaLike && typeof s.think === 'boolean' ? { think: s.think } : {}),
     }),
   })
 

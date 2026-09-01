@@ -480,6 +480,8 @@ body {
 
 .profile-card.active { border-color: var(--accent) !important; background: var(--accent-bg); }
 
+.cross-chat-modal { width: min(640px, 100%) !important; max-height: 90vh; }
+
 .raw-modal-overlay {
   position: fixed;
   inset: 0;
