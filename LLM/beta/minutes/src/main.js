@@ -187,7 +187,7 @@ function detailTarget(rowEl) {
 }
 
 function paintDetail(target, item, state) {
-  target.innerHTML = renderDetailHtml(item, {
+  const renderState = {
     ...state,
     tags: tagsByKey[item.notionPageId],
     memo: memoByKey[item.notionPageId],
@@ -195,13 +195,14 @@ function paintDetail(target, item, state) {
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
     searchQuery,
-  })
+  }
+  target.innerHTML = renderDetailHtml(item, renderState)
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
-  target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, state))
-  target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, state))
+  target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, renderState))
+  target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, renderState))
 
   target.querySelectorAll('.detail-tab').forEach((el) => {
     el.addEventListener('click', () => {
@@ -209,30 +210,30 @@ function paintDetail(target, item, state) {
       paintDetail(target, item, state)
     })
   })
-  target.querySelector('.btn-memo-save')?.addEventListener('click', () => saveMemoField(target, item, state))
+  target.querySelector('.btn-memo-save')?.addEventListener('click', () => saveMemoField(target, item, renderState))
   target.querySelector('.btn-delete')?.addEventListener('click', () => deleteItemFlow(item))
 
   if (target.querySelector('#rawchat-messages')) {
     setupRawChatTab(target, item)
   }
-  setupMarkerUI(target, item, state)
+  setupMarkerUI(target, item, renderState)
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
-    el.addEventListener('click', () => openFieldEditor(target, item, state, el.dataset.field))
+    el.addEventListener('click', () => openFieldEditor(target, item, renderState, el.dataset.field))
   })
   target.querySelectorAll('.todo-check').forEach((el) => {
-    el.addEventListener('change', () => toggleTodo(target, item, state, Number(el.dataset.index), el.checked))
+    el.addEventListener('change', () => toggleTodo(target, item, renderState, Number(el.dataset.index), el.checked))
   })
 
   target.querySelectorAll('.tag-remove').forEach((el) => {
     el.addEventListener('click', (e) => {
       const tag = e.target.closest('.tag-chip').dataset.tag
       const next = (tagsByKey[item.notionPageId] || []).filter((t) => t !== tag)
-      commitTags(target, item, state, next)
+      commitTags(target, item, renderState, next)
     })
   })
   target.querySelector('.tag-add-btn')?.addEventListener('click', () => {
-    openTagPicker(target, item, state)
+    openTagPicker(target, item, renderState)
   })
 }
 
@@ -586,22 +587,14 @@ let markerDocClickBound = false
 function setupMarkerUI(target, item, state) {
   const textEl = target.querySelector('#marker-target')
   const toolbar = target.querySelector('#marker-toolbar')
-  console.log('[marker] setupMarkerUI called', {
-    hasTextEl: !!textEl,
-    hasToolbar: !!toolbar,
-    canEditContent: state.canEditContent,
-    searchQuery: state.searchQuery,
-  })
   if (!textEl || !toolbar || !state.canEditContent || state.searchQuery) {
     currentMarkerContext = null
     return
   }
   currentMarkerContext = { target, item, state, textEl, toolbar, pending: null }
-  console.log('[marker] context set, textEl text length =', textEl.textContent.length)
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
     el.addEventListener('click', () => {
-      console.log('[marker] swatch clicked', { hasPending: !!currentMarkerContext?.pending })
       if (!currentMarkerContext?.pending) return
       const { pending, state } = currentMarkerContext
       const raw = applyMarkerRange(state.summary.cardSummary || '', pending.start, pending.end, Number(el.dataset.color))
@@ -651,18 +644,10 @@ function handleMarkerMouseUp(e) {
   // 直接バインドしているelementは常に最新のcurrentMarkerContextを参照する
   // (setupMarkerUIが再描画のたびにcurrentMarkerContextを更新しているため)
   const ctx = currentMarkerContext
-  console.log('[marker] mouseup fired on textEl, ctx exists =', !!ctx)
   if (!ctx) return
   // 少し遅延させて、ブラウザが選択範囲を確定させた後に読み取る
   setTimeout(() => {
-    const sel = window.getSelection()
-    console.log('[marker] selection check', {
-      hasSelection: !!sel,
-      isCollapsed: sel?.isCollapsed,
-      text: sel?.toString().slice(0, 30),
-    })
     const offsets = getSelectionOffsets(ctx.textEl)
-    console.log('[marker] offsets =', offsets)
     if (!offsets) {
       ctx.toolbar.style.display = 'none'
       ctx.pending = null
@@ -673,7 +658,6 @@ function handleMarkerMouseUp(e) {
     ctx.toolbar.style.position = 'fixed'
     ctx.toolbar.style.left = `${offsets.rect.left}px`
     ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
-    console.log('[marker] toolbar shown at', ctx.toolbar.style.left, ctx.toolbar.style.top)
   }, 0)
 }
 
