@@ -7,10 +7,10 @@
   --text-primary: #2c2c2a;
   --text-secondary: #5f5e5a;
   --text-muted: #888780;
-  --accent: #378add;
-  --accent-bg: #e6f1fb;
-  --accent-text: #0c447c;
-  --accent-text-sub: #185fa5;
+  --accent: #444441;
+  --accent-bg: #e8e6df;
+  --accent-text: #2c2c2a;
+  --accent-text-sub: #5f5e5a;
   --success-bg: #e1f5ee;
   --success-text: #085041;
   --warning-bg: #faeeda;
@@ -325,8 +325,20 @@ body {
 
 #detail-content { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; }
 .detail-fixed { flex-shrink: 0; padding: 18px 18px 0; }
-.detail-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 18px; }
+.detail-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 12px; }
 .detail-scroll .empty-state { padding: 18px 0; height: auto; }
+
+.detail-actions-fixed {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  padding: 10px 18px;
+  border-top: 0.5px solid var(--border);
+  background: var(--surface-2);
+}
+.detail-actions-fixed > button { align-self: center; }
+.chat-composer { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 
 .empty-state {
   height: 100%;
@@ -350,16 +362,70 @@ body {
   white-space: nowrap;
 }
 
+.qa-item { border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+.qa-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+}
+.qa-summary::-webkit-details-marker { display: none; }
+.qa-summary i.ti-chevron-right { font-size: 13px; color: var(--text-muted); transition: transform 0.15s; flex-shrink: 0; }
+.qa-item[open] .qa-summary i.ti-chevron-right { transform: rotate(90deg); }
+.qa-summary-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.qa-body { padding: 4px 12px 12px; border-top: 0.5px solid var(--border); }
+.qa-answer { position: relative; }
+.qa-copy {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 11px;
+  padding: 3px 7px;
+  background: var(--surface-2);
+}
+.qa-copy.copied { color: var(--text-success); }
+
+.chat-context-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.chat-context-toggle { display: flex; gap: 4px; }
+.chat-context-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 0.5px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.chat-context-btn.active { background: var(--bg-accent); border-color: var(--border-accent); color: var(--text-accent); }
+.chat-context-count { font-size: 11px; color: var(--text-muted); }
+
+.thinking-dots { display: inline-flex; gap: 4px; padding: 4px 0; }
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: thinking-bounce 1.2s infinite ease-in-out both;
+}
+.thinking-dots span:nth-child(1) { animation-delay: -0.28s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.14s; }
+@keyframes thinking-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
 .chat-panel {
   display: flex;
   flex-direction: column;
-  height: 320px;
-  min-height: 160px;
-  max-height: 80vh;
+  height: calc(100vh - 340px);
+  min-height: 220px;
+  max-height: 85vh;
   resize: vertical;
   overflow: hidden;
 }
-.chat-messages { flex: 1; overflow-y: auto; padding: 4px 0 10px; }
+.chat-messages { flex: 1; overflow-y: auto; min-height: 200px; padding: 4px 0 10px; }
 .chat-msg-user { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .chat-msg-user .chat-bubble {
   background: var(--surface-1);
@@ -631,8 +697,20 @@ body {
   padding: 6px;
   z-index: 40;
 }
-.model-switch-group { font-size: 10px; color: var(--text-muted); padding: 6px 8px 2px; }
-.model-switch-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.model-switch-group {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 6px 8px 2px;
+}
+.model-switch-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
 .model-switch-item:hover { background: var(--surface-1); }
 .model-switch-item.active { background: var(--bg-accent); color: var(--text-accent); }
 .model-switch-item i { font-size: 13px; }

@@ -78,7 +78,7 @@ function visibleItems() {
 }
 
 function currentFilteredItems() {
-  const byMonth = filterByMonth(visibleItems(), currentMonthKey)
+  const byMonth = (assignMode && assignAllPeriod) ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
   const byStatus = filterByStatus(byMonthAndSearch, selectedStatuses)
   const byPerm = filterByPermissionTags(byStatus, selectedPermissionFilters)
@@ -199,11 +199,7 @@ function refresh() {
       selectedPermissionFilters.has(perm) ? selectedPermissionFilters.delete(perm) : selectedPermissionFilters.add(perm)
       refresh()
     },
-    onToggleShowTags: (v) => {
-      showTags = v
-      document.getElementById('show-tags-checkbox').checked = v
-      refresh()
-    },
+    onToggleShowTags: (v) => { showTags = v; refresh() },
     onResetPeriod: () => {
       assignAllPeriod = true
       selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
@@ -574,14 +570,54 @@ function saveRawChatMessages(pageId, messages) {
   localStorage.setItem(RAWCHAT_PREFIX + pageId, JSON.stringify(messages))
 }
 
+/**
+ * Q&Aをアコーディオンで描画する共通関数(原文チャット・横断チャット共用)。
+ * 直近のやり取りだけ開いた状態にし、それ以前は畳んでおく。
+ * 応答が空文字("")の間は「考え中」アニメーションを出す。
+ */
 function renderQAAccordion(container, messages) {
-  container.innerHTML = messages.map((m, idx) => {
-    const n = idx + 1
-    if (m.role === 'user') {
-      return `<details class="qa-item qa-item-user"><summary class="qa-summary">Q${n}: ${escapeHtml((m.content || '').slice(0, 120))}${(m.content || '').length > 120 ? '…' : ''}</summary><div class="qa-body">${escapeHtml(m.content || '')}</div></details>`
-    }
-    return `<details class="qa-item qa-item-assistant" open><summary class="qa-summary">A${n}</summary><div class="qa-body markdown">${renderMarkdown(m.content || '')}</div></details>`
-  }).join('') || '<p style="font-size:12px;color:var(--text-muted)">この議事録についてQ&Aできます</p>'
+  if (!messages.length) {
+    container.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">質問するとここに表示されます</p>'
+    return
+  }
+  const pairs = []
+  for (let i = 0; i < messages.length; i += 2) pairs.push({ q: messages[i], a: messages[i + 1] })
+
+  container.innerHTML = pairs.map((pair, i) => {
+    const isLast = i === pairs.length - 1
+    const qText = pair.q?.content || ''
+    const hasAssistant = pair.a !== undefined
+    const aContent = pair.a?.content ?? ''
+    const isThinking = !hasAssistant || aContent === ''
+    const answerInner = isThinking
+      ? '<span class="thinking-dots"><span></span><span></span><span></span></span>'
+      : renderMarkdown(aContent)
+    return `
+      <details class="qa-item" ${isLast ? 'open' : ''}>
+        <summary class="qa-summary"><i class="ti ti-chevron-right" aria-hidden="true"></i><span class="qa-summary-text">${escapeHtml(qText)}</span></summary>
+        <div class="qa-body">
+          <div class="chat-msg chat-msg-user"><div class="chat-bubble">${escapeHtml(qText)}</div></div>
+          <div class="chat-msg chat-msg-assistant qa-answer">
+            ${!isThinking ? `<button class="btn qa-copy" data-index="${i}">コピー</button>` : ''}
+            ${answerInner}
+          </div>
+        </div>
+      </details>
+    `
+  }).join('')
+
+  container.querySelectorAll('.qa-copy').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index)
+      const text = pairs[idx]?.a?.content || ''
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'コピーしました'
+        btn.classList.add('copied')
+        setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied') }, 1500)
+      })
+    })
+  })
+
   container.scrollTop = container.scrollHeight
 }
 
@@ -1097,17 +1133,18 @@ async function showRawTranscript(item) {
 // --- 設定モーダル(簡易版) ---
 document.getElementById('open-settings').addEventListener('click', openSettings)
 
-function openSettingsLegacy() {
+function openSettings() {
   const config = loadConfig()
   const settings = loadSettings()
   // 下書き。ここで編集し、保存時にまとめて反映する(キャンセル時は破棄)
-  const draftProfiles = settings.profiles.length ? settings.profiles.map((p) => ({ ...p })) : [newProfile()]
-  let draftActiveId = settings.activeId || draftProfiles[0].id
+  const draftConnections = settings.connections.map((c) => ({ ...c, models: [...(c.models || [])] }))
+  let draftActiveConnectionId = settings.activeConnectionId
+  let draftActiveModel = settings.activeModel
 
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10">
-      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:380px;max-width:90vw;max-height:85vh;overflow-y:auto">
+      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:420px;max-width:90vw;max-height:85vh;overflow-y:auto">
         <h2 style="font-size:15px;margin:0 0 12px">設定</h2>
         <label style="font-size:12px;color:var(--text-secondary)">GAS URL</label>
         <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
@@ -1120,11 +1157,9 @@ function openSettingsLegacy() {
         </div>
         <div id="cfg-role" style="font-size:11px;margin-bottom:14px">${roleLabel(config.role)}</div>
 
-        <div style="display:flex;align-items:center;margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text-secondary);flex:1">AI接続プロファイル</label>
-          <button id="cfg-llm-add" class="btn" style="font-size:11px;padding:3px 9px">+ 追加</button>
-        </div>
-        <div id="cfg-llm-list"></div>
+        <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">AI接続</label>
+        <div id="cfg-conn-list"></div>
+        <button id="cfg-conn-add" class="btn" style="width:100%;font-size:12px;padding:7px 0;margin-bottom:14px"><i class="ti ti-plus" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>接続を追加</button>
 
         <details style="margin:12px 0">
           <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
@@ -1142,55 +1177,94 @@ function openSettingsLegacy() {
     </div>
   `
 
-  /** プロファイル一覧を描画。各カードは開閉式で、使用中はラジオで選ぶ */
-  function paintProfiles() {
-    const listEl = document.getElementById('cfg-llm-list')
-    listEl.innerHTML = draftProfiles.map((p, i) => `
-      <div class="profile-card ${p.id === draftActiveId ? 'active' : ''}" style="border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <input type="radio" name="cfg-active" class="profile-active" data-id="${p.id}" ${p.id === draftActiveId ? 'checked' : ''} />
-          <input type="text" class="profile-label" data-id="${p.id}" value="${escapeHtml(p.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
-          ${draftProfiles.length > 1 ? `<button class="btn profile-delete" data-id="${p.id}" style="font-size:11px;padding:3px 7px">削除</button>` : ''}
+  /** 接続一覧を描画。各カードはbaseUrl/APIキー+モデルのチップ一覧を持つ */
+  function paintConnections() {
+    const listEl = document.getElementById('cfg-conn-list')
+    listEl.innerHTML = draftConnections.map((c) => `
+      <div class="conn-card" data-id="${c.id}" style="border:0.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <input type="text" class="conn-label" data-id="${c.id}" value="${escapeHtml(c.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:13px;font-weight:500;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
+          ${draftConnections.length > 1 ? `<button class="btn conn-delete" data-id="${c.id}" style="font-size:11px;padding:3px 7px"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}
         </div>
-        <input type="text" class="profile-baseurl" data-id="${p.id}" value="${escapeHtml(p.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-apikey" data-id="${p.id}" value="${escapeHtml(p.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-model" data-id="${p.id}" value="${escapeHtml(p.model)}" placeholder="モデル名 (例: gemini-2.5-flash)" style="width:100%;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="conn-baseurl" data-id="${c.id}" value="${escapeHtml(c.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="conn-apikey" data-id="${c.id}" value="${escapeHtml(c.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:8px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:5px">モデル</div>
+        <div class="conn-models" data-id="${c.id}" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+          ${(c.models || []).map((m) => `
+            <span class="conn-model-chip ${c.id === draftActiveConnectionId && m === draftActiveModel ? 'active' : ''}" data-conn="${c.id}" data-model="${escapeHtml(m)}">
+              ${c.id === draftActiveConnectionId && m === draftActiveModel ? '<i class="ti ti-check" aria-hidden="true"></i>' : ''}${escapeHtml(m)}
+              <i class="ti ti-x conn-model-remove" data-conn="${c.id}" data-model="${escapeHtml(m)}" aria-hidden="true"></i>
+            </span>
+          `).join('') || '<span style="font-size:11px;color:var(--text-muted)">未登録</span>'}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" class="conn-model-new" data-id="${c.id}" placeholder="モデル名を追加(例: gemini-2.5-flash)" style="flex:1;min-width:0;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+          <button class="btn conn-model-add" data-id="${c.id}" style="font-size:11px;padding:4px 9px">追加</button>
+        </div>
       </div>
     `).join('')
 
-    listEl.querySelectorAll('.profile-active').forEach((el) => {
-      el.addEventListener('change', () => {
-        draftActiveId = el.dataset.id
-        listEl.querySelectorAll('.profile-card').forEach((c) => c.classList.remove('active'))
-        el.closest('.profile-card').classList.add('active')
-      })
-    })
-    listEl.querySelectorAll('.profile-label, .profile-baseurl, .profile-apikey, .profile-model').forEach((el) => {
+    listEl.querySelectorAll('.conn-label, .conn-baseurl, .conn-apikey').forEach((el) => {
       el.addEventListener('input', () => {
-        const p = draftProfiles.find((p) => p.id === el.dataset.id)
-        if (!p) return
-        if (el.classList.contains('profile-label')) p.label = el.value
-        if (el.classList.contains('profile-baseurl')) p.baseUrl = el.value
-        if (el.classList.contains('profile-apikey')) p.apiKey = el.value
-        if (el.classList.contains('profile-model')) p.model = el.value
+        const c = draftConnections.find((c) => c.id === el.dataset.id)
+        if (!c) return
+        if (el.classList.contains('conn-label')) c.label = el.value
+        if (el.classList.contains('conn-baseurl')) c.baseUrl = el.value
+        if (el.classList.contains('conn-apikey')) c.apiKey = el.value
       })
     })
-    listEl.querySelectorAll('.profile-delete').forEach((el) => {
+    listEl.querySelectorAll('.conn-delete').forEach((el) => {
       el.addEventListener('click', () => {
-        const idx = draftProfiles.findIndex((p) => p.id === el.dataset.id)
+        const idx = draftConnections.findIndex((c) => c.id === el.dataset.id)
         if (idx === -1) return
-        draftProfiles.splice(idx, 1)
-        if (draftActiveId === el.dataset.id) draftActiveId = draftProfiles[0].id
-        paintProfiles()
+        draftConnections.splice(idx, 1)
+        if (draftActiveConnectionId === el.dataset.id) {
+          draftActiveConnectionId = draftConnections[0].id
+          draftActiveModel = draftConnections[0].models?.[0] || null
+        }
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-chip').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('conn-model-remove')) return
+        draftActiveConnectionId = el.dataset.conn
+        draftActiveModel = el.dataset.model
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-remove').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const c = draftConnections.find((c) => c.id === el.dataset.conn)
+        if (!c) return
+        c.models = c.models.filter((m) => m !== el.dataset.model)
+        if (draftActiveConnectionId === c.id && draftActiveModel === el.dataset.model) {
+          draftActiveModel = c.models[0] || null
+        }
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-add').forEach((el) => {
+      el.addEventListener('click', () => {
+        const input = listEl.querySelector(`.conn-model-new[data-id="${el.dataset.id}"]`)
+        const name = input.value.trim()
+        if (!name) return
+        const c = draftConnections.find((c) => c.id === el.dataset.id)
+        if (!c) return
+        if (!c.models.includes(name)) c.models.push(name)
+        if (!draftActiveConnectionId) { draftActiveConnectionId = c.id; draftActiveModel = name }
+        input.value = ''
+        paintConnections()
       })
     })
   }
-  paintProfiles()
+  paintConnections()
 
-  document.getElementById('cfg-llm-add').addEventListener('click', () => {
-    const p = newProfile({ label: `プロファイル${draftProfiles.length + 1}` })
-    draftProfiles.push(p)
-    paintProfiles()
+  document.getElementById('cfg-conn-add').addEventListener('click', () => {
+    const c = newConnection({ label: `接続${draftConnections.length + 1}` })
+    draftConnections.push(c)
+    paintConnections()
   })
 
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
@@ -1200,8 +1274,9 @@ function openSettingsLegacy() {
       gasUrl: document.getElementById('cfg-gas').value.trim(),
       notionToken: document.getElementById('cfg-token').value.trim(),
       code: document.getElementById('cfg-code').value.trim(),
-      llmProfiles: draftProfiles.map(({ label, baseUrl, apiKey, model }) => ({ label, baseUrl, apiKey, model })),
-      activeLlmLabel: draftProfiles.find((p) => p.id === draftActiveId)?.label,
+      connections: draftConnections.map(({ label, baseUrl, apiKey, models }) => ({ label, baseUrl, apiKey, models })),
+      activeConnectionLabel: draftConnections.find((c) => c.id === draftActiveConnectionId)?.label,
+      activeModel: draftActiveModel,
     }
     document.getElementById('cfg-json').value = JSON.stringify(json, null, 2)
   })
@@ -1218,12 +1293,15 @@ function openSettingsLegacy() {
     if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
     if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
 
-    if (Array.isArray(parsed.llmProfiles) && parsed.llmProfiles.length) {
-      draftProfiles.length = 0
-      parsed.llmProfiles.forEach((p) => draftProfiles.push(newProfile(p)))
-      const match = draftProfiles.find((p) => p.label === parsed.activeLlmLabel)
-      draftActiveId = match ? match.id : draftProfiles[0].id
-      paintProfiles()
+    if (Array.isArray(parsed.connections) && parsed.connections.length) {
+      draftConnections.length = 0
+      parsed.connections.forEach((c) => draftConnections.push(newConnection(c)))
+      const match = draftConnections.find((c) => c.label === parsed.activeConnectionLabel)
+      draftActiveConnectionId = (match || draftConnections[0]).id
+      draftActiveModel = parsed.activeModel && (match || draftConnections[0]).models?.includes(parsed.activeModel)
+        ? parsed.activeModel
+        : (match || draftConnections[0]).models?.[0] || null
+      paintConnections()
     }
 
     if (parsed.code) document.getElementById('cfg-verify').click()
@@ -1254,119 +1332,15 @@ function openSettingsLegacy() {
       role: verifiedRole,
     })
 
-    saveSettings({ ...settings, profiles: draftProfiles, activeId: draftActiveId })
+    saveSettings({
+      ...settings,
+      connections: draftConnections,
+      activeConnectionId: draftActiveConnectionId,
+      activeModel: draftActiveModel,
+    })
 
     root.innerHTML = ''
     refresh()
-  })
-}
-
-function openSettings() {
-  const config = loadConfig()
-  const settings = loadSettings()
-  const draftConnections = settings.connections.map((connection) => ({ ...connection, models: [...(connection.models || [])] }))
-  let draftActiveConnectionId = settings.activeConnectionId
-  let draftActiveModel = settings.activeModel
-  const root = document.getElementById('modal-root')
-  root.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10">
-      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:420px;max-width:90vw;max-height:85vh;overflow-y:auto">
-        <h2 style="font-size:15px;margin:0 0 12px">設定</h2>
-        <label style="font-size:12px;color:var(--text-secondary)">GAS URL</label>
-        <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
-        <label style="font-size:12px;color:var(--text-secondary)">共有トークン</label>
-        <input id="cfg-token" value="${config.notionToken}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
-        <label style="font-size:12px;color:var(--text-secondary)">コード</label>
-        <div style="display:flex;gap:6px;margin-bottom:4px"><input id="cfg-code" value="${config.code}" style="flex:1;min-width:0;padding:6px;border:0.5px solid var(--border);border-radius:6px" /><button id="cfg-verify" class="btn">確認</button></div>
-        <div id="cfg-role" style="font-size:11px;margin-bottom:14px">${roleLabel(config.role)}</div>
-        <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">AI接続</label>
-        <div id="cfg-conn-list"></div>
-        <button id="cfg-conn-add" class="btn" style="width:100%;font-size:12px;padding:7px 0;margin-bottom:14px"><i class="ti ti-plus" aria-hidden="true"></i>接続を追加</button>
-        <details style="margin:12px 0"><summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary><textarea id="cfg-json" rows="8" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea><div style="display:flex;gap:8px;margin-top:6px"><button id="cfg-json-export" class="btn" style="font-size:12px">現在の設定を書き出す</button><button id="cfg-json-import" class="btn" style="font-size:12px">この内容を反映</button></div></details>
-        <div style="display:flex;gap:8px;justify-content:flex-end"><button id="cfg-cancel" class="btn">キャンセル</button><button id="cfg-save" class="btn">保存</button></div>
-      </div>
-    </div>`
-
-  function paintConnections() {
-    const listElement = document.getElementById('cfg-conn-list')
-    listElement.innerHTML = draftConnections.map((connection) => `
-      <div class="conn-card" data-id="${connection.id}" style="border:0.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="text" class="conn-label" data-id="${connection.id}" value="${escapeHtml(connection.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:13px;font-weight:500;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />${draftConnections.length > 1 ? `<button class="btn conn-delete" data-id="${connection.id}" style="font-size:11px;padding:3px 7px"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</div>
-        <input type="text" class="conn-baseurl" data-id="${connection.id}" value="${escapeHtml(connection.baseUrl)}" placeholder="baseUrl" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="conn-apikey" data-id="${connection.id}" value="${escapeHtml(connection.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:8px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <div class="conn-models" data-id="${connection.id}" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">${connection.models.map((model) => `<span class="conn-model-chip ${connection.id === draftActiveConnectionId && model === draftActiveModel ? 'active' : ''}" data-conn="${connection.id}" data-model="${escapeHtml(model)}">${connection.id === draftActiveConnectionId && model === draftActiveModel ? '<i class="ti ti-check" aria-hidden="true"></i>' : ''}${escapeHtml(model)}<i class="ti ti-x conn-model-remove" data-conn="${connection.id}" data-model="${escapeHtml(model)}" aria-hidden="true"></i></span>`).join('') || '<span style="font-size:11px;color:var(--text-muted)">未登録</span>'}</div>
-        <div style="display:flex;gap:6px"><input type="text" class="conn-model-new" data-id="${connection.id}" placeholder="モデル名を追加" style="flex:1;min-width:0;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" /><button class="btn conn-model-add" data-id="${connection.id}" style="font-size:11px;padding:4px 9px">追加</button></div>
-      </div>`).join('')
-    listElement.querySelectorAll('.conn-label, .conn-baseurl, .conn-apikey').forEach((element) => element.addEventListener('input', () => {
-      const connection = draftConnections.find((item) => item.id === element.dataset.id)
-      if (!connection) return
-      if (element.classList.contains('conn-label')) connection.label = element.value
-      if (element.classList.contains('conn-baseurl')) connection.baseUrl = element.value
-      if (element.classList.contains('conn-apikey')) connection.apiKey = element.value
-    }))
-    listElement.querySelectorAll('.conn-delete').forEach((element) => element.addEventListener('click', () => {
-      const index = draftConnections.findIndex((connection) => connection.id === element.dataset.id)
-      draftConnections.splice(index, 1)
-      if (draftActiveConnectionId === element.dataset.id) { draftActiveConnectionId = draftConnections[0].id; draftActiveModel = draftConnections[0].models[0] || null }
-      paintConnections()
-    }))
-    listElement.querySelectorAll('.conn-model-chip').forEach((element) => element.addEventListener('click', (event) => {
-      if (event.target.classList.contains('conn-model-remove')) return
-      draftActiveConnectionId = element.dataset.conn; draftActiveModel = element.dataset.model; paintConnections()
-    }))
-    listElement.querySelectorAll('.conn-model-remove').forEach((element) => element.addEventListener('click', (event) => {
-      event.stopPropagation()
-      const connection = draftConnections.find((item) => item.id === element.dataset.conn)
-      connection.models = connection.models.filter((model) => model !== element.dataset.model)
-      if (draftActiveConnectionId === connection.id && draftActiveModel === element.dataset.model) draftActiveModel = connection.models[0] || null
-      paintConnections()
-    }))
-    listElement.querySelectorAll('.conn-model-add').forEach((element) => element.addEventListener('click', () => {
-      const input = listElement.querySelector(`.conn-model-new[data-id="${element.dataset.id}"]`)
-      const model = input.value.trim()
-      const connection = draftConnections.find((item) => item.id === element.dataset.id)
-      if (!model || !connection) return
-      if (!connection.models.includes(model)) connection.models.push(model)
-      if (!draftActiveConnectionId) { draftActiveConnectionId = connection.id; draftActiveModel = model }
-      paintConnections()
-    }))
-  }
-  paintConnections()
-  document.getElementById('cfg-conn-add').addEventListener('click', () => { draftConnections.push(newConnection({ label: `接続${draftConnections.length + 1}` })); paintConnections() })
-  document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
-  document.getElementById('cfg-json-export').addEventListener('click', () => {
-    document.getElementById('cfg-json').value = JSON.stringify({ gasUrl: document.getElementById('cfg-gas').value.trim(), notionToken: document.getElementById('cfg-token').value.trim(), code: document.getElementById('cfg-code').value.trim(), connections: draftConnections.map(({ label, baseUrl, apiKey, models }) => ({ label, baseUrl, apiKey, models })), activeConnectionLabel: draftConnections.find((connection) => connection.id === draftActiveConnectionId)?.label, activeModel: draftActiveModel }, null, 2)
-  })
-  document.getElementById('cfg-json-import').addEventListener('click', () => {
-    try {
-      const parsed = JSON.parse(document.getElementById('cfg-json').value)
-      if (parsed.gasUrl !== undefined) document.getElementById('cfg-gas').value = parsed.gasUrl
-      if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
-      if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
-      if (Array.isArray(parsed.connections) && parsed.connections.length) {
-        draftConnections.splice(0, draftConnections.length, ...parsed.connections.map((connection) => newConnection(connection)))
-        const activeConnection = draftConnections.find((connection) => connection.label === parsed.activeConnectionLabel) || draftConnections[0]
-        draftActiveConnectionId = activeConnection.id
-        draftActiveModel = activeConnection.models.includes(parsed.activeModel) ? parsed.activeModel : activeConnection.models[0] || null
-        paintConnections()
-      }
-      if (parsed.code) document.getElementById('cfg-verify').click()
-      alert('反映しました。内容を確認して「保存」を押してください。')
-    } catch (err) { alert('JSONの形式が不正です: ' + (err.message || err)) }
-  })
-  let verifiedRole = config.role
-  document.getElementById('cfg-verify').addEventListener('click', async () => {
-    const gasUrl = document.getElementById('cfg-gas').value.trim()
-    const code = document.getElementById('cfg-code').value.trim()
-    const roleElement = document.getElementById('cfg-role')
-    if (!gasUrl) { roleElement.innerHTML = '<span style="color:var(--text-danger)">GAS URLを先に入力してください</span>'; return }
-    roleElement.textContent = '確認中...'
-    try { const result = await verifyCode(gasUrl, code); verifiedRole = result.role; roleElement.innerHTML = roleLabel(result.role) } catch (err) { roleElement.innerHTML = `<span style="color:var(--text-danger)">${escapeHtml(String(err.message || err))}</span>` }
-  })
-  document.getElementById('cfg-save').addEventListener('click', () => {
-    saveConfig({ ...config, gasUrl: document.getElementById('cfg-gas').value.trim(), notionToken: document.getElementById('cfg-token').value.trim(), code: document.getElementById('cfg-code').value.trim(), role: verifiedRole })
-    saveSettings({ ...settings, connections: draftConnections, activeConnectionId: draftActiveConnectionId, activeModel: draftActiveModel })
-    root.innerHTML = ''; refresh()
   })
 }
 
@@ -1506,10 +1480,17 @@ const assignBarEl = document.getElementById('assign-bar')
 
 function toggleAssignMode() {
   assignMode = !assignMode
+  assignAllPeriod = true
+  assignPermValue = ''
+  assignBaselineIds = new Set()
   selectedIds.clear()
+  selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
   refresh()
   paintAssignBar()
 }
+
+let assignPermValue = '' // 現在編集対象にしている権限名
+let assignBaselineIds = new Set() // その権限を選んだ時点で付与されていた対象(差分判定の基準)
 
 function paintAssignBar() {
   if (!assignMode) {
@@ -1522,57 +1503,92 @@ function paintAssignBar() {
 
   assignBarEl.innerHTML = `
     <div class="bulk-bar">
-      <span class="bulk-status">${selectedIds.size}件を選択中 — 全期間から選べます</span>
+      <span class="bulk-status">${assignPermValue ? `「${escapeHtml(assignPermValue)}」を編集中 — ` : ''}${selectedIds.size}件を選択中</span>
       <div style="flex:1"></div>
-      <input id="assign-value" list="assign-options" placeholder="権限" style="width:110px;font-size:12px;padding:5px 8px" />
+      <input id="assign-value" list="assign-options" placeholder="権限を選択" value="${escapeHtml(assignPermValue)}" style="width:130px;font-size:12px;padding:5px 8px" />
       <datalist id="assign-options">${[...known].sort().map((p) => `<option value="${escapeHtml(p)}"></option>`).join('')}</datalist>
-      <button class="btn" id="assign-add">割り当て</button>
-      <button class="btn" id="assign-remove">解除</button>
+      <button class="btn" id="assign-update" ${assignPermValue ? '' : 'disabled'}>更新</button>
       <button class="btn" id="assign-exit">終了</button>
     </div>
   `
-  document.getElementById('assign-add').addEventListener('click', () => applyPermissions('add'))
-  document.getElementById('assign-remove').addEventListener('click', () => applyPermissions('remove'))
+  const valueInput = document.getElementById('assign-value')
+  valueInput.addEventListener('change', () => selectPermissionValue(valueInput.value.trim()))
+  valueInput.addEventListener('input', () => {
+    // datalistの候補をクリックした瞬間に反映させる(候補選択はchangeが発火しないブラウザがある)
+    if ([...document.getElementById('assign-options').options].some((o) => o.value === valueInput.value)) {
+      selectPermissionValue(valueInput.value.trim())
+    }
+  })
+  valueInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); selectPermissionValue(valueInput.value.trim()) }
+  })
+  document.getElementById('assign-update').addEventListener('click', applyPermissionsDiff)
   document.getElementById('assign-exit').addEventListener('click', toggleAssignMode)
 }
 
-async function applyPermissions(mode) {
-  const value = document.getElementById('assign-value').value.trim()
-  if (!value) { alert('権限を入力してください'); return }
-  if (!selectedIds.size) { alert('対象を選択してください'); return }
+/**
+ * 権限名を選んだ時点で、現在の絞り込み内でその権限を持つ対象をチェックONにする。
+ * これが「更新」時の差分判定の基準(assignBaselineIds)になる。
+ */
+function selectPermissionValue(value) {
+  if (!value) return
+  assignPermValue = value
+  const candidates = currentFilteredItems()
+  assignBaselineIds = new Set(candidates.filter((i) => (i.permissions || []).includes(value)).map((i) => i.key))
+  selectedIds.clear()
+  assignBaselineIds.forEach((k) => selectedIds.add(k))
+  refresh()
+  paintAssignBar()
+}
 
-  const targets = items.filter((i) => selectedIds.has(i.key))
-  const label = mode === 'add' ? '割り当て' : '解除'
-  if (!confirm(`${targets.length}件に「${value}」を${label}します。よろしいですか?`)) return
+/**
+ * チェック状態の変更箇所から、割り当て(新たにONになった)か解除(新たにOFFになった)かを判定して送信する。
+ */
+async function applyPermissionsDiff() {
+  if (!assignPermValue) { alert('権限を選択してください'); return }
 
-  // GASの6分上限に収まるよう小さめに分割して送る
+  const toAdd = items.filter((i) => selectedIds.has(i.key) && !assignBaselineIds.has(i.key))
+  const toRemove = items.filter((i) => !selectedIds.has(i.key) && assignBaselineIds.has(i.key))
+  if (!toAdd.length && !toRemove.length) { alert('変更箇所がありません'); return }
+
+  if (!confirm(`「${assignPermValue}」を ${toAdd.length}件に割り当て、${toRemove.length}件から解除します。よろしいですか?`)) return
+
   const CHUNK = 20
-  const chunks = []
-  for (let i = 0; i < targets.length; i += CHUNK) chunks.push(targets.slice(i, i + CHUNK))
+  const jobs = []
+  for (let i = 0; i < toAdd.length; i += CHUNK) jobs.push({ mode: 'add', targets: toAdd.slice(i, i + CHUNK) })
+  for (let i = 0; i < toRemove.length; i += CHUNK) jobs.push({ mode: 'remove', targets: toRemove.slice(i, i + CHUNK) })
 
   let updated = 0
   const errors = []
-  for (let i = 0; i < chunks.length; i++) {
-    paintBulkProgress({ current: i + 1, total: chunks.length, title: `${label}中(${chunks[i].length}件ずつ処理)`, done: updated, failed: errors.length, errors: [] })
+  for (let i = 0; i < jobs.length; i++) {
+    const { mode, targets } = jobs[i]
+    paintBulkProgress({
+      current: i + 1,
+      total: jobs.length,
+      title: `${mode === 'add' ? '割り当て' : '解除'}中(${targets.length}件)`,
+      done: updated,
+      failed: errors.length,
+      errors: [],
+    })
     try {
-      const res = await savePermissions(chunks[i].map((t) => t.notionPageId), [value], mode)
+      const res = await savePermissions(targets.map((t) => t.notionPageId), [assignPermValue], mode)
       updated += res.updated
       if (res.errors?.length) errors.push(...res.errors)
+      // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
+      targets.forEach((t) => {
+        const current = t.permissions || []
+        t.permissions = mode === 'add'
+          ? [...new Set([...current, assignPermValue])]
+          : current.filter((p) => p !== assignPermValue)
+      })
     } catch (err) {
       errors.push(String(err.message || err))
     }
   }
-  paintBulkProgress({ finished: true, total: targets.length, done: updated, failed: errors.length, errors })
+  paintBulkProgress({ finished: true, total: toAdd.length + toRemove.length, done: updated, failed: errors.length, errors })
 
-  // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
-  targets.forEach((t) => {
-    const current = t.permissions || []
-    t.permissions = mode === 'add'
-      ? [...new Set([...current, value])]
-      : current.filter((p) => p !== value)
-  })
-
-  selectedIds.clear()
+  // 更新後は現在の状態を新しい基準にして、続けて編集できるようにする
+  assignBaselineIds = new Set(selectedIds)
   refresh()
   paintAssignBar()
 }
@@ -1583,10 +1599,6 @@ document.getElementById('assign-permission').addEventListener('click', toggleAss
 // (毎回 innerHTML で作り直すと入力のたびにフォーカスが外れ、1文字しか打てなくなる)
 document.getElementById('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
-  refresh()
-})
-document.getElementById('show-tags-checkbox').addEventListener('change', (e) => {
-  showTags = e.target.checked
   refresh()
 })
 document.querySelectorAll('.status-filter-chip').forEach((el) => {
@@ -1990,11 +2002,7 @@ function paintCrossChatMessages(space) {
     el.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">左のスペース一覧から選ぶか、新しいスペースを作成してください</p>'
     return
   }
-  el.innerHTML = space.messages.map((m) => m.role === 'user'
-    ? `<div class="chat-msg chat-msg-user"><div class="chat-bubble">${escapeHtml(m.content)}</div></div>`
-    : `<div class="chat-msg chat-msg-assistant">${renderMarkdown(m.content)}</div>`
-  ).join('')
-  el.scrollTop = el.scrollHeight
+  renderQAAccordion(el, space.messages)
 }
 
 async function sendCrossChatMessage() {
@@ -2035,6 +2043,7 @@ ${JSON.stringify(data.items)}`
 
   crossChatBusy = true
   space.messages.push({ role: 'assistant', content: '' })
+  paintCrossChatMessages(space)
   try {
     let full = ''
     for await (const chunk of streamChat(connection, messages)) {
