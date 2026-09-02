@@ -1082,7 +1082,11 @@ async function generateAndSave(item, onProgress) {
   item.status = '要約'
   item.rawContextCount = rawContextCount // index.jsonが未対応でも今回のセッションでは即座に使えるようにする
 
-  return setDetailCache(item.key, {
+  if (result.agendaMissing) {
+    console.warn(`[議事なし] 「${item.title}」の要約で議事(agenda)が生成されませんでした。モデル: ${result.model}。大きいモデルで再生成すると改善する場合があります。`)
+  }
+
+  const saved = setDetailCache(item.key, {
     cardSummary: result.cardSummary,
     detail: {
       agenda: result.agenda,
@@ -1092,8 +1096,11 @@ async function generateAndSave(item, onProgress) {
     },
     model: result.model,
     generatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     rawContextCount,
   })
+  saved.agendaMissing = result.agendaMissing
+  return saved
 }
 
 async function runGenerate(target, item) {

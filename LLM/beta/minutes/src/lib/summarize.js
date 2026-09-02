@@ -18,9 +18,12 @@ const SYSTEM_PROMPT = `あなたは会議の文字起こしを要約するアシ
   "topics": ["未解決の論点や気になる点を1件1文字列で"]
 }
 
-agenda は議題ごとに分けてください。points には「なぜそうなったか」が後から追える
-よう、背景・提起された問題・検討された選択肢を順に並べてください。
-該当する項目が無い場合は空配列にしてください。日本語で出力してください。`
+agenda は必須項目です。省略や空配列は認められません。会議で話された議題を
+必ず1つ以上、議題ごとに分けて出力してください。points には「なぜそうなったか」が
+後から追えるよう、背景・提起された問題・検討された選択肢を順に並べてください。
+decisions / todos / topics は該当が無ければ空配列で構いません。
+5つのキー(cardSummary, agenda, decisions, todos, topics)すべてを含めてください。
+日本語で出力してください。`
 
 function extractJson(text) {
   const trimmed = text.trim()
@@ -57,12 +60,16 @@ export async function generateSummary(transcriptText, onProgress) {
   }
 
   const parsed = extractJson(full)
+  const agenda = Array.isArray(parsed.agenda) ? parsed.agenda : []
   return {
     cardSummary: String(parsed.cardSummary || ''),
-    agenda: Array.isArray(parsed.agenda) ? parsed.agenda : [],
+    agenda,
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
     todos: (Array.isArray(parsed.todos) ? parsed.todos : []).map((t) => ({ text: String(t), done: false })),
     topics: Array.isArray(parsed.topics) ? parsed.topics : [],
     model: connection.model,
+    // 議事は入れ子構造のため小さいモデルでは省略されることがある。
+    // 黙って空のまま保存すると「議事が未登録」に見えてしまうため、呼び出し側へ通知する。
+    agendaMissing: agenda.length === 0,
   }
 }
