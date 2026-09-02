@@ -1,46 +1,680 @@
-{
-  "config": {
-    "title": "マイリソース",
-    "cardMin": 180,
-    "thumbH": 110,
-    "gap": 14,
-    "radius": 14,
-    "fade": 350,
-    "indexPath": "index.json"
-  },
-  "resources": [
-    {
-      "id": "r001",
-      "title": "社内問い合わせボット",
-      "url": "https://example.com/bot",
-      "category": "AI",
-      "runType": "web",
-      "cardSize": "wide",
-      "thumb": "assets/thumbs/bot.png",
-      "preview": "assets/previews/bot.mp4",
-      "type": "site"
-    },
-    {
-      "id": "r002",
-      "title": "売上管理表",
-      "url": "https://example.sharepoint.com/sales.xlsx",
-      "category": "資料",
-      "runType": "web",
-      "cardSize": "normal",
-      "thumb": "assets/thumbs/sales.png",
-      "preview": null,
-      "type": "excel"
-    },
-    {
-      "id": "r003",
-      "title": "画像処理ツール（配布版）",
-      "url": "https://github.com/yourname/imgtool/releases",
-      "category": "アプリ",
-      "runType": "download",
-      "cardSize": "normal",
-      "thumb": null,
-      "preview": "assets/previews/imgtool.mp4",
-      "type": "site"
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マイリソース</title>
+<style>
+  :root{
+    --bg:#14171C;
+    --surface:#1C2028;
+    --surface-2:#242833;
+    --border:#2E323C;
+    --border-strong:#3B4049;
+    --text:#EDEBE6;
+    --text-secondary:#9A968D;
+    --text-muted:#66625A;
+    --accent:#5FA8A0;
+    --accent-soft:rgba(95,168,160,0.16);
+    --danger:#D9694F;
+    --radius:10px;
+
+    /* 設定から動的に上書きされる値 */
+    --card-min:160px;
+    --thumb-h:110px;
+    --grid-gap:14px;
+    --card-radius:14px;
+    --fade:0.35s;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 20px 80px;}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:0.2px;}
+  .head-actions{display:flex;gap:8px;}
+  .icon-btn{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    color:var(--text-secondary);padding:9px 11px;font-size:13px;cursor:pointer;transition:all .15s ease;
+  }
+  .icon-btn:hover{border-color:var(--border-strong);color:var(--text);}
+  .add-btn{
+    display:flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);
+    border:1px solid transparent;border-radius:var(--radius);padding:9px 14px;
+    font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease;
+  }
+  .add-btn:hover{background:rgba(95,168,160,0.26);}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+  .search-input{
+    flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;outline:none;
+  }
+  .search-input:focus{border-color:var(--border-strong);}
+  .search-input::placeholder{color:var(--text-muted);}
+  .size-group{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;}
+  .size-group button{
+    background:transparent;border:none;color:var(--text-muted);font-size:12px;
+    padding:5px 10px;border-radius:7px;cursor:pointer;
+  }
+  .size-group button.active{background:var(--surface-2);color:var(--text);}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
+  .chip{
+    flex-shrink:0;font-size:12px;padding:6px 12px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap;transition:all .15s ease;
+  }
+  .chip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+  .chip:hover:not(.active){border-color:var(--border-strong);color:var(--text);}
+
+  .grid{
+    display:grid;gap:var(--grid-gap);
+    grid-template-columns:repeat(auto-fill,minmax(var(--card-min),1fr));
+    grid-auto-rows:auto;
+  }
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--card-radius);
+    overflow:hidden;cursor:pointer;position:relative;transition:border-color .2s ease;
+  }
+  .card:hover{border-color:var(--border-strong);}
+  .card[data-size="wide"]{grid-column:span 2;}
+  .card[data-size="large"]{grid-column:span 2;}
+  .card[data-size="large"] .thumb{height:calc(var(--thumb-h) * 1.7);}
+  .card[data-size="wide"] .thumb{height:var(--thumb-h);}
+
+  .thumb{
+    position:relative;height:var(--thumb-h);background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+  }
+  .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .base-layer,.hover-layer{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    transition:opacity var(--fade) ease;
+  }
+  .hover-layer{opacity:0;}
+  .card:hover .hover-layer,.card.preview-on .hover-layer{opacity:1;}
+  .card:hover .base-layer,.card.preview-on .base-layer{opacity:0;}
+
+  .type-badge{
+    position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
+    background:rgba(20,23,28,0.8);display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--text-secondary);z-index:2;
+  }
+  .run-badge{
+    position:absolute;bottom:8px;left:8px;font-size:10px;padding:3px 7px;border-radius:5px;
+    background:rgba(20,23,28,0.8);color:var(--text-secondary);z-index:2;
+  }
+  .fallback-icon{font-size:26px;color:var(--text-muted);}
+  .card-actions{position:absolute;top:8px;left:8px;display:none;gap:4px;z-index:3;}
+  .card:hover .card-actions{display:flex;}
+  .mini-btn{
+    width:22px;height:22px;border-radius:6px;background:rgba(20,23,28,0.8);
+    color:var(--text-secondary);display:flex;align-items:center;justify-content:center;
+    font-size:11px;cursor:pointer;border:none;
+  }
+  .mini-btn:hover{color:var(--text);}
+  .mini-btn.del:hover{color:var(--danger);}
+
+  .card-body{padding:10px 11px 12px;}
+  .card-title{
+    font-size:13px;font-weight:600;line-height:1.4;margin:0 0 3px;overflow:hidden;
+    text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  }
+  .card-meta{font-size:11px;color:var(--text-muted);}
+
+  .empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty .big{font-size:15px;color:var(--text-secondary);}
+  .empty p{margin:6px 0 0;font-size:13px;}
+
+  .overlay{display:none;position:fixed;inset:0;background:rgba(10,11,14,0.65);align-items:center;justify-content:center;z-index:20;padding:16px;}
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    width:100%;max-width:520px;padding:22px;max-height:88vh;overflow-y:auto;
+  }
+  .modal h2{font-size:16px;margin:0 0 4px;font-weight:600;}
+  .modal .sub{font-size:12px;color:var(--text-muted);margin:0 0 18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
+  .field input,.field select,.field textarea{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;
+  }
+  .field textarea{min-height:240px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:1.6;resize:vertical;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--border-strong);}
+  .field .hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
+  .field .err{font-size:11px;color:var(--danger);margin-top:5px;display:none;}
+  .range-row{display:flex;align-items:center;gap:10px;}
+  .range-row input[type=range]{flex:1;accent-color:var(--accent);}
+  .range-row .val{font-size:12px;color:var(--text-secondary);min-width:52px;text-align:right;}
+
+  .tabs{display:flex;gap:4px;background:var(--surface-2);border-radius:var(--radius);padding:3px;margin-bottom:18px;}
+  .tabs button{flex:1;background:transparent;border:none;color:var(--text-muted);font-size:12px;padding:7px;border-radius:7px;cursor:pointer;}
+  .tabs button.active{background:var(--surface);color:var(--text);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .btn{flex:1;padding:11px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#0F1512;}
+  .btn-secondary{background:transparent;color:var(--text-secondary);}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--radius);
+    padding:11px 18px;font-size:13px;z-index:40;opacity:0;transition:all .25s ease;pointer-events:none;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+  .status-line{font-size:11px;color:var(--text-muted);margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="pageTitle">マイリソース</h1>
+    <div class="head-actions">
+      <button class="icon-btn" id="openSettings">設定</button>
+      <button class="add-btn" id="openAdd">＋ 追加</button>
+    </div>
+  </header>
+
+  <div class="status-line mono" id="statusLine">読み込み中…</div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="searchInput" placeholder="検索">
+    <div class="size-group" id="sizeGroup">
+      <button data-size="140">小</button>
+      <button data-size="180" class="active">中</button>
+      <button data-size="240">大</button>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- 追加・編集モーダル -->
+<div class="overlay" id="itemOverlay">
+  <div class="modal">
+    <h2 id="itemModalTitle">リンクを追加</h2>
+    <p class="sub">画像・動画は assets/ 配下の相対パスでも指定できます</p>
+    <div class="field">
+      <label>タイトル</label>
+      <input type="text" id="f-title" placeholder="例: 社内問い合わせボット">
+      <div class="err" id="err-title">タイトルを入力してください</div>
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input type="text" id="f-url" placeholder="https://example.com">
+      <div class="hint">YouTube / Excel Web / サイトを自動判定します</div>
+      <div class="err" id="err-url">http:// または https:// から始まるURLを入力してください</div>
+    </div>
+    <div class="field">
+      <label>カテゴリ</label>
+      <input type="text" id="f-category" placeholder="例: AI / 資料 / アプリ">
+    </div>
+    <div class="field">
+      <label>実行方法</label>
+      <select id="f-runtype">
+        <option value="web">Webアプリ</option>
+        <option value="download">ダウンロードして使う</option>
+        <option value="local">ローカル実行</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>カードの大きさ</label>
+      <select id="f-cardsize">
+        <option value="normal">標準</option>
+        <option value="wide">横2列分</option>
+        <option value="large">横2列分・背高</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>サムネイル画像（任意）</label>
+      <input type="text" id="f-thumb" placeholder="assets/thumbs/bot.png">
+    </div>
+    <div class="field">
+      <label>ホバー時プレビュー: 画像またはmp4（任意）</label>
+      <input type="text" id="f-preview" placeholder="assets/previews/bot.mp4">
+      <div class="hint">.mp4 なら動画として自動ループ再生します</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelItem">キャンセル</button>
+      <button class="btn btn-primary" id="saveItem">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>設定</h2>
+    <p class="sub">見た目の調整と、index.json の読み書き</p>
+    <div class="tabs" id="settingsTabs">
+      <button data-tab="display" class="active">表示</button>
+      <button data-tab="data">データ</button>
+      <button data-tab="json">JSON編集</button>
+    </div>
+
+    <div class="tab-panel active" data-panel="display">
+      <div class="field">
+        <label>ページタイトル</label>
+        <input type="text" id="s-title">
+      </div>
+      <div class="field">
+        <label>カード最小幅</label>
+        <div class="range-row">
+          <input type="range" id="s-cardmin" min="120" max="320" step="10">
+          <span class="val mono" id="v-cardmin"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>サムネイル高さ</label>
+        <div class="range-row">
+          <input type="range" id="s-thumbh" min="70" max="240" step="10">
+          <span class="val mono" id="v-thumbh"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>カード間の余白</label>
+        <div class="range-row">
+          <input type="range" id="s-gap" min="6" max="32" step="2">
+          <span class="val mono" id="v-gap"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>角の丸み</label>
+        <div class="range-row">
+          <input type="range" id="s-radius" min="0" max="24" step="2">
+          <span class="val mono" id="v-radius"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>クロスフェードの速さ</label>
+        <div class="range-row">
+          <input type="range" id="s-fade" min="0" max="1200" step="50">
+          <span class="val mono" id="v-fade"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="data">
+      <div class="field">
+        <label>index.json の場所</label>
+        <input type="text" id="s-indexpath" placeholder="index.json">
+        <div class="hint">同じリポジトリに置く場合は index.json のままでOK</div>
+      </div>
+      <div class="field">
+        <label>公開データの反映</label>
+        <button class="icon-btn" id="btn-export" style="width:100%;margin-bottom:8px;">index.json を書き出す</button>
+        <button class="icon-btn" id="btn-copyjson" style="width:100%;margin-bottom:8px;">JSONをコピー</button>
+        <button class="icon-btn" id="btn-reload" style="width:100%;">index.json を再読み込み（編集を破棄）</button>
+        <div class="hint">書き出したファイルをリポジトリに置いて push すると、全員に反映されます</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="json">
+      <div class="field">
+        <label>設定とリンクをJSONで直接編集</label>
+        <textarea id="s-json" spellcheck="false"></textarea>
+        <div class="err" id="err-json">JSONの形式が正しくありません</div>
+        <div class="hint">貼り付けて「適用」を押すと、この内容で置き換わります</div>
+      </div>
+      <button class="btn btn-primary" id="btn-applyjson" style="width:100%;">JSONを適用</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="closeSettings">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TYPE_ICON = { youtube:'▶', excel:'▦', site:'◎' };
+const RUN_LABEL = { web:'Web', download:'DL', local:'Local' };
+const DEFAULT_CONFIG = {
+  title:'マイリソース',
+  cardMin:180,
+  thumbH:110,
+  gap:14,
+  radius:14,
+  fade:350,
+  indexPath:'index.json'
+};
+
+let config = { ...DEFAULT_CONFIG };
+let resources = [];
+let activeCategory = 'すべて';
+let editingId = null;
+
+/* ---------- ストレージ抽象化（Claudeプレビュー / GitHub Pages 両対応） ---------- */
+const store = {
+  async get(key){
+    if(typeof window.storage !== 'undefined'){
+      try{ const r = await window.storage.get(key, false); return r ? r.value : null; }
+      catch(e){ return null; }
     }
-  ]
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  },
+  async set(key, value){
+    if(typeof window.storage !== 'undefined'){
+      try{ await window.storage.set(key, value, false); return; }catch(e){}
+    }
+    try{ localStorage.setItem(key, value); }catch(e){}
+  }
+};
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
 }
+
+function detectType(url){
+  if(/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+  if(/office\.com|sharepoint\.com|docs\.google\.com\/spreadsheets|\.xlsx/.test(url)) return 'excel';
+  return 'site';
+}
+
+function applyConfig(){
+  const r = document.documentElement.style;
+  r.setProperty('--card-min', config.cardMin + 'px');
+  r.setProperty('--thumb-h', config.thumbH + 'px');
+  r.setProperty('--grid-gap', config.gap + 'px');
+  r.setProperty('--card-radius', config.radius + 'px');
+  r.setProperty('--fade', (config.fade/1000) + 's');
+  document.getElementById('pageTitle').textContent = config.title;
+  document.title = config.title;
+  document.querySelectorAll('#sizeGroup button').forEach(b=>{
+    b.classList.toggle('active', Number(b.dataset.size) === config.cardMin);
+  });
+}
+
+async function persistLocal(){
+  await store.set('dashboardState', JSON.stringify({ config, resources }));
+}
+
+/* ---------- 初期読み込み: index.json → ローカル編集を優先 ---------- */
+async function init(){
+  let published = null;
+  try{
+    const res = await fetch(DEFAULT_CONFIG.indexPath, { cache:'no-store' });
+    if(res.ok) published = await res.json();
+  }catch(e){ /* ファイルが無い場合は無視 */ }
+
+  const local = await store.get('dashboardState');
+  if(local){
+    try{
+      const parsed = JSON.parse(local);
+      config = { ...DEFAULT_CONFIG, ...(parsed.config || {}) };
+      resources = parsed.resources || [];
+      setStatus(published ? 'ローカルの編集内容を表示中（未公開の変更があります）' : 'ローカルの編集内容を表示中');
+    }catch(e){
+      resources = [];
+    }
+  }else if(published){
+    config = { ...DEFAULT_CONFIG, ...(published.config || {}) };
+    resources = published.resources || [];
+    setStatus('index.json を読み込みました');
+  }else{
+    setStatus('index.json が見つかりません。追加した内容は書き出して公開できます');
+  }
+  applyConfig();
+  render();
+}
+
+function setStatus(msg){
+  document.getElementById('statusLine').textContent = msg;
+}
+
+/* ---------- 描画 ---------- */
+function renderChips(){
+  const cats = ['すべて', ...new Set(resources.map(r=>r.category).filter(Boolean))];
+  const el = document.getElementById('chips');
+  el.innerHTML = '';
+  cats.forEach(cat=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (cat===activeCategory ? ' active' : '');
+    c.textContent = cat;
+    c.onclick = ()=>{ activeCategory = cat; render(); };
+    el.appendChild(c);
+  });
+}
+
+function thumbHTML(r){
+  const base = r.thumb
+    ? `<img src="${r.thumb}" alt="">`
+    : `<span class="fallback-icon">${TYPE_ICON[r.type]||'◎'}</span>`;
+  let hover = '';
+  if(r.preview){
+    hover = /\.mp4($|\?)/i.test(r.preview)
+      ? `<video src="${r.preview}" muted loop playsinline autoplay></video>`
+      : `<img src="${r.preview}" alt="">`;
+  }
+  return `
+    <div class="thumb">
+      <div class="base-layer">${base}</div>
+      ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
+      <div class="type-badge">${TYPE_ICON[r.type]||'◎'}</div>
+      <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
+      <div class="card-actions">
+        <button class="mini-btn edit" data-edit="${r.id}" title="編集">✎</button>
+        <button class="mini-btn del" data-del="${r.id}" title="削除">✕</button>
+      </div>
+    </div>`;
+}
+
+function render(){
+  renderChips();
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const list = resources.filter(r=>{
+    const okCat = activeCategory==='すべて' || r.category===activeCategory;
+    const okQ = !q || (r.title||'').toLowerCase().includes(q);
+    return okCat && okQ;
+  });
+
+  const grid = document.getElementById('grid');
+  if(list.length===0){
+    grid.innerHTML = `<div class="empty"><div class="big">まだリンクがありません</div><p>右上の「追加」から、アプリ・資料・動画を登録できます</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(r=>`
+    <div class="card" data-id="${r.id}" data-url="${r.url}" data-size="${r.cardSize||'normal'}">
+      ${thumbHTML(r)}
+      <div class="card-body">
+        <div class="card-title">${r.title}</div>
+        <div class="card-meta mono">${r.category || '未分類'}</div>
+      </div>
+    </div>`).join('');
+
+  grid.querySelectorAll('.card').forEach(card=>{
+    card.addEventListener('click', e=>{
+      if(e.target.closest('.card-actions')) return;
+      window.open(card.dataset.url, '_blank');
+    });
+  });
+  grid.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      resources = resources.filter(r=>r.id !== b.dataset.del);
+      await persistLocal(); render();
+      setStatus('削除しました。公開するには index.json を書き出してください');
+    });
+  });
+  grid.querySelectorAll('[data-edit]').forEach(b=>{
+    b.addEventListener('click', e=>{ e.stopPropagation(); openItemModal(b.dataset.edit); });
+  });
+}
+
+document.getElementById('searchInput').addEventListener('input', render);
+
+document.getElementById('sizeGroup').addEventListener('click', async e=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  config.cardMin = Number(btn.dataset.size);
+  applyConfig(); await persistLocal();
+});
+
+/* ---------- 追加・編集モーダル ---------- */
+const itemOverlay = document.getElementById('itemOverlay');
+const F = id => document.getElementById(id);
+
+function openItemModal(id){
+  editingId = id || null;
+  const r = id ? resources.find(x=>x.id===id) : null;
+  F('itemModalTitle').textContent = r ? 'リンクを編集' : 'リンクを追加';
+  F('f-title').value = r ? (r.title||'') : '';
+  F('f-url').value = r ? (r.url||'') : '';
+  F('f-category').value = r ? (r.category||'') : '';
+  F('f-runtype').value = r ? (r.runType||'web') : 'web';
+  F('f-cardsize').value = r ? (r.cardSize||'normal') : 'normal';
+  F('f-thumb').value = r ? (r.thumb||'') : '';
+  F('f-preview').value = r ? (r.preview||'') : '';
+  F('err-title').style.display='none';
+  F('err-url').style.display='none';
+  itemOverlay.classList.add('show');
+}
+document.getElementById('openAdd').onclick = ()=>openItemModal(null);
+document.getElementById('cancelItem').onclick = ()=>itemOverlay.classList.remove('show');
+
+document.getElementById('saveItem').onclick = async ()=>{
+  const title = F('f-title').value.trim();
+  const url = F('f-url').value.trim();
+  let bad = false;
+  if(!title){ F('err-title').style.display='block'; bad=true; } else F('err-title').style.display='none';
+  if(!/^https?:\/\/.+/.test(url)){ F('err-url').style.display='block'; bad=true; } else F('err-url').style.display='none';
+  if(bad) return;
+
+  const data = {
+    title, url,
+    category: F('f-category').value.trim(),
+    runType: F('f-runtype').value,
+    cardSize: F('f-cardsize').value,
+    thumb: F('f-thumb').value.trim() || null,
+    preview: F('f-preview').value.trim() || null,
+    type: detectType(url)
+  };
+  if(editingId){
+    const i = resources.findIndex(r=>r.id===editingId);
+    resources[i] = { ...resources[i], ...data };
+  }else{
+    resources.push({ id:'r'+Date.now(), ...data });
+  }
+  await persistLocal();
+  itemOverlay.classList.remove('show');
+  render();
+  setStatus('保存しました。公開するには index.json を書き出してください');
+};
+
+/* ---------- 設定モーダル ---------- */
+const settingsOverlay = document.getElementById('settingsOverlay');
+
+function syncSettingsForm(){
+  F('s-title').value = config.title;
+  F('s-indexpath').value = config.indexPath;
+  const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
+                 ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']];
+  pairs.forEach(([input,label,key,unit])=>{
+    F(input).value = config[key];
+    F(label).textContent = config[key] + unit;
+  });
+  F('s-json').value = JSON.stringify({ config, resources }, null, 2);
+  F('err-json').style.display = 'none';
+}
+
+document.getElementById('openSettings').onclick = ()=>{ syncSettingsForm(); settingsOverlay.classList.add('show'); };
+document.getElementById('closeSettings').onclick = ()=>settingsOverlay.classList.remove('show');
+
+document.getElementById('settingsTabs').addEventListener('click', e=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#settingsTabs button').forEach(b=>b.classList.toggle('active', b===btn));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===btn.dataset.tab));
+});
+
+F('s-title').addEventListener('input', async e=>{ config.title = e.target.value || 'マイリソース'; applyConfig(); await persistLocal(); });
+F('s-indexpath').addEventListener('input', async e=>{ config.indexPath = e.target.value.trim() || 'index.json'; await persistLocal(); });
+
+[['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
+ ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']]
+.forEach(([input,label,key,unit])=>{
+  F(input).addEventListener('input', async e=>{
+    config[key] = Number(e.target.value);
+    F(label).textContent = config[key] + unit;
+    applyConfig(); await persistLocal();
+  });
+});
+
+/* ---------- JSON編集 ---------- */
+document.getElementById('btn-applyjson').onclick = async ()=>{
+  try{
+    const parsed = JSON.parse(F('s-json').value);
+    if(!Array.isArray(parsed.resources)) throw new Error('resources が配列ではありません');
+    config = { ...DEFAULT_CONFIG, ...(parsed.config || {}) };
+    resources = parsed.resources.map(r=>({
+      ...r,
+      id: r.id || 'r'+Math.random().toString(36).slice(2,9),
+      type: r.type || detectType(r.url || '')
+    }));
+    F('err-json').style.display = 'none';
+    applyConfig(); await persistLocal(); render(); syncSettingsForm();
+    toast('JSONを適用しました');
+  }catch(err){
+    F('err-json').textContent = 'JSONの形式が正しくありません: ' + err.message;
+    F('err-json').style.display = 'block';
+  }
+};
+
+/* ---------- index.json の書き出し / 再読み込み ---------- */
+function currentJSON(){
+  return JSON.stringify({ config, resources }, null, 2);
+}
+
+document.getElementById('btn-export').onclick = ()=>{
+  const blob = new Blob([currentJSON()], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'index.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('index.json を書き出しました');
+};
+
+document.getElementById('btn-copyjson').onclick = async ()=>{
+  try{
+    await navigator.clipboard.writeText(currentJSON());
+    toast('JSONをコピーしました');
+  }catch(e){
+    F('s-json').select();
+    toast('JSON編集タブから手動でコピーしてください');
+  }
+};
+
+document.getElementById('btn-reload').onclick = async ()=>{
+  try{
+    const res = await fetch(config.indexPath, { cache:'no-store' });
+    if(!res.ok) throw new Error('読み込めませんでした');
+    const data = await res.json();
+    config = { ...DEFAULT_CONFIG, ...(data.config || {}) };
+    resources = data.resources || [];
+    await persistLocal();
+    applyConfig(); render(); syncSettingsForm();
+    setStatus('index.json を再読み込みしました');
+    toast('index.json を反映しました');
+  }catch(e){
+    toast('index.json を読み込めませんでした');
+  }
+};
+
+init();
+</script>
+</body>
+</html>
