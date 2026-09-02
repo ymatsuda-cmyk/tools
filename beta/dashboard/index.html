@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リソース</title>
+<style>
+  :root{
+    --bg:#14171C;
+    --surface:#1C2028;
+    --surface-2:#242833;
+    --border:#2E323C;
+    --border-strong:#3B4049;
+    --text:#EDEBE6;
+    --text-secondary:#9A968D;
+    --text-muted:#66625A;
+    --accent:#5FA8A0;
+    --accent-soft:rgba(95,168,160,0.16);
+    --danger:#D9694F;
+    --radius:10px;
+    --radius-lg:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 20px 80px;}
+
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:0.2px;}
+  .add-btn{
+    display:flex;align-items:center;gap:6px;
+    background:var(--accent-soft);color:var(--accent);
+    border:1px solid transparent;border-radius:var(--radius);
+    padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
+    transition:background .15s ease;
+  }
+  .add-btn:hover{background:rgba(95,168,160,0.26);}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .search-input{
+    flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;outline:none;
+  }
+  .search-input:focus{border-color:var(--border-strong);}
+  .search-input::placeholder{color:var(--text-muted);}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;}
+  .chip{
+    flex-shrink:0;font-size:12px;padding:6px 12px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .chip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+  .chip:hover:not(.active){border-color:var(--border-strong);color:var(--text);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+    overflow:hidden;cursor:pointer;position:relative;transition:border-color .2s ease;
+  }
+  .card:hover{border-color:var(--border-strong);}
+
+  .thumb{
+    position:relative;height:100px;background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+  }
+  .thumb img, .thumb video{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  }
+  .thumb .base-layer, .thumb .hover-layer{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    transition:opacity .35s ease;
+  }
+  .thumb .hover-layer{opacity:0;}
+  .card:hover .hover-layer, .card.preview-on .hover-layer{opacity:1;}
+  .card:hover .base-layer, .card.preview-on .base-layer{opacity:0;}
+
+  .type-badge{
+    position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
+    background:rgba(20,23,28,0.78);display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--text-secondary);z-index:2;
+  }
+  .run-badge{
+    position:absolute;bottom:8px;left:8px;font-size:10px;padding:3px 7px;border-radius:5px;
+    background:rgba(20,23,28,0.78);color:var(--text-secondary);z-index:2;letter-spacing:0.2px;
+  }
+  .fallback-icon{font-size:26px;color:var(--text-muted);}
+
+  .card-body{padding:10px 11px 12px;}
+  .card-title{font-size:13px;font-weight:600;line-height:1.4;margin:0 0 3px;
+    overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .card-meta{font-size:11px;color:var(--text-muted);}
+
+  .del-btn{
+    position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:6px;
+    background:rgba(20,23,28,0.78);color:var(--text-secondary);display:none;
+    align-items:center;justify-content:center;font-size:13px;z-index:3;cursor:pointer;
+  }
+  .card:hover .del-btn{display:flex;}
+  .del-btn:hover{color:var(--danger);}
+
+  .empty{
+    grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted);
+  }
+  .empty p{margin:6px 0 0;font-size:13px;}
+  .empty .big{font-size:15px;color:var(--text-secondary);}
+
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(10,11,14,0.6);
+    align-items:flex-end;justify-content:center;z-index:10;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--surface);border-top:1px solid var(--border);
+    border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 26px;
+    max-height:88vh;overflow-y:auto;
+  }
+  .modal h2{font-size:16px;margin:0 0 16px;font-weight:600;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
+  .field input, .field select{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;
+  }
+  .field input:focus, .field select:focus{border-color:var(--border-strong);}
+  .field .hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
+  .field .err{font-size:11px;color:var(--danger);margin-top:5px;display:none;}
+
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .btn{flex:1;padding:11px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#0F1512;}
+  .btn-secondary{background:transparent;color:var(--text-secondary);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>マイリソース</h1>
+    <button class="add-btn" id="openAdd">＋ 追加</button>
+  </header>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="searchInput" placeholder="検索">
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>リンクを追加</h2>
+    <div class="field">
+      <label>タイトル</label>
+      <input type="text" id="f-title" placeholder="例: 社内問い合わせボット">
+      <div class="err" id="err-title">タイトルを入力してください</div>
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input type="text" id="f-url" placeholder="https://example.com">
+      <div class="hint">YouTube / Excel Web / サイトを自動判定します</div>
+      <div class="err" id="err-url">有効なURLを入力してください</div>
+    </div>
+    <div class="field">
+      <label>カテゴリ</label>
+      <input type="text" id="f-category" placeholder="例: AI / 資料 / アプリ">
+    </div>
+    <div class="field">
+      <label>実行方法</label>
+      <select id="f-runtype">
+        <option value="web">Webアプリ</option>
+        <option value="download">ダウンロードして使う</option>
+        <option value="local">ローカル実行</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>サムネイル画像（任意）</label>
+      <input type="text" id="f-thumb" placeholder="assets/thumbs/xxx.png または https://...">
+      <div class="hint">GitHub Pagesに画像を置く場合は相対パスでもOK</div>
+    </div>
+    <div class="field">
+      <label>ホバー時プレビュー: 画像またはmp4（任意）</label>
+      <input type="text" id="f-preview" placeholder="assets/previews/xxx.mp4 または https://...">
+      <div class="hint">.mp4なら動画、それ以外は画像として扱います。相対パス可</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelAdd">キャンセル</button>
+      <button class="btn btn-primary" id="saveAdd">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TYPE_ICON = { youtube:'▶', excel:'▦', site:'◎' };
+const RUN_LABEL = { web:'Web', download:'DL', local:'Local' };
+let resources = [];
+let activeCategory = 'すべて';
+
+function detectType(url){
+  if(/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+  if(/office\.com|sharepoint\.com|docs\.google\.com\/spreadsheets|\.xlsx/.test(url)) return 'excel';
+  return 'site';
+}
+
+async function loadResources(){
+  try{
+    const res = await window.storage.get('resources', false);
+    resources = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    resources = [];
+  }
+  render();
+}
+
+async function saveResources(){
+  try{
+    await window.storage.set('resources', JSON.stringify(resources), false);
+  }catch(e){
+    console.error('保存に失敗しました', e);
+  }
+}
+
+function renderChips(){
+  const cats = ['すべて', ...new Set(resources.map(r => r.category).filter(Boolean))];
+  const chipsEl = document.getElementById('chips');
+  chipsEl.innerHTML = '';
+  cats.forEach(cat => {
+    const el = document.createElement('div');
+    el.className = 'chip' + (cat === activeCategory ? ' active' : '');
+    el.textContent = cat;
+    el.onclick = () => { activeCategory = cat; render(); };
+    chipsEl.appendChild(el);
+  });
+}
+
+function cardThumbHTML(r){
+  const badge = `<div class="type-badge">${TYPE_ICON[r.type] || '◎'}</div>`;
+  const base = r.thumb
+    ? `<img src="${r.thumb}" alt="">`
+    : `<span class="fallback-icon">${TYPE_ICON[r.type] || '◎'}</span>`;
+  let hover = '';
+  if(r.preview){
+    if(/\.mp4($|\?)/i.test(r.preview)){
+      hover = `<video src="${r.preview}" muted loop playsinline autoplay></video>`;
+    }else{
+      hover = `<img src="${r.preview}" alt="">`;
+    }
+  }
+  const runBadge = `<div class="run-badge mono">${RUN_LABEL[r.runType] || 'Web'}</div>`;
+  return `
+    <div class="thumb">
+      <div class="base-layer">${base}</div>
+      ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
+      ${badge}
+      ${runBadge}
+      <div class="del-btn" data-del="${r.id}">✕</div>
+    </div>`;
+}
+
+function render(){
+  renderChips();
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filtered = resources.filter(r => {
+    const matchCat = activeCategory === 'すべて' || r.category === activeCategory;
+    const matchQ = !q || r.title.toLowerCase().includes(q);
+    return matchCat && matchQ;
+  });
+
+  const grid = document.getElementById('grid');
+  if(filtered.length === 0){
+    grid.innerHTML = `<div class="empty"><div class="big">まだリンクがありません</div><p>右上の「追加」からアプリ・資料・動画のリンクを登録できます</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(r => `
+    <div class="card" data-id="${r.id}" data-url="${r.url}">
+      ${cardThumbHTML(r)}
+      <div class="card-body">
+        <div class="card-title">${r.title}</div>
+        <div class="card-meta mono">${r.category || '未分類'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if(e.target.closest('.del-btn')) return;
+      window.open(card.dataset.url, '_blank');
+    });
+  });
+  grid.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      resources = resources.filter(r => r.id !== btn.dataset.del);
+      await saveResources();
+      render();
+    });
+  });
+}
+
+document.getElementById('searchInput').addEventListener('input', render);
+
+const overlay = document.getElementById('overlay');
+document.getElementById('openAdd').onclick = () => overlay.classList.add('show');
+document.getElementById('cancelAdd').onclick = () => closeModal();
+
+function closeModal(){
+  overlay.classList.remove('show');
+  ['f-title','f-url','f-category','f-thumb','f-preview'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-runtype').value = 'web';
+  document.getElementById('err-title').style.display = 'none';
+  document.getElementById('err-url').style.display = 'none';
+}
+
+document.getElementById('saveAdd').onclick = async () => {
+  const title = document.getElementById('f-title').value.trim();
+  const url = document.getElementById('f-url').value.trim();
+  const category = document.getElementById('f-category').value.trim();
+  const thumb = document.getElementById('f-thumb').value.trim();
+  const preview = document.getElementById('f-preview').value.trim();
+  const runType = document.getElementById('f-runtype').value;
+
+  let hasError = false;
+  if(!title){ document.getElementById('err-title').style.display = 'block'; hasError = true; }
+  else{ document.getElementById('err-title').style.display = 'none'; }
+
+  if(!url || !/^https?:\/\/.+/.test(url)){ document.getElementById('err-url').style.display = 'block'; hasError = true; }
+  else{ document.getElementById('err-url').style.display = 'none'; }
+
+  if(hasError) return;
+
+  resources.push({
+    id: 'r' + Date.now(),
+    title, url, category,
+    thumb: thumb || null,
+    preview: preview || null,
+    type: detectType(url),
+    runType: runType
+  });
+  await saveResources();
+  closeModal();
+  render();
+};
+
+loadResources();
+</script>
+</body>
+</html>
