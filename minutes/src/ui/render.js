@@ -198,7 +198,7 @@ export function renderDetailHtml(item, state) {
       <div class="section-label">メモ</div>
       <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
       <div class="memo-actions">
-        <span id="memo-save-status" class="memo-save-status"></span>
+        <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>
         <button class="btn btn-memo-save">保存</button>
       </div>
     </div>
@@ -276,14 +276,7 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
-    memo: `
-      <div class="section-label">メモ</div>
-      <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
-      <div class="memo-actions">
-        <span id="memo-save-status" class="memo-save-status"></span>
-        <button class="btn btn-memo-save">保存</button>
-      </div>
-    `,
+    memo: `<textarea class="memo-textarea" id="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>`,
     chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
 
@@ -323,6 +316,10 @@ export function renderDetailHtml(item, state) {
             <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
           </div>
         </div>
+      ` : activeTab === 'memo' ? `
+        <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-memo-save">保存</button>
       ` : `
         ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
         ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}

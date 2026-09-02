@@ -426,6 +426,7 @@ body {
   overflow: hidden;
 }
 .chat-messages { flex: 1; overflow-y: auto; min-height: 200px; padding: 4px 0 10px; }
+.cross-chat-messages { padding: 14px 18px; }
 .chat-msg-user { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .chat-msg-user .chat-bubble {
   background: var(--surface-1);
@@ -517,7 +518,7 @@ body {
 
 .memo-textarea {
   width: 100%;
-  min-height: 200px;
+  min-height: calc(100vh - 320px);
   font-size: 13px;
   line-height: 1.7;
   padding: 10px;
@@ -528,7 +529,7 @@ body {
   resize: vertical;
 }
 .memo-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.memo-save-status { font-size: 11px; color: var(--text-muted); }
+.memo-save-status { font-size: 11px; color: var(--warning-text); }
 
 .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .detail-title { font-size: 18px; font-weight: 500; }

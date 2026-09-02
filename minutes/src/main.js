@@ -7,7 +7,7 @@ import { loadSettings, saveSettings, newConnection, connectionOf, activeConnecti
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
-import { loadCrossChatData, saveCrossChatData, clearCrossChatData, estimateItemChars, GEMMA_WARN_CHARS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
+import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -20,7 +20,8 @@ let items = []
 let appMode = 'minutes' // 'minutes' | 'crosschat' — 横断チャット表示中は一覧/詳細ペインを乗っ取る
 let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
-const memoByKey = {} // pageId(notionPageId) -> string、メモの楽観更新用
+const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
+const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
 const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
@@ -226,6 +227,7 @@ function refresh() {
 
   document.getElementById('bulk-summarize').style.display = admin ? '' : 'none'
   document.getElementById('assign-permission').style.display = admin ? '' : 'none'
+  document.getElementById('status-filter').style.display = admin ? '' : 'none'
 
   syncStatusEl.textContent = `${filteredItems.length}件`
 }
@@ -244,6 +246,7 @@ function renderDenied() {
   syncStatusEl.textContent = ''
   document.getElementById('bulk-summarize').style.display = 'none'
   document.getElementById('assign-permission').style.display = 'none'
+  document.getElementById('status-filter').style.display = 'none'
 }
 
 /**
@@ -265,10 +268,13 @@ function detailTarget(rowEl) {
 }
 
 function paintDetail(target, item, state) {
+  const pid = item.notionPageId
   const renderState = {
     ...state,
-    tags: tagsByKey[item.notionPageId],
-    memo: memoByKey[item.notionPageId],
+    tags: tagsByKey[pid],
+    // 未保存の下書きがあればそれを表示する(タブを切り替えても入力内容を失わないため)
+    memo: memoDraftByKey[pid] !== undefined ? memoDraftByKey[pid] : memoByKey[pid],
+    memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
     activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
@@ -281,6 +287,14 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, renderState))
   target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, renderState))
+
+  // メモは入力のたびに下書きへ退避する。保存ボタンを押すまでNotionには送らない。
+  const memoEl = target.querySelector('.memo-textarea')
+  memoEl?.addEventListener('input', () => {
+    memoDraftByKey[pid] = memoEl.value
+    const statusEl = target.querySelector('#memo-save-status')
+    if (statusEl) statusEl.textContent = memoEl.value !== (memoByKey[pid] ?? '') ? '未保存の変更があります' : ''
+  })
 
   target.querySelectorAll('.detail-tab').forEach((el) => {
     el.addEventListener('click', () => {
@@ -518,20 +532,30 @@ async function saveMemoField(target, item, state) {
   const textarea = target.querySelector('.memo-textarea')
   const statusEl = target.querySelector('#memo-save-status')
   const value = textarea.value
-  const prev = memoByKey[item.notionPageId]
+  const pid = item.notionPageId
+  const prev = memoByKey[pid]
 
-  memoByKey[item.notionPageId] = value // 楽観的に即反映
+  memoByKey[pid] = value // 楽観的に即反映
   if (statusEl) statusEl.textContent = '保存中...'
 
   try {
-    await saveMemo(item.notionPageId, value)
+    await saveMemo(pid, value)
+    delete memoDraftByKey[pid] // 保存済みになったので下書きは破棄する
     if (statusEl) statusEl.textContent = '保存しました'
     setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
   } catch (err) {
-    memoByKey[item.notionPageId] = prev
-    if (statusEl) statusEl.textContent = ''
+    memoByKey[pid] = prev
+    // 失敗時は下書きを残し、入力内容が消えないようにする
+    memoDraftByKey[pid] = value
+    if (statusEl) statusEl.textContent = '未保存の変更があります'
     alert('メモの保存に失敗しました: ' + (err.message || err))
   }
+}
+
+/** 未保存のメモ下書きを持つ議事録があるか調べる */
+function hasUnsavedMemo(pageId) {
+  const draft = memoDraftByKey[pageId]
+  return draft !== undefined && draft !== (memoByKey[pageId] ?? '')
 }
 
 /**
@@ -1031,6 +1055,17 @@ function updateRowBadge(item) {
 
 async function onSelect(item, rowEl) {
   if (appMode === 'crosschat') return // 横断チャット表示中は通常の議事録選択を無視
+
+  // 別の議事録に移る前に、編集中のメモが未保存なら確認する
+  if (selectedKey && selectedKey !== item.key) {
+    const prevItem = items.find((i) => i.key === selectedKey)
+    if (prevItem && hasUnsavedMemo(prevItem.notionPageId)) {
+      const ok = confirm(`「${prevItem.title}」のメモに未保存の変更があります。\n破棄して移動しますか?`)
+      if (!ok) return
+      delete memoDraftByKey[prevItem.notionPageId] // 破棄を選んだので下書きを消す
+    }
+  }
+
   selectedKey = item.key
   renderList(listItemsEl, currentFilteredItems(), selectedKey, onSelect, showTags, { searchQuery })
   const target = detailTarget(isMobile() ? findRow(item.key) : rowEl)
@@ -1080,7 +1115,11 @@ async function generateAndSave(item, onProgress) {
   item.status = '要約'
   item.rawContextCount = rawContextCount // index.jsonが未対応でも今回のセッションでは即座に使えるようにする
 
-  return setDetailCache(item.key, {
+  if (result.agendaMissing) {
+    console.warn(`[議事なし] 「${item.title}」の要約で議事(agenda)が生成されませんでした。モデル: ${result.model}。大きいモデルで再生成すると改善する場合があります。`)
+  }
+
+  const saved = setDetailCache(item.key, {
     cardSummary: result.cardSummary,
     detail: {
       agenda: result.agenda,
@@ -1090,8 +1129,11 @@ async function generateAndSave(item, onProgress) {
     },
     model: result.model,
     generatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     rawContextCount,
   })
+  saved.agendaMissing = result.agendaMissing
+  return saved
 }
 
 async function runGenerate(target, item) {
@@ -1711,12 +1753,7 @@ document.getElementById('cross-chat-btn').addEventListener('click', () => {
   }
   appMode = 'crosschat'
   document.getElementById('cross-chat-btn').classList.add('active')
-  const data = loadCrossChatData()
-  if (!data) {
-    openCrossChatSelectModal(renderCrossChatMode)
-  } else {
-    renderCrossChatMode()
-  }
+  renderCrossChatMode()
 })
 
 function closeCrossChat() {
@@ -1724,10 +1761,11 @@ function closeCrossChat() {
 }
 
 /**
- * データ選択・作成用のモーダル。一回きりのセットアップ操作なので、
- * 一覧・詳細ペインを占有するチャット本体とは別にモーダルのままにしている。
+ * データ選択・作成用のモーダル。1つのスペース(spaceId)専用の対象データを編集する。
+ * 一回きりのセットアップ操作なので、一覧・詳細ペインを占有するチャット本体とは
+ * 別にモーダルのままにしている。
  */
-function openCrossChatSelectModal(onDone) {
+function openCrossChatSelectModal(spaceId, onDone) {
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div class="raw-modal-overlay">
@@ -1740,14 +1778,14 @@ function openCrossChatSelectModal(onDone) {
       </div>
     </div>
   `
-  document.getElementById('cc-close').addEventListener('click', () => {
-    closeCrossChat()
-    if (!loadCrossChatData()) { appMode = 'minutes'; document.getElementById('cross-chat-btn').classList.remove('active'); refresh() }
-  })
+  document.getElementById('cc-close').addEventListener('click', closeCrossChat)
+  crossChatEditingSpaceId = spaceId
   crossChatOnDataReady = onDone
+  crossChatSelection = { fromMonth: crossChatSelection.fromMonth, toMonth: crossChatSelection.toMonth, tags: new Set(), excluded: new Set() }
   paintCrossChatSelect()
 }
 
+let crossChatEditingSpaceId = null
 let crossChatOnDataReady = null
 
 // --- 対象選択・データ作成 ---
@@ -1771,6 +1809,7 @@ function paintCrossChatSelect() {
   const filtered = candidates.filter((i) => inRange(i) && matchesTags(i))
   const selectable = filtered.filter((i) => i.status === '要約')
   const selectedCount = selectable.filter((i) => !crossChatSelection.excluded.has(i.key)).length
+  const atLimit = selectedCount >= MAX_CROSS_CHAT_ITEMS
 
   body.innerHTML = `
     <div style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
@@ -1787,23 +1826,27 @@ function paintCrossChatSelect() {
         </div>
       </div>
     </div>
+    ${atLimit ? `<div id="cc-limit-warning" style="display:flex;align-items:center;gap:8px;padding:7px 16px;background:var(--warning-bg);color:var(--warning-text);font-size:11px">
+      <i class="ti ti-info-circle" aria-hidden="true"></i>${MAX_CROSS_CHAT_ITEMS}件中${MAX_CROSS_CHAT_ITEMS}件を選択済み。これ以上は選べません
+    </div>` : `<div id="cc-limit-warning"></div>`}
     <div style="padding:6px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="cc-select-all" ${selectedCount === selectable.length && selectable.length ? 'checked' : ''} />
       <span style="font-size:11px;color:var(--text-secondary)">すべて選択</span>
       <div style="flex:1"></div>
-      <span id="cc-filtered-count" style="font-size:11px;color:var(--text-muted)">${filtered.length}件中 <span id="cc-selected-count">${selectedCount}</span>件を選択</span>
+      <span id="cc-filtered-count" style="font-size:11px;color:var(--text-muted)">${filtered.length}件中 <span id="cc-selected-count">${selectedCount}</span>/${MAX_CROSS_CHAT_ITEMS}件を選択</span>
     </div>
     <div id="cc-item-list" class="cc-item-list">
       <div style="padding:4px 16px 4px">
       ${filtered.map((i) => {
         const ok = i.status === '要約'
         const checked = ok && !crossChatSelection.excluded.has(i.key)
+        const disabled = !ok || (atLimit && !checked)
         return `
-          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border);cursor:${ok ? 'pointer' : 'default'}">
-            <input type="checkbox" class="cc-item-check" data-key="${escapeHtml(i.key)}" ${checked ? 'checked' : ''} ${ok ? '' : 'disabled'} style="margin-top:3px" />
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border);cursor:${disabled ? 'default' : 'pointer'};${disabled && ok ? 'opacity:0.45' : ''}">
+            <input type="checkbox" class="cc-item-check" data-key="${escapeHtml(i.key)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="margin-top:3px" />
             <div style="flex:1;min-width:0">
               <div style="font-size:12px;font-weight:500;${ok ? '' : 'color:var(--text-muted)'}">${escapeHtml(i.title)}</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${i.date.slice(0, 10)} · ${(i.tags || []).join(', ') || 'タグなし'}${ok ? '' : ' · 要約が未生成のため対象外'}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${i.date.slice(0, 10)} · ${(i.tags || []).join(', ') || 'タグなし'}${ok ? '' : ' · 要約が未生成のため対象外'}${disabled && ok && !checked ? ' · 上限のため選択不可' : ''}</div>
             </div>
           </label>
         `
@@ -1827,14 +1870,33 @@ function paintCrossChatSelect() {
     })
   })
   document.getElementById('cc-select-all').addEventListener('change', (e) => {
-    if (e.target.checked) selectable.forEach((i) => crossChatSelection.excluded.delete(i.key))
-    else selectable.forEach((i) => crossChatSelection.excluded.add(i.key))
+    if (e.target.checked) {
+      // 上限を超える分は選択せず、上から順に埋める
+      let remaining = MAX_CROSS_CHAT_ITEMS
+      selectable.forEach((i) => {
+        if (remaining > 0) { crossChatSelection.excluded.delete(i.key); remaining-- }
+        else crossChatSelection.excluded.add(i.key)
+      })
+    } else {
+      selectable.forEach((i) => crossChatSelection.excluded.add(i.key))
+    }
     paintCrossChatSelect()
   })
   body.querySelectorAll('.cc-item-check').forEach((el) => {
     el.addEventListener('change', () => {
+      const nowSelectedCount = selectable.filter((i) => !crossChatSelection.excluded.has(i.key)).length
+      if (el.checked && nowSelectedCount >= MAX_CROSS_CHAT_ITEMS) {
+        // 念のための二重防御(disabled属性で通常は到達しない)
+        el.checked = false
+        return
+      }
       el.checked ? crossChatSelection.excluded.delete(el.dataset.key) : crossChatSelection.excluded.add(el.dataset.key)
-      updateCcSelectionSummary(selectable)
+      const newCount = selectable.filter((i) => !crossChatSelection.excluded.has(i.key)).length
+      if (newCount >= MAX_CROSS_CHAT_ITEMS || (newCount === MAX_CROSS_CHAT_ITEMS - 1 && !el.checked)) {
+        paintCrossChatSelect() // 上限の境界をまたぐ時だけ、他行のdisabled状態を更新するため作り直す
+      } else {
+        updateCcSelectionSummary(selectable)
+      }
     })
   })
   document.getElementById('cc-create').addEventListener('click', () => {
@@ -1891,7 +1953,12 @@ async function runCrossChatDataCreation(targets) {
   }
 
   const data = { createdAt: new Date().toISOString(), count: entries.length, chars: totalChars, items: entries }
-  saveCrossChatData(data)
+  const spaces = loadSpaces()
+  const targetSpace = spaces.find((s) => s.id === crossChatEditingSpaceId)
+  if (targetSpace) {
+    targetSpace.data = data
+    saveSpaces(spaces)
+  }
 
   const warn = totalChars > GEMMA_WARN_CHARS
   progressEl.innerHTML = `
@@ -1901,13 +1968,11 @@ async function runCrossChatDataCreation(targets) {
     </div>
   `
   setTimeout(() => {
-    if (!activeSpaceId) {
-      const spaces = loadSpaces()
-      activeSpaceId = spaces[0]?.id || null
-    }
+    if (!activeSpaceId) activeSpaceId = crossChatEditingSpaceId || spaces[0]?.id || null
     closeCrossChat()
     const onReady = crossChatOnDataReady
     crossChatOnDataReady = null
+    crossChatEditingSpaceId = null
     onReady?.()
   }, warn ? 2500 : 800)
 }
@@ -1919,20 +1984,22 @@ async function runCrossChatDataCreation(targets) {
  * チャット本体を描画する(通常の議事録ブラウズ画面を一時的に置き換える)。
  */
 function renderCrossChatMode() {
-  const data = loadCrossChatData()
   const spaces = loadSpaces()
   if (!activeSpaceId && spaces.length) activeSpaceId = spaces[0].id
   const active = spaces.find((s) => s.id === activeSpaceId)
+  const data = active?.data || null
 
   toolbarEl.innerHTML = `
     <div class="toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:500">横断チャット</span>
-      <span style="font-size:11px;color:var(--text-muted)">${data ? `${data.count}件を読み込み済み(約${data.chars.toLocaleString()}字)` : 'データ未作成'}</span>
+      <span style="font-size:11px;color:var(--text-muted)">${active ? (data ? `対象${data.count}件(約${data.chars.toLocaleString()}字)` : '対象データがありません') : 'スペースを選択してください'}</span>
       <div style="flex:1"></div>
-      <button id="cc-manage" class="btn" style="font-size:11px;padding:4px 9px">対象を変更</button>
+      ${active ? `<button id="cc-view-targets" class="btn" style="font-size:11px;padding:4px 9px" ${data ? '' : 'disabled'}>対象を見る</button>
+      <button id="cc-manage" class="btn" style="font-size:11px;padding:4px 9px">対象を変更</button>` : ''}
     </div>
   `
-  document.getElementById('cc-manage').addEventListener('click', () => openCrossChatSelectModal(renderCrossChatMode))
+  document.getElementById('cc-manage')?.addEventListener('click', () => openCrossChatSelectModal(active.id, renderCrossChatMode))
+  document.getElementById('cc-view-targets')?.addEventListener('click', () => openCrossChatTargetsViewer(active))
 
   listItemsEl.innerHTML = `
     <div style="padding:8px 10px;border-bottom:0.5px solid var(--border)">
@@ -1944,7 +2011,7 @@ function renderCrossChatMode() {
           <div class="cc-space-name">${escapeHtml(s.name)}</div>
           <button class="btn-ghost cc-space-rename" data-id="${s.id}" aria-label="スペース名を変更"><i class="ti ti-edit" aria-hidden="true"></i></button>
         </div>
-        <div class="cc-space-meta">${s.messages.length}件のやり取り</div>
+        <div class="cc-space-meta">${s.data ? `対象${s.data.count}件 ・ ` : '対象未選択 ・ '}${s.messages.length}件のやり取り</div>
       </div>
     `).join('') || '<p style="font-size:12px;color:var(--text-muted);padding:12px">まだスペースがありません</p>'}
   `
@@ -1954,7 +2021,8 @@ function renderCrossChatMode() {
     const s = newSpace(name)
     saveSpaces([...spaces, s])
     activeSpaceId = s.id
-    renderCrossChatMode()
+    // 新規スペースは対象データを持たないため、作成直後に選択させる
+    openCrossChatSelectModal(s.id, renderCrossChatMode)
   })
   listItemsEl.querySelectorAll('.cc-space-rename').forEach((el) => {
     el.addEventListener('click', (e) => {
@@ -1975,11 +2043,13 @@ function renderCrossChatMode() {
   detailEl.classList.add('side-panel')
   const detailContentEl = document.getElementById('detail-content')
   detailContentEl.innerHTML = `
-    <div class="chat-panel" style="height:calc(100vh - 200px)">
-      <div id="cc-messages" class="chat-messages"></div>
-      <div class="chat-input-row">
-        <textarea id="cc-input" class="chat-textarea" rows="1" placeholder="${data ? `${data.count}件の議事録に質問する(Shift+Enterで改行)` : 'まずデータを作成してください'}" ${data && active ? '' : 'disabled'}></textarea>
-        <button id="cc-send" class="btn" ${data && active ? '' : 'disabled'} aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+    <div id="cc-messages" class="chat-messages cross-chat-messages"></div>
+    <div class="detail-actions-fixed">
+      <div class="chat-composer">
+        <div class="chat-input-row">
+          <textarea id="cc-input" class="chat-textarea" rows="1" placeholder="${data ? `${data.count}件の議事録に質問する(Shift+Enterで改行)` : 'まず対象を選んでください'}" ${data && active ? '' : 'disabled'}></textarea>
+          <button id="cc-send" class="btn" ${data && active ? '' : 'disabled'} aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+        </div>
       </div>
     </div>
   `
@@ -2010,15 +2080,45 @@ function paintCrossChatMessages(space) {
   renderQAAccordion(el, space.messages)
 }
 
+/** そのスペースの対象データ(選んだ議事録の一覧)を閲覧専用で表示する */
+function openCrossChatTargetsViewer(space) {
+  const data = space?.data
+  const root = document.getElementById('modal-root')
+  root.innerHTML = `
+    <div class="raw-modal-overlay">
+      <div class="raw-modal" style="width:min(480px,100%)">
+        <div class="raw-modal-header">
+          <span>「${escapeHtml(space.name)}」の対象データ${data ? `(${data.count}件)` : ''}</span>
+          <button id="cc-targets-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="raw-modal-body">
+          ${data ? `
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">作成 ${new Date(data.createdAt).toLocaleString('ja-JP')} ・ 約${data.chars.toLocaleString()}字</div>
+            <div>
+              ${data.items.map((it) => `
+                <div style="display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+                  <span style="font-size:12px;flex:1;min-width:0">${escapeHtml(it.title)}</span>
+                  <span style="font-size:10px;color:var(--text-muted)">${escapeHtml(it.date.slice(0, 10))}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p style="font-size:12px;color:var(--text-muted)">対象データがありません</p>'}
+        </div>
+      </div>
+    </div>
+  `
+  document.getElementById('cc-targets-close').addEventListener('click', () => (root.innerHTML = ''))
+}
+
 async function sendCrossChatMessage() {
   if (crossChatBusy) return
   const input = document.getElementById('cc-input')
   const text = input.value.trim()
   if (!text) return
 
-  const data = loadCrossChatData()
   const spaces = loadSpaces()
   const space = spaces.find((s) => s.id === activeSpaceId)
+  const data = space?.data
   if (!data || !space) return
 
   input.value = ''
