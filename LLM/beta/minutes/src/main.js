@@ -78,7 +78,7 @@ function visibleItems() {
 }
 
 function currentFilteredItems() {
-  const byMonth = filterByMonth(visibleItems(), currentMonthKey)
+  const byMonth = (assignMode && assignAllPeriod) ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
   const byStatus = filterByStatus(byMonthAndSearch, selectedStatuses)
   const byPerm = filterByPermissionTags(byStatus, selectedPermissionFilters)
@@ -176,11 +176,19 @@ function refresh() {
     onPrevMonth: () => {
       if (assignMode && assignAllPeriod) { assignAllPeriod = false }
       else { currentMonthKey = shiftMonth(currentMonthKey, -1) }
+      if (assignMode) {
+        selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
+        if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      }
       refresh()
     },
     onNextMonth: () => {
       if (assignMode && assignAllPeriod) { assignAllPeriod = false }
       else { currentMonthKey = shiftMonth(currentMonthKey, 1) }
+      if (assignMode) {
+        selectedTags.clear()
+        if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      }
       refresh()
     },
     onToggleTag: (tag) => {
@@ -192,7 +200,12 @@ function refresh() {
       refresh()
     },
     onToggleShowTags: (v) => { showTags = v; refresh() },
-    onResetPeriod: () => { assignAllPeriod = true; refresh() },
+    onResetPeriod: () => {
+      assignAllPeriod = true
+      selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
+      if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      refresh()
+    },
   })
 
   renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags, {
@@ -1455,6 +1468,7 @@ function toggleAssignMode() {
   assignPermValue = ''
   assignBaselineIds = new Set()
   selectedIds.clear()
+  selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
   refresh()
   paintAssignBar()
 }
