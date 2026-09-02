@@ -35,6 +35,7 @@ var STATUS_DELETED = '削除';       // 削除ボタン押下時にセットす�
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
+var PROP_RAW_COUNT = '原文文字数'; // 文字起こし全文の文字数キャッシュ (number)
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
 var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
@@ -62,7 +63,7 @@ function doPost(e) {
         result = fetchSummary_(body.pageId);
         break;
       case 'saveSummary':
-        result = saveSummary_(body.pageId, body.cardSummary, body.detail, body.model);
+        result = saveSummary_(body.pageId, body.cardSummary, body.detail, body.model, body.rawContextCount);
         break;
       case 'saveTags':
         result = saveTags_(body.pageId, body.tags);
@@ -84,6 +85,9 @@ function doPost(e) {
         break;
       case 'saveMemo':
         result = saveMemo_(body.pageId, body.memo);
+        break;
+      case 'updateRawContextCount':
+        result = updateRawContextCount_(body.pageId, body.count);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -203,6 +207,7 @@ function fetchSummary_(pageId) {
       updatedAt: page.last_edited_time,
       tags: tagsOf_(props),
       memo: richTextOf_(props, PROP_MEMO),
+      rawContextCount: numberOf_(props, PROP_RAW_COUNT),
     };
   }
 
@@ -219,7 +224,14 @@ function fetchSummary_(pageId) {
     updatedAt: page.last_edited_time,
     tags: tagsOf_(props),
     memo: richTextOf_(props, PROP_MEMO),
+    rawContextCount: numberOf_(props, PROP_RAW_COUNT),
   };
+}
+
+/** number プロパティの値を取得する。無ければ0 */
+function numberOf_(properties, name) {
+  var prop = properties[name];
+  return prop && typeof prop.number === 'number' ? prop.number : 0;
 }
 
 /**
@@ -406,7 +418,7 @@ function saveTags_(pageId, tags) {
  * 要約を書き戻す。すべて専用プロパティへの patch 一発で完結する
  * (本文ブロックは操作しない)。
  */
-function saveSummary_(pageId, cardSummary, detail, model) {
+function saveSummary_(pageId, cardSummary, detail, model, rawContextCount) {
   detail = detail || {};
   var props = {};
   props[PROP_SUMMARY]   = richTextProp_(cardSummary);
@@ -419,7 +431,18 @@ function saveSummary_(pageId, cardSummary, detail, model) {
   props[PROP_MODEL]     = richTextProp_(model);
   props[PROP_GENERATED] = { date: { start: new Date().toISOString() } };
   props[PROP_STATUS]    = { select: { name: STATUS_SUMMARIZED } };
+  if (typeof rawContextCount === 'number' && rawContextCount > 0) {
+    props[PROP_RAW_COUNT] = { number: rawContextCount };
+  }
 
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/** 原文の文字数だけを更新する。要約生成を伴わずコンテキスト数だけ後から確定させる場合に使う */
+function updateRawContextCount_(pageId, count) {
+  var props = {};
+  props[PROP_RAW_COUNT] = { number: Number(count) || 0 };
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true };
 }

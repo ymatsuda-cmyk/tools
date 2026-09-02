@@ -39,8 +39,13 @@ export function fetchSummary(pageId) {
 }
 
 /** @returns {Promise<{saved: true}>} */
-export function saveSummary(pageId, cardSummary, detail, model) {
-  return callGas('saveSummary', { pageId, cardSummary, detail, model })
+export function saveSummary(pageId, cardSummary, detail, model, rawContextCount) {
+  return callGas('saveSummary', { pageId, cardSummary, detail, model, rawContextCount })
+}
+
+/** 原文の文字数キャッシュだけを更新する(要約生成を伴わない) */
+export function updateRawContextCount(pageId, count) {
+  return callGas('updateRawContextCount', { pageId, count })
 }
 
 /** @returns {Promise<{saved: true, tags: string[]}>} */

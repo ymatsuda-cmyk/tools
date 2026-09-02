@@ -284,22 +284,7 @@ export function renderDetailHtml(item, state) {
         <button class="btn btn-memo-save">保存</button>
       </div>
     `,
-    chat: `
-      <div class="chat-panel">
-        <div class="chat-context-row">
-          <div class="chat-context-toggle">
-            <button class="chat-context-btn" data-ctx="agenda">議事</button>
-            <button class="chat-context-btn active" data-ctx="raw">原文</button>
-          </div>
-          <span class="chat-context-count" id="rawchat-context-count"></span>
-        </div>
-        <div id="rawchat-messages" class="chat-messages"></div>
-        <div class="chat-input-row">
-          <textarea id="rawchat-input" class="chat-textarea" rows="1" placeholder="質問する(Shift+Enterで改行)"></textarea>
-          <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
-        </div>
-      </div>
-    `,
+    chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
 
   return `
@@ -324,11 +309,27 @@ export function renderDetailHtml(item, state) {
       ${markerToolbarHtml}
     </div>
     <div class="detail-actions-fixed">
-      ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
-      ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
-      <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
-      <span style="flex:1"></span>
-      ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+      ${activeTab === 'chat' ? `
+        <div class="chat-composer">
+          <div class="chat-context-row">
+            <div class="chat-context-toggle">
+              <button class="chat-context-btn" data-ctx="agenda">議事</button>
+              <button class="chat-context-btn active" data-ctx="raw">原文</button>
+            </div>
+            <span class="chat-context-count" id="rawchat-context-count"></span>
+          </div>
+          <div class="chat-input-row">
+            <textarea id="rawchat-input" class="chat-textarea" rows="1" placeholder="質問する(Shift+Enterで改行)"></textarea>
+            <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      ` : `
+        ${state.canEdit ? '<button class="btn btn-regenerate"><i class="ti ti-refresh" aria-hidden="true"></i>要約を再生成</button>' : ''}
+        ${state.canEdit ? '<button class="btn btn-retranscribe"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こし</button>' : ''}
+        <button class="btn btn-raw"><i class="ti ti-file-text" aria-hidden="true"></i>原文表示</button>
+        <span style="flex:1"></span>
+        ${state.canEdit ? '<button class="btn btn-delete" style="color:var(--text-danger);border-color:var(--border-danger)"><i class="ti ti-trash" aria-hidden="true"></i>削除</button>' : ''}
+      `}
     </div>
   `
 }

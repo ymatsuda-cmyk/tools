@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem, updateRawContextCount } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -651,33 +651,40 @@ function setupRawChatTab(target, item, state) {
   let contextMode = 'raw' // 'raw' | 'agenda'
   let transcriptCache = null
   let busy = false
+  // 原文の文字数キャッシュ。index.json → 直近取得したstate.summary → 未計測(0) の優先順
+  let rawCount = item.rawContextCount || state.summary?.rawContextCount || 0
 
-  async function updateContextCount() {
+  function paintCounts() {
     if (!countEl) return
-    if (contextMode === 'agenda') {
-      countEl.textContent = `コンテキスト: 約${buildAgendaContextText(state.summary).length.toLocaleString()}字`
-      return
-    }
-    if (transcriptCache !== null) {
-      countEl.textContent = `コンテキスト: 約${transcriptCache.length.toLocaleString()}字`
-      return
-    }
-    countEl.textContent = 'コンテキスト: 取得中...'
-    try {
-      const { text: full } = await fetchTranscript(item.notionPageId)
-      transcriptCache = full
-      countEl.textContent = `コンテキスト: 約${full.length.toLocaleString()}字`
-    } catch {
-      countEl.textContent = 'コンテキスト: 取得に失敗しました'
-    }
+    const agendaCount = buildAgendaContextText(state.summary).length
+    const rawLabel = rawCount > 0 ? `約${rawCount.toLocaleString()}字` : '取得中...'
+    countEl.textContent = `議事: 約${agendaCount.toLocaleString()}字 ／ 原文: ${rawLabel}`
   }
-  updateContextCount()
+  paintCounts()
+
+  /** 原文の文字数が未計測(0)なら、原文を確認して確定させ、Notionにも書き戻してキャッシュする */
+  async function ensureRawCount() {
+    if (rawCount > 0) return rawCount
+    try {
+      if (!transcriptCache) {
+        const { text: full } = await fetchTranscript(item.notionPageId)
+        transcriptCache = full
+      }
+      rawCount = transcriptCache.length
+      item.rawContextCount = rawCount
+      paintCounts()
+      updateRawContextCount(item.notionPageId, rawCount).catch(() => {}) // 次回から高速に読めるようキャッシュを更新
+    } catch {
+      // 取得に失敗しても致命的ではないため、未計測のまま次回に持ち越す
+    }
+    return rawCount
+  }
+  if (rawCount === 0) ensureRawCount()
 
   ctxButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       contextMode = btn.dataset.ctx
       ctxButtons.forEach((b) => b.classList.toggle('active', b === btn))
-      updateContextCount()
     })
   })
 
@@ -726,6 +733,12 @@ function setupRawChatTab(target, item, state) {
         if (!transcriptCache) {
           const { text: full } = await fetchTranscript(item.notionPageId)
           transcriptCache = full
+          if (rawCount === 0) {
+            rawCount = full.length
+            item.rawContextCount = rawCount
+            paintCounts()
+            updateRawContextCount(item.notionPageId, rawCount).catch(() => {})
+          }
         }
         contextText = transcriptCache
       }
@@ -1049,6 +1062,7 @@ async function onSelect(item, rowEl) {
  */
 async function generateAndSave(item, onProgress) {
   const { text } = await fetchTranscript(item.notionPageId)
+  const rawContextCount = text.length
   const result = await generateSummary(text, onProgress)
 
   await saveSummary(item.notionPageId, result.cardSummary, {
@@ -1056,9 +1070,10 @@ async function generateAndSave(item, onProgress) {
     decisions: result.decisions,
     todos: result.todos,
     topics: result.topics,
-  }, result.model)
+  }, result.model, rawContextCount)
 
   item.status = '要約'
+  item.rawContextCount = rawContextCount // index.jsonが未対応でも今回のセッションでは即座に使えるようにする
 
   return setDetailCache(item.key, {
     cardSummary: result.cardSummary,
@@ -1070,6 +1085,7 @@ async function generateAndSave(item, onProgress) {
     },
     model: result.model,
     generatedAt: new Date().toISOString(),
+    rawContextCount,
   })
 }
 
