@@ -529,7 +529,7 @@ body {
   resize: vertical;
 }
 .memo-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.memo-save-status { font-size: 11px; color: var(--text-muted); }
+.memo-save-status { font-size: 11px; color: var(--warning-text); }
 
 .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .detail-title { font-size: 18px; font-weight: 500; }

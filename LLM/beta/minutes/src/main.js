@@ -20,7 +20,8 @@ let items = []
 let appMode = 'minutes' // 'minutes' | 'crosschat' — 横断チャット表示中は一覧/詳細ペインを乗っ取る
 let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
-const memoByKey = {} // pageId(notionPageId) -> string、メモの楽観更新用
+const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
+const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
 const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
@@ -267,10 +268,13 @@ function detailTarget(rowEl) {
 }
 
 function paintDetail(target, item, state) {
+  const pid = item.notionPageId
   const renderState = {
     ...state,
-    tags: tagsByKey[item.notionPageId],
-    memo: memoByKey[item.notionPageId],
+    tags: tagsByKey[pid],
+    // 未保存の下書きがあればそれを表示する(タブを切り替えても入力内容を失わないため)
+    memo: memoDraftByKey[pid] !== undefined ? memoDraftByKey[pid] : memoByKey[pid],
+    memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
     activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
@@ -283,6 +287,14 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-raw')?.addEventListener('click', () => showRawTranscript(item))
   target.querySelector('.btn-edit-title')?.addEventListener('click', () => editTitle(target, item, renderState))
   target.querySelector('.btn-retranscribe')?.addEventListener('click', () => retranscribeItem(target, item, renderState))
+
+  // メモは入力のたびに下書きへ退避する。保存ボタンを押すまでNotionには送らない。
+  const memoEl = target.querySelector('.memo-textarea')
+  memoEl?.addEventListener('input', () => {
+    memoDraftByKey[pid] = memoEl.value
+    const statusEl = target.querySelector('#memo-save-status')
+    if (statusEl) statusEl.textContent = memoEl.value !== (memoByKey[pid] ?? '') ? '未保存の変更があります' : ''
+  })
 
   target.querySelectorAll('.detail-tab').forEach((el) => {
     el.addEventListener('click', () => {
@@ -520,20 +532,30 @@ async function saveMemoField(target, item, state) {
   const textarea = target.querySelector('.memo-textarea')
   const statusEl = target.querySelector('#memo-save-status')
   const value = textarea.value
-  const prev = memoByKey[item.notionPageId]
+  const pid = item.notionPageId
+  const prev = memoByKey[pid]
 
-  memoByKey[item.notionPageId] = value // 楽観的に即反映
+  memoByKey[pid] = value // 楽観的に即反映
   if (statusEl) statusEl.textContent = '保存中...'
 
   try {
-    await saveMemo(item.notionPageId, value)
+    await saveMemo(pid, value)
+    delete memoDraftByKey[pid] // 保存済みになったので下書きは破棄する
     if (statusEl) statusEl.textContent = '保存しました'
     setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
   } catch (err) {
-    memoByKey[item.notionPageId] = prev
-    if (statusEl) statusEl.textContent = ''
+    memoByKey[pid] = prev
+    // 失敗時は下書きを残し、入力内容が消えないようにする
+    memoDraftByKey[pid] = value
+    if (statusEl) statusEl.textContent = '未保存の変更があります'
     alert('メモの保存に失敗しました: ' + (err.message || err))
   }
+}
+
+/** 未保存のメモ下書きを持つ議事録があるか調べる */
+function hasUnsavedMemo(pageId) {
+  const draft = memoDraftByKey[pageId]
+  return draft !== undefined && draft !== (memoByKey[pageId] ?? '')
 }
 
 /**
@@ -1033,6 +1055,17 @@ function updateRowBadge(item) {
 
 async function onSelect(item, rowEl) {
   if (appMode === 'crosschat') return // 横断チャット表示中は通常の議事録選択を無視
+
+  // 別の議事録に移る前に、編集中のメモが未保存なら確認する
+  if (selectedKey && selectedKey !== item.key) {
+    const prevItem = items.find((i) => i.key === selectedKey)
+    if (prevItem && hasUnsavedMemo(prevItem.notionPageId)) {
+      const ok = confirm(`「${prevItem.title}」のメモに未保存の変更があります。\n破棄して移動しますか?`)
+      if (!ok) return
+      delete memoDraftByKey[prevItem.notionPageId] // 破棄を選んだので下書きを消す
+    }
+  }
+
   selectedKey = item.key
   renderList(listItemsEl, currentFilteredItems(), selectedKey, onSelect, showTags, { searchQuery })
   const target = detailTarget(isMobile() ? findRow(item.key) : rowEl)

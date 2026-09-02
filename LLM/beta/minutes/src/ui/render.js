@@ -198,7 +198,7 @@ export function renderDetailHtml(item, state) {
       <div class="section-label">メモ</div>
       <textarea class="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>
       <div class="memo-actions">
-        <span id="memo-save-status" class="memo-save-status"></span>
+        <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>
         <button class="btn btn-memo-save">保存</button>
       </div>
     </div>
@@ -317,7 +317,7 @@ export function renderDetailHtml(item, state) {
           </div>
         </div>
       ` : activeTab === 'memo' ? `
-        <span id="memo-save-status" class="memo-save-status"></span>
+        <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>
         <span style="flex:1"></span>
         <button class="btn btn-memo-save">保存</button>
       ` : `
