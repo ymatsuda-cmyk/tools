@@ -322,7 +322,7 @@ async function toggleTodo(target, item, state, index, done) {
   const next = prev.map((t, i) => (i === index ? { ...t, done } : t))
 
   const apply = (todos) => {
-    const updated = { ...summary, detail: { ...summary.detail, todos } }
+    const updated = { ...summary, detail: { ...summary.detail, todos }, updatedAt: new Date().toISOString() }
     setDetailCache(item.key, updated)
     paintDetail(target, item, { ...state, summary: updated })
     return updated
@@ -431,6 +431,7 @@ function openFieldEditor(target, item, state, field) {
     }
 
     close()
+    updated.updatedAt = new Date().toISOString()
     setDetailCache(item.key, updated)
     paintDetail(target, item, { ...state, summary: updated })
 
@@ -673,7 +674,9 @@ function setupRawChatTab(target, item, state) {
       rawCount = transcriptCache.length
       item.rawContextCount = rawCount
       paintCounts()
-      updateRawContextCount(item.notionPageId, rawCount).catch(() => {}) // 次回から高速に読めるようキャッシュを更新
+      updateRawContextCount(item.notionPageId, rawCount).catch((err) => {
+        console.error('原文文字数の書き戻しに失敗しました(Notionの「原文文字数」プロパティ有無、GASの再デプロイ状況を確認してください):', err)
+      })
     } catch {
       // 取得に失敗しても致命的ではないため、未計測のまま次回に持ち越す
     }
@@ -737,7 +740,9 @@ function setupRawChatTab(target, item, state) {
             rawCount = full.length
             item.rawContextCount = rawCount
             paintCounts()
-            updateRawContextCount(item.notionPageId, rawCount).catch(() => {})
+            updateRawContextCount(item.notionPageId, rawCount).catch((err) => {
+              console.error('原文文字数の書き戻しに失敗しました:', err)
+            })
           }
         }
         contextText = transcriptCache
@@ -927,7 +932,7 @@ async function applyMarkerAndSave(field, index, sub, newText) {
   if (!ctx) return
   const { target, item, state } = ctx
   const summary = state.summary
-  const updated = setMarkerText(summary, field, index, sub, newText)
+  const updated = { ...setMarkerText(summary, field, index, sub, newText), updatedAt: new Date().toISOString() }
   setDetailCache(item.key, updated)
   ctx.toolbar.style.display = 'none'
   window.getSelection()?.removeAllRanges()
@@ -1043,7 +1048,7 @@ async function onSelect(item, rowEl) {
       return
     }
 
-    const fresh = isCacheFresh(cache, remote.generatedAt) ? cache : setDetailCache(item.key, remote)
+    const fresh = isCacheFresh(cache, remote.updatedAt) ? cache : setDetailCache(item.key, remote)
     paintDetail(target, item, { phase: 'ready', summary: fresh })
   } catch (err) {
     // 通信に失敗してもキャッシュがあればそれを出す(タグは未確定のため編集UIは出さない)

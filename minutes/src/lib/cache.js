@@ -27,9 +27,13 @@ export function setDetailCache(pageId, data) {
 
 /**
  * キャッシュが Notion 側の更新より新しければ再利用可能。
- * generatedAt (要約が生成された日時) を基準に比較する。
+ * updatedAt (Notionページの last_edited_time) を基準に比較する。
+ * generatedAt(要約生成日時)は「要約を再生成」した時にしか変わらないため、
+ * 決定事項/ToDo/論点/議事/サマリを個別編集した場合の変更を検知できない。
+ * updatedAt はどのプロパティを変更しても更新されるため、こちらを基準にする。
  */
-export function isCacheFresh(cache, remoteGeneratedAt) {
-  if (!cache || !remoteGeneratedAt) return false
-  return new Date(cache.generatedAt).getTime() >= new Date(remoteGeneratedAt).getTime()
+export function isCacheFresh(cache, remoteUpdatedAt) {
+  if (!cache || !remoteUpdatedAt) return false
+  if (!cache.updatedAt) return false // 旧キャッシュにupdatedAtが無ければ安全側に倒して再取得する
+  return new Date(cache.updatedAt).getTime() >= new Date(remoteUpdatedAt).getTime()
 }
