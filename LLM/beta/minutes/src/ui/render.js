@@ -15,6 +15,11 @@ export function renderToolbar(container, state, handlers) {
           <span class="month-label">${escapeHtml(state.monthLabel)}</span>
           <button class="month-next btn-ghost" aria-label="翌月"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
+        <label class="show-tags-toggle">
+          <input type="checkbox" class="toolbar-show-tags" ${state.showTags ? 'checked' : ''} />
+          <span>タグ表示</span>
+        </label>
+        ${state.assignMode && !state.assignAllPeriod ? '<button class="btn assign-reset-period" style="font-size:11px;padding:3px 9px">全期間に戻す</button>' : ''}
       </div>
       ${state.permissionOptions?.length ? `<div class="tag-filter-row permission-filter-row">${state.permissionOptions.map((o) => `
         <span class="tag-chip filter-chip perm-filter-chip ${o.selected ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}" data-perm="${escapeHtml(o.tag)}">
@@ -31,6 +36,8 @@ export function renderToolbar(container, state, handlers) {
 
   container.querySelector('.month-prev').addEventListener('click', handlers.onPrevMonth)
   container.querySelector('.month-next').addEventListener('click', handlers.onNextMonth)
+  container.querySelector('.toolbar-show-tags').addEventListener('change', (e) => handlers.onToggleShowTags(e.target.checked))
+  container.querySelector('.assign-reset-period')?.addEventListener('click', handlers.onResetPeriod)
   container.querySelectorAll('.filter-chip:not(.perm-filter-chip):not(.disabled)').forEach((el) => {
     el.addEventListener('click', () => handlers.onToggleTag(el.dataset.tag))
   })

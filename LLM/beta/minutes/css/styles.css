@@ -7,10 +7,10 @@
   --text-primary: #2c2c2a;
   --text-secondary: #5f5e5a;
   --text-muted: #888780;
-  --accent: #378add;
-  --accent-bg: #e6f1fb;
-  --accent-text: #0c447c;
-  --accent-text-sub: #185fa5;
+  --accent: #444441;
+  --accent-bg: #e8e6df;
+  --accent-text: #2c2c2a;
+  --accent-text-sub: #5f5e5a;
   --success-bg: #e1f5ee;
   --success-text: #085041;
   --warning-bg: #faeeda;
@@ -599,6 +599,55 @@ body {
 .bulk-track { flex: 1; height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; }
 .bulk-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
 .bulk-status { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+
+.conn-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 0.5px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.conn-model-chip.active { background: var(--bg-accent); border-color: var(--border-accent); color: var(--text-accent); }
+.conn-model-chip i.ti-check { font-size: 12px; }
+.conn-model-remove { font-size: 11px; margin-left: 2px; color: var(--text-muted); cursor: pointer; }
+.conn-model-remove:hover { color: var(--text-danger); }
+
+.active-model-clickable { cursor: pointer; }
+.active-model-clickable:hover { text-decoration: underline; }
+
+.model-switch-menu {
+  min-width: 180px;
+  max-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  z-index: 40;
+}
+.model-switch-group {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 6px 8px 2px;
+}
+.model-switch-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.model-switch-item:hover { background: var(--surface-1); }
+.model-switch-item.active { background: var(--bg-accent); color: var(--text-accent); }
+.model-switch-item i { font-size: 13px; }
 
 .profile-card.active { border-color: var(--accent) !important; background: var(--accent-bg); }
 

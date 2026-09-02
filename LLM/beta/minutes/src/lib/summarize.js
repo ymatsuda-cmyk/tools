@@ -1,5 +1,5 @@
 import { streamChat } from './llm-client.js'
-import { loadSettings, connectionOf, activeProfile } from './llm-settings.js'
+import { loadSettings, connectionOf } from './llm-settings.js'
 
 const SYSTEM_PROMPT = `あなたは会議の文字起こしを要約するアシスタントです。
 必ず次のJSON形式のみで回答してください。前後に説明文やコードフェンスを付けないこと。
@@ -39,9 +39,8 @@ function extractJson(text) {
 export async function generateSummary(transcriptText, onProgress) {
   const settings = loadSettings()
   const connection = connectionOf(settings)
-  const profile = activeProfile(settings)
   if (!connection) {
-    throw new Error('LLM接続プロファイルが未設定です。設定から接続先を追加してください。')
+    throw new Error('LLM接続が未設定です。設定から接続先とモデルを追加してください。')
   }
 
   const messages = [
@@ -64,6 +63,6 @@ export async function generateSummary(transcriptText, onProgress) {
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
     todos: (Array.isArray(parsed.todos) ? parsed.todos : []).map((t) => ({ text: String(t), done: false })),
     topics: Array.isArray(parsed.topics) ? parsed.topics : [],
-    model: profile?.model || connection.model || 'unknown',
+    model: connection.model,
   }
 }

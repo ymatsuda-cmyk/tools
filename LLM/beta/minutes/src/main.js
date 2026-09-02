@@ -3,13 +3,12 @@ import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDe
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
-import { loadSettings, saveSettings, newProfile, activeProfile } from './lib/llm-settings.js'
+import { loadSettings, saveSettings, newConnection, connectionOf, activeConnection, activeModelName, allModels } from './lib/llm-settings.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { loadCrossChatData, saveCrossChatData, clearCrossChatData, estimateItemChars, GEMMA_WARN_CHARS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
 import { streamChat } from './lib/llm-client.js'
-import { connectionOf } from './lib/llm-settings.js'
 
 const listEl = document.getElementById('list')
 const listItemsEl = document.getElementById('list-items')
@@ -31,8 +30,9 @@ const selectedTags = new Set()
 const selectedPermissionFilters = new Set() // 管理者専用の権限フィルタ(タグの前段)
 const selectedStatuses = new Set() // 空 = 全ステータス表示
 let assignMode = false // 管理者の権限一括割り当てモード
+let assignAllPeriod = true // 割り当てモード中、月で絞らず全期間を対象にするか
 const selectedIds = new Set() // 一括割り当ての選択中キー(全期間をまたいで保持する)
-let showTags = false
+let showTags = true
 
 function monthKeyOf(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -88,10 +88,62 @@ function currentFilteredItems() {
 /** タイトルバー右端に、現在アクティブなAI接続プロファイルのモデル名を表示する */
 function paintActiveModel() {
   const settings = loadSettings()
-  const p = activeProfile(settings)
+  const model = activeModelName(settings)
   const el = document.getElementById('active-model')
-  el.textContent = p?.model ? `AI: ${p.model}` : ''
+  el.textContent = model ? `AI: ${model}` : '(AI未設定)'
+  el.classList.add('active-model-clickable')
 }
+
+/** トップバーのモデル名クリックで、登録済み全モデルから即座に切り替えられるメニューを開く */
+function openModelQuickSwitch() {
+  const settings = loadSettings()
+  const models = allModels(settings)
+  const el = document.getElementById('active-model')
+  document.querySelector('.model-switch-menu')?.remove()
+
+  if (!models.length) {
+    alert('モデルが登録されていません。設定から接続とモデルを追加してください。')
+    return
+  }
+
+  const menu = document.createElement('div')
+  menu.className = 'model-switch-menu'
+  let lastConn = null
+  menu.innerHTML = models.map((m) => {
+    const groupHeader = m.connectionId !== lastConn
+      ? `<div class="model-switch-group">${escapeHtml(m.connectionLabel)}</div>`
+      : ''
+    lastConn = m.connectionId
+    return `${groupHeader}<div class="model-switch-item ${m.active ? 'active' : ''}" data-conn="${m.connectionId}" data-model="${escapeHtml(m.model)}">
+      <i class="ti ti-check" aria-hidden="true" style="visibility:${m.active ? 'visible' : 'hidden'}"></i>
+      <span>${escapeHtml(m.model)}</span>
+    </div>`
+  }).join('')
+
+  document.body.appendChild(menu)
+  const rect = el.getBoundingClientRect()
+  menu.style.position = 'fixed'
+  menu.style.top = `${rect.bottom + 4}px`
+  menu.style.right = `${window.innerWidth - rect.right}px`
+
+  menu.querySelectorAll('.model-switch-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      saveSettings({ ...settings, activeConnectionId: item.dataset.conn, activeModel: item.dataset.model })
+      menu.remove()
+      paintActiveModel()
+    })
+  })
+
+  const closeOnOutsideClick = (e) => {
+    if (!menu.contains(e.target) && e.target !== el) {
+      menu.remove()
+      document.removeEventListener('click', closeOnOutsideClick)
+    }
+  }
+  setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 0)
+}
+
+document.getElementById('active-model').addEventListener('click', openModelQuickSwitch)
 
 function refresh() {
   if (appMode === 'crosschat') return // 横断チャット表示中は通常一覧を再描画しない
@@ -104,8 +156,8 @@ function refresh() {
     return
   }
 
-  // 割り当てモードでは全期間から選べるようにするため月フィルタを外す
-  const scoped = assignMode ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
+  // 割り当てモードでは、既定で全期間対象にしつつ月で絞り込むこともできるようにする
+  const scoped = (assignMode && assignAllPeriod) ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(scoped, searchQuery)
   const baseItems = filterByStatus(byMonthAndSearch, selectedStatuses) // タグ絞り込み前(タグ候補の母集団)
   const byPerm = admin ? filterByPermissionTags(baseItems, selectedPermissionFilters) : baseItems
@@ -114,12 +166,23 @@ function refresh() {
   const permissionOptions = admin ? buildPermissionOptions(baseItems, selectedPermissionFilters) : []
 
   renderToolbar(toolbarEl, {
-    monthLabel: assignMode ? '全期間' : monthLabelOf(currentMonthKey),
+    monthLabel: (assignMode && assignAllPeriod) ? '全期間' : monthLabelOf(currentMonthKey),
     tagOptions,
     permissionOptions,
+    showTags,
+    assignMode,
+    assignAllPeriod,
   }, {
-    onPrevMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, -1); refresh() },
-    onNextMonth: () => { if (assignMode) return; currentMonthKey = shiftMonth(currentMonthKey, 1); refresh() },
+    onPrevMonth: () => {
+      if (assignMode && assignAllPeriod) { assignAllPeriod = false }
+      else { currentMonthKey = shiftMonth(currentMonthKey, -1) }
+      refresh()
+    },
+    onNextMonth: () => {
+      if (assignMode && assignAllPeriod) { assignAllPeriod = false }
+      else { currentMonthKey = shiftMonth(currentMonthKey, 1) }
+      refresh()
+    },
     onToggleTag: (tag) => {
       selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag)
       refresh()
@@ -128,6 +191,8 @@ function refresh() {
       selectedPermissionFilters.has(perm) ? selectedPermissionFilters.delete(perm) : selectedPermissionFilters.add(perm)
       refresh()
     },
+    onToggleShowTags: (v) => { showTags = v; refresh() },
+    onResetPeriod: () => { assignAllPeriod = true; refresh() },
   })
 
   renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags, {
@@ -942,13 +1007,14 @@ function openSettings() {
   const config = loadConfig()
   const settings = loadSettings()
   // 下書き。ここで編集し、保存時にまとめて反映する(キャンセル時は破棄)
-  const draftProfiles = settings.profiles.length ? settings.profiles.map((p) => ({ ...p })) : [newProfile()]
-  let draftActiveId = settings.activeId || draftProfiles[0].id
+  const draftConnections = settings.connections.map((c) => ({ ...c, models: [...(c.models || [])] }))
+  let draftActiveConnectionId = settings.activeConnectionId
+  let draftActiveModel = settings.activeModel
 
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10">
-      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:380px;max-width:90vw;max-height:85vh;overflow-y:auto">
+      <div style="background:var(--surface-2);border-radius:12px;padding:20px;width:420px;max-width:90vw;max-height:85vh;overflow-y:auto">
         <h2 style="font-size:15px;margin:0 0 12px">設定</h2>
         <label style="font-size:12px;color:var(--text-secondary)">GAS URL</label>
         <input id="cfg-gas" value="${config.gasUrl}" style="width:100%;margin-bottom:8px;padding:6px;border:0.5px solid var(--border);border-radius:6px" />
@@ -961,11 +1027,9 @@ function openSettings() {
         </div>
         <div id="cfg-role" style="font-size:11px;margin-bottom:14px">${roleLabel(config.role)}</div>
 
-        <div style="display:flex;align-items:center;margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text-secondary);flex:1">AI接続プロファイル</label>
-          <button id="cfg-llm-add" class="btn" style="font-size:11px;padding:3px 9px">+ 追加</button>
-        </div>
-        <div id="cfg-llm-list"></div>
+        <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">AI接続</label>
+        <div id="cfg-conn-list"></div>
+        <button id="cfg-conn-add" class="btn" style="width:100%;font-size:12px;padding:7px 0;margin-bottom:14px"><i class="ti ti-plus" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>接続を追加</button>
 
         <details style="margin:12px 0">
           <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
@@ -983,55 +1047,94 @@ function openSettings() {
     </div>
   `
 
-  /** プロファイル一覧を描画。各カードは開閉式で、使用中はラジオで選ぶ */
-  function paintProfiles() {
-    const listEl = document.getElementById('cfg-llm-list')
-    listEl.innerHTML = draftProfiles.map((p, i) => `
-      <div class="profile-card ${p.id === draftActiveId ? 'active' : ''}" style="border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <input type="radio" name="cfg-active" class="profile-active" data-id="${p.id}" ${p.id === draftActiveId ? 'checked' : ''} />
-          <input type="text" class="profile-label" data-id="${p.id}" value="${escapeHtml(p.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
-          ${draftProfiles.length > 1 ? `<button class="btn profile-delete" data-id="${p.id}" style="font-size:11px;padding:3px 7px">削除</button>` : ''}
+  /** 接続一覧を描画。各カードはbaseUrl/APIキー+モデルのチップ一覧を持つ */
+  function paintConnections() {
+    const listEl = document.getElementById('cfg-conn-list')
+    listEl.innerHTML = draftConnections.map((c) => `
+      <div class="conn-card" data-id="${c.id}" style="border:0.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <input type="text" class="conn-label" data-id="${c.id}" value="${escapeHtml(c.label)}" placeholder="表示名(例: Gemini)" style="flex:1;min-width:0;font-size:13px;font-weight:500;padding:4px 6px;border:0.5px solid var(--border);border-radius:6px" />
+          ${draftConnections.length > 1 ? `<button class="btn conn-delete" data-id="${c.id}" style="font-size:11px;padding:3px 7px"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}
         </div>
-        <input type="text" class="profile-baseurl" data-id="${p.id}" value="${escapeHtml(p.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-apikey" data-id="${p.id}" value="${escapeHtml(p.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
-        <input type="text" class="profile-model" data-id="${p.id}" value="${escapeHtml(p.model)}" placeholder="モデル名 (例: gemini-2.5-flash)" style="width:100%;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="conn-baseurl" data-id="${c.id}" value="${escapeHtml(c.baseUrl)}" placeholder="baseUrl (例: https://generativelanguage.googleapis.com/v1beta/openai)" style="width:100%;margin-bottom:5px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <input type="text" class="conn-apikey" data-id="${c.id}" value="${escapeHtml(c.apiKey)}" placeholder="APIキー" style="width:100%;margin-bottom:8px;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:5px">モデル</div>
+        <div class="conn-models" data-id="${c.id}" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+          ${(c.models || []).map((m) => `
+            <span class="conn-model-chip ${c.id === draftActiveConnectionId && m === draftActiveModel ? 'active' : ''}" data-conn="${c.id}" data-model="${escapeHtml(m)}">
+              ${c.id === draftActiveConnectionId && m === draftActiveModel ? '<i class="ti ti-check" aria-hidden="true"></i>' : ''}${escapeHtml(m)}
+              <i class="ti ti-x conn-model-remove" data-conn="${c.id}" data-model="${escapeHtml(m)}" aria-hidden="true"></i>
+            </span>
+          `).join('') || '<span style="font-size:11px;color:var(--text-muted)">未登録</span>'}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" class="conn-model-new" data-id="${c.id}" placeholder="モデル名を追加(例: gemini-2.5-flash)" style="flex:1;min-width:0;font-size:11px;padding:5px 6px;border:0.5px solid var(--border);border-radius:6px" />
+          <button class="btn conn-model-add" data-id="${c.id}" style="font-size:11px;padding:4px 9px">追加</button>
+        </div>
       </div>
     `).join('')
 
-    listEl.querySelectorAll('.profile-active').forEach((el) => {
-      el.addEventListener('change', () => {
-        draftActiveId = el.dataset.id
-        listEl.querySelectorAll('.profile-card').forEach((c) => c.classList.remove('active'))
-        el.closest('.profile-card').classList.add('active')
-      })
-    })
-    listEl.querySelectorAll('.profile-label, .profile-baseurl, .profile-apikey, .profile-model').forEach((el) => {
+    listEl.querySelectorAll('.conn-label, .conn-baseurl, .conn-apikey').forEach((el) => {
       el.addEventListener('input', () => {
-        const p = draftProfiles.find((p) => p.id === el.dataset.id)
-        if (!p) return
-        if (el.classList.contains('profile-label')) p.label = el.value
-        if (el.classList.contains('profile-baseurl')) p.baseUrl = el.value
-        if (el.classList.contains('profile-apikey')) p.apiKey = el.value
-        if (el.classList.contains('profile-model')) p.model = el.value
+        const c = draftConnections.find((c) => c.id === el.dataset.id)
+        if (!c) return
+        if (el.classList.contains('conn-label')) c.label = el.value
+        if (el.classList.contains('conn-baseurl')) c.baseUrl = el.value
+        if (el.classList.contains('conn-apikey')) c.apiKey = el.value
       })
     })
-    listEl.querySelectorAll('.profile-delete').forEach((el) => {
+    listEl.querySelectorAll('.conn-delete').forEach((el) => {
       el.addEventListener('click', () => {
-        const idx = draftProfiles.findIndex((p) => p.id === el.dataset.id)
+        const idx = draftConnections.findIndex((c) => c.id === el.dataset.id)
         if (idx === -1) return
-        draftProfiles.splice(idx, 1)
-        if (draftActiveId === el.dataset.id) draftActiveId = draftProfiles[0].id
-        paintProfiles()
+        draftConnections.splice(idx, 1)
+        if (draftActiveConnectionId === el.dataset.id) {
+          draftActiveConnectionId = draftConnections[0].id
+          draftActiveModel = draftConnections[0].models?.[0] || null
+        }
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-chip').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('conn-model-remove')) return
+        draftActiveConnectionId = el.dataset.conn
+        draftActiveModel = el.dataset.model
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-remove').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const c = draftConnections.find((c) => c.id === el.dataset.conn)
+        if (!c) return
+        c.models = c.models.filter((m) => m !== el.dataset.model)
+        if (draftActiveConnectionId === c.id && draftActiveModel === el.dataset.model) {
+          draftActiveModel = c.models[0] || null
+        }
+        paintConnections()
+      })
+    })
+    listEl.querySelectorAll('.conn-model-add').forEach((el) => {
+      el.addEventListener('click', () => {
+        const input = listEl.querySelector(`.conn-model-new[data-id="${el.dataset.id}"]`)
+        const name = input.value.trim()
+        if (!name) return
+        const c = draftConnections.find((c) => c.id === el.dataset.id)
+        if (!c) return
+        if (!c.models.includes(name)) c.models.push(name)
+        if (!draftActiveConnectionId) { draftActiveConnectionId = c.id; draftActiveModel = name }
+        input.value = ''
+        paintConnections()
       })
     })
   }
-  paintProfiles()
+  paintConnections()
 
-  document.getElementById('cfg-llm-add').addEventListener('click', () => {
-    const p = newProfile({ label: `プロファイル${draftProfiles.length + 1}` })
-    draftProfiles.push(p)
-    paintProfiles()
+  document.getElementById('cfg-conn-add').addEventListener('click', () => {
+    const c = newConnection({ label: `接続${draftConnections.length + 1}` })
+    draftConnections.push(c)
+    paintConnections()
   })
 
   document.getElementById('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
@@ -1041,8 +1144,9 @@ function openSettings() {
       gasUrl: document.getElementById('cfg-gas').value.trim(),
       notionToken: document.getElementById('cfg-token').value.trim(),
       code: document.getElementById('cfg-code').value.trim(),
-      llmProfiles: draftProfiles.map(({ label, baseUrl, apiKey, model }) => ({ label, baseUrl, apiKey, model })),
-      activeLlmLabel: draftProfiles.find((p) => p.id === draftActiveId)?.label,
+      connections: draftConnections.map(({ label, baseUrl, apiKey, models }) => ({ label, baseUrl, apiKey, models })),
+      activeConnectionLabel: draftConnections.find((c) => c.id === draftActiveConnectionId)?.label,
+      activeModel: draftActiveModel,
     }
     document.getElementById('cfg-json').value = JSON.stringify(json, null, 2)
   })
@@ -1059,12 +1163,15 @@ function openSettings() {
     if (parsed.notionToken !== undefined) document.getElementById('cfg-token').value = parsed.notionToken
     if (parsed.code !== undefined) document.getElementById('cfg-code').value = parsed.code
 
-    if (Array.isArray(parsed.llmProfiles) && parsed.llmProfiles.length) {
-      draftProfiles.length = 0
-      parsed.llmProfiles.forEach((p) => draftProfiles.push(newProfile(p)))
-      const match = draftProfiles.find((p) => p.label === parsed.activeLlmLabel)
-      draftActiveId = match ? match.id : draftProfiles[0].id
-      paintProfiles()
+    if (Array.isArray(parsed.connections) && parsed.connections.length) {
+      draftConnections.length = 0
+      parsed.connections.forEach((c) => draftConnections.push(newConnection(c)))
+      const match = draftConnections.find((c) => c.label === parsed.activeConnectionLabel)
+      draftActiveConnectionId = (match || draftConnections[0]).id
+      draftActiveModel = parsed.activeModel && (match || draftConnections[0]).models?.includes(parsed.activeModel)
+        ? parsed.activeModel
+        : (match || draftConnections[0]).models?.[0] || null
+      paintConnections()
     }
 
     if (parsed.code) document.getElementById('cfg-verify').click()
@@ -1095,7 +1202,12 @@ function openSettings() {
       role: verifiedRole,
     })
 
-    saveSettings({ ...settings, profiles: draftProfiles, activeId: draftActiveId })
+    saveSettings({
+      ...settings,
+      connections: draftConnections,
+      activeConnectionId: draftActiveConnectionId,
+      activeModel: draftActiveModel,
+    })
 
     root.innerHTML = ''
     refresh()
@@ -1238,10 +1350,16 @@ const assignBarEl = document.getElementById('assign-bar')
 
 function toggleAssignMode() {
   assignMode = !assignMode
+  assignAllPeriod = true
+  assignPermValue = ''
+  assignBaselineIds = new Set()
   selectedIds.clear()
   refresh()
   paintAssignBar()
 }
+
+let assignPermValue = '' // 現在編集対象にしている権限名
+let assignBaselineIds = new Set() // その権限を選んだ時点で付与されていた対象(差分判定の基準)
 
 function paintAssignBar() {
   if (!assignMode) {
@@ -1254,57 +1372,83 @@ function paintAssignBar() {
 
   assignBarEl.innerHTML = `
     <div class="bulk-bar">
-      <span class="bulk-status">${selectedIds.size}件を選択中 — 全期間から選べます</span>
+      <span class="bulk-status">${assignPermValue ? `「${escapeHtml(assignPermValue)}」を編集中 — ` : ''}${selectedIds.size}件を選択中</span>
       <div style="flex:1"></div>
-      <input id="assign-value" list="assign-options" placeholder="権限" style="width:110px;font-size:12px;padding:5px 8px" />
+      <input id="assign-value" list="assign-options" placeholder="権限を選択" value="${escapeHtml(assignPermValue)}" style="width:130px;font-size:12px;padding:5px 8px" />
       <datalist id="assign-options">${[...known].sort().map((p) => `<option value="${escapeHtml(p)}"></option>`).join('')}</datalist>
-      <button class="btn" id="assign-add">割り当て</button>
-      <button class="btn" id="assign-remove">解除</button>
+      <button class="btn" id="assign-update" ${assignPermValue ? '' : 'disabled'}>更新</button>
       <button class="btn" id="assign-exit">終了</button>
     </div>
   `
-  document.getElementById('assign-add').addEventListener('click', () => applyPermissions('add'))
-  document.getElementById('assign-remove').addEventListener('click', () => applyPermissions('remove'))
+  const valueInput = document.getElementById('assign-value')
+  valueInput.addEventListener('change', () => selectPermissionValue(valueInput.value.trim()))
+  document.getElementById('assign-update').addEventListener('click', applyPermissionsDiff)
   document.getElementById('assign-exit').addEventListener('click', toggleAssignMode)
 }
 
-async function applyPermissions(mode) {
-  const value = document.getElementById('assign-value').value.trim()
-  if (!value) { alert('権限を入力してください'); return }
-  if (!selectedIds.size) { alert('対象を選択してください'); return }
+/**
+ * 権限名を選んだ時点で、現在の絞り込み内でその権限を持つ対象をチェックONにする。
+ * これが「更新」時の差分判定の基準(assignBaselineIds)になる。
+ */
+function selectPermissionValue(value) {
+  if (!value) return
+  assignPermValue = value
+  const candidates = currentFilteredItems()
+  assignBaselineIds = new Set(candidates.filter((i) => (i.permissions || []).includes(value)).map((i) => i.key))
+  selectedIds.clear()
+  assignBaselineIds.forEach((k) => selectedIds.add(k))
+  refresh()
+  paintAssignBar()
+}
 
-  const targets = items.filter((i) => selectedIds.has(i.key))
-  const label = mode === 'add' ? '割り当て' : '解除'
-  if (!confirm(`${targets.length}件に「${value}」を${label}します。よろしいですか?`)) return
+/**
+ * チェック状態の変更箇所から、割り当て(新たにONになった)か解除(新たにOFFになった)かを判定して送信する。
+ */
+async function applyPermissionsDiff() {
+  if (!assignPermValue) { alert('権限を選択してください'); return }
 
-  // GASの6分上限に収まるよう小さめに分割して送る
+  const toAdd = items.filter((i) => selectedIds.has(i.key) && !assignBaselineIds.has(i.key))
+  const toRemove = items.filter((i) => !selectedIds.has(i.key) && assignBaselineIds.has(i.key))
+  if (!toAdd.length && !toRemove.length) { alert('変更箇所がありません'); return }
+
+  if (!confirm(`「${assignPermValue}」を ${toAdd.length}件に割り当て、${toRemove.length}件から解除します。よろしいですか?`)) return
+
   const CHUNK = 20
-  const chunks = []
-  for (let i = 0; i < targets.length; i += CHUNK) chunks.push(targets.slice(i, i + CHUNK))
+  const jobs = []
+  for (let i = 0; i < toAdd.length; i += CHUNK) jobs.push({ mode: 'add', targets: toAdd.slice(i, i + CHUNK) })
+  for (let i = 0; i < toRemove.length; i += CHUNK) jobs.push({ mode: 'remove', targets: toRemove.slice(i, i + CHUNK) })
 
   let updated = 0
   const errors = []
-  for (let i = 0; i < chunks.length; i++) {
-    paintBulkProgress({ current: i + 1, total: chunks.length, title: `${label}中(${chunks[i].length}件ずつ処理)`, done: updated, failed: errors.length, errors: [] })
+  for (let i = 0; i < jobs.length; i++) {
+    const { mode, targets } = jobs[i]
+    paintBulkProgress({
+      current: i + 1,
+      total: jobs.length,
+      title: `${mode === 'add' ? '割り当て' : '解除'}中(${targets.length}件)`,
+      done: updated,
+      failed: errors.length,
+      errors: [],
+    })
     try {
-      const res = await savePermissions(chunks[i].map((t) => t.notionPageId), [value], mode)
+      const res = await savePermissions(targets.map((t) => t.notionPageId), [assignPermValue], mode)
       updated += res.updated
       if (res.errors?.length) errors.push(...res.errors)
+      // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
+      targets.forEach((t) => {
+        const current = t.permissions || []
+        t.permissions = mode === 'add'
+          ? [...new Set([...current, assignPermValue])]
+          : current.filter((p) => p !== assignPermValue)
+      })
     } catch (err) {
       errors.push(String(err.message || err))
     }
   }
-  paintBulkProgress({ finished: true, total: targets.length, done: updated, failed: errors.length, errors })
+  paintBulkProgress({ finished: true, total: toAdd.length + toRemove.length, done: updated, failed: errors.length, errors })
 
-  // 手元のデータにも反映(index.jsonの再取得を待たずに一覧へ出すため)
-  targets.forEach((t) => {
-    const current = t.permissions || []
-    t.permissions = mode === 'add'
-      ? [...new Set([...current, value])]
-      : current.filter((p) => p !== value)
-  })
-
-  selectedIds.clear()
+  // 更新後は現在の状態を新しい基準にして、続けて編集できるようにする
+  assignBaselineIds = new Set(selectedIds)
   refresh()
   paintAssignBar()
 }
@@ -1315,10 +1459,6 @@ document.getElementById('assign-permission').addEventListener('click', toggleAss
 // (毎回 innerHTML で作り直すと入力のたびにフォーカスが外れ、1文字しか打てなくなる)
 document.getElementById('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
-  refresh()
-})
-document.getElementById('show-tags-checkbox').addEventListener('change', (e) => {
-  showTags = e.target.checked
   refresh()
 })
 document.querySelectorAll('.status-filter-chip').forEach((el) => {
