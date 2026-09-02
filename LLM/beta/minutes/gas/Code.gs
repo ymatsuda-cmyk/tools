@@ -264,6 +264,9 @@ function parseAgenda_(text) {
     var parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
+    // 保存時に文字数上限で切られていると閉じ括弧が無く、ここに来る。
+    // 黙って空配列を返すと「議事が未登録」に見えて原因が追えないため記録する。
+    console.error('議事JSONのパースに失敗しました(長さ ' + text.length + '): ' + e);
     return [];
   }
 }
@@ -454,8 +457,21 @@ function richTextOf_(properties, name) {
 }
 
 /** 2000字上限に収めた rich_text プロパティのペイロードを作る */
+/**
+ * rich_text プロパティのペイロードを作る。
+ * Notionは1チャンクあたり2000文字までだが、チャンクを複数並べれば
+ * 1プロパティに長い文字列を保存できる。議事(agenda)はJSONで
+ * 2000文字を超えることがあるため、切り捨てずに分割する。
+ */
 function richTextProp_(text) {
-  return { rich_text: [{ text: { content: String(text || '').slice(0, 2000) } }] };
+  var s = String(text || '');
+  if (!s) return { rich_text: [] };
+
+  var chunks = [];
+  for (var i = 0; i < s.length; i += 2000) {
+    chunks.push({ text: { content: s.slice(i, i + 2000) } });
+  }
+  return { rich_text: chunks };
 }
 
 /** 配列を改行区切りの1文字列にする(空配列/未定義は空文字) */
