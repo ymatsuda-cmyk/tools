@@ -748,15 +748,6 @@ ${contextText.slice(0, 30000)}`
     busy = false
   }
 }
-      const msg = 'エラーが発生しました: ' + (err.message || err)
-      if (last?.role === 'assistant' && !last.content) last.content = msg
-      else messages.push({ role: 'assistant', content: msg })
-    }
-    saveRawChatMessages(item.notionPageId, messages)
-    paintRawChatMessages(messagesEl, messages)
-    busy = false
-  }
-}
 
 // --- マーカー(サマリ・論点・議事・決定事項・ToDoの各項目に色を付ける) ---
 // ツールバーは1つだけ共通で使い、どの項目(field/index/sub)を選択したかを
