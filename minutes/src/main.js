@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem, updateRawContextCount } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -176,11 +176,19 @@ function refresh() {
     onPrevMonth: () => {
       if (assignMode && assignAllPeriod) { assignAllPeriod = false }
       else { currentMonthKey = shiftMonth(currentMonthKey, -1) }
+      if (assignMode) {
+        selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
+        if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      }
       refresh()
     },
     onNextMonth: () => {
       if (assignMode && assignAllPeriod) { assignAllPeriod = false }
       else { currentMonthKey = shiftMonth(currentMonthKey, 1) }
+      if (assignMode) {
+        selectedTags.clear()
+        if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      }
       refresh()
     },
     onToggleTag: (tag) => {
@@ -196,7 +204,12 @@ function refresh() {
       document.getElementById('show-tags-checkbox').checked = v
       refresh()
     },
-    onResetPeriod: () => { assignAllPeriod = true; refresh() },
+    onResetPeriod: () => {
+      assignAllPeriod = true
+      selectedTags.clear() // 一覧の対象が変わるため、タグ絞り込みは解除する
+      if (assignPermValue) { selectPermissionValue(assignPermValue); return }
+      refresh()
+    },
   })
 
   renderList(listItemsEl, filteredItems, selectedKey, onSelect, showTags, {
@@ -283,7 +296,7 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-delete')?.addEventListener('click', () => deleteItemFlow(item))
 
   if (target.querySelector('#rawchat-messages')) {
-    setupRawChatTab(target, item)
+    setupRawChatTab(target, item, renderState)
   }
   setupMarkerUI(target, item, renderState)
 
@@ -561,22 +574,83 @@ function saveRawChatMessages(pageId, messages) {
   localStorage.setItem(RAWCHAT_PREFIX + pageId, JSON.stringify(messages))
 }
 
-function paintRawChatMessages(container, messages) {
-  container.innerHTML = messages.map((m) => m.role === 'user'
-    ? `<div class="chat-msg chat-msg-user"><div class="chat-bubble">${escapeHtml(m.content)}</div></div>`
-    : `<div class="chat-msg chat-msg-assistant">${renderMarkdown(m.content)}</div>`
-  ).join('') || '<p style="font-size:12px;color:var(--text-muted)">この議事録の原文について質問できます</p>'
+function renderQAAccordion(container, messages) {
+  container.innerHTML = messages.map((m, idx) => {
+    const n = idx + 1
+    if (m.role === 'user') {
+      return `<details class="qa-item qa-item-user"><summary class="qa-summary">Q${n}: ${escapeHtml((m.content || '').slice(0, 120))}${(m.content || '').length > 120 ? '…' : ''}</summary><div class="qa-body">${escapeHtml(m.content || '')}</div></details>`
+    }
+    return `<details class="qa-item qa-item-assistant" open><summary class="qa-summary">A${n}</summary><div class="qa-body markdown">${renderMarkdown(m.content || '')}</div></details>`
+  }).join('') || '<p style="font-size:12px;color:var(--text-muted)">この議事録についてQ&Aできます</p>'
   container.scrollTop = container.scrollHeight
 }
 
-function setupRawChatTab(target, item) {
+/** 議事タブ相当(サマリ・議事・決定事項・ToDo・論点)をテキスト化する。原文より軽いコンテキスト用 */
+function buildAgendaContextText(summary) {
+  const d = summary.detail || {}
+  const lines = []
+  if (summary.cardSummary) lines.push('サマリ: ' + plainTextOf(summary.cardSummary))
+  ;(d.agenda || []).forEach((a, i) => {
+    lines.push(`議題${i + 1}: ${plainTextOf(a.topic || '')}`)
+    ;(a.points || []).forEach((p) => lines.push('- ' + plainTextOf(p)))
+    if (a.outcome) lines.push('結論: ' + plainTextOf(a.outcome))
+  })
+  if (d.decisions?.length) lines.push('決定事項: ' + d.decisions.map((x) => plainTextOf(x)).join(' / '))
+  if (d.todos?.length) lines.push('ToDo: ' + d.todos.map((t) => plainTextOf(t.text ?? t)).join(' / '))
+  if (d.topics?.length) lines.push('論点: ' + d.topics.map((x) => plainTextOf(x)).join(' / '))
+  return lines.join('\n')
+}
+
+function setupRawChatTab(target, item, state) {
   const messagesEl = target.querySelector('#rawchat-messages')
   const inputEl = target.querySelector('#rawchat-input')
   const sendBtn = target.querySelector('#rawchat-send')
+  const countEl = target.querySelector('#rawchat-context-count')
+  const ctxButtons = target.querySelectorAll('.chat-context-btn')
   if (!messagesEl || !inputEl || !sendBtn) return
 
   const messages = loadRawChatMessages(item.notionPageId)
-  paintRawChatMessages(messagesEl, messages)
+  renderQAAccordion(messagesEl, messages)
+
+  let contextMode = 'raw' // 'raw' | 'agenda'
+  let transcriptCache = null
+  let busy = false
+  // 原文の文字数キャッシュ。index.json → 直近取得したstate.summary → 未計測(0) の優先順
+  let rawCount = item.rawContextCount || state.summary?.rawContextCount || 0
+
+  function paintCounts() {
+    if (!countEl) return
+    const agendaCount = buildAgendaContextText(state.summary).length
+    const rawLabel = rawCount > 0 ? `約${rawCount.toLocaleString()}字` : '取得中...'
+    countEl.textContent = `議事: 約${agendaCount.toLocaleString()}字 ／ 原文: ${rawLabel}`
+  }
+  paintCounts()
+
+  /** 原文の文字数が未計測(0)なら、原文を確認して確定させ、Notionにも書き戻してキャッシュする */
+  async function ensureRawCount() {
+    if (rawCount > 0) return rawCount
+    try {
+      if (!transcriptCache) {
+        const { text: full } = await fetchTranscript(item.notionPageId)
+        transcriptCache = full
+      }
+      rawCount = transcriptCache.length
+      item.rawContextCount = rawCount
+      paintCounts()
+      updateRawContextCount(item.notionPageId, rawCount).catch(() => {}) // 次回から高速に読めるようキャッシュを更新
+    } catch {
+      // 取得に失敗しても致命的ではないため、未計測のまま次回に持ち越す
+    }
+    return rawCount
+  }
+  if (rawCount === 0) ensureRawCount()
+
+  ctxButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      contextMode = btn.dataset.ctx
+      ctxButtons.forEach((b) => b.classList.toggle('active', b === btn))
+    })
+  })
 
   // Shift+Enterで改行、Enter単体で送信
   inputEl.addEventListener('keydown', (e) => {
@@ -591,9 +665,6 @@ function setupRawChatTab(target, item) {
   })
   sendBtn.addEventListener('click', send)
 
-  let busy = false
-  let transcriptCache = null
-
   async function send() {
     if (busy) return
     const text = inputEl.value.trim()
@@ -603,40 +674,56 @@ function setupRawChatTab(target, item) {
 
     messages.push({ role: 'user', content: text })
     saveRawChatMessages(item.notionPageId, messages)
-    paintRawChatMessages(messagesEl, messages)
+    renderQAAccordion(messagesEl, messages)
 
     const connection = connectionOf(loadSettings())
     if (!connection) {
       messages.push({ role: 'assistant', content: 'LLM接続プロファイルが未設定です。設定から接続先を追加してください。' })
       saveRawChatMessages(item.notionPageId, messages)
-      paintRawChatMessages(messagesEl, messages)
+      renderQAAccordion(messagesEl, messages)
       return
     }
 
     busy = true
+    // 「考え中」を即座に見せるため、本文取得より先にプレースホルダーを積む
+    messages.push({ role: 'assistant', content: '' })
+    renderQAAccordion(messagesEl, messages)
+
     try {
-      if (!transcriptCache) {
-        const { text: full } = await fetchTranscript(item.notionPageId)
-        transcriptCache = full
+      let contextText
+      if (contextMode === 'agenda') {
+        contextText = buildAgendaContextText(state.summary)
+      } else {
+        if (!transcriptCache) {
+          const { text: full } = await fetchTranscript(item.notionPageId)
+          transcriptCache = full
+          if (rawCount === 0) {
+            rawCount = full.length
+            item.rawContextCount = rawCount
+            paintCounts()
+            updateRawContextCount(item.notionPageId, rawCount).catch(() => {})
+          }
+        }
+        contextText = transcriptCache
       }
-      const systemPrompt = `あなたは会議の文字起こしについて質問に答えるアシスタントです。
-以下は「${item.title}」の文字起こし全文です。この内容の範囲で答え、無い情報は「分かりません」と答えてください。
+
+      const systemPrompt = `あなたは会議の内容について質問に答えるアシスタントです。
+以下は「${item.title}」の${contextMode === 'agenda' ? '議事(要約)' : '文字起こし全文'}です。この内容の範囲で答え、無い情報は「分かりません」と答えてください。
 Markdown形式(見出し・箇条書き・強調など)を使って読みやすく整理して構いません。日本語で回答してください。
 
-${transcriptCache.slice(0, 30000)}`
+${contextText.slice(0, 30000)}`
 
       const chatMessages = [
         { role: 'system', content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ...messages.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
       ]
 
-      messages.push({ role: 'assistant', content: '' })
       let full = ''
       for await (const chunk of streamChat(connection, chatMessages)) {
         if (chunk.delta) {
           full += chunk.delta
           messages[messages.length - 1].content = full
-          paintRawChatMessages(messagesEl, messages)
+          renderQAAccordion(messagesEl, messages)
         }
       }
       if (!full) messages[messages.length - 1].content = '(応答がありませんでした)'
@@ -647,7 +734,7 @@ ${transcriptCache.slice(0, 30000)}`
       else messages.push({ role: 'assistant', content: msg })
     }
     saveRawChatMessages(item.notionPageId, messages)
-    paintRawChatMessages(messagesEl, messages)
+    renderQAAccordion(messagesEl, messages)
     busy = false
   }
 }
@@ -939,6 +1026,7 @@ async function onSelect(item, rowEl) {
  */
 async function generateAndSave(item, onProgress) {
   const { text } = await fetchTranscript(item.notionPageId)
+  const rawContextCount = text.length
   const result = await generateSummary(text, onProgress)
 
   await saveSummary(item.notionPageId, result.cardSummary, {
@@ -946,9 +1034,10 @@ async function generateAndSave(item, onProgress) {
     decisions: result.decisions,
     todos: result.todos,
     topics: result.topics,
-  }, result.model)
+  }, result.model, rawContextCount)
 
   item.status = '要約'
+  item.rawContextCount = rawContextCount // index.jsonが未対応でも今回のセッションでは即座に使えるようにする
 
   return setDetailCache(item.key, {
     cardSummary: result.cardSummary,
@@ -960,6 +1049,7 @@ async function generateAndSave(item, onProgress) {
     },
     model: result.model,
     generatedAt: new Date().toISOString(),
+    rawContextCount,
   })
 }
 
