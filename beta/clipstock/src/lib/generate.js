@@ -36,20 +36,55 @@ function requireConnection() {
   return connection
 }
 
+/** HTTPステータスをメッセージ文字列から拾う。streamChatは "HTTP 429 ..." の形で投げてくる */
+function httpStatusOf(err) {
+  const m = String(err?.message ?? '').match(/HTTP (\d{3})/)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * 429には2種類ある。
+ *  - 分あたりの上限(RPM): 少し待てば直る一時的なもの
+ *  - 日あたりの上限(RPD): 待っても直らない。深夜(太平洋時間)まで復旧しない
+ * メッセージ本文で見分けている。判別できない場合は一時的な方として扱い、
+ * 待っても直らなければ最終的にリトライ上限で諦める。
+ */
+function isDailyQuota(err) {
+  return /quota|exceeded your current quota/i.test(String(err?.message ?? '')) && !/per minute|rpm/i.test(String(err?.message ?? ''))
+}
+
+const RATE_LIMIT_RETRIES = 4
+const RATE_LIMIT_BASE_MS = 15000
+
 async function ask(connection, system, user, onProgress) {
   const messages = [
     { role: 'system', content: system },
     { role: 'user', content: user },
   ]
-  let full = ''
-  for await (const chunk of streamChat(connection, messages)) {
-    if (chunk.delta) {
-      full += chunk.delta
-      onProgress?.(full)
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      let full = ''
+      for await (const chunk of streamChat(connection, messages)) {
+        if (chunk.delta) {
+          full += chunk.delta
+          onProgress?.(full)
+        }
+      }
+      if (!full.trim()) throw new Error('AIから応答がありませんでした')
+      return full
+    } catch (err) {
+      if (httpStatusOf(err) !== 429 || attempt >= RATE_LIMIT_RETRIES) throw err
+      if (isDailyQuota(err)) {
+        // 待っても直らない種類なので、リトライで時間を浪費せずすぐ諦める
+        throw new Error('1日の利用上限に達しています。日付が変わるまで待つか、プランを見直してください。')
+      }
+      // 分あたりの上限。指数的に間を空けて再試行する
+      const wait = RATE_LIMIT_BASE_MS * 2 ** attempt
+      onProgress?.(`(利用制限のため ${Math.round(wait / 1000)} 秒待って再試行します: ${attempt + 1}/${RATE_LIMIT_RETRIES})`)
+      await new Promise((r) => setTimeout(r, wait))
     }
   }
-  if (!full.trim()) throw new Error('AIから応答がありませんでした')
-  return full
 }
 
 const NO_FENCE = '前後に説明文やコードフェンス(```)を付けず、JSONだけを出力してください。日本語で書いてください。'
@@ -75,31 +110,47 @@ function tagRule(knownTags) {
 ${knownTags.map((t) => `- ${t}`).join('\n')}`
 }
 
-function coreSystem(knownTags) {
+/**
+ * マインドマップは自由記述のMarkdown文字列ではなく構造化JSONで受け取る。
+ * 理由は2つ: (1) 分野別と同じ「引用→時刻」を枝ごとに割り当てるには、
+ * どの行がどの枝かをこちらで把握できる形でないと後処理できない。
+ * (2) 自由記述だとインデントや見出し記号をモデルが崩し、markmapの
+ * パースに失敗する事故が起きやすい。Markdown文字列はこちらで組み立てる。
+ */
+function mindmapNodeShape(withQuotes) {
+  const quote = withQuotes
+    ? `, "quote": "この項目の根拠になった原文の一文。原文から一字一句そのまま写す。無ければ空文字"`
+    : ''
+  return `{ "label": "見出しの語句(40字以内)"${quote}, "children": [ /* 同じ形。無ければ省略可 */ ] }`
+}
+
+function coreSystem(knownTags, withQuotes) {
   return `あなたは動画の文字起こしを整理するアシスタントです。
 次のJSON形式のみで回答してください。${NO_FENCE}
 
 {
   "summary": "この動画が何を扱い、何を主張しているかを300〜500字で。前置きや「この動画では」といった枕詞は書かず、内容そのものから始める",
   "tags": ["内容を表す短い語"],
-  "mindmap": "マインドマップをMarkdownの見出しと箇条書きで表現したもの(下の書式に従う)"
+  "mindmap": {
+    "title": "動画の主題",
+    "branches": [${mindmapNodeShape(withQuotes)}]
+  }
 }
 
 tags の決め方:
 ${tagRule(knownTags)}
 
-mindmap の書式:
-# 動画の主題
-## 大項目
-- 中項目
-  - 詳細
-## 大項目
-
-制約:
-- 大項目は3〜6個、階層は3段まで。
-- 1行は40字以内。文ではなく要点の語句で書く。
-- 全体で1500字以内に収める。
-- 改行は \\n でエスケープした1つの文字列として出力する。`
+mindmap の決め方:
+- branches(大項目)は3〜6個。各branchのchildrenは中項目、そのchildrenは詳細(最大3段)。
+- label は文ではなく要点の語句。40字以内。
+- 全体で40〜80項目を超えないこと(枝を無理に増やさない)。${
+    withQuotes
+      ? `
+- quote は原文に存在する文字列でなければならない。20〜60字程度で写す。自分で言い換えた文を書いてはいけない。
+  該当が無い、または要約や見出しとして作った項目(原文の特定の一文に対応しない)には quote を空文字にする。
+- 時刻や秒数は書かないこと。こちらで原文から割り出す。`
+      : ''
+  }`
 }
 
 // ---- 第2段: 分野別要約 ----
@@ -166,6 +217,39 @@ const APPLY_SYSTEM = `あなたは、動画から得た知識を実務と遊び�
 - apply は2〜4件。「AIを活用する」のような一般論ではなく、この動画の内容が効いている案にする。
 - ideas は2〜4件。個人の趣味・家庭・遊び・学習など、仕事以外の文脈も歓迎する。
 - 全体で1800字以内に収める。`
+
+// ---- マインドマップの組み立て ----
+
+/**
+ * mindmapのJSONをmarkmap用のMarkdownに組み立てる。
+ * quote が原文で見つかった枝にだけ末尾へ [mm:ss] を付ける
+ * (renderMindmap側がそれをリンクに変換する)。
+ * 見出し記号やインデントをこちらで機械的に出すので、モデルが崩す余地がない。
+ */
+function mindmapToText(parsed, segments) {
+  const title = String(parsed?.title ?? '').trim() || '動画の主題'
+  const lines = [`# ${title}`]
+
+  function walk(nodes, depth) {
+    for (const raw of Array.isArray(nodes) ? nodes : []) {
+      const label = String(raw?.label ?? '').trim()
+      if (!label) continue
+      const quote = String(raw?.quote ?? '')
+      const at = segments.length ? resolveQuote(quote, segments) : null
+      const text = withTimecode(label, at)
+
+      if (depth === 0) {
+        lines.push(`## ${text}`)
+      } else {
+        lines.push(`${'  '.repeat(depth - 1)}- ${text}`)
+      }
+      if (Array.isArray(raw?.children) && raw.children.length) walk(raw.children, depth + 1)
+    }
+  }
+
+  walk(parsed?.branches, 0)
+  return lines.join('\n')
+}
 
 // ---- セクション形式への変換 ----
 
@@ -238,7 +322,10 @@ export async function generateStage(stageId, ctx, onProgress) {
 
   if (stageId === 'core') {
     const knownTags = Array.isArray(ctx.knownTags) ? ctx.knownTags : []
-    const raw = await ask(connection, coreSystem(knownTags), `動画タイトル: ${ctx.title}\n\n${transcript}`, onProgress)
+    // 文字起こしにタイムスタンプが無い(旧データ)なら引用も求めない。無駄に出力が伸びるだけ
+    const timed = hasTimecodes(transcript)
+    const segments = timed ? splitTranscript(transcript) : []
+    const raw = await ask(connection, coreSystem(knownTags, timed), `動画タイトル: ${ctx.title}\n\n${transcript}`, onProgress)
     const parsed = jsonOf(raw)
     // プロンプトで縛っても表記ゆれは残るので、既存の綴りへ機械的に寄せ直す
     const reconciled = reconcileTags(parsed.tags, knownTags)
@@ -247,7 +334,7 @@ export async function generateStage(stageId, ctx, onProgress) {
       tagReport: reconciled,
       detail: {
         summary: String(parsed.summary || '').trim(),
-        mindmap: String(parsed.mindmap || '').trim(),
+        mindmap: mindmapToText(parsed.mindmap, segments),
         tags: reconciled.tags,
       },
     }

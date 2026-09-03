@@ -1285,6 +1285,14 @@ async function runBulkGenerate() {
       item.rawCount = transcript.length
     } catch (err) {
       failures.push(`${item.title}: ${err.message || err}`)
+      // 1日の利用上限に達した場合、残りを叩いても全滅するだけなのでここで打ち切る
+      if (String(err.message || err).includes('1日の利用上限')) {
+        bar.innerHTML = ''
+        alert(`${i + 1}/${targets.length}件まで処理したところで1日の利用上限に達しました。\n日付が変わってから残りを実行してください。`)
+        ideasState.phase = 'idle'
+        refresh()
+        return
+      }
     }
   }
 

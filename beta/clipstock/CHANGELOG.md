@@ -1,5 +1,51 @@
 # Change Log
 
+## 1.5.0 - 2026-09-03
+
+### Title
+
+Wire up playback links on mindmap branches
+
+### Changes
+
+- The mindmap-branch-to-playback-link plumbing existed since 1.3.0 (`linkTimecodes` in `mindmap.js`), but nothing ever populated it: the core stage generated mindmap as a single free-form Markdown string with no quote/timecode mechanism, so branches never carried `[mm:ss]` and the links never appeared.
+- Changed the core-stage prompt to return mindmap as structured JSON (`{ title, branches: [{ label, quote, children }] }`) instead of a raw Markdown string, mirroring the fields-stage pattern: the model supplies a verbatim quote per node, this app resolves it against the timestamped transcript via `resolveQuote`, and only matched nodes get a time.
+- Added `mindmapToText`, which builds the Markdown itself (heading marks, indentation, timecodes) rather than trusting the model to format it — removing a source of markmap parse failures as a side effect.
+- Skipped quotes for transcripts without timestamps, same as fields, so older material renders exactly as before with no time.
+- Left the legacy value formats (older plain-markdown mindmaps, and HTML embedded by the previous skill) untouched and still rendering; only newly generated mindmaps use the structured path.
+
+### Affected Files
+
+- `videos/src/lib/generate.js`
+
+### Notes
+
+- Regenerating the mindmap (via "この項目を作り直す" or "すべて生成") is required for existing videos to get clickable branches; nothing changes for content that isn't regenerated.
+- A branch with no matching quote (a synthesized grouping label, or a fabricated quote) simply carries no time — same "absence is meaningful" rule as fields.
+
+## 1.4.1 - 2026-09-03
+
+### Title
+
+Handle 429 quota errors instead of failing every request
+
+### Changes
+
+- Distinguished the two shapes of a Gemini 429: a per-minute rate limit (temporary, clears in seconds) and a daily/plan quota exhaustion (does not clear until the quota resets), by inspecting the error body rather than treating all 429s the same.
+- Added retry with exponential backoff (15s, 30s, 60s, 120s) for the rate-limit case, surfaced as a visible "waiting Ns, retry X/4" message rather than a silent hang.
+- Failed fast with a clear message for the daily-quota case instead of burning through retries that cannot succeed.
+- Stopped a bulk run immediately when the daily quota is hit, rather than letting it fail through every remaining item, and reported how many videos were completed before the stop.
+
+### Affected Files
+
+- `videos/src/lib/generate.js`
+- `videos/src/main.js`
+
+### Notes
+
+- Detection is string-based on the error body ("quota" vs "per minute"/"RPM"), since the API does not expose a structured error subtype through the OpenAI-compatible endpoint used here.
+- This does not remove the underlying limit — a free-tier key is still capped at roughly 15 requests/minute and 1,500/day as of this writing. It only stops the app from wasting requests against a limit that will not clear.
+
 ## 1.4.0 - 2026-09-03
 
 ### Title
