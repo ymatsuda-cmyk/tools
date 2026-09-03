@@ -9,28 +9,34 @@
   1. Notionから対象ページを取得
   2. URLプロパティから動画IDを解決
   3. 字幕API（youtube-transcript-api）で文字起こしを取得
+     取れない場合は yt-dlp で音声を落とし、mlx-whisper で文字起こし（既定でON）
   4. 既存の本文ブロックをアーカイブしてから新しい文字起こしを追記
   5. 動画タイトル・サムネイル・原文文字数・状態を更新
-
-字幕が存在しない動画は取得不可としてスキップします（音声DL＋ASRは行いません）。
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
   VIDEO_ENV_FILE   環境変数を読み込むファイルのパス（既定: ~/.video_notion_sync.env）
   VIDEO_DB_ID      対象データベースID（既定: 📚動画DB）
 
+Whisperフォールバックを使うには:
+  pip install mlx-whisper
+  brew install ffmpeg yt-dlp   （未導入の場合）
+
 使い方:
     python3 video_transcribe_notion.py --dry-run
     python3 video_transcribe_notion.py
     python3 video_transcribe_notion.py --limit 1
+    python3 video_transcribe_notion.py --no-whisper       # Whisperフォールバックを使わない
     python3 video_transcribe_notion.py --page-id 3d00e7a535dc81e1b57bfc93f65019d2
 """
 import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -60,6 +66,8 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
 
 STATUS_EMPTY = "空欄"
+WHISPER_MODEL_DEFAULT = "mlx-community/whisper-large-v2-mlx"
+WHISPER_LANGUAGE_DEFAULT = "ja"
 
 # ---------------------------------------------------------------- Notion
 
@@ -428,9 +436,102 @@ def fetch_captions(video_id, languages=("ja", "ja-JP", "en")):
     return None
 
 
+class _WhisperSeg:
+    """build_timestamped_lines がそのまま使えるよう .text / .start を持たせたラッパー"""
+    __slots__ = ("text", "start")
+
+    def __init__(self, text, start):
+        self.text = text
+        self.start = start
+
+
+def resolve_ffmpeg_cmd():
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
+    for candidate in (Path("/opt/homebrew/bin/ffmpeg"), Path("/usr/local/bin/ffmpeg")):
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def download_audio_for_whisper(canonical_url, dest_dir):
+    """yt-dlpで音声のみをダウンロードする（変換はmlx-whisper内部のffmpegに任せる）。"""
+    out_tmpl = str(Path(dest_dir) / "audio.%(ext)s")
+    cmd = ["yt-dlp", "-f", "bestaudio/best", "--no-warnings", "-o", out_tmpl, canonical_url]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    except FileNotFoundError:
+        print("    ❌ yt-dlp が見つかりません（pip install yt-dlp）")
+        return None
+    except subprocess.TimeoutExpired:
+        print("    ❌ 音声ダウンロードがタイムアウトしました")
+        return None
+    if result.returncode != 0:
+        print(f"    ❌ 音声ダウンロード失敗: {(result.stderr or '')[:300]}")
+        return None
+    audio_files = sorted(Path(dest_dir).glob("audio.*"))
+    return audio_files[0] if audio_files else None
+
+
+def transcribe_with_whisper(audio_path, model, language):
+    """mlx-whisperでローカル文字起こしし、[12:34]付きの行に整形する。"""
+    try:
+        import mlx_whisper
+    except ImportError:
+        print("    ❌ mlx-whisper が未導入です（pip install mlx-whisper）")
+        return None
+    if not resolve_ffmpeg_cmd():
+        print("    ❌ ffmpeg が見つかりません（brew install ffmpeg）")
+        return None
+
+    try:
+        result = mlx_whisper.transcribe(
+            str(audio_path),
+            path_or_hf_repo=model,
+            language=language,
+            condition_on_previous_text=False,
+            verbose=False,
+        )
+    except Exception as e:
+        print(f"    ❌ Whisper文字起こし失敗: {type(e).__name__}: {e}")
+        return None
+
+    segments = result.get("segments") or []
+    if segments:
+        segs = [_WhisperSeg((s.get("text") or "").strip(), s.get("start") or 0.0)
+                for s in segments if (s.get("text") or "").strip()]
+    else:
+        text = (result.get("text") or "").strip()
+        segs = [_WhisperSeg(text, 0.0)] if text else []
+
+    if not segs:
+        return None
+    lines = build_timestamped_lines(segs)
+    return lines or None
+
+
+def transcribe_video_via_whisper(canonical_url, *, model, language):
+    """字幕が無い動画向け：音声DL→mlx-whisperで文字起こし。"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        print("    → 音声をダウンロード中（yt-dlp）...")
+        audio_path = download_audio_for_whisper(canonical_url, tmpdir)
+        if not audio_path:
+            return None
+        size_mb = audio_path.stat().st_size / 1024 / 1024
+        print(f"    ✅ 音声取得 ({size_mb:.1f} MB)")
+        print(f"    → Whisperで文字起こし中...（model={model}）")
+        lines = transcribe_with_whisper(audio_path, model, language)
+        if not lines:
+            return None
+        model_short = model.split("/")[-1]
+        return "\n".join(lines), f"Whisper({model_short})"
+
+
 # ---------------------------------------------------------------- 本処理
 
-def process_page(page, *, set_status_name, is_retry):
+def process_page(page, *, set_status_name, is_retry, whisper_enabled,
+                 whisper_model, whisper_language):
     title = page_title(page)
     page_id = page.get("id")
     raw_url = page_url_value(page)
@@ -466,8 +567,15 @@ def process_page(page, *, set_status_name, is_retry):
     if got:
         transcript, engine_label = got
 
+    if not transcript and whisper_enabled:
+        print("    字幕なし → Whisperにフォールバック")
+        got = transcribe_video_via_whisper(canonical_url, model=whisper_model,
+                                           language=whisper_language)
+        if got:
+            transcript, engine_label = got
+
     if not transcript:
-        print("  ❌ 字幕を取得できませんでした（この動画には字幕が無い可能性）。スキップ")
+        print("  ❌ 文字起こしを取得できませんでした。スキップ")
         return False
     print(f"  ✅ 文字起こし取得 ({len(transcript)}文字 / {engine_label})")
 
@@ -506,6 +614,12 @@ def main():
     ap.add_argument("--set-status", default="完了",
                     help="処理完了後に設定する状態（既定: 完了。空文字で更新しない）")
     ap.add_argument("--limit", type=int, help="処理する件数の上限")
+    ap.add_argument("--no-whisper", action="store_true",
+                    help="字幕が無いときWhisperにフォールバックしない")
+    ap.add_argument("--whisper-model", default=WHISPER_MODEL_DEFAULT,
+                    help=f"mlx-whisperのモデル（既定: {WHISPER_MODEL_DEFAULT}）")
+    ap.add_argument("--whisper-language", default=WHISPER_LANGUAGE_DEFAULT,
+                    help=f"Whisperの言語コード（既定: {WHISPER_LANGUAGE_DEFAULT}）")
     ap.add_argument("--dry-run", action="store_true", help="対象一覧を表示するだけ")
     args = ap.parse_args()
 
@@ -547,7 +661,10 @@ def main():
         st = (page.get("properties", {}).get("状態", {}).get("select") or {}).get("name") or ""
         is_retry = is_retry_default or st == "再取得"
         try:
-            if process_page(page, set_status_name=set_status_name, is_retry=is_retry):
+            if process_page(page, set_status_name=set_status_name, is_retry=is_retry,
+                            whisper_enabled=not args.no_whisper,
+                            whisper_model=args.whisper_model,
+                            whisper_language=args.whisper_language):
                 ok_count += 1
         except Exception as e:
             print(f"  ❌ 例外: {type(e).__name__}: {e}")
