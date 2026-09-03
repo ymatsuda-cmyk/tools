@@ -1,1 +1,0 @@
-[{"id":"a","label":"Gemma 4 12B","user":"ymatsuda2025","key":"KGAT_f54a1bf880243a8b7739da48c087a012","kernel":"gemma4-12b","title":"gemma4 12b","model":"gemma4:12b","ngrok":"pregnant-vindicate-deacon.ngrok-free.dev","proxyKey":"bb3d602bc2a2499993a97e1bf9cf98f2","datasets":["ymatsuda2025/ollama-gemma4-12b-v2","ymatsuda2025/ngrok-binary"]}]
