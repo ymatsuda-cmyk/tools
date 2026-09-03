@@ -74,14 +74,37 @@ def notion_headers():
     }
 
 
+def get_valid_status_options():
+    """DBの「状態」プロパティに定義済みの選択肢一覧を取得する。"""
+    resp = requests.get(f"{NOTION_API}/databases/{VIDEO_DB_ID}",
+                        headers=notion_headers(), timeout=60)
+    if resp.status_code != 200:
+        print(f"    ⚠️ DBスキーマ取得失敗: {resp.status_code} {resp.text[:200]}")
+        return None
+    prop = resp.json().get("properties", {}).get("状態", {})
+    options = prop.get("select", {}).get("options", [])
+    return {o["name"] for o in options}
+
+
 def build_status_filter(statuses):
-    """状態フィルタを組み立てる。'空欄' は is_empty に変換する。"""
+    """状態フィルタを組み立てる。'空欄' は is_empty に変換する。
+
+    DBに存在しない選択肢が指定された場合は除外し、警告を出す
+    （Notion APIは未定義の選択肢を equals に渡すと 400 を返すため）。
+    """
+    valid_options = get_valid_status_options()
     conds = []
     for s in statuses:
         if s == STATUS_EMPTY:
             conds.append({"property": "状態", "select": {"is_empty": True}})
-        else:
-            conds.append({"property": "状態", "select": {"equals": s}})
+            continue
+        if valid_options is not None and s not in valid_options:
+            print(f"    ⚠️ 状態「{s}」はこのDBに存在しないため無視します"
+                  f"（利用可能: {', '.join(sorted(valid_options))}）")
+            continue
+        conds.append({"property": "状態", "select": {"equals": s}})
+    if not conds:
+        return None
     if len(conds) == 1:
         return conds[0]
     return {"or": conds}
@@ -89,6 +112,9 @@ def build_status_filter(statuses):
 
 def query_pages_by_status(statuses):
     filter_ = build_status_filter(statuses)
+    if filter_ is None:
+        print("    ⚠️ 有効な状態フィルタが無いため検索を中止します。")
+        return []
     pages, has_more, cursor = [], True, None
     while has_more:
         payload = {"page_size": 100, "filter": filter_}
@@ -331,11 +357,58 @@ def clean_title(title):
 
 # ---------------------------------------------------------------- 文字起こし
 
+def format_timecode(seconds: float) -> str:
+    """秒を [12:34] / [1:02:03] の表記にする"""
+    total = int(seconds)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def build_timestamped_lines(fetched, window: int = 30, max_chars: int = 900):
+    """
+    セグメントをまとめて "[12:34] 本文" の行にする。
+
+    1セグメントは2〜5秒しかないので、そのまま1行ずつ書くと本文が数百ブロックに
+    膨らんで、Notionへの書き込み回数も表示も破綻する。約30秒ぶんを1行にまとめる。
+    max_chars は Notion の rich_text 1件あたり2000字上限に対する余裕分。
+    """
+    lines = []
+    start = None
+    buf = []
+
+    def flush():
+        if buf:
+            lines.append(f"[{format_timecode(start)}] {''.join(buf).strip()}")
+
+    for seg in fetched:
+        # 属性アクセスであることに注意（seg['text'] ではなく seg.text）
+        text = getattr(seg, "text", "") or ""
+        text = text.replace("\n", " ").strip()
+        if not text:
+            continue
+        seg_start = getattr(seg, "start", 0) or 0
+        if start is None:
+            start = seg_start
+        over_window = seg_start - start >= window
+        over_chars = sum(len(b) for b in buf) + len(text) > max_chars
+        if buf and (over_window or over_chars):
+            flush()
+            start = seg_start
+            buf = []
+        buf.append(text + " ")
+
+    flush()
+    return lines
+
+
 def fetch_captions(video_id, languages=("ja", "ja-JP", "en")):
-    """youtube-transcript-api で字幕を取得する。
+    """youtube-transcript-api で字幕を取得し、[12:34] 形式の時刻付きテキストにする。
 
     注意: 新しいAPIではインスタンス化して fetch() を呼ぶ。
-    テキストは t.text（属性アクセス）で取り出す。
+    テキスト・開始秒は t.text / t.start（属性アクセス）で取り出す。
     """
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
@@ -349,12 +422,7 @@ def fetch_captions(video_id, languages=("ja", "ja-JP", "en")):
             fetched = ytt.fetch(video_id, languages=[lang])
         except Exception:
             continue
-        lines = []
-        for t in fetched:
-            text = getattr(t, "text", "") or ""
-            text = text.replace("\n", " ").strip()
-            if text:
-                lines.append(text)
+        lines = build_timestamped_lines(fetched)
         if lines:
             return "\n".join(lines), f"字幕({lang})"
     return None
