@@ -1,5 +1,25 @@
 # Change Log
 
+## 1.3.1 - 2026-09-03
+
+### Title
+
+Fix markmap failing to initialise: wrong CDN filename for markmap-lib
+
+### Changes
+
+- Stopped hardcoding browser bundle filenames. `markmap-view` ships `dist/browser/index.js` but `markmap-lib` ships `dist/browser/index.iife.js`; the previous code used `index.js` for both, so `Transformer` never appeared on `window.markmap` and initialisation failed. Requesting the bare package path lets the CDN resolve the entry from the package's own `jsdelivr` field.
+- Verified each dependency immediately after loading it, so the error names the specific package and URL that failed instead of reporting a generic initialisation failure.
+
+### Affected Files
+
+- `videos/src/lib/mindmap.js`
+
+### Notes
+
+- The raw-markdown fallback behaved as intended during the failure — the content stayed readable.
+- Versions remain pinned to `@0.18`; only the filename was at fault.
+
 ## 1.3.0 - 2026-09-03
 
 ### Title

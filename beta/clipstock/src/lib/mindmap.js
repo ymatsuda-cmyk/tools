@@ -12,10 +12,28 @@
 
 import { parseTimecode, youtubeUrlAt } from './timecode.js'
 
+/**
+ * ファイル名を直接指定しないこと。
+ * ブラウザ向けの実体は markmap-view が dist/browser/index.js なのに対し、
+ * markmap-lib は dist/browser/index.iife.js と名前が違う。
+ * パッケージ名だけを指定すれば、CDNが package.json の jsdelivr フィールドを見て
+ * 正しいファイルを返すので、この取り違えが起きない。
+ *
+ * 読み込み順も変えないこと。両方が window.markmap に生えるが、
+ * lib(Transformer) -> view(Markmap) の順が公式ドキュメントの前提。
+ */
 const CDN = [
-  'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js',
-  'https://cdn.jsdelivr.net/npm/markmap-lib@0.18/dist/browser/index.js',
-  'https://cdn.jsdelivr.net/npm/markmap-view@0.18/dist/browser/index.js',
+  { url: 'https://cdn.jsdelivr.net/npm/d3@7', check: () => Boolean(window.d3), name: 'd3' },
+  {
+    url: 'https://cdn.jsdelivr.net/npm/markmap-lib@0.18',
+    check: () => Boolean(window.markmap?.Transformer),
+    name: 'markmap-lib',
+  },
+  {
+    url: 'https://cdn.jsdelivr.net/npm/markmap-view@0.18',
+    check: () => Boolean(window.markmap?.Markmap),
+    name: 'markmap-view',
+  },
 ]
 
 let loading = null
@@ -31,13 +49,19 @@ function loadScript(src) {
   })
 }
 
-/** markmap一式を読み込む。2回目以降は同じPromiseを返す */
+/**
+ * markmap一式を読み込む。2回目以降は同じPromiseを返す。
+ * どれが欠けたのか分かるよう、1つずつ読み込んで直後に検証する。
+ * まとめて読んでから確認すると「初期化に失敗」としか言えず、原因を追えない。
+ */
 function loadMarkmap() {
   if (!loading) {
     loading = (async () => {
-      for (const src of CDN) await loadScript(src)
-      if (!window.markmap?.Markmap || !window.markmap?.Transformer) {
-        throw new Error('markmap の初期化に失敗しました')
+      for (const dep of CDN) {
+        await loadScript(dep.url)
+        if (!dep.check()) {
+          throw new Error(`${dep.name} を読み込めませんでした (${dep.url})`)
+        }
       }
       return window.markmap
     })().catch((err) => {
