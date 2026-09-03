@@ -1,5 +1,7 @@
 import { parseSections } from '../lib/sections.js'
 import { splitLabel, splitTranscript, formatTimecode, youtubeUrlAt } from '../lib/timecode.js'
+import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
+import { addrAttrs } from '../lib/marker-target.js'
 import { STATUS_SUMMARIZED, STATUS_DONE, STATUS_NEW } from '../lib/filters.js'
 
 export function escapeHtml(str) {
@@ -99,7 +101,7 @@ export function renderLibrary(container, items, state, handlers) {
           ${thumbHtml(item)}
           <div class="card-body">
             <h3 class="card-title">${highlightText(item.title, state.searchQuery)}</h3>
-            <p class="card-summary">${item.summary ? highlightText(item.summary.slice(0, 110), state.searchQuery) : '<span class="muted">要約はまだありません</span>'}</p>
+            <p class="card-summary">${item.summary ? highlightText(plainTextOf(item.summary).slice(0, 110), state.searchQuery) : '<span class="muted">要約はまだありません</span>'}</p>
             <div class="card-foot">
               <span class="badge s-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
               ${progressHtml(item)}
@@ -140,27 +142,45 @@ function timeChip(at, videoUrl) {
   return `<a class="tc tc-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${label} から再生"><i class="ti ti-player-play" aria-hidden="true"></i>${label}</a>`
 }
 
-function sectionsHtml(text, { numbered = false, videoUrl = '' } = {}) {
+function sectionsHtml(text, { numbered = false, videoUrl = '', field = null } = {}) {
   const sections = parseSections(text)
   if (!sections.length) return '<p class="empty-section">まだありません</p>'
+  // field が渡されたときだけマーカーを引けるようにする(読み取り専用のときは付けない)
+  const mark = (raw, kind, sec, point) =>
+    field
+      ? `<span class="marker-target" ${addrAttrs(field, kind, sec, point)}>${renderMarkedHtml(raw, escapeHtml)}</span>`
+      : escapeHtml(plainTextOf(raw))
+
   return `<div class="sections">${sections
     .map((s, i) => {
       const head = splitLabel(s.heading || '(無題)')
       return `
     <section class="sec">
-      <h4 class="sec-head">${numbered ? `<span class="sec-num">${i + 1}</span>` : ''}${escapeHtml(head.text)}${timeChip(head.at, videoUrl)}</h4>
-      ${s.body ? `<p class="sec-body">${escapeHtml(s.body).replace(/\n/g, '<br />')}</p>` : ''}
+      <h4 class="sec-head">${numbered ? `<span class="sec-num">${i + 1}</span>` : ''}${escapeHtml(plainTextOf(head.text))}${timeChip(head.at, videoUrl)}</h4>
+      ${s.body ? `<p class="sec-body">${mark(s.body, 'body', i, null).replace(/\n/g, '<br />')}</p>` : ''}
       ${s.points.length
         ? `<ul class="sec-points">${s.points
-            .map((p) => {
+            .map((p, j) => {
               const point = splitLabel(p)
-              return `<li>${escapeHtml(point.text)}${timeChip(point.at, videoUrl)}</li>`
+              return `<li>${mark(point.text, 'point', i, j)}${timeChip(point.at, videoUrl)}</li>`
             })
             .join('')}</ul>`
         : ''}
     </section>`
     })
     .join('')}</div>`
+}
+
+/** 選択したときに出るマーカーのツールバー。位置は選択範囲に合わせて動かす */
+function markerToolbarHtml() {
+  return `
+    <div class="marker-toolbar" id="marker-toolbar" style="display:none">
+      ${[1, 2, 3]
+        .map((c) => `<span class="marker-swatch" data-color="${c}" style="background:${MARKER_COLORS[c]}"></span>`)
+        .join('')}
+      <span class="marker-sep"></span>
+      <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
+    </div>`
 }
 
 /** 原文タブ。タイムスタンプがあれば各かたまりの頭を再生リンクにする */
@@ -276,6 +296,7 @@ export function detailHtml(item, state) {
 
   return `
     <div class="detail">
+      ${markerToolbarHtml()}
       <div class="detail-fixed">${head}</div>
       <div class="detail-scroll" id="detail-scroll">${panel}</div>
       <div class="detail-foot">${foot}</div>
@@ -287,18 +308,25 @@ function renderPanel(item, state, tab, d) {
   switch (tab) {
     case 'summary':
       return d.summary
-        ? `<p class="prose">${escapeHtml(d.summary).replace(/\n/g, '<br />')}</p>`
+        ? `<p class="prose"><span class="marker-target" ${addrAttrs('summary', 'whole')}>${renderMarkedHtml(
+            d.summary,
+            escapeHtml
+          ).replace(/\n/g, '<br />')}</span></p>`
         : emptyPanel(item, 'サマリ', 'core')
     case 'mindmap':
       return '<div id="mindmap-host" class="mindmap-host"></div>'
     case 'fields':
-      return d.fields ? sectionsHtml(d.fields, { videoUrl: item.url }) : emptyPanel(item, '分野別要約', 'fields')
+      return d.fields
+        ? sectionsHtml(d.fields, { videoUrl: item.url, field: 'fields' })
+        : emptyPanel(item, '分野別要約', 'fields')
     case 'apply':
       return d.apply
-        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url })
+        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply' })
         : emptyPanel(item, '応用', 'apply')
     case 'ideas':
-      return d.ideas ? sectionsHtml(d.ideas, { videoUrl: item.url }) : emptyPanel(item, '活用アイデア', 'apply')
+      return d.ideas
+        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas' })
+        : emptyPanel(item, '活用アイデア', 'apply')
     case 'memo':
       return `<textarea id="memo-input" class="memo-input" placeholder="気づいたこと、あとで試すこと、関連する話などを自由に">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
     case 'chat':
@@ -365,9 +393,9 @@ export function renderIdeas(container, entries, state, handlers) {
           (e) => `
         <article class="idea" data-key="${escapeHtml(e.key)}">
           <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}</div>
-          <h4 class="idea-title">${escapeHtml(e.heading)}</h4>
-          ${e.body ? `<p class="idea-body">${escapeHtml(e.body)}</p>` : ''}
-          ${e.points.length ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(splitLabel(p).text)}</li>`).join('')}</ul>` : ''}
+          <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
+          ${e.body ? `<p class="idea-body">${escapeHtml(plainTextOf(e.body))}</p>` : ''}
+          ${e.points.length ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(plainTextOf(splitLabel(p).text))}</li>`).join('')}</ul>` : ''}
           <button class="idea-source">
             <i class="ti ti-movie" aria-hidden="true"></i>${escapeHtml(e.videoTitle)}
           </button>

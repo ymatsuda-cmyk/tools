@@ -1,3 +1,5 @@
+import { plainTextOf } from './markers.js'
+
 export const STATUS_NEW = '新規'
 export const STATUS_RUNNING = '処理中'
 export const STATUS_DONE = '完了'
@@ -26,12 +28,16 @@ export function filterByTags(items, selected) {
   })
 }
 
-/** タイトルとサマリを対象にした検索。原文は含まない */
+/**
+ * タイトルとサマリを対象にした検索。原文は含まない。
+ * サマリにはマーカーのタグが混ざっているので、外してから照合する
+ * (そうしないと "m1" のような文字列が誤ってヒットする)。
+ */
 export function filterBySearch(items, query) {
   const q = query.trim().toLowerCase()
   if (!q) return items
   return items.filter(
-    (i) => i.title.toLowerCase().includes(q) || String(i.summary || '').toLowerCase().includes(q)
+    (i) => i.title.toLowerCase().includes(q) || plainTextOf(i.summary || '').toLowerCase().includes(q)
   )
 }
 

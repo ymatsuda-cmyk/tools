@@ -1,5 +1,37 @@
 # Change Log
 
+## 1.4.0 - 2026-09-03
+
+### Title
+
+Add markers; widen bulk generation to partially generated videos
+
+### Changes
+
+- Brought `markers.js` over from `minutes` unchanged and added `src/lib/marker-target.js` to address a single item inside the section storage format (`## heading` / body / `- point`), rebuilding and saving the whole field after each edit.
+- Made summary text, section bodies and section points markable in three colours, with an eraser, using the same floating toolbar as `minutes`.
+- Excluded headings from marking: they sit next to the trailing timecode and are rarely worth highlighting, so the risk outweighs the benefit.
+- Stripped the trailing timecode before marking a point and reattached it on write-back, so a marker cannot swallow or corrupt the timecode.
+- Routed marker text through `plainTextOf` everywhere raw tags would otherwise leak: library cards, idea feed, search matching, chat context and generation context.
+- Made the manual editor show plain text and carry markers back with `reconcileMarkers`, so highlights survive rewording where the wording is unchanged and drop where it is not.
+- Saved markers via `saveField`, which leaves 要約日時, 要約モデル and 状態 untouched — highlighting is not regeneration.
+- Widened bulk generation to also offer videos whose 状態 is 要約済み but which are missing one of mindmap/fields/apply/ideas, so a video that lost a single stage to an error is no longer stranded.
+
+### Affected Files
+
+- `videos/src/lib/markers.js` (new, copied from `minutes`)
+- `videos/src/lib/marker-target.js` (new)
+- `videos/src/ui/render.js`
+- `videos/src/main.js`
+- `videos/src/lib/filters.js`
+- `videos/css/styles.css`
+
+### Notes
+
+- Markers are stored inline in the existing text properties; no new Notion column is required.
+- The transcript tab is not markable. It lives in the page body rather than a property, so marking it would need block-level writes.
+- Regenerating a field discards its markers, since the text they were anchored to no longer exists.
+
 ## 1.3.1 - 2026-09-03
 
 ### Title

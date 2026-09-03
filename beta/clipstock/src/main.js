@@ -28,6 +28,8 @@ import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } 
 import { generateAll, generateStage, STAGES } from './lib/generate.js'
 import { renderMindmap } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
+import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
+import { addrOf, getMarkedText, setMarkedText, stripMarkers } from './lib/marker-target.js'
 import { getDetailCache, setDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
   excludeExcluded,
@@ -288,6 +290,8 @@ function wireDetail(item) {
 
   if (detail.phase !== 'ready' || detail.busyStage) return
 
+  setupMarkers(item)
+
   if (detail.activeTab === 'mindmap') {
     const host = stageEl.querySelector('#mindmap-host')
     if (host) renderMindmap(host, detail.detail?.mindmap, item.url)
@@ -362,8 +366,10 @@ async function ensureTranscript(item) {
 }
 
 /** 要約タブ相当のテキスト。チャットの軽いコンテキスト用 */
+/** チャットや横断チャットに渡す文脈。マーカーのタグは必ず落とす */
 function summaryContext(d) {
   return ['# サマリ', d.summary || '', '', '# 分野別要約', d.fields || '', '', '# 応用', d.apply || '']
+    .map(stripMarkers)
     .join('\n')
     .trim()
 }
@@ -463,6 +469,123 @@ ${context.slice(0, 30000)}`
   })
 }
 
+
+// ============ マーカー ============
+//
+// マーカーは本文の文字列に <m1>…</m1> として埋め込まれ、既存のテキスト
+// プロパティにそのまま保存される。座標を別に持たないので、あとから本文を
+// 編集しても位置がずれて壊れることがない。
+
+let markerCtx = null
+let markerDocBound = false
+
+function setupMarkers(item) {
+  const toolbar = stageEl.querySelector('#marker-toolbar')
+  const targets = stageEl.querySelectorAll('.marker-target')
+  if (!toolbar || !targets.length) {
+    markerCtx = null
+    return
+  }
+  markerCtx = { item, toolbar, pending: null }
+
+  toolbar.querySelectorAll('.marker-swatch').forEach((el) =>
+    el.addEventListener('click', () => commitMarker(Number(el.dataset.color)))
+  )
+  toolbar.querySelector('.marker-erase')?.addEventListener('click', () => commitMarker(null))
+
+  targets.forEach((el) => {
+    const handler = () => onMarkerSelect(el)
+    el.addEventListener('mouseup', handler)
+    el.addEventListener('touchend', handler)
+  })
+
+  if (!markerDocBound) {
+    markerDocBound = true
+    document.addEventListener('click', (e) => {
+      if (!markerCtx) return
+      if (markerCtx.toolbar.contains(e.target)) return
+      if (e.target.closest?.('.marker-target')) return
+      markerCtx.toolbar.style.display = 'none'
+    })
+  }
+}
+
+/**
+ * 選択範囲を、その要素のプレーンテキスト上の [start, end) に直す。
+ * 要素の中はマーカーでspanに分かれているので、テキストノードを順に
+ * 辿って通し位置を数える。
+ */
+function selectionOffsets(container) {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) return null
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let start = null
+  let end = null
+  let node
+  while ((node = walker.nextNode())) {
+    if (node === range.startContainer) start = offset + range.startOffset
+    if (node === range.endContainer) end = offset + range.endOffset
+    offset += node.textContent.length
+  }
+  if (start === null || end === null || start === end) return null
+  return { start: Math.min(start, end), end: Math.max(start, end), rect: range.getBoundingClientRect() }
+}
+
+function onMarkerSelect(el) {
+  if (!markerCtx) return
+  // ブラウザが選択を確定させてから読む
+  setTimeout(() => {
+    const offsets = selectionOffsets(el)
+    const addr = addrOf(el)
+    if (!offsets || !addr) {
+      markerCtx.toolbar.style.display = 'none'
+      markerCtx.pending = null
+      return
+    }
+    markerCtx.pending = { addr, start: offsets.start, end: offsets.end }
+    const bar = markerCtx.toolbar
+    bar.style.display = 'flex'
+    bar.style.position = 'fixed'
+    bar.style.left = `${Math.max(8, Math.min(offsets.rect.left, window.innerWidth - 150))}px`
+    bar.style.top = `${Math.max(8, offsets.rect.top - 40)}px`
+  }, 0)
+}
+
+/** colorIndex が null なら消去 */
+async function commitMarker(colorIndex) {
+  if (!markerCtx?.pending) return
+  const { item, pending } = markerCtx
+  const field = pending.addr.field
+  const before = detail.detail?.[field] ?? ''
+
+  const current = getMarkedText(before, pending.addr)
+  const marked =
+    colorIndex === null
+      ? eraseMarkerRange(current, pending.start, pending.end)
+      : applyMarkerRange(current, pending.start, pending.end, colorIndex)
+  const next = setMarkedText(before, pending.addr, marked)
+
+  markerCtx.toolbar.style.display = 'none'
+  window.getSelection()?.removeAllRanges()
+
+  // 先に画面へ反映してから保存する。失敗したら元に戻す
+  detail.detail = { ...detail.detail, [field]: next }
+  paintDetail()
+  try {
+    await saveField(item.key, field, next)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+    if (field === 'summary') item.summary = next
+  } catch (err) {
+    detail.detail = { ...detail.detail, [field]: before }
+    paintDetail()
+    alert('マーカーを保存できませんでした: ' + (err.message || err))
+  }
+}
+
 // ---- 生成 ----
 
 /**
@@ -536,8 +659,8 @@ async function generateContext(item) {
   return {
     title: item.title,
     transcript,
-    summary: detail.detail?.summary || '',
-    fields: detail.detail?.fields || '',
+    summary: stripMarkers(detail.detail?.summary || ''),
+    fields: stripMarkers(detail.detail?.fields || ''),
     // 既存のタグを渡して語彙を縛る。渡さないと動画ごとに表記が増えていく
     knownTags: knownTagsOf(items),
   }
@@ -616,9 +739,11 @@ function editCurrentField(item) {
 
   openEditor({
     title: `${FIELD_LABEL[field]}を直す`,
-    value: detail.detail?.[field] ?? '',
+    // マーカーのタグは見せない。保存時に、文言が一致した範囲だけ引き継ぐ
+    value: plainTextOf(detail.detail?.[field] ?? ''),
     hint,
-    onSave: async (value) => {
+    onSave: async (plain) => {
+      const value = reconcileMarkers(detail.detail?.[field] ?? '', plain)
       try {
         await saveField(item.key, field, value)
         const next = { ...(detail.detail || {}), [field]: value }
@@ -1087,9 +1212,30 @@ function pickTargets(spaceId) {
 // ============ 一括生成 ============
 
 async function runBulkGenerate() {
-  const targets = visibleItems().filter((i) => i.status === STATUS_DONE)
+  // 未生成(完了)に加えて、途中で失敗して一部だけ欠けているものも拾う。
+  // 拾わないと、1段だけ落ちた動画が永久に取り残される
+  const fresh = visibleItems().filter((i) => i.status === STATUS_DONE)
+  const partial = visibleItems().filter(
+    (i) =>
+      i.status === STATUS_SUMMARIZED &&
+      !(i.has?.mindmap && i.has?.fields && i.has?.apply && i.has?.ideas)
+  )
+
+  if (!fresh.length && !partial.length) {
+    alert('生成の対象になる動画がありません(状態が「完了」のもの、または項目が欠けているものが対象です)')
+    return
+  }
+
+  const includePartial =
+    partial.length > 0 &&
+    confirm(
+      `未生成が${fresh.length}件、項目が欠けているものが${partial.length}件あります。\n\n` +
+        `OK: 両方(${fresh.length + partial.length}件)を処理する\n` +
+        `キャンセル: 未生成の${fresh.length}件だけ処理する`
+    )
+  const targets = includePartial ? [...fresh, ...partial] : fresh
   if (!targets.length) {
-    alert('状態が「完了」の動画がありません(文字起こし済みで要約待ちのものが対象です)')
+    alert('未生成の動画がありません')
     return
   }
   if (!confirm(`${targets.length}件を順番に生成します。時間がかかります。続けますか?`)) return
