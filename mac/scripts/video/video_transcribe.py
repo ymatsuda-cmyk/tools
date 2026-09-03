@@ -293,11 +293,35 @@ def resolve_redirect(url):
 
 # ---------------------------------------------------------------- メタ情報
 
+def resolve_ytdlp_cmd():
+    """yt-dlpの実行コマンドを解決する。
+
+    PATH上の `yt-dlp` が別のPython（例: 古いPython3.9のuser site。
+    LibreSSL絡みでエラーになる）に紐づいていることがあるため、
+    まず「今動いているPython自身のモジュール」として呼び出すことを優先する。
+    これなら venv を有効化していれば必ずその venv の yt-dlp が使われる。
+    """
+    try:
+        import yt_dlp  # noqa: F401
+        return [sys.executable, "-m", "yt_dlp"]
+    except ImportError:
+        pass
+    path = shutil.which("yt-dlp")
+    if path:
+        print(f"    ⚠️ 現在のPython環境に yt-dlp が無いため PATH上のもの({path})を使います。"
+              f"　pip install yt-dlp を推奨します。")
+        return [path]
+    return None
+
+
 def fetch_metadata(url):
     """yt-dlp --dump-json でタイトルとサムネイルだけ取得する（音声DLはしない）。"""
+    cmd_prefix = resolve_ytdlp_cmd()
+    if not cmd_prefix:
+        return {}
     try:
         result = subprocess.run(
-            ["yt-dlp", "--dump-json", "--no-warnings", "--skip-download", url],
+            [*cmd_prefix, "--dump-json", "--no-warnings", "--skip-download", url],
             capture_output=True, text=True, timeout=120)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return {}
@@ -457,18 +481,24 @@ def resolve_ffmpeg_cmd():
 
 def download_audio_for_whisper(canonical_url, dest_dir):
     """yt-dlpで音声のみをダウンロードする（変換はmlx-whisper内部のffmpegに任せる）。"""
+    cmd_prefix = resolve_ytdlp_cmd()
+    if not cmd_prefix:
+        print("    ❌ yt-dlp が見つかりません（pip install yt-dlp）")
+        return None
     out_tmpl = str(Path(dest_dir) / "audio.%(ext)s")
-    cmd = ["yt-dlp", "-f", "bestaudio/best", "--no-warnings", "-o", out_tmpl, canonical_url]
+    cmd = [*cmd_prefix, "-f", "bestaudio/best", "--no-warnings", "-o", out_tmpl, canonical_url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     except FileNotFoundError:
-        print("    ❌ yt-dlp が見つかりません（pip install yt-dlp）")
+        print("    ❌ yt-dlp を起動できませんでした")
         return None
     except subprocess.TimeoutExpired:
         print("    ❌ 音声ダウンロードがタイムアウトしました")
         return None
     if result.returncode != 0:
-        print(f"    ❌ 音声ダウンロード失敗: {(result.stderr or '')[:300]}")
+        # 警告(NotOpenSSLWarning等)が先頭に出て本題が末尾に埋もれることが多いため末尾を見せる
+        tail = (result.stderr or result.stdout or "").strip()[-500:]
+        print(f"    ❌ 音声ダウンロード失敗:\n{tail}")
         return None
     audio_files = sorted(Path(dest_dir).glob("audio.*"))
     return audio_files[0] if audio_files else None
@@ -629,6 +659,10 @@ def main():
 
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
     print(f"\n{'='*60}\n動画DB→文字起こし開始: {now}\n{'='*60}")
+    print(f"実行中のPython: {sys.executable} ({sys.version.split()[0]})")
+    if sys.version_info < (3, 10):
+        print("⚠️ Python 3.9以下で実行されています。古いPython環境はLibreSSL絡みで"
+              "yt-dlpが失敗しやすいので、python3.11以降で実行し直すことを推奨します。")
 
     if args.page_id:
         page = fetch_page(args.page_id)
