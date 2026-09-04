@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import traceback
@@ -54,13 +55,21 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DB_ID = os.environ.get("NOTION_DB_ID", "28b0e7a535dc805697c6d4b9f8032d18")
 NOTION_VERSION = "2022-06-28"
 
-# Notion のプロパティ名。DB 側の実際の名前に合わせて変更する。
-PROP_TITLE = os.environ.get("PROP_TITLE", "名前")
-PROP_DATE = os.environ.get("PROP_DATE", "日付")
+# Notion のプロパティ名・型。DB の実スキーマ（notion-fetch で確認済み）に合わせてある。
+#   ミーティング名: title / 日時: date / 状態: select（新規という値は無い）
+#   カテゴリー: multi_select / 権限: multi_select（値は "kijun" "jba"）
+# 一覧の「新規」はステータス値ではなく、カテゴリー未設定 + 状態が要約/文字起こし +
+# 日時が1ヶ月以内、という保存済みビューのフィルタ条件。カテゴリーを付けずに
+# 状態=文字起こし で登録すれば自動的にそこに乗る。
+PROP_TITLE = os.environ.get("PROP_TITLE", "ミーティング名")
+PROP_DATE = os.environ.get("PROP_DATE", "日時")
 PROP_CATEGORY = os.environ.get("PROP_CATEGORY", "カテゴリー")
 PROP_PERMISSION = os.environ.get("PROP_PERMISSION", "権限")
 PROP_STATUS = os.environ.get("PROP_STATUS", "状態")
 STATUS_DONE = os.environ.get("STATUS_DONE", "文字起こし")
+PROP_AUDIO_FILE = os.environ.get("PROP_AUDIO_FILE", "音声ファイル")
+PROP_CHAR_COUNT = os.environ.get("PROP_CHAR_COUNT", "原文文字数")
+PROP_DURATION = os.environ.get("PROP_DURATION", "会議時間")
 
 AUDIO_EXT = {".m4a", ".mp3", ".wav", ".mp4", ".aac", ".flac", ".ogg"}
 SKIP_EXT = {".tmp", ".partial", ".download", ".crdownload", ".gdoc"}
@@ -152,12 +161,115 @@ def collect() -> list[tuple[Path, dict, Path | None]]:
 
 
 def transcribe(audio: Path) -> str:
-    """既存の transcribe_engines を使う。エンジン切替も既存設定に従う。"""
-    sys.path.insert(0, str(Path.home() / "scripts"))
-    from transcribe_engines import transcribe as _t  # type: ignore
+    """既存の transcribe_engines を使う。
 
-    # Qwen3-ASR は diarize を省略すると暗黙的に True になる。必ず明示する。
-    return _t(str(audio), diarize=False)
+    transcribe(audio_path, label=None, settings=None, verbose=True) が実シグネチャで、
+    diarize というキーワードは存在しない。話者分離は settings.json の
+    engines[].diarization.enabled で制御されるため、ここで settings を複製して
+    全エンジン分を False に上書きしてから渡す。
+    （CPU実行では pyannote のResNetモデルが重すぎるため無効化する方針 — 詳細は SETUP.md 参照）
+
+    有効にしたい場合は環境変数 DISABLE_DIARIZATION=0 で上書きできる。
+
+    whisper エンジンは結果の .txt を audio_path.parent（= このスクリプトでは
+    audio-inbox = Drive のミラーフォルダ）に書き出す仕様になっている。そのまま
+    渡すとゴミファイルが Drive まで同期されてしまうため、ローカルの一時フォルダに
+    コピーしてから処理し、後片付けもそこで完結させる。
+    """
+    import copy
+    import shutil
+    import tempfile
+
+    sys.path.insert(0, str(Path.home() / "scripts"))
+    from transcribe_engines import transcribe as _t, load_settings  # type: ignore
+
+    label = os.environ.get("TRANSCRIBE_LABEL")  # 未設定なら settings.json の defaultLabel
+    settings = copy.deepcopy(load_settings())
+
+    if os.environ.get("DISABLE_DIARIZATION", "1") != "0":
+        for eng in settings.get("engines", []):
+            eng.setdefault("diarization", {})
+            eng["diarization"]["enabled"] = False
+
+    # audio-inbox（Drive ミラーフォルダ）内で直接実行すると、whisper が書き出す
+    # 中間 .txt がそのまま Drive に同期されてゴミとして残り続ける。一時フォルダに
+    # コピーしてから処理し、ゴミごと丸ごと破棄する。
+    with tempfile.TemporaryDirectory(prefix="drive_inbox_") as tmp:
+        work_audio = Path(tmp) / audio.name
+        shutil.copy2(audio, work_audio)
+        text = _t(str(work_audio), label=label, settings=settings)
+
+    if not text:
+        raise RuntimeError("transcribe() が結果を返しませんでした（内部でエラーの可能性）")
+    return text
+
+
+def audio_duration_seconds(path: Path) -> float | None:
+    """音声の長さ（秒）を取得する。
+
+    .wav は Python 標準の wave モジュールでヘッダーを直接読む（サブプロセス不要、
+    ffmpeg/ffprobe の互換性問題に左右されない）。それ以外の形式（m4a 等）は
+    ffprobe にフォールバックする。両方失敗したら None。
+    """
+    if path.suffix.lower() == ".wav":
+        duration = _wav_duration_seconds(path)
+        if duration is not None:
+            return duration
+        log("-- wave モジュールで取得できず、ffprobe にフォールバックします")
+
+    return _ffprobe_duration_seconds(path)
+
+
+def _wav_duration_seconds(path: Path) -> float | None:
+    import wave
+
+    try:
+        with wave.open(str(path), "rb") as w:
+            frames = w.getnframes()
+            rate = w.getframerate()
+            if not rate:
+                raise ValueError("フレームレートが0です")
+            return frames / float(rate)
+    except Exception as e:  # noqa: BLE001  非標準WAV・壊れたヘッダーなど
+        log(f"-- 音声長の取得に失敗（wave, {path.name}）: {e}")
+        return None
+
+
+def _ffprobe_duration_seconds(path: Path) -> float | None:
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrapped=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+        return float(out.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        # CalledProcessError の str() は returncode と cmd しか出さず、
+        # 肝心の原因（stderr）が見えないため明示的に足す。
+        log(f"-- 音声長の取得に失敗（ffprobe, exit={e.returncode}）: {e.stderr.strip() if e.stderr else '(stderrなし)'}")
+        return None
+    except Exception as e:  # noqa: BLE001  ffprobe未導入・タイムアウトなど
+        log(f"-- 音声長の取得に失敗（ffprobe）: {e}")
+        return None
+
+
+def format_duration(total_seconds: float) -> str:
+    """既存データの表記（例: '1時間36分54秒' '59分40秒' '4秒'）に合わせる。
+    ゼロの上位単位は省略し、秒は常に表示する。"""
+    total = int(round(total_seconds))
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    parts = []
+    if h:
+        parts.append(f"{h}時間")
+    if h or m:
+        parts.append(f"{m}分")
+    parts.append(f"{s}秒")
+    return "".join(parts)
 
 
 # ---------------------------------------------------------------- notion
@@ -209,19 +321,40 @@ def para(text: str) -> dict:
     }
 
 
-def create_page(meta: dict, transcript: str) -> str:
+def create_page(meta: dict, transcript: str, audio_path: Path | None = None) -> str:
     props: dict = {
         PROP_TITLE: {"title": [{"text": {"content": meta.get("title", "無題")[:200]}}]},
         PROP_DATE: {"date": {"start": meta["meetingAt"]}},
-        PROP_STATUS: {"status": {"name": STATUS_DONE}},
+        PROP_STATUS: {"select": {"name": STATUS_DONE}},
+        PROP_CHAR_COUNT: {"number": len(transcript)},
     }
+    if meta.get("audio"):
+        props[PROP_AUDIO_FILE] = {"rich_text": [{"text": {"content": meta["audio"][:2000]}}]}
+
+    if audio_path is not None:
+        duration = audio_duration_seconds(audio_path)
+        if duration is not None:
+            props[PROP_DURATION] = {"rich_text": [{"text": {"content": format_duration(duration)}}]}
+
+    # カテゴリーを付けないまま登録すると「新規」ビュー（カテゴリー未設定＋状態が
+    # 要約/文字起こし＋日時1ヶ月以内、という保存済みフィルタ）に自動的に乗る。
+    # ここで category を渡すのは、後から手動で分類する運用を想定した保険。
     cats = meta.get("category") or []
     if isinstance(cats, str):
         cats = [cats]
     if cats:
         props[PROP_CATEGORY] = {"multi_select": [{"name": c} for c in cats]}
-    if meta.get("permission"):
-        props[PROP_PERMISSION] = {"select": {"name": meta["permission"]}}
+
+    # 権限は select ではなく multi_select。実際の選択肢は "kijun" / "jba" のみで、
+    # upload.js 側の自由入力（社内/限定/非公開 等）とは語彙が違うため、
+    # 一致するものだけを反映する。合わないものは黙って捨てる（Notion側のバリデーション
+    # エラーで登録全体が失敗するのを避けるため）。
+    perms = meta.get("permission") or []
+    if isinstance(perms, str):
+        perms = [perms]
+    valid_perms = [p for p in perms if p in ("kijun", "jba")]
+    if valid_perms:
+        props[PROP_PERMISSION] = {"multi_select": [{"name": p} for p in valid_perms]}
 
     children: list[dict] = []
     if meta.get("note"):
@@ -337,7 +470,7 @@ def main() -> int:
                 log(f"   文字起こし完了 {len(text):,} 文字 / {time.time() - t0:.0f}秒")
                 if not text.strip():
                     raise RuntimeError("文字起こし結果が空です")
-                page_id = create_page(meta, text)
+                page_id = create_page(meta, text, audio)
                 log(f"   Notion 登録完了 {page_id}")
                 # Notion 登録が成功してからファイルを消す。順序を逆にしないこと。
                 finish(audio, sidecar)
