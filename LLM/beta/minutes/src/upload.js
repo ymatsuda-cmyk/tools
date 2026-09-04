@@ -8,7 +8,8 @@
 // アップロード後、一覧の先頭に「新規」バッジ付きの仮カードを表示する。
 // 実際の文字起こしは Mac mini 側の drive_inbox.py が担当し、Notion 登録が
 // index.json に反映されて一覧に本物のカードが現れたら、仮カードは自動で消える
-// （タイトル文字列の突き合わせで判定している）。
+// （タイトルの一致件数がアップロード時点より増えたかで判定。単純な存在判定だと
+// 毎週同名の会議で誤って早期に消えてしまうため件数比較にしている）。
 
 const CFG_KEY = 'minutes:upload';
 const PENDING_KEY = 'minutes:pendingUploads';
@@ -208,7 +209,19 @@ function renderPending() {
   `).join('');
 }
 
+/** 一覧上の「タイトルが完全一致する項目」の件数を数える。同名の会議が
+ *  繰り返し登録される場合があるため、存在有無ではなく件数で見る。 */
+function countLiveTitle(host, title) {
+  return Array.from(host.querySelectorAll('.list-item:not(.pending-list-item) .list-item-title'))
+    .filter((el) => el.textContent.trim() === title).length;
+}
+
 function addPending(entry) {
+  const host = document.getElementById('list-items');
+  // アップロード時点で同名の項目が何件あったかを記録しておく。「存在するか」
+  // ではなく「その数より増えたか」で判定しないと、毎週同じ議題名の会議（例:
+  // 「GMO定例」）で先週分を「もう届いた」と誤認して仮カードを消してしまう。
+  entry.baselineCount = host ? countLiveTitle(host, entry.title) : 0;
   const items = loadPending();
   items.unshift(entry);
   savePending(items);
@@ -223,19 +236,15 @@ function removePending(id) {
   renderPending();
 }
 
-/** 一覧に本物のカードが現れたら仮カードを消す。タイトル文字列の一致で判定するので
- *  main.js がどうやって一覧を描画しているかは問わない。 */
+/** 一覧に本物のカードが現れたら仮カードを消す。タイトルの一致件数が
+ *  アップロード時点より増えていたら「本当に届いた」と判断する。 */
 function reconcilePending() {
   const host = document.getElementById('list-items');
   if (!host) return;
   const items = loadPending();
   if (!items.length) return;
 
-  const liveTitles = Array.from(
-    host.querySelectorAll('.list-item:not(.pending-list-item) .list-item-title')
-  ).map((el) => el.textContent.trim());
-
-  let next = items.filter((p) => !liveTitles.includes(p.title.trim()));
+  let next = items.filter((p) => countLiveTitle(host, p.title) <= (p.baselineCount ?? 0));
   next = next.filter((p) => Date.now() - p.createdAt < PENDING_TTL_MS);
 
   if (next.length !== items.length) {
@@ -289,6 +298,14 @@ function openModal() {
             <label for="up-fid">audio-inbox のフォルダ ID</label>
             <input type="text" id="up-fid" value="${escapeHtml(cfg.folderId || '')}" placeholder="Drive の URL の /folders/ 以降">
           </div>
+          <div class="upload-field">
+            <label for="up-role">自分の権限</label>
+            <select id="up-role">
+              <option value="admin" ${(!cfg.role || cfg.role === 'admin') ? 'selected' : ''}>管理者</option>
+              <option value="kijun" ${cfg.role === 'kijun' ? 'selected' : ''}>kijun</option>
+              <option value="jba" ${cfg.role === 'jba' ? 'selected' : ''}>jba</option>
+            </select>
+          </div>
         </details>
       </div>
       <div class="raw-modal-footer">
@@ -310,6 +327,7 @@ function openModal() {
   const msg = $('#up-msg');
   const cidInput = $('#up-cid');
   const fidInput = $('#up-fid');
+  const roleInput = $('#up-role');
 
   let picked = null;
 
@@ -319,12 +337,10 @@ function openModal() {
   }
   function close() { overlay.remove(); }
 
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  // 画面外タップや Escape での誤クローズを防ぐため、閉じる手段は
+  // キャンセルボタンと右上の×だけにする。アップロード中の誤操作対策。
   $('#up-close').onclick = close;
   $('#up-cancel').onclick = close;
-  document.addEventListener('keydown', function onEsc(e) {
-    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
-  });
 
   function accept(file) {
     if (!file) return;
@@ -360,6 +376,7 @@ function openModal() {
 
   cidInput.onchange = () => saveCfg({ ...loadCfg(), clientId: cidInput.value.trim() });
   fidInput.onchange = () => saveCfg({ ...loadCfg(), folderId: fidInput.value.trim() });
+  roleInput.onchange = () => saveCfg({ ...loadCfg(), role: roleInput.value });
 
   go.onclick = async () => {
     const c = loadCfg();
@@ -394,6 +411,7 @@ function openModal() {
 
       // 音声の送信完了後に JSON を置く。これが Mac mini 側の処理開始の合図。
       say('メタデータを登録しています…');
+      const role = loadCfg().role || 'admin';
       const meta = {
         audio: audioName,
         title,
@@ -401,6 +419,9 @@ function openModal() {
         source: 'minutes-viewer',
         uploadedAt: new Date().toISOString(),
       };
+      // 管理者以外がアップロードした場合は、その人自身の権限で登録する。
+      // 管理者は権限を空のまま登録し、後から手動で割り当てる運用。
+      if (role !== 'admin') meta.permission = [role];
       await uploadMultipart(
         token,
         { name: base + '.json', parents: [c.folderId] },
