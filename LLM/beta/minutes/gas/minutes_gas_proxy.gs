@@ -23,6 +23,13 @@
  *     "https://www.googleapis.com/auth/drive"
  *   ]
  *
+ *   ※ マニフェストに書くだけでは不十分な場合がある。Apps Script はコードを
+ *   静的解析して実際に使うサービスからスコープを決めるため、UrlFetchApp で
+ *   Drive API を直接叩くだけのコードだと「Driveを使っている」と認識されず、
+ *   ACCESS_TOKEN_SCOPE_INSUFFICIENT (403) になることがある。
+ *   その場合は「サービス」→「Drive API」(高度なサービス) を追加し、
+ *   touchDriveScope_() のように実際に呼び出すコードを含めること。
+ *
  * デプロイ:
  *  - 種類: ウェブアプリ
  *  - 実行するユーザー: 自分
@@ -504,6 +511,33 @@ function splitLines_(text) {
 // ============ 音声アップロード(ログイン不要) ============
 
 /**
+ * Drive API(高度なサービス)を実際に呼び出すことで、Apps Script の静的解析に
+ * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() が発行する
+ * トークンに Drive の書き込みスコープを含めさせる。
+ *
+ * 事前に「サービス」→「+」→「Drive API」を追加しておくこと
+ * (エディタ左側の「サービス」から追加。関数名は Drive でグローバルに使えるようになる)。
+ * 戻り値は使わない。呼ぶこと自体に意味がある。
+ */
+function touchDriveScope_() {
+  try {
+    Drive.About.get({ fields: 'user' });
+  } catch (e) {
+    // 高度なサービスが未追加、または一時的なエラーでも致命的ではないので握りつぶす。
+    // これが原因で本当にスコープが付かない場合は、初回のトークン発行 403 で気づける。
+  }
+}
+
+/** デバッグ用。読み取り(About.get)ではなく、実際に書き込み(ファイル作成)を試す。
+ *  403 の原因はここ（Files.create）だったので、これが通るかどうかで切り分ける。
+ *  成功したら Drive にテスト用の空ファイルができるので、確認後に手動で削除してよい。 */
+function testDriveAuth() {
+  Logger.log('OAuth token: ' + ScriptApp.getOAuthToken().slice(0, 20) + '...');
+  var file = Drive.Files.create({ name: 'drive_auth_test.txt' }, Utilities.newBlob('test'));
+  Logger.log('Drive.Files.create 成功: ' + JSON.stringify(file));
+}
+
+/**
  * Drive の resumable upload セッションを、このスクリプト自身(管理者)の権限で
  * 発行する。Google の resumable upload は「セッション URL の発行」にだけ認証が要り、
  * 発行された URL への実際のバイト送信(PUT)には認証が要らない仕様になっている。
@@ -512,6 +546,7 @@ function splitLines_(text) {
  * (経由すると doPost 全体で約50MBのペイロード上限に当たるため)。
  */
 function initUpload_(body) {
+  touchDriveScope_();
   var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
   if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
 
@@ -549,6 +584,7 @@ function initUpload_(body) {
  * このファイルの出現を処理開始の合図として使う。
  */
 function writeSidecar_(body) {
+  touchDriveScope_();
   var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
   if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
 
