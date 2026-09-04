@@ -560,6 +560,11 @@ function initUpload_(body) {
         Authorization: 'Bearer ' + token,
         'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
         'X-Upload-Content-Length': String(body.size || 0),
+        // Google はセッション URI への CORS 許可を「セッションを作った最初の
+        // POST に Origin ヘッダーがあったか」で決める（バケット/ファイル側の
+        // CORS 設定だけでは効かない）。UrlFetchApp はサーバー実行なので
+        // Origin を自動では付けない。ブラウザから直接 PUT するために明示する。
+        'Origin': 'https://ymatsuda-cmyk.github.io',
       },
       payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
       muteHttpExceptions: true,
