@@ -4,15 +4,15 @@
 // トークンは、既存の設定画面（main.js / minutes-config.js）で入力済みの
 // localStorage "minutes:config" をそのまま読む。ここで別の接続設定を持たない。
 //
-// 【認証について】
-// Google の resumable upload は「セッション URL を発行する最初の1回」だけ認証が要り、
-// 発行された URL への実際のデータ送信（PUT）には認証が要らない
-// （Google Cloud Storage の公式ドキュメントにも「このURLを知っていれば誰でも認証なしで
-// アップロードできてしまうので取り扱い注意」と明記されている）。
-// これを利用し、セッション URL の発行だけを GAS（管理者の権限で動く）に任せ、
-// 実際のバイト送信はブラウザから直接 Google に対して行う。利用者は一切
-// Google にログインする必要がない。ファイル本体は GAS を経由しないので、
-// GAS のペイロード上限（約50MB）にも引っかからない。
+// 【認証・通信経路について】
+// Drive の resumable upload は「セッション URL を発行する最初の1回」だけ認証が要り、
+// 発行された URL への実際のデータ送信（PUT）自体には認証が要らない。これを利用して
+// 当初は「セッション発行だけ GAS に任せ、バイトはブラウザから直接 Google へ」という
+// 構成を試みたが、Drive API v3 のセッション URL はブラウザからの直接 CORS アクセスに
+// 対応しておらず（Origin ヘッダーを明示しても改善せず、502 も発生）、断念した。
+// そのため、バイト自体も数MB単位のチャンクに分割して GAS 経由で中継する方式にした。
+// 1回のリクエストは小さいままなので、GAS の1リクエストあたりのペイロード上限
+// （約50MB）には当たらない。利用者は一切 Google にログインする必要がない。
 //
 // 権限タグについても自己申告のドロップダウンは持たない。設定画面で入力した
 // コードが verifyCode_ で検証済みの role なので、それをそのまま使う
@@ -27,7 +27,7 @@
 const MAIN_CFG_KEY = 'minutes:config'; // main.js / minutes-config.js と同じキー
 const ADMIN_ROLE = 'xYz'; // minutes-config.js の ADMIN_ROLE と一致させること
 const PENDING_KEY = 'minutes:pendingUploads';
-const CHUNK = 8 * 1024 * 1024;
+const PUT_CHUNK = 3 * 1024 * 1024; // base64化すると4/3倍になるので、小さめに保つ
 const AUDIO_EXT = ['.m4a', '.mp3', '.wav', '.mp4', '.aac', '.flac', '.ogg'];
 const PENDING_TTL_MS = 3 * 60 * 60 * 1000; // 3時間。失敗時にカードが残り続けないための保険
 
@@ -44,7 +44,7 @@ function savePending(list) { localStorage.setItem(PENDING_KEY, JSON.stringify(li
 // ---------------------------------------------------------------- GAS
 
 /**
- * GAS 経由でセッション URL を発行してもらう。
+ * GAS 呼び出しの共通部分。
  * text/plain で送るのは、application/json だとブラウザが CORS preflight (OPTIONS) を
  * 先に飛ばしてしまい、GAS の Web App がそれに正しく応答できず失敗するため。
  * 既存の Notion 連携アクションと同じ回避パターン・同じ token フィールドを使う。
@@ -62,29 +62,33 @@ async function gasCall(gasUrl, payload) {
   return data.data;
 }
 
-// ---------------------------------------------------------------- drive (認証不要)
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
 
-/** GAS が発行したセッション URL に直接バイトを送る。認証ヘッダは不要。 */
-async function uploadToSession(sessionUrl, file, onProgress) {
+/** 音声をチャンクに分割し、1つずつ GAS 経由で Google に中継する。 */
+async function uploadToSession(gasUrl, token, sessionUrl, file, onProgress) {
   let offset = 0;
   while (offset < file.size) {
-    const end = Math.min(offset + CHUNK, file.size);
-    const res = await fetch(sessionUrl, {
-      method: 'PUT',
-      headers: { 'Content-Range': `bytes ${offset}-${end - 1}/${file.size}` },
-      body: file.slice(offset, end),
+    const end = Math.min(offset + PUT_CHUNK, file.size);
+    const buf = await file.slice(offset, end).arrayBuffer();
+    const result = await gasCall(gasUrl, {
+      token,
+      action: 'putChunk',
+      sessionUrl,
+      offset,
+      total: file.size,
+      chunk: arrayBufferToBase64(buf),
     });
-
-    if (res.status === 308) {
-      const range = res.headers.get('Range');
-      offset = range ? Number(range.split('-')[1]) + 1 : end;
-    } else if (res.ok) {
-      onProgress(1);
-      return res.json().catch(() => ({}));
-    } else {
-      throw new Error(`chunk ${offset} failed (${res.status}): ${await res.text()}`);
-    }
+    offset = end;
     onProgress(offset / file.size);
+    if (result.done) return result.file;
   }
   throw new Error('アップロードが完了しませんでした');
 }
@@ -325,7 +329,7 @@ function openModal() {
       if (!sessionUrl) throw new Error('セッション URL を取得できませんでした');
 
       say('音声を送っています…');
-      await uploadToSession(sessionUrl, picked, (p) => {
+      await uploadToSession(cfg.gasUrl, cfg.notionToken, sessionUrl, picked, (p) => {
         const pct = Math.round(p * 100);
         barFill.style.width = `${pct}%`;
         say(`音声を送っています… ${pct}%`);

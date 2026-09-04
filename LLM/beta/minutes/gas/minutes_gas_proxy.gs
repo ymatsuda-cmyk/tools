@@ -4,9 +4,11 @@
  * 役割:
  *  - Notion API はブラウザから直接叩けない(CORSヘッダーなし)ため、
  *    このスクリプトが仲介する。
- *  - 音声アップロード用に、Drive の resumable upload セッションを発行する
- *    (このスクリプト自身の権限で発行し、実際のバイト送信はブラウザから
- *    Google へ直接行う。利用者は Google にログイン不要)。
+ *  - 音声アップロード用に、Drive の resumable upload セッションを発行し、
+ *    音声のバイト自体もチャンク単位でこのスクリプトが中継する
+ *    (Drive API のセッション URL はブラウザからの直接 CORS アクセスに
+ *    対応していないため、バイトの中継も GAS 側で行う。数MB単位に分割して
+ *    送るので、GAS の1リクエストあたりのペイロード上限には当たらない)。
  *  - フロントは text/plain で JSON を POST する(プリフライトを発生させないため)。
  *    Content-Type を application/json にすると OPTIONS preflight が飛び、
  *    GAS は OPTIONS に応答できないため必ず失敗する。
@@ -109,6 +111,9 @@ function doPost(e) {
         break;
       case 'initUpload':
         result = initUpload_(body);
+        break;
+      case 'putChunk':
+        result = putChunk_(body);
         break;
       case 'writeSidecar':
         result = writeSidecar_(body);
@@ -560,11 +565,6 @@ function initUpload_(body) {
         Authorization: 'Bearer ' + token,
         'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
         'X-Upload-Content-Length': String(body.size || 0),
-        // Google はセッション URI への CORS 許可を「セッションを作った最初の
-        // POST に Origin ヘッダーがあったか」で決める（バケット/ファイル側の
-        // CORS 設定だけでは効かない）。UrlFetchApp はサーバー実行なので
-        // Origin を自動では付けない。ブラウザから直接 PUT するために明示する。
-        'Origin': 'https://ymatsuda-cmyk.github.io',
       },
       payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
       muteHttpExceptions: true,
@@ -580,6 +580,46 @@ function initUpload_(body) {
   if (!sessionUrl) throw new Error('セッション URL が取得できませんでした');
 
   return { sessionUrl: sessionUrl };
+}
+
+/**
+ * 音声のバイトそのものを、ブラウザ→GAS→Google と中継する。
+ *
+ * 【なぜ直接PUTできないか】
+ * initUpload_ で発行したセッション URL に、ブラウザから直接 PUT できれば
+ * 一番シンプルだった。だが実際に試すと CORS で弾かれ、Origin ヘッダーを
+ * 明示しても改善しなかった。Google Cloud Storage の resumable upload とは
+ * 違い、Drive API v3 のセッション URL はブラウザからの直接アクセスを
+ * サポートしていないと判断し、バイト自体も GAS 経由にした。
+ *
+ * 【50MBペイロード上限に当たらない理由】
+ * GAS の上限は「1回の doPost リクエストのサイズ」に対してかかる。ここでは
+ * 音声全体を1回で送るのではなく、数MB単位のチャンクに分割して何度も
+ * doPost を呼ぶので、1回あたりのペイロードは小さいまま保たれる。
+ */
+function putChunk_(body) {
+  var bytes = Utilities.base64Decode(body.chunk);
+  var start = body.offset;
+  var end = start + bytes.length - 1;
+
+  var res = UrlFetchApp.fetch(body.sessionUrl, {
+    method: 'put',
+    contentType: 'application/octet-stream',
+    headers: {
+      'Content-Range': 'bytes ' + start + '-' + end + '/' + body.total,
+    },
+    payload: bytes,
+    muteHttpExceptions: true,
+  });
+
+  var code = res.getResponseCode();
+  if (code === 200 || code === 201) {
+    return { done: true, file: JSON.parse(res.getContentText()) };
+  }
+  if (code === 308) {
+    return { done: false };
+  }
+  throw new Error('chunk upload failed (' + code + '): ' + res.getContentText());
 }
 
 /**
