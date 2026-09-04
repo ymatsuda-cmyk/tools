@@ -1,9 +1,22 @@
-// src/upload.js — 音声アップロード機能
+// src/upload.js — 音声アップロード機能（ログイン不要版）
 //
-// main.js の内部実装には依存せず、DOM 挿入と localStorage だけで完結させている。
-// ヘッダーの #open-upload ボタンでモーダルを開き、タイトル・日時・音声ファイル
-// (ドラッグ&ドロップ対応) を入力して Google Drive の audio-inbox へ直接アップロード
-// する。Drive API は CORS 対応済みなので GAS を経由しない。
+// main.js の内部実装には依存しないが、設定は共有する。GAS の URL とアクセス
+// トークンは、既存の設定画面（main.js / minutes-config.js）で入力済みの
+// localStorage "minutes:config" をそのまま読む。ここで別の接続設定を持たない。
+//
+// 【認証について】
+// Google の resumable upload は「セッション URL を発行する最初の1回」だけ認証が要り、
+// 発行された URL への実際のデータ送信（PUT）には認証が要らない
+// （Google Cloud Storage の公式ドキュメントにも「このURLを知っていれば誰でも認証なしで
+// アップロードできてしまうので取り扱い注意」と明記されている）。
+// これを利用し、セッション URL の発行だけを GAS（管理者の権限で動く）に任せ、
+// 実際のバイト送信はブラウザから直接 Google に対して行う。利用者は一切
+// Google にログインする必要がない。ファイル本体は GAS を経由しないので、
+// GAS のペイロード上限（約50MB）にも引っかからない。
+//
+// 権限タグについても自己申告のドロップダウンは持たない。設定画面で入力した
+// コードが verifyCode_ で検証済みの role なので、それをそのまま使う
+// （管理者コードなら権限は付けず、それ以外ならその role をタグとして付与する）。
 //
 // アップロード後、一覧の先頭に「新規」バッジ付きの仮カードを表示する。
 // 実際の文字起こしは Mac mini 側の drive_inbox.py が担当し、Notion 登録が
@@ -11,124 +24,48 @@
 // （タイトルの一致件数がアップロード時点より増えたかで判定。単純な存在判定だと
 // 毎週同名の会議で誤って早期に消えてしまうため件数比較にしている）。
 
-const CFG_KEY = 'minutes:upload';
+const MAIN_CFG_KEY = 'minutes:config'; // main.js / minutes-config.js と同じキー
+const ADMIN_ROLE = 'xYz'; // minutes-config.js の ADMIN_ROLE と一致させること
 const PENDING_KEY = 'minutes:pendingUploads';
-const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const CHUNK = 8 * 1024 * 1024;
 const AUDIO_EXT = ['.m4a', '.mp3', '.wav', '.mp4', '.aac', '.flac', '.ogg'];
 const PENDING_TTL_MS = 3 * 60 * 60 * 1000; // 3時間。失敗時にカードが残り続けないための保険
 
 // ---------------------------------------------------------------- storage
 
-function loadCfg() {
-  try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch { return {}; }
+function loadMainConfig() {
+  try { return JSON.parse(localStorage.getItem(MAIN_CFG_KEY) || '{}'); } catch { return {}; }
 }
-function saveCfg(c) { localStorage.setItem(CFG_KEY, JSON.stringify(c)); }
 function loadPending() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
 }
 function savePending(list) { localStorage.setItem(PENDING_KEY, JSON.stringify(list)); }
 
-// ---------------------------------------------------------------- auth
+// ---------------------------------------------------------------- GAS
 
-let tokenClient = null;
-let cachedToken = null;
-let tokenExpiresAt = 0;
-
-/** ユーザー操作起因で呼ぶこと。ポップアップがブロックされる。 */
-function getToken(clientId) {
-  if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
-    return Promise.resolve(cachedToken);
-  }
-  if (!window.google?.accounts?.oauth2) {
-    return Promise.reject(new Error(
-      'Google Identity Services が読み込まれていません。index.html の <head> に GSI の script タグが必要です。'
-    ));
-  }
-  return new Promise((resolve, reject) => {
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: SCOPE,
-        callback: (res) => {
-          if (res.error) return reject(new Error(res.error_description || res.error));
-          cachedToken = res.access_token;
-          tokenExpiresAt = Date.now() + (res.expires_in ?? 3600) * 1000;
-          resolve(cachedToken);
-        },
-        error_callback: (err) => reject(new Error(err.message || '認証がキャンセルされました')),
-      });
-    } else {
-      tokenClient.callback = (res) => {
-        if (res.error) return reject(new Error(res.error_description || res.error));
-        cachedToken = res.access_token;
-        tokenExpiresAt = Date.now() + (res.expires_in ?? 3600) * 1000;
-        resolve(cachedToken);
-      };
-    }
-    tokenClient.requestAccessToken({ prompt: cachedToken ? '' : 'select_account' });
+/**
+ * GAS 経由でセッション URL を発行してもらう。
+ * text/plain で送るのは、application/json だとブラウザが CORS preflight (OPTIONS) を
+ * 先に飛ばしてしまい、GAS の Web App がそれに正しく応答できず失敗するため。
+ * 既存の Notion 連携アクションと同じ回避パターン・同じ token フィールドを使う。
+ */
+async function gasCall(gasUrl, payload) {
+  const res = await fetch(gasUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
   });
-}
-
-// ---------------------------------------------------------------- drive
-
-/** multipart/related で1回POST。5MB程度までの小さいファイル・JSON向け */
-async function uploadMultipart(token, meta, blob, mime) {
-  const boundary = '----minutesUploader' + Math.random().toString(36).slice(2);
-  const body = new Blob([
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-    JSON.stringify(meta),
-    `\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`,
-    blob,
-    `\r\n--${boundary}--\r\n`,
-  ]);
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    }
-  );
-  if (!res.ok) throw new Error(`Drive upload failed (${res.status}): ${await res.text()}`);
-  return res.json();
-}
-
-/** resumable upload。分割送信するので容量上限がなく、途中失敗にも強い */
-async function uploadResumable(token, meta, file, onProgress) {
-  const init = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': file.type || 'application/octet-stream',
-        'X-Upload-Content-Length': String(file.size),
-      },
-      body: JSON.stringify(meta),
-    }
-  );
-  if (!init.ok) throw new Error(`Drive session failed (${init.status}): ${await init.text()}`);
-
-  const sessionUrl = init.headers.get('Location');
-  if (!sessionUrl) {
-    // CORS で Location が読めない環境向けのフォールバック
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error(
-        'resumable セッション URL が取得できず、ファイルが 5MB を超えています。' +
-        'ブラウザの拡張機能を無効にして再試行してください。'
-      );
-    }
-    onProgress(0.5);
-    const r = await uploadMultipart(token, meta, file, file.type || 'application/octet-stream');
-    onProgress(1);
-    return r;
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.ok === false) {
+    throw new Error((data && data.error) || `GAS呼び出しに失敗 (${res.status})`);
   }
+  return data.data;
+}
 
+// ---------------------------------------------------------------- drive (認証不要)
+
+/** GAS が発行したセッション URL に直接バイトを送る。認証ヘッダは不要。 */
+async function uploadToSession(sessionUrl, file, onProgress) {
   let offset = 0;
   while (offset < file.size) {
     const end = Math.min(offset + CHUNK, file.size);
@@ -143,7 +80,7 @@ async function uploadResumable(token, meta, file, onProgress) {
       offset = range ? Number(range.split('-')[1]) + 1 : end;
     } else if (res.ok) {
       onProgress(1);
-      return res.json();
+      return res.json().catch(() => ({}));
     } else {
       throw new Error(`chunk ${offset} failed (${res.status}): ${await res.text()}`);
     }
@@ -256,7 +193,6 @@ function reconcilePending() {
 // ---------------------------------------------------------------- modal
 
 function openModal() {
-  const cfg = loadCfg();
   const root = document.getElementById('modal-root');
   if (!root) return;
 
@@ -287,26 +223,6 @@ function openModal() {
         </div>
         <div class="upload-progress" id="up-bar"><div class="upload-progress-fill" id="up-bar-fill"></div></div>
         <div class="upload-msg" id="up-msg" role="status" aria-live="polite"></div>
-
-        <details id="up-setup" ${cfg.clientId && cfg.folderId ? '' : 'open'} style="margin-top:10px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text-muted)">接続設定</summary>
-          <div class="upload-field" style="margin-top:8px">
-            <label for="up-cid">OAuth クライアント ID</label>
-            <input type="text" id="up-cid" value="${escapeHtml(cfg.clientId || '')}" placeholder="xxxx.apps.googleusercontent.com">
-          </div>
-          <div class="upload-field">
-            <label for="up-fid">audio-inbox のフォルダ ID</label>
-            <input type="text" id="up-fid" value="${escapeHtml(cfg.folderId || '')}" placeholder="Drive の URL の /folders/ 以降">
-          </div>
-          <div class="upload-field">
-            <label for="up-role">自分の権限</label>
-            <select id="up-role">
-              <option value="admin" ${(!cfg.role || cfg.role === 'admin') ? 'selected' : ''}>管理者</option>
-              <option value="kijun" ${cfg.role === 'kijun' ? 'selected' : ''}>kijun</option>
-              <option value="jba" ${cfg.role === 'jba' ? 'selected' : ''}>jba</option>
-            </select>
-          </div>
-        </details>
       </div>
       <div class="raw-modal-footer">
         <button class="btn" id="up-cancel">キャンセル</button>
@@ -325,9 +241,6 @@ function openModal() {
   const bar = $('#up-bar');
   const barFill = $('#up-bar-fill');
   const msg = $('#up-msg');
-  const cidInput = $('#up-cid');
-  const fidInput = $('#up-fid');
-  const roleInput = $('#up-role');
 
   let picked = null;
 
@@ -341,6 +254,11 @@ function openModal() {
   // キャンセルボタンと右上の×だけにする。アップロード中の誤操作対策。
   $('#up-close').onclick = close;
   $('#up-cancel').onclick = close;
+
+  const main = loadMainConfig();
+  if (!main.gasUrl || !main.notionToken) {
+    say('設定画面（歯車アイコン）で GAS の URL とコードを先に登録してください。', 'error');
+  }
 
   function accept(file) {
     if (!file) return;
@@ -374,13 +292,11 @@ function openModal() {
     accept(e.dataTransfer.files[0]);
   };
 
-  cidInput.onchange = () => saveCfg({ ...loadCfg(), clientId: cidInput.value.trim() });
-  fidInput.onchange = () => saveCfg({ ...loadCfg(), folderId: fidInput.value.trim() });
-  roleInput.onchange = () => saveCfg({ ...loadCfg(), role: roleInput.value });
-
   go.onclick = async () => {
-    const c = loadCfg();
-    if (!c.clientId || !c.folderId) return say('接続設定にクライアント ID とフォルダ ID を入れてください。', 'error');
+    const cfg = loadMainConfig();
+    if (!cfg.gasUrl || !cfg.notionToken) {
+      return say('設定画面（歯車アイコン）で GAS の URL とコードを先に登録してください。', 'error');
+    }
     if (!picked) return say('音声ファイルを選んでください。', 'error');
     if (!atInput.value) return say('打合せ日時を入れてください。', 'error');
 
@@ -395,14 +311,21 @@ function openModal() {
     addPending({ id: pendingId, title, meetingAt, status: 'uploading', progress: 0, createdAt: Date.now() });
 
     try {
-      say('Google に接続しています…');
-      const token = await getToken(c.clientId);
-
       const base = `${stampFrom(atInput.value)}_${slugify(title)}_${Math.random().toString(16).slice(2, 6)}`;
       const audioName = base + extOf(picked.name);
 
+      say('アップロード先を準備しています…');
+      const { sessionUrl } = await gasCall(cfg.gasUrl, {
+        token: cfg.notionToken,
+        action: 'initUpload',
+        filename: audioName,
+        mimeType: picked.type || 'application/octet-stream',
+        size: picked.size,
+      });
+      if (!sessionUrl) throw new Error('セッション URL を取得できませんでした');
+
       say('音声を送っています…');
-      await uploadResumable(token, { name: audioName, parents: [c.folderId] }, picked, (p) => {
+      await uploadToSession(sessionUrl, picked, (p) => {
         const pct = Math.round(p * 100);
         barFill.style.width = `${pct}%`;
         say(`音声を送っています… ${pct}%`);
@@ -411,7 +334,6 @@ function openModal() {
 
       // 音声の送信完了後に JSON を置く。これが Mac mini 側の処理開始の合図。
       say('メタデータを登録しています…');
-      const role = loadCfg().role || 'admin';
       const meta = {
         audio: audioName,
         title,
@@ -419,15 +341,17 @@ function openModal() {
         source: 'minutes-viewer',
         uploadedAt: new Date().toISOString(),
       };
-      // 管理者以外がアップロードした場合は、その人自身の権限で登録する。
-      // 管理者は権限を空のまま登録し、後から手動で割り当てる運用。
-      if (role !== 'admin') meta.permission = [role];
-      await uploadMultipart(
-        token,
-        { name: base + '.json', parents: [c.folderId] },
-        new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' }),
-        'application/json'
-      );
+      // 設定画面で検証済みの role をそのまま使う。管理者コードなら権限は付けず
+      // 後から手動で割り当てる。自己申告のドロップダウンは持たせない
+      // （なりすまし防止。role は verifyCode_ を通過した本物の権限）。
+      if (cfg.role && cfg.role !== ADMIN_ROLE) meta.permission = [cfg.role];
+
+      await gasCall(cfg.gasUrl, {
+        token: cfg.notionToken,
+        action: 'writeSidecar',
+        name: base + '.json',
+        meta,
+      });
 
       updatePending(pendingId, { status: 'queued' });
       say('アップロードしました。文字起こしが終わると一覧に反映されます。', 'ok');
