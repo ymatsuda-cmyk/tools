@@ -89,6 +89,15 @@ function doPost(e) {
       case 'updateRawContextCount':
         result = updateRawContextCount_(body.pageId, body.count);
         break;
+      case 'initUpload':
+        result = initUpload_(body);
+        break;
+      case 'putChunk':
+        result = putChunk_(body);
+        break;
+      case 'writeSidecar':
+        result = writeSidecar_(body);
+        break;
       default:
         throw new Error('unknown action: ' + body.action);
     }
@@ -264,6 +273,9 @@ function parseAgenda_(text) {
     var parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
+    // 保存時に文字数上限で切られていると閉じ括弧が無く、ここに来る。
+    // 黙って空配列を返すと「議事が未登録」に見えて原因が追えないため記録する。
+    console.error('議事JSONのパースに失敗しました(長さ ' + text.length + '): ' + e);
     return [];
   }
 }
@@ -453,9 +465,21 @@ function richTextOf_(properties, name) {
   return prop && prop.rich_text ? plainTextOf_(prop.rich_text) : '';
 }
 
-/** 2000字上限に収めた rich_text プロパティのペイロードを作る */
+/**
+ * rich_text プロパティのペイロードを作る。
+ * Notionは1チャンクあたり2000文字までだが、チャンクを複数並べれば
+ * 1プロパティに長い文字列を保存できる。議事(agenda)はJSONで
+ * 2000文字を超えることがあるため、切り捨てずに分割する。
+ */
 function richTextProp_(text) {
-  return { rich_text: [{ text: { content: String(text || '').slice(0, 2000) } }] };
+  var s = String(text || '');
+  if (!s) return { rich_text: [] };
+
+  var chunks = [];
+  for (var i = 0; i < s.length; i += 2000) {
+    chunks.push({ text: { content: s.slice(i, i + 2000) } });
+  }
+  return { rich_text: chunks };
 }
 
 /** 配列を改行区切りの1文字列にする(空配列/未定義は空文字) */
@@ -467,4 +491,152 @@ function joinLines_(arr) {
 function splitLines_(text) {
   if (!text) return [];
   return text.split('\n').filter(function (line) { return line.length > 0; });
+}
+
+// ============ 音声アップロード(ログイン不要) ============
+
+/**
+ * Drive API(高度なサービス)を実際に呼び出すことで、Apps Script の静的解析に
+ * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() が発行する
+ * トークンに Drive の書き込みスコープを含めさせる。
+ *
+ * 事前に「サービス」→「+」→「Drive API」を追加しておくこと
+ * (エディタ左側の「サービス」から追加。関数名は Drive でグローバルに使えるようになる)。
+ * 戻り値は使わない。呼ぶこと自体に意味がある。
+ */
+function touchDriveScope_() {
+  try {
+    Drive.About.get({ fields: 'user' });
+  } catch (e) {
+    // 高度なサービスが未追加、または一時的なエラーでも致命的ではないので握りつぶす。
+    // これが原因で本当にスコープが付かない場合は、初回のトークン発行 403 で気づける。
+  }
+}
+
+/** デバッグ用。読み取り(About.get)ではなく、実際に書き込み(ファイル作成)を試す。
+ *  403 の原因はここ（Files.create）だったので、これが通るかどうかで切り分ける。
+ *  成功したら Drive にテスト用の空ファイルができるので、確認後に手動で削除してよい。 */
+function testDriveAuth() {
+  Logger.log('OAuth token: ' + ScriptApp.getOAuthToken().slice(0, 20) + '...');
+  var file = Drive.Files.create({ name: 'drive_auth_test.txt' }, Utilities.newBlob('test'));
+  Logger.log('Drive.Files.create 成功: ' + JSON.stringify(file));
+}
+
+/**
+ * Drive の resumable upload セッションを、このスクリプト自身(管理者)の権限で
+ * 発行する。Google の resumable upload は「セッション URL の発行」にだけ認証が要り、
+ * 発行された URL への実際のバイト送信(PUT)には認証が要らない仕様になっている。
+ * そのため、ブラウザはここで受け取った URL に直接 PUT するだけで済み、
+ * Google へのログインが一切不要になる。ファイル本体もこの GAS を経由しない
+ * (経由すると doPost 全体で約50MBのペイロード上限に当たるため)。
+ */
+function initUpload_(body) {
+  touchDriveScope_();
+  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
+  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
+
+  var token = ScriptApp.getOAuthToken();
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'application/json; charset=UTF-8',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
+        'X-Upload-Content-Length': String(body.size || 0),
+      },
+      payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('Drive session failed (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+
+  var headers = res.getAllHeaders();
+  var sessionUrl = headers['Location'] || headers['location'];
+  if (!sessionUrl) throw new Error('セッション URL が取得できませんでした');
+
+  return { sessionUrl: sessionUrl };
+}
+
+/**
+ * 音声のバイトそのものを、ブラウザ→GAS→Google と中継する。
+ *
+ * 【なぜ直接PUTできないか】
+ * initUpload_ で発行したセッション URL に、ブラウザから直接 PUT できれば
+ * 一番シンプルだった。だが実際に試すと CORS で弾かれ、Origin ヘッダーを
+ * 明示しても改善しなかった。Google Cloud Storage の resumable upload とは
+ * 違い、Drive API v3 のセッション URL はブラウザからの直接アクセスを
+ * サポートしていないと判断し、バイト自体も GAS 経由にした。
+ *
+ * 【50MBペイロード上限に当たらない理由】
+ * GAS の上限は「1回の doPost リクエストのサイズ」に対してかかる。ここでは
+ * 音声全体を1回で送るのではなく、数MB単位のチャンクに分割して何度も
+ * doPost を呼ぶので、1回あたりのペイロードは小さいまま保たれる。
+ */
+function putChunk_(body) {
+  var bytes = Utilities.base64Decode(body.chunk);
+  var start = body.offset;
+  var end = start + bytes.length - 1;
+
+  var res = UrlFetchApp.fetch(body.sessionUrl, {
+    method: 'put',
+    contentType: 'application/octet-stream',
+    headers: {
+      'Content-Range': 'bytes ' + start + '-' + end + '/' + body.total,
+    },
+    payload: bytes,
+    muteHttpExceptions: true,
+  });
+
+  var code = res.getResponseCode();
+  if (code === 200 || code === 201) {
+    return { done: true, file: JSON.parse(res.getContentText()) };
+  }
+  if (code === 308) {
+    return { done: false };
+  }
+  throw new Error('chunk upload failed (' + code + '): ' + res.getContentText());
+}
+
+/**
+ * 打合せ日時などのメタデータをサイドカー JSON として同じフォルダに置く。
+ * ファイルサイズが小さいので multipart で一発アップロードする
+ * (resumable にする必要がない)。Mac mini 側の drive_inbox.py は
+ * このファイルの出現を処理開始の合図として使う。
+ */
+function writeSidecar_(body) {
+  touchDriveScope_();
+  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
+  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
+
+  var token = ScriptApp.getOAuthToken();
+  var boundary = '-------minutesUploader' + Date.now();
+  var payload =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify({ name: body.name, parents: [folderId] }) + '\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(body.meta) + '\r\n' +
+    '--' + boundary + '--';
+
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'multipart/related; boundary=' + boundary,
+      headers: { Authorization: 'Bearer ' + token },
+      payload: payload,
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('JSON登録に失敗 (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+  return JSON.parse(res.getContentText());
 }

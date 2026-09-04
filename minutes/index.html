@@ -7,6 +7,7 @@
 <link rel="icon" href="data:," />
 <link rel="stylesheet" href="./css/styles.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div class="app">
@@ -27,6 +28,7 @@
       <button id="assign-permission" class="btn-ghost" aria-label="権限を割り当て"><i class="ti ti-users" aria-hidden="true"></i></button>
       <button id="bulk-summarize" class="btn-ghost" aria-label="一括要約"><i class="ti ti-sparkles" aria-hidden="true"></i></button>
       <button id="cross-chat-btn" class="btn-ghost" aria-label="横断チャット"><i class="ti ti-messages" aria-hidden="true"></i></button>
+      <button id="open-upload" class="btn-ghost" aria-label="音声をアップロード"><i class="ti ti-upload" aria-hidden="true"></i></button>
       <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
       <span id="active-model" class="active-model"></span>
     </div>
@@ -59,5 +61,6 @@
 
 <div id="modal-root"></div>
 <script type="module" src="./src/main.js"></script>
+<script type="module" src="./src/upload.js"></script>
 </body>
 </html>

@@ -1,5 +1,29 @@
 # Change Log
 
+## 1.2.0 - 2026-09-04
+
+### Release Title
+
+Beta parity update: audio upload pipeline and GAS upload proxy support
+
+### Release Changes
+
+- Added upload entry points to the minutes UI: Google script loader, upload button, and upload module bootstrap.
+- Added new upload client module with chunked transfer, pending-item rendering, and sidecar metadata registration.
+- Extended GAS action router with `initUpload`, `putChunk`, and `writeSidecar` endpoints.
+- Added resumable Drive upload session support and chunk relay implementation in GAS.
+- Added sidecar JSON writer for Mac mini inbox workflow handoff.
+- Improved agenda JSON parse diagnostics with explicit error logging.
+- Updated rich text writer to chunk long strings instead of truncating at 2000 chars.
+- Added upload-related styles for modal fields, drop zone, progress, status messages, and pending cards.
+
+### Release Affected Files
+
+- `minutes/index.html`
+- `minutes/src/upload.js`
+- `minutes/gas/Code.gs`
+- `minutes/css/styles.css`
+
 ## 1.1.0 - 2026-09-02
 
 ### Title
