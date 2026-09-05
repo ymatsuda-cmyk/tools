@@ -230,3 +230,130 @@ GASのスクリプトプロパティに、監視IDから作った名前で登録
 
 APIが応答しない場合、そのカードだけ「応答がありません」と表示され、
 トグルは操作できなくなります。他の監視対象には影響しません。
+
+---
+
+## 公式APIがないサービスを試す（Kaggleの例）
+
+Kaggleには「残量を取得するAPI」も「起動/停止するAPI」も公式には存在しません。
+このようなサービスは、外部にAPIを立てる代わりに **GAS自身が状態を保持** する形で試せます。
+
+### 登録方法
+
+`endpoint` を `internal:kaggle` という特別な値にします。この値の監視対象は
+外部への通信を一切行わず、GAS内の関数だけで完結します。
+
+```json
+{ "id": "kaggle-gpu", "name": "Kaggle GPU", "endpoint": "internal:kaggle" }
+```
+
+### 残量の更新
+
+自動更新はできないため、Kaggleのサイトで残り時間を確認し、手動で反映します。
+
+- Apps Scriptエディタで `updateKaggleRemainingExample` の中の数値を書き換えて実行する
+- または `updateKaggleRemaining(22.5)` のように直接呼び出す
+
+### トグルの意味
+
+ONにしてもKaggleを実際に起動するわけではありません。「今から使う」を
+自分のために記録するだけのメモ用トグルです。GASのスクリプトプロパティ
+`KAGGLE_STATE` に保存されます。
+
+同じ考え方で、公式APIがない他のサービスも `internal:任意の名前` を作り、
+GAS側に対応する関数を足せば同様に試せます。
+
+---
+
+## Kaggleコントローラーとの連携（実物版）
+
+`internal:kaggle`による手入力の仮実装は廃止しました。代わりに、
+Kaggle Notebookを実際に起動・停止できるコントローラー（別GASプロジェクト、
+`gas/kaggle-controller/Kaggle_controller_single.gs`）と直接連携します。
+
+### 全体構成
+
+```
+ダッシュボード(GitHub Pages)
+   ↓ トグル操作
+ダッシュボード用GAS (Code.gs)
+   ↓ ?action=status / start / stop
+Kaggleコントローラー用GAS (別デプロイ)
+   ↓ Kaggle API
+Kaggle Notebook
+```
+
+2つのGASは別プロジェクトです。ダッシュボード用GASが、
+Kaggleコントローラー用GASのURLをHTTPで呼び出す形で繋がります。
+
+### Kaggleコントローラー側のセットアップ
+
+1. 新しいGASプロジェクトを作り、`Kaggle_controller_single.gs`と
+   `proxy_py.html`をどちらも貼り付ける（ファイル名を一致させること）
+2. スクリプトプロパティ`CONFIG`に、コメント内の説明どおりJSONを設定する
+3. ウェブアプリとしてデプロイし、`/exec`URLを控える
+4. **`setupMonitorTrigger`を一度だけ実行する**（今回追加した関数）
+   1分おきに自分の状態を確認し、Kaggle側の自動終了や、
+   他の人がKaggleの画面から直接止めた場合を検出して記録を閉じる
+
+### ダッシュボード用GAS側の設定
+
+スクリプトプロパティに、Kaggleコントローラーの`controlToken`と
+同じ値を登録する（監視IDから作った名前で）。
+
+| 監視ID | プロパティ名 | 値 |
+|---|---|---|
+| `kaggle-gemma` | `MONITOR_TOKEN_KAGGLE_GEMMA` | Kaggleコントローラーの`controlToken` |
+
+### ダッシュボードへの登録
+
+```json
+{
+  "id": "kaggle-gemma",
+  "name": "Kaggle (gemma4 12b)",
+  "type": "kaggle",
+  "endpoint": "https://script.google.com/macros/s/【Kaggleコントローラーの/execURL】/exec"
+}
+```
+
+`type: "kaggle"`を付けることで、ダッシュボード用GASが
+汎用の`service-api.md`仕様ではなく、Kaggleコントローラー専用の
+応答形式（`status` `weeklyRemainMin` `zombie`など）を読み替えて処理します。
+
+### 表示の対応関係
+
+| Kaggle側の値 | ダッシュボードでの表示 |
+|---|---|
+| `status: running/queued` かつ `proxyAlive: true` | 稼働中（緑） |
+| `status: running/queued` かつ `proxyAlive: false` | 起動中（黄）※ Ollamaがまだ立ち上がっていない |
+| `zombie: true` | エラー（赤）※ 応答なし。強制停止が必要な可能性 |
+| それ以外 | 停止中 |
+| `weeklyRemainMin / 60` | リングの残量（時間） |
+
+### トグル操作の意味
+
+- **ON**: `action=start` を呼び、Notebookを起動する
+- **OFF**: コントローラー側で自動的に判断する
+  - ハートビートが生きていれば `stopRequested`フラグを立てて自然停止を待つ（穏やかな停止）
+  - ハートビートが途絶していれば、その場で強制停止する（Kaggleの`cancel-session` API）
+
+### 「他の人が止めた／Kaggleが自動で止めた」の検出
+
+これは**ダッシュボードの画面を見ていなくても**検出されます。
+Kaggleコントローラー側に設定した1分おきのトリガー(`monitorTick`)が、
+記録上「稼働中」なのにKaggle側の実際の状態が停止していることを検知し、
+自動的に稼働時間の記録を閉じて残量計算を正しく保ちます。
+
+ダッシュボードの`monitorInterval`（既定を1分に変更済み）は、
+あくまで**画面を開いている間の表示更新頻度**です。実際の検出・記録の
+正しさは、Kaggleコントローラー側のトリガーが担います。両方が
+1分間隔で動くことで、画面を見ている間はほぼリアルタイムに、
+見ていない間も記録だけは正しく保たれます。
+
+### 気づいた点（コード自体への提案）
+
+- `handleStarted`と`testNotebookSource`がファイル内に2回定義されています。
+  後の定義で上書きされるだけで動作に支障はありませんが、デバッグ時の
+  残骸と思われるので、次に触るタイミングで一本化すると読みやすくなります
+- `kaggle.json`に実キーが入っていました。GASの`CONFIG`プロパティに
+  移したら、ローカルのそのファイルは残さない方が安全です

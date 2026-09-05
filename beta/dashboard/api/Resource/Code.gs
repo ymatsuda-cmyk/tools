@@ -234,6 +234,78 @@ function syncFromNotion() {
 }
 
 
+
+
+/* ============================================================
+   Kaggle コントローラー（別デプロイのGAS）への橋渡し
+
+   Kaggle_controller_single.gs は、このダッシュボード用GASとは
+   別の独立したGASプロジェクトとしてデプロイする。
+   認証は Authorization ヘッダではなく ?token= クエリパラメータ
+   で行う仕様のため、専用の関数で対応する。
+
+   monitors の登録で "type": "kaggle" を指定したものだけ、
+   この経路を使う。
+   ============================================================ */
+
+function fetchKaggleStatus(monitor) {
+  var token = monitorToken(monitor.id);
+  var url = monitor.endpoint + '?action=status&token=' + encodeURIComponent(token || '');
+
+  var res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+  var data;
+  try { data = JSON.parse(res.getContentText()); }
+  catch (e) { return { id: monitor.id, state: 'error', error: 'JSON解析に失敗しました' }; }
+
+  if (!data.success) {
+    return { id: monitor.id, state: 'error', error: data.error || '取得に失敗しました' };
+  }
+
+  var state;
+  if (data.zombie) {
+    state = 'error';
+  } else if (data.status === 'running' || data.status === 'queued') {
+    state = data.proxyAlive ? 'running' : 'starting';
+  } else {
+    state = 'stopped';
+  }
+
+  var maxH = Math.round((data.weeklyLimitMin || 1800) / 60);
+  var remH = Math.round(((data.weeklyRemainMin || 0) / 60) * 10) / 10;
+
+  return {
+    id: monitor.id,
+    name: data.label || monitor.name || monitor.id,
+    state: state,
+    remaining: { value: remH, max: maxH, unit: 'h' },
+    note: data.zombie ? '応答なし。強制停止が必要な可能性があります' : '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sendKaggleControl(monitor, command) {
+  var token = monitorToken(monitor.id);
+  var action = command === 'start' ? 'start' : 'stop';
+
+  // Kaggle_controller_single.gs の doPost は、受け取ったJSONを
+  // そのまま doGet のパラメータとして扱うため、この形で送れば届く
+  var res = UrlFetchApp.fetch(monitor.endpoint, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ action: action, token: token }),
+    muteHttpExceptions: true
+  });
+
+  var data;
+  try { data = JSON.parse(res.getContentText()); }
+  catch (e) { throw new Error('応答の解析に失敗しました'); }
+
+  if (!data.success) {
+    throw new Error(data.message || data.error || '操作に失敗しました');
+  }
+  return fetchKaggleStatus(monitor);
+}
+
 /* ============================================================
    稼働状況モニターの中継
 
@@ -267,6 +339,10 @@ function monitorHeaders(monitor) {
 function fetchMonitorStatus(monitor) {
   try {
     if (!monitor.endpoint) throw new Error('endpoint が未設定です');
+
+    if (monitor.type === 'kaggle') {
+      return fetchKaggleStatus(monitor);
+    }
 
     const sep = monitor.endpoint.indexOf('?') >= 0 ? '&' : '?';
     const url = monitor.endpoint + sep + 'action=status';
@@ -307,6 +383,10 @@ function sendMonitorControl(monitor, command) {
     throw new Error('command は start か stop のみです');
   }
   if (!monitor.endpoint) throw new Error('endpoint が未設定です');
+
+  if (monitor.type === 'kaggle') {
+    return sendKaggleControl(monitor, command);
+  }
 
   const res = UrlFetchApp.fetch(monitor.endpoint, {
     method: 'post',
