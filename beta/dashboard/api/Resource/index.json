@@ -1,0 +1,67 @@
+{
+  "config": {
+    "title": "マイリソース",
+    "cardMin": 180,
+    "thumbH": 110,
+    "gap": 14,
+    "radius": 14,
+    "fade": 350,
+    "indexPath": "index.json",
+    "monitorInterval": 3,
+    "monitors": [
+      {
+        "id": "gpu-server",
+        "name": "GPU サーバー",
+        "group": "本番",
+        "endpoint": "https://your-service.example.com/api/resource"
+      },
+      {
+        "id": "batch-worker",
+        "name": "バッチ処理",
+        "group": "本番",
+        "endpoint": "https://your-service.example.com/api/worker"
+      },
+      {
+        "id": "dev-server",
+        "name": "検証サーバー",
+        "group": "検証",
+        "endpoint": "https://your-service.example.com/api/dev"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "id": "r001",
+      "title": "社内問い合わせボット",
+      "url": "https://example.com/bot",
+      "category": "AI",
+      "runType": "web",
+      "cardSize": "wide",
+      "thumb": "assets/thumbs/bot.png",
+      "preview": "assets/previews/bot.mp4",
+      "type": "site"
+    },
+    {
+      "id": "r002",
+      "title": "売上管理表",
+      "url": "https://example.sharepoint.com/sales.xlsx",
+      "category": "資料",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "assets/thumbs/sales.png",
+      "preview": null,
+      "type": "excel"
+    },
+    {
+      "id": "r003",
+      "title": "画像処理ツール（配布版）",
+      "url": "https://github.com/yourname/imgtool/releases",
+      "category": "アプリ",
+      "runType": "download",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": "assets/previews/imgtool.mp4",
+      "type": "site"
+    }
+  ]
+}
