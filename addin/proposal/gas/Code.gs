@@ -92,7 +92,7 @@ ${sourceText}
 
     const payload = {
       model: model,
-      max_tokens: 1000,
+      max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     };
 
@@ -107,9 +107,11 @@ ${sourceText}
       muteHttpExceptions: true,
     });
 
-    const body = JSON.parse(res.getContentText());
+    const body = safeParseJson(res.getContentText(), null);
+    if (!body) return respond({ error: "AI API response was not valid JSON: " + res.getContentText().slice(0, 300) });
+    if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
     const textBlock = (body.content || []).find(c => c.type === "text");
-    const parsed = JSON.parse((textBlock && textBlock.text) || '{"items":[]}');
+    const parsed = safeParseJson(textBlock && textBlock.text, { items: [] });
 
     return respond(parsed);
 }
@@ -147,7 +149,7 @@ ${req.text}
 出力は次のJSON形式のみとしてください（説明文は不要）:
 {"results":[{"category":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
 
-  const payload = { model: model, max_tokens: 1500, messages: [{ role: "user", content: prompt }] };
+  const payload = { model: model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] };
   const res = UrlFetchApp.fetch(apiUrl, {
     method: "post",
     contentType: "application/json",
@@ -155,12 +157,25 @@ ${req.text}
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
-  const body = JSON.parse(res.getContentText());
+  const body = safeParseJson(res.getContentText(), null);
+  if (!body) return respond({ error: "AI API response was not valid JSON: " + res.getContentText().slice(0, 300) });
+  if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
   const textBlock = (body.content || []).find(c => c.type === "text");
-  const parsed = JSON.parse((textBlock && textBlock.text) || '{"results":[]}');
+  const parsed = safeParseJson(textBlock && textBlock.text, { results: [] });
   return respond(parsed);
 }
 
+/* Claudeがコードフェンス付き（```json ... ```）で返すことがあるため、
+ * JSON.parse前に取り除く。空文字や解析不能な場合はフォールバック値を返す。 */
+function safeParseJson(text, fallback) {
+  try {
+    const cleaned = String(text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+    if (!cleaned) return fallback;
+    return JSON.parse(cleaned);
+  } catch (e) {
+    return fallback;
+  }
+}
 /* 参照URL先のテキストを取得する。
  * 議事録ビューア（Notion等）が公開URLでプレーンテキスト/HTMLを返す前提。
  * 認証が必要なページは取得できないため、その場合はtext欄への貼り付けを使う。 */
