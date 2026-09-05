@@ -27,8 +27,21 @@
  */
 
 const SHARED_TOKEN = "";              // 空なら照合をスキップ（開発時のみ推奨）
-const AI_API_URL = "https://api.anthropic.com/v1/messages";
-const AI_MODEL = "claude-sonnet-4-6"; // 登録するモデルをここで指定する
+
+/* AI_API_KEY・AI_API_URL・AI_MODEL はすべてスクリプトプロパティに設定する。
+ * スクリプトエディタ → プロジェクトの設定 → スクリプト プロパティ で以下を登録:
+ *   AI_API_KEY  … 例: sk-ant-xxxxx（必須）
+ *   AI_API_URL  … 例: https://api.anthropic.com/v1/messages（未設定ならデフォルト値を使う）
+ *   AI_MODEL    … 例: claude-sonnet-4-6（未設定ならデフォルト値を使う）
+ * コードを直接編集しなくても、モデル差し替えやAPI切り替えができるようにするため。 */
+function getAiSettings() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    apiKey: props.getProperty("AI_API_KEY"),
+    apiUrl: props.getProperty("AI_API_URL") || "https://api.anthropic.com/v1/messages",
+    model: props.getProperty("AI_MODEL") || "claude-sonnet-4-6",
+  };
+}
 
 function doPost(e) {
   try {
@@ -47,7 +60,7 @@ function doPost(e) {
 
 /* 単一カテゴリ抽出（提案ナレッジ側の詳細レビュー、営業報告側の旧フロー互換） */
 function handleSingleCategoryMode(req) {
-    const apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY");
+    const { apiKey, apiUrl, model } = getAiSettings();
     if (!apiKey) return respond({ error: "AI_API_KEY not configured" });
 
     let sourceText = req.text || "";
@@ -78,12 +91,12 @@ ${sourceText}
 {"items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}`;
 
     const payload = {
-      model: AI_MODEL,
+      model: model,
       max_tokens: 1000,
       messages: [{ role: "user", content: prompt }],
     };
 
-    const res = UrlFetchApp.fetch(AI_API_URL, {
+    const res = UrlFetchApp.fetch(apiUrl, {
       method: "post",
       contentType: "application/json",
       headers: {
@@ -109,7 +122,7 @@ ${sourceText}
  * { results: [{ category, items:[{itemId,value,confidence}] }, ...] }
  * （該当なしのカテゴリは items:[] または results に含めない） */
 function handleAutoMode(req) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY");
+  const { apiKey, apiUrl, model } = getAiSettings();
   if (!apiKey) return respond({ error: "AI_API_KEY not configured" });
   if (!req.text) return respond({ error: "text is empty" });
 
@@ -134,8 +147,8 @@ ${req.text}
 出力は次のJSON形式のみとしてください（説明文は不要）:
 {"results":[{"category":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
 
-  const payload = { model: AI_MODEL, max_tokens: 1500, messages: [{ role: "user", content: prompt }] };
-  const res = UrlFetchApp.fetch(AI_API_URL, {
+  const payload = { model: model, max_tokens: 1500, messages: [{ role: "user", content: prompt }] };
+  const res = UrlFetchApp.fetch(apiUrl, {
     method: "post",
     contentType: "application/json",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
