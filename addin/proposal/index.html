@@ -6,6 +6,7 @@
 <title>提案ナレッジ</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <link rel="stylesheet" href="style.css">
+<script src="roi-core.js"></script>
 </head>
 <body>
 
@@ -48,9 +49,13 @@
         <option value="自社">自社</option>
       </select>
     </div>
+    <div class="field-row">
+      <label>参照URL</label>
+      <input id="hearing-url" placeholder="議事録ビューア等へのリンク（任意）">
+    </div>
     <div class="field-row col">
       <label>発言・メモ</label>
-      <textarea id="hearing-text" rows="5" placeholder="議事録の文字起こし、または要点メモを貼り付け"></textarea>
+      <textarea id="hearing-text" rows="5" placeholder="議事録の文字起こし、または要点メモを貼り付け（URLのみでも可）"></textarea>
     </div>
 
     <div class="btn-row">
