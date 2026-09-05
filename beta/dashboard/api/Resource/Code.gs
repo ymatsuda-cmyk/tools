@@ -236,6 +236,69 @@ function syncFromNotion() {
 
 
 
+
+/* ============================================================
+   APIクォータの自己記録カウンタ（Gemini / OpenAI などの無料枠用）
+
+   これらのサービスには「残り回数を問い合わせるAPI」が公式には
+   存在しないため、呼び出し側のスクリプトが自己申告した回数を
+   ここで積算し、手動設定した1日の上限との差分を残量として返す。
+
+   外部への通信は一切行わない。すべてこのGASのスクリプトプロパティ
+   だけで完結する（Kaggleのような別プロジェクトは不要）。
+   ============================================================ */
+
+function quotaDateKeyUtc() {
+  var d = new Date();
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+}
+
+function quotaPropKey(service, model, metric) {
+  var safe = (service + '_' + model).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  return 'QUOTA_' + safe + '_' + metric + '_' + quotaDateKeyUtc();
+}
+
+/**
+ * 呼び出し側スクリプトから action:'recordApiUsage' で呼ばれる。
+ * リクエスト回数とトークン数を両方積算しておく（どちらを見るかは
+ * monitors 側の registration で選べるようにするため）。
+ */
+function recordApiUsage(service, model, requestCount, tokenCount) {
+  var reqKey = quotaPropKey(service, model, 'REQ');
+  var tokKey = quotaPropKey(service, model, 'TOK');
+
+  var reqNext = (Number(PROP.getProperty(reqKey)) || 0) + (Number(requestCount) || 1);
+  var tokNext = (Number(PROP.getProperty(tokKey)) || 0) + (Number(tokenCount) || 0);
+
+  PROP.setProperty(reqKey, String(reqNext));
+  PROP.setProperty(tokKey, String(tokNext));
+
+  return { requests: reqNext, tokens: tokNext };
+}
+
+/**
+ * monitors の type:"quota" 用。ネットワーク通信なしで即座に返る。
+ * monitor.metric が "tokens" ならトークン数、それ以外（省略時含む）は
+ * リクエスト回数を残量として表示する。
+ */
+function getQuotaStatus(monitor) {
+  var metric = monitor.metric === 'tokens' ? 'TOK' : 'REQ';
+  var unit = monitor.metric === 'tokens' ? 'tok' : '回';
+
+  var used = Number(PROP.getProperty(quotaPropKey(monitor.service, monitor.model, metric))) || 0;
+  var limit = Number(monitor.dailyLimit) || 0;
+  var remaining = Math.max(0, limit - used);
+
+  return {
+    id: monitor.id,
+    name: monitor.name || monitor.id,
+    state: 'tracking',   // 起動/停止の概念が無いことを表す専用ステート
+    remaining: { value: remaining, max: limit, unit: unit },
+    note: used >= limit && limit > 0 ? '本日の上限に到達した可能性があります' : '',
+    updatedAt: new Date().toISOString()
+  };
+}
+
 /* ============================================================
    Kaggle コントローラー（別デプロイのGAS）への橋渡し
 
@@ -261,9 +324,17 @@ function fetchKaggleStatus(monitor) {
     return { id: monitor.id, state: 'error', error: data.error || '取得に失敗しました' };
   }
 
+  // status の値はコントローラーのバージョンにより異なる:
+  //   旧版: Kaggle APIの値をそのまま使う（running / queued / stopped など）
+  //   新版: ハートビート自前判定（running / booting / stopping / stopped）
+  // 両方に対応できるよう、値そのもので分岐する
   var state;
   if (data.zombie) {
     state = 'error';
+  } else if (data.status === 'stopping') {
+    state = 'stopping';
+  } else if (data.status === 'booting') {
+    state = 'starting';
   } else if (data.status === 'running' || data.status === 'queued') {
     state = data.proxyAlive ? 'running' : 'starting';
   } else {
@@ -343,6 +414,9 @@ function fetchMonitorStatus(monitor) {
     if (monitor.type === 'kaggle') {
       return fetchKaggleStatus(monitor);
     }
+    if (monitor.type === 'quota') {
+      return getQuotaStatus(monitor);
+    }
 
     const sep = monitor.endpoint.indexOf('?') >= 0 ? '&' : '?';
     const url = monitor.endpoint + sep + 'action=status';
@@ -386,6 +460,9 @@ function sendMonitorControl(monitor, command) {
 
   if (monitor.type === 'kaggle') {
     return sendKaggleControl(monitor, command);
+  }
+  if (monitor.type === 'quota') {
+    throw new Error('この監視対象には起動/停止の概念がありません');
   }
 
   const res = UrlFetchApp.fetch(monitor.endpoint, {
@@ -465,6 +542,12 @@ function doPost(e) {
       JSON.parse(req.json);   // 形式チェック
       commitText('index.json', req.json, 'ダッシュボードから更新');
       return jsonOut({ ok: true });
+    }
+
+    if (req.action === 'recordApiUsage') {
+      if (!req.service || !req.model) throw new Error('service と model は必須です');
+      var total = recordApiUsage(req.service, req.model, req.count, req.tokens);
+      return jsonOut({ ok: true, total: total });
     }
 
     if (req.action === 'monitorStatus') {

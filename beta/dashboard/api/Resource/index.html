@@ -914,7 +914,8 @@ const STATE_META = {
   stopping: { color:'#E0B252', label:'停止中'  },
   stopped : { color:'#66625A', label:'停止'    },
   error   : { color:'#D9694F', label:'エラー'  },
-  unknown : { color:'#66625A', label:'不明'    }
+  unknown : { color:'#66625A', label:'不明'    },
+  tracking: { color:'#5FA8A0', label:'記録中'  }
 };
 
 let monitorTimer = null;
@@ -1027,6 +1028,17 @@ function renderMonitorCard(m, snap){
   }
 
   const cls = 'switch' + (busy ? ' busy' : '') + (locked ? ' disabled' : '');
+  const toggleRow = m.type === 'quota'
+    ? ''  // 起動/停止の概念が無い監視対象にはトグルを出さない
+    : `<div class="mon-toggle">
+        <span class="tl">${busy ? meta.label + '…' : (on ? '稼働中' : '停止中')}</span>
+        <label class="${cls}">
+          <input type="checkbox" data-toggle="${m.id}" ${on ? 'checked' : ''}
+            ${(busy || locked) ? 'disabled' : ''} aria-label="起動と停止の切り替え">
+          <span class="track"><span class="knob"></span></span>
+        </label>
+      </div>`;
+
   return `
     <div class="mon-card" data-monitor="${m.id}">
       <div class="mon-head">
@@ -1035,14 +1047,7 @@ function renderMonitorCard(m, snap){
         <span class="mon-state">${meta.label}</span>
       </div>
       ${body}
-      <div class="mon-toggle">
-        <span class="tl">${busy ? meta.label + '…' : (on ? '稼働中' : '停止中')}</span>
-        <label class="${cls}">
-          <input type="checkbox" data-toggle="${m.id}" ${on ? 'checked' : ''}
-            ${(busy || locked) ? 'disabled' : ''} aria-label="起動と停止の切り替え">
-          <span class="track"><span class="knob"></span></span>
-        </label>
-      </div>
+      ${toggleRow}
     </div>`;
 }
 

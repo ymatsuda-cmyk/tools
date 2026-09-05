@@ -1,0 +1,557 @@
+import os, re, sys, json, time, base64, socket, subprocess, threading, urllib.request, urllib.parse, uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# ============================================================
+# プレースホルダ（GAS側が push 直前に置換する。 "<" は使わない — HTMLエディタが
+# &lt; にエスケープしてしまい構文エラーになるため、比較は for/range 方式で書く）
+# ============================================================
+PROXY_KEY      = '__PROXY_KEY__'
+GAS_URL        = '__GAS_URL__'
+CONTROL_TOKEN  = '__CONTROL_TOKEN__'
+NGROK_DOMAIN   = '__NGROK_DOMAIN__'
+ENDPOINT_ID    = '__ENDPOINT_ID__'
+DEFAULT_MODEL  = '__MODEL__'
+
+OL              = 'http://127.0.0.1:11434'
+PROXY_PORT      = 11435
+MAX_MINUTES     = 540      # Kaggleセッション上限(9時間)より少し手前で自発終了
+POLL_INTERVAL   = 30
+HOME            = os.path.expanduser('~')
+
+# ============================================================
+# GAS 呼び出し（すべての罠を踏まえた実装）
+# ============================================================
+def gas(action, **params):
+    if GAS_URL.startswith('__'):
+        return {}
+    params.update({'action': action, 'token': CONTROL_TOKEN, 'id': ENDPOINT_ID})
+    url = GAS_URL + '?' + urllib.parse.urlencode(params)
+    last_err = None
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                body = r.read().decode('utf-8', 'replace')
+            return json.loads(body)
+        except Exception as e:
+            last_err = e
+            is_last = (attempt == max_attempts - 1)
+            if not is_last:
+                time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f'GAS 呼び出しに失敗しました（{max_attempts}回試行）: {last_err}')
+
+
+# ============================================================
+# 1. zstd / ollama インストール
+# ============================================================
+print('=== zstd / ollama インストール ===', flush=True)
+subprocess.run(['bash', '-lc', 'apt-get -qq update && apt-get -qq install -y zstd >/dev/null 2>&1 || true'])
+subprocess.run(['bash', '-lc', 'curl -fsSL https://ollama.com/install.sh | sh'], check=True)
+
+
+# ============================================================
+# 2. データセットから blobs/manifests を探索してコピー
+#    （階層構造に依存せず、blobs と manifests を両方含むディレクトリを再帰探索する）
+# ============================================================
+def find_models_dir(root='/kaggle/input'):
+    found = []
+    for base, dirs, files in os.walk(root):
+        names = set(dirs)
+        if 'blobs' in names and 'manifests' in names:
+            found.append(base)
+    return found
+
+def find_file(root, name_pattern):
+    rx = re.compile(name_pattern, re.IGNORECASE)
+    for base, dirs, files in os.walk(root):
+        for f in files:
+            if rx.search(f):
+                return os.path.join(base, f)
+    return None
+
+def find_ngrok_binary(root='/kaggle/input'):
+    # 1) 完全一致（拡張子なし想定の理想形）
+    hit = find_file(root, r'^ngrok$')
+    if hit:
+        return hit
+    # 2) 部分一致（ngrok_linux_amd64 のような命名や大文字小文字違いを拾う）
+    candidates = []
+    for base, dirs, files in os.walk(root):
+        for f in files:
+            if 'ngrok' in f.lower() and not f.lower().endswith(('.tgz', '.zip', '.tar.gz', '.gz')):
+                candidates.append(os.path.join(base, f))
+    if candidates:
+        return candidates[0]
+    # 3) 圧縮されたまま置かれているケース（.tgz / .zip）を展開して探す
+    extract_dir = '/tmp/ngrok_extract_tmp'
+    os.makedirs(extract_dir, exist_ok=True)
+    for base, dirs, files in os.walk(root):
+        for f in files:
+            fl = f.lower()
+            full = os.path.join(base, f)
+            if fl.endswith('.tgz') or fl.endswith('.tar.gz'):
+                subprocess.run(['bash', '-lc', f"tar -xzf '{full}' -C '{extract_dir}'"])
+            elif fl.endswith('.zip'):
+                subprocess.run(['bash', '-lc', f"unzip -o '{full}' -d '{extract_dir}'"])
+    if os.path.isdir(extract_dir):
+        hit = find_file(extract_dir, r'^ngrok$')
+        if hit:
+            return hit
+    return None
+
+print('=== モデルデータセットの探索 ===', flush=True)
+OLLAMA_MODELS_DIR = os.environ.get('OLLAMA_MODELS', os.path.join(HOME, '.ollama', 'models'))
+os.makedirs(os.path.join(OLLAMA_MODELS_DIR, 'blobs'), exist_ok=True)
+os.makedirs(os.path.join(OLLAMA_MODELS_DIR, 'manifests'), exist_ok=True)
+
+model_dirs = find_models_dir()
+print('見つかった models ディレクトリ:', model_dirs, flush=True)
+for d in model_dirs:
+    subprocess.run(['bash', '-lc', f"cp -rn '{d}/blobs/.' '{OLLAMA_MODELS_DIR}/blobs/' 2>/dev/null || true"])
+    subprocess.run(['bash', '-lc', f"cp -rn '{d}/manifests/.' '{OLLAMA_MODELS_DIR}/manifests/' 2>/dev/null || true"])
+
+# ngrok バイナリは blobs/manifests とは別のデータセットに単体で入っている想定
+print('=== ngrok バイナリの探索 ===', flush=True)
+ngrok_bin_src = find_ngrok_binary()
+NGROK_BIN = '/usr/local/bin/ngrok'
+if ngrok_bin_src:
+    subprocess.run(['bash', '-lc', f"cp '{ngrok_bin_src}' '{NGROK_BIN}' && chmod +x '{NGROK_BIN}'"], check=True)
+    print('ngrok バイナリを配置:', ngrok_bin_src, '->', NGROK_BIN, flush=True)
+else:
+    print('★ ngrok バイナリがデータセット内に見つかりませんでした。データセット構成を確認してください。', flush=True)
+    raise RuntimeError('ngrok バイナリが見つかりません。処理を中断します（起動しても後段でクラッシュするため）')
+
+
+# ============================================================
+# 3. ollama serve 起動
+# ============================================================
+print('=== ollama serve 起動 ===', flush=True)
+env = os.environ.copy()
+env['OLLAMA_MODELS'] = OLLAMA_MODELS_DIR
+env['OLLAMA_HOST'] = '0.0.0.0:11434'
+env['OLLAMA_MAX_LOADED_MODELS'] = '1'
+env['OLLAMA_SCHED_SPREAD'] = '1'  # T4x2への分散を促進
+# 注意: OLLAMA_KV_CACHE_TYPE は設定しない。q8_0 等を指定すると
+# 一部モデルでサイレントにCPUフォールバックする実測不具合があるため、未設定が正解。
+
+subprocess.Popen(['ollama', 'serve'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def wait_port(host, port, timeout=60):
+    deadline = time.time() + timeout
+    while deadline > time.time():
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            time.sleep(1)
+    return False
+
+if not wait_port('127.0.0.1', 11434, timeout=60):
+    print('★ ollama serve がポート11434で応答しません', flush=True)
+
+
+# ============================================================
+# 4. ollama show でモデルの対応能力を確認・ログ出力
+#    （画像対応かどうかは思い込みで判断せず、必ずここの出力で確認する）
+# ============================================================
+print('=== モデル取得 (未取得の場合は pull) ===', flush=True)
+subprocess.run(['bash', '-lc', f"ollama list | grep -q '{DEFAULT_MODEL.split(':')[0]}' || ollama pull {DEFAULT_MODEL}"],
+               env=env)
+
+print('=== ollama show ===', flush=True)
+r = subprocess.run(['ollama', 'show', DEFAULT_MODEL], capture_output=True, text=True, env=env)
+print(r.stdout, flush=True)
+caps = r.stdout.lower()
+print('VISION:', 'vision' in caps, flush=True)
+print('AUDIO:', 'audio' in caps, flush=True)
+
+
+# ============================================================
+# 5. wait_model_ready(): 実際にダミーチャットを送り応答確認（最大5分、5秒間隔）
+#    started 通知の前にここを通すことで、「稼働中」表示が
+#    「プロセスは起動したがまだ使えない」状態を含まないようにする。
+# ============================================================
+def wait_model_ready(timeout_sec=300):
+    body = json.dumps({
+        'model': DEFAULT_MODEL,
+        'messages': [{'role': 'user', 'content': 'hi'}],
+        'stream': False,
+        'think': False,
+        'options': {'num_predict': 1},
+    }).encode()
+    deadline = time.time() + timeout_sec
+    attempt = 0
+    while deadline > time.time():
+        attempt += 1
+        try:
+            req = urllib.request.Request(
+                OL + '/api/chat', data=body,
+                headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                resp.read()
+            print(f'Model ready (試行{attempt}回目)', flush=True)
+            return True
+        except Exception as e:
+            print(f'Model not ready yet (試行{attempt}回目): {e}', flush=True)
+            time.sleep(5)
+    print('Model ready の確認がタイムアウトしました。started はそのまま送信します', flush=True)
+    return False
+
+model_ready = wait_model_ready()
+
+
+# ============================================================
+# OpenAI互換プロキシ（:11435）
+# ============================================================
+def ol_chat_stream(payload):
+    print('[OLLAMA REQ]', json.dumps({k: v for k, v in payload.items() if k != 'messages'}), flush=True)
+    req = urllib.request.Request(
+        OL + '/api/chat', data=json.dumps(payload).encode(),
+        headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            for line in resp:
+                line = line.strip()
+                if not line:
+                    continue
+                chunk = json.loads(line)
+                # --- デバッグログ: Ollamaからの生チャンク（contentは長いので短縮） ---
+                msg = chunk.get('message') or {}
+                dbg = {
+                    'done': chunk.get('done'),
+                    'content_len': len(msg.get('content', '') or ''),
+                    'tool_calls': msg.get('tool_calls'),
+                    'done_reason': chunk.get('done_reason'),
+                }
+                print('[OLLAMA CHUNK]', json.dumps(dbg, ensure_ascii=False), flush=True)
+                yield chunk
+    except Exception as e:
+        print('[OLLAMA STREAM ERROR]', repr(e), flush=True)
+        raise
+
+def openai_messages_to_ollama(messages):
+    """OpenAI形式のcontent（文字列 or パーツ配列）をOllama形式へ変換する。
+    画像: image_url(base64データURL) -> images配列
+    音声: 現時点でこのモデル(__MODEL__)は音声入力に非対応のため変換しない。
+    """
+    out = []
+    for m in messages:
+        role = m.get('role', 'user')
+        content = m.get('content')
+        if isinstance(content, str):
+            out.append({'role': role, 'content': content})
+            continue
+
+        text_parts = []
+        images = []
+        for part in (content or []):
+            ptype = part.get('type')
+            if ptype == 'text':
+                text_parts.append(part.get('text', ''))
+            elif ptype == 'image_url':
+                url = (part.get('image_url') or {}).get('url', '')
+                if url.startswith('data:'):
+                    b64 = url.split(',', 1)[1] if ',' in url else ''
+                    images.append(b64)
+            elif ptype == 'input_audio':
+                # このモデルは音声入力に対応していないため、無視する。
+                # (Ollamaの/api/chatにはOpenAI形式input_audioの受け口が無い)
+                print('★ input_audio パートを受け取りましたが、このモデルは音声入力非対応のため無視します', flush=True)
+
+        row = {'role': role, 'content': '\n'.join(text_parts)}
+        if images:
+            row['images'] = images
+        out.append(row)
+    return out
+
+
+def ollama_tool_calls_to_openai(tool_calls):
+    """Ollamaのtool_calls（function.argumentsがJSONオブジェクト）を
+    OpenAI形式（function.argumentsがJSON文字列）に変換する。"""
+    out = []
+    for i, tc in enumerate(tool_calls or []):
+        fn = tc.get('function', {}) or {}
+        args = fn.get('arguments', {})
+        if not isinstance(args, str):
+            args = json.dumps(args, ensure_ascii=False)
+        out.append({
+            'index': i,
+            'id': 'call_' + uuid.uuid4().hex[:24],
+            'type': 'function',
+            'function': {'name': fn.get('name', ''), 'arguments': args},
+        })
+    return out
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        pass
+
+    def _auth_ok(self):
+        auth = self.headers.get('Authorization', '')
+        return auth == f'Bearer {PROXY_KEY}'
+
+    def _cors_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors_headers()
+        # preflightのキャッシュ。毎回OPTIONSを飛ばされないようにする。
+        self.send_header('Access-Control-Max-Age', '86400')
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path.rstrip('/') == '/v1/models':
+            if not self._auth_ok():
+                self.send_response(401); self._cors_headers(); self.end_headers(); return
+            body = json.dumps({'object': 'list', 'data': [{'id': DEFAULT_MODEL, 'object': 'model'}]}).encode()
+            self.send_response(200)
+            self._cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(404); self._cors_headers(); self.end_headers()
+
+    def do_POST(self):
+        if self.path.rstrip('/') != '/v1/chat/completions':
+            self.send_response(404); self._cors_headers(); self.end_headers(); return
+        if not self._auth_ok():
+            self.send_response(401); self._cors_headers(); self.end_headers(); return
+
+        length = int(self.headers.get('Content-Length', 0))
+        raw = self.rfile.read(length)
+        try:
+            req = json.loads(raw)
+        except Exception:
+            self.send_response(400); self._cors_headers(); self.end_headers(); return
+
+        model = req.get('model') or DEFAULT_MODEL
+        messages = openai_messages_to_ollama(req.get('messages', []))
+        stream = bool(req.get('stream', False))
+        options = {}
+        if 'temperature' in req:
+            options['temperature'] = req['temperature']
+        if 'top_p' in req:
+            options['top_p'] = req['top_p']
+        if req.get('num_ctx'):
+            options['num_ctx'] = req['num_ctx']
+
+        payload = {
+            'model': model, 'messages': messages, 'stream': True,
+            'options': options,
+        }
+        if 'think' in req:
+            payload['think'] = req['think']
+        if req.get('tools'):
+            # OllamaのtoolsスキーマはOpenAIと同一（type:"function", function:{name,description,parameters}）
+            # なのでそのまま転送する。tool_choiceはOllamaが受け付けないため転送しない。
+            payload['tools'] = req['tools']
+
+        # --- デバッグログ: 受信したリクエストの概要 ---
+        tool_names = [t.get('function', {}).get('name', '?') for t in (req.get('tools') or [])]
+        print(f'[REQ] model={model} stream={stream} messages={len(messages)} '
+              f'tools={len(tool_names)} {tool_names} think={req.get("think")}', flush=True)
+
+        created = int(time.time())
+        cmpl_id = 'chatcmpl-' + str(created)
+
+        if not stream:
+            full = ''
+            tool_calls_raw = None
+            usage = {}
+            for chunk in ol_chat_stream(payload):
+                msg = chunk.get('message') or {}
+                full += msg.get('content', '')
+                if msg.get('tool_calls'):
+                    tool_calls_raw = msg['tool_calls']
+                if chunk.get('done'):
+                    usage = {
+                        'prompt_tokens': chunk.get('prompt_eval_count', 0),
+                        'completion_tokens': chunk.get('eval_count', 0),
+                        'total_tokens': chunk.get('prompt_eval_count', 0) + chunk.get('eval_count', 0),
+                    }
+            message_obj = {'role': 'assistant', 'content': full if full else None}
+            finish_reason = 'stop'
+            if tool_calls_raw:
+                message_obj['tool_calls'] = ollama_tool_calls_to_openai(tool_calls_raw)
+                finish_reason = 'tool_calls'
+            body = json.dumps({
+                'id': cmpl_id, 'object': 'chat.completion', 'created': created, 'model': model,
+                'choices': [{'index': 0, 'message': message_obj, 'finish_reason': finish_reason}],
+                'usage': usage,
+            }).encode()
+            print('[RESP non-stream] finish_reason=' + finish_reason
+                  + ' content_len=' + str(len(full))
+                  + ' tool_calls=' + str(message_obj.get('tool_calls')), flush=True)
+            self.send_response(200)
+            self._cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # ストリーミング: OllamaのNDJSON -> SSE(OpenAI互換)
+        self.send_response(200)
+        self._cors_headers()
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+
+        try:
+            tool_calls_seen = False
+            for chunk in ol_chat_stream(payload):
+                msg = chunk.get('message') or {}
+                delta_text = msg.get('content', '')
+                done = chunk.get('done', False)
+                delta = {}
+                if msg.get('tool_calls'):
+                    tool_calls_seen = True
+                    delta['tool_calls'] = ollama_tool_calls_to_openai(msg['tool_calls'])
+                elif not done:
+                    delta['content'] = delta_text
+
+                if done:
+                    finish_reason = 'tool_calls' if tool_calls_seen else 'stop'
+                else:
+                    finish_reason = None
+
+                data = {
+                    'id': cmpl_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model,
+                    'choices': [{'index': 0, 'delta': delta, 'finish_reason': finish_reason}],
+                }
+                if done:
+                    # 切り捨て検出用にusageを最終チャンクへ付与
+                    data['usage'] = {
+                        'prompt_tokens': chunk.get('prompt_eval_count', 0),
+                        'completion_tokens': chunk.get('eval_count', 0),
+                        'total_tokens': chunk.get('prompt_eval_count', 0) + chunk.get('eval_count', 0),
+                    }
+                self.wfile.write(f'data: {json.dumps(data)}\n\n'.encode())
+                self.wfile.flush()
+            print(f'[RESP stream] done. tool_calls_seen={tool_calls_seen}', flush=True)
+            self.wfile.write(b'data: [DONE]\n\n')
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError) as e:
+            print('[RESP stream] クライアント切断:', repr(e), flush=True)
+        except Exception as e:
+            print('[RESP stream] 予期しないエラー:', repr(e), flush=True)
+
+
+def run_proxy():
+    server = ThreadingHTTPServer(('0.0.0.0', PROXY_PORT), Handler)
+    server.serve_forever()
+
+print('=== プロキシ起動 (:11435) ===', flush=True)
+threading.Thread(target=run_proxy, daemon=True).start()
+wait_port('127.0.0.1', PROXY_PORT, timeout=30)
+
+
+# ============================================================
+# 7. ngrok起動
+# ============================================================
+print('=== ngrok起動 ===', flush=True)
+ngrok_token = ''
+try:
+    from kaggle_secrets import UserSecretsClient
+    ngrok_token = UserSecretsClient().get_secret('NGROK_AUTHTOKEN')
+except Exception as e:
+    print('★ Kaggle Secrets からの NGROK_AUTHTOKEN 取得に失敗:', repr(e), flush=True)
+    # 環境変数経由（ローカル検証用のフォールバック）
+    ngrok_token = os.environ.get('NGROK_AUTHTOKEN', '')
+
+if not ngrok_token:
+    print('★ NGROK_AUTHTOKEN が未設定です。Kaggle Secrets にこのノートブック用として個別アタッチしてください', flush=True)
+else:
+    subprocess.run(['ngrok', 'config', 'add-authtoken', ngrok_token])
+
+ngrok_log_path = '/tmp/ngrok.log'
+ngrok_log_file = open(ngrok_log_path, 'w')
+subprocess.Popen([
+    'ngrok', 'http', str(PROXY_PORT),
+    '--domain', NGROK_DOMAIN,
+    '--log', 'stdout',
+], stdout=ngrok_log_file, stderr=subprocess.STDOUT)
+
+# ngrokのローカル管理API(4040)でトンネルが実際に確立したか確認する。
+# authtoken未設定や固定ドメイン権限エラーはプロセス自体はクラッシュせず、
+# トンネルが張れないまま静かに居座ることがあるため、ここで明示的にチェックする。
+time.sleep(3)
+try:
+    with urllib.request.urlopen('http://127.0.0.1:4040/api/tunnels', timeout=5) as r:
+        tunnels = json.loads(r.read().decode())
+    if tunnels.get('tunnels'):
+        print('ngrok トンネル確立:', [t.get('public_url') for t in tunnels['tunnels']], flush=True)
+    else:
+        print('★ ngrok トンネルが確立していません（authtoken未設定/ドメイン権限エラーの可能性）', flush=True)
+        print('--- ngrok ログ (末尾) ---', flush=True)
+        subprocess.run(['bash', '-lc', f"tail -n 40 '{ngrok_log_path}' 2>/dev/null || true"])
+except Exception as e:
+    print('★ ngrok管理APIに接続できません（ngrokが起動していない可能性）:', repr(e), flush=True)
+    print('--- ngrok ログ (末尾) ---', flush=True)
+    subprocess.run(['bash', '-lc', f"tail -n 40 '{ngrok_log_path}' 2>/dev/null || true"])
+
+
+# ============================================================
+# 8. セッションID抽出（KAGGLE_CONTAINER_NAMEから数値部分を正規表現抽出）
+# ============================================================
+container_name = os.environ.get('KAGGLE_CONTAINER_NAME', '')
+# ランダム文字列部分に混じる単独の数字を誤検出しないよう、
+# ダッシュで囲まれた5桁以上の数値セグメントだけを対象にする
+# 例: kaggle_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX-344256295-webtier -> 344256295
+m = re.search(r'-(\d{5,})-', container_name)
+session_id = m.group(1) if m else None
+print('KAGGLE_CONTAINER_NAME:', container_name, '-> session_id:', session_id, flush=True)
+
+
+# ============================================================
+# 9. gas('started', sessionId, modelReady) 送信（必ずtryで囲む）
+# ============================================================
+start_iso = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+try:
+    r = gas('started', sessionId=session_id, modelReady=model_ready)
+    print('gas started ->', r, flush=True)
+except Exception as e:
+    import traceback
+    print('gas started FAILED:', repr(e), flush=True)
+    traceback.print_exc()
+
+
+# ============================================================
+# 10-11. 30秒間隔でgas('shouldStop')ポーリング。停止指示 or MAX_MINUTES到達で終了
+# ============================================================
+print('=== ポーリングループ開始 ===', flush=True)
+start_time = time.time()
+stopped_by = None
+for _ in range(10 ** 9):
+    elapsed_min = (time.time() - start_time) / 60
+    if elapsed_min >= MAX_MINUTES:
+        stopped_by = 'max_minutes'
+        break
+    try:
+        r = gas('shouldStop')
+        print(f'{elapsed_min:.1f}min alive, shouldStop={r}', flush=True)
+        if r.get('stop'):
+            stopped_by = 'requested'
+            break
+    except Exception as e:
+        print('shouldStop 呼び出し失敗（次回リトライ）:', repr(e), flush=True)
+    time.sleep(POLL_INTERVAL)
+
+print('停止理由:', stopped_by, flush=True)
+
+
+# ============================================================
+# 12. gas('record') で稼働時間確定
+# ============================================================
+try:
+    r = gas('record')
+    print('gas record ->', r, flush=True)
+except Exception as e:
+    print('gas record FAILED:', repr(e), flush=True)

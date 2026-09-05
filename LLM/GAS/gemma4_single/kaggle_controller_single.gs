@@ -41,6 +41,7 @@ var WEEKLY_LIMIT_HOURS = 30;
 var HEARTBEAT_STALE_MS = 3 * 60000;
 var ABNORMAL_MIN       = 720;
 var PROP_STOP          = "STOP_REQUESTED";
+var PROP_STATE         = "CURRENT_STATE";   // "running" | "stopping" | "stopped"
 
 // ============================================================
 // 設定の読み込み（CONFIG 優先、無ければ個別プロパティにフォールバック）
@@ -131,6 +132,19 @@ function setStopRequested(on) {
   else PROPS.deleteProperty(PROP_STOP);
 }
 function isStopRequested() { return PROPS.getProperty(PROP_STOP) === "1"; }
+
+/**
+ * 起動/停止の意図をスクリプトプロパティに書き出す。
+ * Kaggle APIへの問い合わせ結果（handleStatusのstatus）とは別に持つことで、
+ * 「停止処理中」のような遷移状態を、次にKaggle APIを叩かなくても
+ * すぐダッシュボードに返せるようにする。
+ * 実態との食い違いはmonitorTick()が定期的に検出して補正する。
+ */
+function setState(state) {
+  PROPS.setProperty(PROP_STATE, state);
+  Logger.log("state -> " + state);
+}
+function getState() { return PROPS.getProperty(PROP_STATE) || "stopped"; }
 
 // ============================================================
 // Notebook ソース
@@ -405,7 +419,8 @@ function handleStatus() {
     totalUsedMin: summary.totalMin,
     currentSessionMin: summary.currentMin,
     currentStartedAt: summary.startedAt,
-    runCount: summary.runCount
+    runCount: summary.runCount,
+    recordedState: getState()
   };
 }
 
@@ -456,6 +471,7 @@ function handleStart() {
   PROPS.deleteProperty("LAST_HEARTBEAT");
   PROPS.deleteProperty("MODEL_READY");
   appendRunStart();
+  setState("running");
 
   return { success: true, message: "起動リクエスト送信完了 (v" + out.versionNumber + ")" };
 }
@@ -470,6 +486,7 @@ function handleStop() {
 
   if (alive) {
     setStopRequested(true);
+    setState("stopping");
     return {
       success: true,
       mode: "graceful",
@@ -560,12 +577,17 @@ function handleForceStop() {
   // record が走らないので、開いたままの行をここで閉じる
   var closed = closeOpenRun();
 
+  if (code === 200) {
+    setState("stopped");
+  }
+
   if (code !== 200) {
     // cancel-session が効かない場合の最終手段。
     // GPU 無効の空ノートブックを同じスラッグに push すると、
     // 実行中のセッションが置き換えられて終了する。
     Logger.log("cancel-session 失敗 (HTTP " + code + ")。push による置き換えを試みます");
     var replaced = replaceWithIdleNotebook();
+    if (replaced.success) setState("stopped");
     return {
       success: replaced.success,
       message: replaced.success
@@ -632,6 +654,7 @@ function handleStarted(sessionId, modelReady) {
   // proxyAlive（通知が来ているか）とは意味が違うので分けておく。
   PROPS.setProperty("MODEL_READY", modelReady === "true" || modelReady === true ? "1" : "0");
   setStopRequested(false);
+  setState("running");
   return { success: true };
 }
 
@@ -645,6 +668,7 @@ function handleRecord() {
   PROPS.deleteProperty("LAST_HEARTBEAT");
   PROPS.deleteProperty("SESSION_ID");
   PROPS.deleteProperty("MODEL_READY");
+  setState("stopped");
   var closed = closeOpenRun();
   if (!closed) return { success: false, message: "未クローズの行がありません" };
   return { success: true, durationMin: closed.durationMin };
@@ -673,7 +697,9 @@ function monitorTick() {
   var hasOpenRun = log.length > 0 && log[log.length - 1].e === null;
 
   if (!hasOpenRun) {
-    // 記録上「稼働中」の行が無いなら、何もすることがない
+    // 記録上「稼働中」の行が無いなら、状態確認はスキップする。
+    // ただし実行自体は生きていることが分かるよう1行だけ残す。
+    Logger.log("monitorTick: 稼働中の記録なし。スキップ");
     return;
   }
 
@@ -695,7 +721,7 @@ function monitorTick() {
     // Kaggle上は動いているがnotebookが応答しない = 詰まっている。
     // 強制停止して記録を閉じ、次回起動できる状態に戻す。
     Logger.log("monitorTick: zombie検出。強制停止します");
-    handleForceStop();
+    handleForceStop();   // 内部で setState("stopped") される
     return;
   }
 
@@ -707,6 +733,7 @@ function monitorTick() {
     PROPS.deleteProperty("SESSION_ID");
     PROPS.deleteProperty("MODEL_READY");
     setStopRequested(false);
+    setState("stopped");
     closeOpenRun();
   }
 }
@@ -728,6 +755,8 @@ function removeMonitorTrigger() {
 }
 
 function testMonitorTick() { monitorTick(); Logger.log("実行しました"); }
+function testState() { Logger.log("CURRENT_STATE: " + getState()); }
+function resetState() { setState("stopped"); Logger.log("stoppedにリセットしました"); }
 
 // ============================================================
 // テスト関数

@@ -37,6 +37,8 @@ var BOOT_GRACE_MS       = 15 * 60000;  // 起動リクエストから初回ハ�
 var ABNORMAL_MIN        = 720;         // 12時間超の記録は異常値として週間集計から除外
 var USAGE_LOG_MAX       = 120;
 var PROP_STOP           = "STOP_REQUESTED";
+var PROP_STOP_AT        = "STOP_REQUESTED_AT";
+var STOP_STUCK_MS       = 5 * 60000;   // 停止指示からこの時間応答がなければ「詰まった停止」とみなす
 
 // ============================================================
 // CONFIG の読み込み
@@ -100,9 +102,19 @@ function fetchWithRetry(url, options) {
   throw new Error("リトライ失敗: " + JSON.stringify(lastError));
 }
 
+/**
+ * 停止指示のON/OFFを、時刻付きで記録する。
+ * 時刻を持たせることで、「停止を指示したのに一向に反映されない」
+ * 詰まった状態を monitorTick() が検出できるようにする。
+ */
 function setStopRequested(on) {
-  if (on) PROPS.setProperty(PROP_STOP, "1");
-  else PROPS.deleteProperty(PROP_STOP);
+  if (on) {
+    PROPS.setProperty(PROP_STOP, "1");
+    PROPS.setProperty(PROP_STOP_AT, new Date().toISOString());
+  } else {
+    PROPS.deleteProperty(PROP_STOP);
+    PROPS.deleteProperty(PROP_STOP_AT);
+  }
 }
 function isStopRequested() { return PROPS.getProperty(PROP_STOP) === "1"; }
 
@@ -207,6 +219,11 @@ function closeOpenRun() {
     }
   }
   return null;
+}
+
+function hasOpenRun() {
+  var log = getUsageLog();
+  return log.length > 0 && (log[log.length - 1].e === null || log[log.length - 1].e === undefined);
 }
 
 // 週の起点は土曜0時UTC
@@ -325,6 +342,10 @@ function handleStatus() {
   // ハートビートを一度でも受け取った後に途絶した（かつ停止指示もしていない）= 異常終了の疑い
   var zombie = !!hb && !aliveByHeartbeat && !stopReq && !withinBootGrace;
 
+  // 停止を指示したのに、猶予時間を過ぎても反映されない = 詰まっている
+  var stopAt = PROPS.getProperty(PROP_STOP_AT);
+  var stopStuck = stopReq && stopAt && (now - new Date(stopAt)) > STOP_STUCK_MS;
+
   var used = getWeeklyUsedMinutes();
   var result = {
     success: true,
@@ -336,6 +357,7 @@ function handleStatus() {
     lastHeartbeat: hb || null,
     zombie: zombie,
     stopRequested: stopReq,
+    stopStuck: stopStuck,
     sessionId: PROPS.getProperty("SESSION_ID") || null,
     baseUrl: "https://" + c.ngrokDomain + "/v1",
     weeklyUsedMin: used,
@@ -544,6 +566,82 @@ function handleRecord() {
 }
 
 // ============================================================
+// 自律監視（1分おきのトリガー）
+// ============================================================
+// ダッシュボードの画面を誰も見ていなくても、このGAS自身が1分ごとに
+// 自分の状態を確認し、次の3つを検出して記録を正しく保つ。
+//
+//   1. ハートビートが途絶した（zombie）= Kaggleが自動終了した、
+//      または他の人がKaggleの画面から直接止めた
+//   2. 起動を指示したのに、猶予時間を過ぎても一度もハートビートが
+//      来ないまま「stopped」になっている = 起動に静かに失敗した
+//   3. 停止を指示したのに、猶予時間を過ぎても反映されない
+//      = 停止処理が詰まっている
+//
+// いずれも handleForceStopInternal() で記録を閉じ、次回起動できる
+// 状態に戻す。
+
+function monitorTick() {
+  if (!hasOpenRun()) {
+    // 記録上「稼働中」の行が無いなら、確認することがない。
+    // ただし実行自体は生きていることが分かるよう1行だけ残す。
+    Logger.log("monitorTick: 稼働中の記録なし。スキップ");
+    return;
+  }
+
+  var st;
+  try {
+    st = handleStatus();
+  } catch (err) {
+    Logger.log("monitorTick: ステータス取得に失敗: " + err.message);
+    return;
+  }
+
+  if (st.zombie) {
+    Logger.log("monitorTick: zombie検出（ハートビート途絶）。強制停止します");
+    try { handleForceStopInternal(); }
+    catch (e) { Logger.log("monitorTick: 強制停止に失敗: " + e.message); }
+    return;
+  }
+
+  if (st.stopStuck) {
+    Logger.log("monitorTick: 停止指示から" + (STOP_STUCK_MS / 60000) + "分応答なし。強制停止します");
+    try { handleForceStopInternal(); }
+    catch (e) { Logger.log("monitorTick: 強制停止に失敗: " + e.message); }
+    return;
+  }
+
+  if (st.status === "stopped" && !st.stopRequested) {
+    // 起動猶予も過ぎ、ハートビートも一度も来ず、こちらから停止も
+    // 指示していないのに記録上は稼働中のまま = 起動が静かに失敗していた
+    Logger.log("monitorTick: 起動失敗を検知（一度もハートビートなし）。記録を閉じます");
+    closeOpenRun();
+    PROPS.deleteProperty("START_REQUESTED_AT");
+    return;
+  }
+
+  // running / booting / stopping はそのまま様子を見る（ログは残さない）
+}
+
+/** 1分おきのトリガーを設定する。一度だけ実行すればよい */
+function setupMonitorTrigger() {
+  removeMonitorTrigger();
+  ScriptApp.newTrigger("monitorTick").timeBased().everyMinutes(1).create();
+  Logger.log("1分おきの監視トリガーを設定しました");
+}
+
+function removeMonitorTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "monitorTick") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+}
+
+function testMonitorTick() { monitorTick(); Logger.log("実行しました"); }
+
+// ============================================================
 // テスト関数（GASエディタから手動実行する）
 // ============================================================
 
@@ -605,4 +703,22 @@ function printConfigTemplate() {
     datasets: ["matsuda2026/ngrok-binary", "matsuda2026/ollama-qwen3-8-27b"],
     gasWebappUrl: ""
   }, null, 2));
+}
+
+function inspectRawLog() {
+  var raw = PROPS.getProperty("USAGE_LOG")
+  Logger.log("型: " + typeof raw)
+  Logger.log("長さ: " + (raw ? raw.length : 0))
+  Logger.log("先頭200文字: " + (raw ? raw.substring(0, 200) : "(null)"))
+  try {
+    var parsed = JSON.parse(raw)
+    Logger.log("パース後の型: " + typeof parsed + " / Array.isArray: " + Array.isArray(parsed))
+  } catch (e) {
+    Logger.log("JSONパース失敗: " + e.message)
+  }
+}
+
+function resetLog() {
+  PROPS.setProperty("USAGE_LOG", JSON.stringify([]))
+  Logger.log("USAGE_LOG を空配列にリセットしました")
 }
