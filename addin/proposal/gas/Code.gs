@@ -108,7 +108,7 @@ ${sourceText}
     });
 
     const body = safeParseJson(res.getContentText(), null);
-    if (!body) return respond({ error: "AI API response was not valid JSON: " + res.getContentText().slice(0, 300) });
+    if (!body) return respond({ error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()}): ` + res.getContentText().slice(0, 300) });
     if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
     const textBlock = (body.content || []).find(c => c.type === "text");
     const parsed = safeParseJson(textBlock && textBlock.text, { items: [] });
@@ -158,7 +158,7 @@ ${req.text}
     muteHttpExceptions: true,
   });
   const body = safeParseJson(res.getContentText(), null);
-  if (!body) return respond({ error: "AI API response was not valid JSON: " + res.getContentText().slice(0, 300) });
+  if (!body) return respond({ error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()}): ` + res.getContentText().slice(0, 300) });
   if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
   const textBlock = (body.content || []).find(c => c.type === "text");
   const parsed = safeParseJson(textBlock && textBlock.text, { results: [] });
