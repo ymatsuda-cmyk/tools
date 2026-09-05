@@ -13,7 +13,7 @@ Excelの操作とAI呼び出しのロジックは両アドインで共有する 
 ## ファイル構成
 
 ```
-roi-knowledge/
+proposal/
 ├── manifest.xml          … 提案ナレッジアドイン本体のマニフェスト
 ├── index.html / app.js   … 提案ナレッジの詳細UI（3タブ）
 ├── roi-core.js           … 共有ライブラリ（Excel操作・AI呼び出し。DOM非依存）
@@ -26,11 +26,11 @@ roi-knowledge/
 
 営業報告アドイン（`eigyo/`）側の変更は最小限です。
 
-1. `roi-core.js` と `eigyo-roi-panel.js` を同じGitHub Pagesリポジトリに配置し、営業報告の `index.html` の `<head>` に追加する（`app.js` の前）。
+1. `roi-core.js` と `eigyo-roi-panel.js` を、営業報告アドインと同じ `tools/addin/` 直下の兄弟フォルダ `proposal/` に配置する（このリポジトリの実際の構成）。営業報告の `index.html` の `<head>` には、絶対URLではなく**相対パス**で追加する（`eigyo/` と `proposal/` が兄弟フォルダのため）。
 
    ```html
-   <script src="https://ymatsuda-cmyk.github.io/tools/addin/roi-knowledge/roi-core.js"></script>
-   <script src="https://ymatsuda-cmyk.github.io/tools/addin/roi-knowledge/eigyo-roi-panel.js"></script>
+   <script src="../proposal/roi-core.js"></script>
+   <script src="../proposal/eigyo-roi-panel.js"></script>
    ```
 
 2. 編集画面（ステージタブ式モーダル）のHTMLに、マウント先を1つ追加する（備考欄の近くなど、どのステージでも見える位置を推奨）。
@@ -92,7 +92,7 @@ roi-knowledge/
 
 ## デプロイ手順（GitHub Pages）
 
-1. `manifest.xml` `index.html` `app.js` `roi-core.js` `style.css` `commands.html` `commands.js` `icons/` 一式を、営業報告アドインと同じリポジトリの `tools/addin/roi-knowledge/` に配置
+1. `manifest.xml` `index.html` `app.js` `roi-core.js` `style.css` `commands.html` `commands.js` `icons/` 一式を、営業報告アドインと同じリポジトリの `tools/addin/proposal/` に配置
 2. `icons/` は暫定的に営業報告アドインのアイコンを流用。実運用前に差し替える
 3. `manifest.xml` をサイドロード、または管理センターから組織展開
 4. Excelで対象ブックを開き、ホームタブの「提案ナレッジ」ボタンでタスクペインを表示

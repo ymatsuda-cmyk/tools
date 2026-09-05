@@ -140,7 +140,7 @@ async function runExtraction() {
     setStatus("");
   } catch (e) {
     console.warn(e);
-    setStatus("抽出に失敗しました。エンドポイントの設定を確認してください");
+    setStatus(e.message || "抽出に失敗しました。エンドポイントの設定を確認してください");
   }
 }
 

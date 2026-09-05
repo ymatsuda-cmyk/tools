@@ -208,7 +208,14 @@
       }),
     });
     const raw = await res.text();
-    const data = JSON.parse(raw);
+    console.log("[RoiCore] extraction raw response:", raw);
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
+    }
+    if (data.error) throw new Error("GASエラー: " + data.error);
     return data.items || [];
   }
 
@@ -316,7 +323,15 @@
       method: "POST",
       body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, text: combinedText, categories: categoryDefs }),
     });
-    const data = JSON.parse(await res.text());
+    const raw = await res.text();
+    console.log("[RoiCore] auto-extraction raw response:", raw);
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
+    }
+    if (data.error) throw new Error("GASエラー: " + data.error);
     const results = data.results || [];
     for (const r of results) {
       if (r.items && r.items.length) await applyCategoryToCalcSheet(caseId, r.category, r.items, hearingIds);

@@ -114,7 +114,7 @@
         await refreshList();
       } catch (e) {
         console.warn(e);
-        setStatus("抽出に失敗しました");
+        setStatus(e.message || "抽出に失敗しました");
       }
     });
 
