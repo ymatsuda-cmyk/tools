@@ -173,17 +173,46 @@ function testUrlOnlyFetch() {
   Logger.log("先頭200文字: " + text.slice(0, 200));
 }
 
+/* 動作確認用。ブラウザでURLを直接開いたときに「スクリプト関数が見つかりません」
+ * ではなく分かりやすい応答が返るようにする。実行数ログにも残る。 */
+function doGet(e) {
+  Logger.log("[doGet] called at " + new Date().toISOString());
+  return respond({ status: "ok", time: new Date().toISOString(), note: "この提案ナレッジWebアプリは動作しています（doGet）" });
+}
+
+/* ブラウザがpreflight（OPTIONS）を送ってきた場合の応答。
+ * GAS Web Appはカスタムヘッダーを自由に設定できないため気休め程度だが、
+ * 何も応答しないよりは良い。 */
+function doOptions(e) {
+  Logger.log("[doOptions] called");
+  return ContentService.createTextOutput("");
+}
+
 function doPost(e) {
+  // ここが実行数ログに出るかどうかで、「GASまで届いているか」を切り分けられる。
+  try {
+    const bodyLen = e && e.postData && e.postData.contents ? e.postData.contents.length : -1;
+    const contentType = e && e.postData ? e.postData.type : "(none)";
+    Logger.log("[doPost] called at " + new Date().toISOString()
+      + " / bodyLength=" + bodyLen + " / contentType=" + contentType);
+  } catch (logErr) {
+    Logger.log("[doPost] logging failed: " + String(logErr));
+  }
+
   try {
     const req = JSON.parse(e.postData.contents);
+    Logger.log("[doPost] mode=" + (req.mode || "(single)") + " caseId=" + req.caseId);
 
     if (SHARED_TOKEN && req.token !== SHARED_TOKEN) {
+      Logger.log("[doPost] unauthorized: token mismatch");
       return respond({ error: "unauthorized" });
     }
 
-    if (req.mode === "auto") return handleAutoMode(req);
-    return handleSingleCategoryMode(req);
+    const result = (req.mode === "auto") ? handleAutoMode(req) : handleSingleCategoryMode(req);
+    Logger.log("[doPost] responded OK");
+    return result;
   } catch (err) {
+    Logger.log("[doPost] ERROR: " + String(err) + (err && err.stack ? ("\n" + err.stack) : ""));
     return respond({ error: String(err) });
   }
 }
