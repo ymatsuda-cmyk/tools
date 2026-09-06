@@ -29,7 +29,6 @@ async function init() {
   const { demo } = await RoiCore.ensureAllSheets();
   demoMode = demo;
   document.getElementById("demo-badge").style.display = demoMode ? "" : "none";
-  renderCategorySelect();
   await renderCaseIdList();
 }
 
@@ -40,11 +39,25 @@ function bindStaticUI() {
   document.getElementById("cfg-close-btn").addEventListener("click", closeSettings);
   document.getElementById("cfg-save-btn").addEventListener("click", saveSettings);
 
+  ["case-select", "case-select-2", "case-select-3"].forEach(id => {
+    document.getElementById(id).addEventListener("change", async (e) => {
+      await selectCase(e.target.value);
+      if (id !== "case-select" && e.target.value) await loadProposal();
+    });
+  });
+
+  document.getElementById("add-log-btn").addEventListener("click", () => {
+    const f = document.getElementById("log-form");
+    f.style.display = f.style.display === "none" ? "" : "none";
+  });
+  document.getElementById("cancel-log-btn").addEventListener("click", () => {
+    document.getElementById("log-form").style.display = "none";
+  });
   document.getElementById("save-log-btn").addEventListener("click", saveHearingLog);
   document.getElementById("extract-btn").addEventListener("click", runExtraction);
-  document.getElementById("case-id").addEventListener("change", loadHearingLogForCase);
+  document.getElementById("apply-extract-btn").addEventListener("click", applyExtraction);
+  document.getElementById("cancel-extract-btn").addEventListener("click", cancelExtraction);
 
-  document.getElementById("load-proposal-btn").addEventListener("click", loadProposal);
   document.getElementById("build-prompt-btn").addEventListener("click", buildPrompt);
 }
 
@@ -52,8 +65,6 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
   document.getElementById("pane-" + tab).classList.add("active");
-  const cur = document.getElementById("case-id").value;
-  ["case-id-2", "case-id-3"].forEach(id => { document.getElementById(id).value = cur; });
 }
 
 /* ---------- 設定 ---------- */
@@ -73,13 +84,77 @@ function saveSettings() {
 }
 
 /* ---------- 候補一覧 ---------- */
+let caseOptions = [];
+
 async function renderCaseIdList() {
-  const ids = demoMode ? ["KM-01", "OF-02"] : await RoiCore.listCaseIds();
-  document.getElementById("case-id-list").innerHTML = ids.map(id => `<option value="${escAttr(id)}">`).join("");
+  caseOptions = demoMode
+    ? [{ caseId: "KM-01", label: "KM-01 ／ kakimoto arms" }, { caseId: "OF-02", label: "OF-02 ／ 大石フーズ" }]
+    : await RoiCore.listCaseIds();
+  const opts = `<option value="">案件を選択してください</option>` +
+    caseOptions.map(c => `<option value="${escAttr(c.caseId)}">${escHtml(c.label)}</option>`).join("");
+  ["case-select", "case-select-2", "case-select-3"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+  await renderCaseOverview();
 }
-function renderCategorySelect() {
-  const cats = RoiCore.getCategories();
-  document.getElementById("category-select").innerHTML = cats.map(c => `<option value="${escAttr(c)}">${escHtml(c)}</option>`).join("");
+
+function caseLabelOf(caseId) {
+  const c = caseOptions.find(x => x.caseId === caseId);
+  return c ? c.label : caseId;
+}
+
+/* 案件を選ぶ（3タブ間で共有） */
+async function selectCase(caseId) {
+  ["case-id", "case-id-2", "case-id-3"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = caseId;
+  });
+  ["case-select", "case-select-2", "case-select-3"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = caseId;
+  });
+  document.getElementById("hearing-area").style.display = caseId ? "" : "none";
+  if (caseId) await loadHearingLogForCase();
+}
+
+/* ---------- 案件の状況（未抽出はグレー表示、タップで②タブへ） ---------- */
+async function renderCaseOverview() {
+  const el = document.getElementById("case-overview");
+  if (!el) return;
+  const stats = demoMode ? [] : await RoiCore.listCasesWithHearings();
+  if (!stats.length) { el.innerHTML = `<div class="meta">まだ議事録が登録されていません</div>`; return; }
+  stats.sort((a, b) => b.issueCount - a.issueCount);
+  el.innerHTML = stats.map(s => {
+    const done = s.issueCount > 0;
+    return `
+    <div class="case-row${done ? " done" : ""}" data-case="${escAttr(s.caseId)}">
+      <div class="c-main">
+        <div class="c-id">${escHtml(s.caseId)}</div>
+        <div class="c-title">${escHtml(stripId(caseLabelOf(s.caseId)))}</div>
+        <div class="c-sub">議事録 ${s.hearingCount}件</div>
+      </div>
+      <div class="c-count">
+        ${done ? `<b>${s.issueCount}</b><span>課題</span>` : `<span class="c-none">未抽出</span>`}
+      </div>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".case-row").forEach(row => {
+    row.addEventListener("click", async () => {
+      const caseId = row.dataset.case;
+      await selectCase(caseId);
+      // 抽出済みなら②提案タブへ、未抽出なら①に留まり議事録を見せる
+      if (row.classList.contains("done")) {
+        switchTab("proposal");
+        await loadProposal();
+      }
+    });
+  });
+}
+function stripId(label) {
+  const i = label.indexOf("／");
+  return i >= 0 ? label.slice(i + 1).trim() : label;
 }
 
 /* ============================================================
@@ -87,21 +162,21 @@ function renderCategorySelect() {
    ============================================================ */
 async function saveHearingLog() {
   const caseId = document.getElementById("case-id").value.trim();
-  const category = document.getElementById("category-select").value;
-  const speaker = document.getElementById("speaker-select").value;
+  const title = document.getElementById("log-title").value.trim();
   const text = document.getElementById("hearing-text").value.trim();
   const url = document.getElementById("hearing-url").value.trim();
-  if (!caseId) { setStatus("案件IDを入力してください"); return; }
-  if (!text && !url) { setStatus("発言・メモかURLのどちらかを入力してください"); return; }
+  if (!caseId) { setStatus("案件を選択してください"); return; }
+  if (!text && !url) { setStatus("本文かURLのどちらかを入力してください"); return; }
 
   if (demoMode) { setStatus("デモモードのため保存はシミュレーションのみです"); }
   else {
-    await RoiCore.appendHearingLog(caseId, category, speaker, { text, url });
-    setStatus("議事録に記録しました");
+    await RoiCore.appendHearingLog(caseId, title || "議事録", { text, url });
+    setStatus("議事録に追加しました");
   }
-  document.getElementById("hearing-text").value = "";
-  document.getElementById("hearing-url").value = "";
+  ["log-title", "hearing-text", "hearing-url"].forEach(id => { document.getElementById(id).value = ""; });
+  document.getElementById("log-form").style.display = "none";
   await loadHearingLogForCase();
+  await renderCaseOverview();
 }
 
 async function loadHearingLogForCase() {
@@ -109,62 +184,109 @@ async function loadHearingLogForCase() {
   const list = document.getElementById("hearing-log-list");
   if (!caseId) { list.innerHTML = ""; return; }
   const rows = demoMode ? [] : await RoiCore.listHearingLogs(caseId);
+  document.getElementById("hearing-count").textContent = `この案件の議事録（${rows.length}件）`;
+  document.getElementById("extract-btn").textContent =
+    rows.length ? `${rows.length}件の議事録から課題を抽出` : "課題を抽出";
   list.innerHTML = rows.map(r => `
     <div class="log-item">
-      <div class="meta">${escHtml(r.category || "")} ／ ${escHtml(r.speaker || "")} ／ ${escHtml(r.registeredAt || "")}</div>
-      ${r.url ? `<div class="meta"><a href="${escAttr(r.url)}" target="_blank" rel="noopener">${escHtml(r.url)}</a></div>` : ""}
-      <div class="text">${escHtml(r.text || "")}</div>
-    </div>`).join("") || `<div class="meta">まだ記録がありません</div>`;
+      <div class="log-top">
+        <span class="log-title">${escHtml(r.title)}</span>
+        <span class="log-date">${escHtml((r.registeredAt || "").slice(5, 10))}</span>
+      </div>
+      ${r.url ? `<div class="log-url"><a href="${escAttr(r.url)}" target="_blank" rel="noopener">${escHtml(r.url)}</a></div>` : ""}
+      ${r.text ? `<div class="log-text">${escHtml(r.text.slice(0, 60))}${r.text.length > 60 ? "…" : ""}</div>` : ""}
+    </div>`).join("") || `<div class="meta">まだ議事録がありません</div>`;
 }
 
-/* ---------- AI抽出（議事録から複数の課題を抽出） ----------
- * 1つの議事録に複数の課題が含まれる前提で、課題カテゴリ・課題内容・
- * ROI数値をまとめて抽出する。抽出結果は確認用に一覧表示し、
- * そのままROI試算シート・抽出課題シートへ保存される。 */
+/* ---------- 課題抽出（差分確認つき） ---------- */
+let pendingExtraction = null;
+
 async function runExtraction() {
   const caseId = document.getElementById("case-id").value.trim();
-  const text = document.getElementById("hearing-text").value.trim();
-  const url = document.getElementById("hearing-url").value.trim();
-  if (!caseId) { setStatus("案件IDを入力してください"); return; }
-
+  if (!caseId) { setStatus("案件を選択してください"); return; }
   const cfg = RoiCore.getConfig();
   if (!cfg.webhookUrl) { setStatus("設定（⚙）でAI連携エンドポイントを登録してください"); return; }
 
   setStatus("議事録から課題を抽出中…");
   try {
-    // 未記録のテキスト・URLがあれば、抽出対象に含めるため先に記録する
-    if (text || url) {
-      const category = document.getElementById("category-select").value;
-      const speaker = document.getElementById("speaker-select").value;
-      if (!demoMode) await RoiCore.appendHearingLog(caseId, category, speaker, { text, url });
-      document.getElementById("hearing-text").value = "";
-      document.getElementById("hearing-url").value = "";
-      await loadHearingLogForCase();
-    }
-
-    const results = demoMode ? [] : await RoiCore.autoExtractProposals(caseId);
-    renderExtractResults(results);
-    setStatus(results.length ? `${results.length}件の課題を抽出しました` : "課題は抽出されませんでした");
+    const preview = demoMode ? { hearingIds: [], results: [] } : await RoiCore.previewExtraction(caseId);
+    if (!preview.results.length) { setStatus("課題は抽出されませんでした"); return; }
+    pendingExtraction = { caseId, ...preview };
+    renderExtractDiff();
+    setStatus("");
   } catch (e) {
     console.warn(e);
     setStatus(e.message || "抽出に失敗しました。エンドポイントの設定を確認してください");
   }
 }
 
-function renderExtractResults(results) {
+function renderExtractDiff() {
   const box = document.getElementById("extract-review");
   const wrap = document.getElementById("extract-items");
-  if (!results.length) { box.style.display = "none"; return; }
-  wrap.innerHTML = results.map(r => `
-    <div class="review-item">
-      <div class="item-head">
-        <span>${escHtml(r.title)}</span>
-        <span style="font-size:10px;color:#185fa5;background:#e6f1fb;padding:1px 7px;border-radius:8px">${escHtml(r.category)}</span>
+  wrap.innerHTML = pendingExtraction.results.map((r, i) => {
+    if (r.status === "新規") {
+      return `
+      <div class="diff-card new">
+        <div class="diff-head"><span class="diff-cat">${escHtml(r.category)}</span>
+          <span class="tag-new">新規</span></div>
+        <div class="diff-title">${escHtml(r.newTitle)}</div>
+        <div class="diff-text">${escHtml(r.newSummary)}</div>
+      </div>`;
+    }
+    if (r.status === "未編集") {
+      return `
+      <div class="diff-card">
+        <div class="diff-head"><span class="diff-cat">${escHtml(r.category)}</span>
+          <span class="tag-plain">未編集</span></div>
+        <div class="diff-title">${escHtml(r.newTitle)}</div>
+        <div class="diff-text">${escHtml(r.newSummary)}</div>
+        <div class="hint-sm">編集されていないため自動で更新します</div>
+      </div>`;
+    }
+    return `
+    <div class="diff-card">
+      <div class="diff-head"><span class="diff-cat">${escHtml(r.category)}</span>
+        <span class="tag-edited">編集済み</span></div>
+      <div class="diff-block cur">
+        <div class="diff-label">現在（営業が編集）</div>
+        <div class="diff-title">${escHtml(r.current.title)}</div>
+        <div class="diff-text">${escHtml(r.current.summary)}</div>
       </div>
-      <div style="font-size:11px;color:#5f5e5a;line-height:1.6">${escHtml(r.summary)}</div>
-      <div style="font-size:10px;color:#888780">${r.itemCount ? `ROI数値 ${r.itemCount}件を反映` : "数値なし（解決案のみ提示）"}</div>
-    </div>`).join("");
+      <div class="diff-block nw">
+        <div class="diff-label">新しい抽出結果</div>
+        <div class="diff-title">${escHtml(r.newTitle)}</div>
+        <div class="diff-text">${escHtml(r.newSummary)}</div>
+      </div>
+      <div class="choice-row">
+        <button class="btn btn-sm${r.keepText ? " btn-accent" : ""}" data-keep="${i}" data-v="1">残す</button>
+        <button class="btn btn-sm${r.keepText ? "" : " btn-accent"}" data-keep="${i}" data-v="0">上書き</button>
+      </div>
+      <div class="hint-sm">数値（棚卸人数など）は選択に関わらず更新されます</div>
+    </div>`;
+  }).join("");
+
+  wrap.querySelectorAll("[data-keep]").forEach(b => {
+    b.addEventListener("click", () => {
+      pendingExtraction.results[+b.dataset.keep].keepText = b.dataset.v === "1";
+      renderExtractDiff();
+    });
+  });
   box.style.display = "";
+}
+
+function cancelExtraction() {
+  pendingExtraction = null;
+  document.getElementById("extract-review").style.display = "none";
+}
+
+async function applyExtraction() {
+  if (!pendingExtraction) return;
+  const { caseId, hearingIds, results } = pendingExtraction;
+  setStatus("反映中…");
+  if (!demoMode) await RoiCore.commitExtraction(caseId, hearingIds, results);
+  cancelExtraction();
+  setStatus(`${results.length}件の課題を反映しました`);
+  await renderCaseOverview();
 }
 
 /* ============================================================

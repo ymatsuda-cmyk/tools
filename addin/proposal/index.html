@@ -33,54 +33,64 @@
   <section id="pane-hearing" class="pane active">
 
     <div class="field-row">
-      <label>案件ID</label>
-      <input id="case-id" list="case-id-list" placeholder="例: KM-01">
-      <datalist id="case-id-list"></datalist>
-    </div>
-    <div class="field-row">
-      <label>課題カテゴリ</label>
-      <select id="category-select"></select>
+      <label>案件</label>
+      <select id="case-select"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id">
     </div>
 
-    <div class="field-row">
-      <label>発言者</label>
-      <select id="speaker-select">
-        <option value="顧客">顧客</option>
-        <option value="自社">自社</option>
-      </select>
-    </div>
-    <div class="field-row">
-      <label>参照URL</label>
-      <input id="hearing-url" placeholder="議事録ビューア等へのリンク（任意）">
-    </div>
-    <div class="field-row col">
-      <label>発言・メモ</label>
-      <textarea id="hearing-text" rows="5" placeholder="議事録の文字起こし、または要点メモを貼り付け（URLのみでも可）"></textarea>
+    <div id="hearing-area" style="display:none">
+      <div class="mini-box" style="margin-bottom:12px">
+        <div class="box-head">
+          <span id="hearing-count">この案件の議事録</span>
+          <button id="add-log-btn" class="btn btn-sm">＋ 追加</button>
+        </div>
+        <div id="hearing-log-list" class="log-list"></div>
+      </div>
+
+      <div id="log-form" style="display:none">
+        <div class="field-row col">
+          <label>タイトル</label>
+          <input id="log-title" placeholder="例: 初回訪問ヒアリング">
+        </div>
+        <div class="field-row col">
+          <label>参照URL</label>
+          <input id="hearing-url" placeholder="議事録ビューア等へのリンク（任意）">
+        </div>
+        <div class="field-row col">
+          <label>本文</label>
+          <textarea id="hearing-text" rows="5" placeholder="議事録の文字起こし、または要点メモを貼り付け（URLのみでも可）"></textarea>
+        </div>
+        <div class="btn-row">
+          <button id="save-log-btn" class="btn btn-accent">議事録に追加</button>
+          <button id="cancel-log-btn" class="btn">取消</button>
+        </div>
+      </div>
+
+      <button id="extract-btn" class="btn btn-accent" style="width:100%">課題を抽出</button>
+      <div id="extract-status" class="status-line"></div>
+
+      <div id="extract-review" style="display:none">
+        <div class="review-title">再抽出の結果を反映しますか</div>
+        <div class="hint-sm" style="margin-bottom:8px">編集済みの課題は既定で「残す」になっています</div>
+        <div id="extract-items"></div>
+        <div class="btn-row">
+          <button id="cancel-extract-btn" class="btn">取消</button>
+          <button id="apply-extract-btn" class="btn btn-accent" style="flex:2">選択した内容で反映</button>
+        </div>
+      </div>
     </div>
 
-    <div class="btn-row">
-      <button id="save-log-btn" class="btn">発言を議事録に記録</button>
-      <button id="extract-btn" class="btn btn-accent">AIで課題を抽出</button>
-    </div>
-
-    <div id="extract-status" class="status-line"></div>
-
-    <div id="extract-review" class="review-list" style="display:none">
-      <div class="review-title">抽出された課題（②提案タブで試算・解決策を検討できます）</div>
-      <div id="extract-items"></div>
-    </div>
-
-    <div class="section-title">この案件の議事録ログ</div>
-    <div id="hearing-log-list" class="log-list"></div>
+    <div class="section-title">案件の状況</div>
+    <div id="case-overview"></div>
   </section>
 
   <!-- ====== ② 提案 ====== -->
   <section id="pane-proposal" class="pane">
-    <div class="field-row">
-      <label>案件ID</label>
-      <input id="case-id-2" list="case-id-list" placeholder="例: KM-01">
+    <div class="field-row col">
+      <label>案件</label>
+      <select id="case-select-2"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id-2">
     </div>
-    <button id="load-proposal-btn" class="btn">この案件の課題を表示</button>
 
     <div id="totals" class="totals-box" style="display:none">
       <div class="totals-grid">
@@ -102,11 +112,12 @@
 
   <!-- ====== ③ プロンプト出力 ====== -->
   <section id="pane-prompt" class="pane">
-    <div class="field-row">
-      <label>案件ID</label>
-      <input id="case-id-3" list="case-id-list" placeholder="例: KM-01">
+    <div class="field-row col">
+      <label>案件</label>
+      <select id="case-select-3"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id-3">
     </div>
-    <button id="build-prompt-btn" class="btn">選択済みの課題からプロンプトを組み立て</button>
+    <button id="build-prompt-btn" class="btn">提案に含めた課題からプロンプトを組み立て</button>
 
     <div id="prompt-output"></div>
   </section>

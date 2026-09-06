@@ -95,6 +95,47 @@ textarea { resize: vertical; }
   border-top: 1px solid #d3d1c7; margin-top: 10px; padding-top: 10px; font-size: 12px;
 }
 
+/* ---- ①タブ：案件一覧・議事録・差分確認 ---- */
+.btn-sm { font-size: 11px; padding: 4px 10px; flex: none; width: auto; }
+.box-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.box-head > span { font-size: 11px; font-weight: 600; color: #5f5e5a; }
+
+.log-item { background: #fff; border: 1px solid #e5e3da; border-radius: 6px; padding: 7px 9px; margin-bottom: 4px; }
+.log-top { display: flex; justify-content: space-between; align-items: baseline; }
+.log-title { font-size: 11px; font-weight: 600; }
+.log-date { font-size: 10px; color: #888780; }
+.log-url { font-size: 10px; color: #185fa5; word-break: break-all; }
+.log-text { font-size: 10px; color: #5f5e5a; line-height: 1.5; margin-top: 2px; }
+
+.case-row { display: flex; align-items: center; gap: 10px; background: #fafaf8;
+  border-radius: 8px; padding: 9px 10px; margin-bottom: 5px; cursor: pointer; opacity: 0.6; }
+.case-row.done { opacity: 1; border-left: 3px solid #185fa5; }
+.case-row:hover { background: #f1efe8; }
+.case-row .c-main { flex: 1; min-width: 0; }
+.case-row .c-id { font-size: 10px; color: #888780; }
+.case-row .c-title { font-size: 12px; font-weight: 600; }
+.case-row .c-sub { font-size: 10px; color: #888780; }
+.case-row .c-count { text-align: right; flex: none; }
+.case-row .c-count b { font-size: 17px; display: block; }
+.case-row .c-count span { font-size: 10px; color: #888780; }
+.case-row .c-none { font-size: 11px; color: #888780; }
+
+.diff-card { border: 1px solid #e5e3da; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fff; }
+.diff-card.new { border: 2px solid #1d9e75; }
+.diff-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.diff-cat { font-size: 12px; font-weight: 600; }
+.tag-new { font-size: 10px; background: #e1f5ee; color: #0f6e56; padding: 1px 7px; border-radius: 8px; }
+.tag-edited { font-size: 10px; background: #faeeda; color: #854f0b; padding: 1px 7px; border-radius: 8px; }
+.tag-plain { font-size: 10px; background: #f1efe8; color: #888780; padding: 1px 7px; border-radius: 8px; }
+.diff-block { border-radius: 6px; padding: 8px; margin-bottom: 6px; }
+.diff-block.cur { background: #fafaf8; }
+.diff-block.nw { background: #e6f1fb; }
+.diff-label { font-size: 10px; color: #888780; margin-bottom: 3px; }
+.diff-block.nw .diff-label { color: #185fa5; }
+.diff-title { font-size: 12px; font-weight: 600; line-height: 1.5; }
+.diff-text { font-size: 11px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
+.choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.choice-row .btn { width: auto; }
 /* ---- ②提案タブ：合計・アコーディオン・ウィザード ---- */
 .totals-box { background: #e6f1fb; border-radius: 10px; padding: 12px; margin: 10px 0; }
 .totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

@@ -28,7 +28,8 @@
   // 参照URL: PLAUD/Notion等、既存の議事録ビューアに保管されているテキストへの
   // リンクだけを持たせるケースを想定した列。発言テキストは空でもよい。
   // 議事録ID: ROI試算側から「どの議事録から抽出したか」を辿るための一意キー。
-  const HEARING_COLUMNS = ["案件ID", "課題カテゴリ", "発言者", "参照URL", "発言テキスト", "登録日時", "議事録ID"];
+  // タイトル: 「初回訪問ヒアリング」など、1案件に複数の議事録を並べたときの識別用。
+  const HEARING_COLUMNS = ["案件ID", "タイトル", "参照URL", "発言テキスト", "登録日時", "議事録ID"];
 
   const CALC_SHEET = "ROI試算";
   // 根拠議事録ID: そのカテゴリを作成するときに参照した議事録IDのカンマ区切り。
@@ -51,7 +52,11 @@
   // 1つの議事録から複数カテゴリが抽出されるため、案件ID×課題カテゴリで1行。
   // 既存ワークブックの「課題」シート（課題管理表）とは別物なので名前を分けている。
   const ISSUE_SHEET = "抽出課題";
-  const ISSUE_COLUMNS = ["案件ID", "課題カテゴリ", "課題タイトル", "課題内容", "根拠議事録ID", "抽出日時"];
+  // AI原文タイトル / AI原文内容: AIが最後に出力したそのままの文章を保持する。
+  // 現在の課題タイトル・課題内容がこれと異なれば「営業が編集した」と判定し、
+  // 再抽出時に自動で上書きせず確認を出す。
+  const ISSUE_COLUMNS = ["案件ID", "課題カテゴリ", "課題タイトル", "課題内容",
+    "AI原文タイトル", "AI原文内容", "根拠議事録ID", "抽出日時"];
 
   // 案件ごとの「どの解決策に決めたか」を保持するシート。
   // 導入費・改善率・削減根拠はソリューションDBの値を初期値としてコピーし、
@@ -208,10 +213,11 @@
   function getMasterItems() { return masterItems || []; }
   function getCategories() { return Array.from(new Set(getMasterItems().map(m => m.category))); }
 
-  /* ---------- 案件IDの候補（営業報告シートのID列） ---------- */
+  /* 案件IDの候補。営業報告シートのID列に加え、顧客マスタから顧客名、
+   * 営業報告シートの案件名列（あれば）を引いてラベルを組み立てる。 */
   async function listCaseIds() {
     if (!global.Office || !global.Excel) return [];
-    const ids = new Set();
+    const out = [];
     await Excel.run(async ctx => {
       const sheets = ctx.workbook.worksheets;
       sheets.load("items/name");
@@ -219,30 +225,44 @@
       if (!sheets.items.find(s => s.name === EIGYO_SHEET)) return;
       const sheet = ctx.workbook.worksheets.getItem(EIGYO_SHEET);
       const used = sheet.getUsedRange(true);
-      used.load("rowCount");
+      used.load("values");
+      const custSheet = sheets.items.find(s => s.name === CUST_SHEET)
+        ? ctx.workbook.worksheets.getItem(CUST_SHEET).getUsedRange(true) : null;
+      if (custSheet) custSheet.load("values");
       await ctx.sync();
-      const lastRow = Math.min(Math.max(used.rowCount, 1), 1000);
-      if (lastRow < 2) return;
-      const rng = sheet.getRange(`A2:A${lastRow}`);
-      rng.load("values");
-      await ctx.sync();
-      rng.values.forEach(r => { if (r[0]) ids.add(String(r[0])); });
+
+      const custMap = {};
+      if (custSheet) custSheet.values.slice(1).forEach(r => { if (r[0]) custMap[String(r[0])] = r[1] || ""; });
+
+      const header = used.values[0] || [];
+      // 案件名らしき列を探す（見つからなければラベルは顧客名のみ）
+      const titleCol = header.findIndex(h => /案件名|件名|タイトル|概要/.test(String(h)));
+      const seen = new Set();
+      used.values.slice(1).forEach(r => {
+        const id = r[0] ? String(r[0]) : "";
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        const custName = custMap[id.split("-")[0]] || "";
+        const title = titleCol >= 0 ? String(r[titleCol] || "") : "";
+        const label = [id, [custName, title].filter(Boolean).join(" ・")].filter(Boolean).join(" ／ ");
+        out.push({ caseId: id, customer: custName, title, label });
+      });
     });
-    return Array.from(ids);
+    return out;
   }
 
   /* ---------- 議事録：紐づけ・参照 ---------- */
-  async function appendHearingLog(caseId, category, speaker, { text = "", url = "" } = {}) {
+  async function appendHearingLog(caseId, title, { text = "", url = "" } = {}) {
     const hearingId = genId("H");
-    const row = [caseId, category, speaker, url, text, nowStr(), hearingId];
-    if (!global.Office || !global.Excel) return hearingId; // デモモードは書き込みなし
+    const row = [caseId, title || "議事録", url, text, nowStr(), hearingId];
+    if (!global.Office || !global.Excel) return hearingId;
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(HEARING_SHEET);
       const used = sheet.getUsedRange(true);
       used.load("rowCount");
       await ctx.sync();
       const nextRow = Math.max(used.rowCount, 1) + 1;
-      sheet.getRange(`A${nextRow}:G${nextRow}`).values = [row];
+      sheet.getRange(`A${nextRow}:F${nextRow}`).values = [row];
       await ctx.sync();
     });
     return hearingId;
@@ -258,7 +278,37 @@
       await ctx.sync();
       rows = rng.values.slice(1).filter(r => String(r[0]) === caseId);
     });
-    return rows.map(r => ({ category: r[1], speaker: r[2], url: r[3], text: r[4], registeredAt: r[5], hearingId: r[6] }));
+    return rows.map(r => ({
+      title: r[1] || "議事録", url: r[2], text: r[3],
+      registeredAt: r[4], hearingId: r[5],
+    }));
+  }
+
+  /* 議事録が1件以上ある案件IDの一覧（未抽出案件をグレー表示するために使う） */
+  async function listCasesWithHearings() {
+    if (!global.Office || !global.Excel) return [];
+    let hearing = [], issues = [];
+    await Excel.run(async ctx => {
+      const h = ctx.workbook.worksheets.getItem(HEARING_SHEET).getUsedRange(true);
+      h.load("values");
+      const i = ctx.workbook.worksheets.getItem(ISSUE_SHEET).getUsedRange(true);
+      i.load("values");
+      await ctx.sync();
+      hearing = h.values.slice(1).filter(r => r[0]);
+      issues = i.values.slice(1).filter(r => r[0] && r[1]);
+    });
+    const map = {};
+    hearing.forEach(r => {
+      const id = String(r[0]);
+      map[id] = map[id] || { caseId: id, hearingCount: 0, issueCount: 0 };
+      map[id].hearingCount++;
+    });
+    issues.forEach(r => {
+      const id = String(r[0]);
+      map[id] = map[id] || { caseId: id, hearingCount: 0, issueCount: 0 };
+      map[id].issueCount++;
+    });
+    return Object.values(map);
   }
 
   function genId(prefix) {
@@ -365,28 +415,25 @@
    * 営業報告アドインの「ROI提案」ボタンはこれだけを呼ぶ。
    * レビュー画面は挟まず、AIの抽出結果をそのまま保存する（詳細な確認・修正が
    * 必要な場合は提案ナレッジアドイン側の runExtractionForReview を使う）。 */
-  async function quickCreateProposal(caseId, category, { text = "", url = "" } = {}) {
+  async function quickCreateProposal(caseId, category, { text = "", url = "", title = "" } = {}) {
     let hearingId = null;
-    if (text || url) hearingId = await appendHearingLog(caseId, category, "顧客", { text, url });
+    if (text || url) hearingId = await appendHearingLog(caseId, title || "議事録", { text, url });
     const items = await callExtractionWebhook(caseId, category, { text, url });
     await applyCategoryToCalcSheet(caseId, category, items, hearingId ? [hearingId] : []);
     return getProposalSummaryForCase(caseId, category);
   }
 
-  /* ---------- 複数課題の一括抽出（営業報告の「作成」アイコン／提案ナレッジの①タブ） ----------
-   * この案件に紐づく議事録すべて＋メモを1回のAI呼び出しに渡し、
-   *   ・どの課題カテゴリが当てはまるか
-   *   ・その課題の内容（タイトルと説明文）
-   *   ・ROI試算に必要な数値
-   * をまとめて判定させる。1つの議事録から複数の課題が出るのが前提。
-   * 数値が読み取れないカテゴリでも、課題として挙がっていれば抽出課題には残す
-   * （属人化など金額換算できない課題を取りこぼさないため）。 */
-  async function autoExtractProposals(caseId, memoText = "") {
+  /* ---------- 複数課題の一括抽出（2段階） ----------
+   * previewExtraction()  … AIを呼び、既存の抽出課題と突き合わせた差分を返す。保存はしない。
+   * commitExtraction()   … 差分に対する選択（残す/上書き）を受け取って保存する。
+   * 数値（ROI試算）は選択に関わらず更新する。文章だけが選択の対象。
+   * 1つの議事録から複数の課題が出るのが前提。 */
+  async function previewExtraction(caseId, memoText = "") {
     const cfg = getConfig();
     if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
     const logs = await listHearingLogs(caseId);
     const combinedText = [memoText, ...logs.map(l => l.text || l.url || "")].filter(Boolean).join("\n\n");
-    if (!combinedText) return [];
+    if (!combinedText) return { hearingIds: [], results: [] };
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
 
     const categoryDefs = getCategories().map(cat => ({
@@ -409,23 +456,44 @@
     }
     if (data.error) throw new Error("GASエラー: " + data.error);
 
-    const results = (data.results || []).filter(r => r && r.category);
+    const existing = await getIssues(caseId);
+    const results = (data.results || []).filter(r => r && r.category).map(r => {
+      const cur = existing.find(x => x.category === r.category);
+      return {
+        category: r.category,
+        newTitle: r.title || r.category,
+        newSummary: r.summary || "",
+        items: r.items || [],
+        current: cur || null,
+        // 新規 / 編集済み（要確認） / 未編集（自動更新）
+        status: !cur ? "新規" : (cur.edited ? "編集済み" : "未編集"),
+        // 既定値: 編集済みは残す、それ以外は上書き
+        keepText: cur ? cur.edited : false,
+      };
+    });
+    return { hearingIds, results };
+  }
+
+  async function commitExtraction(caseId, hearingIds, results) {
     for (const r of results) {
-      // 課題そのものは、数値が取れなくても記録する
       await saveIssue(caseId, r.category, {
-        title: r.title || r.category,
-        summary: r.summary || "",
-        hearingIds,
+        title: r.newTitle, summary: r.newSummary, hearingIds, keepText: !!r.keepText,
       });
       if (r.items && r.items.length) {
         await applyCategoryToCalcSheet(caseId, r.category, r.items, hearingIds);
       }
     }
+    return results.length;
+  }
+
+  /* 確認なしで一括反映する簡易版（営業報告アドインの「作成」アイコン用）。
+   * 編集済みの課題文は自動的に残す。 */
+  async function autoExtractProposals(caseId, memoText = "") {
+    const { hearingIds, results } = await previewExtraction(caseId, memoText);
+    await commitExtraction(caseId, hearingIds, results);
     return results.map(r => ({
-      category: r.category,
-      title: r.title || r.category,
-      summary: r.summary || "",
-      itemCount: (r.items || []).length,
+      category: r.category, title: r.newTitle, summary: r.newSummary,
+      itemCount: (r.items || []).length, status: r.status,
     }));
   }
 
@@ -575,16 +643,24 @@
       await ctx.sync();
       rows = rng.values.slice(1).filter(r => String(r[0]) === caseId && r[1]);
     });
-    return rows.map(r => ({
-      caseId: r[0], category: r[1], title: r[2] || "", summary: r[3] || "",
-      hearingIds: String(r[4] || "").split(",").filter(Boolean), extractedAt: r[5],
-    }));
+    return rows.map(r => {
+      const title = r[2] || "", summary = r[3] || "";
+      const aiTitle = r[4] || "", aiSummary = r[5] || "";
+      return {
+        caseId: r[0], category: r[1], title, summary, aiTitle, aiSummary,
+        // AIが書いた原文と現在の内容が違えば、営業が手を入れたとみなす
+        edited: (title !== aiTitle) || (summary !== aiSummary),
+        hearingIds: String(r[6] || "").split(",").filter(Boolean),
+        extractedAt: r[7],
+      };
+    });
   }
 
-  /* 同じ案件・同じ課題カテゴリの行があれば上書き、無ければ追加する。 */
-  async function saveIssue(caseId, category, { title = "", summary = "", hearingIds = [] } = {}) {
+  /* 課題を保存する。keepText=true なら課題タイトル・内容は既存のまま残し、
+   * AI原文の列だけを更新する（営業の編集を守りつつ、次回の編集判定は
+   * 最新のAI出力を基準にするため）。 */
+  async function saveIssue(caseId, category, { title = "", summary = "", hearingIds = [], keepText = false } = {}) {
     if (!global.Office || !global.Excel) return;
-    const row = [caseId, category, title, summary, hearingIds.filter(Boolean).join(","), nowStr()];
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
       const used = sheet.getUsedRange(true);
@@ -592,7 +668,30 @@
       await ctx.sync();
       const idx = used.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
       const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
-      sheet.getRange(`A${rowNum}:F${rowNum}`).values = [row];
+      const cur = idx >= 0 ? used.values[idx + 1] : null;
+      const keepTitle = keepText && cur ? (cur[2] || "") : title;
+      const keepSummary = keepText && cur ? (cur[3] || "") : summary;
+      sheet.getRange(`A${rowNum}:H${rowNum}`).values = [[
+        caseId, category, keepTitle, keepSummary, title, summary,
+        hearingIds.filter(Boolean).join(","), nowStr(),
+      ]];
+      await ctx.sync();
+    });
+  }
+
+  /* 営業が課題タイトル・内容を手で編集したときに呼ぶ（AI原文列は触らない）。 */
+  async function updateIssueText(caseId, category, { title, summary } = {}) {
+    if (!global.Office || !global.Excel) return;
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
+      const rng = sheet.getUsedRange(true);
+      rng.load("values");
+      await ctx.sync();
+      const idx = rng.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
+      if (idx < 0) return;
+      const rowNum = idx + 2;
+      if (title !== undefined) sheet.getRange(`C${rowNum}`).values = [[title]];
+      if (summary !== undefined) sheet.getRange(`D${rowNum}`).values = [[summary]];
       await ctx.sync();
     });
   }
@@ -695,13 +794,14 @@
     CONF_LEVELS, CONF_WEIGHT, BASIS_LEVELS, BASIS_WEIGHT,
     getConfig, setConfig,
     ensureAllSheets, getMasterItems, getCategories,
-    listCaseIds,
+    listCaseIds, listCasesWithHearings,
     appendHearingLog, listHearingLogs,
     callExtractionWebhook, runExtractionForReview, applyReviewedItems,
+    previewExtraction, commitExtraction,
     quickCreateProposal, autoExtractProposals, getSourceEntriesForCategory,
     getProposalSummaryForCase, getCalcRowsForCase, toggleSelection, updateCalcInput,
     getDecisions, saveDecision,
-    getIssues, saveIssue,
+    getIssues, saveIssue, updateIssueText,
     confidenceOf, confidenceLabel,
     getCustomerInfo, getSolutions, getSolutionsForCategory,
   };
