@@ -86,11 +86,22 @@
     </div>
     <button id="load-proposal-btn" class="btn">この案件の課題を表示</button>
 
-    <div id="proposal-list"></div>
-
-    <div id="proposal-summary" class="summary-bar" style="display:none">
-      <span id="proposal-summary-text"></span>
+    <div id="totals" class="totals-box" style="display:none">
+      <div class="totals-grid">
+        <div>
+          <div class="t-label">損失合計 / 年</div>
+          <div id="t-loss" class="t-value">—</div>
+          <div id="t-loss-cf" class="t-sub">—</div>
+        </div>
+        <div>
+          <div class="t-label">全体回収</div>
+          <div id="t-pay" class="t-value">—</div>
+          <div id="t-pay-cf" class="t-sub">—</div>
+        </div>
+      </div>
     </div>
+
+    <div id="proposal-list"></div>
   </section>
 
   <!-- ====== ③ プロンプト出力 ====== -->

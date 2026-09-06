@@ -24,23 +24,102 @@
  *
  * mode: "auto" を指定すると複数カテゴリ一括判定モードになる（handleAutoMode参照）。
  * 営業報告アドインの「作成」アイコンはこちらを使う。
+ *
+ * 対応プロバイダ: Anthropic（既定）／ OpenAI互換（Gemini等。AI_PROVIDER=openai）。
+ * getAiSettings() と callAiModel() を参照。
  */
 
 const SHARED_TOKEN = "";              // 空なら照合をスキップ（開発時のみ推奨）
 
-/* AI_API_KEY・AI_API_URL・AI_MODEL はすべてスクリプトプロパティに設定する。
+/* AI_API_KEY・AI_API_URL・AI_MODEL・AI_PROVIDER はすべてスクリプトプロパティに設定する。
  * スクリプトエディタ → プロジェクトの設定 → スクリプト プロパティ で以下を登録:
- *   AI_API_KEY  … 例: sk-ant-xxxxx（必須）
- *   AI_API_URL  … 例: https://api.anthropic.com/v1/messages（未設定ならデフォルト値を使う）
- *   AI_MODEL    … 例: claude-sonnet-4-6（未設定ならデフォルト値を使う）
- * コードを直接編集しなくても、モデル差し替えやAPI切り替えができるようにするため。 */
+ *   AI_API_KEY  … 必須。プロバイダのAPIキー
+ *   AI_PROVIDER … "anthropic"（既定） または "openai"（OpenAI互換。Gemini等もこちら）
+ *   AI_API_URL  … anthropicなら未設定でデフォルト値を使う。
+ *                 openaiの場合は必須（例: Geminiなら
+ *                 https://generativelanguage.googleapis.com/v1beta/openai ）
+ *                 ※ "/chat/completions" は自動で付加するので含めなくてよい
+ *   AI_MODEL    … 例: claude-sonnet-4-6 / gemini-2.5-flash 等
+ * コードを直接編集しなくても、モデル・プロバイダ差し替えができるようにするため。 */
 function getAiSettings() {
   const props = PropertiesService.getScriptProperties();
+  const provider = (props.getProperty("AI_PROVIDER") || "anthropic").toLowerCase();
   return {
+    provider,
     apiKey: props.getProperty("AI_API_KEY"),
-    apiUrl: props.getProperty("AI_API_URL") || "https://api.anthropic.com/v1/messages",
+    apiUrl: props.getProperty("AI_API_URL") || (provider === "anthropic" ? "https://api.anthropic.com/v1/messages" : ""),
     model: props.getProperty("AI_MODEL") || "claude-sonnet-4-6",
   };
+}
+
+/* プロバイダ差異を吸収してAIを呼び、テキスト応答だけを返す共通関数。
+ * 戻り値: { text } または { error } */
+function callAiModel(prompt, maxTokens, settings) {
+  if (!settings.apiKey) return { error: "AI_API_KEY not configured" };
+
+  if (settings.provider === "openai") {
+    if (!settings.apiUrl) return { error: "AI_API_URL is required when AI_PROVIDER=openai" };
+    const url = settings.apiUrl.replace(/\/+$/, "") + "/chat/completions";
+    const payload = {
+      model: settings.model,
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    };
+    const res = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: { Authorization: "Bearer " + settings.apiKey },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    const body = safeParseJson(res.getContentText(), null);
+    if (!body) return { error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()} @ ${url}): ` + res.getContentText().slice(0, 300) };
+    if (body.error) return { error: "AI API error: " + JSON.stringify(body.error) };
+    const text = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
+    return { text: text || "" };
+  }
+
+  // デフォルト: Anthropic Messages API
+  const res = UrlFetchApp.fetch(settings.apiUrl, {
+    method: "post",
+    contentType: "application/json",
+    headers: { "x-api-key": settings.apiKey, "anthropic-version": "2023-06-01" },
+    payload: JSON.stringify({ model: settings.model, max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
+    muteHttpExceptions: true,
+  });
+  const body = safeParseJson(res.getContentText(), null);
+  if (!body) return { error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()} @ ${settings.apiUrl}): ` + res.getContentText().slice(0, 300) };
+  if (body.error) return { error: "AI API error: " + JSON.stringify(body.error) };
+  const textBlock = (body.content || []).find(c => c.type === "text");
+  return { text: (textBlock && textBlock.text) || "" };
+}
+
+/* ------------------------------------------------------------
+ * 手動テスト用。スクリプトエディタでこの関数を選んで「実行」すると、
+ * ・外部リクエスト（api.anthropic.com）の権限承認ダイアログが出る（初回のみ）
+ * ・実行数ログに、AI APIへのリクエスト結果がそのまま出る
+ * ので、Webアプリ経由ではなくこの関数単体でAI連携の疎通確認ができる。
+ * 実行後は「実行数」メニューでログを確認すること。
+ * ------------------------------------------------------------ */
+function testRun() {
+  const settings = getAiSettings();
+  Logger.log("provider: [" + settings.provider + "]");
+  Logger.log("apiUrl: [" + settings.apiUrl + "]");
+  Logger.log("model: [" + settings.model + "]");
+  Logger.log("apiKey set: " + (settings.apiKey ? ("yes, length=" + settings.apiKey.length) : "NO"));
+
+  const result = handleSingleCategoryMode({
+    caseId: "TEST-01",
+    category: "在庫管理",
+    text: "議事1 棚卸は5人で行っていて、月に1回、1回あたり4時間かかっている。時給は3000円くらい。",
+    items: [
+      { itemId: "stk_people", name: "棚卸人数", unit: "人" },
+      { itemId: "stk_hours", name: "棚卸時間", unit: "時間" },
+      { itemId: "stk_freq", name: "棚卸回数/年", unit: "回" },
+      { itemId: "stk_wage", name: "時給", unit: "円" },
+    ],
+  });
+  Logger.log(result.getContent());
 }
 
 function doPost(e) {
@@ -60,8 +139,8 @@ function doPost(e) {
 
 /* 単一カテゴリ抽出（提案ナレッジ側の詳細レビュー、営業報告側の旧フロー互換） */
 function handleSingleCategoryMode(req) {
-    const { apiKey, apiUrl, model } = getAiSettings();
-    if (!apiKey) return respond({ error: "AI_API_KEY not configured" });
+    const settings = getAiSettings();
+    if (!settings.apiKey) return respond({ error: "AI_API_KEY not configured" });
 
     let sourceText = req.text || "";
     if (!sourceText && req.url) {
@@ -90,29 +169,9 @@ ${sourceText}
 出力は次のJSON形式のみとしてください（説明文は不要）:
 {"items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}`;
 
-    const payload = {
-      model: model,
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    };
-
-    const res = UrlFetchApp.fetch(apiUrl, {
-      method: "post",
-      contentType: "application/json",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true,
-    });
-
-    const body = safeParseJson(res.getContentText(), null);
-    if (!body) return respond({ error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()}): ` + res.getContentText().slice(0, 300) });
-    if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
-    const textBlock = (body.content || []).find(c => c.type === "text");
-    const parsed = safeParseJson(textBlock && textBlock.text, { items: [] });
-
+    const ai = callAiModel(prompt, 1500, settings);
+    if (ai.error) return respond({ error: ai.error });
+    const parsed = safeParseJson(ai.text, { items: [] });
     return respond(parsed);
 }
 
@@ -124,8 +183,8 @@ ${sourceText}
  * { results: [{ category, items:[{itemId,value,confidence}] }, ...] }
  * （該当なしのカテゴリは items:[] または results に含めない） */
 function handleAutoMode(req) {
-  const { apiKey, apiUrl, model } = getAiSettings();
-  if (!apiKey) return respond({ error: "AI_API_KEY not configured" });
+  const settings = getAiSettings();
+  if (!settings.apiKey) return respond({ error: "AI_API_KEY not configured" });
   if (!req.text) return respond({ error: "text is empty" });
 
   const categoryBlock = (req.categories || []).map(c =>
@@ -149,19 +208,9 @@ ${req.text}
 出力は次のJSON形式のみとしてください（説明文は不要）:
 {"results":[{"category":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
 
-  const payload = { model: model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] };
-  const res = UrlFetchApp.fetch(apiUrl, {
-    method: "post",
-    contentType: "application/json",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-  });
-  const body = safeParseJson(res.getContentText(), null);
-  if (!body) return respond({ error: `AI API response was not valid JSON (HTTP ${res.getResponseCode()}): ` + res.getContentText().slice(0, 300) });
-  if (body.error) return respond({ error: "AI API error: " + JSON.stringify(body.error) });
-  const textBlock = (body.content || []).find(c => c.type === "text");
-  const parsed = safeParseJson(textBlock && textBlock.text, { results: [] });
+  const ai = callAiModel(prompt, 2000, settings);
+  if (ai.error) return respond({ error: ai.error });
+  const parsed = safeParseJson(ai.text, { results: [] });
   return respond(parsed);
 }
 

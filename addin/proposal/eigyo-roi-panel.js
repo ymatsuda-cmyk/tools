@@ -165,19 +165,29 @@
     async function loadDetail(item) {
       const cat = item.dataset.cat;
       const detailEl = item.querySelector(".roi-detail");
-      const [rows, sources] = await Promise.all([
+      const [rows, sources, sols] = await Promise.all([
         RoiCore.getCalcRowsForCase(caseId, {}).then(all => all.filter(r => r.category === cat)),
         RoiCore.getSourceEntriesForCategory(caseId, cat),
+        RoiCore.getSolutionsForCategory(cat),
       ]);
-      const sol = (await RoiCore.getSolutions()).find(s => s.category === cat);
       const outputLines = rows.filter(r => r.kind === "出力").map(r => `${r.name} ${fmtNum(r.value)}${r.unit || ""}`).join("<br>");
       const srcHtml = sources.length
         ? sources.map(s => `<div class="roi-src-item">${s.url ? `<a href="${escHtml(s.url)}" target="_blank" rel="noopener">${escHtml(s.url)}</a>` : escHtml((s.text || "").slice(0, 40) + "…")}</div>`).join("")
         : `<div class="roi-src-item">元データのリンクは記録されていません</div>`;
+      const solHtml = sols.length
+        ? sols.map(s => `<div class="roi-src-item"><b>${escHtml(s.name)}</b>（${escHtml(s.cost)}コスト・改善率${s.rate}%）<span style="font-size:10px;color:#888780">[${escHtml(s.basisLevel)}]</span><br><span style="font-size:10px;color:#5f5e5a">${escHtml(s.method)}</span></div>`).join("")
+        : `<div class="roi-src-item">解決案が未登録です</div>`;
+      const decs = await RoiCore.getDecisions(caseId);
+      const dec = decs.find(d => d.category === cat);
+      const decHtml = dec && dec.included
+        ? `<div class="roi-src-item" style="color:#0f6e56"><b>決定：${escHtml(dec.solutionName)}</b> ／ 導入費 ${Number(dec.cost).toLocaleString("ja-JP")}円 ／ 改善率 ${dec.rate}%（${escHtml(dec.basisLevel)}）</div>`
+        : "";
       detailEl.innerHTML = `
-        <div style="margin-bottom:4px">解決策：${escHtml(sol ? sol.name : "未設定")}</div>
         <div style="margin-bottom:6px">${outputLines || "（内訳なし）"}</div>
-        <div style="font-weight:600;margin-bottom:2px">元データ</div>
+        ${decHtml ? `<div style="font-weight:600;margin-bottom:2px">決定内容</div>${decHtml}` : ""}
+        <div style="font-weight:600;margin:6px 0 2px">解決案</div>
+        ${solHtml}
+        <div style="font-weight:600;margin:6px 0 2px">元データ</div>
         ${srcHtml}
       `;
     }

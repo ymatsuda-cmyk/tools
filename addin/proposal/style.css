@@ -95,6 +95,67 @@ textarea { resize: vertical; }
   border-top: 1px solid #d3d1c7; margin-top: 10px; padding-top: 10px; font-size: 12px;
 }
 
+/* ---- ②提案タブ：合計・アコーディオン・ウィザード ---- */
+.totals-box { background: #e6f1fb; border-radius: 10px; padding: 12px; margin: 10px 0; }
+.totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.t-label { font-size: 10px; color: #185fa5; }
+.t-value { font-size: 19px; font-weight: 600; color: #0c447c; }
+.t-sub { font-size: 10px; color: #185fa5; }
+
+.acc { background: #fff; border: 1px solid #e5e3da; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.acc-head { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; cursor: pointer; }
+.acc-head .a-main { flex: 1; min-width: 0; }
+.acc-head .a-name { font-size: 13px; font-weight: 600; }
+.acc-head .a-desc { font-size: 11px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
+.acc-head .a-result { font-size: 10px; color: #0f6e56; margin-top: 4px; }
+.acc-head .a-loss { text-align: right; flex: none; width: 64px; }
+.acc-head .a-loss b { font-size: 13px; color: #a32d2d; }
+.acc-head .a-loss span { font-size: 10px; color: #888780; display: block; }
+.acc-body { padding: 0 12px 12px; display: none; }
+.acc.open .acc-body { display: block; }
+
+.wiz-dots { display: flex; align-items: center; gap: 4px; margin: 8px 0 4px; }
+.wiz-dot { width: 21px; height: 21px; border-radius: 50%; font-size: 10px;
+  display: flex; align-items: center; justify-content: center; flex: none;
+  background: #f1efe8; color: #888780; border: 1px solid #b4b2a9; }
+.wiz-dot.on { background: #185fa5; color: #fff; border: none; }
+.wiz-line { flex: 1; height: 2px; background: #d3d1c7; }
+.wiz-line.on { background: #185fa5; }
+.wiz-labels { display: flex; justify-content: space-between; font-size: 10px; color: #5f5e5a; margin-bottom: 12px; }
+.wiz-step { display: none; }
+.wiz-step.on { display: block; }
+
+.sl-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.sl-row > label { font-size: 11px; color: #5f5e5a; width: 58px; flex: none; }
+.sl-row > input[type=range] { flex: 1; }
+.cf-chip { font-size: 10px; font-weight: 600; width: 66px; flex: none; text-align: center;
+  padding: 4px 0; border-radius: 8px; border: none; cursor: pointer; }
+.cf-確定 { background: #e1f5ee; color: #0f6e56; }
+.cf-推定 { background: #faeeda; color: #854f0b; }
+.cf-未確認 { background: #f1efe8; color: #888780; }
+
+.plan-card { background: #fafaf8; border: 1px solid #e5e3da; border-radius: 8px;
+  padding: 9px 10px; margin-bottom: 6px; cursor: pointer; }
+.plan-card.on { border: 2px solid #185fa5; }
+.plan-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.plan-name { font-size: 12px; font-weight: 600; }
+.cost-低 { background: #e1f5ee; color: #0f6e56; }
+.cost-中 { background: #faeeda; color: #854f0b; }
+.cost-高 { background: #fcebeb; color: #a32d2d; }
+.plan-tier { font-size: 10px; padding: 1px 7px; border-radius: 8px; }
+.plan-method { font-size: 11px; color: #5f5e5a; }
+.plan-rate { display: flex; align-items: center; gap: 6px; margin: 6px 0 4px; font-size: 11px; color: #888780; }
+.plan-rate b { font-size: 13px; color: #2c2c2a; }
+.basis-実績 { background: #e1f5ee; color: #0f6e56; }
+.basis-推定 { background: #faeeda; color: #854f0b; }
+.basis-一般値 { background: #f1efe8; color: #888780; }
+.basis-tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; }
+.basis-text { font-size: 10px; color: #5f5e5a; line-height: 1.6;
+  background: #fff; border-radius: 5px; padding: 6px 8px; }
+.mini-box { background: #fafaf8; border-radius: 8px; padding: 10px; }
+.mini-label { font-size: 10px; color: #888780; }
+.hint-sm { font-size: 10px; color: #888780; margin-top: 6px; }
+
 #prompt-output .prompt-block {
   background: #fff; border: 1px solid #e5e3da; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;
 }
