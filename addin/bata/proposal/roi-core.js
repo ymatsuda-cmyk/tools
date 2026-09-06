@@ -533,9 +533,10 @@
    * commitExtraction()   … 差分に対する選択（残す/上書き）を受け取って保存する。
    * 数値（ROI試算）は選択に関わらず更新する。文章だけが選択の対象。
    * 1つの議事録から複数の課題が出るのが前提。 */
-  // 1件あたりの議事録本文が長すぎるとGASのWebアプリ中継（echo）が
-  // 不安定になることがあるため、送信前に上限で切り詰める。
-  const HEARING_TEXT_LIMIT = 6000;
+  // 以前は404対策として6,000文字で切り詰めていたが、実際の原因は
+  // GASのデプロイ・バージョン管理の問題だった可能性が高いと判明したため、
+  // 冒頭の雑談・ノイズで実質的な内容が切り捨てられないよう上限を引き上げる。
+  const HEARING_TEXT_LIMIT = 30000;
   function capText(s) {
     if (!s) return s;
     return s.length > HEARING_TEXT_LIMIT ? s.slice(0, HEARING_TEXT_LIMIT) + "\n…（以降省略）" : s;
