@@ -59,6 +59,26 @@ function bindStaticUI() {
   document.getElementById("cancel-extract-btn").addEventListener("click", cancelExtraction);
 
   document.getElementById("build-prompt-btn").addEventListener("click", buildPrompt);
+
+  // カテゴリ割り当てモーダル
+  document.getElementById("assign-close-btn").addEventListener("click", closeAssignModal);
+  document.getElementById("assign-apply-btn").addEventListener("click", applyCandidate);
+  document.getElementById("assign-chat-btn").addEventListener("click", () => startCategoryChat(null));
+  document.getElementById("assign-nocat-btn").addEventListener("click", () =>
+    finishAssign("", RoiCore.ASSIGN_NOCAT));
+  document.getElementById("chat-send-btn").addEventListener("click", async () => {
+    const inp = document.getElementById("chat-input");
+    const v = inp.value.trim();
+    if (!v) return;
+    assignState.messages.push({ role: "user", content: v });
+    inp.value = "";
+    renderChat();
+    await sendCategoryChat();
+  });
+  document.getElementById("chat-save-common-btn").addEventListener("click", () =>
+    saveCategory(RoiCore.SCOPE_COMMON));
+  document.getElementById("chat-save-temp-btn").addEventListener("click", () =>
+    saveCategory(RoiCore.SCOPE_TEMP));
 }
 
 function switchTab(tab) {
@@ -321,42 +341,49 @@ async function loadProposal() {
     return;
   }
 
-  // カテゴリごとにまとめる（ROI試算の行と、抽出課題の両方からカテゴリを集める）
+  // ROI試算の行をカテゴリごとにまとめる
   const byCat = {};
   rows.forEach(r => {
     byCat[r.category] = byCat[r.category] || { inputs: [], outputs: [] };
     (r.kind === "出力" ? byCat[r.category].outputs : byCat[r.category].inputs).push(r);
   });
-  issues.forEach(is => { byCat[is.category] = byCat[is.category] || { inputs: [], outputs: [] }; });
 
+  // 課題（抽出課題）を主軸にする。カテゴリ未設定の課題も必ず一覧に載せる。
   propState = {
     caseId,
-    issues: Object.keys(byCat).map(cat => {
-      const g = byCat[cat];
-      const iss = issues.find(x => x.category === cat);
-      const plans = solutions.filter(s => s.category === cat)
-        .sort((a, b) => ({ "低": 0, "中": 1, "高": 2 }[a.cost] ?? 9) - ({ "低": 0, "中": 1, "高": 2 }[b.cost] ?? 9));
-      const dec = decisions.find(d => d.category === cat);
-      let sel = 0;
-      if (dec) {
-        const i = plans.findIndex(p => p.name === dec.solutionName);
-        if (i >= 0) sel = i;
-      }
-      const plan = plans[sel];
-      return {
-        category: cat,
-        title: iss ? iss.title : cat,
-        summary: iss ? iss.summary : "",
-        inputs: g.inputs,
-        outputs: g.outputs,
-        plans, sel, step: 1,
-        cost: dec ? dec.cost : (plan ? plan.initialCost : 0),
-        rate: dec ? dec.rate : (plan ? plan.rate : 0),
-        basis: dec ? dec.basis : (plan ? plan.basis : ""),
-        basisLevel: dec ? dec.basisLevel : (plan ? plan.basisLevel : "一般値"),
-        included: dec ? dec.included : false,
-      };
-    }),
+    issues: issues
+      .filter(iss => iss.assignStatus !== RoiCore.ASSIGN_SKIP)
+      .map(iss => {
+        const cat = iss.category || "";
+        const g = byCat[cat] || { inputs: [], outputs: [] };
+        const plans = cat
+          ? solutions.filter(s => s.category === cat)
+              .sort((a, b) => ({ "低": 0, "中": 1, "高": 2 }[a.cost] ?? 9) - ({ "低": 0, "中": 1, "高": 2 }[b.cost] ?? 9))
+          : [];
+        const dec = cat ? decisions.find(d => d.category === cat) : null;
+        let sel = 0;
+        if (dec) {
+          const i = plans.findIndex(p => p.name === dec.solutionName);
+          if (i >= 0) sel = i;
+        }
+        const plan = plans[sel];
+        return {
+          issueId: iss.issueId,
+          category: cat,
+          assignStatus: iss.assignStatus,
+          candidates: iss.candidates || [],
+          title: iss.title || cat,
+          summary: iss.summary || "",
+          inputs: g.inputs,
+          outputs: g.outputs,
+          plans, sel, step: 1,
+          cost: dec ? dec.cost : (plan ? plan.initialCost : 0),
+          rate: dec ? dec.rate : (plan ? plan.rate : 0),
+          basis: dec ? dec.basis : (plan ? plan.basis : ""),
+          basisLevel: dec ? dec.basisLevel : (plan ? plan.basisLevel : "一般値"),
+          included: dec ? dec.included : false,
+        };
+      }),
   };
 
   renderProposal();
@@ -381,10 +408,10 @@ function renderProposal() {
   list.innerHTML = propState.issues.map((is, ix) => {
     const loss = lossOfIssue(is);
     return `
-    <div class="acc" id="acc-${ix}">
+    <div class="acc${!is.category ? " unmapped" : ""}" id="acc-${ix}">
       <div class="acc-head" data-acc="${ix}">
         <div class="a-main">
-          <div class="a-cat">${escHtml(is.category)}</div>
+          ${catTag(is)}
           <div class="a-name">${escHtml(is.title || is.category)}</div>
           <div class="a-result" id="res-${ix}" style="display:none"></div>
         </div>
@@ -396,7 +423,9 @@ function renderProposal() {
       </div>
       <div class="acc-body">
         ${is.summary ? `<div class="issue-summary">${escHtml(is.summary)}</div>` : ""}
-        ${!is.inputs.length ? `<div class="meta" style="margin:8px 0">この課題は数値化していません。解決案のみ提示します。</div>` : ""}
+        ${unmappedBlock(is, ix)}
+        ${!is.category ? "" : (!is.inputs.length ? `<div class="meta" style="margin:8px 0">この課題は数値化していません。解決案のみ提示します。</div>` : "")}
+        ${!is.category ? "" : `
         <div class="wiz-dots">
           <span class="wiz-dot" id="dot-${ix}-1">1</span><div class="wiz-line" id="line-${ix}-1"></div>
           <span class="wiz-dot" id="dot-${ix}-2">2</span><div class="wiz-line" id="line-${ix}-2"></div>
@@ -453,13 +482,13 @@ function renderProposal() {
         <div class="btn-row">
           <button class="btn" data-back="${ix}" id="back-${ix}">戻る</button>
           <button class="btn btn-accent" data-next="${ix}" id="next-${ix}" style="flex:2">次へ</button>
-        </div>
+        </div>`}
       </div>
     </div>`;
   }).join("");
 
   document.getElementById("totals").style.display = "";
-  propState.issues.forEach((_, ix) => { renderPlans(ix); navWizard(ix); });
+  propState.issues.forEach((is, ix) => { if (is.category) { renderPlans(ix); navWizard(ix); } });
   updateProposal();
 }
 
@@ -532,7 +561,8 @@ function updateProposal() {
     const save = loss != null ? loss * (is.rate / 100) : 0;
 
     if (loss != null) { sumLoss += loss; }
-    cfAll.push(RoiCore.confidenceOf(is.inputs, is.basisLevel));
+    // 未設定の課題は試算していないので、信頼度の平均には含めない
+    if (is.category) cfAll.push(RoiCore.confidenceOf(is.inputs, is.basisLevel));
 
     const lossEl = document.getElementById(`loss-${ix}`);
     if (lossEl) lossEl.textContent = loss != null ? fmtMan(loss) : "未算出";
@@ -573,12 +603,18 @@ function updateProposal() {
     }
 
     if (is.included) { payCost += is.cost; paySave += save; payCf.push(cfIssue); }
-    navWizard(ix);
+    if (is.category) navWizard(ix);
   });
 
   document.getElementById("t-loss").textContent = fmtMan(sumLoss);
+  const total = propState.issues.length;
+  const calced = propState.issues.filter(i => lossOfIssue(i) != null).length;
   const gc = cfAll.length ? cfAll.reduce((a, b) => a + b, 0) / cfAll.length : 0;
-  document.getElementById("t-loss-cf").textContent = `${Math.round(gc * 100)}% ・${RoiCore.confidenceLabel(gc)}`;
+  // 全課題のうち何件が試算できているかを明示する。
+  // 一部しか金額が出ていない状態で合計だけ見せると全体像と誤解されるため。
+  document.getElementById("t-loss-cf").textContent = calced < total
+    ? `全${total}件中 ${calced}件のみ試算済`
+    : `${Math.round(gc * 100)}% ・${RoiCore.confidenceLabel(gc)}`;
 
   if (paySave > 0) {
     document.getElementById("t-pay").textContent = `${Math.ceil(payCost / (paySave / 12))}ヶ月`;
@@ -629,6 +665,18 @@ document.addEventListener("input", async (e) => {
 
 document.addEventListener("click", async (e) => {
   if (!propState) return;
+
+  const asg = e.target.closest("[data-assign]");
+  if (asg) { openAssignModal(+asg.dataset.assign); return; }
+
+  const nc = e.target.closest("[data-nocat]");
+  if (nc) {
+    const is = propState.issues[+nc.dataset.nocat];
+    if (!demoMode) await RoiCore.assignIssueCategory(propState.caseId, is.issueId,
+      { category: "", assignStatus: RoiCore.ASSIGN_NOCAT });
+    await loadProposal();
+    return;
+  }
 
   const chip = e.target.closest("[data-cf]");
   if (chip) {
@@ -717,6 +765,151 @@ function recalcOutputs(is) {
   is.outputs.forEach(o => { if (vals[o.itemId] !== undefined) o.value = vals[o.itemId]; });
 }
 
+/* カテゴリのタグ表示。未設定・カテゴリなし提案を区別する。 */
+function catTag(is) {
+  if (is.category) return `<div class="a-cat">${escHtml(is.category)}</div>`;
+  if (is.assignStatus === RoiCore.ASSIGN_NOCAT) {
+    return `<span class="tag-nocat">カテゴリなしで提案</span>`;
+  }
+  const sug = (is.candidates || [])[0];
+  return `<span class="tag-unmapped">カテゴリ未設定</span>`
+    + (sug ? ` <span style="font-size:10px;color:#888780">AI提案：${escHtml(sug.name)}</span>` : "");
+}
+
+/* カテゴリ未設定の課題に出す操作ブロック。 */
+function unmappedBlock(is, ix) {
+  if (is.category) return "";
+  if (is.assignStatus === RoiCore.ASSIGN_NOCAT) {
+    return `<div class="meta" style="margin:8px 0">カテゴリなしで提案に含めます。金額は出ませんが提案書には載ります。</div>
+      <div class="btn-row"><button class="btn" data-assign="${ix}">カテゴリを割り当てる</button></div>`;
+  }
+  return `
+    <div class="btn-row">
+      <button class="btn btn-accent" data-assign="${ix}" style="flex:2">カテゴリを割り当てる</button>
+      <button class="btn" data-nocat="${ix}">このまま提案に含める</button>
+    </div>`;
+}
+
+/* ============================================================
+   カテゴリ割り当てモーダル（候補選択 ＋ AIとの壁打ち）
+   ============================================================ */
+let assignState = null;
+
+function openAssignModal(ix) {
+  const is = propState.issues[ix];
+  assignState = { ix, issue: is, selected: 0, messages: [], definition: null };
+  document.getElementById("assign-issue").innerHTML = `
+    <div class="mini-label">対象の課題</div>
+    <div style="font-size:12px;font-weight:600">${escHtml(is.title)}</div>
+    <div style="font-size:11px;color:#5f5e5a;line-height:1.6;margin-top:3px">${escHtml(is.summary)}</div>`;
+  document.getElementById("assign-pick").style.display = "";
+  document.getElementById("assign-chat").style.display = "none";
+  renderCandidates();
+  document.getElementById("assign-modal").style.display = "flex";
+}
+
+function renderCandidates() {
+  const cands = assignState.issue.candidates || [];
+  const el = document.getElementById("assign-candidates");
+  if (!cands.length) {
+    el.innerHTML = `<div class="meta">AIからの候補がありません。「AIと相談」でカテゴリを作れます。</div>`;
+    document.getElementById("assign-apply-btn").style.display = "none";
+    return;
+  }
+  document.getElementById("assign-apply-btn").style.display = "";
+  el.innerHTML = cands.map((c, i) => `
+    <div class="cand-card${i === assignState.selected ? " on" : ""}" data-cand="${i}">
+      <span class="radio-dot"></span>
+      <div class="c-body">
+        <div class="cand-head">
+          <span class="cand-name">${escHtml(c.name)}</span>
+          <span class="${c.isNew ? "tag-new2" : "tag-exist"}">${c.isNew ? "新規" : "既存"}</span>
+        </div>
+        <div class="cand-reason">${escHtml(c.reason || "")}</div>
+      </div>
+    </div>`).join("");
+  el.querySelectorAll("[data-cand]").forEach(e => {
+    e.addEventListener("click", () => { assignState.selected = +e.dataset.cand; renderCandidates(); });
+  });
+}
+
+async function applyCandidate() {
+  const c = (assignState.issue.candidates || [])[assignState.selected];
+  if (!c) return;
+  if (c.isNew) {
+    // 新規候補は定義が必要なので、そのまま壁打ちに入る
+    await startCategoryChat(`「${c.name}」で作りたいです。`);
+    return;
+  }
+  await finishAssign(c.name, RoiCore.ASSIGN_DONE);
+}
+
+async function finishAssign(category, status) {
+  const { issue } = assignState;
+  if (!demoMode) await RoiCore.assignIssueCategory(propState.caseId, issue.issueId, { category, assignStatus: status });
+  closeAssignModal();
+  await loadProposal();
+}
+
+function closeAssignModal() {
+  assignState = null;
+  document.getElementById("assign-modal").style.display = "none";
+}
+
+/* ---- AIとの壁打ち ---- */
+async function startCategoryChat(initialMessage) {
+  document.getElementById("assign-pick").style.display = "none";
+  document.getElementById("assign-chat").style.display = "";
+  if (initialMessage) assignState.messages.push({ role: "user", content: initialMessage });
+  renderChat();
+  await sendCategoryChat();
+}
+
+function renderChat() {
+  document.getElementById("chat-log").innerHTML = assignState.messages.map(m =>
+    `<div class="${m.role === "user" ? "chat-me" : "chat-ai"}">${escHtml(m.content)}</div>`).join("");
+  const d = assignState.definition;
+  const box = document.getElementById("chat-def");
+  if (!d) { box.innerHTML = `<div class="def-label">案を作成中…</div>`; return; }
+  box.innerHTML = `
+    <div class="def-label">現在の案（編集できます）</div>
+    <div class="mini-label">カテゴリ名</div>
+    <input id="def-name" value="${escAttr(d.category || "")}" style="font-size:12px;margin-bottom:8px">
+    <div class="mini-label">入力項目</div>
+    ${(d.inputs || []).map(i => `
+      <div class="def-item"><span class="di-name">${escHtml(i.name)}</span><span class="di-unit">${escHtml(i.unit || "")}</span></div>`).join("")}
+    <div class="mini-label" style="margin-top:6px">計算式</div>
+    <div class="def-formula">${(d.outputs || []).map(o => `${escHtml(o.name)} = ${escHtml(o.formula || "")}`).join("<br>")}</div>`;
+}
+
+async function sendCategoryChat() {
+  const box = document.getElementById("chat-def");
+  box.innerHTML = `<div class="def-label">AIが考えています…</div>`;
+  try {
+    const data = await RoiCore.proposeCategoryDefinition(
+      propState.caseId, assignState.issue, assignState.messages);
+    if (data.reply) assignState.messages.push({ role: "assistant", content: data.reply });
+    if (data.definition) assignState.definition = data.definition;
+    renderChat();
+  } catch (e) {
+    console.warn(e);
+    box.innerHTML = `<div class="def-label">エラー: ${escHtml(e.message || "")}</div>`;
+  }
+}
+
+async function saveCategory(scope) {
+  const d = assignState.definition;
+  if (!d) return;
+  const nameInput = document.getElementById("def-name");
+  if (nameInput) d.category = nameInput.value.trim() || d.category;
+  if (!demoMode) {
+    await RoiCore.addCategoryToMaster(d, {
+      scope, caseId: scope === RoiCore.SCOPE_TEMP ? propState.caseId : "",
+    });
+  }
+  await finishAssign(d.category, RoiCore.ASSIGN_DONE);
+}
+
 function fmtMan(v) {
   const n = Number(v);
   if (isNaN(n)) return "—";
@@ -732,8 +925,11 @@ async function buildPrompt() {
   if (!caseId) return;
 
   const rows = demoMode ? [] : await RoiCore.getCalcRowsForCase(caseId, { onlySelected: true });
-  if (!rows.length) {
-    document.getElementById("prompt-output").innerHTML = `<div class="meta">②で提案書に含める課題を選択（チェック）してください。</div>`;
+  const allIssues = demoMode ? [] : await RoiCore.getIssues(caseId);
+  // カテゴリなしで提案に含めると決めた課題も、金額なしで提案書に載せる
+  const noCatIssues = allIssues.filter(i => i.assignStatus === RoiCore.ASSIGN_NOCAT);
+  if (!rows.length && !noCatIssues.length) {
+    document.getElementById("prompt-output").innerHTML = `<div class="meta">②で提案書に含める課題を選択してください。</div>`;
     return;
   }
   const solutions = demoMode ? [] : await RoiCore.getSolutions();
@@ -765,7 +961,11 @@ async function buildPrompt() {
       ? cands.map(s => `・${s.name}（コスト感：${s.cost}／改善率${s.rate}%・${s.basisLevel}）${s.method}`).join("\n")
       : "（解決案未登録）";
     return `${i + 1}. ${cat}\n解決案候補：\n${solLines}`;
-  }).join("\n\n");
+  }).join("\n\n")
+  + (noCatIssues.length
+      ? "\n\n" + noCatIssues.map((iss, j) =>
+          `${cats.length + j + 1}. ${iss.title}\n（ROI試算なし・定性課題として記載）\n${iss.summary}`).join("\n\n")
+      : "");
 
   const promptText =
 `中小企業向けの提案書を、現状課題→解決の型→ROI→費用・体制の4章構成で作成してください。

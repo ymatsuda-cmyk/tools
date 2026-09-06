@@ -136,6 +136,39 @@ textarea { resize: vertical; }
 .diff-text { font-size: 11px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
 .choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 .choice-row .btn { width: auto; }
+/* ---- カテゴリ未設定・割り当て ---- */
+.acc.unmapped { border-left: 3px solid #e8a33d; }
+.tag-unmapped { font-size: 10px; background: #faeeda; color: #854f0b; padding: 1px 7px; border-radius: 8px; }
+.tag-cat { font-size: 10px; background: #e6f1fb; color: #185fa5; padding: 1px 7px; border-radius: 8px; }
+.tag-nocat { font-size: 10px; background: #f1efe8; color: #888780; padding: 1px 7px; border-radius: 8px; }
+.lbl-sm { font-size: 11px; color: #5f5e5a; margin-bottom: 6px; }
+
+.cand-card { background: #fafaf8; border: 1px solid #e5e3da; border-radius: 8px;
+  padding: 10px; margin-bottom: 6px; cursor: pointer; display: flex; gap: 7px; align-items: flex-start; }
+.cand-card.on { border: 2px solid #185fa5; }
+.cand-card .c-body { flex: 1; min-width: 0; }
+.cand-head { display: flex; justify-content: space-between; align-items: center; }
+.cand-name { font-size: 12px; font-weight: 600; }
+.cand-reason { font-size: 10px; color: #5f5e5a; margin-top: 3px; line-height: 1.6; }
+.tag-exist { font-size: 10px; background: #e1f5ee; color: #0f6e56; padding: 1px 7px; border-radius: 8px; }
+.tag-new2 { font-size: 10px; background: #e6f1fb; color: #185fa5; padding: 1px 7px; border-radius: 8px; }
+.radio-dot { width: 15px; height: 15px; border-radius: 50%; border: 1px solid #b4b2a9; flex: none; margin-top: 2px; }
+.cand-card.on .radio-dot { border: 5px solid #185fa5; }
+
+.chat-log { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;
+  max-height: 200px; overflow-y: auto; }
+.chat-ai { background: #fafaf8; border-radius: 10px 10px 10px 2px; padding: 9px 11px;
+  font-size: 11px; line-height: 1.7; }
+.chat-me { background: #e6f1fb; border-radius: 10px 10px 2px 10px; padding: 9px 11px;
+  font-size: 11px; line-height: 1.7; color: #0c447c; margin-left: 24px; }
+.def-box { border: 2px solid #185fa5; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+.def-box .def-label { font-size: 10px; color: #185fa5; margin-bottom: 6px; }
+.def-item { display: flex; gap: 6px; align-items: center; font-size: 11px; margin-bottom: 4px; }
+.def-item .di-name { flex: 1; background: #fafaf8; border-radius: 5px; padding: 5px 7px; }
+.def-item .di-unit { color: #888780; width: 30px; }
+.def-formula { font-family: ui-monospace, monospace; font-size: 10px; color: #5f5e5a;
+  background: #fafaf8; border-radius: 5px; padding: 7px; line-height: 1.6; }
+
 /* ---- ②提案タブ：合計・アコーディオン・ウィザード ---- */
 .totals-box { background: #e6f1fb; border-radius: 10px; padding: 12px; margin: 10px 0; }
 .totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

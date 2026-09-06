@@ -22,7 +22,14 @@
   const CUST_SHEET = "顧客マスタ";
 
   const MASTER_SHEET = "ROIマスタ";
-  const MASTER_COLUMNS = ["課題カテゴリ", "項目ID", "項目名", "区分", "単位", "デフォルト値", "数式", "信頼度初期値"];
+  // 利用範囲: "共通"（全案件で使う正式カテゴリ） / "一時"（作成した案件でのみ使う）
+  // 作成案件ID: 利用範囲が"一時"のときに、どの案件用に作られたかを持つ。
+  //   一時カテゴリは他案件のカテゴリ一覧には出さず、マスタを汚さない。
+  //   複数案件で使われるようになったら、利用範囲を"共通"に変えるだけで昇格できる。
+  const MASTER_COLUMNS = ["課題カテゴリ", "項目ID", "項目名", "区分", "単位", "デフォルト値", "数式", "信頼度初期値", "利用範囲", "作成案件ID"];
+
+  const SCOPE_COMMON = "共通";
+  const SCOPE_TEMP = "一時";
 
   const HEARING_SHEET = "議事録";
   // 参照URL: PLAUD/Notion等、既存の議事録ビューアに保管されているテキストへの
@@ -52,11 +59,16 @@
   // 1つの議事録から複数カテゴリが抽出されるため、案件ID×課題カテゴリで1行。
   // 既存ワークブックの「課題」シート（課題管理表）とは別物なので名前を分けている。
   const ISSUE_SHEET = "抽出課題";
-  // AI原文タイトル / AI原文内容: AIが最後に出力したそのままの文章を保持する。
-  // 現在の課題タイトル・課題内容がこれと異なれば「営業が編集した」と判定し、
-  // 再抽出時に自動で上書きせず確認を出す。
-  const ISSUE_COLUMNS = ["案件ID", "課題カテゴリ", "課題タイトル", "課題内容",
-    "AI原文タイトル", "AI原文内容", "根拠議事録ID", "抽出日時"];
+  // 課題カテゴリ: 割り当て済みならカテゴリ名、未割り当てなら空。
+  // 割当状態: 未設定 / 割当済 / カテゴリなしで提案 / 対象外
+  // AI候補: AIが提示したカテゴリ候補をJSON文字列で保持（候補名・既存or新規・理由）
+  const ISSUE_COLUMNS = ["案件ID", "課題ID", "課題カテゴリ", "課題タイトル", "課題内容",
+    "AI原文タイトル", "AI原文内容", "割当状態", "AI候補", "根拠議事録ID", "抽出日時"];
+
+  const ASSIGN_UNSET = "未設定";
+  const ASSIGN_DONE = "割当済";
+  const ASSIGN_NOCAT = "カテゴリなしで提案";
+  const ASSIGN_SKIP = "対象外";
 
   // 案件ごとの「どの解決策に決めたか」を保持するシート。
   // 導入費・改善率・削減根拠はソリューションDBの値を初期値としてコピーし、
@@ -72,56 +84,56 @@
   const CONF_WEIGHT = { "確定": 1, "推定": 0.5, "未確認": 0 };
 
   const MASTER_SEED = [
-    ["在庫管理", "stk_people", "棚卸人数", "入力", "人", 3, "", "未確認"],
-    ["在庫管理", "stk_hours", "棚卸時間", "入力", "時間", 4, "", "未確認"],
-    ["在庫管理", "stk_freq", "棚卸回数/年", "入力", "回", 12, "", "未確認"],
-    ["在庫管理", "stk_wage", "時給", "入力", "円", 3000, "", "推定"],
-    ["在庫管理", "stk_improve", "改善率", "入力", "%", 60, "", "推定"],
-    ["在庫管理", "stk_hours_yr", "年間棚卸工数", "出力", "時間", "", "stk_people*stk_hours*stk_freq", ""],
-    ["在庫管理", "stk_cost_yr", "年間棚卸コスト", "出力", "円", "", "stk_hours_yr*stk_wage", ""],
-    ["在庫管理", "stk_saving", "削減額", "出力", "円", "", "stk_cost_yr*stk_improve/100", ""],
-    ["ロット管理", "lot_hours", "追跡時間", "入力", "時間", 2, "", "未確認"],
-    ["ロット管理", "lot_freq", "追跡回数/年", "入力", "回", 100, "", "未確認"],
-    ["ロット管理", "lot_people", "担当人数", "入力", "人", 2, "", "未確認"],
-    ["ロット管理", "lot_wage", "時給", "入力", "円", 3000, "", "推定"],
-    ["ロット管理", "lot_improve", "改善率", "入力", "%", 60, "", "推定"],
-    ["ロット管理", "lot_hours_yr", "年間追跡工数", "出力", "時間", "", "lot_hours*lot_freq*lot_people", ""],
-    ["ロット管理", "lot_saving", "削減額", "出力", "円", "", "lot_hours_yr*lot_wage*lot_improve/100", ""],
-    ["AI議事録", "min_meetings", "会議回数/月", "入力", "回", 8, "", "未確認"],
-    ["AI議事録", "min_people", "参加人数", "入力", "人", 3, "", "未確認"],
-    ["AI議事録", "min_hours", "議事録作成時間", "入力", "時間", 1, "", "未確認"],
-    ["AI議事録", "min_wage", "時給", "入力", "円", 3000, "", "推定"],
-    ["AI議事録", "min_hours_yr", "年間工数", "出力", "時間", "", "min_meetings*12*min_people*min_hours", ""],
-    ["AI議事録", "min_saving", "削減額", "出力", "円", "", "min_hours_yr*min_wage", ""],
+    ["在庫管理", "stk_people", "棚卸人数", "入力", "人", 3, "", "未確認", "共通", ""],
+    ["在庫管理", "stk_hours", "棚卸時間", "入力", "時間", 4, "", "未確認", "共通", ""],
+    ["在庫管理", "stk_freq", "棚卸回数/年", "入力", "回", 12, "", "未確認", "共通", ""],
+    ["在庫管理", "stk_wage", "時給", "入力", "円", 3000, "", "推定", "共通", ""],
+    ["在庫管理", "stk_improve", "改善率", "入力", "%", 60, "", "推定", "共通", ""],
+    ["在庫管理", "stk_hours_yr", "年間棚卸工数", "出力", "時間", "", "stk_people*stk_hours*stk_freq", "", "共通", ""],
+    ["在庫管理", "stk_cost_yr", "年間棚卸コスト", "出力", "円", "", "stk_hours_yr*stk_wage", "", "共通", ""],
+    ["在庫管理", "stk_saving", "削減額", "出力", "円", "", "stk_cost_yr*stk_improve/100", "", "共通", ""],
+    ["ロット管理", "lot_hours", "追跡時間", "入力", "時間", 2, "", "未確認", "共通", ""],
+    ["ロット管理", "lot_freq", "追跡回数/年", "入力", "回", 100, "", "未確認", "共通", ""],
+    ["ロット管理", "lot_people", "担当人数", "入力", "人", 2, "", "未確認", "共通", ""],
+    ["ロット管理", "lot_wage", "時給", "入力", "円", 3000, "", "推定", "共通", ""],
+    ["ロット管理", "lot_improve", "改善率", "入力", "%", 60, "", "推定", "共通", ""],
+    ["ロット管理", "lot_hours_yr", "年間追跡工数", "出力", "時間", "", "lot_hours*lot_freq*lot_people", "", "共通", ""],
+    ["ロット管理", "lot_saving", "削減額", "出力", "円", "", "lot_hours_yr*lot_wage*lot_improve/100", "", "共通", ""],
+    ["AI議事録", "min_meetings", "会議回数/月", "入力", "回", 8, "", "未確認", "共通", ""],
+    ["AI議事録", "min_people", "参加人数", "入力", "人", 3, "", "未確認", "共通", ""],
+    ["AI議事録", "min_hours", "議事録作成時間", "入力", "時間", 1, "", "未確認", "共通", ""],
+    ["AI議事録", "min_wage", "時給", "入力", "円", 3000, "", "推定", "共通", ""],
+    ["AI議事録", "min_hours_yr", "年間工数", "出力", "時間", "", "min_meetings*12*min_people*min_hours", "", "共通", ""],
+    ["AI議事録", "min_saving", "削減額", "出力", "円", "", "min_hours_yr*min_wage", "", "共通", ""],
     // 製造管理
-    ["製造管理", "mfg_revenue", "生産額", "入力", "円", 50000000, "", "未確認"],
-    ["製造管理", "mfg_defect_rate", "不良率", "入力", "%", 3, "", "推定"],
-    ["製造管理", "mfg_defect_rate_after", "改善後不良率", "入力", "%", 1, "", "推定"],
-    ["製造管理", "mfg_loss", "不良損失", "出力", "円", "", "mfg_revenue*mfg_defect_rate/100", ""],
-    ["製造管理", "mfg_loss_after", "改善後不良損失", "出力", "円", "", "mfg_revenue*mfg_defect_rate_after/100", ""],
-    ["製造管理", "mfg_saving", "削減額", "出力", "円", "", "mfg_loss-mfg_loss_after", ""],
+    ["製造管理", "mfg_revenue", "生産額", "入力", "円", 50000000, "", "未確認", "共通", ""],
+    ["製造管理", "mfg_defect_rate", "不良率", "入力", "%", 3, "", "推定", "共通", ""],
+    ["製造管理", "mfg_defect_rate_after", "改善後不良率", "入力", "%", 1, "", "推定", "共通", ""],
+    ["製造管理", "mfg_loss", "不良損失", "出力", "円", "", "mfg_revenue*mfg_defect_rate/100", "", "共通", ""],
+    ["製造管理", "mfg_loss_after", "改善後不良損失", "出力", "円", "", "mfg_revenue*mfg_defect_rate_after/100", "", "共通", ""],
+    ["製造管理", "mfg_saving", "削減額", "出力", "円", "", "mfg_loss-mfg_loss_after", "", "共通", ""],
     // OCR受注入力
-    ["OCR受注入力", "ocr_count", "注文書件数/月", "入力", "件", 200, "", "未確認"],
-    ["OCR受注入力", "ocr_input_min", "入力時間", "入力", "分", 5, "", "未確認"],
-    ["OCR受注入力", "ocr_fix_min", "修正時間", "入力", "分", 2, "", "未確認"],
-    ["OCR受注入力", "ocr_wage", "時給", "入力", "円", 3000, "", "推定"],
-    ["OCR受注入力", "ocr_improve", "改善率", "入力", "%", 70, "", "推定"],
-    ["OCR受注入力", "ocr_hours_yr", "年間入力時間", "出力", "時間", "", "ocr_count*12*(ocr_input_min+ocr_fix_min)/60", ""],
-    ["OCR受注入力", "ocr_saving", "削減額", "出力", "円", "", "ocr_hours_yr*ocr_wage*ocr_improve/100", ""],
+    ["OCR受注入力", "ocr_count", "注文書件数/月", "入力", "件", 200, "", "未確認", "共通", ""],
+    ["OCR受注入力", "ocr_input_min", "入力時間", "入力", "分", 5, "", "未確認", "共通", ""],
+    ["OCR受注入力", "ocr_fix_min", "修正時間", "入力", "分", 2, "", "未確認", "共通", ""],
+    ["OCR受注入力", "ocr_wage", "時給", "入力", "円", 3000, "", "推定", "共通", ""],
+    ["OCR受注入力", "ocr_improve", "改善率", "入力", "%", 70, "", "推定", "共通", ""],
+    ["OCR受注入力", "ocr_hours_yr", "年間入力時間", "出力", "時間", "", "ocr_count*12*(ocr_input_min+ocr_fix_min)/60", "", "共通", ""],
+    ["OCR受注入力", "ocr_saving", "削減額", "出力", "円", "", "ocr_hours_yr*ocr_wage*ocr_improve/100", "", "共通", ""],
     // Delphi移行
-    ["Delphi移行", "delphi_staff", "保守担当人数", "入力", "人", 2, "", "未確認"],
-    ["Delphi移行", "delphi_inquiries", "問い合わせ件数/年", "入力", "件", 300, "", "未確認"],
-    ["Delphi移行", "delphi_avg_hours", "平均対応時間", "入力", "時間", 1, "", "推定"],
-    ["Delphi移行", "delphi_wage", "時給", "入力", "円", 3000, "", "推定"],
-    ["Delphi移行", "delphi_improve", "改善率", "入力", "%", 50, "", "推定"],
-    ["Delphi移行", "delphi_hours_yr", "年間保守工数", "出力", "時間", "", "delphi_inquiries*delphi_avg_hours", ""],
-    ["Delphi移行", "delphi_cost_yr", "年間保守コスト", "出力", "円", "", "delphi_hours_yr*delphi_wage", ""],
-    ["Delphi移行", "delphi_saving", "削減額", "出力", "円", "", "delphi_cost_yr*delphi_improve/100", ""],
+    ["Delphi移行", "delphi_staff", "保守担当人数", "入力", "人", 2, "", "未確認", "共通", ""],
+    ["Delphi移行", "delphi_inquiries", "問い合わせ件数/年", "入力", "件", 300, "", "未確認", "共通", ""],
+    ["Delphi移行", "delphi_avg_hours", "平均対応時間", "入力", "時間", 1, "", "推定", "共通", ""],
+    ["Delphi移行", "delphi_wage", "時給", "入力", "円", 3000, "", "推定", "共通", ""],
+    ["Delphi移行", "delphi_improve", "改善率", "入力", "%", 50, "", "推定", "共通", ""],
+    ["Delphi移行", "delphi_hours_yr", "年間保守工数", "出力", "時間", "", "delphi_inquiries*delphi_avg_hours", "", "共通", ""],
+    ["Delphi移行", "delphi_cost_yr", "年間保守コスト", "出力", "円", "", "delphi_hours_yr*delphi_wage", "", "共通", ""],
+    ["Delphi移行", "delphi_saving", "削減額", "出力", "円", "", "delphi_cost_yr*delphi_improve/100", "", "共通", ""],
     // 属人化・情報共有・問合せ対応: ROI試算は行わず、定性的な解決案候補のみ持つ
     // カテゴリ一覧に出てくるよう最低限の入力項目だけ用意している
-    ["属人化", "attrib_people", "該当ベテラン人数", "入力", "人", 1, "", "未確認"],
-    ["情報共有", "info_tools", "使用ツール数", "入力", "個", 3, "", "未確認"],
-    ["問合せ対応", "inquiry_count", "月間問合せ件数", "入力", "件", 20, "", "未確認"],
+    ["属人化", "attrib_people", "該当ベテラン人数", "入力", "人", 1, "", "未確認", "共通", ""],
+    ["情報共有", "info_tools", "使用ツール数", "入力", "個", 3, "", "未確認", "共通", ""],
+    ["問合せ対応", "inquiry_count", "月間問合せ件数", "入力", "件", 20, "", "未確認", "共通", ""],
   ];
 
   const SOLUTION_SEED = [
@@ -189,7 +201,96 @@
   }
 
   function rowToMasterItem(r) {
-    return { category: r[0], itemId: r[1], name: r[2], kind: r[3], unit: r[4], defaultVal: r[5], formula: r[6], confDefault: r[7] };
+    return {
+      category: r[0], itemId: r[1], name: r[2], kind: r[3], unit: r[4],
+      defaultVal: r[5], formula: r[6], confDefault: r[7],
+      // 既存シート（列が無い旧版）は空になるので「共通」扱いにする
+      scope: r[8] || SCOPE_COMMON,
+      ownerCaseId: r[9] || "",
+    };
+  }
+
+  /* この案件で使えるマスタ項目。共通カテゴリ＋この案件用の一時カテゴリ。 */
+  function getMasterItemsFor(caseId) {
+    return getMasterItems().filter(m =>
+      m.scope !== SCOPE_TEMP || sameId(m.ownerCaseId, caseId));
+  }
+
+  /* この案件で使えるカテゴリ名の一覧。 */
+  function getCategoriesFor(caseId) {
+    return Array.from(new Set(getMasterItemsFor(caseId).map(m => m.category)));
+  }
+
+  /* 一時カテゴリの一覧（マスタ化候補の確認用）。
+   * 利用状況（何案件で使われているか）も返す。 */
+  async function listTempCategories() {
+    const temps = {};
+    getMasterItems().filter(m => m.scope === SCOPE_TEMP).forEach(m => {
+      temps[m.category] = temps[m.category] || { category: m.category, ownerCaseId: m.ownerCaseId, itemCount: 0 };
+      temps[m.category].itemCount++;
+    });
+    if (!global.Office || !global.Excel) return Object.values(temps);
+    // ROI試算シートで実際に使われている案件数を数える
+    let calcRows = [];
+    await Excel.run(async ctx => {
+      const rng = ctx.workbook.worksheets.getItem(CALC_SHEET).getUsedRange(true);
+      rng.load("values");
+      await ctx.sync();
+      calcRows = rng.values.slice(1);
+    });
+    Object.values(temps).forEach(t => {
+      const cases = new Set(calcRows.filter(r => r[1] === t.category).map(r => String(r[0]).trim()));
+      t.usedCaseCount = cases.size;
+    });
+    return Object.values(temps);
+  }
+
+  /* 一時カテゴリを共通カテゴリへ昇格させる（利用範囲を"共通"に書き換える）。 */
+  async function promoteTempCategory(category) {
+    if (!global.Office || !global.Excel) return;
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(MASTER_SHEET);
+      const rng = sheet.getUsedRange(true);
+      rng.load("values");
+      await ctx.sync();
+      rng.values.forEach((r, i) => {
+        if (i === 0 || r[0] !== category) return;
+        sheet.getRange(`I${i + 1}`).values = [[SCOPE_COMMON]];
+        sheet.getRange(`J${i + 1}`).values = [[""]];
+      });
+      await ctx.sync();
+    });
+    await ensureAllSheets(); // マスタのキャッシュを更新
+  }
+
+  /* AIとの壁打ちで決めたカテゴリ定義をROIマスタに追加する。
+   * scope に SCOPE_TEMP を渡すと、その案件専用の一時カテゴリになる。
+   * def = { category, inputs:[{itemId,name,unit,defaultVal,confDefault}],
+   *         outputs:[{itemId,name,unit,formula}] } */
+  async function addCategoryToMaster(def, { scope = SCOPE_TEMP, caseId = "" } = {}) {
+    if (!global.Office || !global.Excel) return;
+    const rows = [];
+    (def.inputs || []).forEach(i => rows.push([
+      def.category, i.itemId, i.name, "入力", i.unit || "",
+      i.defaultVal ?? "", "", i.confDefault || "未確認",
+      scope, scope === SCOPE_TEMP ? caseId : "",
+    ]));
+    (def.outputs || []).forEach(o => rows.push([
+      def.category, o.itemId, o.name, "出力", o.unit || "",
+      "", o.formula || "", "",
+      scope, scope === SCOPE_TEMP ? caseId : "",
+    ]));
+    if (!rows.length) return;
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(MASTER_SHEET);
+      const used = sheet.getUsedRange(true);
+      used.load("rowCount");
+      await ctx.sync();
+      const start = Math.max(used.rowCount, 1) + 1;
+      sheet.getRange(`A${start}:J${start + rows.length - 1}`).values = rows;
+      await ctx.sync();
+    });
+    await ensureAllSheets();
   }
 
   /* すべての必要シートを用意し、ROIマスタをキャッシュして返す。
@@ -450,9 +551,10 @@
     if (!hearings.length && !memoText) return { hearingIds: [], results: [] };
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
 
-    const categoryDefs = getCategories().map(cat => ({
+    // この案件で使えるカテゴリ（共通＋この案件の一時カテゴリ）を候補判定の材料として渡す
+    const categoryDefs = getCategoriesFor(caseId).map(cat => ({
       category: cat,
-      items: getMasterItems().filter(m => m.category === cat && m.kind === "入力")
+      items: getMasterItemsFor(caseId).filter(m => m.category === cat && m.kind === "入力")
         .map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
     }));
 
@@ -471,17 +573,20 @@
     if (data.error) throw new Error("GASエラー: " + data.error);
 
     const existing = await getIssues(caseId);
-    const results = (data.results || []).filter(r => r && r.category).map(r => {
-      const cur = existing.find(x => x.category === r.category);
+    const results = (data.issues || []).filter(r => r && r.title).map(r => {
+      // 既存課題との突き合わせは、AIが返した課題IDがあればそれで、
+      // 無ければAI原文タイトルの一致で行う（再抽出時に重複を作らないため）
+      const cur = existing.find(x => (r.issueId && x.issueId === r.issueId) || x.aiTitle === r.title);
       return {
-        category: r.category,
-        newTitle: r.title || r.category,
+        issueId: cur ? cur.issueId : genId("I"),
+        newTitle: r.title,
         newSummary: r.summary || "",
+        candidates: r.candidates || [],
+        // AIが「既存カテゴリにそのまま当てはまる」と判断した場合のみ設定される
+        matchedCategory: r.matchedCategory || "",
         items: r.items || [],
         current: cur || null,
-        // 新規 / 編集済み（要確認） / 未編集（自動更新）
         status: !cur ? "新規" : (cur.edited ? "編集済み" : "未編集"),
-        // 既定値: 編集済みは残す、それ以外は上書き
         keepText: cur ? cur.edited : false,
       };
     });
@@ -490,14 +595,44 @@
 
   async function commitExtraction(caseId, hearingIds, results) {
     for (const r of results) {
-      await saveIssue(caseId, r.category, {
-        title: r.newTitle, summary: r.newSummary, hearingIds, keepText: !!r.keepText,
+      const assigned = !!r.matchedCategory;
+      await saveIssue(caseId, r.issueId, {
+        category: assigned ? r.matchedCategory : (r.current ? r.current.category : ""),
+        title: r.newTitle, summary: r.newSummary,
+        assignStatus: assigned ? ASSIGN_DONE
+          : (r.current ? r.current.assignStatus : ASSIGN_UNSET),
+        candidates: r.candidates,
+        hearingIds, keepText: !!r.keepText,
       });
-      if (r.items && r.items.length) {
-        await applyCategoryToCalcSheet(caseId, r.category, r.items, hearingIds);
+      if (assigned && r.items && r.items.length) {
+        await applyCategoryToCalcSheet(caseId, r.matchedCategory, r.items, hearingIds);
       }
     }
     return results.length;
+  }
+
+  /* ---------- AIと壁打ちして新カテゴリを設計する ----------
+   * 会話履歴を渡すと、AIの返答とカテゴリ定義案（名前・入力項目・計算式）を返す。
+   * 返ってきた定義は addCategoryToMaster() で登録する。 */
+  async function proposeCategoryDefinition(caseId, issue, messages = []) {
+    const cfg = getConfig();
+    if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
+    const res = await fetch(cfg.webhookUrl, {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "category", token: cfg.token || "", caseId,
+        issue: { title: issue.title, summary: issue.summary },
+        existingCategories: getCategoriesFor(caseId),
+        messages,
+      }),
+    });
+    const raw = await res.text();
+    console.log("[RoiCore] category-design raw response:", raw);
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (e) { throw new Error("サーバーの応答がJSONではありません。実際の応答はconsoleに出力しています。"); }
+    if (data.error) throw new Error("GASエラー: " + data.error);
+    return data; // { reply, definition:{category,inputs,outputs} }
   }
 
   /* 確認なしで一括反映する簡易版（営業報告アドインの「作成」アイコン用）。
@@ -506,8 +641,9 @@
     const { hearingIds, results } = await previewExtraction(caseId, memoText);
     await commitExtraction(caseId, hearingIds, results);
     return results.map(r => ({
-      category: r.category, title: r.newTitle, summary: r.newSummary,
-      itemCount: (r.items || []).length, status: r.status,
+      issueId: r.issueId, category: r.matchedCategory, title: r.newTitle,
+      summary: r.newSummary, itemCount: (r.items || []).length, status: r.status,
+      unassigned: !r.matchedCategory,
     }));
   }
 
@@ -658,54 +794,80 @@
       rows = rng.values.slice(1).filter(r => sameId(r[0], caseId) && r[1]);
     });
     return rows.map(r => {
-      const title = r[2] || "", summary = r[3] || "";
-      const aiTitle = r[4] || "", aiSummary = r[5] || "";
+      const title = r[3] || "", summary = r[4] || "";
+      const aiTitle = r[5] || "", aiSummary = r[6] || "";
+      let candidates = [];
+      try { candidates = JSON.parse(r[8] || "[]"); } catch (e) { candidates = []; }
       return {
-        caseId: r[0], category: r[1], title, summary, aiTitle, aiSummary,
-        // AIが書いた原文と現在の内容が違えば、営業が手を入れたとみなす
+        caseId: r[0], issueId: r[1], category: r[2] || "", title, summary,
+        aiTitle, aiSummary,
         edited: (title !== aiTitle) || (summary !== aiSummary),
-        hearingIds: String(r[6] || "").split(",").filter(Boolean),
-        extractedAt: r[7],
+        assignStatus: r[7] || ASSIGN_UNSET,
+        candidates,
+        hearingIds: String(r[9] || "").split(",").filter(Boolean),
+        extractedAt: r[10],
       };
     });
   }
 
-  /* 課題を保存する。keepText=true なら課題タイトル・内容は既存のまま残し、
-   * AI原文の列だけを更新する（営業の編集を守りつつ、次回の編集判定は
-   * 最新のAI出力を基準にするため）。 */
-  async function saveIssue(caseId, category, { title = "", summary = "", hearingIds = [], keepText = false } = {}) {
+  /* 課題を保存する。課題IDで既存行を探し、あれば上書き、無ければ追加。
+   * keepText=true なら課題タイトル・内容は既存のまま残し、AI原文だけ更新する。 */
+  async function saveIssue(caseId, issueId, d = {}) {
     if (!global.Office || !global.Excel) return;
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
       const used = sheet.getUsedRange(true);
       used.load("values, rowCount");
       await ctx.sync();
-      const idx = used.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === category);
+      const idx = used.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
       const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
       const cur = idx >= 0 ? used.values[idx + 1] : null;
-      const keepTitle = keepText && cur ? (cur[2] || "") : title;
-      const keepSummary = keepText && cur ? (cur[3] || "") : summary;
-      sheet.getRange(`A${rowNum}:H${rowNum}`).values = [[
-        caseId, category, keepTitle, keepSummary, title, summary,
-        hearingIds.filter(Boolean).join(","), nowStr(),
+      const keepTitle = d.keepText && cur ? (cur[3] || "") : (d.title || "");
+      const keepSummary = d.keepText && cur ? (cur[4] || "") : (d.summary || "");
+      sheet.getRange(`A${rowNum}:K${rowNum}`).values = [[
+        caseId, issueId,
+        d.category !== undefined ? d.category : (cur ? cur[2] : ""),
+        keepTitle, keepSummary,
+        d.title || "", d.summary || "",
+        d.assignStatus || (cur ? cur[7] : ASSIGN_UNSET) || ASSIGN_UNSET,
+        JSON.stringify(d.candidates || (cur ? (() => { try { return JSON.parse(cur[8] || "[]"); } catch (e) { return []; } })() : [])),
+        (d.hearingIds || []).filter(Boolean).join(","),
+        nowStr(),
       ]];
       await ctx.sync();
     });
   }
 
-  /* 営業が課題タイトル・内容を手で編集したときに呼ぶ（AI原文列は触らない）。 */
-  async function updateIssueText(caseId, category, { title, summary } = {}) {
+  /* 担当者がカテゴリを割り当てた/扱いを決めたときに呼ぶ。 */
+  async function assignIssueCategory(caseId, issueId, { category = "", assignStatus } = {}) {
     if (!global.Office || !global.Excel) return;
     await Excel.run(async ctx => {
       const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === category);
+      const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
       if (idx < 0) return;
       const rowNum = idx + 2;
-      if (title !== undefined) sheet.getRange(`C${rowNum}`).values = [[title]];
-      if (summary !== undefined) sheet.getRange(`D${rowNum}`).values = [[summary]];
+      sheet.getRange(`C${rowNum}`).values = [[category]];
+      if (assignStatus) sheet.getRange(`H${rowNum}`).values = [[assignStatus]];
+      await ctx.sync();
+    });
+  }
+
+  /* 営業が課題タイトル・内容を手で編集したときに呼ぶ（AI原文列は触らない）。 */
+  async function updateIssueText(caseId, issueId, { title, summary } = {}) {
+    if (!global.Office || !global.Excel) return;
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
+      const rng = sheet.getUsedRange(true);
+      rng.load("values");
+      await ctx.sync();
+      const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
+      if (idx < 0) return;
+      const rowNum = idx + 2;
+      if (title !== undefined) sheet.getRange(`D${rowNum}`).values = [[title]];
+      if (summary !== undefined) sheet.getRange(`E${rowNum}`).values = [[summary]];
       await ctx.sync();
     });
   }
@@ -815,7 +977,12 @@
     quickCreateProposal, autoExtractProposals, getSourceEntriesForCategory,
     getProposalSummaryForCase, getCalcRowsForCase, toggleSelection, updateCalcInput,
     getDecisions, saveDecision,
-    getIssues, saveIssue, updateIssueText,
+    getIssues, saveIssue, updateIssueText, assignIssueCategory,
+    proposeCategoryDefinition, addCategoryToMaster,
+    listTempCategories, promoteTempCategory,
+    getMasterItemsFor, getCategoriesFor,
+    ASSIGN_UNSET, ASSIGN_DONE, ASSIGN_NOCAT, ASSIGN_SKIP,
+    SCOPE_COMMON, SCOPE_TEMP,
     confidenceOf, confidenceLabel,
     getCustomerInfo, getSolutions, getSolutionsForCategory,
   };

@@ -208,7 +208,10 @@ function doPost(e) {
       return respond({ error: "unauthorized" });
     }
 
-    const result = (req.mode === "auto") ? handleAutoMode(req) : handleSingleCategoryMode(req);
+    let result;
+    if (req.mode === "auto") result = handleAutoMode(req);
+    else if (req.mode === "category") result = handleCategoryMode(req);
+    else result = handleSingleCategoryMode(req);
     Logger.log("[doPost] responded OK");
     return result;
   } catch (err) {
@@ -293,28 +296,37 @@ function handleAutoMode(req) {
   ).join("\n\n");
 
   const prompt =
-`あなたは中小製造業向けの業務システム提案を行う営業担当です。
+`あなたは中小企業向けの業務システム提案を行う営業担当です。
 以下の議事録・メモを読み、顧客が抱えている課題を抽出してください。
 
-【重要】1つの議事録に複数の課題が含まれているのが普通です。
-当てはまる課題カテゴリをすべて洗い出してください。1つに絞らないでください。
+【最重要】顧客が困りごととして語っている内容は、下の「既存カテゴリ一覧」に
+当てはまるかどうかに関わらず、すべて抽出してください。
+既存カテゴリに無いという理由で課題を捨てないでください。
+自社のカテゴリ整備が追いついていないだけで、顧客にとっては同じ課題です。
+
+【重要】1つの議事録に複数の課題が含まれているのが普通です。1つに絞らないでください。
 
 各課題について、次を出力してください。
-- category: 下の一覧にあるカテゴリ名をそのまま使う（一覧にない課題は出力しない）
+
 - title: その顧客固有の課題を一行で（例「棚卸と在庫差異の調査に時間がかかっている」）
   カテゴリ名をそのまま書かず、議事録に出てきた具体的な状況を反映すること
 - summary: 課題の内容を2〜3文で。現状の進め方、何に困っているか、その影響を含める。
   議事録に書かれていないことは推測で補わないこと
-- items: そのカテゴリの項目一覧に対応する数値。読み取れない項目は value を null、
-  confidence を "未確認" とする。数値が明言されていれば "確定"、
-  文脈から推測した場合は "推定" とする
+- matchedCategory: 既存カテゴリのどれかに**明確に**当てはまる場合のみ、そのカテゴリ名。
+  少しでも迷う場合は空文字 "" にすること（担当者が後で判断する）
+- items: matchedCategory を設定した場合のみ、そのカテゴリの項目一覧に対応する数値。
+  読み取れない項目は value を null、confidence を "未確認" とする。
+  数値が明言されていれば "確定"、文脈から推測した場合は "推定"。
+  matchedCategory が空なら items は空配列にすること
+- candidates: 担当者がカテゴリを選ぶための候補を1〜3件。既存・新規を混ぜてよい。
+  各候補は { name, isNew, reason } の形。
+  - name: カテゴリ名。既存カテゴリなら一覧の名前をそのまま使う
+  - isNew: 既存カテゴリなら false、新しく作る提案なら true
+  - reason: なぜその候補か、および当てはまらない可能性があればその留保も一行で
+  新規候補の name は、その顧客固有の言葉ではなく、他業種でも通じる一般的な名前にすること
 
-数値がまったく読み取れない課題でも、議事録で困りごととして語られていれば
-items を空配列にして results に含めてください（属人化など金額換算しにくい課題を
-取りこぼさないため）。逆に、議事録で言及されていないカテゴリは含めないでください。
-
-カテゴリと項目一覧:
-${categoryBlock}
+既存カテゴリ一覧（この案件で使えるもの）:
+${categoryBlock || "（まだカテゴリが登録されていません）"}
 
 議事録・メモ:
 """
@@ -322,11 +334,11 @@ ${combinedText}
 """
 
 出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
-{"results":[{"category":"...","title":"...","summary":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
+{"issues":[{"title":"...","summary":"...","matchedCategory":"","items":[],"candidates":[{"name":"...","isNew":false,"reason":"..."}]}]}`;
 
   const ai = callAiModel(prompt, 4000, settings);
   if (ai.error) return respond({ error: ai.error });
-  const parsed = safeParseJson(ai.text, { results: [] });
+  const parsed = safeParseJson(ai.text, { issues: [] });
   return respond(parsed);
 }
 
@@ -341,6 +353,59 @@ function safeParseJson(text, fallback) {
     return fallback;
   }
 }
+/* カテゴリ設計モード（AIとの壁打ち）。
+ * リクエスト:
+ * { mode:"category", caseId,
+ *   issue: { title, summary },
+ *   existingCategories: ["在庫管理", ...],
+ *   messages: [{ role:"user"|"assistant", content:"..." }, ...] }
+ * レスポンス:
+ * { reply: "AIの返答文", definition: { category, inputs:[...], outputs:[...] } }
+ * definition は毎回「現時点での案」を返す。担当者が画面で編集して登録する。 */
+function handleCategoryMode(req) {
+  const settings = getAiSettings();
+  if (!settings.apiKey) return respond({ error: "AI_API_KEY not configured" });
+
+  const issue = req.issue || {};
+  const history = (req.messages || [])
+    .map(m => (m.role === "user" ? "担当者: " : "AI: ") + m.content).join("\n");
+
+  const prompt =
+`あなたは中小企業向けの業務システム提案で使うROI試算マスタの設計を手伝います。
+担当者と相談しながら、この課題を試算するための課題カテゴリを設計してください。
+
+対象の課題:
+タイトル: ${issue.title || ""}
+内容: ${issue.summary || ""}
+
+既にあるカテゴリ（重複させないこと）:
+${(req.existingCategories || []).join(" / ") || "（なし）"}
+
+これまでのやり取り:
+${history || "（まだありません）"}
+
+設計の方針:
+- カテゴリ名は、この顧客固有の言葉ではなく、他業種でも通じる一般的な名前にする
+  （例:「美容室の予約電話対応」ではなく「予約・スケジュール調整」）
+- 既存カテゴリで足りるなら、無理に新規を作らずそう伝える
+- 入力項目は、顧客にヒアリングすれば答えられる具体的な数値にする
+  （件数・時間・人数・単価など。抽象的な指標は避ける）
+- 出力項目には必ず削減額を含め、項目IDは "_saving" で終わらせる
+- 数式は入力項目の項目IDだけを使った式にする（例: "xxx_count*12*xxx_min/60"）
+- 項目IDは英小文字とアンダースコアのみ。カテゴリごとに共通の接頭辞をつける
+
+reply には担当者への返答を書いてください。設計の意図や、迷っている点への質問を
+1〜3文で簡潔に。専門用語を並べず、平易な日本語で書くこと。
+
+出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
+{"reply":"...","definition":{"category":"...","inputs":[{"itemId":"...","name":"...","unit":"...","defaultVal":0,"confDefault":"未確認"}],"outputs":[{"itemId":"..._saving","name":"削減額","unit":"円","formula":"..."}]}}`;
+
+  const ai = callAiModel(prompt, 2500, settings);
+  if (ai.error) return respond({ error: ai.error });
+  const parsed = safeParseJson(ai.text, { reply: "", definition: null });
+  return respond(parsed);
+}
+
 /* 参照URL先のテキストを取得する。
  * 議事録ビューア（Notion等）が公開URLでプレーンテキスト/HTMLを返す前提。
  * 認証が必要なページは取得できないため、その場合はtext欄への貼り付けを使う。 */
