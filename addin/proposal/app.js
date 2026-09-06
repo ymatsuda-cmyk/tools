@@ -191,7 +191,7 @@ async function loadHearingLogForCase() {
     <div class="log-item">
       <div class="log-top">
         <span class="log-title">${escHtml(r.title)}</span>
-        <span class="log-date">${escHtml((r.registeredAt || "").slice(5, 10))}</span>
+        <span class="log-date">${escHtml(fmtMonthDay(r.registeredAt))}</span>
       </div>
       ${r.url ? `<div class="log-url"><a href="${escAttr(r.url)}" target="_blank" rel="noopener">${escHtml(r.url)}</a></div>` : ""}
       ${r.text ? `<div class="log-text">${escHtml(r.text.slice(0, 60))}${r.text.length > 60 ? "…" : ""}</div>` : ""}
@@ -790,6 +790,23 @@ async function buildPrompt() {
 function copyToClipboard(text) { if (navigator.clipboard) navigator.clipboard.writeText(text); }
 
 /* ---------- ユーティリティ ---------- */
+/* ---------- ユーティリティ ---------- */
+/* Excelがセルを日付として自動認識すると、"YYYY-MM-DD HH:MM"のような文字列で
+ * 書き込んでも、読み戻すとシリアル値（数値）で返ってくることがある。
+ * どちらの形でも "MM-DD" 表示に変換できるようにする。 */
+function fmtMonthDay(v) {
+  if (v == null || v === "") return "";
+  if (typeof v === "number") {
+    // Excelのシリアル値（1900年1月1日を1とする日数）をJS Dateに変換
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return "";
+    const p = n => String(n).padStart(2, "0");
+    return `${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  const s = String(v);
+  return s.length >= 10 ? s.slice(5, 10) : s;
+}
 function setStatus(msg) { document.getElementById("extract-status").textContent = msg; }
 function fmtNum(v) { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("ja-JP"); }
 function escHtml(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
