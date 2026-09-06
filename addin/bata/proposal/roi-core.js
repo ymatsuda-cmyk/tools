@@ -173,13 +173,100 @@
 
   /* ---------- 設定（AIエンドポイント） ----------
    * localStorage にはエンドポインURLと簡易トークンのみ保存する。
-   * APIキー本体はサーバ（GAS等）側にのみ保持し、ここには保存しない。
+   * APIキー本体もここに保存する（社内利用限定の前提。GASは廃止）。
    * 営業報告・提案ナレッジの両アドインは同一オリジンなので localStorage を共有する。 */
   function getConfig() {
     try { return JSON.parse(localStorage.getItem("roiAddinConfig") || "{}"); }
     catch (e) { return {}; }
   }
   function setConfig(cfg) { localStorage.setItem("roiAddinConfig", JSON.stringify(cfg)); }
+
+  /* ---------- AI直接呼び出し（GAS廃止） ----------
+   * 社内利用限定という前提で、ブラウザから直接AI APIを呼ぶ。
+   * 設定（⚙）に登録した「ベースURL・APIキー・モデル」をそのまま使う。
+   * 注意: この構成はAPIキーがブラウザ側に露出する（開発者ツールで見える、
+   * roi-core.js自体もGitHub Pagesで公開されている）。社外に公開しないこと。 */
+
+  /* Claudeがコードフェンス付き（```json ... ```）で返すことがあるため除去してからパースする。 */
+  function safeParseJson(text, fallback) {
+    try {
+      const cleaned = String(text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+      if (!cleaned) return fallback;
+      return JSON.parse(cleaned);
+    } catch (e) { return fallback; }
+  }
+
+  /* プロバイダ差異を吸収してAIを呼び、テキスト応答だけを返す。
+   * provider: "anthropic"（既定） または "openai"（OpenAI互換。Gemini等もこちら）。 */
+  async function callAiModel(prompt, maxTokens) {
+    const cfg = getConfig();
+    if (!cfg.aiApiKey) throw new Error("設定（⚙）でAPIキーを登録してください");
+    const provider = cfg.aiProvider || "anthropic";
+
+    if (provider === "openai") {
+      if (!cfg.aiBaseUrl) throw new Error("設定（⚙）でベースURLを登録してください（OpenAI互換の場合は必須）");
+      const url = cfg.aiBaseUrl.replace(/\/+$/, "") + "/chat/completions";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cfg.aiApiKey },
+        body: JSON.stringify({
+          model: cfg.aiModel || "gpt-4o-mini",
+          max_tokens: maxTokens,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const raw = await res.text();
+      const body = safeParseJson(raw, null);
+      if (!body) throw new Error(`AI APIの応答がJSONではありません（HTTP ${res.status}）: ` + raw.slice(0, 300));
+      if (body.error) throw new Error("AI APIエラー: " + JSON.stringify(body.error));
+      const text = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
+      return text || "";
+    }
+
+    // 既定: Anthropic Messages API
+    const url = cfg.aiBaseUrl || "https://api.anthropic.com/v1/messages";
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": cfg.aiApiKey,
+        "anthropic-version": "2023-06-01",
+        // ブラウザから直接呼ぶ場合に必要（Anthropicはブラウザからの直接アクセスを
+        // 既定でブロックしており、この明示ヘッダーで許可する）。
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: cfg.aiModel || "claude-sonnet-4-6",
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const raw = await res.text();
+    const body = safeParseJson(raw, null);
+    if (!body) throw new Error(`AI APIの応答がJSONではありません（HTTP ${res.status}）: ` + raw.slice(0, 300));
+    if (body.error) throw new Error("AI APIエラー: " + JSON.stringify(body.error));
+    const textBlock = (body.content || []).find(c => c.type === "text");
+    return (textBlock && textBlock.text) || "";
+  }
+
+  /* 参照URLの中身をブラウザから直接取得する。GAS（サーバ側）が無くなったため、
+   * fetch先がCORSを許可していないと失敗する（Notion等の多くのサービスは許可していない）。
+   * 失敗した場合はそのURLをスキップし、consoleに警告を出す。 */
+  async function fetchTextFromUrlClient(url) {
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      return html.replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 8000);
+    } catch (e) {
+      console.warn("[RoiCore] 参照URLの取得に失敗しました（CORSの可能性）:", url, e);
+      return "";
+    }
+  }
 
   /* ---------- シートの自動作成 ---------- */
   function colLetterOf(n) {
@@ -427,30 +514,36 @@
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  /* ---------- AI抽出（GAS等のWebhook） ----------
-   * url が指定されている場合はサーバ側（GAS）でページ内容を取得させる。
+  /* ---------- AI抽出（単一カテゴリ） ----------
+   * url が指定されている場合はブラウザから直接ページ内容を取得する。
    * レスポンス: { items: [{ itemId, value, confidence }] } */
   async function callExtractionWebhook(caseId, category, { text = "", url = "" } = {}) {
-    const cfg = getConfig();
-    if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
     const items = getMasterItems().filter(m => m.category === category && m.kind === "入力");
-    const res = await fetch(cfg.webhookUrl, {
-      method: "POST",
-      body: JSON.stringify({
-        token: cfg.token || "",
-        caseId, category, text: capText(text), url,
-        items: items.map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
-      }),
-    });
-    const raw = await res.text();
+    let sourceText = capText(text || "");
+    if (!sourceText && url) sourceText = await fetchTextFromUrlClient(url);
+    if (!sourceText) throw new Error("text and url are both empty");
+
+    const itemList = items.map(i => `- ${i.itemId} (${i.name}, 単位:${i.unit})`).join("\n");
+    const prompt =
+`以下の議事録テキストから、指定した項目IDに対応する数値を抽出してください。
+読み取れない項目は value を null にし、confidence は "未確認" としてください。
+数値が明言されておらず推測が入る場合は confidence を "推定" にしてください。
+明確に数値が述べられている場合のみ confidence を "確定" にしてください。
+
+項目一覧:
+${itemList}
+
+議事録テキスト:
+"""
+${sourceText}
+"""
+
+出力は次のJSON形式のみとしてください（説明文は不要）:
+{"items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}`;
+
+    const raw = await callAiModel(prompt, 1500);
     console.log("[RoiCore] extraction raw response:", raw);
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
-    }
-    if (data.error) throw new Error("GASエラー: " + data.error);
+    const data = safeParseJson(raw, { items: [] });
     return data.items || [];
   }
 
@@ -541,7 +634,7 @@
    * 数値（ROI試算）は選択に関わらず更新する。文章だけが選択の対象。
    * 1つの議事録から複数の課題が出るのが前提。 */
   // 以前は404対策として6,000文字で切り詰めていたが、実際の原因は
-  // GASのデプロイ・バージョン管理の問題だった可能性が高いと判明したため、
+  // 以前GAS経由で運用していた際、デプロイ・バージョン管理の問題だと判明したため、
   // 冒頭の雑談・ノイズで実質的な内容が切り捨てられないよう上限を引き上げる。
   const HEARING_TEXT_LIMIT = 30000;
   function capText(s) {
@@ -550,18 +643,20 @@
   }
 
   async function previewExtraction(caseId, memoText = "") {
-    const cfg = getConfig();
-    if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
     const logs = await listHearingLogs(caseId);
-    // テキストがある議事録はそのまま、URLのみの議事録はGAS側で内容を取得させる。
-    const hearings = logs.map(l => ({ title: l.title, text: capText(l.text || ""), url: l.url || "" }))
-      .filter(h => h.text || h.url);
+    // テキストがある議事録はそのまま、URLのみの議事録はブラウザから直接取得を試みる
+    // （CORSを許可していないサービスだと失敗し、そのURLはスキップされる）。
+    const hearings = [];
+    for (const l of logs) {
+      let text = capText(l.text || "");
+      if (!text && l.url) text = await fetchTextFromUrlClient(l.url);
+      if (text || l.url) hearings.push({ title: l.title, text, url: l.url || "" });
+    }
     console.log("[RoiCore] previewExtraction: logs=" + logs.length
       + " hearings(after filter)=" + hearings.length
-      + " memoText.length=" + (memoText || "").length
-      + " rawLogsSample=" + JSON.stringify(logs.map(l => ({ title: l.title, textLen: (l.text || "").length, url: l.url }))));
+      + " memoText.length=" + (memoText || "").length);
     if (!hearings.length && !memoText) {
-      console.log("[RoiCore] previewExtraction: 議事録が空と判定したためGASを呼ばずに終了します");
+      console.log("[RoiCore] previewExtraction: 議事録が空と判定したためAI呼び出しをせず終了します");
       return { hearingIds: [], results: [] };
     }
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
@@ -572,21 +667,87 @@
       items: getMasterItemsFor(caseId).filter(m => m.category === cat && m.kind === "入力")
         .map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
     }));
+    const categoryBlock = categoryDefs.map(c =>
+      `### ${c.category}\n${c.items.map(i => `- ${i.itemId} (${i.name}, 単位:${i.unit})`).join("\n")}`
+    ).join("\n\n");
 
-    const res = await fetch(cfg.webhookUrl, {
-      method: "POST",
-      body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, memoText: capText(memoText), hearings, categories: categoryDefs }),
-    });
-    const raw = await res.text();
+    const combinedText = [memoText, ...hearings.map(h => `【${h.title || "議事録"}】\n${h.text}`)]
+      .filter(Boolean).join("\n\n");
+
+    const prompt =
+`あなたは中小企業向けの業務システム提案を行う営業担当です。
+以下の議事録・メモを読み、顧客が抱えている課題を抽出してください。
+
+## 粒度の基準（最重要）
+
+個別の事象を1件ずつ並べるのではなく、**提案の単位**にまとめてください。
+目安は「その課題を解決する提案書を1本書けるか」です。
+
+- 同じ原因・同じ業務から生じている事象は、1つの課題にまとめること
+  例)「フリー予約がない」「割り振りが属人化」「予約を受けきれない」
+    → まとめて「予約機会の取りこぼし」1件とする
+- 金額換算したときに年間数十万円以上のインパクトがある規模を目安にする
+  操作性の細かい不満や、打合せ中の一時的な出来事は課題として挙げない
+- 出力は多くても5件まで。重要度の高い順に並べること
+  細かく分けたくなっても、まとめられないか必ず一度検討すること
+
+## 種別の判定
+
+各課題に kind を付けてください。
+
+- "経営課題": 顧客の事業運営上の困りごと。システム提案・ROI試算の対象になるもの
+- "改修要望": すでに導入済み・開発中のシステムに対する不具合報告や改善要望。
+  提案の対象ではなく、既存案件の課題管理表に登録すべきもの
+- "対象外": 打合せ中の一時的な事象など、課題として扱う必要がないもの
+
+議事録が既存案件の進捗確認会議だった場合、"改修要望" が多くなるのは正常です。
+"経営課題" を無理に作り出さないでください。
+
+## 抽出の範囲
+
+顧客が困りごととして語っている内容は、下の「既存カテゴリ一覧」に
+当てはまるかどうかに関わらず抽出してください。
+既存カテゴリに無いという理由で課題を捨てないでください。
+
+## 各課題の出力項目
+
+- kind: 上記の3種別のいずれか
+- title: その顧客固有の課題を一行で。カテゴリ名をそのまま書かず、具体的な状況を反映する
+- summary: 2〜3文で。現状の進め方、何に困っているか、その影響を含める。
+  議事録に書かれていないことは推測で補わないこと
+- sources: この課題の根拠になった議事録中の具体的な事象を、短い文で1〜5件の配列。
+  まとめた場合、元が何だったか分かるようにするため
+- matchedCategory: kind が "経営課題" で、既存カテゴリのどれかに**明確に**当てはまる場合のみ、
+  そのカテゴリ名。少しでも迷う場合、および "改修要望"・"対象外" の場合は空文字 ""
+- items: matchedCategory を設定した場合のみ、そのカテゴリの項目一覧に対応する数値。
+  読み取れない項目は value を null、confidence を "未確認" とする。
+  数値が明言されていれば "確定"、文脈から推測した場合は "推定"。
+  matchedCategory が空なら items は空配列にすること
+- candidates: kind が "経営課題" の場合のみ、担当者がカテゴリを選ぶための候補を1〜3件。
+  各候補は { name, isNew, reason } の形。既存カテゴリなら一覧の名前をそのまま使い isNew は false。
+  新規候補の name は、その顧客固有の言葉ではなく他業種でも通じる一般的な名前にすること。
+  "改修要望"・"対象外" の場合は空配列にすること
+
+既存カテゴリ一覧（この案件で使えるもの）:
+${categoryBlock || "（まだカテゴリが登録されていません）"}
+
+議事録・メモ:
+"""
+${combinedText}
+"""
+
+出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
+{"issues":[{"kind":"経営課題","title":"...","summary":"...","sources":["..."],"matchedCategory":"","items":[],"candidates":[{"name":"...","isNew":false,"reason":"..."}]}]}`;
+
+    const raw = await callAiModel(prompt, 8000);
     console.log("[RoiCore] auto-extraction raw response:", raw);
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
+    let data = safeParseJson(raw, null);
+    let warning = null;
+    if (!data) {
+      console.warn("[RoiCore] JSON解析に失敗しました（max_tokens超過の可能性）。出力末尾200文字:", raw.slice(-200));
+      data = { issues: [] };
+      warning = "AIの応答が途中で切れた可能性があります（max_tokens超過）。もう一度お試しください。";
     }
-    if (data.error) throw new Error("GASエラー: " + data.error);
-    if (data.warning) console.warn("[RoiCore]", data.warning);
 
     const existing = await getIssues(caseId);
     const results = (data.issues || []).filter(r => r && r.title).map(r => {
@@ -608,7 +769,7 @@
         keepText: cur ? cur.edited : false,
       };
     });
-    return { hearingIds, results, warning: data.warning || null };
+    return { hearingIds, results, warning };
   }
 
   async function commitExtraction(caseId, hearingIds, results) {
@@ -637,24 +798,43 @@
    * 会話履歴を渡すと、AIの返答とカテゴリ定義案（名前・入力項目・計算式）を返す。
    * 返ってきた定義は addCategoryToMaster() で登録する。 */
   async function proposeCategoryDefinition(caseId, issue, messages = []) {
-    const cfg = getConfig();
-    if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
-    const res = await fetch(cfg.webhookUrl, {
-      method: "POST",
-      body: JSON.stringify({
-        mode: "category", token: cfg.token || "", caseId,
-        issue: { title: issue.title, summary: issue.summary },
-        existingCategories: getCategoriesFor(caseId),
-        messages,
-      }),
-    });
-    const raw = await res.text();
+    const history = (messages || [])
+      .map(m => (m.role === "user" ? "担当者: " : "AI: ") + m.content).join("\n");
+    const existingCategories = getCategoriesFor(caseId);
+
+    const prompt =
+`あなたは中小企業向けの業務システム提案で使うROI試算マスタの設計を手伝います。
+担当者と相談しながら、この課題を試算するための課題カテゴリを設計してください。
+
+対象の課題:
+タイトル: ${issue.title || ""}
+内容: ${issue.summary || ""}
+
+既にあるカテゴリ（重複させないこと）:
+${(existingCategories || []).join(" / ") || "（なし）"}
+
+これまでのやり取り:
+${history || "（まだありません）"}
+
+設計の方針:
+- カテゴリ名は、この顧客固有の言葉ではなく、他業種でも通じる一般的な名前にする
+  （例:「美容室の予約電話対応」ではなく「予約・スケジュール調整」）
+- 既存カテゴリで足りるなら、無理に新規を作らずそう伝える
+- 入力項目は、顧客にヒアリングすれば答えられる具体的な数値にする
+  （件数・時間・人数・単価など。抽象的な指標は避ける）
+- 出力項目には必ず削減額を含め、項目IDは "_saving" で終わらせる
+- 数式は入力項目の項目IDだけを使った式にする（例: "xxx_count*12*xxx_min/60"）
+- 項目IDは英小文字とアンダースコアのみ。カテゴリごとに共通の接頭辞をつける
+
+reply には担当者への返答を書いてください。設計の意図や、迷っている点への質問を
+1〜3文で簡潔に。専門用語を並べず、平易な日本語で書くこと。
+
+出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
+{"reply":"...","definition":{"category":"...","inputs":[{"itemId":"...","name":"...","unit":"...","defaultVal":0,"confDefault":"未確認"}],"outputs":[{"itemId":"..._saving","name":"削減額","unit":"円","formula":"..."}]}}`;
+
+    const raw = await callAiModel(prompt, 2500);
     console.log("[RoiCore] category-design raw response:", raw);
-    let data;
-    try { data = JSON.parse(raw); }
-    catch (e) { throw new Error("サーバーの応答がJSONではありません。実際の応答はconsoleに出力しています。"); }
-    if (data.error) throw new Error("GASエラー: " + data.error);
-    return data; // { reply, definition:{category,inputs,outputs} }
+    return safeParseJson(raw, { reply: "", definition: null });
   }
 
   /* 確認なしで一括反映する簡易版（営業報告アドインの「作成」アイコン用）。

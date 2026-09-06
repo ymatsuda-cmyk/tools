@@ -6,7 +6,7 @@
 <title>提案ナレッジ</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <link rel="stylesheet" href="style.css">
-<script src="roi-core.js?v=20260906g"></script>
+<script src="roi-core.js?v=20260907a"></script>
 </head>
 <body>
 
@@ -129,14 +129,25 @@
   <div class="modal-box">
     <div class="modal-title">設定</div>
     <div class="field-row col">
-      <label>AI連携エンドポイント（GAS WebアプリURLなど）</label>
-      <input id="cfg-webhook" placeholder="https://script.google.com/macros/s/.../exec">
+      <label>プロバイダ</label>
+      <select id="cfg-provider">
+        <option value="anthropic">Anthropic（Claude）</option>
+        <option value="openai">OpenAI互換（Gemini等）</option>
+      </select>
     </div>
     <div class="field-row col">
-      <label>簡易トークン（任意）</label>
-      <input id="cfg-token" placeholder="サーバ側で照合する共有トークン">
+      <label>ベースURL（OpenAI互換の場合は必須）</label>
+      <input id="cfg-baseurl" placeholder="例: https://api.anthropic.com/v1/messages">
     </div>
-    <p class="hint">APIキーはここには保存されません。エンドポイント側（GAS等）でのみ保持してください。</p>
+    <div class="field-row col">
+      <label>APIキー</label>
+      <input id="cfg-apikey" type="password" placeholder="sk-ant-...">
+    </div>
+    <div class="field-row col">
+      <label>モデル</label>
+      <input id="cfg-model" placeholder="例: claude-sonnet-4-6">
+    </div>
+    <p class="hint">社内利用限定の前提です。このAPIキーはブラウザに保存され、開発者ツールから見える状態になります。社外に公開しないでください。</p>
     <div class="btn-row">
       <button id="cfg-save-btn" class="btn btn-accent">保存</button>
       <button id="cfg-close-btn" class="btn">閉じる</button>
@@ -178,6 +189,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260906g"></script>
+<script src="app.js?v=20260907a"></script>
 </body>
 </html>

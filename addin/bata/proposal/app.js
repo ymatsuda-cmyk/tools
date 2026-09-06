@@ -90,15 +90,19 @@ function switchTab(tab) {
 /* ---------- 設定 ---------- */
 function openSettings() {
   const cfg = RoiCore.getConfig();
-  document.getElementById("cfg-webhook").value = cfg.webhookUrl || "";
-  document.getElementById("cfg-token").value = cfg.token || "";
+  document.getElementById("cfg-provider").value = cfg.aiProvider || "anthropic";
+  document.getElementById("cfg-baseurl").value = cfg.aiBaseUrl || "";
+  document.getElementById("cfg-apikey").value = cfg.aiApiKey || "";
+  document.getElementById("cfg-model").value = cfg.aiModel || "";
   document.getElementById("settings-modal").style.display = "flex";
 }
 function closeSettings() { document.getElementById("settings-modal").style.display = "none"; }
 function saveSettings() {
   RoiCore.setConfig({
-    webhookUrl: document.getElementById("cfg-webhook").value.trim(),
-    token: document.getElementById("cfg-token").value.trim(),
+    aiProvider: document.getElementById("cfg-provider").value,
+    aiBaseUrl: document.getElementById("cfg-baseurl").value.trim(),
+    aiApiKey: document.getElementById("cfg-apikey").value.trim(),
+    aiModel: document.getElementById("cfg-model").value.trim(),
   });
   closeSettings();
 }
@@ -225,14 +229,14 @@ async function runExtraction() {
   const caseId = document.getElementById("case-id").value.trim();
   if (!caseId) { setStatus("案件を選択してください"); return; }
   const cfg = RoiCore.getConfig();
-  if (!cfg.webhookUrl) { setStatus("設定（⚙）でAI連携エンドポイントを登録してください"); return; }
+  if (!cfg.aiApiKey) { setStatus("設定（⚙）でAPIキーを登録してください"); return; }
 
   setStatus("議事録から課題を抽出中…");
   try {
     const preview = demoMode ? { hearingIds: [], results: [] } : await RoiCore.previewExtraction(caseId);
     if (!preview.results.length) {
       setStatus(preview.warning
-        ? "AIの応答が途中で切れた可能性があります。もう一度お試しください（それでも失敗する場合はGASのmax_tokensを見直してください）"
+        ? "AIの応答が途中で切れた可能性があります。もう一度お試しください（それでも失敗する場合は設定のモデルを見直してください）"
         : "課題は抽出されませんでした");
       return;
     }

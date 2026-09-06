@@ -105,7 +105,7 @@
 
     $(".roi-create").addEventListener("click", async () => {
       const cfg = RoiCore.getConfig();
-      if (!cfg.webhookUrl) { setStatus("AI連携エンドポイントが未設定です（提案ナレッジ側の設定で登録してください）"); return; }
+      if (!cfg.aiApiKey) { setStatus("APIキーが未設定です（提案ナレッジ側の設定で登録してください）"); return; }
       setStatus("議事録・メモから課題を判定中…");
       try {
         const cats = await RoiCore.autoExtractProposals(caseId, getMemo());
