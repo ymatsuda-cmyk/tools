@@ -230,7 +230,12 @@ async function runExtraction() {
   setStatus("議事録から課題を抽出中…");
   try {
     const preview = demoMode ? { hearingIds: [], results: [] } : await RoiCore.previewExtraction(caseId);
-    if (!preview.results.length) { setStatus("課題は抽出されませんでした"); return; }
+    if (!preview.results.length) {
+      setStatus(preview.warning
+        ? "AIの応答が途中で切れた可能性があります。もう一度お試しください（それでも失敗する場合はGASのmax_tokensを見直してください）"
+        : "課題は抽出されませんでした");
+      return;
+    }
     pendingExtraction = { caseId, ...preview };
     renderExtractDiff();
     setStatus("");

@@ -336,9 +336,18 @@ ${combinedText}
 出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
 {"issues":[{"title":"...","summary":"...","matchedCategory":"","items":[],"candidates":[{"name":"...","isNew":false,"reason":"..."}]}]}`;
 
-  const ai = callAiModel(prompt, 4000, settings);
+  const ai = callAiModel(prompt, 8000, settings);
   if (ai.error) return respond({ error: ai.error });
-  const parsed = safeParseJson(ai.text, { issues: [] });
+  // 課題が多い議事録だと出力が長くなり、max_tokensで途中で切れて
+  // 壊れたJSONになることがある。パース失敗時はそれと分かるようログに残す
+  // （fallbackの空配列を返すだけだと、AIが「該当なし」と判断したのか
+  // 出力が切れただけなのか区別できず原因調査に時間がかかるため）。
+  let parsed = safeParseJson(ai.text, null);
+  if (!parsed) {
+    Logger.log("[handleAutoMode] JSON parse failed. output length=" + (ai.text || "").length
+      + " tail200=" + (ai.text || "").slice(-200));
+    parsed = { issues: [], warning: "AIの出力が途中で切れた可能性があります（max_tokens超過）。実行数ログを確認してください。" };
+  }
   return respond(parsed);
 }
 

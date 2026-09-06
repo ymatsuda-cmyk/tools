@@ -579,6 +579,7 @@
       throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
     }
     if (data.error) throw new Error("GASエラー: " + data.error);
+    if (data.warning) console.warn("[RoiCore]", data.warning);
 
     const existing = await getIssues(caseId);
     const results = (data.issues || []).filter(r => r && r.title).map(r => {
@@ -598,7 +599,7 @@
         keepText: cur ? cur.edited : false,
       };
     });
-    return { hearingIds, results };
+    return { hearingIds, results, warning: data.warning || null };
   }
 
   async function commitExtraction(caseId, hearingIds, results) {
