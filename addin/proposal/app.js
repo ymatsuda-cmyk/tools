@@ -12,7 +12,6 @@
  * ============================================================ */
 
 let demoMode = false;
-let currentReview = null;
 
 if (window.Office) {
   Office.onReady(() => whenDomReady(init));
@@ -43,8 +42,6 @@ function bindStaticUI() {
 
   document.getElementById("save-log-btn").addEventListener("click", saveHearingLog);
   document.getElementById("extract-btn").addEventListener("click", runExtraction);
-  document.getElementById("apply-extract-btn").addEventListener("click", applyExtraction);
-  document.getElementById("cancel-extract-btn").addEventListener("click", cancelExtraction);
   document.getElementById("case-id").addEventListener("change", loadHearingLogForCase);
 
   document.getElementById("load-proposal-btn").addEventListener("click", loadProposal);
@@ -120,61 +117,54 @@ async function loadHearingLogForCase() {
     </div>`).join("") || `<div class="meta">まだ記録がありません</div>`;
 }
 
-/* ---------- AI抽出（レビューあり） ---------- */
+/* ---------- AI抽出（議事録から複数の課題を抽出） ----------
+ * 1つの議事録に複数の課題が含まれる前提で、課題カテゴリ・課題内容・
+ * ROI数値をまとめて抽出する。抽出結果は確認用に一覧表示し、
+ * そのままROI試算シート・抽出課題シートへ保存される。 */
 async function runExtraction() {
   const caseId = document.getElementById("case-id").value.trim();
-  const category = document.getElementById("category-select").value;
   const text = document.getElementById("hearing-text").value.trim();
   const url = document.getElementById("hearing-url").value.trim();
   if (!caseId) { setStatus("案件IDを入力してください"); return; }
-  if (!text && !url) { setStatus("発言・メモかURLのどちらかを入力してください（記録前でも抽出だけ試せます）"); return; }
 
   const cfg = RoiCore.getConfig();
   if (!cfg.webhookUrl) { setStatus("設定（⚙）でAI連携エンドポイントを登録してください"); return; }
 
-  setStatus("AIに抽出を依頼中…");
+  setStatus("議事録から課題を抽出中…");
   try {
-    const items = await RoiCore.runExtractionForReview(caseId, category, { text, url });
-    currentReview = { caseId, category, items };
-    renderExtractReview();
-    setStatus("");
+    // 未記録のテキスト・URLがあれば、抽出対象に含めるため先に記録する
+    if (text || url) {
+      const category = document.getElementById("category-select").value;
+      const speaker = document.getElementById("speaker-select").value;
+      if (!demoMode) await RoiCore.appendHearingLog(caseId, category, speaker, { text, url });
+      document.getElementById("hearing-text").value = "";
+      document.getElementById("hearing-url").value = "";
+      await loadHearingLogForCase();
+    }
+
+    const results = demoMode ? [] : await RoiCore.autoExtractProposals(caseId);
+    renderExtractResults(results);
+    setStatus(results.length ? `${results.length}件の課題を抽出しました` : "課題は抽出されませんでした");
   } catch (e) {
     console.warn(e);
     setStatus(e.message || "抽出に失敗しました。エンドポイントの設定を確認してください");
   }
 }
 
-function renderExtractReview() {
+function renderExtractResults(results) {
   const box = document.getElementById("extract-review");
   const wrap = document.getElementById("extract-items");
-  if (!currentReview || !currentReview.items.length) { box.style.display = "none"; return; }
-  const master = RoiCore.getMasterItems().filter(m => m.category === currentReview.category && m.kind === "入力");
-  wrap.innerHTML = currentReview.items.map((it, idx) => {
-    const def = master.find(m => m.itemId === it.itemId);
-    return `
-    <div class="review-item" data-idx="${idx}">
-      <div class="item-head"><span>${escHtml(def ? def.name : it.itemId)}</span><span>${escHtml(def ? def.unit : "")}</span></div>
-      <div class="item-row">
-        <input type="text" class="rv-value" value="${escAttr(it.value ?? "")}">
-        <select class="rv-conf">${RoiCore.CONF_LEVELS.map(c => `<option value="${c}" ${c === it.confidence ? "selected" : ""}>${c}</option>`).join("")}</select>
+  if (!results.length) { box.style.display = "none"; return; }
+  wrap.innerHTML = results.map(r => `
+    <div class="review-item">
+      <div class="item-head">
+        <span>${escHtml(r.title)}</span>
+        <span style="font-size:10px;color:#185fa5;background:#e6f1fb;padding:1px 7px;border-radius:8px">${escHtml(r.category)}</span>
       </div>
-    </div>`;
-  }).join("");
+      <div style="font-size:11px;color:#5f5e5a;line-height:1.6">${escHtml(r.summary)}</div>
+      <div style="font-size:10px;color:#888780">${r.itemCount ? `ROI数値 ${r.itemCount}件を反映` : "数値なし（解決案のみ提示）"}</div>
+    </div>`).join("");
   box.style.display = "";
-}
-
-function cancelExtraction() { currentReview = null; document.getElementById("extract-review").style.display = "none"; }
-
-async function applyExtraction() {
-  if (!currentReview) return;
-  document.querySelectorAll("#extract-items .review-item").forEach(el => {
-    const idx = Number(el.dataset.idx);
-    currentReview.items[idx].value = el.querySelector(".rv-value").value;
-    currentReview.items[idx].confidence = el.querySelector(".rv-conf").value;
-  });
-  if (!demoMode) await RoiCore.applyReviewedItems(currentReview.caseId, currentReview.category, currentReview.items);
-  setStatus("ROI試算シートに反映しました");
-  cancelExtraction();
 }
 
 /* ============================================================
@@ -195,29 +185,33 @@ async function loadProposal() {
   const list = document.getElementById("proposal-list");
   list.innerHTML = `<div class="meta">読み込み中…</div>`;
 
-  const [rows, solutions, decisions] = await Promise.all([
+  const [rows, solutions, decisions, issues] = await Promise.all([
     demoMode ? [] : RoiCore.getCalcRowsForCase(caseId, {}),
     RoiCore.getSolutions(),
     demoMode ? [] : RoiCore.getDecisions(caseId),
+    demoMode ? [] : RoiCore.getIssues(caseId),
   ]);
 
-  if (!rows.length) {
-    list.innerHTML = `<div class="meta">この案件のROI試算データがまだありません。①でAI抽出を行ってください。</div>`;
+  // ROI試算データが無くても、抽出課題だけある場合（数値が取れなかった課題）も表示する
+  if (!rows.length && !issues.length) {
+    list.innerHTML = `<div class="meta">この案件の課題がまだ抽出されていません。①でAI抽出を行ってください。</div>`;
     document.getElementById("totals").style.display = "none";
     return;
   }
 
-  // カテゴリごとにまとめる
+  // カテゴリごとにまとめる（ROI試算の行と、抽出課題の両方からカテゴリを集める）
   const byCat = {};
   rows.forEach(r => {
     byCat[r.category] = byCat[r.category] || { inputs: [], outputs: [] };
     (r.kind === "出力" ? byCat[r.category].outputs : byCat[r.category].inputs).push(r);
   });
+  issues.forEach(is => { byCat[is.category] = byCat[is.category] || { inputs: [], outputs: [] }; });
 
   propState = {
     caseId,
     issues: Object.keys(byCat).map(cat => {
       const g = byCat[cat];
+      const iss = issues.find(x => x.category === cat);
       const plans = solutions.filter(s => s.category === cat)
         .sort((a, b) => ({ "低": 0, "中": 1, "高": 2 }[a.cost] ?? 9) - ({ "低": 0, "中": 1, "高": 2 }[b.cost] ?? 9));
       const dec = decisions.find(d => d.category === cat);
@@ -229,11 +223,11 @@ async function loadProposal() {
       const plan = plans[sel];
       return {
         category: cat,
-        desc: (g.inputs[0] || {}).name ? "" : "",
+        title: iss ? iss.title : cat,
+        summary: iss ? iss.summary : "",
         inputs: g.inputs,
         outputs: g.outputs,
         plans, sel, step: 1,
-        // 決定済みの値があればそれを、無ければマスタの初期値を使う
         cost: dec ? dec.cost : (plan ? plan.initialCost : 0),
         rate: dec ? dec.rate : (plan ? plan.rate : 0),
         basis: dec ? dec.basis : (plan ? plan.basis : ""),
@@ -268,8 +262,8 @@ function renderProposal() {
     <div class="acc" id="acc-${ix}">
       <div class="acc-head" data-acc="${ix}">
         <div class="a-main">
-          <div class="a-name">${escHtml(is.category)}</div>
-          <div class="a-desc">${escHtml(summarizeInputs(is))}</div>
+          <div class="a-cat">${escHtml(is.category)}</div>
+          <div class="a-name">${escHtml(is.title || is.category)}</div>
           <div class="a-result" id="res-${ix}" style="display:none"></div>
         </div>
         <div class="a-loss">
@@ -279,6 +273,8 @@ function renderProposal() {
         <span id="chev-${ix}">▸</span>
       </div>
       <div class="acc-body">
+        ${is.summary ? `<div class="issue-summary">${escHtml(is.summary)}</div>` : ""}
+        ${!is.inputs.length ? `<div class="meta" style="margin:8px 0">この課題は数値化していません。解決案のみ提示します。</div>` : ""}
         <div class="wiz-dots">
           <span class="wiz-dot" id="dot-${ix}-1">1</span><div class="wiz-line" id="line-${ix}-1"></div>
           <span class="wiz-dot" id="dot-${ix}-2">2</span><div class="wiz-line" id="line-${ix}-2"></div>
@@ -345,10 +341,6 @@ function renderProposal() {
   updateProposal();
 }
 
-function summarizeInputs(is) {
-  const parts = is.inputs.slice(0, 3).map(i => `${i.name}${fmtNum(i.value)}${i.unit || ""}`);
-  return parts.join("・");
-}
 function sliderMin(inp) { return /時給|単価|額|費/.test(inp.name) ? 0 : 1; }
 function sliderMax(inp) {
   const v = Number(inp.value) || 1;

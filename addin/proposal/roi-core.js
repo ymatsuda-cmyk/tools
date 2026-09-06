@@ -47,6 +47,12 @@
   // 根拠区分の重み。信頼度計算で入力値の 確定/推定/未確認 と同じ尺度に載せる。
   const BASIS_WEIGHT = { "実績": 1, "推定": 0.5, "一般値": 0.25 };
 
+  // AIが議事録から抽出した課題（カテゴリ・タイトル・内容）。
+  // 1つの議事録から複数カテゴリが抽出されるため、案件ID×課題カテゴリで1行。
+  // 既存ワークブックの「課題」シート（課題管理表）とは別物なので名前を分けている。
+  const ISSUE_SHEET = "抽出課題";
+  const ISSUE_COLUMNS = ["案件ID", "課題カテゴリ", "課題タイトル", "課題内容", "根拠議事録ID", "抽出日時"];
+
   // 案件ごとの「どの解決策に決めたか」を保持するシート。
   // 導入費・改善率・削減根拠はソリューションDBの値を初期値としてコピーし、
   // 営業側が案件ごとに書き換えられるようにする（マスタ側は変更しない）。
@@ -189,6 +195,7 @@
       await getOrCreateSheet(ctx, HEARING_SHEET, HEARING_COLUMNS, null);
       await getOrCreateSheet(ctx, CALC_SHEET, CALC_COLUMNS, null);
       await getOrCreateSheet(ctx, SOLUTION_SHEET, SOLUTION_COLUMNS, SOLUTION_SEED);
+      await getOrCreateSheet(ctx, ISSUE_SHEET, ISSUE_COLUMNS, null);
       await getOrCreateSheet(ctx, DECISION_SHEET, DECISION_COLUMNS, null);
       const rng = ctx.workbook.worksheets.getItem(MASTER_SHEET).getUsedRange(true);
       rng.load("values");
@@ -366,12 +373,14 @@
     return getProposalSummaryForCase(caseId, category);
   }
 
-  /* ---------- 複数カテゴリの一括抽出（営業報告の「作成」アイコン用） ----------
-   * この案件に紐づく議事録すべて＋メモ（営業報告シートの備考等）を渡し、
-   * AIに「どの課題カテゴリが当てはまるか」ごと判定させ、該当カテゴリを
-   * まとめてROI試算シートに反映する。
-   * 精度優先の簡易実装のため、根拠議事録IDはこの案件の全議事録IDを
-   * まとめて記録する（カテゴリ単位でどの発言が根拠かまでは追跡しない）。 */
+  /* ---------- 複数課題の一括抽出（営業報告の「作成」アイコン／提案ナレッジの①タブ） ----------
+   * この案件に紐づく議事録すべて＋メモを1回のAI呼び出しに渡し、
+   *   ・どの課題カテゴリが当てはまるか
+   *   ・その課題の内容（タイトルと説明文）
+   *   ・ROI試算に必要な数値
+   * をまとめて判定させる。1つの議事録から複数の課題が出るのが前提。
+   * 数値が読み取れないカテゴリでも、課題として挙がっていれば抽出課題には残す
+   * （属人化など金額換算できない課題を取りこぼさないため）。 */
   async function autoExtractProposals(caseId, memoText = "") {
     const cfg = getConfig();
     if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
@@ -382,7 +391,8 @@
 
     const categoryDefs = getCategories().map(cat => ({
       category: cat,
-      items: getMasterItems().filter(m => m.category === cat && m.kind === "入力").map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
+      items: getMasterItems().filter(m => m.category === cat && m.kind === "入力")
+        .map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
     }));
 
     const res = await fetch(cfg.webhookUrl, {
@@ -398,11 +408,25 @@
       throw new Error("サーバーの応答がJSONではありません（GASのデプロイ設定を確認してください）。実際の応答はconsoleに出力しています。");
     }
     if (data.error) throw new Error("GASエラー: " + data.error);
-    const results = data.results || [];
+
+    const results = (data.results || []).filter(r => r && r.category);
     for (const r of results) {
-      if (r.items && r.items.length) await applyCategoryToCalcSheet(caseId, r.category, r.items, hearingIds);
+      // 課題そのものは、数値が取れなくても記録する
+      await saveIssue(caseId, r.category, {
+        title: r.title || r.category,
+        summary: r.summary || "",
+        hearingIds,
+      });
+      if (r.items && r.items.length) {
+        await applyCategoryToCalcSheet(caseId, r.category, r.items, hearingIds);
+      }
     }
-    return results.map(r => r.category);
+    return results.map(r => ({
+      category: r.category,
+      title: r.title || r.category,
+      summary: r.summary || "",
+      itemCount: (r.items || []).length,
+    }));
   }
 
   /* 選択済みカテゴリの元データ（議事録）リンク一覧を返す。
@@ -540,6 +564,39 @@
     return all.filter(s => s.category === category).sort((a, b) => (order[a.cost] ?? 9) - (order[b.cost] ?? 9));
   }
 
+  /* ---------- 抽出課題（AIが議事録から抽出した課題カテゴリと内容） ---------- */
+  async function getIssues(caseId) {
+    if (!global.Office || !global.Excel) return [];
+    let rows = [];
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
+      const rng = sheet.getUsedRange(true);
+      rng.load("values");
+      await ctx.sync();
+      rows = rng.values.slice(1).filter(r => String(r[0]) === caseId && r[1]);
+    });
+    return rows.map(r => ({
+      caseId: r[0], category: r[1], title: r[2] || "", summary: r[3] || "",
+      hearingIds: String(r[4] || "").split(",").filter(Boolean), extractedAt: r[5],
+    }));
+  }
+
+  /* 同じ案件・同じ課題カテゴリの行があれば上書き、無ければ追加する。 */
+  async function saveIssue(caseId, category, { title = "", summary = "", hearingIds = [] } = {}) {
+    if (!global.Office || !global.Excel) return;
+    const row = [caseId, category, title, summary, hearingIds.filter(Boolean).join(","), nowStr()];
+    await Excel.run(async ctx => {
+      const sheet = ctx.workbook.worksheets.getItem(ISSUE_SHEET);
+      const used = sheet.getUsedRange(true);
+      used.load("values, rowCount");
+      await ctx.sync();
+      const idx = used.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
+      const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
+      sheet.getRange(`A${rowNum}:F${rowNum}`).values = [row];
+      await ctx.sync();
+    });
+  }
+
   /* ---------- 提案決定（案件ごとの解決策の選択と、書き換えた導入費・改善率） ---------- */
   async function getDecisions(caseId) {
     if (!global.Office || !global.Excel) return [];
@@ -644,6 +701,7 @@
     quickCreateProposal, autoExtractProposals, getSourceEntriesForCategory,
     getProposalSummaryForCase, getCalcRowsForCase, toggleSelection, updateCalcInput,
     getDecisions, saveDecision,
+    getIssues, saveIssue,
     confidenceOf, confidenceLabel,
     getCustomerInfo, getSolutions, getSolutionsForCategory,
   };

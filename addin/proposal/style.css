@@ -105,8 +105,11 @@ textarea { resize: vertical; }
 .acc { background: #fff; border: 1px solid #e5e3da; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
 .acc-head { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; cursor: pointer; }
 .acc-head .a-main { flex: 1; min-width: 0; }
-.acc-head .a-name { font-size: 13px; font-weight: 600; }
-.acc-head .a-desc { font-size: 11px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
+.acc-head .a-cat { font-size: 10px; color: #185fa5; background: #e6f1fb;
+  display: inline-block; padding: 1px 7px; border-radius: 8px; margin-bottom: 3px; }
+.acc-head .a-name { font-size: 13px; font-weight: 600; line-height: 1.5; }
+.issue-summary { font-size: 11px; color: #5f5e5a; line-height: 1.7;
+  background: #fafaf8; border-radius: 8px; padding: 9px 10px; margin: 8px 0 4px; }
 .acc-head .a-result { font-size: 10px; color: #0f6e56; margin-top: 4px; }
 .acc-head .a-loss { text-align: right; flex: none; width: 64px; }
 .acc-head .a-loss b { font-size: 13px; color: #a32d2d; }

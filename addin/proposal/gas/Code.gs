@@ -122,6 +122,41 @@ function testRun() {
   Logger.log(result.getContent());
 }
 
+/* ------------------------------------------------------------
+ * 複数課題の一括抽出テスト。1つの議事録から複数カテゴリが
+ * 抽出されるか（title・summary が入るか）を確認する。
+ * 実行後は「実行数」メニューでログを確認すること。
+ * ------------------------------------------------------------ */
+function testAutoRun() {
+  const result = handleAutoMode({
+    caseId: "TEST-01",
+    text: "棚卸は5人で月1回、1回4時間かかっている。集計はExcelで手作業のため、"
+        + "在庫差異が判明するのが翌月になってしまう。時給は3000円くらい。"
+        + "またロット追跡の依頼が入ると、担当者が台帳を探して回答するのに半日かかる。"
+        + "追跡依頼は月に10件ほど、対応できるのは2名だけ。"
+        + "あと、原価計算のやり方はベテランの田中さんしか分からず、"
+        + "田中さんが休むと月次が止まる。これは前から不安に思っている。",
+    categories: [
+      { category: "在庫管理", items: [
+        { itemId: "stk_people", name: "棚卸人数", unit: "人" },
+        { itemId: "stk_hours", name: "棚卸時間", unit: "時間" },
+        { itemId: "stk_freq", name: "棚卸回数/年", unit: "回" },
+        { itemId: "stk_wage", name: "時給", unit: "円" },
+        { itemId: "stk_improve", name: "改善率", unit: "%" }]},
+      { category: "ロット管理", items: [
+        { itemId: "lot_hours", name: "追跡時間", unit: "時間" },
+        { itemId: "lot_freq", name: "追跡回数/年", unit: "回" },
+        { itemId: "lot_people", name: "担当人数", unit: "人" },
+        { itemId: "lot_wage", name: "時給", unit: "円" }]},
+      { category: "属人化", items: [
+        { itemId: "attrib_people", name: "該当ベテラン人数", unit: "人" }]},
+      { category: "AI議事録", items: [
+        { itemId: "min_meetings", name: "会議回数/月", unit: "回" }]},
+    ],
+  });
+  Logger.log(result.getContent());
+}
+
 function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
@@ -182,6 +217,14 @@ ${sourceText}
  * レスポンス:
  * { results: [{ category, items:[{itemId,value,confidence}] }, ...] }
  * （該当なしのカテゴリは items:[] または results に含めない） */
+/* 複数課題の一括抽出（営業報告アドインの「作成」アイコン、提案ナレッジの①タブ）。
+ * リクエスト:
+ * { mode:"auto", caseId, text: "議事録＋メモを連結したテキスト",
+ *   categories: [{ category, items:[{itemId,name,unit}] }, ...] }
+ * レスポンス:
+ * { results: [{ category, title, summary, items:[{itemId,value,confidence}] }, ...] }
+ * 1つの議事録から複数の課題が出るのが前提。数値が読み取れない課題でも、
+ * 課題として言及されていれば items:[] で results に含める。 */
 function handleAutoMode(req) {
   const settings = getAiSettings();
   if (!settings.apiKey) return respond({ error: "AI_API_KEY not configured" });
@@ -192,23 +235,38 @@ function handleAutoMode(req) {
   ).join("\n\n");
 
   const prompt =
-`以下のテキスト（議事録・メモ）を読み、当てはまる課題カテゴリを判定してください。
-各カテゴリの項目一覧に対応する数値が読み取れる場合のみ、そのカテゴリをresultsに含めてください。
-数値が全く読み取れないカテゴリは results に含めないでください。
-数値の確度は confidence（確定|推定|未確認）で表してください。
+`あなたは中小製造業向けの業務システム提案を行う営業担当です。
+以下の議事録・メモを読み、顧客が抱えている課題を抽出してください。
+
+【重要】1つの議事録に複数の課題が含まれているのが普通です。
+当てはまる課題カテゴリをすべて洗い出してください。1つに絞らないでください。
+
+各課題について、次を出力してください。
+- category: 下の一覧にあるカテゴリ名をそのまま使う（一覧にない課題は出力しない）
+- title: その顧客固有の課題を一行で（例「棚卸と在庫差異の調査に時間がかかっている」）
+  カテゴリ名をそのまま書かず、議事録に出てきた具体的な状況を反映すること
+- summary: 課題の内容を2〜3文で。現状の進め方、何に困っているか、その影響を含める。
+  議事録に書かれていないことは推測で補わないこと
+- items: そのカテゴリの項目一覧に対応する数値。読み取れない項目は value を null、
+  confidence を "未確認" とする。数値が明言されていれば "確定"、
+  文脈から推測した場合は "推定" とする
+
+数値がまったく読み取れない課題でも、議事録で困りごととして語られていれば
+items を空配列にして results に含めてください（属人化など金額換算しにくい課題を
+取りこぼさないため）。逆に、議事録で言及されていないカテゴリは含めないでください。
 
 カテゴリと項目一覧:
 ${categoryBlock}
 
-テキスト:
+議事録・メモ:
 """
 ${req.text}
 """
 
-出力は次のJSON形式のみとしてください（説明文は不要）:
-{"results":[{"category":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
+出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
+{"results":[{"category":"...","title":"...","summary":"...","items":[{"itemId":"...","value":数値またはnull,"confidence":"確定|推定|未確認"}]}]}`;
 
-  const ai = callAiModel(prompt, 2000, settings);
+  const ai = callAiModel(prompt, 4000, settings);
   if (ai.error) return respond({ error: ai.error });
   const parsed = safeParseJson(ai.text, { results: [] });
   return respond(parsed);
