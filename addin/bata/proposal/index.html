@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提案ナレッジ</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="stylesheet" href="style.css">
+<script src="roi-core.js?v=20260906a"></script>
+</head>
+<body>
+
+<header id="app-header">
+  <div class="hdr-left">
+    <span class="hdr-title">提案ナレッジ</span>
+    <span id="demo-badge" class="demo-badge" style="display:none">DEMO</span>
+  </div>
+  <div class="hdr-right">
+    <button id="settings-btn" class="icon-btn" title="設定">⚙</button>
+    <button id="reload-btn" class="icon-btn" title="再読み込み">⟳</button>
+  </div>
+</header>
+
+<nav id="tab-nav">
+  <button class="tab-btn active" data-tab="hearing">① 議事録入力</button>
+  <button class="tab-btn" data-tab="proposal">② 提案</button>
+  <button class="tab-btn" data-tab="prompt">③ プロンプト出力</button>
+</nav>
+
+<main id="app-main">
+
+  <!-- ====== ① 議事録入力 ====== -->
+  <section id="pane-hearing" class="pane active">
+
+    <div class="field-row">
+      <label>案件</label>
+      <select id="case-select"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id">
+    </div>
+
+    <div id="hearing-area" style="display:none">
+      <div class="mini-box" style="margin-bottom:12px">
+        <div class="box-head">
+          <span id="hearing-count">この案件の議事録</span>
+          <button id="add-log-btn" class="btn btn-sm">＋ 追加</button>
+        </div>
+        <div id="hearing-log-list" class="log-list"></div>
+      </div>
+
+      <div id="log-form" style="display:none">
+        <div class="field-row col">
+          <label>タイトル</label>
+          <input id="log-title" placeholder="例: 初回訪問ヒアリング">
+        </div>
+        <div class="field-row col">
+          <label>参照URL</label>
+          <input id="hearing-url" placeholder="議事録ビューア等へのリンク（任意）">
+        </div>
+        <div class="field-row col">
+          <label>本文</label>
+          <textarea id="hearing-text" rows="5" placeholder="議事録の文字起こし、または要点メモを貼り付け（URLのみでも可）"></textarea>
+        </div>
+        <div class="btn-row">
+          <button id="save-log-btn" class="btn btn-accent">議事録に追加</button>
+          <button id="cancel-log-btn" class="btn">取消</button>
+        </div>
+      </div>
+
+      <button id="extract-btn" class="btn btn-accent" style="width:100%">課題を抽出</button>
+      <div id="extract-status" class="status-line"></div>
+
+      <div id="extract-review" style="display:none">
+        <div class="review-title">再抽出の結果を反映しますか</div>
+        <div class="hint-sm" style="margin-bottom:8px">編集済みの課題は既定で「残す」になっています</div>
+        <div id="extract-items"></div>
+        <div class="btn-row">
+          <button id="cancel-extract-btn" class="btn">取消</button>
+          <button id="apply-extract-btn" class="btn btn-accent" style="flex:2">選択した内容で反映</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">案件の状況</div>
+    <div id="case-overview"></div>
+  </section>
+
+  <!-- ====== ② 提案 ====== -->
+  <section id="pane-proposal" class="pane">
+    <div class="field-row col">
+      <label>案件</label>
+      <select id="case-select-2"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id-2">
+    </div>
+
+    <div id="totals" class="totals-box" style="display:none">
+      <div class="totals-grid">
+        <div>
+          <div class="t-label">損失合計 / 年</div>
+          <div id="t-loss" class="t-value">—</div>
+          <div id="t-loss-cf" class="t-sub">—</div>
+        </div>
+        <div>
+          <div class="t-label">全体回収</div>
+          <div id="t-pay" class="t-value">—</div>
+          <div id="t-pay-cf" class="t-sub">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="proposal-list"></div>
+  </section>
+
+  <!-- ====== ③ プロンプト出力 ====== -->
+  <section id="pane-prompt" class="pane">
+    <div class="field-row col">
+      <label>案件</label>
+      <select id="case-select-3"><option value="">案件を選択してください</option></select>
+      <input type="hidden" id="case-id-3">
+    </div>
+    <button id="build-prompt-btn" class="btn">提案に含めた課題からプロンプトを組み立て</button>
+
+    <div id="prompt-output"></div>
+  </section>
+
+</main>
+
+<!-- ====== 設定パネル ====== -->
+<div id="settings-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">設定</div>
+    <div class="field-row col">
+      <label>AI連携エンドポイント（GAS WebアプリURLなど）</label>
+      <input id="cfg-webhook" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="field-row col">
+      <label>簡易トークン（任意）</label>
+      <input id="cfg-token" placeholder="サーバ側で照合する共有トークン">
+    </div>
+    <p class="hint">APIキーはここには保存されません。エンドポイント側（GAS等）でのみ保持してください。</p>
+    <div class="btn-row">
+      <button id="cfg-save-btn" class="btn btn-accent">保存</button>
+      <button id="cfg-close-btn" class="btn">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=20260906a"></script>
+</body>
+</html>

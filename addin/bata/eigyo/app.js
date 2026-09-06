@@ -1294,6 +1294,17 @@ function openEditModal(id, forceTab) {
   } catch (e) {
     console.warn("タスク一覧の初期化に失敗:", e);
   }
+  // 提案ナレッジ連携（議事録・提案パネル）。付随機能なので、
+  // 初期化に失敗しても編集画面自体は開けるようにする。
+  try {
+    if (window.RoiPanel) {
+      RoiPanel.mount(document.getElementById("roi-panel-mount"), rec.id, {
+        getMemo: () => document.getElementById("ed-note").value,
+      });
+    }
+  } catch (e) {
+    console.warn("提案ナレッジ連携パネルの初期化に失敗:", e);
+  }
 }
 function markDirty() { editDirty = true; }
 
