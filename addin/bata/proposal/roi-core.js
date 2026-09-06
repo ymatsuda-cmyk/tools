@@ -330,7 +330,7 @@
       method: "POST",
       body: JSON.stringify({
         token: cfg.token || "",
-        caseId, category, text, url,
+        caseId, category, text: capText(text), url,
         items: items.map(i => ({ itemId: i.itemId, name: i.name, unit: i.unit })),
       }),
     });
@@ -432,12 +432,20 @@
    * commitExtraction()   … 差分に対する選択（残す/上書き）を受け取って保存する。
    * 数値（ROI試算）は選択に関わらず更新する。文章だけが選択の対象。
    * 1つの議事録から複数の課題が出るのが前提。 */
+  // 1件あたりの議事録本文が長すぎるとGASのWebアプリ中継（echo）が
+  // 不安定になることがあるため、送信前に上限で切り詰める。
+  const HEARING_TEXT_LIMIT = 6000;
+  function capText(s) {
+    if (!s) return s;
+    return s.length > HEARING_TEXT_LIMIT ? s.slice(0, HEARING_TEXT_LIMIT) + "\n…（以降省略）" : s;
+  }
+
   async function previewExtraction(caseId, memoText = "") {
     const cfg = getConfig();
     if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
     const logs = await listHearingLogs(caseId);
     // テキストがある議事録はそのまま、URLのみの議事録はGAS側で内容を取得させる。
-    const hearings = logs.map(l => ({ title: l.title, text: l.text || "", url: l.url || "" }))
+    const hearings = logs.map(l => ({ title: l.title, text: capText(l.text || ""), url: l.url || "" }))
       .filter(h => h.text || h.url);
     if (!hearings.length && !memoText) return { hearingIds: [], results: [] };
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
@@ -450,7 +458,7 @@
 
     const res = await fetch(cfg.webhookUrl, {
       method: "POST",
-      body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, memoText, hearings, categories: categoryDefs }),
+      body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, memoText: capText(memoText), hearings, categories: categoryDefs }),
     });
     const raw = await res.text();
     console.log("[RoiCore] auto-extraction raw response:", raw);
