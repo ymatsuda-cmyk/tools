@@ -432,8 +432,10 @@
     const cfg = getConfig();
     if (!cfg.webhookUrl) throw new Error("AI連携エンドポイントが未設定です");
     const logs = await listHearingLogs(caseId);
-    const combinedText = [memoText, ...logs.map(l => l.text || l.url || "")].filter(Boolean).join("\n\n");
-    if (!combinedText) return { hearingIds: [], results: [] };
+    // テキストがある議事録はそのまま、URLのみの議事録はGAS側で内容を取得させる。
+    const hearings = logs.map(l => ({ title: l.title, text: l.text || "", url: l.url || "" }))
+      .filter(h => h.text || h.url);
+    if (!hearings.length && !memoText) return { hearingIds: [], results: [] };
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
 
     const categoryDefs = getCategories().map(cat => ({
@@ -444,7 +446,7 @@
 
     const res = await fetch(cfg.webhookUrl, {
       method: "POST",
-      body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, text: combinedText, categories: categoryDefs }),
+      body: JSON.stringify({ mode: "auto", token: cfg.token || "", caseId, memoText, hearings, categories: categoryDefs }),
     });
     const raw = await res.text();
     console.log("[RoiCore] auto-extraction raw response:", raw);

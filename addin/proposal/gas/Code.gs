@@ -130,12 +130,16 @@ function testRun() {
 function testAutoRun() {
   const result = handleAutoMode({
     caseId: "TEST-01",
-    text: "棚卸は5人で月1回、1回4時間かかっている。集計はExcelで手作業のため、"
-        + "在庫差異が判明するのが翌月になってしまう。時給は3000円くらい。"
-        + "またロット追跡の依頼が入ると、担当者が台帳を探して回答するのに半日かかる。"
-        + "追跡依頼は月に10件ほど、対応できるのは2名だけ。"
-        + "あと、原価計算のやり方はベテランの田中さんしか分からず、"
-        + "田中さんが休むと月次が止まる。これは前から不安に思っている。",
+    memoText: "",
+    hearings: [{
+      title: "初回訪問ヒアリング",
+      text: "棚卸は5人で月1回、1回4時間かかっている。集計はExcelで手作業のため、"
+          + "在庫差異が判明するのが翌月になってしまう。時給は3000円くらい。"
+          + "またロット追跡の依頼が入ると、担当者が台帳を探して回答するのに半日かかる。"
+          + "追跡依頼は月に10件ほど、対応できるのは2名だけ。"
+          + "あと、原価計算のやり方はベテランの田中さんしか分からず、"
+          + "田中さんが休むと月次が止まる。これは前から不安に思っている。",
+    }],
     categories: [
       { category: "在庫管理", items: [
         { itemId: "stk_people", name: "棚卸人数", unit: "人" },
@@ -155,6 +159,18 @@ function testAutoRun() {
     ],
   });
   Logger.log(result.getContent());
+}
+
+/* ------------------------------------------------------------
+ * 参照URLのみ（本文テキストが空）の議事録が正しく扱えるかのテスト。
+ * 実在するURLに差し替えて実行し、実行数ログで
+ * 「取得したテキストの先頭」を確認すること。
+ * ------------------------------------------------------------ */
+function testUrlOnlyFetch() {
+  const url = "https://example.com/"; // ← 実際の議事録ビューアのURLに差し替える
+  const text = fetchTextFromUrl(url);
+  Logger.log("取得文字数: " + text.length);
+  Logger.log("先頭200文字: " + text.slice(0, 200));
 }
 
 function doPost(e) {
@@ -219,8 +235,12 @@ ${sourceText}
  * （該当なしのカテゴリは items:[] または results に含めない） */
 /* 複数課題の一括抽出（営業報告アドインの「作成」アイコン、提案ナレッジの①タブ）。
  * リクエスト:
- * { mode:"auto", caseId, text: "議事録＋メモを連結したテキスト",
+ * { mode:"auto", caseId, memoText: "任意のメモ",
+ *   hearings: [{ title, text, url }, ...],
  *   categories: [{ category, items:[{itemId,name,unit}] }, ...] }
+ * hearings の各要素は text か url のどちらかがあればよい。text が空で url が
+ * ある場合は、このサーバー側で UrlFetchApp によりページ内容を取得してから
+ * まとめてプロンプトに渡す（認証が必要なページは取得できない）。
  * レスポンス:
  * { results: [{ category, title, summary, items:[{itemId,value,confidence}] }, ...] }
  * 1つの議事録から複数の課題が出るのが前提。数値が読み取れない課題でも、
@@ -228,7 +248,16 @@ ${sourceText}
 function handleAutoMode(req) {
   const settings = getAiSettings();
   if (!settings.apiKey) return respond({ error: "AI_API_KEY not configured" });
-  if (!req.text) return respond({ error: "text is empty" });
+
+  const hearings = req.hearings || [];
+  const sections = [];
+  if (req.memoText) sections.push(req.memoText);
+  hearings.forEach(h => {
+    const body = h.text || (h.url ? fetchTextFromUrl(h.url) : "");
+    if (body) sections.push(`【${h.title || "議事録"}】\n${body}`);
+  });
+  const combinedText = sections.join("\n\n");
+  if (!combinedText) return respond({ error: "text is empty" });
 
   const categoryBlock = (req.categories || []).map(c =>
     `### ${c.category}\n${c.items.map(i => `- ${i.itemId} (${i.name}, 単位:${i.unit})`).join("\n")}`
@@ -260,7 +289,7 @@ ${categoryBlock}
 
 議事録・メモ:
 """
-${req.text}
+${combinedText}
 """
 
 出力は次のJSON形式のみとしてください（説明文やコードフェンスは不要）:
