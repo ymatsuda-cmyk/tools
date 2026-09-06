@@ -340,7 +340,7 @@ async function loadProposal() {
   ]);
 
   // ROI試算データが無くても、抽出課題だけある場合（数値が取れなかった課題）も表示する
-  if (!rows.length && !issues.length) {
+  if (!issues.length) {
     list.innerHTML = `<div class="meta">この案件の課題がまだ抽出されていません。①でAI抽出を行ってください。</div>`;
     document.getElementById("totals").style.display = "none";
     return;
@@ -356,8 +356,10 @@ async function loadProposal() {
   // 課題（抽出課題）を主軸にする。カテゴリ未設定の課題も必ず一覧に載せる。
   propState = {
     caseId,
+    // 経営課題だけを提案の対象として扱う。改修要望・対象外は別枠に出す。
+    otherIssues: issues.filter(iss => iss.kind !== RoiCore.KIND_BUSINESS),
     issues: issues
-      .filter(iss => iss.assignStatus !== RoiCore.ASSIGN_SKIP)
+      .filter(iss => iss.kind === RoiCore.KIND_BUSINESS)
       .map(iss => {
         const cat = iss.category || "";
         const g = byCat[cat] || { inputs: [], outputs: [] };
@@ -374,6 +376,8 @@ async function loadProposal() {
         const plan = plans[sel];
         return {
           issueId: iss.issueId,
+          kind: iss.kind,
+          sources: iss.sources || [],
           category: cat,
           assignStatus: iss.assignStatus,
           candidates: iss.candidates || [],
@@ -410,6 +414,12 @@ function hoursOfIssue(is) {
 
 function renderProposal() {
   const list = document.getElementById("proposal-list");
+  if (!propState.issues.length) {
+    list.innerHTML = `<div class="meta">提案対象の経営課題は抽出されませんでした。<br>この議事録は既存案件の進捗確認が中心だった可能性があります。</div>`
+      + renderOtherIssues();
+    document.getElementById("totals").style.display = "none";
+    return;
+  }
   list.innerHTML = propState.issues.map((is, ix) => {
     const loss = lossOfIssue(is);
     return `
@@ -428,6 +438,7 @@ function renderProposal() {
       </div>
       <div class="acc-body">
         ${is.summary ? `<div class="issue-summary">${escHtml(is.summary)}</div>` : ""}
+        ${sourcesBlock(is)}
         ${unmappedBlock(is, ix)}
         ${!is.category ? "" : (!is.inputs.length ? `<div class="meta" style="margin:8px 0">この課題は数値化していません。解決案のみ提示します。</div>` : "")}
         ${!is.category ? "" : `
@@ -491,6 +502,8 @@ function renderProposal() {
       </div>
     </div>`;
   }).join("");
+
+  list.innerHTML += renderOtherIssues();
 
   document.getElementById("totals").style.display = "";
   propState.issues.forEach((is, ix) => { if (is.category) { renderPlans(ix); navWizard(ix); } });
@@ -671,6 +684,13 @@ document.addEventListener("input", async (e) => {
 document.addEventListener("click", async (e) => {
   if (!propState) return;
 
+  if (e.target.id === "copy-others-btn") {
+    const others = (propState.otherIssues || []).filter(i => i.kind !== RoiCore.KIND_NONE);
+    copyToClipboard(others.map(o => `・${o.title}\n  ${o.summary}`).join("\n"));
+    e.target.textContent = "コピーしました";
+    return;
+  }
+
   const asg = e.target.closest("[data-assign]");
   if (asg) { openAssignModal(+asg.dataset.assign); return; }
 
@@ -768,6 +788,37 @@ function recalcOutputs(is) {
     });
   }
   is.outputs.forEach(o => { if (vals[o.itemId] !== undefined) o.value = vals[o.itemId]; });
+}
+
+/* 改修要望・対象外の課題を、提案一覧とは別枠で表示する。
+ * 捨てずに見せることで、既存案件の課題管理表への転記漏れを防ぐ。 */
+function renderOtherIssues() {
+  const others = (propState.otherIssues || []).filter(i => i.kind !== RoiCore.KIND_NONE);
+  if (!others.length) return "";
+  return `
+    <div class="other-box">
+      <div class="other-head">
+        <i class="ti ti-tool" aria-hidden="true"></i>
+        <span>改修要望（${others.length}件）</span>
+      </div>
+      <div class="other-note">提案の対象外です。既存案件の課題管理表に転記してください。</div>
+      ${others.map(o => `
+        <div class="other-item">
+          <div class="oi-title">${escHtml(o.title)}</div>
+          ${o.summary ? `<div class="oi-sum">${escHtml(o.summary)}</div>` : ""}
+        </div>`).join("")}
+      <button class="btn btn-sm" id="copy-others-btn" style="width:100%;margin-top:8px">一覧をコピー</button>
+    </div>`;
+}
+
+/* まとめる前の個別事象。何を集約したのかを商談中に辿れるようにする。 */
+function sourcesBlock(is) {
+  if (!is.sources || !is.sources.length) return "";
+  return `
+    <details class="src-details">
+      <summary>元になった発言（${is.sources.length}件）</summary>
+      ${is.sources.map(x => `<div class="src-line">・${escHtml(x)}</div>`).join("")}
+    </details>`;
 }
 
 /* カテゴリのタグ表示。未設定・カテゴリなし提案を区別する。 */

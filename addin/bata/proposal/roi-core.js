@@ -59,11 +59,18 @@
   // 1つの議事録から複数カテゴリが抽出されるため、案件ID×課題カテゴリで1行。
   // 既存ワークブックの「課題」シート（課題管理表）とは別物なので名前を分けている。
   const ISSUE_SHEET = "抽出課題";
+  // 種別: 経営課題（提案・ROI試算の対象） / 改修要望（既存案件の課題管理表へ） / 対象外
+  //   議事録が既存案件の進捗会議だった場合、改修要望が多くなるのは正常。
+  // 根拠事象: まとめる前の個別事象をJSON配列で保持（何をまとめたか辿れるようにするため）
   // 課題カテゴリ: 割り当て済みならカテゴリ名、未割り当てなら空。
   // 割当状態: 未設定 / 割当済 / カテゴリなしで提案 / 対象外
   // AI候補: AIが提示したカテゴリ候補をJSON文字列で保持（候補名・既存or新規・理由）
-  const ISSUE_COLUMNS = ["案件ID", "課題ID", "課題カテゴリ", "課題タイトル", "課題内容",
-    "AI原文タイトル", "AI原文内容", "割当状態", "AI候補", "根拠議事録ID", "抽出日時"];
+  const ISSUE_COLUMNS = ["案件ID", "課題ID", "種別", "課題カテゴリ", "課題タイトル", "課題内容",
+    "AI原文タイトル", "AI原文内容", "割当状態", "AI候補", "根拠事象", "根拠議事録ID", "抽出日時"];
+
+  const KIND_BUSINESS = "経営課題";
+  const KIND_REQUEST = "改修要望";
+  const KIND_NONE = "対象外";
 
   const ASSIGN_UNSET = "未設定";
   const ASSIGN_DONE = "割当済";
@@ -588,8 +595,10 @@
       const cur = existing.find(x => (r.issueId && x.issueId === r.issueId) || x.aiTitle === r.title);
       return {
         issueId: cur ? cur.issueId : genId("I"),
+        kind: r.kind || KIND_BUSINESS,
         newTitle: r.title,
         newSummary: r.summary || "",
+        sources: r.sources || [],
         candidates: r.candidates || [],
         // AIが「既存カテゴリにそのまま当てはまる」と判断した場合のみ設定される
         matchedCategory: r.matchedCategory || "",
@@ -605,15 +614,19 @@
   async function commitExtraction(caseId, hearingIds, results) {
     for (const r of results) {
       const assigned = !!r.matchedCategory;
+      // 改修要望・対象外はROI試算しないので、割当状態は「対象外」扱いにする
+      const isBusiness = r.kind === KIND_BUSINESS;
       await saveIssue(caseId, r.issueId, {
+        kind: r.kind,
         category: assigned ? r.matchedCategory : (r.current ? r.current.category : ""),
         title: r.newTitle, summary: r.newSummary,
-        assignStatus: assigned ? ASSIGN_DONE
-          : (r.current ? r.current.assignStatus : ASSIGN_UNSET),
+        sources: r.sources,
+        assignStatus: !isBusiness ? ASSIGN_SKIP
+          : (assigned ? ASSIGN_DONE : (r.current ? r.current.assignStatus : ASSIGN_UNSET)),
         candidates: r.candidates,
         hearingIds, keepText: !!r.keepText,
       });
-      if (assigned && r.items && r.items.length) {
+      if (isBusiness && assigned && r.items && r.items.length) {
         await applyCategoryToCalcSheet(caseId, r.matchedCategory, r.items, hearingIds);
       }
     }
@@ -803,18 +816,21 @@
       rows = rng.values.slice(1).filter(r => sameId(r[0], caseId) && r[1]);
     });
     return rows.map(r => {
-      const title = r[3] || "", summary = r[4] || "";
-      const aiTitle = r[5] || "", aiSummary = r[6] || "";
-      let candidates = [];
-      try { candidates = JSON.parse(r[8] || "[]"); } catch (e) { candidates = []; }
+      const title = r[4] || "", summary = r[5] || "";
+      const aiTitle = r[6] || "", aiSummary = r[7] || "";
+      let candidates = [], sources = [];
+      try { candidates = JSON.parse(r[9] || "[]"); } catch (e) { candidates = []; }
+      try { sources = JSON.parse(r[10] || "[]"); } catch (e) { sources = []; }
       return {
-        caseId: r[0], issueId: r[1], category: r[2] || "", title, summary,
+        caseId: r[0], issueId: r[1],
+        kind: r[2] || KIND_BUSINESS,
+        category: r[3] || "", title, summary,
         aiTitle, aiSummary,
         edited: (title !== aiTitle) || (summary !== aiSummary),
-        assignStatus: r[7] || ASSIGN_UNSET,
-        candidates,
-        hearingIds: String(r[9] || "").split(",").filter(Boolean),
-        extractedAt: r[10],
+        assignStatus: r[8] || ASSIGN_UNSET,
+        candidates, sources,
+        hearingIds: String(r[11] || "").split(",").filter(Boolean),
+        extractedAt: r[12],
       };
     });
   }
@@ -831,15 +847,17 @@
       const idx = used.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
       const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
       const cur = idx >= 0 ? used.values[idx + 1] : null;
-      const keepTitle = d.keepText && cur ? (cur[3] || "") : (d.title || "");
-      const keepSummary = d.keepText && cur ? (cur[4] || "") : (d.summary || "");
-      sheet.getRange(`A${rowNum}:K${rowNum}`).values = [[
+      const keepTitle = d.keepText && cur ? (cur[4] || "") : (d.title || "");
+      const keepSummary = d.keepText && cur ? (cur[5] || "") : (d.summary || "");
+      sheet.getRange(`A${rowNum}:M${rowNum}`).values = [[
         caseId, issueId,
-        d.category !== undefined ? d.category : (cur ? cur[2] : ""),
+        d.kind || (cur ? cur[2] : KIND_BUSINESS) || KIND_BUSINESS,
+        d.category !== undefined ? d.category : (cur ? cur[3] : ""),
         keepTitle, keepSummary,
         d.title || "", d.summary || "",
-        d.assignStatus || (cur ? cur[7] : ASSIGN_UNSET) || ASSIGN_UNSET,
-        JSON.stringify(d.candidates || (cur ? (() => { try { return JSON.parse(cur[8] || "[]"); } catch (e) { return []; } })() : [])),
+        d.assignStatus || (cur ? cur[8] : ASSIGN_UNSET) || ASSIGN_UNSET,
+        JSON.stringify(d.candidates || (cur ? (() => { try { return JSON.parse(cur[9] || "[]"); } catch (e) { return []; } })() : [])),
+        JSON.stringify(d.sources || (cur ? (() => { try { return JSON.parse(cur[10] || "[]"); } catch (e) { return []; } })() : [])),
         (d.hearingIds || []).filter(Boolean).join(","),
         nowStr(),
       ]];
@@ -858,8 +876,8 @@
       const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
       if (idx < 0) return;
       const rowNum = idx + 2;
-      sheet.getRange(`C${rowNum}`).values = [[category]];
-      if (assignStatus) sheet.getRange(`H${rowNum}`).values = [[assignStatus]];
+      sheet.getRange(`D${rowNum}`).values = [[category]];
+      if (assignStatus) sheet.getRange(`I${rowNum}`).values = [[assignStatus]];
       await ctx.sync();
     });
   }
@@ -875,8 +893,8 @@
       const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === issueId);
       if (idx < 0) return;
       const rowNum = idx + 2;
-      if (title !== undefined) sheet.getRange(`D${rowNum}`).values = [[title]];
-      if (summary !== undefined) sheet.getRange(`E${rowNum}`).values = [[summary]];
+      if (title !== undefined) sheet.getRange(`E${rowNum}`).values = [[title]];
+      if (summary !== undefined) sheet.getRange(`F${rowNum}`).values = [[summary]];
       await ctx.sync();
     });
   }
@@ -991,6 +1009,7 @@
     listTempCategories, promoteTempCategory,
     getMasterItemsFor, getCategoriesFor,
     ASSIGN_UNSET, ASSIGN_DONE, ASSIGN_NOCAT, ASSIGN_SKIP,
+    KIND_BUSINESS, KIND_REQUEST, KIND_NONE,
     SCOPE_COMMON, SCOPE_TEMP,
     confidenceOf, confidenceLabel,
     getCustomerInfo, getSolutions, getSolutionsForCategory,

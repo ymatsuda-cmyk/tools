@@ -5,8 +5,8 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>c7d66c89-54e6-4b8c-bb13-87f600879da9</Id>
-  <Version>1.0.0.0</Version>
+  <Id>c7d66c89-54e6-4b8c-bb13-87f600879daa</Id>
+  <Version>1.0.0.1</Version>
   <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
@@ -65,7 +65,9 @@
                     <bt:Image size="80" resid="Icon.80x80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>RoiKnowledgeTaskpane</TaskpaneId>
+                    <TaskpaneId>
+                      Office.AutoShowTaskpaneWithDocument
+                    </TaskpaneId>
                     <SourceLocation resid="Taskpane.Url"/>
                   </Action>
                 </Control>

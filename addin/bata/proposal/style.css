@@ -136,6 +136,20 @@ textarea { resize: vertical; }
 .diff-text { font-size: 11px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
 .choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 .choice-row .btn { width: auto; }
+/* ---- 改修要望・根拠事象 ---- */
+.other-box { background: #fafaf8; border: 1px solid #e5e3da; border-left: 3px solid #e8a33d;
+  border-radius: 10px; padding: 11px 12px; margin-top: 12px; }
+.other-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+.other-head i { font-size: 15px; color: #854f0b; }
+.other-note { font-size: 10px; color: #5f5e5a; margin-bottom: 8px; }
+.other-item { background: #fff; border-radius: 6px; padding: 7px 9px; margin-bottom: 4px; }
+.oi-title { font-size: 11px; font-weight: 600; line-height: 1.5; }
+.oi-sum { font-size: 10px; color: #5f5e5a; line-height: 1.6; margin-top: 2px; }
+
+.src-details { margin: 6px 0 4px; }
+.src-details summary { font-size: 10px; color: #185fa5; cursor: pointer; }
+.src-line { font-size: 10px; color: #5f5e5a; line-height: 1.7; margin-top: 3px; }
+
 /* ---- カテゴリ未設定・割り当て ---- */
 .acc.unmapped { border-left: 3px solid #e8a33d; }
 .tag-unmapped { font-size: 10px; background: #faeeda; color: #854f0b; padding: 1px 7px; border-radius: 8px; }
