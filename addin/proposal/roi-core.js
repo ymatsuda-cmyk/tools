@@ -64,6 +64,10 @@
   const DECISION_SHEET = "提案決定";
   const DECISION_COLUMNS = ["案件ID", "課題カテゴリ", "解決策名", "導入費", "改善率", "削減根拠", "根拠区分", "提案に含める", "更新日時"];
 
+  /* 案件IDの前後に空白が混じっていても同一とみなす（営業報告シート等の
+   * コピー&ペースト由来の余分な空白で一致しなくなる事故を防ぐ）。 */
+  function sameId(a, b) { return String(a ?? "").trim() === String(b ?? "").trim(); }
+
   const CONF_LEVELS = ["確定", "推定", "未確認"];
   const CONF_WEIGHT = { "確定": 1, "推定": 0.5, "未確認": 0 };
 
@@ -239,7 +243,7 @@
       const titleCol = header.findIndex(h => /案件名|件名|タイトル|概要/.test(String(h)));
       const seen = new Set();
       used.values.slice(1).forEach(r => {
-        const id = r[0] ? String(r[0]) : "";
+        const id = r[0] ? String(r[0]).trim() : "";
         if (!id || seen.has(id)) return;
         seen.add(id);
         const custName = custMap[id.split("-")[0]] || "";
@@ -276,7 +280,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      rows = rng.values.slice(1).filter(r => String(r[0]) === caseId);
+      rows = rng.values.slice(1).filter(r => sameId(r[0], caseId));
     });
     return rows.map(r => ({
       title: r[1] || "議事録", url: r[2], text: r[3],
@@ -299,12 +303,12 @@
     });
     const map = {};
     hearing.forEach(r => {
-      const id = String(r[0]);
+      const id = String(r[0]).trim();
       map[id] = map[id] || { caseId: id, hearingCount: 0, issueCount: 0 };
       map[id].hearingCount++;
     });
     issues.forEach(r => {
-      const id = String(r[0]);
+      const id = String(r[0]).trim();
       map[id] = map[id] || { caseId: id, hearingCount: 0, issueCount: 0 };
       map[id].issueCount++;
     });
@@ -509,7 +513,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      const row = rng.values.slice(1).find(r => String(r[0]) === caseId && r[1] === category && r[10]);
+      const row = rng.values.slice(1).find(r => sameId(r[0], caseId) && r[1] === category && r[10]);
       provenance = row ? row[10] : "";
     });
     const ids = new Set(provenance.split(",").filter(Boolean));
@@ -540,7 +544,7 @@
       const r2 = solSheet.getUsedRange(true);
       r2.load("values");
       await ctx.sync();
-      calcRows = r1.values.slice(1).filter(r => String(r[0]) === caseId);
+      calcRows = r1.values.slice(1).filter(r => sameId(r[0], caseId));
       solutions = r2.values.slice(1);
     });
 
@@ -580,7 +584,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      rows = rng.values.slice(1).filter(r => String(r[0]) === caseId);
+      rows = rng.values.slice(1).filter(r => sameId(r[0], caseId));
     });
     if (onlySelected) rows = rows.filter(r => String(r[8]).toUpperCase() === "TRUE");
     return rows.map(r => ({
@@ -598,7 +602,7 @@
       await ctx.sync();
       rng.values.forEach((r, i) => {
         if (i === 0) return;
-        if (String(r[0]) === caseId && r[1] === category) sheet.getRange(`I${i + 1}`).values = [[checked ? "TRUE" : "FALSE"]];
+        if (sameId(r[0], caseId) && r[1] === category) sheet.getRange(`I${i + 1}`).values = [[checked ? "TRUE" : "FALSE"]];
       });
       await ctx.sync();
     });
@@ -643,7 +647,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      rows = rng.values.slice(1).filter(r => String(r[0]) === caseId && r[1]);
+      rows = rng.values.slice(1).filter(r => sameId(r[0], caseId) && r[1]);
     });
     return rows.map(r => {
       const title = r[2] || "", summary = r[3] || "";
@@ -668,7 +672,7 @@
       const used = sheet.getUsedRange(true);
       used.load("values, rowCount");
       await ctx.sync();
-      const idx = used.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
+      const idx = used.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === category);
       const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
       const cur = idx >= 0 ? used.values[idx + 1] : null;
       const keepTitle = keepText && cur ? (cur[2] || "") : title;
@@ -689,7 +693,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      const idx = rng.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
+      const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === category);
       if (idx < 0) return;
       const rowNum = idx + 2;
       if (title !== undefined) sheet.getRange(`C${rowNum}`).values = [[title]];
@@ -707,7 +711,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      rows = rng.values.slice(1).filter(r => String(r[0]) === caseId);
+      rows = rng.values.slice(1).filter(r => sameId(r[0], caseId));
     });
     return rows.map(r => ({
       caseId: r[0], category: r[1], solutionName: r[2],
@@ -727,7 +731,7 @@
       const used = sheet.getUsedRange(true);
       used.load("values, rowCount");
       await ctx.sync();
-      const idx = used.values.slice(1).findIndex(r => String(r[0]) === caseId && r[1] === category);
+      const idx = used.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[1] === category);
       const rowNum = idx >= 0 ? idx + 2 : Math.max(used.rowCount, 1) + 1;
       sheet.getRange(`A${rowNum}:I${rowNum}`).values = [row];
       await ctx.sync();
@@ -761,7 +765,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      const idx = rng.values.slice(1).findIndex(r => String(r[0]) === caseId && r[2] === itemId);
+      const idx = rng.values.slice(1).findIndex(r => sameId(r[0], caseId) && r[2] === itemId);
       if (idx < 0) return;
       const rowNum = idx + 2;
       if (value !== undefined) sheet.getRange(`F${rowNum}`).values = [[value]];
@@ -779,7 +783,7 @@
       const rng = sheet.getUsedRange(true);
       rng.load("values");
       await ctx.sync();
-      const code = caseId.split("-")[0];
+      const code = String(caseId).trim().split("-")[0];
       row = rng.values.slice(1).find(r => r[0] === code) || null;
     });
     if (!row) return null;
