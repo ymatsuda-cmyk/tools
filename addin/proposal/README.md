@@ -147,6 +147,8 @@ proposal/
 
 ## デプロイ手順（GitHub Pages）
 
+**`roi-core.js` や `app.js` を更新したら、`index.html` の `<script src="...?v=YYYYMMDDx">` のバージョン文字列を毎回変える。** ブラウザ・GitHub Pages側のキャッシュにより、バージョンを変えないと更新が反映されないことがある（実際に、抽出処理を何度も直したのに古いコードが動き続ける不具合が発生したため）。営業報告アドイン側の `eigyo-integrated/index.html` にある相対パス参照（`../proposal/roi-core.js?v=...`）も同様。
+
 1. `manifest.xml` `index.html` `app.js` `roi-core.js` `style.css` `commands.html` `commands.js` `icons/` 一式を、営業報告アドインと同じリポジトリの `tools/addin/proposal/` に配置
 2. `icons/` は暫定的に営業報告アドインのアイコンを流用。実運用前に差し替える
 3. `manifest.xml` をサイドロード、または管理センターから組織展開
