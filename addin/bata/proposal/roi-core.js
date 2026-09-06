@@ -548,7 +548,14 @@
     // テキストがある議事録はそのまま、URLのみの議事録はGAS側で内容を取得させる。
     const hearings = logs.map(l => ({ title: l.title, text: capText(l.text || ""), url: l.url || "" }))
       .filter(h => h.text || h.url);
-    if (!hearings.length && !memoText) return { hearingIds: [], results: [] };
+    console.log("[RoiCore] previewExtraction: logs=" + logs.length
+      + " hearings(after filter)=" + hearings.length
+      + " memoText.length=" + (memoText || "").length
+      + " rawLogsSample=" + JSON.stringify(logs.map(l => ({ title: l.title, textLen: (l.text || "").length, url: l.url }))));
+    if (!hearings.length && !memoText) {
+      console.log("[RoiCore] previewExtraction: 議事録が空と判定したためGASを呼ばずに終了します");
+      return { hearingIds: [], results: [] };
+    }
     const hearingIds = logs.map(l => l.hearingId).filter(Boolean);
 
     // この案件で使えるカテゴリ（共通＋この案件の一時カテゴリ）を候補判定の材料として渡す
