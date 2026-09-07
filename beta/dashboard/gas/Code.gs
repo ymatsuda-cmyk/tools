@@ -300,6 +300,177 @@ function getQuotaStatus(monitor) {
 }
 
 /* ============================================================
+   手動カウンタ（Gemini / ChatGPT のチャットUI利用枠など）
+
+   ブラウザのチャットUIの利用回数は外部から取得する手段が無いため、
+   ダッシュボードのカードから手動で加算・リセットする。
+   カウントはスクリプトプロパティに持つので端末をまたいで共有される。
+
+   monitors の登録例:
+     { "id":"gemini-pro", "name":"Gemini Pro", "type":"manual",
+       "limit":100, "unit":"回", "cycle":"daily" }
+     { "id":"chatgpt-free", "name":"ChatGPT (無料)", "type":"manual",
+       "limit":10, "unit":"回", "cycle":"rolling", "windowHours":5 }
+
+   cycle: "daily"（既定） / "monthly" / "rolling"（windowHours 時間の
+   ローリングウィンドウ。最初の1回を記録した時点から計測を始める）
+   ============================================================ */
+
+function manualKey(id, suffix) {
+  var safe = String(id).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  return 'MANUAL_' + safe + '_' + suffix;
+}
+
+/** daily / monthly の「今の期間」を表す文字列。期間が変われば値も変わる */
+function manualPeriodKey(monitor) {
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  if (monitor.cycle === 'monthly') return Utilities.formatDate(now, tz, 'yyyy-MM');
+  return Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+}
+
+/**
+ * 保存済みのカウントを読む。期間が切り替わっていれば 0 として扱う
+ * （実際の書き込みは記録時にまとめて行う）。
+ */
+function readManual(monitor) {
+  var used = Number(PROP.getProperty(manualKey(monitor.id, 'USED'))) || 0;
+  var mark = PROP.getProperty(manualKey(monitor.id, 'MARK')) || '';
+  var start = 0;
+  var resetAt = null;
+
+  if (monitor.cycle === 'rolling') {
+    var span = (Number(monitor.windowHours) || 5) * 3600 * 1000;
+    start = Number(mark) || 0;
+    if (!start || Date.now() - start >= span) { used = 0; start = 0; }
+    else resetAt = new Date(start + span);
+  } else if (mark !== manualPeriodKey(monitor)) {
+    used = 0;
+  }
+
+  return { used: used, start: start, resetAt: resetAt };
+}
+
+function manualNote(monitor, state) {
+  if (monitor.cycle === 'rolling') {
+    if (!state.resetAt) return (Number(monitor.windowHours) || 5) + '時間の枠。1回目の記録から計測開始';
+    var left = Math.max(0, state.resetAt.getTime() - Date.now());
+    var h = Math.floor(left / 3600000);
+    var m = Math.floor((left % 3600000) / 60000);
+    return 'あと ' + h + '時間' + m + '分でリセット';
+  }
+  return monitor.cycle === 'monthly' ? '毎月1日にリセット' : '毎日0時にリセット';
+}
+
+function getManualStatus(monitor) {
+  var state = readManual(monitor);
+  var limit = Number(monitor.limit) || 0;
+
+  return {
+    id: monitor.id,
+    name: monitor.name || monitor.id,
+    state: 'tracking',
+    remaining: { value: Math.max(0, limit - state.used), max: limit, unit: monitor.unit || '回' },
+    used: state.used,
+    note: manualNote(monitor, state),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * カードのボタンから呼ばれる。delta は増減量、reset:true なら 0 に戻す。
+ */
+function recordManualUsage(monitor, delta, reset) {
+  var state = readManual(monitor);
+  var used = reset ? 0 : Math.max(0, state.used + (Number(delta) || 0));
+
+  PROP.setProperty(manualKey(monitor.id, 'USED'), String(used));
+
+  if (monitor.cycle === 'rolling') {
+    // ウィンドウの起点は「0 から増えた瞬間」。以降は延長しない
+    if (used === 0) PROP.deleteProperty(manualKey(monitor.id, 'MARK'));
+    else if (!state.start) PROP.setProperty(manualKey(monitor.id, 'MARK'), String(Date.now()));
+  } else {
+    PROP.setProperty(manualKey(monitor.id, 'MARK'), manualPeriodKey(monitor));
+  }
+
+  return getManualStatus(monitor);
+}
+
+/* ============================================================
+   GitHub Copilot のプレミアムリクエスト残量
+
+   GitHub の課金APIから当月の使用量を取得し、契約プランの上限
+   （monitor.monthlyLimit）との差分を残量として返す。
+
+     GET /users/{user}/settings/billing/usage?year=&month=
+
+   このAPIは Fine-grained PAT の「Account permissions → Plan:
+   Read-only」が必要。index.json のコミットに使っている GITHUB_TOKEN
+   にその権限が無い場合は、監視ID用のトークン
+   （MONITOR_TOKEN_COPILOT など）を別に登録すればそちらが優先される。
+
+   monitors の登録例:
+     { "id":"copilot", "name":"GitHub Copilot", "type":"copilot",
+       "monthlyLimit":300 }
+   ============================================================ */
+
+function fetchCopilotStatus(monitor) {
+  var token = monitorToken(monitor.id) || cfg('GITHUB_TOKEN');
+  var user = monitor.user || cfg('GITHUB_OWNER');
+  if (!token) return { id: monitor.id, state: 'error', error: 'GitHubのトークンが未設定です' };
+  if (!user)  return { id: monitor.id, state: 'error', error: 'GITHUB_OWNER が未設定です' };
+
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var url = 'https://api.github.com/users/' + encodeURIComponent(user) +
+            '/settings/billing/usage' +
+            '?year=' + Utilities.formatDate(now, tz, 'yyyy') +
+            '&month=' + Number(Utilities.formatDate(now, tz, 'MM'));
+
+  var res = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+    muteHttpExceptions: true
+  });
+
+  var code = res.getResponseCode();
+  if (code === 403 || code === 404) {
+    return {
+      id: monitor.id, state: 'error',
+      error: 'HTTP ' + code + '：トークンに Plan(Read-only) 権限が必要です'
+    };
+  }
+  if (code !== 200) {
+    return { id: monitor.id, state: 'error', error: 'HTTP ' + code };
+  }
+
+  var data;
+  try { data = JSON.parse(res.getContentText()); }
+  catch (e) { return { id: monitor.id, state: 'error', error: 'JSON解析に失敗しました' }; }
+
+  // usageItems は日次の明細。プレミアムリクエスト分だけを当月で合計する
+  var used = 0;
+  (data.usageItems || []).forEach(function (it) {
+    if (String(it.product || '').toLowerCase().indexOf('copilot') < 0) return;
+    if (!/premium/i.test(String(it.sku || ''))) return;
+    used += Number(it.quantity) || 0;
+  });
+
+  var limit = Number(monitor.monthlyLimit) || 300;
+
+  return {
+    id: monitor.id,
+    name: monitor.name || monitor.id,
+    state: 'tracking',
+    remaining: { value: Math.max(0, limit - used), max: limit, unit: '回' },
+    used: used,
+    note: used >= limit ? '当月の割り当てを使い切っています' : '毎月1日にリセット',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/* ============================================================
    Kaggle コントローラー（別デプロイのGAS）への橋渡し
 
    Kaggle_controller_single.gs は、このダッシュボード用GASとは
@@ -409,13 +580,15 @@ function monitorHeaders(monitor) {
  */
 function fetchMonitorStatus(monitor) {
   try {
+    // endpoint を持たない種別を先に処理する
+    if (monitor.type === 'quota')   return getQuotaStatus(monitor);
+    if (monitor.type === 'manual')  return getManualStatus(monitor);
+    if (monitor.type === 'copilot') return fetchCopilotStatus(monitor);
+
     if (!monitor.endpoint) throw new Error('endpoint が未設定です');
 
     if (monitor.type === 'kaggle') {
       return fetchKaggleStatus(monitor);
-    }
-    if (monitor.type === 'quota') {
-      return getQuotaStatus(monitor);
     }
 
     const sep = monitor.endpoint.indexOf('?') >= 0 ? '&' : '?';
@@ -456,13 +629,13 @@ function sendMonitorControl(monitor, command) {
   if (command !== 'start' && command !== 'stop') {
     throw new Error('command は start か stop のみです');
   }
+  if (monitor.type === 'quota' || monitor.type === 'manual' || monitor.type === 'copilot') {
+    throw new Error('この監視対象には起動/停止の概念がありません');
+  }
   if (!monitor.endpoint) throw new Error('endpoint が未設定です');
 
   if (monitor.type === 'kaggle') {
     return sendKaggleControl(monitor, command);
-  }
-  if (monitor.type === 'quota') {
-    throw new Error('この監視対象には起動/停止の概念がありません');
   }
 
   const res = UrlFetchApp.fetch(monitor.endpoint, {
@@ -554,6 +727,13 @@ function doPost(e) {
       const list = req.monitors || [];
       const results = list.map(function (m) { return fetchMonitorStatus(m); });
       return jsonOut({ ok: true, results: results });
+    }
+
+    if (req.action === 'monitorUsage') {
+      if (!req.monitor) throw new Error('monitor は必須です');
+      if (req.monitor.type !== 'manual') throw new Error('手動カウンタ以外は記録できません');
+      const snapshot = recordManualUsage(req.monitor, req.delta, req.reset === true);
+      return jsonOut({ ok: true, snapshot: snapshot });
     }
 
     if (req.action === 'monitorControl') {

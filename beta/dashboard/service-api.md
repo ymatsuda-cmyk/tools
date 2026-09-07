@@ -184,6 +184,66 @@ app.listen(3000);
 
 ---
 
+## endpoint を持たない監視対象
+
+AIサービスの利用枠のように、この仕様のAPIを立てられないものは
+`type` を指定すると GAS 側だけで完結します。`endpoint` は不要です。
+
+### `type: "copilot"` — GitHub Copilot（自動取得）
+
+GitHubの課金APIから当月のプレミアムリクエスト使用量を取得し、
+`monthlyLimit` との差分を残量として表示します。
+
+```json
+{ "id": "copilot", "name": "GitHub Copilot", "group": "AI",
+  "type": "copilot", "monthlyLimit": 300 }
+```
+
+| フィールド | 内容 |
+|---|---|
+| `monthlyLimit` | プランの月間割り当て（Pro: 300 / Pro+: 1500 など） |
+| `user` | 任意。省略時は `GITHUB_OWNER` を使う |
+
+このAPIは Fine-grained PAT の **Account permissions → Plan: Read-only** が必要です。
+`GITHUB_TOKEN` にその権限が無い場合は、スクリプトプロパティ
+`MONITOR_TOKEN_COPILOT` に別トークンを登録すればそちらが優先されます。
+
+### `type: "manual"` — 手動カウンタ
+
+Gemini や ChatGPT のチャットUIの利用回数は外部から取得できないため、
+カードの「1回使った」ボタンで手動カウントします。
+カウントはGASのスクリプトプロパティに保存されるので、端末をまたいで共有されます。
+
+```json
+[
+  { "id": "gemini-pro",   "name": "Gemini Pro",     "group": "AI",
+    "type": "manual", "limit": 100, "unit": "回", "cycle": "daily" },
+  { "id": "gemini-free",  "name": "Gemini (無料)",  "group": "AI",
+    "type": "manual", "limit": 20,  "unit": "回", "cycle": "daily" },
+  { "id": "chatgpt-free", "name": "ChatGPT (無料)", "group": "AI",
+    "type": "manual", "limit": 10,  "unit": "回", "cycle": "rolling", "windowHours": 5 }
+]
+```
+
+| フィールド | 内容 |
+|---|---|
+| `limit` | 1周期あたりの上限 |
+| `unit` | ゲージに出す単位。省略時は `回` |
+| `cycle` | `daily`（既定） / `monthly` / `rolling` |
+| `windowHours` | `cycle: "rolling"` のときの枠の長さ。省略時は5 |
+
+`rolling` は「最初の1回を記録した時点」から `windowHours` 時間を数え、
+経過すると自動で0に戻ります。ChatGPT無料版のような区切りに使います。
+
+`daily` / `monthly` のリセット時刻は、GASプロジェクトのタイムゾーン設定に従います。
+
+### `type: "quota"` — API呼び出しの自己記録
+
+スクリプトから `action: "recordApiUsage"` を投げて積算する方式です。
+詳細は `gas/Code.gs` のコメントを参照してください。
+
+---
+
 ## URLパラメータで表示を切り替える
 
 特定のサーバーだけを表示した状態でページを開けます。

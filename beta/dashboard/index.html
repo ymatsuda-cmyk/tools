@@ -87,6 +87,15 @@
   .switch.disabled .track{cursor:not-allowed;opacity:0.35;}
   .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
   .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
+  .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
+  .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
+  .mon-actions button{
+    flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:12px;padding:7px 0;cursor:pointer;transition:all .15s ease;
+  }
+  .mon-actions button:hover:not(:disabled){border-color:var(--border-strong);color:var(--text);}
+  .mon-actions button:disabled{opacity:0.35;cursor:not-allowed;}
+  .mon-actions button.use{color:var(--accent);border-color:var(--accent-soft);}
 
   .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
   .search-input{
@@ -1011,7 +1020,7 @@ function renderMonitorCard(m, snap){
   if(!snap){
     body = `<div class="mon-offline">取得中…</div>`;
   }else if(snap.error){
-    body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${snap.error}</div>`;
+    body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${esc(snap.error)}</div>`;
   }else if(!snap.remaining){
     body = `<div class="mon-offline">${meta.label}</div>`;
   }else{
@@ -1024,13 +1033,24 @@ function renderMonitorCard(m, snap){
       <div class="mon-ring">
         ${ringSVG(pct, remainColor(pct), round1(val) + unit)}
         <div class="sub mono">${max ? '残り / 上限 ' + round1(max) + unit : '残り'}</div>
+        ${snap.note ? `<div class="mon-note">${esc(snap.note)}</div>` : ''}
       </div>`;
   }
 
   const cls = 'switch' + (busy ? ' busy' : '') + (locked ? ' disabled' : '');
-  const toggleRow = m.type === 'quota'
-    ? ''  // 起動/停止の概念が無い監視対象にはトグルを出さない
-    : `<div class="mon-toggle">
+  let footer;
+  if(m.type === 'manual'){
+    // 外部から取得できない利用枠は手で1回ぶん減らす
+    const dis = snap && !snap.error ? '' : 'disabled';
+    footer = `<div class="mon-actions">
+        <button class="use" data-use="${m.id}" data-delta="1" ${dis}>1回使った</button>
+        <button data-use="${m.id}" data-delta="-1" ${dis} aria-label="1回ぶん戻す">戻す</button>
+        <button data-reset="${m.id}" ${dis}>リセット</button>
+      </div>`;
+  }else if(m.type === 'quota' || m.type === 'copilot'){
+    footer = '';   // 起動/停止の概念が無い監視対象にはトグルを出さない
+  }else{
+    footer = `<div class="mon-toggle">
         <span class="tl">${busy ? meta.label + '…' : (on ? '稼働中' : '停止中')}</span>
         <label class="${cls}">
           <input type="checkbox" data-toggle="${m.id}" ${on ? 'checked' : ''}
@@ -1038,17 +1058,25 @@ function renderMonitorCard(m, snap){
           <span class="track"><span class="knob"></span></span>
         </label>
       </div>`;
+  }
 
   return `
     <div class="mon-card" data-monitor="${m.id}">
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
-        <span class="mon-name">${snap && snap.name ? snap.name : m.name || m.id}</span>
+        <span class="mon-name">${esc(snap && snap.name ? snap.name : m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
       </div>
       ${body}
-      ${toggleRow}
+      ${footer}
     </div>`;
+}
+
+/** 設定やAPI応答由来の文字列をHTMLに埋めるときのエスケープ */
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
 
 /* 残量が少ないほど警告色にする */
@@ -1112,6 +1140,33 @@ function renderMonitors(){
       controlMonitor(sw.dataset.toggle, sw.checked ? 'start' : 'stop');
     });
   });
+
+  grid.querySelectorAll('[data-use]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      recordManualUsage(btn.dataset.use, Number(btn.dataset.delta), false);
+    });
+  });
+
+  grid.querySelectorAll('[data-reset]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.reset;
+      const m = monitors().find(x=>x.id===id);
+      if(confirm(`${(m && m.name) || id} のカウントを0に戻しますか？`)){
+        recordManualUsage(id, 0, true);
+      }
+    });
+  });
+}
+
+/** 手動カウンタの増減。GAS側に保存するので端末をまたいで揃う */
+async function recordManualUsage(id, delta, reset){
+  const m = monitors().find(x=>x.id===id);
+  if(!m) return;
+  try{
+    const res = await callGas({ action:'monitorUsage', monitor:m, delta, reset });
+    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    renderMonitors();
+  }catch(err){ toast(err.message); }
 }
 
 async function fetchMonitors(){

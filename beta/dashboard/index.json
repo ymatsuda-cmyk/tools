@@ -26,6 +26,41 @@
         "name": "検証サーバー",
         "group": "検証",
         "endpoint": "https://your-service.example.com/api/dev"
+      },
+      {
+        "id": "copilot",
+        "name": "GitHub Copilot",
+        "group": "AI",
+        "type": "copilot",
+        "monthlyLimit": 300
+      },
+      {
+        "id": "gemini-pro",
+        "name": "Gemini Pro",
+        "group": "AI",
+        "type": "manual",
+        "limit": 100,
+        "unit": "回",
+        "cycle": "daily"
+      },
+      {
+        "id": "gemini-free",
+        "name": "Gemini (無料)",
+        "group": "AI",
+        "type": "manual",
+        "limit": 20,
+        "unit": "回",
+        "cycle": "daily"
+      },
+      {
+        "id": "chatgpt-free",
+        "name": "ChatGPT (無料)",
+        "group": "AI",
+        "type": "manual",
+        "limit": 10,
+        "unit": "回",
+        "cycle": "rolling",
+        "windowHours": 5
       }
     ]
   },
