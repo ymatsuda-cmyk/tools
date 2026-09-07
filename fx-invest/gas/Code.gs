@@ -68,6 +68,32 @@ function fetchUsdJpySeries(days) {
 }
 
 /* ============================================================
+   いまのレート（数分おきに更新される無料API）
+
+   Frankfurter はECBの1日1回の基準レートなので、現在値は別途取得する。
+   取得できなかったときは直近の終値で代用する。
+   ============================================================ */
+
+function fetchUsdJpyLive() {
+  var sources = [
+    { url: 'https://api.fxratesapi.com/latest?base=USD&currencies=JPY',
+      pick: function (j) { return j.rates && j.rates.JPY; } },
+    { url: 'https://open.er-api.com/v6/latest/USD',
+      pick: function (j) { return j.rates && j.rates.JPY; } }
+  ];
+
+  for (var i = 0; i < sources.length; i++) {
+    try {
+      var res = UrlFetchApp.fetch(sources[i].url, { muteHttpExceptions: true });
+      if (res.getResponseCode() !== 200) continue;
+      var rate = sources[i].pick(JSON.parse(res.getContentText()));
+      if (typeof rate === 'number' && rate > 0) return rate;
+    } catch (e) { /* 次の取得先を試す */ }
+  }
+  return null;
+}
+
+/* ============================================================
    判定
    ============================================================ */
 
@@ -79,15 +105,22 @@ function fxJudge() {
   var sum = recent.reduce(function (a, x) { return a + x.rate; }, 0);
   var avg = sum / FX_SMA_DAYS;
 
-  var last = series[series.length - 1];
-  var gap = (last.rate - avg) / avg * 100;
+  var close = series[series.length - 1];
+  var live = fetchUsdJpyLive();
+  var rate = live === null ? close.rate : live;
+
+  var gap = (rate - avg) / avg * 100;
   var level = FX_LEVELS[fxCfg('FX_LEVEL', 'normal')] || FX_LEVELS.normal;
 
   var state = 'hold';
   if (gap <= -level.buy) state = 'buy';
   else if (gap >= level.sell) state = 'sell';
 
-  return { state: state, gap: gap, rate: last.rate, avg: avg, date: last.date };
+  return {
+    state: state, gap: gap, rate: rate, avg: avg, live: live !== null,
+    date: live === null ? close.date
+      : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+  };
 }
 
 /* ============================================================
@@ -102,7 +135,7 @@ function fxMessage(j) {
   var body = [
     (j.state === 'buy' ? '買い時のサインが出ました。' : '売り時のサインが出ました。'),
     '',
-    'レート    : ' + j.rate.toFixed(2) + ' 円（' + j.date + ' 終値）',
+    'レート    : ' + j.rate.toFixed(2) + ' 円（' + j.date + (j.live ? ' 時点' : ' 終値') + '）',
     'いつもの値段: ' + j.avg.toFixed(2) + ' 円（過去' + FX_SMA_DAYS + '営業日の平均）',
     'かい離    : ' + Math.abs(j.gap).toFixed(1) + '% ' + word,
     '',

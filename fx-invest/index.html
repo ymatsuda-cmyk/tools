@@ -220,6 +220,32 @@ async function fetchSeries(days){
   throw err;
 }
 
+/* ===== いまのレート（数分おきに更新される無料API） =====
+   履歴用の Frankfurter はECBの1日1回の基準レートなので、現在値は別の取得先を使う */
+const LIVE_SOURCES = [
+  { name:'fxratesapi',
+    url:'https://api.fxratesapi.com/latest?base=USD&currencies=JPY',
+    pick: j => ({ rate: j.rates && j.rates.JPY, at: j.date ? new Date(j.date) : new Date() }) },
+  { name:'er-api',
+    url:'https://open.er-api.com/v6/latest/USD',
+    pick: j => ({ rate: j.rates && j.rates.JPY,
+                  at: new Date((j.time_last_update_unix || 0) * 1000 || Date.now()) }) }
+];
+
+async function fetchLive(){
+  for(const s of LIVE_SOURCES){
+    try{
+      const res = await fetch(s.url, { cache:'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const v = s.pick(await res.json());
+      if(typeof v.rate === 'number' && v.rate > 0) return { rate:v.rate, at:v.at, source:s.name };
+    }catch(e){ /* 次の取得先を試す */ }
+  }
+  return null;
+}
+
+const hhmm = d => String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+
 /* ===== 判定：いつもの値段（移動平均）からどれだけ離れたか ===== */
 function sma(list, n){
   const out = new Array(list.length).fill(null);
@@ -239,24 +265,36 @@ function judge(rate, avg){
   return { state:'hold', gap };
 }
 
-/* ===== 最新レートの取り込み ===== */
-async function refresh(){
+/* ===== 履歴（日足）の取り込み。いつもの値段とグラフに使う ===== */
+async function loadHistory(){
   const st = $('status');
   st.className = 'status'; st.textContent = 'レートを取得中…';
-  let data;
-  try{ data = await fetchSeries(420); }
-  catch(e){
+  try{
+    series = await fetchSeries(420);
+    avgLine = sma(series, SMA_DAYS);
+    st.textContent = '';
+    return true;
+  }catch(e){
     st.className = 'status err';
     st.textContent = 'レートを取得できませんでした（' + e.message + '）';
-    return;
+    return false;
   }
-  series = data;
-  avgLine = sma(series, SMA_DAYS);
+}
+
+/* ===== いまのレートで判定を更新（1分ごと） ===== */
+async function updateLive(){
+  if(!series.length) return;
   const i = series.length - 1;
-  const j = judge(series[i].rate, avgLine[i]);
-  now = { date:series[i].date, rate:series[i].rate, avg:avgLine[i],
-          prev: i > 0 ? series[i-1].rate : null, state:j.state, gap:j.gap };
-  st.textContent = '';
+  const close = series[i];
+  const live = await fetchLive();
+  const rate = live ? live.rate : close.rate;
+  const j = judge(rate, avgLine[i]);
+  now = {
+    rate: rate, avg: avgLine[i], state: j.state, gap: j.gap,
+    date: new Date().toLocaleDateString('sv-SE'),
+    prevClose: close.rate, prevDate: close.date,
+    at: live ? live.at : null, live: !!live
+  };
   render();
   maybeNotify();
 }
@@ -267,17 +305,19 @@ function render(){
   $('hero').className = 'hero ' + (now ? now.state : 'hold');
   if(now){
     const g = Math.abs(now.gap).toFixed(1);
-    const d = now.prev == null ? 0 : now.rate - now.prev;
+    const d = now.rate - now.prevClose;
     $('verdict').textContent = VERDICT[now.state];
     $('rate').textContent = now.rate.toFixed(2);
-    $('diff').textContent = '1ドル ＝ ' + now.rate.toFixed(2) + '円（前営業日 ' +
-      (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(2) + '円）';
+    $('diff').textContent = '前回終値 ' + now.prevClose.toFixed(2) + '円から ' +
+      (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(2) + '円';
     $('why').textContent =
       now.state === 'buy'  ? 'いつもの値段より ' + g + '% 安いので、買い時のサインが出ています。' :
       now.state === 'sell' ? 'いつもの値段より ' + g + '% 高いので、売り時のサインが出ています。' :
       'いつもの値段との差は ' + (now.gap >= 0 ? '+' : '−') + g + '%。サインが出るまで待ちましょう。';
-    $('stamp').textContent = now.date + ' 終値 ／ いつもの値段 ' +
-      (now.avg ? now.avg.toFixed(2) + '円' : '—') + '（過去' + SMA_DAYS + '営業日の平均）';
+    $('stamp').textContent =
+      (now.live ? hhmm(now.at) + ' 時点（1分ごとに更新）' : now.prevDate + ' の終値（現在値を取得できません）') +
+      ' ／ いつもの値段 ' + (now.avg ? now.avg.toFixed(2) + '円' : '—') +
+      '（過去' + SMA_DAYS + '営業日の平均）';
   }
 
   const usd  = S.lots.reduce((a,l) => a + l.usd, 0);
@@ -381,8 +421,10 @@ function drawChart(){
   c.stroke();
 
   const idx = new Map(view.map((v,i) => [v.date, i]));
+  const lastDate = view[view.length-1].date;
   S.history.forEach(t => {
-    const i = idx.get(t.date);
+    let i = idx.get(t.date);
+    if(i == null && t.date >= lastDate) i = view.length - 1;   // 当日の売買は右端に置く
     if(i == null) return;
     c.beginPath(); c.fillStyle = t.side === 'buy' ? '#15803d' : '#b91c1c';
     c.arc(X(i), Y(t.rate), 4, 0, Math.PI*2); c.fill();
@@ -434,8 +476,7 @@ function buildSettings(){
 }
 function recalc(){
   if(now && series.length){
-    const i = series.length - 1;
-    const j = judge(series[i].rate, avgLine[i]);
+    const j = judge(now.rate, now.avg);
     now.state = j.state; now.gap = j.gap;
   }
   render();
@@ -466,9 +507,11 @@ function init(){
     save(); render();
   });
   window.addEventListener('resize', drawChart);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) updateLive(); });
 
-  refresh();
-  setInterval(refresh, 30*60*1000);
+  loadHistory().then(ok => { if(ok) updateLive(); });
+  setInterval(updateLive, 60*1000);
+  setInterval(loadHistory, 6*60*60*1000);
 }
 init();
 </script>
