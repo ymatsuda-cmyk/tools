@@ -50,6 +50,44 @@
   }
   .add-btn:hover{background:rgba(95,168,160,0.26);}
 
+  .main-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;margin-bottom:14px;width:fit-content;}
+  .main-tabs button{background:transparent;border:none;color:var(--text-muted);font-size:13px;padding:7px 16px;border-radius:7px;cursor:pointer;}
+  .main-tabs button.active{background:var(--surface-2);color:var(--text);}
+  .view[hidden]{display:none;}
+
+  .monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+  .monitor-bar .mono{font-size:11px;color:var(--text-muted);}
+  .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
+  .monitor-empty{padding:50px 20px;text-align:center;color:var(--text-muted);font-size:13px;}
+  .mon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .mon-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+  .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mon-state{font-size:10px;color:var(--text-muted);}
+  .mon-ring{text-align:center;margin-bottom:12px;}
+  .mon-ring svg{width:96px;height:96px;display:block;margin:0 auto;}
+  .mon-ring .sub{font-size:11px;color:var(--text-secondary);margin-top:5px;}
+
+  .mon-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border-top:1px solid var(--border);padding-top:12px;}
+  .mon-toggle .tl{font-size:12px;color:var(--text-secondary);}
+  .switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;position:absolute;}
+  .switch .track{
+    position:absolute;inset:0;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:12px;cursor:pointer;transition:background .2s ease,border-color .2s ease;
+  }
+  .switch .knob{
+    position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+    background:var(--text-muted);transition:transform .2s ease,background .2s ease;pointer-events:none;
+  }
+  .switch input:checked + .track{background:rgba(95,168,160,0.3);border-color:var(--accent);}
+  .switch input:checked + .track .knob{transform:translateX(20px);background:var(--accent);}
+  .switch.busy .track{cursor:wait;opacity:0.5;}
+  .switch.disabled .track{cursor:not-allowed;opacity:0.35;}
+  .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
+  .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
+
   .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
   .search-input{
     flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);
@@ -149,6 +187,12 @@
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--border-strong);}
   .field .hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
   .field .err{font-size:11px;color:var(--danger);margin-top:5px;display:none;}
+  .upload-row{display:flex;gap:8px;align-items:center;margin-top:7px;}
+  .upload-row input[type=file]{
+    flex:1;min-width:0;font-size:11px;color:var(--text-muted);
+    background:transparent;border:none;padding:0;
+  }
+  .upload-row button{flex-shrink:0;padding:6px 10px;font-size:11px;}
   .range-row{display:flex;align-items:center;gap:10px;}
   .range-row input[type=range]{flex:1;accent-color:var(--accent);}
   .range-row .val{font-size:12px;color:var(--text-secondary);min-width:52px;text-align:right;}
@@ -183,8 +227,14 @@
     </div>
   </header>
 
+  <div class="main-tabs" id="mainTabs">
+    <button data-view="links" class="active">リンク</button>
+    <button data-view="monitor">稼働状況</button>
+  </div>
+
   <div class="status-line mono" id="statusLine">読み込み中…</div>
 
+  <div class="view" data-view="links">
   <div class="toolbar">
     <input type="text" class="search-input" id="searchInput" placeholder="検索">
     <div class="size-group" id="sizeGroup">
@@ -196,6 +246,19 @@
 
   <div class="chips" id="chips"></div>
   <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="view" data-view="monitor" hidden>
+    <div class="chips" id="monitorChips"></div>
+    <div class="monitor-bar">
+      <span class="mono" id="monitorClock">—</span>
+      <button class="icon-btn" id="btn-refresh-monitor">今すぐ更新</button>
+    </div>
+    <div class="monitor-grid" id="monitorGrid"></div>
+    <div class="monitor-empty" id="monitorEmpty">
+      監視対象が登録されていません。設定 → 監視 から追加してください。
+    </div>
+  </div>
 </div>
 
 <!-- 追加・編集モーダル -->
@@ -237,11 +300,20 @@
     <div class="field">
       <label>サムネイル画像（任意）</label>
       <input type="text" id="f-thumb" placeholder="assets/thumbs/bot.png">
+      <div class="upload-row">
+        <input type="file" id="u-thumb" accept="image/*">
+        <button class="icon-btn" id="btn-upthumb">アップロード</button>
+      </div>
+      <div class="hint" id="hint-thumb">ファイルを選んでアップロードすると assets/thumbs/ に保存されます</div>
     </div>
     <div class="field">
       <label>ホバー時プレビュー: 画像またはmp4（任意）</label>
       <input type="text" id="f-preview" placeholder="assets/previews/bot.mp4">
-      <div class="hint">.mp4 なら動画として自動ループ再生します</div>
+      <div class="upload-row">
+        <input type="file" id="u-preview" accept="image/*,video/mp4">
+        <button class="icon-btn" id="btn-uppreview">アップロード</button>
+      </div>
+      <div class="hint" id="hint-preview">.mp4 なら動画として自動ループ再生します</div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelItem">キャンセル</button>
@@ -258,6 +330,8 @@
     <div class="tabs" id="settingsTabs">
       <button data-tab="display" class="active">表示</button>
       <button data-tab="data">データ</button>
+      <button data-tab="link">連携</button>
+      <button data-tab="monitor">監視</button>
       <button data-tab="json">JSON編集</button>
     </div>
 
@@ -316,6 +390,43 @@
         <button class="icon-btn" id="btn-reload" style="width:100%;">index.json を再読み込み（編集を破棄）</button>
         <div class="hint">書き出したファイルをリポジトリに置いて push すると、全員に反映されます</div>
       </div>
+    </div>
+
+    <div class="tab-panel" data-panel="link">
+      <div class="field">
+        <label>GAS の URL</label>
+        <input type="text" id="s-gasurl" placeholder="https://script.google.com/macros/s/.../exec">
+        <div class="hint">GASを「ウェブアプリとしてデプロイ」して得たURL</div>
+      </div>
+      <div class="field">
+        <label>共有パスワード</label>
+        <input type="password" id="s-gassecret" placeholder="SHARED_SECRET と同じ文字列">
+        <div class="hint">このブラウザにのみ保存されます</div>
+      </div>
+      <div class="field">
+        <label>GitHubへの反映</label>
+        <button class="icon-btn" id="btn-push" style="width:100%;margin-bottom:8px;">index.json を GitHub に保存</button>
+        <button class="icon-btn" id="btn-notionsync" style="width:100%;">Notion から同期する</button>
+        <div class="hint">反映後、GitHub Pages に出るまで1分ほどかかります</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="monitor">
+      <div class="field">
+        <label>更新間隔</label>
+        <div class="range-row">
+          <input type="range" id="s-interval" min="1" max="30" step="1">
+          <span class="val mono" id="v-interval"></span>
+        </div>
+        <div class="hint">稼働状況タブを開いている間だけ自動更新します</div>
+      </div>
+      <div class="field">
+        <label>監視対象（JSON）</label>
+        <textarea id="s-monitors" spellcheck="false" style="min-height:180px;"></textarea>
+        <div class="err" id="err-monitors">JSONの形式が正しくありません</div>
+        <div class="hint">各サービスが用意したAPIのURLを登録します</div>
+      </div>
+      <button class="btn btn-primary" id="btn-applymonitors" style="width:100%;">監視対象を保存</button>
     </div>
 
     <div class="tab-panel" data-panel="json">
@@ -429,6 +540,14 @@ async function init(){
   }
   applyConfig();
   render();
+  applyInitialView();
+}
+
+/** URLの ?view=monitor を反映して初期表示を決める */
+function applyInitialView(){
+  if(initialParams.view !== 'monitor') return;
+  const btn = document.querySelector('#mainTabs button[data-view="monitor"]');
+  if(btn) btn.click();
 }
 
 function setStatus(msg){
@@ -586,6 +705,12 @@ function syncSettingsForm(){
     F(input).value = config[key];
     F(label).textContent = config[key] + unit;
   });
+  F('s-interval').value = config.monitorInterval || 3;
+  F('v-interval').textContent = (config.monitorInterval || 3) + '分';
+  F('s-monitors').value = JSON.stringify(config.monitors || [], null, 2);
+  F('err-monitors').style.display = 'none';
+  F('s-gasurl').value = gasSettings.url || '';
+  F('s-gassecret').value = gasSettings.secret || '';
   F('s-json').value = JSON.stringify({ config, resources }, null, 2);
   F('err-json').style.display = 'none';
 }
@@ -674,7 +799,451 @@ document.getElementById('btn-reload').onclick = async ()=>{
   }
 };
 
-init();
+/* ---------- GAS連携 ---------- */
+let initialParams = { view:null };
+let gasSettings = { url:'', secret:'' };
+
+async function loadGasSettings(){
+  const raw = await store.get('gasSettings');
+  if(raw){
+    try{ gasSettings = JSON.parse(raw); }catch(e){}
+  }
+}
+
+async function saveGasSettings(){
+  await store.set('gasSettings', JSON.stringify(gasSettings));
+}
+
+/**
+ * GASにPOSTする。
+ * Content-Type を text/plain にすることでCORSのプリフライトを回避する。
+ */
+async function callGas(payload){
+  if(!gasSettings.url) throw new Error('設定 → 連携 で GAS の URL を入力してください');
+  const res = await fetch(gasSettings.url, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify({ ...payload, secret: gasSettings.secret })
+  });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || '処理に失敗しました');
+  return data;
+}
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result.split(',')[1]);
+    reader.onerror = ()=>reject(new Error('ファイルを読み込めませんでした'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function safeName(name){
+  return name.normalize('NFKC')
+    .replace(/[^\w.\-]/g, '_')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+}
+
+async function uploadAsset(inputId, targetField, folder, hintId){
+  const input = F(inputId);
+  const hint = F(hintId);
+  const file = input.files[0];
+  if(!file){ toast('ファイルを選んでください'); return; }
+
+  // Notion無料枠と同等の目安。大きすぎるとGASの実行時間にも影響する
+  if(file.size > 25 * 1024 * 1024){
+    hint.textContent = 'ファイルが大きすぎます（25MBまで）。圧縮してから試してください';
+    return;
+  }
+
+  const path = folder + safeName(file.name);
+  hint.textContent = 'アップロード中… ' + path;
+  try{
+    const b64 = await fileToBase64(file);
+    await callGas({ action:'upload', path, contentBase64:b64 });
+    F(targetField).value = path;
+    hint.textContent = 'アップロードしました: ' + path;
+    toast('アップロードしました');
+  }catch(err){
+    hint.textContent = 'アップロードに失敗しました: ' + err.message;
+  }
+}
+
+document.getElementById('btn-upthumb').onclick = ()=>
+  uploadAsset('u-thumb','f-thumb','assets/thumbs/','hint-thumb');
+document.getElementById('btn-uppreview').onclick = ()=>
+  uploadAsset('u-preview','f-preview','assets/previews/','hint-preview');
+
+F('s-gasurl').addEventListener('input', async e=>{
+  gasSettings.url = e.target.value.trim(); await saveGasSettings();
+});
+F('s-gassecret').addEventListener('input', async e=>{
+  gasSettings.secret = e.target.value; await saveGasSettings();
+});
+
+document.getElementById('btn-push').onclick = async ()=>{
+  toast('GitHubに保存しています…');
+  try{
+    await callGas({ action:'saveIndex', json: currentJSON() });
+    setStatus('GitHubに保存しました。反映まで1分ほどかかります');
+    toast('GitHubに保存しました');
+  }catch(err){ toast(err.message); }
+};
+
+document.getElementById('btn-notionsync').onclick = async ()=>{
+  toast('Notionから同期しています…');
+  try{
+    const r = await callGas({ action:'sync' });
+    setStatus('Notionから ' + r.count + '件を同期しました');
+    toast('同期しました（' + r.count + '件）');
+  }catch(err){ toast(err.message); }
+};
+
+
+/* ============================================================
+   稼働状況モニター
+   各サービスは共通仕様のAPIを1つ用意する（docs/service-api.md 参照）
+   ブラウザからは直接叩かず、GASを中継してCORSとトークンを解決する
+   ============================================================ */
+
+const STATE_META = {
+  running : { color:'#7CC47C', label:'稼働中' },
+  starting: { color:'#E0B252', label:'起動中'  },
+  stopping: { color:'#E0B252', label:'停止中'  },
+  stopped : { color:'#66625A', label:'停止'    },
+  error   : { color:'#D9694F', label:'エラー'  },
+  unknown : { color:'#66625A', label:'不明'    },
+  tracking: { color:'#5FA8A0', label:'記録中'  }
+};
+
+let monitorTimer = null;
+let monitorCountdown = null;
+let nextFetchAt = 0;
+let currentView = 'links';
+let activeMonitor = 'all';    // 'all' か 監視ID か 'group:名前'
+
+/**
+ * URLパラメータを読む
+ *   ?server=gpu-server    … 特定のサーバーだけ表示
+ *   ?group=prod           … グループで絞り込み
+ *   ?view=monitor         … 稼働状況タブを開いた状態で起動
+ */
+function readUrlParams(){
+  const q = new URLSearchParams(location.search);
+  const server = q.get('server') || q.get('monitor');
+  const group  = q.get('group');
+  if(server)     activeMonitor = server;
+  else if(group) activeMonitor = 'group:' + group;
+  else           activeMonitor = 'all';
+  return { view: q.get('view') };
+}
+
+/** 現在の選択をURLに書き戻す（履歴を汚さず、ブックマーク可能にする） */
+function syncUrl(){
+  const q = new URLSearchParams(location.search);
+  q.delete('server'); q.delete('monitor'); q.delete('group');
+
+  if(activeMonitor.startsWith('group:')) q.set('group', activeMonitor.slice(6));
+  else if(activeMonitor !== 'all')       q.set('server', activeMonitor);
+
+  if(currentView === 'monitor') q.set('view', 'monitor');
+  else q.delete('view');
+
+  const qs = q.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+}
+
+function allMonitors(){
+  return Array.isArray(config.monitors) ? config.monitors : [];
+}
+
+/** 現在の選択で絞り込んだ監視対象 */
+function monitors(){
+  const list = allMonitors();
+  if(activeMonitor === 'all') return list;
+  if(activeMonitor.startsWith('group:')){
+    const g = activeMonitor.slice(6);
+    return list.filter(m => m.group === g);
+  }
+  return list.filter(m => m.id === activeMonitor);
+}
+
+/** 登録済みのグループ名一覧 */
+function monitorGroups(){
+  return [...new Set(allMonitors().map(m => m.group).filter(Boolean))];
+}
+
+function intervalMs(){
+  return (config.monitorInterval || 3) * 60 * 1000;
+}
+
+function ringSVG(pct, color, center){
+  const p = Math.max(0, Math.min(100, pct));
+  const circ = 251;
+  const offset = Math.round(circ * (1 - p / 100));
+  return `
+    <svg viewBox="0 0 100 100" role="img" aria-label="${center} (${Math.round(p)}%)">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface-2)" stroke-width="9"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="9"
+        stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"
+        transform="rotate(-90 50 50)"/>
+      <text x="50" y="55" text-anchor="middle" font-size="19" font-weight="600"
+        fill="var(--text)">${center}</text>
+    </svg>`;
+}
+
+function metricColor(pct){
+  if(pct >= 90) return '#D9694F';
+  if(pct >= 70) return '#E0B252';
+  return '#5FA8A0';
+}
+
+function renderMonitorCard(m, snap){
+  const state = snap && snap.state ? snap.state : 'unknown';
+  const meta = STATE_META[state] || STATE_META.unknown;
+  const busy = state === 'starting' || state === 'stopping';
+  const on = state === 'running' || state === 'starting';
+  const locked = !snap || snap.error || state === 'unknown';
+
+  let body;
+  if(!snap){
+    body = `<div class="mon-offline">取得中…</div>`;
+  }else if(snap.error){
+    body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${snap.error}</div>`;
+  }else if(!snap.remaining){
+    body = `<div class="mon-offline">${meta.label}</div>`;
+  }else{
+    const r = snap.remaining;
+    const max = Number(r.max) || 0;
+    const val = Math.max(0, Number(r.value) || 0);
+    const pct = max === 0 ? 0 : (val / max) * 100;
+    const unit = r.unit || 'h';
+    body = `
+      <div class="mon-ring">
+        ${ringSVG(pct, remainColor(pct), round1(val) + unit)}
+        <div class="sub mono">${max ? '残り / 上限 ' + round1(max) + unit : '残り'}</div>
+      </div>`;
+  }
+
+  const cls = 'switch' + (busy ? ' busy' : '') + (locked ? ' disabled' : '');
+  const toggleRow = m.type === 'quota'
+    ? ''  // 起動/停止の概念が無い監視対象にはトグルを出さない
+    : `<div class="mon-toggle">
+        <span class="tl">${busy ? meta.label + '…' : (on ? '稼働中' : '停止中')}</span>
+        <label class="${cls}">
+          <input type="checkbox" data-toggle="${m.id}" ${on ? 'checked' : ''}
+            ${(busy || locked) ? 'disabled' : ''} aria-label="起動と停止の切り替え">
+          <span class="track"><span class="knob"></span></span>
+        </label>
+      </div>`;
+
+  return `
+    <div class="mon-card" data-monitor="${m.id}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${snap && snap.name ? snap.name : m.name || m.id}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      ${body}
+      ${toggleRow}
+    </div>`;
+}
+
+/* 残量が少ないほど警告色にする */
+function remainColor(pct){
+  if(pct <= 10) return '#D9694F';
+  if(pct <= 30) return '#E0B252';
+  return '#5FA8A0';
+}
+
+function round1(n){
+  const v = Number(n);
+  if(!isFinite(v)) return '0';
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+let monitorSnapshots = {};
+
+function renderMonitorChips(){
+  const el = document.getElementById('monitorChips');
+  const all = allMonitors();
+  if(all.length <= 1){ el.innerHTML = ''; return; }
+
+  const items = [{ key:'all', label:'すべて' }];
+  monitorGroups().forEach(g => items.push({ key:'group:'+g, label:g }));
+  all.forEach(m => items.push({ key:m.id, label:m.name || m.id }));
+
+  el.innerHTML = '';
+  items.forEach(it=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (it.key === activeMonitor ? ' active' : '');
+    c.textContent = it.label;
+    c.onclick = ()=>{
+      activeMonitor = it.key;
+      syncUrl();
+      renderMonitors();
+      startMonitorLoop();
+    };
+    el.appendChild(c);
+  });
+}
+
+function renderMonitors(){
+  renderMonitorChips();
+  const list = monitors();
+  const grid = document.getElementById('monitorGrid');
+  const empty = document.getElementById('monitorEmpty');
+
+  if(list.length === 0){
+    grid.innerHTML = '';
+    empty.textContent = allMonitors().length === 0
+      ? '監視対象が登録されていません。設定 → 監視 から追加してください。'
+      : 'この条件に一致する監視対象がありません。';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  grid.innerHTML = list.map(m => renderMonitorCard(m, monitorSnapshots[m.id])).join('');
+
+  grid.querySelectorAll('[data-toggle]').forEach(sw=>{
+    sw.addEventListener('change', ()=>{
+      controlMonitor(sw.dataset.toggle, sw.checked ? 'start' : 'stop');
+    });
+  });
+}
+
+async function fetchMonitors(){
+  const list = monitors();
+  if(list.length === 0) return;
+  try{
+    const res = await callGas({ action:'monitorStatus', monitors:list });
+    (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
+  }catch(err){
+    list.forEach(m=>{
+      monitorSnapshots[m.id] = { id:m.id, state:'error', error:err.message };
+    });
+  }
+  nextFetchAt = Date.now() + intervalMs();
+  renderMonitors();
+}
+
+async function controlMonitor(id, action){
+  const m = monitors().find(x=>x.id===id);
+  if(!m) return;
+  const label = action === 'start' ? '起動' : '停止';
+  if(!confirm(`${m.name || id} を${label}しますか？`)){
+    renderMonitors();   // トグルを元に戻す
+    return;
+  }
+
+  monitorSnapshots[id] = Object.assign({}, monitorSnapshots[id], {
+    state: action === 'start' ? 'starting' : 'stopping'
+  });
+  renderMonitors();
+
+  try{
+    const res = await callGas({ action:'monitorControl', monitor:m, command:action });
+    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    toast(`${label}を要求しました`);
+  }catch(err){
+    monitorSnapshots[id] = Object.assign({}, monitorSnapshots[id], {
+      state:'error', error: err.message
+    });
+    toast(err.message);
+  }
+  renderMonitors();
+  // 状態が落ち着くまで少し待って再取得
+  setTimeout(fetchMonitors, 8000);
+}
+
+function updateClock(){
+  const el = document.getElementById('monitorClock');
+  if(!el) return;
+  if(monitors().length === 0){ el.textContent = '—'; return; }
+  const left = Math.max(0, Math.ceil((nextFetchAt - Date.now()) / 1000));
+  const mm = String(Math.floor(left / 60)).padStart(2,'0');
+  const ss = String(left % 60).padStart(2,'0');
+  el.textContent = `次の更新まで ${mm}:${ss}`;
+}
+
+function startMonitorLoop(){
+  stopMonitorLoop();
+  fetchMonitors();
+  monitorTimer = setInterval(fetchMonitors, intervalMs());
+  monitorCountdown = setInterval(updateClock, 1000);
+}
+
+function stopMonitorLoop(){
+  if(monitorTimer) clearInterval(monitorTimer);
+  if(monitorCountdown) clearInterval(monitorCountdown);
+  monitorTimer = null; monitorCountdown = null;
+}
+
+document.getElementById('mainTabs').addEventListener('click', e=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  currentView = btn.dataset.view;
+  document.querySelectorAll('#mainTabs button').forEach(b=>b.classList.toggle('active', b===btn));
+  document.querySelectorAll('.view').forEach(v=>{ v.hidden = v.dataset.view !== currentView; });
+
+  syncUrl();
+  if(currentView === 'monitor'){
+    renderMonitors();
+    startMonitorLoop();
+  }else{
+    stopMonitorLoop();
+  }
+});
+
+window.addEventListener('popstate', ()=>{
+  readUrlParams();
+  if(currentView === 'monitor'){ renderMonitors(); startMonitorLoop(); }
+});
+
+document.getElementById('btn-refresh-monitor').onclick = ()=>{
+  toast('更新しています…');
+  fetchMonitors();
+};
+
+// タブを離れている間は止めて、戻ったら再開する
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ stopMonitorLoop(); }
+  else if(currentView === 'monitor'){ startMonitorLoop(); }
+});
+
+document.getElementById('btn-applymonitors').onclick = async ()=>{
+  try{
+    const parsed = JSON.parse(F('s-monitors').value);
+    if(!Array.isArray(parsed)) throw new Error('配列で指定してください');
+    parsed.forEach(m=>{
+      if(!m.id || !m.endpoint) throw new Error('各要素に id と endpoint が必要です');
+    });
+    config.monitors = parsed;
+    F('err-monitors').style.display = 'none';
+    await persistLocal();
+    if(monitors().length === 0) activeMonitor = 'all';
+    syncUrl();
+    monitorSnapshots = {};
+    renderMonitors();
+    if(currentView === 'monitor') startMonitorLoop();
+    toast('監視対象を保存しました');
+  }catch(err){
+    F('err-monitors').textContent = 'JSONの形式が正しくありません: ' + err.message;
+    F('err-monitors').style.display = 'block';
+  }
+};
+
+F('s-interval').addEventListener('input', async e=>{
+  config.monitorInterval = Number(e.target.value);
+  F('v-interval').textContent = config.monitorInterval + '分';
+  await persistLocal();
+  if(currentView === 'monitor') startMonitorLoop();
+});
+
+initialParams = readUrlParams();
+loadGasSettings().then(init);
 </script>
 </body>
 </html>
