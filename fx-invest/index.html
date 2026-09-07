@@ -3,669 +3,472 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ドル円 積立シミュレーター</title>
+<title>ドル円 かんたん投資</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#1c1917; --ink2:#57534e; --ink3:#a8a29e;
-  --bg:#fafaf9; --bg2:#f5f4f1; --bg3:#edecea; --white:#fff;
-  --border:rgba(0,0,0,.08); --border2:rgba(0,0,0,.14);
-  --blue:#1e6fb5; --blue-l:#dbeafe;
-  --teal:#0f766e; --teal-l:#ccfbf1;
-  --amber:#92400e; --amber-l:#fef3c7;
-  --red:#b91c1c; --red-l:#fee2e2;
+  --bg:#f5f4f1; --bg2:#faf9f8; --white:#fff;
+  --border:rgba(0,0,0,.08); --border2:rgba(0,0,0,.16);
   --green:#15803d; --green-l:#dcfce7;
-  --r:14px; --r-sm:8px;
-  --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+  --red:#b91c1c; --red-l:#fee2e2;
+  --gray-l:#eceae7; --blue:#1e6fb5;
+  --r:18px; --shadow:0 1px 4px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.05);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
-.app{max-width:1080px;margin:0 auto;padding:0 16px 64px}
+body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;-webkit-tap-highlight-color:transparent}
+.app{max-width:460px;margin:0 auto;padding:0 14px 40px}
 
-.header{padding:24px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px}
-.logo{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:600;letter-spacing:.04em}
-.logo em{font-style:normal;color:var(--teal)}
-.lead{font-size:12px;color:var(--ink2);margin-top:4px}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 12px}
+.logo{font-family:'Noto Serif JP',serif;font-size:17px;font-weight:600}
+.icon-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--white);font-size:17px;cursor:pointer}
+.icon-btn:hover{background:var(--bg2)}
 
-.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
-.card h2{font-size:14px;font-weight:700;letter-spacing:.04em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.card h2::before{content:'';width:3px;height:14px;background:var(--teal);border-radius:2px}
-.card h3{font-size:12px;font-weight:700;color:var(--ink2);margin:16px 0 8px}
+.hero{border-radius:var(--r);padding:24px 20px;text-align:center;border:1px solid var(--border);background:var(--white);box-shadow:var(--shadow);margin-bottom:14px}
+.hero.buy{background:var(--green-l);border-color:var(--green)}
+.hero.sell{background:var(--red-l);border-color:var(--red)}
+.hero .verdict{font-size:26px;font-weight:700;font-family:'Noto Serif JP',serif;color:var(--ink2)}
+.hero.buy .verdict{color:var(--green)}
+.hero.sell .verdict{color:var(--red)}
+.hero .rate{font-family:'DM Mono',monospace;font-size:46px;font-weight:500;line-height:1.2;margin:8px 0 2px}
+.hero .diff{font-family:'DM Mono',monospace;font-size:12px;color:var(--ink2)}
+.hero .why{margin-top:14px;background:rgba(255,255,255,.75);border-radius:12px;padding:10px 12px;font-size:13px}
+.hero .stamp{font-size:11px;color:var(--ink3);margin-top:8px;font-family:'DM Mono',monospace}
 
-.grid{display:grid;gap:12px}
-.g2{grid-template-columns:repeat(2,1fr)}
-.g3{grid-template-columns:repeat(3,1fr)}
-.g4{grid-template-columns:repeat(4,1fr)}
-@media(max-width:720px){.g3,.g4{grid-template-columns:repeat(2,1fr)}}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.big{font-family:inherit;border:none;border-radius:16px;padding:18px 8px;font-size:17px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);transition:.12s;line-height:1.35}
+.big small{display:block;font-size:11px;font-weight:500;opacity:.85}
+.big.buy{background:var(--green);color:#fff}
+.big.sell{background:var(--white);color:var(--red);border:2px solid var(--red)}
+.big:active{transform:scale(.97)}
+.big:disabled{background:var(--gray-l);color:var(--ink3);border-color:transparent;box-shadow:none;cursor:not-allowed}
 
-label.f{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ink2);font-weight:500}
-input,select{font-family:'DM Mono',monospace;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:var(--r-sm);background:var(--white);color:var(--ink);width:100%}
-input:focus,select:focus{outline:2px solid var(--teal-l);border-color:var(--teal)}
-
-.btn{font-family:inherit;font-size:13px;font-weight:700;padding:10px 20px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--white);color:var(--ink);cursor:pointer;transition:.15s}
-.btn:hover{background:var(--bg2)}
-.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
-.btn.primary:hover{filter:brightness(1.1)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-
-.strats{display:grid;gap:10px}
-.strat{border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;background:var(--bg2)}
-.strat.on{background:var(--white);border-color:var(--teal)}
-.strat-head{display:flex;align-items:center;gap:8px;cursor:pointer}
-.strat-head input{width:auto}
-.strat-name{font-weight:700;font-size:13px}
-.dot{width:10px;height:10px;border-radius:50%;flex:none}
-.strat-desc{font-size:11px;color:var(--ink2);margin:6px 0 0 26px}
-.strat-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:10px 0 0 26px}
-.strat-params.hide{display:none}
-
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
-th{font-size:11px;color:var(--ink2);font-weight:700;background:var(--bg2);position:sticky;top:0}
-th:first-child,td:first-child{text-align:left}
-td.num{font-family:'DM Mono',monospace}
-.pos{color:var(--green);font-weight:600}
-.neg{color:var(--red);font-weight:600}
-.scroll{overflow:auto;max-height:420px;border:1px solid var(--border);border-radius:var(--r-sm)}
-
-.sig{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-.sig-card{border:1px solid var(--border);border-radius:var(--r-sm);padding:12px}
-.sig-card .t{font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:6px}
-.sig-card .v{font-size:20px;font-weight:700;margin:4px 0;font-family:'Noto Serif JP',serif}
-.sig-card .m{font-size:11px;color:var(--ink2);font-family:'DM Mono',monospace}
-.sig-buy{background:var(--green-l);border-color:var(--green)}.sig-buy .v{color:var(--green)}
-.sig-sell{background:var(--red-l);border-color:var(--red)}.sig-sell .v{color:var(--red)}
-.sig-hold{background:var(--bg2)}.sig-hold .v{color:var(--ink2)}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2{font-size:12px;color:var(--ink2);font-weight:700;margin-bottom:10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:6px}
+.stats .l{font-size:11px;color:var(--ink2)}
+.stats .n{font-size:19px;font-weight:700;font-family:'DM Mono',monospace}
+.pos{color:var(--green)}.neg{color:var(--red)}
 
 canvas{width:100%;display:block}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:8px}
-.legend span{display:flex;align-items:center;gap:5px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:11px;color:var(--ink2);margin-top:8px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
 
-.note{font-size:11px;color:var(--ink3);margin-top:10px;line-height:1.7}
-.status{font-size:12px;color:var(--ink2);font-family:'DM Mono',monospace}
+.hist{list-style:none}
+.hist li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--border);font-size:13px}
+.hist li:last-child{border-bottom:none}
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;flex:none}
+.badge.b{background:var(--green-l);color:var(--green)}
+.badge.s{background:var(--red-l);color:var(--red)}
+.hist .d{color:var(--ink2);font-family:'DM Mono',monospace;font-size:12px}
+.hist .r{margin-left:auto;font-family:'DM Mono',monospace;text-align:right}
+.empty{text-align:center;color:var(--ink3);font-size:13px;padding:18px 0}
+
+.btn{font-family:inherit;font-size:13px;font-weight:700;padding:11px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--white);color:var(--ink);cursor:pointer;width:100%}
+.btn:hover{background:var(--bg2)}
+.btn.ghost{border-style:dashed;color:var(--ink2);font-weight:500}
+
+dialog{border:none;border-radius:var(--r);padding:0;max-width:420px;width:calc(100% - 28px);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dlg{padding:20px}
+.dlg h3{font-family:'Noto Serif JP',serif;font-size:16px;margin-bottom:14px}
+.field{margin-bottom:16px}
+.field>span{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.choices label{border:1px solid var(--border2);border-radius:12px;padding:9px 4px;text-align:center;font-size:13px;cursor:pointer}
+.choices input{display:none}
+.choices label:has(input:checked){border-color:var(--green);background:var(--green-l);color:var(--green);font-weight:700}
+.field input[type=number]{width:100%;font-family:'DM Mono',monospace;font-size:15px;padding:10px;border:1px solid var(--border2);border-radius:12px}
+.help{font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.7}
+.dlg .row{display:flex;gap:8px;margin-top:6px}
+.status{font-size:12px;color:var(--ink2);text-align:center;padding:8px 0;line-height:1.7}
 .status.err{color:var(--red)}
-.tag{font-size:10px;padding:2px 7px;border-radius:99px;background:var(--bg3);color:var(--ink2);font-weight:700}
-.hint{font-size:11px;color:var(--ink3);margin-top:6px}
-.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.kpi div{background:var(--bg2);border-radius:var(--r-sm);padding:10px 12px}
-.kpi .l{font-size:10px;color:var(--ink2)}
-.kpi .n{font-size:17px;font-weight:700;font-family:'DM Mono',monospace}
+details{font-size:12px;color:var(--ink2);margin-bottom:16px}
+details summary{cursor:pointer;font-weight:700}
+details ol{margin:8px 0 0 18px;line-height:1.9}
+code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px}
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="header">
-    <div class="logo">ドル円 <em>積立シミュレーター</em></div>
-    <div class="lead">USD/JPY の過去レートで複数の投資ルールを比較し、本日のシグナルを確認します（発注は手動）。</div>
+  <header>
+    <div class="logo">ドル円 かんたん投資</div>
+    <button class="icon-btn" id="openSet" title="設定">⚙</button>
   </header>
 
-  <section class="card">
-    <h2>基本設定</h2>
-    <div class="grid g4">
-      <label class="f">開始日<input type="date" id="from"></label>
-      <label class="f">終了日<input type="date" id="to"></label>
-      <label class="f">積立頻度
-        <select id="freq"><option value="month">毎月</option><option value="week">毎週</option></select>
-      </label>
-      <label class="f">1回の入金額（円）<input type="number" id="amount" value="50000" step="1000" min="0"></label>
-      <label class="f">スプレッド（銭 / 往復）<input type="number" id="spread" value="0.4" step="0.1" min="0"></label>
-      <label class="f">金利・スワップ 年率（%）<input type="number" id="swap" value="0" step="0.5"></label>
-      <label class="f">比較チャート表示
-        <select id="chartMode"><option value="asset">資産評価額</option><option value="ratio">損益率</option></select>
-      </label>
-      <label class="f">売買詳細を見る戦略<select id="detailSel"></select></label>
+  <div class="hero hold" id="hero">
+    <div class="verdict" id="verdict">読み込み中…</div>
+    <div class="rate" id="rate">—</div>
+    <div class="diff" id="diff"></div>
+    <div class="why" id="why">為替レートを取りに行っています…</div>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <div class="actions">
+    <button class="big buy" id="buyBtn" disabled>買う<small id="buyNote">1</small></button>
+    <button class="big sell" id="sellBtn" disabled>売る<small id="sellNote">1</small></button>
+  </div>
+
+  <div class="card">
+    <h2>いまの状況</h2>
+    <div class="stats">
+      <div><div class="l">保有</div><div class="n" id="qty">0</div></div>
+      <div><div class="l">平均の買値</div><div class="n" id="avg">—</div></div>
+      <div><div class="l">損益</div><div class="n" id="pl">¥0</div></div>
     </div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn primary" id="run">レート取得して実行</button>
-      <button class="btn" id="reset">設定を初期化</button>
-      <span class="status" id="status"></span>
+  </div>
+
+  <div class="card">
+    <h2>ここ1年の動き</h2>
+    <canvas id="chart" height="200"></canvas>
+    <div class="legend">
+      <span><i style="background:#1e6fb5"></i>レート</span>
+      <span><i style="background:#a8a29e"></i>いつもの値段</span>
+      <span><i style="background:#15803d"></i>買った</span>
+      <span><i style="background:#b91c1c"></i>売った</span>
     </div>
-    <div class="note">入金額は頻度ごとに口座へ積み立てられ、各戦略はそのキャッシュの範囲で売買します。ドルコスト平均法は入金日に全額購入、他の戦略はシグナルが出るまでキャッシュを保有します。</div>
-  </section>
+  </div>
 
-  <section class="card">
-    <h2>戦略</h2>
-    <div class="strats" id="strats"></div>
-  </section>
+  <div class="card">
+    <h2>履歴</h2>
+    <ul class="hist" id="hist"></ul>
+  </div>
 
-  <section class="card" id="sigCard" style="display:none">
-    <h2>本日のシグナル</h2>
-    <div class="sig" id="sig"></div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn" id="notify">ブラウザ通知を有効にする</button>
-      <button class="btn" id="copy">シグナルをコピー</button>
-      <span class="status" id="notifyStatus"></span>
-    </div>
-    <div class="note">シグナルは最新の終値ベースです。実際の発注は必ずご自身で判断してください。本アプリは投資助言ではありません。</div>
-  </section>
-
-  <section class="card" id="resultCard" style="display:none">
-    <h2>成績比較</h2>
-    <div class="scroll"><table id="cmp"></table></div>
-    <div class="note">年率は入金タイミングを考慮した内部収益率（IRR）、最大DDは資産評価額のピークからの最大下落率です。</div>
-  </section>
-
-  <section class="card" id="chartCard" style="display:none">
-    <h2>推移</h2>
-    <canvas id="ch1" height="260"></canvas>
-    <div class="legend" id="lg1"></div>
-    <h3>USD/JPY レートと売買ポイント</h3>
-    <canvas id="ch2" height="220"></canvas>
-    <div class="legend"><span><span class="dot" style="background:#1e6fb5"></span>レート</span><span><span class="dot" style="background:#15803d"></span>買い</span><span><span class="dot" style="background:#b91c1c"></span>売り</span></div>
-  </section>
-
-  <section class="card" id="tradeCard" style="display:none">
-    <h2>売買履歴 <span class="tag" id="tradeName"></span></h2>
-    <div class="kpi" id="tradeKpi" style="margin-bottom:12px"></div>
-    <div class="scroll"><table id="trades"></table></div>
-  </section>
+  <button class="btn ghost" id="tryBtn">「5年前から続けていたら？」を見る</button>
+  <div class="status" id="tryOut"></div>
+  <div class="status" id="status"></div>
 </div>
+
+<dialog id="setDlg"><form method="dialog" class="dlg">
+  <h3>設定</h3>
+
+  <div class="field">
+    <span>知らせる回数</span>
+    <div class="choices" id="levels"></div>
+    <div class="help" id="levelHelp"></div>
+  </div>
+
+  <div class="field">
+    <span>1回の金額（円）</span>
+    <input type="number" id="lot" step="100000" min="10000">
+    <div class="help">「買う 1」を押すと、この金額ぶんのドルを買ったことにします。</div>
+  </div>
+
+  <div class="field">
+    <span>ブラウザ通知</span>
+    <button type="button" class="btn" id="notifyBtn">通知を有効にする</button>
+    <div class="help" id="notifyHelp">このページを開いている間、買い時・売り時になったら通知します。</div>
+  </div>
+
+  <details>
+    <summary>アプリを閉じていてもメールで知らせる</summary>
+    <ol>
+      <li>Googleドライブで新しい Apps Script を作る</li>
+      <li><code>fx-invest/gas/Code.gs</code> の中身を貼り付ける</li>
+      <li>スクリプトプロパティに <code>FX_MAIL_TO</code>（宛先メール）と <code>FX_LEVEL</code>（easy / normal / hard）を登録</li>
+      <li><code>setupFxTrigger</code> を1回実行する（毎日夕方に自動チェック）</li>
+    </ol>
+  </details>
+
+  <div class="row">
+    <button type="button" class="btn" id="resetBtn">履歴を消す</button>
+    <button class="btn" value="close">閉じる</button>
+  </div>
+</form></dialog>
 
 <script>
 'use strict';
 
-const LS_KEY = 'fxInvest.settings.v1';
-const CACHE_KEY = 'fxInvest.rates.v1';
+const KEY = 'fxSimple.v1';
+const SMA_DAYS = 75;                       // 「いつもの値段」= 過去75営業日の平均
+const LEVELS = {
+  easy:   { label:'かんたん', buy:1.5, sell:2.5, help:'小さな値動きでも知らせます。売買の回数は多めです。' },
+  normal: { label:'ふつう',   buy:3,   sell:5,   help:'ほどよい回数で知らせます。まずはこれがおすすめです。' },
+  hard:   { label:'きびしい', buy:5,   sell:8,   help:'大きく動いたときだけ知らせます。売買の回数は少なめです。' }
+};
 
-/* ========== 戦略定義 ========== */
-const STRATEGIES = [
-  {
-    id:'dca', name:'ドルコスト平均法', color:'#1e6fb5',
-    desc:'入金日に毎回、全額をドルに換えます。判断不要・時間分散の基本形。',
-    params:[],
-    signal(ctx){ return ctx.isDepositDay && ctx.cash > 0 ? 'buy' : null; }
-  },
-  {
-    id:'sma', name:'移動平均クロス', color:'#0f766e',
-    desc:'短期移動平均が長期を上抜けたら買い、下抜けたら全売却するトレンド追随型。',
-    params:[{k:'short',label:'短期SMA(日)',v:25},{k:'long',label:'長期SMA(日)',v:75}],
-    prepare(series,p){ return { s:sma(series,p.short), l:sma(series,p.long) }; },
-    signal(ctx){
-      const {s,l} = ctx.ind, i = ctx.i;
-      if(i<1 || s[i]==null || l[i]==null || s[i-1]==null || l[i-1]==null) return null;
-      const now = s[i]-l[i], prev = s[i-1]-l[i-1];
-      if(prev<=0 && now>0) return 'buy';
-      if(prev>=0 && now<0) return 'sell';
-      return null;
-    },
-    metric(ctx){ const {s,l}=ctx.ind, i=ctx.i;
-      if(s[i]==null||l[i]==null) return 'データ不足';
-      return `短期 ${s[i].toFixed(2)} / 長期 ${l[i].toFixed(2)}`; }
-  },
-  {
-    id:'rsi', name:'RSI 逆張り', color:'#92400e',
-    desc:'RSIが売られ過ぎ水準を下回ったら買い、買われ過ぎで全売却する逆張り型。',
-    params:[{k:'period',label:'RSI期間',v:14},{k:'buyTh',label:'買い閾値',v:30},{k:'sellTh',label:'売り閾値',v:70}],
-    prepare(series,p){ return { r:rsi(series,p.period) }; },
-    signal(ctx){
-      const r = ctx.ind.r[ctx.i]; if(r==null) return null;
-      if(r <= ctx.p.buyTh) return 'buy';
-      if(r >= ctx.p.sellTh) return 'sell';
-      return null;
-    },
-    metric(ctx){ const r=ctx.ind.r[ctx.i]; return r==null?'データ不足':`RSI ${r.toFixed(1)}`; }
-  },
-  {
-    id:'dip', name:'移動平均かい離（押し目買い）', color:'#7c3aed',
-    desc:'移動平均から一定率下に離れたら買い、上に離れたら全売却します。',
-    params:[{k:'period',label:'SMA期間',v:75},{k:'buyGap',label:'買いかい離(%)',v:3},{k:'sellGap',label:'売りかい離(%)',v:5}],
-    prepare(series,p){ return { m:sma(series,p.period) }; },
-    signal(ctx){
-      const m = ctx.ind.m[ctx.i]; if(m==null) return null;
-      const gap = (ctx.rate - m)/m*100;
-      if(gap <= -ctx.p.buyGap) return 'buy';
-      if(gap >= ctx.p.sellGap) return 'sell';
-      return null;
-    },
-    metric(ctx){ const m=ctx.ind.m[ctx.i]; if(m==null) return 'データ不足';
-      return `かい離 ${((ctx.rate-m)/m*100).toFixed(2)}%`; }
-  }
-];
-
-/* ========== テクニカル指標 ========== */
-function sma(series, period){
-  const out = new Array(series.length).fill(null);
-  let sum = 0;
-  for(let i=0;i<series.length;i++){
-    sum += series[i].rate;
-    if(i >= period) sum -= series[i-period].rate;
-    if(i >= period-1) out[i] = sum/period;
-  }
-  return out;
-}
-function rsi(series, period){
-  const out = new Array(series.length).fill(null);
-  if(series.length <= period) return out;
-  let gain = 0, loss = 0;
-  for(let i=1;i<=period;i++){
-    const d = series[i].rate - series[i-1].rate;
-    if(d >= 0) gain += d; else loss -= d;
-  }
-  gain /= period; loss /= period;
-  out[period] = loss === 0 ? 100 : 100 - 100/(1+gain/loss);
-  for(let i=period+1;i<series.length;i++){
-    const d = series[i].rate - series[i-1].rate;
-    gain = (gain*(period-1) + Math.max(d,0))/period;
-    loss = (loss*(period-1) + Math.max(-d,0))/period;
-    out[i] = loss === 0 ? 100 : 100 - 100/(1+gain/loss);
-  }
-  return out;
-}
-
-/* ========== シミュレーション ========== */
-function periodKey(dateStr, freq){
-  if(freq === 'month') return dateStr.slice(0,7);
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const day = (d.getUTCDay() + 6) % 7;              // 月曜=0
-  d.setUTCDate(d.getUTCDate() - day);
-  return d.toISOString().slice(0,10);
-}
-
-function simulate(series, strat, params, cfg){
-  const ind = strat.prepare ? strat.prepare(series, params) : {};
-  const halfSpread = cfg.spread / 100 / 2;          // 銭 → 円（片道）
-  const dailyRate = cfg.swap / 100 / 365;
-  let cash = 0, usd = 0, deposited = 0, cost = 0, realized = 0;
-  const trades = [], equity = [], flows = [];
-  let peak = 0, mdd = 0, lastKey = null;
-
-  for(let i=0;i<series.length;i++){
-    const { date, rate } = series[i];
-    const key = periodKey(date, cfg.freq);
-    const isDepositDay = key !== lastKey;
-    if(isDepositDay){
-      lastKey = key;
-      cash += cfg.amount; deposited += cfg.amount;
-      flows.push({ date, amount: -cfg.amount });
-    }
-    if(usd > 0 && dailyRate) usd *= (1 + dailyRate);
-
-    const ctx = { i, rate, cash, usd, ind, p: params, isDepositDay };
-    const sig = strat.signal(ctx);
-
-    if(sig === 'buy' && cash > 0){
-      const px = rate + halfSpread;
-      const qty = cash / px;
-      usd += qty; cost += cash;
-      trades.push({ date, side:'買', rate:px, jpy:cash, qty });
-      cash = 0;
-    } else if(sig === 'sell' && usd > 0){
-      const px = Math.max(rate - halfSpread, 0.01);
-      const jpy = usd * px;
-      realized += jpy - cost;
-      trades.push({ date, side:'売', rate:px, jpy, qty:usd, pl:jpy - cost });
-      cash += jpy; usd = 0; cost = 0;
-    }
-
-    const value = cash + usd * rate;
-    peak = Math.max(peak, value);
-    if(peak > 0) mdd = Math.min(mdd, value/peak - 1);
-    equity.push({ date, value, deposited, rate });
-  }
-
-  const last = series[series.length-1];
-  const finalValue = cash + usd * last.rate;
-  flows.push({ date: last.date, amount: finalValue });
-
-  return {
-    strat, params, trades, equity, cash, usd, deposited,
-    finalValue, realized,
-    profit: finalValue - deposited,
-    ratio: deposited ? (finalValue - deposited)/deposited : 0,
-    avgCost: usd > 0 ? cost/usd : null,
-    irr: xirr(flows), mdd,
-    buys: trades.filter(t=>t.side==='買').length,
-    sells: trades.filter(t=>t.side==='売').length,
-    lastMetric: strat.metric ? strat.metric({ i: series.length-1, rate: last.rate, ind, p: params }) : '—',
-    lastSignal: strat.signal({ i: series.length-1, rate: last.rate, cash: 1, usd: 1, ind, p: params, isDepositDay: true })
-  };
-}
-
-function xirr(flows){
-  if(flows.length < 2) return null;
-  const t0 = new Date(flows[0].date).getTime();
-  const npv = r => flows.reduce((s,f)=>{
-    const yrs = (new Date(f.date).getTime() - t0)/(365*24*3600*1000);
-    return s + f.amount / Math.pow(1+r, yrs);
-  }, 0);
-  let lo = -0.9999, hi = 10;
-  if(npv(lo) * npv(hi) > 0) return null;
-  for(let k=0;k<200;k++){
-    const mid = (lo+hi)/2;
-    if(npv(lo) * npv(mid) <= 0) hi = mid; else lo = mid;
-  }
-  return (lo+hi)/2;
-}
-
-/* ========== レート取得 ========== */
-const HOSTS = ['https://api.frankfurter.app', 'https://api.frankfurter.dev/v1'];
-
-async function fetchRates(from, to){
-  const cache = readCache();
-  const hit = cache[from + '_' + to];
-  if(hit && hit.fetched === todayStr()) return hit.series;
-
-  let lastErr = null;
-  for(const host of HOSTS){
-    try{
-      const res = await fetch(`${host}/${from}..${to}?from=USD&to=JPY`);
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      const series = Object.keys(json.rates || {}).sort()
-        .map(d => ({ date: d, rate: json.rates[d].JPY }))
-        .filter(x => typeof x.rate === 'number');
-      if(!series.length) throw new Error('データが空です');
-      cache[from + '_' + to] = { fetched: todayStr(), series };
-      try{ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }catch(e){ /* 容量超過は無視 */ }
-      return series;
-    }catch(e){ lastErr = e; }
-  }
-  if(hit) return hit.series;
-  throw lastErr || new Error('取得に失敗しました');
-}
-function readCache(){
-  try{ return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; }catch(e){ return {}; }
-}
-function todayStr(){ return new Date().toISOString().slice(0,10); }
-
-/* ========== 表示ユーティリティ ========== */
-const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
-const pct = n => (n==null ? '—' : (n*100).toFixed(2) + '%');
-const sign = n => n >= 0 ? 'pos' : 'neg';
-
-/* ========== UI ========== */
 const $ = id => document.getElementById(id);
-let results = [];
-let series = [];
+const yen = n => (n < 0 ? '−' : '') + '¥' + Math.abs(Math.round(n)).toLocaleString('ja-JP');
+const cls = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
 
-function buildStrategyUI(saved){
-  $('strats').innerHTML = STRATEGIES.map(s => `
-    <div class="strat" id="st_${s.id}">
-      <label class="strat-head">
-        <input type="checkbox" id="en_${s.id}" ${(!saved || saved.enabled?.includes(s.id) || !saved.enabled) ? 'checked' : ''}>
-        <span class="dot" style="background:${s.color}"></span>
-        <span class="strat-name">${s.name}</span>
-      </label>
-      <div class="strat-desc">${s.desc}</div>
-      ${s.params.length ? `<div class="strat-params">${s.params.map(p=>`
-        <label class="f">${p.label}<input type="number" id="p_${s.id}_${p.k}" value="${saved?.params?.[s.id]?.[p.k] ?? p.v}" step="1" min="1"></label>`).join('')}</div>` : ''}
-    </div>`).join('');
-  STRATEGIES.forEach(s => {
-    const cb = $('en_' + s.id);
-    const sync = () => $('st_' + s.id).classList.toggle('on', cb.checked);
-    cb.addEventListener('change', sync); sync();
+let S = load();
+let series = [], avgLine = [], now = null;
+
+function load(){
+  const d = { level:'normal', lot:1000000, lots:[], realized:0, history:[], lastSignal:'hold' };
+  try{ return Object.assign(d, JSON.parse(localStorage.getItem(KEY)) || {}); }
+  catch(e){ return d; }
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ===== レート取得 ===== */
+async function fetchSeries(days){
+  const iso = d => d.toISOString().slice(0,10);
+  const end = new Date(), start = new Date(Date.now() - days*86400000);
+  const hosts = ['https://api.frankfurter.app', 'https://api.frankfurter.dev/v1'];
+  let err = null;
+  for(const h of hosts){
+    try{
+      const res = await fetch(h + '/' + iso(start) + '..' + iso(end) + '?from=USD&to=JPY');
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      const out = Object.keys(j.rates || {}).sort().map(d => ({ date:d, rate:j.rates[d].JPY }));
+      if(!out.length) throw new Error('データが空です');
+      return out;
+    }catch(e){ err = e; }
+  }
+  throw err;
+}
+
+/* ===== 判定：いつもの値段（移動平均）からどれだけ離れたか ===== */
+function sma(list, n){
+  const out = new Array(list.length).fill(null);
+  let sum = 0;
+  for(let i=0;i<list.length;i++){
+    sum += list[i].rate;
+    if(i >= n) sum -= list[i-n].rate;
+    if(i >= n-1) out[i] = sum/n;
+  }
+  return out;
+}
+function judge(rate, avg){
+  if(avg == null) return { state:'hold', gap:0 };
+  const gap = (rate - avg)/avg*100, L = LEVELS[S.level];
+  if(gap <= -L.buy)  return { state:'buy',  gap };
+  if(gap >=  L.sell) return { state:'sell', gap };
+  return { state:'hold', gap };
+}
+
+/* ===== 最新レートの取り込み ===== */
+async function refresh(){
+  const st = $('status');
+  st.className = 'status'; st.textContent = 'レートを取得中…';
+  let data;
+  try{ data = await fetchSeries(420); }
+  catch(e){
+    st.className = 'status err';
+    st.textContent = 'レートを取得できませんでした（' + e.message + '）';
+    return;
+  }
+  series = data;
+  avgLine = sma(series, SMA_DAYS);
+  const i = series.length - 1;
+  const j = judge(series[i].rate, avgLine[i]);
+  now = { date:series[i].date, rate:series[i].rate, avg:avgLine[i],
+          prev: i > 0 ? series[i-1].rate : null, state:j.state, gap:j.gap };
+  st.textContent = '';
+  render();
+  maybeNotify();
+}
+
+/* ===== 表示 ===== */
+function render(){
+  const VERDICT = { buy:'いまは 買い時', sell:'いまは 売り時', hold:'いまは 様子見' };
+  $('hero').className = 'hero ' + (now ? now.state : 'hold');
+  if(now){
+    const g = Math.abs(now.gap).toFixed(1);
+    const d = now.prev == null ? 0 : now.rate - now.prev;
+    $('verdict').textContent = VERDICT[now.state];
+    $('rate').textContent = now.rate.toFixed(2);
+    $('diff').textContent = '1ドル ＝ ' + now.rate.toFixed(2) + '円（前営業日 ' +
+      (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(2) + '円）';
+    $('why').textContent =
+      now.state === 'buy'  ? 'いつもの値段より ' + g + '% 安いので、買い時のサインが出ています。' :
+      now.state === 'sell' ? 'いつもの値段より ' + g + '% 高いので、売り時のサインが出ています。' :
+      'いつもの値段との差は ' + (now.gap >= 0 ? '+' : '−') + g + '%。サインが出るまで待ちましょう。';
+    $('stamp').textContent = now.date + ' 終値 ／ いつもの値段 ' +
+      (now.avg ? now.avg.toFixed(2) + '円' : '—') + '（過去' + SMA_DAYS + '営業日の平均）';
+  }
+
+  const usd  = S.lots.reduce((a,l) => a + l.usd, 0);
+  const cost = S.lots.reduce((a,l) => a + l.jpy, 0);
+  const total = S.realized + (now ? usd * now.rate - cost : 0);
+
+  $('qty').textContent = S.lots.length;
+  $('avg').textContent = usd ? (cost/usd).toFixed(2) : '—';
+  $('pl').textContent  = yen(total);
+  $('pl').className = 'n ' + cls(total);
+
+  $('buyBtn').disabled  = !now;
+  $('sellBtn').disabled = !now || !S.lots.length;
+  $('buyNote').textContent  = '1（' + yen(S.lot) + '）';
+  $('sellNote').textContent = S.lots.length ? '1（保有 ' + S.lots.length + '）' : '保有なし';
+
+  renderHistory();
+  drawChart();
+}
+
+function renderHistory(){
+  if(!S.history.length){
+    $('hist').innerHTML = '<li class="empty">まだ売買がありません</li>';
+    return;
+  }
+  $('hist').innerHTML = S.history.slice(0,30).map(h => `
+    <li>
+      <span class="badge ${h.side==='buy'?'b':'s'}">${h.side==='buy'?'買い':'売り'}</span>
+      <span class="d">${h.date}</span>
+      <span class="r">${h.rate.toFixed(2)}円<br>${
+        h.pl != null ? `<b class="${cls(h.pl)}">${yen(h.pl)}</b>` : yen(h.jpy)}</span>
+    </li>`).join('');
+}
+
+/* ===== 売買（数量1 = 設定金額ぶん） ===== */
+function buy(){
+  if(!now) return;
+  S.lots.push({ date:now.date, rate:now.rate, jpy:S.lot, usd:S.lot/now.rate });
+  S.history.unshift({ date:now.date, side:'buy', rate:now.rate, jpy:S.lot });
+  save(); render();
+}
+function sell(){
+  if(!now || !S.lots.length) return;
+  const lot = S.lots.shift();                      // 古い1つから順に売る
+  const proceeds = lot.usd * now.rate;
+  S.realized += proceeds - lot.jpy;
+  S.history.unshift({ date:now.date, side:'sell', rate:now.rate, jpy:proceeds, pl:proceeds - lot.jpy });
+  save(); render();
+}
+
+/* ===== 通知 ===== */
+function maybeNotify(){
+  if(!now || now.state === S.lastSignal) return;
+  S.lastSignal = now.state; save();
+  if(now.state === 'hold') return;
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  new Notification(now.state === 'buy' ? '買い時です' : '売り時です', {
+    body: now.rate.toFixed(2) + '円 ／ いつもの値段より ' +
+          Math.abs(now.gap).toFixed(1) + '% ' + (now.state === 'buy' ? '安い' : '高い'),
+    tag: 'fx-signal'
   });
 }
 
-function readParams(s){
-  const p = {};
-  s.params.forEach(x => { p[x.k] = Number($(`p_${s.id}_${x.k}`).value) || x.v; });
-  return p;
-}
-function enabledStrategies(){ return STRATEGIES.filter(s => $('en_' + s.id).checked); }
-
-function collectSettings(){
-  const params = {};
-  STRATEGIES.forEach(s => { if(s.params.length) params[s.id] = readParams(s); });
-  return {
-    from: $('from').value, to: $('to').value, freq: $('freq').value,
-    amount: Number($('amount').value), spread: Number($('spread').value),
-    swap: Number($('swap').value), chartMode: $('chartMode').value,
-    enabled: enabledStrategies().map(s => s.id), params
-  };
-}
-function saveSettings(){
-  try{ localStorage.setItem(LS_KEY, JSON.stringify(collectSettings())); }catch(e){}
-}
-function loadSettings(){
-  try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ return null; }
-}
-
-async function run(){
-  const btn = $('run'), st = $('status');
-  const from = $('from').value, to = $('to').value;
-  if(!from || !to || from >= to){ st.className = 'status err'; st.textContent = '期間の指定が正しくありません。'; return; }
-  const strats = enabledStrategies();
-  if(!strats.length){ st.className = 'status err'; st.textContent = '戦略を1つ以上選択してください。'; return; }
-
-  btn.disabled = true; st.className = 'status'; st.textContent = 'レート取得中…';
-  try{
-    series = await fetchRates(from, to);
-  }catch(e){
-    st.className = 'status err'; st.textContent = 'レート取得に失敗: ' + e.message;
-    btn.disabled = false; return;
-  }
-
-  const cfg = {
-    freq: $('freq').value,
-    amount: Math.max(Number($('amount').value) || 0, 0),
-    spread: Math.max(Number($('spread').value) || 0, 0),
-    swap: Number($('swap').value) || 0
-  };
-  results = strats.map(s => simulate(series, s, readParams(s), cfg));
-
-  const first = series[0], last = series[series.length-1];
-  st.textContent = `${first.date} 〜 ${last.date} / ${series.length}営業日 / 最新 ${last.rate.toFixed(2)}円`;
-
-  renderSignals(last);
-  renderCompare();
-  renderDetailSelector();
-  drawCharts();
-  btn.disabled = false;
-  saveSettings();
-}
-
-function renderSignals(last){
-  const label = { buy:'買い', sell:'売り' };
-  $('sig').innerHTML = `
-    <div class="sig-card sig-hold">
-      <div class="t">USD/JPY 終値</div>
-      <div class="v">${last.rate.toFixed(2)}</div>
-      <div class="m">${last.date}</div>
-    </div>` + results.map(r => {
-      const s = r.lastSignal;
-      const cls = s === 'buy' ? 'sig-buy' : s === 'sell' ? 'sig-sell' : 'sig-hold';
-      return `<div class="sig-card ${cls}">
-        <div class="t"><span class="dot" style="background:${r.strat.color}"></span>${r.strat.name}</div>
-        <div class="v">${label[s] || '待機'}</div>
-        <div class="m">${r.lastMetric}</div>
-      </div>`;
-    }).join('');
-  $('sigCard').style.display = '';
-}
-
-function signalText(){
-  const last = series[series.length-1];
-  const label = { buy:'買い', sell:'売り' };
-  return [`【ドル円シグナル ${last.date}】終値 ${last.rate.toFixed(2)}円`]
-    .concat(results.map(r => `・${r.strat.name}: ${label[r.lastSignal] || '待機'} (${r.lastMetric})`))
-    .join('\n');
-}
-
-function renderCompare(){
-  const rows = results.slice().sort((a,b) => b.ratio - a.ratio);
-  $('cmp').innerHTML = `
-    <thead><tr>
-      <th>戦略</th><th>累計入金</th><th>資産評価額</th><th>損益</th><th>損益率</th>
-      <th>年率(IRR)</th><th>最大DD</th><th>平均取得</th><th>ドル残高</th><th>現金残高</th><th>売買</th>
-    </tr></thead>
-    <tbody>${rows.map(r => `
-      <tr>
-        <td><span class="dot" style="background:${r.strat.color};display:inline-block;margin-right:6px"></span>${r.strat.name}</td>
-        <td class="num">${yen(r.deposited)}</td>
-        <td class="num">${yen(r.finalValue)}</td>
-        <td class="num ${sign(r.profit)}">${yen(r.profit)}</td>
-        <td class="num ${sign(r.profit)}">${pct(r.ratio)}</td>
-        <td class="num ${sign(r.irr||0)}">${pct(r.irr)}</td>
-        <td class="num neg">${pct(r.mdd)}</td>
-        <td class="num">${r.avgCost ? r.avgCost.toFixed(2) : '—'}</td>
-        <td class="num">$${Math.round(r.usd).toLocaleString()}</td>
-        <td class="num">${yen(r.cash)}</td>
-        <td class="num">${r.buys} / ${r.sells}</td>
-      </tr>`).join('')}
-    </tbody>`;
-  $('resultCard').style.display = '';
-}
-
-function renderDetailSelector(){
-  const sel = $('detailSel'), prev = sel.value;
-  sel.innerHTML = results.map(r => `<option value="${r.strat.id}">${r.strat.name}</option>`).join('');
-  if(results.some(r => r.strat.id === prev)) sel.value = prev;
-  renderTrades();
-}
-
-function renderTrades(){
-  const r = results.find(x => x.strat.id === $('detailSel').value) || results[0];
-  if(!r) return;
-  $('tradeName').textContent = r.strat.name;
-  $('tradeKpi').innerHTML = `
-    <div><div class="l">売買回数</div><div class="n">${r.trades.length}</div></div>
-    <div><div class="l">確定損益</div><div class="n ${sign(r.realized)}">${yen(r.realized)}</div></div>
-    <div><div class="l">評価損益</div><div class="n ${sign(r.finalValue - r.deposited)}">${yen(r.finalValue - r.deposited)}</div></div>
-    <div><div class="l">平均取得単価</div><div class="n">${r.avgCost ? r.avgCost.toFixed(2) : '—'}</div></div>`;
-  $('trades').innerHTML = `
-    <thead><tr><th>日付</th><th>売買</th><th>約定レート</th><th>金額(円)</th><th>数量($)</th><th>実現損益</th></tr></thead>
-    <tbody>${r.trades.slice().reverse().map(t => `
-      <tr>
-        <td>${t.date}</td>
-        <td class="${t.side==='買'?'pos':'neg'}">${t.side}</td>
-        <td class="num">${t.rate.toFixed(3)}</td>
-        <td class="num">${yen(t.jpy)}</td>
-        <td class="num">${t.qty.toFixed(2)}</td>
-        <td class="num ${t.pl!=null?sign(t.pl):''}">${t.pl!=null?yen(t.pl):'—'}</td>
-      </tr>`).join('')}
-    </tbody>`;
-  $('tradeCard').style.display = '';
-  drawRateChart();
-}
-
-/* ========== チャート ========== */
-function setupCanvas(cv, h){
+/* ===== チャート ===== */
+function drawChart(){
+  const cv = $('chart');
   const dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth || 800;
-  cv.width = w * dpr; cv.height = h * dpr;
-  cv.style.height = h + 'px';
-  const ctx = cv.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  return { ctx, w, h };
-}
-function axes(ctx, pad, w, h, min, max, fmt){
-  ctx.strokeStyle = 'rgba(0,0,0,.07)'; ctx.fillStyle = '#a8a29e';
-  ctx.font = "11px 'DM Mono',monospace"; ctx.textAlign = 'right';
-  for(let i=0;i<=4;i++){
-    const y = pad.t + (h - pad.t - pad.b) * i/4;
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    ctx.fillText(fmt(max - (max-min)*i/4), pad.l - 6, y + 4);
-  }
-}
-function drawCharts(){ drawAssetChart(); drawRateChart(); }
+  const w = cv.clientWidth || 360, h = 200;
+  cv.width = w*dpr; cv.height = h*dpr; cv.style.height = h + 'px';
+  const c = cv.getContext('2d');
+  c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+  if(series.length < 2) return;
 
-function drawAssetChart(){
-  const cv = $('ch1'); const { ctx, w, h } = setupCanvas(cv, 260);
-  const pad = { l:66, r:12, t:12, b:22 };
-  const n = series.length; if(!n) return;
-  const mode = $('chartMode').value;
-  const lines = results.map(r => ({
-    color: r.strat.color, name: r.strat.name,
-    data: r.equity.map(e => mode === 'asset' ? e.value : (e.deposited ? (e.value - e.deposited)/e.deposited : 0))
+  const head = Math.max(0, series.length - 250);
+  const view = series.slice(head), avg = avgLine.slice(head);
+  const vals = view.map(v => v.rate).concat(avg.filter(v => v != null));
+  let min = Math.min(...vals), max = Math.max(...vals);
+  const gap = (max-min)*0.1 || 1; min -= gap; max += gap;
+  const pl = 40, pr = 8, pt = 8, pb = 18;
+  const X = i => pl + (w-pl-pr) * i/(view.length-1);
+  const Y = v => pt + (h-pt-pb) * (1 - (v-min)/(max-min));
+
+  c.strokeStyle = 'rgba(0,0,0,.06)'; c.fillStyle = '#a8a29e';
+  c.font = "10px 'DM Mono',monospace"; c.textAlign = 'right';
+  for(let k=0;k<=3;k++){
+    const y = pt + (h-pt-pb)*k/3;
+    c.beginPath(); c.moveTo(pl,y); c.lineTo(w-pr,y); c.stroke();
+    c.fillText((max-(max-min)*k/3).toFixed(0), pl-5, y+3);
+  }
+
+  c.beginPath(); c.lineWidth = 1.5; c.strokeStyle = '#a8a29e'; c.setLineDash([4,4]);
+  let started = false;
+  avg.forEach((v,i) => {
+    if(v == null) return;
+    if(started) c.lineTo(X(i), Y(v)); else { c.moveTo(X(i), Y(v)); started = true; }
+  });
+  c.stroke(); c.setLineDash([]);
+
+  c.beginPath(); c.lineWidth = 2; c.strokeStyle = '#1e6fb5';
+  view.forEach((v,i) => i ? c.lineTo(X(i), Y(v.rate)) : c.moveTo(X(i), Y(v.rate)));
+  c.stroke();
+
+  const idx = new Map(view.map((v,i) => [v.date, i]));
+  S.history.forEach(t => {
+    const i = idx.get(t.date);
+    if(i == null) return;
+    c.beginPath(); c.fillStyle = t.side === 'buy' ? '#15803d' : '#b91c1c';
+    c.arc(X(i), Y(t.rate), 4, 0, Math.PI*2); c.fill();
+  });
+
+  c.fillStyle = '#a8a29e'; c.textAlign = 'left';
+  c.fillText(view[0].date.slice(0,7), pl, h-4);
+  c.textAlign = 'right'; c.fillText(view[view.length-1].date.slice(0,7), w-pr, h-4);
+}
+
+/* ===== 「5年前から続けていたら？」 ===== */
+async function tryPast(){
+  const out = $('tryOut');
+  out.className = 'status'; out.textContent = '計算中…';
+  let s;
+  try{ s = await fetchSeries(365*5 + 40); }
+  catch(e){ out.className = 'status err'; out.textContent = '計算できませんでした'; return; }
+
+  const m = sma(s, SMA_DAYS);
+  let lots = [], realized = 0, buys = 0, sells = 0, prev = 'hold';
+  for(let i=0;i<s.length;i++){
+    if(m[i] == null) continue;
+    const st = judge(s[i].rate, m[i]).state;
+    if(st === prev) continue;
+    if(st === 'buy'){ lots.push({ jpy:S.lot, usd:S.lot/s[i].rate }); buys++; }
+    else if(st === 'sell' && lots.length){
+      const l = lots.shift();
+      realized += l.usd*s[i].rate - l.jpy; sells++;
+    }
+    prev = st;
+  }
+  const last = s[s.length-1].rate;
+  const total = realized + lots.reduce((a,l) => a + (l.usd*last - l.jpy), 0);
+  out.innerHTML = '5年前から同じルールで続けた場合<br>買い ' + buys + '回・売り ' + sells +
+    '回、いまの損益は <b class="' + cls(total) + '">' + yen(total) + '</b>（投資した合計 ' + yen(buys*S.lot) + '）';
+}
+
+/* ===== 設定 ===== */
+function buildSettings(){
+  $('levels').innerHTML = Object.keys(LEVELS).map(k =>
+    `<label><input type="radio" name="lv" value="${k}" ${S.level===k?'checked':''}><span>${LEVELS[k].label}</span></label>`).join('');
+  $('levelHelp').textContent = LEVELS[S.level].help;
+  $('lot').value = S.lot;
+  $('levels').querySelectorAll('input').forEach(r => r.addEventListener('change', () => {
+    S.level = r.value;
+    $('levelHelp').textContent = LEVELS[S.level].help;
+    save(); recalc();
   }));
-  if(mode === 'asset') lines.push({ color:'#a8a29e', name:'累計入金', dash:true, data: results[0].equity.map(e => e.deposited) });
-
-  let min = Infinity, max = -Infinity;
-  lines.forEach(l => l.data.forEach(v => { if(v < min) min = v; if(v > max) max = v; }));
-  if(min === max){ min -= 1; max += 1; }
-  const padv = (max-min)*0.08; min -= padv; max += padv;
-  const X = i => pad.l + (w - pad.l - pad.r) * i/(n-1);
-  const Y = v => pad.t + (h - pad.t - pad.b) * (1 - (v-min)/(max-min));
-
-  axes(ctx, pad, w, h, min, max, mode === 'asset' ? (v => Math.round(v/10000) + '万') : (v => (v*100).toFixed(0) + '%'));
-  if(mode === 'ratio' && min < 0 && max > 0){
-    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
-    ctx.moveTo(pad.l, Y(0)); ctx.lineTo(w - pad.r, Y(0)); ctx.stroke();
+}
+function recalc(){
+  if(now && series.length){
+    const i = series.length - 1;
+    const j = judge(series[i].rate, avgLine[i]);
+    now.state = j.state; now.gap = j.gap;
   }
-  lines.forEach(l => {
-    ctx.beginPath(); ctx.lineWidth = l.dash ? 1.5 : 2;
-    ctx.setLineDash(l.dash ? [4,4] : []);
-    ctx.strokeStyle = l.color;
-    l.data.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
-    ctx.stroke(); ctx.setLineDash([]);
-  });
-  ctx.fillStyle = '#a8a29e'; ctx.textAlign = 'left';
-  ctx.fillText(series[0].date, pad.l, h - 6);
-  ctx.textAlign = 'right'; ctx.fillText(series[n-1].date, w - pad.r, h - 6);
-  $('lg1').innerHTML = lines.map(l => `<span><span class="dot" style="background:${l.color}"></span>${l.name}</span>`).join('');
-  $('chartCard').style.display = '';
+  render();
 }
 
-function drawRateChart(){
-  const cv = $('ch2'); const { ctx, w, h } = setupCanvas(cv, 220);
-  const pad = { l:66, r:12, t:12, b:22 };
-  const n = series.length; if(!n) return;
-  const rates = series.map(s => s.rate);
-  let min = Math.min(...rates), max = Math.max(...rates);
-  const padv = (max-min)*0.08 || 1; min -= padv; max += padv;
-  const X = i => pad.l + (w - pad.l - pad.r) * i/(n-1);
-  const Y = v => pad.t + (h - pad.t - pad.b) * (1 - (v-min)/(max-min));
-
-  axes(ctx, pad, w, h, min, max, v => v.toFixed(1));
-  ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = '#1e6fb5';
-  rates.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
-  ctx.stroke();
-
-  const r = results.find(x => x.strat.id === $('detailSel').value) || results[0];
-  if(r){
-    const idx = new Map(series.map((s,i) => [s.date, i]));
-    r.trades.forEach(t => {
-      const i = idx.get(t.date); if(i == null) return;
-      ctx.beginPath(); ctx.fillStyle = t.side === '買' ? '#15803d' : '#b91c1c';
-      ctx.arc(X(i), Y(series[i].rate), 3.5, 0, Math.PI*2); ctx.fill();
-    });
-  }
-  ctx.fillStyle = '#a8a29e'; ctx.font = "11px 'DM Mono',monospace";
-  ctx.textAlign = 'left'; ctx.fillText(series[0].date, pad.l, h - 6);
-  ctx.textAlign = 'right'; ctx.fillText(series[n-1].date, w - pad.r, h - 6);
-}
-
-/* ========== 初期化 ========== */
 function init(){
-  const saved = loadSettings();
-  const today = new Date();
-  const past = new Date(today); past.setFullYear(past.getFullYear() - 5);
-  $('to').value = saved?.to || todayStr();
-  $('from').value = saved?.from || past.toISOString().slice(0,10);
-  if(saved){
-    $('freq').value = saved.freq || 'month';
-    $('amount').value = saved.amount ?? 50000;
-    $('spread').value = saved.spread ?? 0.4;
-    $('swap').value = saved.swap ?? 0;
-    $('chartMode').value = saved.chartMode || 'asset';
-  }
-  buildStrategyUI(saved);
+  buildSettings();
+  render();
 
-  $('run').addEventListener('click', run);
-  $('reset').addEventListener('click', () => { localStorage.removeItem(LS_KEY); location.reload(); });
-  $('detailSel').addEventListener('change', renderTrades);
-  $('chartMode').addEventListener('change', () => { if(results.length) drawAssetChart(); });
-  $('copy').addEventListener('click', async () => {
-    try{ await navigator.clipboard.writeText(signalText()); $('notifyStatus').textContent = 'コピーしました'; }
-    catch(e){ $('notifyStatus').textContent = 'コピーに失敗しました'; }
+  $('openSet').addEventListener('click', () => $('setDlg').showModal());
+  $('buyBtn').addEventListener('click', buy);
+  $('sellBtn').addEventListener('click', sell);
+  $('tryBtn').addEventListener('click', tryPast);
+  $('lot').addEventListener('change', () => {
+    S.lot = Math.max(10000, Number($('lot').value) || 1000000);
+    $('lot').value = S.lot; save(); render();
   });
-  $('notify').addEventListener('click', async () => {
-    if(!('Notification' in window)){ $('notifyStatus').textContent = 'この環境では通知を利用できません'; return; }
-    const perm = await Notification.requestPermission();
-    if(perm !== 'granted'){ $('notifyStatus').textContent = '通知が許可されていません'; return; }
-    const actionable = results.filter(r => r.lastSignal);
-    new Notification('ドル円シグナル', {
-      body: actionable.length
-        ? actionable.map(r => `${r.strat.name}: ${r.lastSignal === 'buy' ? '買い' : '売り'}`).join('\n')
-        : '本日、売買シグナルはありません'
-    });
-    $('notifyStatus').textContent = '通知を送信しました';
+  $('notifyBtn').addEventListener('click', async () => {
+    if(!('Notification' in window)){ $('notifyHelp').textContent = 'この環境では通知を使えません。'; return; }
+    const p = await Notification.requestPermission();
+    $('notifyHelp').textContent = p === 'granted'
+      ? 'このページを開いている間、サインが出たら通知します。'
+      : '通知が許可されませんでした。ブラウザの設定から許可してください。';
   });
-  window.addEventListener('resize', () => { if(results.length) drawCharts(); });
-  run();
+  $('resetBtn').addEventListener('click', () => {
+    if(!confirm('保有と履歴をすべて消します。よろしいですか？')) return;
+    S.lots = []; S.history = []; S.realized = 0;
+    save(); render();
+  });
+  window.addEventListener('resize', drawChart);
+
+  refresh();
+  setInterval(refresh, 30*60*1000);
 }
 init();
 </script>
