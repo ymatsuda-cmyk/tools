@@ -433,7 +433,8 @@
         <label>監視対象（JSON）</label>
         <textarea id="s-monitors" spellcheck="false" style="min-height:180px;"></textarea>
         <div class="err" id="err-monitors">JSONの形式が正しくありません</div>
-        <div class="hint">各サービスが用意したAPIのURLを登録します</div>
+        <div class="hint">各サービスが用意したAPIのURLを endpoint に登録します。<br>
+          type を <code>copilot</code> / <code>manual</code> / <code>quota</code> にすると endpoint は不要です。</div>
       </div>
       <button class="btn btn-primary" id="btn-applymonitors" style="width:100%;">監視対象を保存</button>
     </div>
@@ -927,6 +928,9 @@ const STATE_META = {
   tracking: { color:'#5FA8A0', label:'記録中'  }
 };
 
+/* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota'];
+
 let monitorTimer = null;
 let monitorCountdown = null;
 let nextFetchAt = 0;
@@ -1047,7 +1051,7 @@ function renderMonitorCard(m, snap){
         <button data-use="${m.id}" data-delta="-1" ${dis} aria-label="1回ぶん戻す">戻す</button>
         <button data-reset="${m.id}" ${dis}>リセット</button>
       </div>`;
-  }else if(m.type === 'quota' || m.type === 'copilot'){
+  }else if(ENDPOINTLESS_TYPES.includes(m.type)){
     footer = '';   // 起動/停止の概念が無い監視対象にはトグルを出さない
   }else{
     footer = `<div class="mon-toggle">
@@ -1273,7 +1277,10 @@ document.getElementById('btn-applymonitors').onclick = async ()=>{
     const parsed = JSON.parse(F('s-monitors').value);
     if(!Array.isArray(parsed)) throw new Error('配列で指定してください');
     parsed.forEach(m=>{
-      if(!m.id || !m.endpoint) throw new Error('各要素に id と endpoint が必要です');
+      if(!m.id) throw new Error('各要素に id が必要です');
+      if(!m.endpoint && !ENDPOINTLESS_TYPES.includes(m.type)){
+        throw new Error(`${m.id}: endpoint が必要です（または type を ${ENDPOINTLESS_TYPES.join(' / ')} にしてください）`);
+      }
     });
     config.monitors = parsed;
     F('err-monitors').style.display = 'none';
