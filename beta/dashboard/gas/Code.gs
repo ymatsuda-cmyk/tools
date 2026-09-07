@@ -418,8 +418,19 @@ function recordManualUsage(monitor, delta, reset) {
 function fetchCopilotStatus(monitor) {
   var token = monitorToken(monitor.id) || cfg('GITHUB_TOKEN');
   var user = monitor.user || cfg('GITHUB_OWNER');
-  if (!token) return { id: monitor.id, state: 'error', error: 'GitHubのトークンが未設定です' };
-  if (!user)  return { id: monitor.id, state: 'error', error: 'GITHUB_OWNER が未設定です' };
+  if (!token) {
+    return {
+      id: monitor.id, state: 'error',
+      error: 'スクリプトプロパティ ' + monitorTokenKey(monitor.id) +
+             ' または GITHUB_TOKEN を登録してください'
+    };
+  }
+  if (!user) {
+    return {
+      id: monitor.id, state: 'error',
+      error: 'GITHUB_OWNER を登録するか、monitor に user を指定してください'
+    };
+  }
 
   var tz = Session.getScriptTimeZone();
   var now = new Date();
@@ -562,9 +573,12 @@ function sendKaggleControl(monitor, command) {
    例: 監視IDが gpu-server なら MONITOR_TOKEN_GPU_SERVER
    ============================================================ */
 
+function monitorTokenKey(id) {
+  return 'MONITOR_TOKEN_' + String(id).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+}
+
 function monitorToken(id) {
-  const key = 'MONITOR_TOKEN_' + String(id).toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return PROP.getProperty(key);
+  return PROP.getProperty(monitorTokenKey(id));
 }
 
 function monitorHeaders(monitor) {
@@ -773,4 +787,13 @@ function testNotionConnection() {
   const pages = fetchNotionPages();
   Logger.log('取得件数: ' + pages.length);
   Logger.log(JSON.stringify(buildResources(pages), null, 2));
+}
+
+/** Copilot監視の設定確認。登録済みプロパティとAPIの応答をログに出す */
+function testCopilotQuota() {
+  Logger.log('MONITOR_TOKEN_COPILOT: ' + (PROP.getProperty('MONITOR_TOKEN_COPILOT') ? 'あり' : 'なし'));
+  Logger.log('GITHUB_TOKEN: ' + (cfg('GITHUB_TOKEN') ? 'あり' : 'なし'));
+  Logger.log('GITHUB_OWNER: ' + (cfg('GITHUB_OWNER') || 'なし'));
+  Logger.log(JSON.stringify(
+    fetchCopilotStatus({ id: 'copilot', name: 'GitHub Copilot', monthlyLimit: 300 }), null, 2));
 }
