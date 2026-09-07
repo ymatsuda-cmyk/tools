@@ -410,6 +410,12 @@ function recordManualUsage(monitor, delta, reset) {
    にその権限が無い場合は、監視ID用のトークン
    （MONITOR_TOKEN_COPILOT など）を別に登録すればそちらが優先される。
 
+   注意: このエンドポイントは個人アカウントの課金明細のみを返す。
+   ・割り当て枠内の利用は明細に載らないため、超過分が出るまで used は 0
+   ・組織管理の Copilot Business/Enterprise シートは対象外（組織側の
+     請求管理者権限が必要な別エンドポイントにしか記録が無い）
+   いずれの場合も、type:"manual" の手動カウンタ（cycle:"monthly"）を使う。
+
    monitors の登録例:
      { "id":"copilot", "name":"GitHub Copilot", "type":"copilot",
        "monthlyLimit":300 }
@@ -446,6 +452,12 @@ function fetchCopilotStatus(monitor) {
   });
 
   var code = res.getResponseCode();
+  if (code === 401) {
+    return {
+      id: monitor.id, state: 'error',
+      error: 'HTTP 401：トークンが無効か期限切れです（' + monitorTokenKey(monitor.id) + ' / GITHUB_TOKEN）'
+    };
+  }
   if (code === 403 || code === 404) {
     return {
       id: monitor.id, state: 'error',
@@ -462,13 +474,21 @@ function fetchCopilotStatus(monitor) {
 
   // usageItems は日次の明細。プレミアムリクエスト分だけを当月で合計する
   var used = 0;
+  var found = false;
   (data.usageItems || []).forEach(function (it) {
     if (String(it.product || '').toLowerCase().indexOf('copilot') < 0) return;
     if (!/premium/i.test(String(it.sku || ''))) return;
+    found = true;
     used += Number(it.quantity) || 0;
   });
 
   var limit = Number(monitor.monthlyLimit) || 300;
+
+  // 個人アカウントの割り当て枠内の利用は課金明細に載らない
+  var note;
+  if (!found) note = '課金明細にCopilotの記録なし（枠内利用は反映されません）';
+  else if (used >= limit) note = '当月の割り当てを使い切っています';
+  else note = '毎月1日にリセット';
 
   return {
     id: monitor.id,
@@ -476,7 +496,7 @@ function fetchCopilotStatus(monitor) {
     state: 'tracking',
     remaining: { value: Math.max(0, limit - used), max: limit, unit: '回' },
     used: used,
-    note: used >= limit ? '当月の割り当てを使い切っています' : '毎月1日にリセット',
+    note: note,
     updatedAt: new Date().toISOString()
   };
 }
@@ -794,6 +814,31 @@ function testCopilotQuota() {
   Logger.log('MONITOR_TOKEN_COPILOT: ' + (PROP.getProperty('MONITOR_TOKEN_COPILOT') ? 'あり' : 'なし'));
   Logger.log('GITHUB_TOKEN: ' + (cfg('GITHUB_TOKEN') ? 'あり' : 'なし'));
   Logger.log('GITHUB_OWNER: ' + (cfg('GITHUB_OWNER') || 'なし'));
+
+  // used が 0 のとき、明細が空なのか sku の判定漏れなのかを切り分ける
+  var token = PROP.getProperty('MONITOR_TOKEN_COPILOT') || cfg('GITHUB_TOKEN');
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var url = 'https://api.github.com/users/' + encodeURIComponent(cfg('GITHUB_OWNER')) +
+            '/settings/billing/usage?year=' + Utilities.formatDate(now, tz, 'yyyy') +
+            '&month=' + Number(Utilities.formatDate(now, tz, 'MM'));
+  var raw = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+    muteHttpExceptions: true
+  });
+  Logger.log('HTTP ' + raw.getResponseCode());
+
+  // product / sku ごとに集計して、Copilot の明細が含まれるかを確認する
+  var items = (JSON.parse(raw.getContentText()).usageItems) || [];
+  Logger.log('usageItems 件数: ' + items.length);
+  var agg = {};
+  items.forEach(function (it) {
+    var key = it.product + ' | ' + it.sku + ' | ' + it.unitType;
+    agg[key] = (agg[key] || 0) + (Number(it.quantity) || 0);
+  });
+  Object.keys(agg).forEach(function (k) { Logger.log(k + ' => ' + agg[k]); });
+
   Logger.log(JSON.stringify(
     fetchCopilotStatus({ id: 'copilot', name: 'GitHub Copilot', monthlyLimit: 300 }), null, 2));
 }

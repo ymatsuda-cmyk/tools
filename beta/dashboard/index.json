@@ -31,8 +31,10 @@
         "id": "copilot",
         "name": "GitHub Copilot",
         "group": "AI",
-        "type": "copilot",
-        "monthlyLimit": 300
+        "type": "manual",
+        "limit": 1500,
+        "unit": "credits",
+        "cycle": "monthly"
       },
       {
         "id": "gemini-pro",

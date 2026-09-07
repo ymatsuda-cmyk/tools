@@ -208,14 +208,21 @@ GitHubの課金APIから当月のプレミアムリクエスト使用量を取�
 `GITHUB_TOKEN` にその権限が無い場合は、スクリプトプロパティ
 `MONITOR_TOKEN_COPILOT` に別トークンを登録すればそちらが優先されます。
 
+> **制約**: このエンドポイントは個人アカウントの課金明細しか返しません。
+> 割り当て枠内の利用は明細に載らず、組織管理の Copilot Business / Enterprise
+> シートはそもそも対象外です（組織の請求管理者権限が必要な別APIにしか記録が無い）。
+> どちらの場合も下の `manual` を `cycle: "monthly"` で使ってください。
+
 ### `type: "manual"` — 手動カウンタ
 
-Gemini や ChatGPT のチャットUIの利用回数は外部から取得できないため、
+Gemini や ChatGPT、Copilot のように外部から利用回数を取得できないものは、
 カードの「1回使った」ボタンで手動カウントします。
 カウントはGASのスクリプトプロパティに保存されるので、端末をまたいで共有されます。
 
 ```json
 [
+  { "id": "copilot",      "name": "GitHub Copilot",  "group": "AI",
+    "type": "manual", "limit": 300, "unit": "回", "cycle": "monthly" },
   { "id": "gemini-pro",   "name": "Gemini Pro",     "group": "AI",
     "type": "manual", "limit": 100, "unit": "回", "cycle": "daily" },
   { "id": "gemini-free",  "name": "Gemini (無料)",  "group": "AI",
