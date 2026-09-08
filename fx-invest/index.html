@@ -58,9 +58,9 @@ canvas{width:100%;display:block}
 
 .pos-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
 .pos-row:last-of-type{border-bottom:none}
-.pos-row select{width:64px;flex:none;font-family:inherit;font-size:13px;padding:7px 4px;border:1px solid var(--border2);border-radius:10px;background:var(--white)}
-.pos-row input{width:88px;flex:none;font-family:'DM Mono',monospace;font-size:14px;text-align:right;padding:7px 8px;border:1px solid var(--border2);border-radius:10px}
-.pos-pl{margin-left:auto;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;line-height:1.3}
+.pos-row select{width:60px;flex:none;font-family:inherit;font-size:13px;padding:7px 4px;border:1px solid var(--border2);border-radius:10px;background:var(--white)}
+.pos-row input{flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:14px;text-align:right;padding:7px 8px;border:1px solid var(--border2);border-radius:10px}
+.pos-pl{flex:none;min-width:96px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:700;line-height:1.3}
 .pos-pl small{display:block;font-size:10px;font-weight:400;color:var(--ink2)}
 .pos-del{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--white);color:var(--ink3);font-size:15px;cursor:pointer}
 .pos-del:hover{color:var(--red);border-color:var(--red)}
@@ -153,8 +153,8 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
 
   <div class="field">
     <span>1回の金額（円）</span>
-    <input type="number" id="lot" step="100000" min="10000">
-    <div class="help">「買う 1」を押すと、この金額ぶんのドルを買ったことにします。</div>
+    <input type="number" id="lot" step="10000" min="10000">
+    <div class="help">「5年前から続けていたら？」の試算に使う金額です。建値リストの損益は100万円あたりで固定です。</div>
   </div>
 
   <div class="field">
@@ -316,7 +316,7 @@ async function updateLive(){
     rate: rate, avg: avgLine[i], state: j.state, gap: j.gap,
     date: new Date().toLocaleDateString('sv-SE'),
     prevClose: close.rate, prevDate: close.date,
-    at: live ? live.at : null, live: !!live
+    at: new Date(), quoteAt: live ? live.at : null, live: !!live
   };
   render();
   maybeNotify();
@@ -337,8 +337,11 @@ function render(){
       now.state === 'buy'  ? 'いつもの値段より ' + g + '% 安いので、買い時のサインが出ています。' :
       now.state === 'sell' ? 'いつもの値段より ' + g + '% 高いので、売り時のサインが出ています。' :
       'いつもの値段との差は ' + (now.gap >= 0 ? '+' : '−') + g + '%。サインが出るまで待ちましょう。';
+    // 取得元のレートが古いときだけ、その時刻を併記する
+    const stale = now.quoteAt && now.at - now.quoteAt > 10 * 60 * 1000
+      ? '（レート提供 ' + hhmm(now.quoteAt) + '）' : '';
     $('stamp').textContent =
-      (now.live ? hhmm(now.at) + ' 時点（1分ごとに更新）' : now.prevDate + ' の終値（現在値を取得できません）') +
+      (now.live ? hhmm(now.at) + ' 更新' + stale : now.prevDate + ' の終値（現在値を取得できません）') +
       ' ／ いつもの値段 ' + (now.avg ? now.avg.toFixed(2) + '円' : '—') +
       '（過去' + SMA_DAYS + '営業日の平均）';
   }
@@ -489,7 +492,7 @@ function renderPositions(){
     price.type = 'number';
     price.step = '0.01';
     price.min = '0';
-    price.value = p.price || '';
+    price.value = p.price ? Math.round(p.price * 1000) / 1000 : '';
     price.placeholder = '150.55';
 
     const pl = document.createElement('div');
