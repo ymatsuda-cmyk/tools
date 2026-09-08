@@ -260,6 +260,7 @@ Gemini や ChatGPT、Copilot のように外部から利用回数を取得でき
 |---|---|---|
 | `server` | `?server=gpu-server` | そのIDのサーバーだけ表示 |
 | `group` | `?group=本番` | そのグループのサーバーだけ表示 |
+| `type` | `?type=manual` | その種別のものだけ表示 |
 | `view` | `?view=monitor` | 稼働状況タブを開いた状態で起動 |
 
 組み合わせられます。
