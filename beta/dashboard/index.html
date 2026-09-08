@@ -931,24 +931,35 @@ const STATE_META = {
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
 const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota'];
 
+const TYPE_LABELS = {
+  kaggle : 'Kaggle',
+  copilot: 'Copilot',
+  manual : '手動カウンタ',
+  quota  : 'APIクォータ',
+  api    : '汎用API'   // type 未指定（共通仕様のendpoint）
+};
+
 let monitorTimer = null;
 let monitorCountdown = null;
 let nextFetchAt = 0;
 let currentView = 'links';
-let activeMonitor = 'all';    // 'all' か 監視ID か 'group:名前'
+let activeMonitor = 'all';    // 'all' か 監視ID か 'group:名前' か 'type:種別'
 
 /**
  * URLパラメータを読む
  *   ?server=gpu-server    … 特定のサーバーだけ表示
  *   ?group=prod           … グループで絞り込み
+ *   ?type=manual          … 種別で絞り込み
  *   ?view=monitor         … 稼働状況タブを開いた状態で起動
  */
 function readUrlParams(){
   const q = new URLSearchParams(location.search);
   const server = q.get('server') || q.get('monitor');
   const group  = q.get('group');
+  const type   = q.get('type');
   if(server)     activeMonitor = server;
   else if(group) activeMonitor = 'group:' + group;
+  else if(type)  activeMonitor = 'type:' + type;
   else           activeMonitor = 'all';
   return { view: q.get('view') };
 }
@@ -956,10 +967,11 @@ function readUrlParams(){
 /** 現在の選択をURLに書き戻す（履歴を汚さず、ブックマーク可能にする） */
 function syncUrl(){
   const q = new URLSearchParams(location.search);
-  q.delete('server'); q.delete('monitor'); q.delete('group');
+  q.delete('server'); q.delete('monitor'); q.delete('group'); q.delete('type');
 
-  if(activeMonitor.startsWith('group:')) q.set('group', activeMonitor.slice(6));
-  else if(activeMonitor !== 'all')       q.set('server', activeMonitor);
+  if(activeMonitor.startsWith('group:'))     q.set('group', activeMonitor.slice(6));
+  else if(activeMonitor.startsWith('type:')) q.set('type', activeMonitor.slice(5));
+  else if(activeMonitor !== 'all')           q.set('server', activeMonitor);
 
   if(currentView === 'monitor') q.set('view', 'monitor');
   else q.delete('view');
@@ -972,6 +984,11 @@ function allMonitors(){
   return Array.isArray(config.monitors) ? config.monitors : [];
 }
 
+/** type 未指定は共通仕様のAPIとして扱う */
+function monitorType(m){
+  return m.type || 'api';
+}
+
 /** 現在の選択で絞り込んだ監視対象 */
 function monitors(){
   const list = allMonitors();
@@ -980,12 +997,21 @@ function monitors(){
     const g = activeMonitor.slice(6);
     return list.filter(m => m.group === g);
   }
+  if(activeMonitor.startsWith('type:')){
+    const t = activeMonitor.slice(5);
+    return list.filter(m => monitorType(m) === t);
+  }
   return list.filter(m => m.id === activeMonitor);
 }
 
 /** 登録済みのグループ名一覧 */
 function monitorGroups(){
   return [...new Set(allMonitors().map(m => m.group).filter(Boolean))];
+}
+
+/** 登録済みの種別一覧 */
+function monitorTypes(){
+  return [...new Set(allMonitors().map(monitorType))];
 }
 
 function intervalMs(){
@@ -1105,6 +1131,7 @@ function renderMonitorChips(){
 
   const items = [{ key:'all', label:'すべて' }];
   monitorGroups().forEach(g => items.push({ key:'group:'+g, label:g }));
+  monitorTypes().forEach(t => items.push({ key:'type:'+t, label:TYPE_LABELS[t] || t }));
   all.forEach(m => items.push({ key:m.id, label:m.name || m.id }));
 
   el.innerHTML = '';

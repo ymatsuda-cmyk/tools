@@ -1,8 +1,9 @@
 /**
- * ドル円 かんたん投資 — 通知用 Google Apps Script
+ * ドル円 かんたん投資 — 通知＋売買履歴の保存用 Google Apps Script
  *
- * アプリを閉じていても「買い時 / 売り時」をメールで知らせるためのスクリプト。
- * ブラウザ側アプリ（fx-invest/index.html）と同じ判定ロジックを使う。
+ * 役割:
+ *  1. アプリを閉じていても「買い時 / 売り時」をメールで知らせる
+ *  2. 売買履歴をスプレッドシートに保存し、端末間で同期する
  *
  * 判定: いまのレートが「いつもの値段（過去75営業日の平均）」から
  *       どれだけ離れたかで、買い時 / 売り時 / 様子見を決める。
@@ -11,13 +12,18 @@
  *  1. Googleドライブ → 新規 → その他 → Google Apps Script でプロジェクトを作る
  *  2. このファイルの中身をすべて貼り付ける
  *  3. 「プロジェクトの設定」→「スクリプト プロパティ」に以下を登録
- *       FX_MAIL_TO    … 通知先メールアドレス（必須）
+ *       FX_MAIL_TO    … 通知先メールアドレス
+ *       FX_SECRET     … アプリから接続するときの合言葉（同期を使うなら必須）
  *       FX_LEVEL      … easy / normal / hard （省略時 normal）
  *       FX_LOT_JPY    … 1回の金額。メール本文の表示に使う（省略時 1000000）
+ *       FX_SHEET_ID   … 保存先のスプレッドシートID（省略時は自動作成）
  *       FX_WEBHOOK_URL… Slack等のWebhook URL（任意。{"text":"..."} を送る）
- *  4. エディタで setupFxTrigger を1回実行する（毎日夕方に自動チェックされる）
+ *  4. setupFxTrigger を1回実行する（毎日夕方に自動チェック）
+ *  5. 端末間で同期する場合は「デプロイ」→「新しいデプロイ」→ 種類：ウェブアプリ
+ *     アクセスできるユーザー：全員 でデプロイし、発行された /exec のURLと
+ *     FX_SECRET をアプリの設定画面に入力する
  *
- * 動作確認は testFxSignal を実行してログを見る。
+ * 動作確認は testFxSignal / setupFxSheet を実行してログを見る。
  */
 
 var FXP = PropertiesService.getScriptProperties();
@@ -170,6 +176,131 @@ function fxSend(j) {
 }
 
 /* ============================================================
+   売買履歴の保存（スプレッドシート）
+
+   1行 = 1回の売買。id はアプリ側で付け、同じ id は二重登録しないので
+   複数端末から送っても重複しない。
+   ============================================================ */
+
+var FX_HEADER = ['id', 'at', 'date', 'side', 'rate', 'jpy', 'usd', 'pl'];
+
+function fxSheet() {
+  var id = fxCfg('FX_SHEET_ID');
+  var ss;
+  if (id) {
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    ss = SpreadsheetApp.create('ドル円 かんたん投資 売買履歴');
+    FXP.setProperty('FX_SHEET_ID', ss.getId());
+  }
+  var sh = ss.getSheetByName('trades') || ss.insertSheet('trades');
+  if (sh.getLastRow() === 0) sh.appendRow(FX_HEADER);
+  return sh;
+}
+
+/** シートが日付型に変換してしまった値を文字列に戻す */
+function fxCell(v, pattern) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), pattern);
+  }
+  return String(v);
+}
+
+function fxListTrades() {
+  var sh = fxSheet();
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+
+  return sh.getRange(2, 1, last - 1, FX_HEADER.length).getValues()
+    .filter(function (r) { return r[0] !== '' && r[0] !== null; })
+    .map(function (r) {
+      return {
+        id:   fxCell(r[0], 'yyyy-MM-dd'),
+        at:   fxCell(r[1], "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"),
+        date: fxCell(r[2], 'yyyy-MM-dd'),
+        side: String(r[3]),
+        rate: Number(r[4]),
+        jpy:  Number(r[5]),
+        usd:  Number(r[6]),
+        pl:   (r[7] === '' || r[7] === null) ? null : Number(r[7])
+      };
+    })
+    .sort(function (a, b) { return a.at < b.at ? -1 : (a.at > b.at ? 1 : 0); });
+}
+
+function fxAddTrade(t) {
+  if (!t || !t.id) throw new Error('id のない記録は保存できません');
+  if (t.side !== 'buy' && t.side !== 'sell') throw new Error('side が不正です');
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var current = fxListTrades();
+    var exists = current.some(function (x) { return x.id === String(t.id); });
+    if (!exists) {
+      fxSheet().appendRow([
+        String(t.id),
+        String(t.at || new Date().toISOString()),
+        String(t.date || ''),
+        String(t.side),
+        Number(t.rate) || 0,
+        Number(t.jpy) || 0,
+        Number(t.usd) || 0,
+        (t.pl === null || t.pl === undefined || t.pl === '') ? '' : Number(t.pl)
+      ]);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return fxListTrades();
+}
+
+function fxClearTrades() {
+  var sh = fxSheet();
+  if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+  return [];
+}
+
+/* ============================================================
+   Web API（アプリから呼ぶ）
+
+   ブラウザの事前確認（preflight）を避けるため、アプリ側は
+   Content-Type: text/plain で POST してくる。
+   ============================================================ */
+
+function fxJson(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function fxHandle(req) {
+  try {
+    var secret = fxCfg('FX_SECRET');
+    if (!secret) throw new Error('FX_SECRET が未設定です');
+    if (String(req.secret || '') !== String(secret)) throw new Error('合言葉が違います');
+
+    if (req.action === 'list')   return fxJson({ ok: true, trades: fxListTrades() });
+    if (req.action === 'add')    return fxJson({ ok: true, trades: fxAddTrade(req.trade) });
+    if (req.action === 'clear')  return fxJson({ ok: true, trades: fxClearTrades() });
+    if (req.action === 'signal') return fxJson({ ok: true, signal: fxJudge() });
+
+    return fxJson({ ok: false, error: '不明な action: ' + req.action });
+  } catch (err) {
+    return fxJson({ ok: false, error: String(err.message || err) });
+  }
+}
+
+function doGet(e) {
+  return fxHandle((e && e.parameter) || {});
+}
+
+function doPost(e) {
+  var req = {};
+  try { req = JSON.parse(e.postData.contents); } catch (err) { /* 不正なJSONは空扱い */ }
+  return fxHandle(req);
+}
+
+/* ============================================================
    定期実行の入口
    ============================================================ */
 
@@ -210,6 +341,19 @@ function testFxSignal() {
   var j = fxJudge();
   Logger.log(JSON.stringify(j, null, 2));
   Logger.log(fxMessage(j).body);
+}
+
+/** 保存先シートを作成（または確認）してURLをログに出す */
+function setupFxSheet() {
+  var sh = fxSheet();
+  Logger.log('シート: ' + sh.getParent().getUrl());
+  Logger.log('保存済みの売買: ' + fxListTrades().length + '件');
+}
+
+/** 履歴を全件消す（エディタから手動で実行する用） */
+function clearFxTrades() {
+  fxClearTrades();
+  Logger.log('履歴を消しました');
 }
 
 /** サインの状態を忘れさせる。次回のチェックで必ず通知が飛ぶ */

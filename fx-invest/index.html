@@ -78,8 +78,9 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .choices label{border:1px solid var(--border2);border-radius:12px;padding:9px 4px;text-align:center;font-size:13px;cursor:pointer}
 .choices input{display:none}
 .choices label:has(input:checked){border-color:var(--green);background:var(--green-l);color:var(--green);font-weight:700}
-.field input[type=number]{width:100%;font-family:'DM Mono',monospace;font-size:15px;padding:10px;border:1px solid var(--border2);border-radius:12px}
+.field input[type=number],.field input[type=text]{width:100%;font-family:'DM Mono',monospace;font-size:15px;padding:10px;border:1px solid var(--border2);border-radius:12px}
 .help{font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.7}
+.pend{color:var(--amber,#92400e);font-size:10px;margin-left:5px}
 .dlg .row{display:flex;gap:8px;margin-top:6px}
 .status{font-size:12px;color:var(--ink2);text-align:center;padding:8px 0;line-height:1.7}
 .status.err{color:var(--red)}
@@ -160,13 +161,23 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
     <div class="help" id="notifyHelp">このページを開いている間、買い時・売り時になったら通知します。</div>
   </div>
 
+  <div class="field">
+    <span>端末間で同期（Google Apps Script）</span>
+    <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/…/exec">
+    <input type="text" id="gasSecret" placeholder="合言葉（FX_SECRET）" style="margin-top:6px">
+    <button type="button" class="btn" id="syncBtn" style="margin-top:6px">いま同期する</button>
+    <div class="help" id="syncStatus">未設定のときはこの端末の中だけに記録します。</div>
+  </div>
+
   <details>
-    <summary>アプリを閉じていてもメールで知らせる</summary>
+    <summary>アプリを閉じていてもメールで知らせる・端末間で同期する</summary>
     <ol>
       <li>Googleドライブで新しい Apps Script を作る</li>
       <li><code>fx-invest/gas/Code.gs</code> の中身を貼り付ける</li>
-      <li>スクリプトプロパティに <code>FX_MAIL_TO</code>（宛先メール）と <code>FX_LEVEL</code>（easy / normal / hard）を登録</li>
+      <li>スクリプトプロパティに <code>FX_MAIL_TO</code>（宛先メール）と <code>FX_SECRET</code>（合言葉）を登録</li>
       <li><code>setupFxTrigger</code> を1回実行する（毎日夕方に自動チェック）</li>
+      <li>デプロイ → 新しいデプロイ → ウェブアプリ（アクセス：全員）で公開し、
+          <code>/exec</code> のURLと合言葉を上の欄に入力</li>
     </ol>
   </details>
 
@@ -195,11 +206,34 @@ let S = load();
 let series = [], avgLine = [], now = null;
 
 function load(){
-  const d = { level:'normal', lot:1000000, lots:[], realized:0, history:[], lastSignal:'hold' };
-  try{ return Object.assign(d, JSON.parse(localStorage.getItem(KEY)) || {}); }
+  const d = { level:'normal', lot:1000000, trades:[], gasUrl:'', secret:'', lastSignal:'hold' };
+  let s;
+  try{ s = Object.assign(d, JSON.parse(localStorage.getItem(KEY)) || {}); }
   catch(e){ return d; }
+
+  // 旧形式（lots / history / realized）を売買履歴だけの形に移行する
+  if(!s.trades.length && Array.isArray(s.history) && s.history.length){
+    s.trades = s.history.slice().reverse().map((h,i) => ({
+      id: 'old-' + i + '-' + h.date, at: h.date + 'T00:00:00.000Z', date: h.date,
+      side: h.side, rate: h.rate, jpy: h.jpy, usd: h.jpy / h.rate,
+      pl: h.pl == null ? null : h.pl, pending: true
+    }));
+  }
+  delete s.history; delete s.lots; delete s.realized;
+  return s;
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/** 売買履歴を先頭から再生して、いまの保有と確定損益を求める（古い順に売る） */
+function replay(trades){
+  const lots = [];
+  let realized = 0;
+  trades.forEach(t => {
+    if(t.side === 'buy') lots.push({ date:t.date, rate:t.rate, jpy:t.jpy, usd:t.usd });
+    else if(lots.length) realized += t.jpy - lots.shift().jpy;
+  });
+  return { lots, realized };
+}
 
 /* ===== レート取得 ===== */
 async function fetchSeries(days){
@@ -320,33 +354,34 @@ function render(){
       '（過去' + SMA_DAYS + '営業日の平均）';
   }
 
-  const usd  = S.lots.reduce((a,l) => a + l.usd, 0);
-  const cost = S.lots.reduce((a,l) => a + l.jpy, 0);
-  const total = S.realized + (now ? usd * now.rate - cost : 0);
+  const pos = replay(S.trades);
+  const usd  = pos.lots.reduce((a,l) => a + l.usd, 0);
+  const cost = pos.lots.reduce((a,l) => a + l.jpy, 0);
+  const total = pos.realized + (now ? usd * now.rate - cost : 0);
 
-  $('qty').textContent = S.lots.length;
+  $('qty').textContent = pos.lots.length;
   $('avg').textContent = usd ? (cost/usd).toFixed(2) : '—';
   $('pl').textContent  = yen(total);
   $('pl').className = 'n ' + cls(total);
 
   $('buyBtn').disabled  = !now;
-  $('sellBtn').disabled = !now || !S.lots.length;
+  $('sellBtn').disabled = !now || !pos.lots.length;
   $('buyNote').textContent  = '1（' + yen(S.lot) + '）';
-  $('sellNote').textContent = S.lots.length ? '1（保有 ' + S.lots.length + '）' : '保有なし';
+  $('sellNote').textContent = pos.lots.length ? '1（保有 ' + pos.lots.length + '）' : '保有なし';
 
   renderHistory();
   drawChart();
 }
 
 function renderHistory(){
-  if(!S.history.length){
+  if(!S.trades.length){
     $('hist').innerHTML = '<li class="empty">まだ売買がありません</li>';
     return;
   }
-  $('hist').innerHTML = S.history.slice(0,30).map(h => `
+  $('hist').innerHTML = S.trades.slice().reverse().slice(0,30).map(h => `
     <li>
       <span class="badge ${h.side==='buy'?'b':'s'}">${h.side==='buy'?'買い':'売り'}</span>
-      <span class="d">${h.date}</span>
+      <span class="d">${h.date}${h.pending ? '<span class="pend">未同期</span>' : ''}</span>
       <span class="r">${h.rate.toFixed(2)}円<br>${
         h.pl != null ? `<b class="${cls(h.pl)}">${yen(h.pl)}</b>` : yen(h.jpy)}</span>
     </li>`).join('');
@@ -355,17 +390,69 @@ function renderHistory(){
 /* ===== 売買（数量1 = 設定金額ぶん） ===== */
 function buy(){
   if(!now) return;
-  S.lots.push({ date:now.date, rate:now.rate, jpy:S.lot, usd:S.lot/now.rate });
-  S.history.unshift({ date:now.date, side:'buy', rate:now.rate, jpy:S.lot });
-  save(); render();
+  addTrade({ side:'buy', rate:now.rate, jpy:S.lot, usd:S.lot/now.rate, pl:null });
 }
 function sell(){
-  if(!now || !S.lots.length) return;
-  const lot = S.lots.shift();                      // 古い1つから順に売る
+  if(!now) return;
+  const lots = replay(S.trades).lots;
+  if(!lots.length) return;
+  const lot = lots[0];                             // 古い1つから順に売る
   const proceeds = lot.usd * now.rate;
-  S.realized += proceeds - lot.jpy;
-  S.history.unshift({ date:now.date, side:'sell', rate:now.rate, jpy:proceeds, pl:proceeds - lot.jpy });
+  addTrade({ side:'sell', rate:now.rate, jpy:proceeds, usd:lot.usd, pl:proceeds - lot.jpy });
+}
+function addTrade(t){
+  const rec = Object.assign({
+    id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8),
+    at: new Date().toISOString(),
+    date: now.date
+  }, t);
+  S.trades.push(rec);
   save(); render();
+  pushTrade(rec);
+}
+
+/* ===== 端末間の同期（GAS + スプレッドシート） ===== */
+async function api(payload){
+  if(!S.gasUrl) throw new Error('同期先が未設定です');
+  const res = await fetch(S.gasUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // 事前確認を避ける
+    body: JSON.stringify(Object.assign({ secret: S.secret || '' }, payload))
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const j = await res.json();
+  if(!j.ok) throw new Error(j.error || '失敗しました');
+  return j;
+}
+function setSync(msg){ $('syncStatus').textContent = msg; }
+
+async function pushTrade(rec){
+  if(!S.gasUrl) return;
+  try{
+    const j = await api({ action:'add', trade: rec });
+    S.trades = j.trades; save(); render();
+    setSync('同期済み ' + hhmm(new Date()));
+  }catch(e){
+    rec.pending = true; save(); render();
+    setSync('未同期の記録があります（' + e.message + '）');
+  }
+}
+
+async function syncTrades(){
+  if(!S.gasUrl) return;
+  setSync('同期中…');
+  try{
+    for(const t of S.trades.filter(x => x.pending)){
+      const copy = Object.assign({}, t);
+      delete copy.pending;
+      await api({ action:'add', trade: copy });
+    }
+    const j = await api({ action:'list' });
+    S.trades = j.trades; save(); render();
+    setSync('同期済み ' + hhmm(new Date()) + '（' + S.trades.length + '件）');
+  }catch(e){
+    setSync('同期できません（' + e.message + '）');
+  }
 }
 
 /* ===== 通知 ===== */
@@ -422,7 +509,7 @@ function drawChart(){
 
   const idx = new Map(view.map((v,i) => [v.date, i]));
   const lastDate = view[view.length-1].date;
-  S.history.forEach(t => {
+  S.trades.forEach(t => {
     let i = idx.get(t.date);
     if(i == null && t.date >= lastDate) i = view.length - 1;   // 当日の売買は右端に置く
     if(i == null) return;
@@ -468,6 +555,8 @@ function buildSettings(){
     `<label><input type="radio" name="lv" value="${k}" ${S.level===k?'checked':''}><span>${LEVELS[k].label}</span></label>`).join('');
   $('levelHelp').textContent = LEVELS[S.level].help;
   $('lot').value = S.lot;
+  $('gasUrl').value = S.gasUrl || '';
+  $('gasSecret').value = S.secret || '';
   $('levels').querySelectorAll('input').forEach(r => r.addEventListener('change', () => {
     S.level = r.value;
     $('levelHelp').textContent = LEVELS[S.level].help;
@@ -494,6 +583,13 @@ function init(){
     S.lot = Math.max(10000, Number($('lot').value) || 1000000);
     $('lot').value = S.lot; save(); render();
   });
+  $('gasUrl').addEventListener('change', () => {
+    S.gasUrl = $('gasUrl').value.trim(); save(); syncTrades();
+  });
+  $('gasSecret').addEventListener('change', () => {
+    S.secret = $('gasSecret').value.trim(); save(); syncTrades();
+  });
+  $('syncBtn').addEventListener('click', syncTrades);
   $('notifyBtn').addEventListener('click', async () => {
     if(!('Notification' in window)){ $('notifyHelp').textContent = 'この環境では通知を使えません。'; return; }
     const p = await Notification.requestPermission();
@@ -501,16 +597,25 @@ function init(){
       ? 'このページを開いている間、サインが出たら通知します。'
       : '通知が許可されませんでした。ブラウザの設定から許可してください。';
   });
-  $('resetBtn').addEventListener('click', () => {
-    if(!confirm('保有と履歴をすべて消します。よろしいですか？')) return;
-    S.lots = []; S.history = []; S.realized = 0;
+  $('resetBtn').addEventListener('click', async () => {
+    if(!confirm('保有と履歴をすべて消します。同期先のスプレッドシートも消えます。よろしいですか？')) return;
+    S.trades = [];
     save(); render();
+    if(S.gasUrl){
+      try{ await api({ action:'clear' }); setSync('同期先も消しました'); }
+      catch(e){ setSync('同期先を消せませんでした（' + e.message + '）'); }
+    }
   });
   window.addEventListener('resize', drawChart);
-  document.addEventListener('visibilitychange', () => { if(!document.hidden) updateLive(); });
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden) return;
+    updateLive(); syncTrades();
+  });
 
   loadHistory().then(ok => { if(ok) updateLive(); });
+  syncTrades();
   setInterval(updateLive, 60*1000);
+  setInterval(syncTrades, 5*60*1000);
   setInterval(loadHistory, 6*60*60*1000);
 }
 init();
