@@ -682,6 +682,9 @@ function fetchMonitorStatus(monitor) {
     }
 
     const data = JSON.parse(res.getContentText());
+    if (data.ok === false) {
+      return { id: monitor.id, state: 'error', error: data.error || 'サービス側でエラーが発生しました' };
+    }
     return {
       id: monitor.id,
       name: data.name || monitor.name || monitor.id,

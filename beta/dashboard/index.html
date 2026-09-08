@@ -1108,6 +1108,9 @@ function renderMonitorCard(m, snap){
     body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${esc(snap.error)}</div>`;
   }else if(snap.fx){
     body = fxBody(snap.fx);
+  }else if(m.type === 'fx'){
+    body = `<div class="mon-offline">データを取得できません</div>
+      <div class="mon-err">ダッシュボード用GASを最新の Code.gs に更新し、再デプロイしてください</div>`;
   }else if(!snap.remaining){
     body = `<div class="mon-offline">${meta.label}</div>`;
   }else{
