@@ -8,6 +8,13 @@ const PDFJS_VERSION = '4.10.38'
 const MAMMOTH_URL = 'https://cdn.jsdelivr.net/npm/mammoth@1.9.0/mammoth.browser.min.js'
 const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 
+/** スキャンPDFを画像化するときの上限と解像度 */
+const PDF_PAGE_IMAGE_LIMIT = 8
+const PDF_PAGE_IMAGE_WIDTH = 1280
+
+/** 1ページあたりこれ未満しか文字が取れなければ、文字情報を持たないPDFとみなす */
+const PDF_TEXT_PER_PAGE = 30
+
 const TEXT_EXT =
   /\.(txt|md|markdown|csv|tsv|json|ya?ml|log|ts|tsx|js|jsx|py|java|kt|sql|html|css|xml)$/i
 
@@ -49,12 +56,14 @@ async function packImage(file, name) {
   }
 }
 
-async function parsePdf(file) {
+async function openPdf(file) {
   const pdfjs = await import('pdfjs')
   pdfjs.GlobalWorkerOptions.workerSrc =
     `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`
+  return pdfjs.getDocument({ data: await file.arrayBuffer() }).promise
+}
 
-  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise
+async function pdfText(doc) {
   const pages = []
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i)
@@ -67,6 +76,57 @@ async function parsePdf(file) {
     if (line) pages.push(`--- p.${i} ---\n${line}`)
   }
   return pages.join('\n\n')
+}
+
+/** スキャンPDFをビジョンモデルに読ませるため、ページを画像にする */
+async function pdfPageImages(doc, name) {
+  const out = []
+  const last = Math.min(doc.numPages, PDF_PAGE_IMAGE_LIMIT)
+  for (let i = 1; i <= last; i++) {
+    const page = await doc.getPage(i)
+    const base = page.getViewport({ scale: 1 })
+    const viewport = page.getViewport({ scale: Math.min(2, PDF_PAGE_IMAGE_WIDTH / base.width) })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(viewport.width)
+    canvas.height = Math.round(viewport.height)
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+    out.push({
+      id: makeId(),
+      name: `${name} p.${i}`,
+      kind: 'image',
+      chars: 0,
+      tokens: IMAGE_TOKENS,
+      text: '',
+      dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+      bytes: 0,
+    })
+  }
+  return out
+}
+
+async function parsePdf(file, name) {
+  const doc = await openPdf(file)
+  const text = await pdfText(doc)
+  const chars = text.replace(/---\s*p\.\d+\s*---/g, '').trim().length
+
+  if (chars >= PDF_TEXT_PER_PAGE * doc.numPages) return [pack(name, 'pdf', text)]
+
+  const images = await pdfPageImages(doc, name)
+  if (!images.length) throw new Error(`内容を取り出せませんでした: ${name}`)
+
+  const notes = []
+  if (text.trim()) notes.push(pack(name, 'pdf', text))
+  if (doc.numPages > PDF_PAGE_IMAGE_LIMIT) {
+    notes.push(
+      pack(
+        `${name} の注記`,
+        'text',
+        `${name} は全${doc.numPages}ページです。文字データが埋め込まれていないため、` +
+          `先頭${PDF_PAGE_IMAGE_LIMIT}ページのみ画像として読み込みました。`,
+      ),
+    )
+  }
+  return [...notes, ...images]
 }
 
 async function parseDocx(file) {
@@ -86,14 +146,15 @@ async function parseXlsx(file) {
   return out.join('\n\n')
 }
 
+/** 戻りは常に配列。スキャンPDFは1ファイルが複数のページ画像になる */
 export async function parseFile(file) {
   const name = file.name || `image-${Date.now()}.png`
-  if (file.type.startsWith('image/')) return packImage(file, name)
-  if (/\.pdf$/i.test(name)) return pack(name, 'pdf', await parsePdf(file))
-  if (/\.docx$/i.test(name)) return pack(name, 'docx', await parseDocx(file))
-  if (/\.(xlsx|xlsm|xls)$/i.test(name)) return pack(name, 'xlsx', await parseXlsx(file))
+  if (file.type.startsWith('image/')) return [await packImage(file, name)]
+  if (/\.pdf$/i.test(name)) return parsePdf(file, name)
+  if (/\.docx$/i.test(name)) return [pack(name, 'docx', await parseDocx(file))]
+  if (/\.(xlsx|xlsm|xls)$/i.test(name)) return [pack(name, 'xlsx', await parseXlsx(file))]
   if (TEXT_EXT.test(name) || file.type.startsWith('text/')) {
-    return pack(name, 'text', await file.text())
+    return [pack(name, 'text', await file.text())]
   }
   throw new Error(`未対応の形式です: ${name}`)
 }

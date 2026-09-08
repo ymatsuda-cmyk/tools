@@ -152,7 +152,7 @@ export function createComposer(root, handlers) {
     update()
     for (const f of Array.from(files ?? [])) {
       try {
-        atts.push(await parseFile(f))
+        atts.push(...(await parseFile(f)))
       } catch (e) {
         error = e.message
       }
