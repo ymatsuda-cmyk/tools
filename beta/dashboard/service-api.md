@@ -246,6 +246,22 @@ Gemini や ChatGPT、Copilot のように外部から利用回数を取得でき
 スクリプトから `action: "recordApiUsage"` を投げて積算する方式です。
 詳細は `gas/Code.gs` のコメントを参照してください。
 
+### `type: "fx"` — ドル円 かんたん投資
+
+`fx-invest/gas/Code.gs` をウェブアプリとしてデプロイし、その `/exec` を
+`endpoint` に指定します。いまのレート・判定・保有・損益をカードに表示します。
+
+```json
+{ "id": "fx", "name": "ドル円 かんたん投資", "type": "fx",
+  "endpoint": "https://script.google.com/macros/s/xxx/exec" }
+```
+
+合言葉（fx側の `FX_SECRET`）は、ダッシュボード用GASのスクリプトプロパティ
+`MONITOR_TOKEN_FX` に登録します。ブラウザには渡りません。
+
+損益は円グラフで表します。12時の位置が損益0で、プラスは右回り、
+マイナスは左回りに塗られます。半周（±10万円）で振り切ります。
+
 ---
 
 ## URLパラメータで表示を切り替える

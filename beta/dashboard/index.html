@@ -88,6 +88,17 @@
   .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
   .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
   .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
+
+  .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
+  .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .fx-rate span{font-size:11px;color:var(--text-muted);}
+  .fx-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;margin-left:2px;}
+  .fx-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center;
+    border-top:1px solid var(--border);padding-top:10px;margin-top:10px;}
+  .fx-stats span{display:block;font-size:9px;color:var(--text-muted);}
+  .fx-stats b{font-size:13px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .fx-plus{color:#5FA8A0;}
+  .fx-minus{color:#D9694F;}
   .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
   .mon-actions button{
     flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
@@ -929,13 +940,14 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
   copilot: 'Copilot',
   manual : '手動カウンタ',
   quota  : 'APIクォータ',
+  fx     : 'ドル円',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1018,6 +1030,70 @@ function metricColor(pct){
   return '#5FA8A0';
 }
 
+/* ============================================================
+   ドル円 かんたん投資
+   ============================================================ */
+
+const FX_PROFIT_CAP = 100000;   // 円グラフが半周しきる損益
+const FX_SIGNALS = {
+  buy : { label:'買い時', color:'#5FA8A0', bg:'rgba(95,168,160,0.18)' },
+  sell: { label:'売り時', color:'#D9694F', bg:'rgba(217,105,79,0.18)' },
+  hold: { label:'様子見', color:'#8A857C', bg:'rgba(255,255,255,0.06)' }
+};
+
+/** 12時を損益0とし、プラスは右回り・マイナスは左回りに塗る */
+function fxProfitSVG(profit){
+  const ratio = Math.max(-1, Math.min(1, (Number(profit) || 0) / FX_PROFIT_CAP));
+  const deg = ratio * 180;
+  const rad = deg * Math.PI / 180;
+  const x = (50 + 40 * Math.sin(rad)).toFixed(2);
+  const y = (50 - 40 * Math.cos(rad)).toFixed(2);
+  const color = profit > 0 ? '#5FA8A0' : profit < 0 ? '#D9694F' : '#66625A';
+  const sign = profit > 0 ? '+' : profit < 0 ? '−' : '';
+  const label = sign + (Math.abs(profit) / 10000).toFixed(1) + '万';
+
+  const arc = Math.abs(deg) < 0.5 ? '' : `
+      <path d="M 50 10 A 40 40 0 0 ${deg >= 0 ? 1 : 0} ${x} ${y}"
+        fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"/>`;
+
+  return `
+    <svg viewBox="0 0 100 100" role="img" aria-label="損益 ${label}">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface-2)" stroke-width="9"/>${arc}
+      <line x1="50" y1="3" x2="50" y2="17" stroke="var(--border-strong)" stroke-width="1.5"/>
+      <text x="50" y="56" text-anchor="middle" font-size="17" font-weight="600"
+        fill="${color}">${label}</text>
+    </svg>`;
+}
+
+function fxBody(f){
+  const sig = FX_SIGNALS[f.signal] || FX_SIGNALS.hold;
+  const diff = f.prevClose == null ? null : f.rate - f.prevClose;
+  const gapWord = f.gap >= 0 ? '高い' : '安い';
+  const plCls = f.profit > 0 ? 'fx-plus' : f.profit < 0 ? 'fx-minus' : '';
+
+  return `
+    <div class="fx-rate">
+      <b>${f.rate.toFixed(2)}</b><span>円</span>
+      <span class="fx-badge" style="color:${sig.color};background:${sig.bg}">${sig.label}</span>
+    </div>
+    <div class="mon-ring">
+      ${fxProfitSVG(f.profit)}
+      <div class="sub mono">損益（上限 ±10万）</div>
+    </div>
+    <div class="fx-stats">
+      <div><span>保有</span><b>${f.qty}</b></div>
+      <div><span>平均の買値</span><b>${f.avgCost ? f.avgCost.toFixed(2) : '—'}</b></div>
+      <div><span>損益</span><b class="${plCls}">${
+        (f.profit >= 0 ? '+' : '−') + '¥' + Math.abs(Math.round(f.profit)).toLocaleString()
+      }</b></div>
+    </div>
+    <div class="mon-note">
+      いつもの値段より ${Math.abs(f.gap).toFixed(1)}% ${gapWord}
+      ${diff == null ? '' : ' ／ 前回終値 ' + (diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(2) + '円'}
+    </div>
+    <div class="mon-note">${esc(f.date)}${f.live ? ' 時点' : ' 終値'}</div>`;
+}
+
 function renderMonitorCard(m, snap){
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -1030,6 +1106,8 @@ function renderMonitorCard(m, snap){
     body = `<div class="mon-offline">取得中…</div>`;
   }else if(snap.error){
     body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${esc(snap.error)}</div>`;
+  }else if(snap.fx){
+    body = fxBody(snap.fx);
   }else if(!snap.remaining){
     body = `<div class="mon-offline">${meta.label}</div>`;
   }else{

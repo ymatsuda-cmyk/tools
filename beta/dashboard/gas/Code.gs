@@ -580,6 +580,43 @@ function sendKaggleControl(monitor, command) {
 }
 
 /* ============================================================
+   ドル円 かんたん投資（fx-invest のGAS）への橋渡し
+
+   fx-invest/gas/Code.gs をウェブアプリとしてデプロイし、
+   その /exec を monitor.endpoint に指定する。合言葉（FX_SECRET）は
+   MONITOR_TOKEN_{監視ID} に登録する。
+
+   monitors の登録例:
+     { "id":"fx", "name":"ドル円 かんたん投資", "type":"fx",
+       "endpoint":"https://script.google.com/macros/s/xxx/exec" }
+   ============================================================ */
+
+function fetchFxStatus(monitor) {
+  var res = UrlFetchApp.fetch(monitor.endpoint, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ action: 'summary', secret: monitorToken(monitor.id) || '' }),
+    muteHttpExceptions: true
+  });
+
+  var data;
+  try { data = JSON.parse(res.getContentText()); }
+  catch (e) { return { id: monitor.id, state: 'error', error: 'JSON解析に失敗しました' }; }
+
+  if (!data.ok) {
+    return { id: monitor.id, state: 'error', error: data.error || '取得に失敗しました' };
+  }
+
+  return {
+    id: monitor.id,
+    name: monitor.name || monitor.id,
+    state: 'tracking',
+    fx: data.summary,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/* ============================================================
    稼働状況モニターの中継
 
    各サービスは以下の共通仕様のAPIを用意する（docs/service-api.md 参照）:
@@ -624,6 +661,9 @@ function fetchMonitorStatus(monitor) {
     if (monitor.type === 'kaggle') {
       return fetchKaggleStatus(monitor);
     }
+    if (monitor.type === 'fx') {
+      return fetchFxStatus(monitor);
+    }
 
     const sep = monitor.endpoint.indexOf('?') >= 0 ? '&' : '?';
     const url = monitor.endpoint + sep + 'action=status';
@@ -663,7 +703,8 @@ function sendMonitorControl(monitor, command) {
   if (command !== 'start' && command !== 'stop') {
     throw new Error('command は start か stop のみです');
   }
-  if (monitor.type === 'quota' || monitor.type === 'manual' || monitor.type === 'copilot') {
+  if (monitor.type === 'quota' || monitor.type === 'manual' ||
+      monitor.type === 'copilot' || monitor.type === 'fx') {
     throw new Error('この監視対象には起動/停止の概念がありません');
   }
   if (!monitor.endpoint) throw new Error('endpoint が未設定です');

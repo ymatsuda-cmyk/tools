@@ -124,8 +124,35 @@ function fxJudge() {
 
   return {
     state: state, gap: gap, rate: rate, avg: avg, live: live !== null,
+    prevClose: close.rate, prevDate: close.date,
     date: live === null ? close.date
       : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+  };
+}
+
+/** 判定と保有状況をまとめて返す（ダッシュボードのカード用） */
+function fxSummary() {
+  var j = fxJudge();
+  var trades = fxListTrades();
+
+  var lots = [];
+  var realized = 0;
+  trades.forEach(function (t) {
+    if (t.side === 'buy') lots.push(t);
+    else if (lots.length) realized += t.jpy - lots.shift().jpy;
+  });
+
+  var usd = lots.reduce(function (a, l) { return a + l.usd; }, 0);
+  var cost = lots.reduce(function (a, l) { return a + l.jpy; }, 0);
+
+  return {
+    signal: j.state, gap: j.gap, rate: j.rate, avg: j.avg,
+    live: j.live, date: j.date, prevClose: j.prevClose,
+    qty: lots.length,
+    avgCost: usd ? cost / usd : null,
+    realized: realized,
+    profit: realized + (usd * j.rate - cost),
+    trades: trades.length
   };
 }
 
@@ -279,10 +306,11 @@ function fxHandle(req) {
     if (!secret) throw new Error('FX_SECRET が未設定です');
     if (String(req.secret || '') !== String(secret)) throw new Error('合言葉が違います');
 
-    if (req.action === 'list')   return fxJson({ ok: true, trades: fxListTrades() });
-    if (req.action === 'add')    return fxJson({ ok: true, trades: fxAddTrade(req.trade) });
-    if (req.action === 'clear')  return fxJson({ ok: true, trades: fxClearTrades() });
-    if (req.action === 'signal') return fxJson({ ok: true, signal: fxJudge() });
+    if (req.action === 'list')    return fxJson({ ok: true, trades: fxListTrades() });
+    if (req.action === 'add')     return fxJson({ ok: true, trades: fxAddTrade(req.trade) });
+    if (req.action === 'clear')   return fxJson({ ok: true, trades: fxClearTrades() });
+    if (req.action === 'signal')  return fxJson({ ok: true, signal: fxJudge() });
+    if (req.action === 'summary') return fxJson({ ok: true, summary: fxSummary() });
 
     return fxJson({ ok: false, error: '不明な action: ' + req.action });
   } catch (err) {
