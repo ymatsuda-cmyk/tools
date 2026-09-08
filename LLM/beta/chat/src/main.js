@@ -90,6 +90,25 @@ function cycleThink() {
 }
 
 let renamingId = null
+const openConvs = new Set()
+
+/** アコーディオン内に1行で出す要約 */
+function convSummary(m) {
+  const names = (m.attachments ?? []).map((a) => a.name).join(', ')
+  const text = (m.content || '').trim() || names
+  return text.replace(/\s+/g, ' ').slice(0, 60) || '（本文なし）'
+}
+
+function toggleConv(id) {
+  if (openConvs.has(id)) openConvs.delete(id)
+  else openConvs.add(id)
+  renderSidebar()
+}
+
+async function jumpToMessage(cid, messageId) {
+  if (cid !== convId) await selectConversation(cid)
+  list.scrollToMessage(messageId)
+}
 
 async function renderSidebar() {
   const root = $('conv-list')
@@ -97,6 +116,8 @@ async function renderSidebar() {
   clear(root)
 
   for (const c of convs) {
+    const item = h('div', { class: 'conv-item' })
+
     if (c.id === renamingId) {
       const input = h('input', { value: c.title })
       const commit = async () => {
@@ -105,72 +126,122 @@ async function renderSidebar() {
         if (title && title !== c.title) await touchConversation(c.id, title)
         await renderSidebar()
       }
-      root.append(
+      const cancel = () => {
+        renamingId = null
+        renderSidebar()
+      }
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') cancel()
+      })
+      item.append(
         h(
           'div',
           { class: 'conv renaming' },
           input,
-          h('button', {
-            class: 'icon',
-            'aria-label': '確定',
-            onClick: commit,
-          }, h('i', { class: 'ti ti-check', 'aria-hidden': 'true' })),
-          h('button', {
-            class: 'icon',
-            'aria-label': 'キャンセル',
-            onClick: () => {
-              renamingId = null
-              renderSidebar()
-            },
-          }, h('i', { class: 'ti ti-x', 'aria-hidden': 'true' })),
+          h(
+            'button',
+            { class: 'icon', 'aria-label': '確定', onClick: commit },
+            h('i', { class: 'ti ti-check', 'aria-hidden': 'true' }),
+          ),
+          h(
+            'button',
+            { class: 'icon', 'aria-label': 'キャンセル', onClick: cancel },
+            h('i', { class: 'ti ti-x', 'aria-hidden': 'true' }),
+          ),
         ),
       )
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') commit()
-        if (e.key === 'Escape') {
-          renamingId = null
-          renderSidebar()
-        }
-      })
+      root.append(item)
       input.focus()
       input.select()
       continue
     }
 
-    root.append(
+    const open = openConvs.has(c.id)
+    const startRename = (e) => {
+      e.stopPropagation()
+      renamingId = c.id
+      renderSidebar()
+    }
+
+    item.append(
       h(
         'div',
         {
           class: c.id === convId ? 'conv active' : 'conv',
           onClick: () => selectConversation(c.id),
         },
-        h('span', { text: c.title }),
+        h(
+          'button',
+          {
+            class: 'icon caret',
+            'aria-label': open ? '閉じる' : '開く',
+            'aria-expanded': String(open),
+            onClick: (e) => {
+              e.stopPropagation()
+              toggleConv(c.id)
+            },
+          },
+          h('i', {
+            class: open ? 'ti ti-chevron-down' : 'ti ti-chevron-right',
+            'aria-hidden': 'true',
+          }),
+        ),
+        h('span', {
+          text: c.title,
+          title: 'ダブルクリックで名前を変更',
+          onDblClick: startRename,
+        }),
         h(
           'div',
           { class: 'conv-tools' },
-          h('button', {
-            class: 'icon',
-            'aria-label': '名前を変更',
-            onClick: (e) => {
-              e.stopPropagation()
-              renamingId = c.id
-              renderSidebar()
+          h(
+            'button',
+            { class: 'icon', 'aria-label': '名前を変更', onClick: startRename },
+            h('i', { class: 'ti ti-pencil', 'aria-hidden': 'true' }),
+          ),
+          h(
+            'button',
+            {
+              class: 'icon',
+              'aria-label': '削除',
+              onClick: async (e) => {
+                e.stopPropagation()
+                if (!confirm(`「${c.title}」を削除しますか？`)) return
+                await deleteConversation(c.id)
+                openConvs.delete(c.id)
+                if (c.id === convId) convId = null
+                await refresh()
+              },
             },
-          }, h('i', { class: 'ti ti-pencil', 'aria-hidden': 'true' })),
-          h('button', {
-            class: 'icon',
-            'aria-label': '削除',
-            onClick: async (e) => {
-              e.stopPropagation()
-              if (!confirm(`「${c.title}」を削除しますか？`)) return
-              await deleteConversation(c.id)
-              if (c.id === convId) convId = null
-              await refresh()
-            },
-          }, h('i', { class: 'ti ti-trash', 'aria-hidden': 'true' })),
+            h('i', { class: 'ti ti-trash', 'aria-hidden': 'true' }),
+          ),
         ),
       ),
     )
+
+    if (open) {
+      const msgs = await listMessages(c.id)
+      const body = h('div', { class: 'conv-body' })
+      if (!msgs.length) {
+        body.append(h('div', { class: 'conv-empty', text: 'まだ発言がありません' }))
+      }
+      for (const m of msgs) {
+        body.append(
+          h('button', {
+            class: m.role === 'user' ? 'conv-msg user' : 'conv-msg',
+            text: convSummary(m),
+            onClick: (e) => {
+              e.stopPropagation()
+              jumpToMessage(c.id, m.id)
+            },
+          }),
+        )
+      }
+      item.append(body)
+    }
+
+    root.append(item)
   }
 }
 
@@ -190,6 +261,7 @@ async function refresh() {
 
 async function selectConversation(id) {
   convId = id
+  openConvs.add(id)
   await refresh()
 }
 

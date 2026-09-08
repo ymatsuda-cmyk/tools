@@ -95,7 +95,7 @@ function messageAsText(m) {
 }
 
 function messageEl(m) {
-  const wrap = h('div', { class: m.role === 'user' ? 'msg user' : 'msg' })
+  const wrap = h('div', { class: m.role === 'user' ? 'msg user' : 'msg', 'data-msg-id': m.id })
 
   if (m.attachments?.length) {
     wrap.append(h('div', { class: 'atts' }, m.attachments.map((a) => attachmentCard(a))))
@@ -159,6 +159,15 @@ export function createMessageList(root) {
       root.append(h('div', { class: 'msg' }, h('div', { class: 'warn', text })))
       stick = true
       scrollToEnd()
+    },
+    /** サイドバーから特定の発言へ飛ぶ */
+    scrollToMessage(id) {
+      const el = root.querySelector(`[data-msg-id="${id}"]`)
+      if (!el) return
+      stick = false
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      el.classList.add('flash')
+      setTimeout(() => el.classList.remove('flash'), 1200)
     },
     scrollToEnd,
   }
