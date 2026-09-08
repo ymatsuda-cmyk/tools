@@ -54,14 +54,6 @@ canvas{width:100%;display:block}
 .legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:11px;color:var(--ink2);margin-top:8px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
 
-.hist{list-style:none}
-.hist li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--border);font-size:13px}
-.hist li:last-child{border-bottom:none}
-.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;flex:none}
-.badge.b{background:var(--green-l);color:var(--green)}
-.badge.s{background:var(--red-l);color:var(--red)}
-.hist .d{color:var(--ink2);font-family:'DM Mono',monospace;font-size:12px}
-.hist .r{margin-left:auto;font-family:'DM Mono',monospace;text-align:right}
 .empty{text-align:center;color:var(--ink3);font-size:13px;padding:18px 0}
 
 .pos-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
@@ -129,7 +121,7 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
   </div>
 
   <div class="card">
-    <h2 id="posTitle">建値ごとの損益</h2>
+    <h2>建値ごとの損益（100万円あたり）</h2>
     <div id="posList"></div>
     <button class="btn ghost" id="addPos" style="margin-top:10px">＋ 建値を追加</button>
   </div>
@@ -143,11 +135,6 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
       <span><i style="background:#15803d"></i>買った</span>
       <span><i style="background:#b91c1c"></i>売った</span>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>履歴</h2>
-    <ul class="hist" id="hist"></ul>
   </div>
 
   <button class="btn ghost" id="tryBtn">「5年前から続けていたら？」を見る</button>
@@ -384,24 +371,10 @@ function render(){
   $('buyNote').textContent  = '1（' + yen(S.lot) + '）';
   $('sellNote').textContent = pos.lots.length ? '1（保有 ' + pos.lots.length + '）' : '保有なし';
 
-  renderHistory();
   renderPositions();
   drawChart();
 }
 
-function renderHistory(){
-  if(!S.trades.length){
-    $('hist').innerHTML = '<li class="empty">まだ売買がありません</li>';
-    return;
-  }
-  $('hist').innerHTML = S.trades.slice().reverse().slice(0,30).map(h => `
-    <li>
-      <span class="badge ${h.side==='buy'?'b':'s'}">${h.side==='buy'?'買い':'売り'}</span>
-      <span class="d">${h.date}${h.pending ? '<span class="pend">未同期</span>' : ''}</span>
-      <span class="r">${h.rate.toFixed(2)}円<br>${
-        h.pl != null ? `<b class="${cls(h.pl)}">${yen(h.pl)}</b>` : yen(h.jpy)}</span>
-    </li>`).join('');
-}
 
 /* ===== 売買（数量1 = 設定金額ぶん） ===== */
 function buy(){
@@ -484,59 +457,84 @@ function maybeNotify(){
   });
 }
 
-/* ===== 建値リスト（買値／売値と金額だけで損益を見る） ===== */
+/* ===== 建値リスト（買値／売値と値段だけで損益を見る） ===== */
+const POS_AMOUNT = 1000000;
+
+let posRows = [];
+let posKeys = null;
+
 function positionProfit(p){
-  if(!now || !p.price) return null
-  const ratio = p.side === 'sell' ? 1 - now.rate / p.price : now.rate / p.price - 1
-  return { ratio, profit: S.lot * ratio }
+  if(!now || !p.price) return null;
+  const ratio = p.side === 'sell' ? 1 - now.rate / p.price : now.rate / p.price - 1;
+  return { ratio, profit: POS_AMOUNT * ratio };
 }
 
-function renderPositions(){
-  $('posTitle').textContent = `建値ごとの損益（${yen(S.lot)}あたり）`
-  const root = $('posList')
-  root.innerHTML = ''
+function paintPl(row){
+  const r = positionProfit(row.p);
+  if(!r){
+    row.pl.className = 'pos-pl';
+    row.pl.innerHTML = '—<small>値段を入力</small>';
+    return;
+  }
+  row.pl.className = 'pos-pl ' + cls(r.profit);
+  row.pl.innerHTML = `${yen(r.profit)}<small>${
+    (r.ratio >= 0 ? '+' : '−')}${Math.abs(r.ratio * 100).toFixed(2)}%</small>`;
+}
 
+/** 行の中身だけ更新する。入力中に作り直すとフォーカスが外れるため */
+function renderPositions(){
+  const keys = S.positions.map(p => p.id).join(',');
+  if(keys === posKeys){
+    posRows.forEach(paintPl);
+    return;
+  }
+  posKeys = keys;
+  posRows = [];
+
+  const root = $('posList');
+  root.innerHTML = '';
   if(!S.positions.length){
-    root.innerHTML = '<div class="empty">買値・売値を登録すると、いまの損益が見えます</div>'
-    return
+    root.innerHTML = '<div class="empty">買値・売値を登録すると、いまの損益が見えます</div>';
+    return;
   }
 
   for(const p of S.positions){
-    const row = document.createElement('div')
-    row.className = 'pos-row'
+    const rowEl = document.createElement('div');
+    rowEl.className = 'pos-row';
 
-    const side = document.createElement('select')
-    side.innerHTML = '<option value="buy">買</option><option value="sell">売</option>'
-    side.value = p.side
-    side.addEventListener('change', () => { p.side = side.value; save(); renderPositions() })
+    const side = document.createElement('select');
+    side.innerHTML = '<option value="buy">買</option><option value="sell">売</option>';
+    side.value = p.side;
 
-    const price = document.createElement('input')
-    price.type = 'number'; price.step = '0.01'; price.min = '0'
-    price.value = p.price || ''
-    price.placeholder = '150.55'
-    price.addEventListener('input', () => { p.price = Number(price.value) || 0; save(); renderPositions() })
+    const price = document.createElement('input');
+    price.type = 'number';
+    price.step = '0.01';
+    price.min = '0';
+    price.value = p.price || '';
+    price.placeholder = '150.55';
 
-    const pl = document.createElement('div')
-    pl.className = 'pos-pl'
-    const r = positionProfit(p)
-    if(r){
-      pl.className = 'pos-pl ' + cls(r.profit)
-      pl.innerHTML = `${yen(r.profit)}<small>${(r.ratio >= 0 ? '+' : '−')}${Math.abs(r.ratio * 100).toFixed(2)}%</small>`
-    }else{
-      pl.innerHTML = '—<small>値段を入力</small>'
-    }
+    const pl = document.createElement('div');
+    pl.className = 'pos-pl';
 
-    const del = document.createElement('button')
-    del.className = 'pos-del'; del.type = 'button'
-    del.setAttribute('aria-label', '削除')
-    del.textContent = '×'
+    const row = { p, pl };
+    side.addEventListener('change', () => { p.side = side.value; save(); paintPl(row); });
+    price.addEventListener('input', () => { p.price = Number(price.value) || 0; save(); paintPl(row); });
+
+    const del = document.createElement('button');
+    del.className = 'pos-del';
+    del.type = 'button';
+    del.setAttribute('aria-label', '削除');
+    del.textContent = '×';
     del.addEventListener('click', () => {
-      S.positions = S.positions.filter(x => x.id !== p.id)
-      save(); renderPositions()
-    })
+      S.positions = S.positions.filter(x => x.id !== p.id);
+      save();
+      renderPositions();
+    });
 
-    row.append(side, price, pl, del)
-    root.append(row)
+    paintPl(row);
+    posRows.push(row);
+    rowEl.append(side, price, pl, del);
+    root.append(rowEl);
   }
 }
 
@@ -545,10 +543,11 @@ function addPosition(){
     id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6),
     side: 'buy',
     price: now ? Number(now.rate.toFixed(2)) : 0,
-  })
-  save(); renderPositions()
-  const inputs = $('posList').querySelectorAll('input')
-  inputs[inputs.length - 1]?.focus()
+  });
+  save();
+  renderPositions();
+  const inputs = $('posList').querySelectorAll('input');
+  inputs[inputs.length - 1]?.focus();
 }
 
 /* ===== チャート ===== */
