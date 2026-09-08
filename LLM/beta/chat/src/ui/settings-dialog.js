@@ -1,7 +1,7 @@
 import { h, clear } from '../lib/dom.js'
 import { newProfile, normalizeBaseUrl, validateApiKey } from '../lib/settings.js'
 import { jsonToProfiles, profilesToJson, sampleProfilesJson } from '../lib/profiles-json.js'
-import { fetchModels } from '../lib/client.js'
+import { fetchModels, isGemini } from '../lib/client.js'
 import { openModal } from './modal.js'
 
 const field = (label, ...ctrl) => h('div', { class: 'field' }, h('label', { text: label }), ...ctrl)
@@ -136,6 +136,19 @@ export function openSettings(settings, onSave) {
       inputs.think.value = p.think === null ? 'default' : p.think ? 'on' : 'off'
       const keyErr = h('div', { class: 'err' })
 
+      // Gemini は num_ctx / think を受け付けないため、入力自体を無効化して迷わせない
+      const providerHint = h('div', { class: 'hint', style: { marginTop: '4px' } })
+      function syncProvider() {
+        const gemini = isGemini({ baseUrl: inputs.baseUrl.value })
+        inputs.numCtx.disabled = gemini
+        inputs.think.disabled = gemini
+        providerHint.textContent = gemini
+          ? 'Gemini を検出しました。APIキーは Google AI Studio のキーです。num_ctx と思考モードは送信されません。'
+          : ''
+      }
+      inputs.baseUrl.addEventListener('input', syncProvider)
+      syncProvider()
+
       const testBtn = h('button', {
         text: '接続テスト',
         onClick: async () => {
@@ -161,7 +174,7 @@ export function openSettings(settings, onSave) {
 
       body.append(
         h('div', { class: 'row' }, field('表示名', inputs.label), field('ID', inputs.id)),
-        field('ベースURL', inputs.baseUrl),
+        field('ベースURL', inputs.baseUrl, providerHint),
         field('APIキー', inputs.apiKey, keyErr),
         h('div', { class: 'row' }, field('モデル', inputs.model), field('num_ctx', inputs.numCtx)),
         field(

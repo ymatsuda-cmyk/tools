@@ -1,9 +1,30 @@
+/**
+ * Gemini は OpenAI 互換エンドポイントを持つが、Ollama 向けの拡張
+ * （num_ctx / think）や独自ヘッダを付けると 400 で弾かれる。
+ */
+export function isGemini(s) {
+  return /generativelanguage\.googleapis\.com/i.test(s?.baseUrl ?? '')
+}
+
 function headers(s) {
-  return {
+  const h = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${s.apiKey}`,
-    // ngrok の警告ページを回避する（予約ドメインでは通常不要だが保険）
-    'ngrok-skip-browser-warning': 'true',
+  }
+  // ngrok の警告ページを回避する（予約ドメインでは通常不要だが保険）
+  if (!isGemini(s)) h['ngrok-skip-browser-warning'] = 'true'
+  return h
+}
+
+function chatBody(s, messages) {
+  const base = { model: s.model, messages, stream: true, temperature: s.temperature }
+  if (isGemini(s)) return { ...base, stream_options: { include_usage: true } }
+  return {
+    ...base,
+    num_ctx: s.numCtx,
+    // qwen3 系はデフォルトで思考モードが有効。オフにすると応答開始が大きく速くなる。
+    // プロキシ側は think があればそのまま Ollama に転送する実装。
+    ...(typeof s.think === 'boolean' ? { think: s.think } : {}),
   }
 }
 
@@ -15,7 +36,8 @@ export async function fetchModels(s, signal) {
     throw new Error(`HTTP ${res.status} ${body.slice(0, 200)}`)
   }
   const json = await res.json()
-  return (json?.data ?? []).map((m) => m.id)
+  // Gemini は "models/gemini-2.5-flash" の形で返すが、指定は接頭辞なしでよい
+  return (json?.data ?? []).map((m) => String(m.id).replace(/^models\//, ''))
 }
 
 /**
@@ -27,16 +49,7 @@ export async function* streamChat(s, messages, signal) {
     method: 'POST',
     headers: headers(s),
     signal,
-    body: JSON.stringify({
-      model: s.model,
-      messages,
-      stream: true,
-      num_ctx: s.numCtx,
-      temperature: s.temperature,
-      // qwen3 系はデフォルトで思考モードが有効。オフにすると応答開始が大きく速くなる。
-      // プロキシ側は think があればそのまま Ollama に転送する実装。
-      ...(typeof s.think === 'boolean' ? { think: s.think } : {}),
-    }),
+    body: JSON.stringify(chatBody(s, messages)),
   })
 
   if (!res.ok || !res.body) {

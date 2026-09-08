@@ -74,6 +74,13 @@ export function sampleProfilesJson() {
         controlToken: 'CONTROL_TOKEN',
         think: null, // null=サーバー既定 / true=オン / false=オフ
       },
+      {
+        id: 'g',
+        label: 'Gemini 2.5 Flash',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        apiKey: 'GOOGLE_AI_STUDIO_API_KEY',
+        model: 'gemini-2.5-flash',
+      },
     ],
     null,
     2,
