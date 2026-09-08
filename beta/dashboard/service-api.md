@@ -163,13 +163,11 @@ app.listen(3000);
   {
     "id": "gpu-server",
     "name": "GPU サーバー",
-    "group": "本番",
     "endpoint": "https://your-service.example.com/api/resource"
   },
   {
     "id": "dev-server",
     "name": "検証サーバー",
-    "group": "検証",
     "endpoint": "https://your-service.example.com/api/dev"
   }
 ]
@@ -177,9 +175,8 @@ app.listen(3000);
 
 | フィールド | 内容 |
 |---|---|
-| `id` | 一意の識別子。トークンのプロパティ名とURLパラメータに使う |
+| `id` | 一意の識別子。トークンのプロパティ名に使う |
 | `name` | 画面に出す名前 |
-| `group` | 任意。同じ値を持つもの同士でまとめて絞り込める |
 | `endpoint` | GETとPOSTを受けるURL |
 
 ---
@@ -195,7 +192,7 @@ GitHubの課金APIから当月のプレミアムリクエスト使用量を取�
 `monthlyLimit` との差分を残量として表示します。
 
 ```json
-{ "id": "copilot", "name": "GitHub Copilot", "group": "AI",
+{ "id": "copilot", "name": "GitHub Copilot",
   "type": "copilot", "monthlyLimit": 300 }
 ```
 
@@ -221,13 +218,13 @@ Gemini や ChatGPT、Copilot のように外部から利用回数を取得でき
 
 ```json
 [
-  { "id": "copilot",      "name": "GitHub Copilot",  "group": "AI",
+  { "id": "copilot",      "name": "GitHub Copilot",
     "type": "manual", "limit": 300, "unit": "回", "cycle": "monthly" },
-  { "id": "gemini-pro",   "name": "Gemini Pro",     "group": "AI",
+  { "id": "gemini-pro",   "name": "Gemini Pro",
     "type": "manual", "limit": 100, "unit": "回", "cycle": "daily" },
-  { "id": "gemini-free",  "name": "Gemini (無料)",  "group": "AI",
+  { "id": "gemini-free",  "name": "Gemini (無料)",
     "type": "manual", "limit": 20,  "unit": "回", "cycle": "daily" },
-  { "id": "chatgpt-free", "name": "ChatGPT (無料)", "group": "AI",
+  { "id": "chatgpt-free", "name": "ChatGPT (無料)",
     "type": "manual", "limit": 10,  "unit": "回", "cycle": "rolling", "windowHours": 5 }
 ]
 ```
@@ -253,20 +250,18 @@ Gemini や ChatGPT、Copilot のように外部から利用回数を取得でき
 
 ## URLパラメータで表示を切り替える
 
-特定のサーバーだけを表示した状態でページを開けます。
+特定の種別だけを表示した状態でページを開けます。
 ブックマークやショートカットから直接その画面を出したいときに使います。
 
 | パラメータ | 例 | 動作 |
 |---|---|---|
-| `server` | `?server=gpu-server` | そのIDのサーバーだけ表示 |
-| `group` | `?group=本番` | そのグループのサーバーだけ表示 |
 | `type` | `?type=manual` | その種別のものだけ表示 |
 | `view` | `?view=monitor` | 稼働状況タブを開いた状態で起動 |
 
 組み合わせられます。
 
 ```
-https://ユーザー名.github.io/リポジトリ名/?view=monitor&server=gpu-server
+https://ユーザー名.github.io/リポジトリ名/?view=monitor&type=manual
 ```
 
 画面上のチップで切り替えると、URLも自動で書き換わります。
