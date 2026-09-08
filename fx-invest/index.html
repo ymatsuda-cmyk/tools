@@ -107,8 +107,8 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
   </div>
 
   <div class="actions">
-    <button class="big buy" id="buyBtn" disabled>買う<small id="buyNote">1</small></button>
-    <button class="big sell" id="sellBtn" disabled>売る<small id="sellNote">1</small></button>
+    <button class="big buy" id="buyBtn" disabled>買う<small id="buyNote">いまの値段で追加</small></button>
+    <button class="big sell" id="sellBtn" disabled>売る<small id="sellNote">いまの値段で追加</small></button>
   </div>
 
   <div class="card">
@@ -208,34 +208,21 @@ let S = load();
 let series = [], avgLine = [], now = null;
 
 function load(){
-  const d = { level:'normal', lot:1000000, trades:[], positions:[], gasUrl:'', secret:'', lastSignal:'hold' };
+  const d = { level:'normal', lot:1000000, positions:[], removed:[], gasUrl:'', secret:'', lastSignal:'hold' };
   let s;
   try{ s = Object.assign(d, JSON.parse(localStorage.getItem(KEY)) || {}); }
   catch(e){ return d; }
 
-  // 旧形式（lots / history / realized）を売買履歴だけの形に移行する
-  if(!s.trades.length && Array.isArray(s.history) && s.history.length){
-    s.trades = s.history.slice().reverse().map((h,i) => ({
-      id: 'old-' + i + '-' + h.date, at: h.date + 'T00:00:00.000Z', date: h.date,
-      side: h.side, rate: h.rate, jpy: h.jpy, usd: h.jpy / h.rate,
-      pl: h.pl == null ? null : h.pl, pending: true
+  // 旧形式（売買履歴）を建値リストに移行する
+  if(!s.positions.length && Array.isArray(s.trades) && s.trades.length){
+    s.positions = s.trades.map((t) => ({
+      id: t.id, at: t.at, date: t.date, side: t.side, price: t.rate, pending: true,
     }));
   }
-  delete s.history; delete s.lots; delete s.realized;
+  delete s.trades; delete s.history; delete s.lots; delete s.realized;
   return s;
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
-
-/** 売買履歴を先頭から再生して、いまの保有と確定損益を求める（古い順に売る） */
-function replay(trades){
-  const lots = [];
-  let realized = 0;
-  trades.forEach(t => {
-    if(t.side === 'buy') lots.push({ date:t.date, rate:t.rate, jpy:t.jpy, usd:t.usd });
-    else if(lots.length) realized += t.jpy - lots.shift().jpy;
-  });
-  return { lots, realized };
-}
 
 /* ===== レート取得 ===== */
 async function fetchSeries(days){
@@ -356,49 +343,29 @@ function render(){
       '（過去' + SMA_DAYS + '営業日の平均）';
   }
 
-  const pos = replay(S.trades);
-  const usd  = pos.lots.reduce((a,l) => a + l.usd, 0);
-  const cost = pos.lots.reduce((a,l) => a + l.jpy, 0);
-  const total = pos.realized + (now ? usd * now.rate - cost : 0);
+  const totals = S.positions.reduce((a, p) => {
+    const r = positionProfit(p);
+    if(r) a.profit += r.profit;
+    if(p.price) { a.sum += p.price; a.n++; }
+    return a;
+  }, { profit:0, sum:0, n:0 });
 
-  $('qty').textContent = pos.lots.length;
-  $('avg').textContent = usd ? (cost/usd).toFixed(2) : '—';
-  $('pl').textContent  = yen(total);
-  $('pl').className = 'n ' + cls(total);
+  $('qty').textContent = S.positions.length;
+  $('avg').textContent = totals.n ? (totals.sum / totals.n).toFixed(2) : '—';
+  $('pl').textContent  = yen(totals.profit);
+  $('pl').className = 'n ' + cls(totals.profit);
 
   $('buyBtn').disabled  = !now;
-  $('sellBtn').disabled = !now || !pos.lots.length;
-  $('buyNote').textContent  = '1（' + yen(S.lot) + '）';
-  $('sellNote').textContent = pos.lots.length ? '1（保有 ' + pos.lots.length + '）' : '保有なし';
+  $('sellBtn').disabled = !now;
 
   renderPositions();
   drawChart();
 }
 
 
-/* ===== 売買（数量1 = 設定金額ぶん） ===== */
-function buy(){
-  if(!now) return;
-  addTrade({ side:'buy', rate:now.rate, jpy:S.lot, usd:S.lot/now.rate, pl:null });
-}
-function sell(){
-  if(!now) return;
-  const lots = replay(S.trades).lots;
-  if(!lots.length) return;
-  const lot = lots[0];                             // 古い1つから順に売る
-  const proceeds = lot.usd * now.rate;
-  addTrade({ side:'sell', rate:now.rate, jpy:proceeds, usd:lot.usd, pl:proceeds - lot.jpy });
-}
-function addTrade(t){
-  const rec = Object.assign({
-    id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8),
-    at: new Date().toISOString(),
-    date: now.date
-  }, t);
-  S.trades.push(rec);
-  save(); render();
-  pushTrade(rec);
-}
+/* ===== 買う／売る（建値リストに1件追加する） ===== */
+function buy(){ addPosition('buy'); }
+function sell(){ addPosition('sell'); }
 
 /* ===== 端末間の同期（GAS + スプレッドシート） ===== */
 async function api(payload){
@@ -415,14 +382,21 @@ async function api(payload){
 }
 function setSync(msg){ $('syncStatus').textContent = msg; }
 
-async function pushTrade(rec){
-  if(!S.gasUrl) return;
+/** スプレッドシートの行を建値リストの形に直す */
+function toPosition(t){
+  return { id:t.id, at:t.at, date:t.date, side:t.side, price:t.rate };
+}
+
+async function pushPosition(p){
+  if(!S.gasUrl || !p.price) return;
   try{
-    const j = await api({ action:'add', trade: rec });
-    S.trades = j.trades; save(); render();
+    await api({ action:'add', trade:{ id:p.id, at:p.at, date:p.date, side:p.side, rate:p.price } });
+    delete p.pending;
+    save(); renderPositions();
     setSync('同期済み ' + hhmm(new Date()));
   }catch(e){
-    rec.pending = true; save(); render();
+    p.pending = true;
+    save(); renderPositions();
     setSync('未同期の記録があります（' + e.message + '）');
   }
 }
@@ -431,15 +405,20 @@ async function syncTrades(){
   if(!S.gasUrl) return;
   setSync('同期中…');
   try{
-    for(const t of S.trades.filter(x => x.pending)){
-      const copy = Object.assign({}, t);
-      delete copy.pending;
-      await api({ action:'add', trade: copy });
+    for(const id of S.removed.slice()){
+      await api({ action:'remove', id });
+      S.removed = S.removed.filter(x => x !== id);
+    }
+    for(const p of S.positions.filter(x => x.pending && x.price)){
+      await api({ action:'add', trade:{ id:p.id, at:p.at, date:p.date, side:p.side, rate:p.price } });
+      delete p.pending;
     }
     const j = await api({ action:'list' });
-    S.trades = j.trades; save(); render();
-    setSync('同期済み ' + hhmm(new Date()) + '（' + S.trades.length + '件）');
+    S.positions = j.trades.map(toPosition);
+    save(); render();
+    setSync('同期済み ' + hhmm(new Date()) + '（' + S.positions.length + '件）');
   }catch(e){
+    save();
     setSync('同期できません（' + e.message + '）');
   }
 }
@@ -517,8 +496,13 @@ function renderPositions(){
     pl.className = 'pos-pl';
 
     const row = { p, pl };
-    side.addEventListener('change', () => { p.side = side.value; save(); paintPl(row); });
-    price.addEventListener('input', () => { p.price = Number(price.value) || 0; save(); paintPl(row); });
+    side.addEventListener('change', () => {
+      p.side = side.value; save(); paintPl(row); pushPosition(p);
+    });
+    price.addEventListener('input', () => {
+      p.price = Number(price.value) || 0; save(); paintPl(row);
+    });
+    price.addEventListener('change', () => pushPosition(p));
 
     const del = document.createElement('button');
     del.className = 'pos-del';
@@ -527,8 +511,10 @@ function renderPositions(){
     del.textContent = '×';
     del.addEventListener('click', () => {
       S.positions = S.positions.filter(x => x.id !== p.id);
+      S.removed.push(p.id);
       save();
       renderPositions();
+      removePosition(p.id);
     });
 
     paintPl(row);
@@ -538,16 +524,31 @@ function renderPositions(){
   }
 }
 
-function addPosition(){
-  S.positions.push({
+function addPosition(side){
+  const p = {
     id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6),
-    side: 'buy',
+    at: new Date().toISOString(),
+    date: now ? now.date : new Date().toLocaleDateString('sv-SE'),
+    side: side === 'sell' ? 'sell' : 'buy',
     price: now ? Number(now.rate.toFixed(2)) : 0,
-  });
+  };
+  S.positions.push(p);
   save();
-  renderPositions();
-  const inputs = $('posList').querySelectorAll('input');
-  inputs[inputs.length - 1]?.focus();
+  render();
+  if(p.price) pushPosition(p);
+  else $('posList').querySelectorAll('input')[S.positions.length - 1]?.focus();
+}
+
+async function removePosition(id){
+  if(!S.gasUrl) return;
+  try{
+    await api({ action:'remove', id });
+    S.removed = S.removed.filter(x => x !== id);
+    save();
+    setSync('同期済み ' + hhmm(new Date()));
+  }catch(e){
+    setSync('削除を同期できません（' + e.message + '）');
+  }
 }
 
 /* ===== チャート ===== */
@@ -591,12 +592,13 @@ function drawChart(){
 
   const idx = new Map(view.map((v,i) => [v.date, i]));
   const lastDate = view[view.length-1].date;
-  S.trades.forEach(t => {
+  S.positions.forEach(t => {
+    if(!t.price) return;
     let i = idx.get(t.date);
-    if(i == null && t.date >= lastDate) i = view.length - 1;   // 当日の売買は右端に置く
+    if(i == null && (!t.date || t.date >= lastDate)) i = view.length - 1;   // 当日分は右端に置く
     if(i == null) return;
     c.beginPath(); c.fillStyle = t.side === 'buy' ? '#15803d' : '#b91c1c';
-    c.arc(X(i), Y(t.rate), 4, 0, Math.PI*2); c.fill();
+    c.arc(X(i), Y(t.price), 4, 0, Math.PI*2); c.fill();
   });
 
   c.fillStyle = '#a8a29e'; c.textAlign = 'left';
@@ -661,7 +663,7 @@ function init(){
   $('buyBtn').addEventListener('click', buy);
   $('sellBtn').addEventListener('click', sell);
   $('tryBtn').addEventListener('click', tryPast)
-  $('addPos').addEventListener('click', addPosition);
+  $('addPos').addEventListener('click', () => addPosition('buy'));
   $('lot').addEventListener('change', () => {
     S.lot = Math.max(10000, Number($('lot').value) || 1000000);
     $('lot').value = S.lot; save(); render();
@@ -681,8 +683,9 @@ function init(){
       : '通知が許可されませんでした。ブラウザの設定から許可してください。';
   });
   $('resetBtn').addEventListener('click', async () => {
-    if(!confirm('保有と履歴をすべて消します。同期先のスプレッドシートも消えます。よろしいですか？')) return;
-    S.trades = [];
+    if(!confirm('建値リストをすべて消します。同期先のスプレッドシートも消えます。よろしいですか？')) return;
+    S.positions = [];
+    S.removed = [];
     save(); render();
     if(S.gasUrl){
       try{ await api({ action:'clear' }); setSync('同期先も消しました'); }

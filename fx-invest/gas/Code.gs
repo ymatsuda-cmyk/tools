@@ -130,29 +130,29 @@ function fxJudge() {
   };
 }
 
-/** 判定と保有状況をまとめて返す（ダッシュボードのカード用） */
+/** 判定と建値の損益をまとめて返す（ダッシュボードのカード用） */
 function fxSummary() {
   var j = fxJudge();
-  var trades = fxListTrades();
+  var rows = fxListTrades();
 
-  var lots = [];
-  var realized = 0;
-  trades.forEach(function (t) {
-    if (t.side === 'buy') lots.push(t);
-    else if (lots.length) realized += t.jpy - lots.shift().jpy;
+  var profit = 0;
+  var sum = 0;
+  rows.forEach(function (t) {
+    if (!t.rate) return;
+    // 売りは建値で売って現在値で買い戻すので、損益の符号が逆になる
+    var ratio = t.side === 'sell' ? 1 - j.rate / t.rate : j.rate / t.rate - 1;
+    profit += FX_POS_AMOUNT * ratio;
+    sum += t.rate;
   });
-
-  var usd = lots.reduce(function (a, l) { return a + l.usd; }, 0);
-  var cost = lots.reduce(function (a, l) { return a + l.jpy; }, 0);
 
   return {
     signal: j.state, gap: j.gap, rate: j.rate, avg: j.avg,
     live: j.live, date: j.date, prevClose: j.prevClose,
-    qty: lots.length,
-    avgCost: usd ? cost / usd : null,
-    realized: realized,
-    profit: realized + (usd * j.rate - cost),
-    trades: trades.length
+    qty: rows.length,
+    avgCost: rows.length ? sum / rows.length : null,
+    profit: profit,
+    amount: FX_POS_AMOUNT,
+    trades: rows.length
   };
 }
 
@@ -203,13 +203,15 @@ function fxSend(j) {
 }
 
 /* ============================================================
-   売買履歴の保存（スプレッドシート）
+   建値の保存（スプレッドシート）
 
-   1行 = 1回の売買。id はアプリ側で付け、同じ id は二重登録しないので
+   1行 = 「この値段で買った / 売った」という記録。
+   id はアプリ側で付け、同じ id は上書きするので
    複数端末から送っても重複しない。
    ============================================================ */
 
 var FX_HEADER = ['id', 'at', 'date', 'side', 'rate', 'jpy', 'usd', 'pl'];
+var FX_POS_AMOUNT = 1000000;   // 1件あたりの建て金額
 
 function fxSheet() {
   var id = fxCfg('FX_SHEET_ID');
@@ -259,23 +261,48 @@ function fxAddTrade(t) {
   if (!t || !t.id) throw new Error('id のない記録は保存できません');
   if (t.side !== 'buy' && t.side !== 'sell') throw new Error('side が不正です');
 
+  var row = [
+    String(t.id),
+    String(t.at || new Date().toISOString()),
+    String(t.date || ''),
+    String(t.side),
+    Number(t.rate) || 0,
+    Number(t.jpy) || 0,
+    Number(t.usd) || 0,
+    (t.pl === null || t.pl === undefined || t.pl === '') ? '' : Number(t.pl)
+  ];
+
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    var current = fxListTrades();
-    var exists = current.some(function (x) { return x.id === String(t.id); });
-    if (!exists) {
-      fxSheet().appendRow([
-        String(t.id),
-        String(t.at || new Date().toISOString()),
-        String(t.date || ''),
-        String(t.side),
-        Number(t.rate) || 0,
-        Number(t.jpy) || 0,
-        Number(t.usd) || 0,
-        (t.pl === null || t.pl === undefined || t.pl === '') ? '' : Number(t.pl)
-      ]);
-    }
+    var sh = fxSheet();
+    var at = fxRowIndex(sh, t.id);
+    if (at > 0) sh.getRange(at, 1, 1, FX_HEADER.length).setValues([row]);
+    else sh.appendRow(row);
+  } finally {
+    lock.releaseLock();
+  }
+  return fxListTrades();
+}
+
+/** id のある行番号を返す。見つからなければ 0 */
+function fxRowIndex(sh, id) {
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(id)) return i + 2;
+  }
+  return 0;
+}
+
+function fxRemoveTrade(id) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = fxSheet();
+    var at = fxRowIndex(sh, id);
+    if (at > 0) sh.deleteRow(at);
   } finally {
     lock.releaseLock();
   }
@@ -308,6 +335,7 @@ function fxHandle(req) {
 
     if (req.action === 'list')    return fxJson({ ok: true, trades: fxListTrades() });
     if (req.action === 'add')     return fxJson({ ok: true, trades: fxAddTrade(req.trade) });
+    if (req.action === 'remove')  return fxJson({ ok: true, trades: fxRemoveTrade(req.id) });
     if (req.action === 'clear')   return fxJson({ ok: true, trades: fxClearTrades() });
     if (req.action === 'signal')  return fxJson({ ok: true, signal: fxJudge() });
     if (req.action === 'summary') return fxJson({ ok: true, summary: fxSummary() });
