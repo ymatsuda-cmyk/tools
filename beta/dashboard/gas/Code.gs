@@ -617,6 +617,75 @@ function fetchFxStatus(monitor) {
 }
 
 /* ============================================================
+   ドル円ポジションの損益（endpoint 不要）
+
+   建値と金額だけを登録し、いまのレートとの差から損益を計算する。
+   売買履歴は持たず、この1件だけを見る用途。
+
+   monitors の登録例:
+     { "id":"usd-150", "name":"ドル円 150.55 買い", "type":"fxpos",
+       "side":"buy", "price":150.55, "amount":1000000 }
+
+   side  : "buy"（既定）/ "sell"
+   price : 建値（円）
+   amount: 建てた金額（円）。省略時 1000000
+   ============================================================ */
+
+/** 数分おきに更新される無料API。1分だけキャッシュして共有する */
+function dashUsdJpyRate() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('USDJPY');
+  if (hit) return Number(hit);
+
+  var urls = [
+    'https://api.fxratesapi.com/latest?base=USD&currencies=JPY',
+    'https://open.er-api.com/v6/latest/USD'
+  ];
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      var res = UrlFetchApp.fetch(urls[i], { muteHttpExceptions: true });
+      if (res.getResponseCode() !== 200) continue;
+      var rate = (JSON.parse(res.getContentText()).rates || {}).JPY;
+      if (typeof rate === 'number' && rate > 0) {
+        cache.put('USDJPY', String(rate), 60);
+        return rate;
+      }
+    } catch (e) { /* 次の取得先を試す */ }
+  }
+  return null;
+}
+
+function getFxPositionStatus(monitor) {
+  var price = Number(monitor.price);
+  if (!price) {
+    return { id: monitor.id, state: 'error', error: 'price（建値）を指定してください' };
+  }
+
+  var rate = dashUsdJpyRate();
+  if (rate === null) {
+    return { id: monitor.id, state: 'error', error: 'レートを取得できませんでした' };
+  }
+
+  var side = monitor.side === 'sell' ? 'sell' : 'buy';
+  var amount = Number(monitor.amount) || 1000000;
+  // 売りは建値で売って現在値で買い戻すので、損益の符号が逆になる
+  var ratio = side === 'buy' ? (rate / price - 1) : (1 - rate / price);
+
+  return {
+    id: monitor.id,
+    name: monitor.name || monitor.id,
+    state: 'tracking',
+    fxpos: {
+      side: side, price: price, amount: amount, rate: rate,
+      ratio: ratio, profit: amount * ratio,
+      cap: Number(monitor.cap) || 100000,
+      date: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm')
+    },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/* ============================================================
    稼働状況モニターの中継
 
    各サービスは以下の共通仕様のAPIを用意する（docs/service-api.md 参照）:
@@ -655,6 +724,7 @@ function fetchMonitorStatus(monitor) {
     if (monitor.type === 'quota')   return getQuotaStatus(monitor);
     if (monitor.type === 'manual')  return getManualStatus(monitor);
     if (monitor.type === 'copilot') return fetchCopilotStatus(monitor);
+    if (monitor.type === 'fxpos')   return getFxPositionStatus(monitor);
 
     if (!monitor.endpoint) throw new Error('endpoint が未設定です');
 
@@ -707,7 +777,7 @@ function sendMonitorControl(monitor, command) {
     throw new Error('command は start か stop のみです');
   }
   if (monitor.type === 'quota' || monitor.type === 'manual' ||
-      monitor.type === 'copilot' || monitor.type === 'fx') {
+      monitor.type === 'copilot' || monitor.type === 'fx' || monitor.type === 'fxpos') {
     throw new Error('この監視対象には起動/停止の概念がありません');
   }
   if (!monitor.endpoint) throw new Error('endpoint が未設定です');

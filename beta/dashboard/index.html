@@ -940,7 +940,7 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -948,6 +948,7 @@ const TYPE_LABELS = {
   manual : '手動カウンタ',
   quota  : 'APIクォータ',
   fx     : 'ドル円',
+  fxpos  : 'ドル円建値',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1042,8 +1043,9 @@ const FX_SIGNALS = {
 };
 
 /** 12時を損益0とし、プラスは右回り・マイナスは左回りに塗る */
-function fxProfitSVG(profit){
-  const ratio = Math.max(-1, Math.min(1, (Number(profit) || 0) / FX_PROFIT_CAP));
+function fxProfitSVG(profit, cap){
+  const limit = Number(cap) || FX_PROFIT_CAP;
+  const ratio = Math.max(-1, Math.min(1, (Number(profit) || 0) / limit));
   const deg = ratio * 180;
   const rad = deg * Math.PI / 180;
   const x = (50 + 40 * Math.sin(rad)).toFixed(2);
@@ -1094,6 +1096,35 @@ function fxBody(f){
     <div class="mon-note">${esc(f.date)}${f.live ? ' 時点' : ' 終値'}</div>`;
 }
 
+/** 建値と金額だけを登録したポジションの評価 */
+function fxPosBody(p){
+  const isSell = p.side === 'sell';
+  const sideLabel = isSell ? '売値' : '買値';
+  const sideColor = isSell ? '#D9694F' : '#5FA8A0';
+  const sideBg = isSell ? 'rgba(217,105,79,0.18)' : 'rgba(95,168,160,0.18)';
+  const diff = p.rate - p.price;
+  const plCls = p.profit > 0 ? 'fx-plus' : p.profit < 0 ? 'fx-minus' : '';
+
+  return `
+    <div class="fx-rate">
+      <b>${p.rate.toFixed(2)}</b><span>円</span>
+      <span class="fx-badge" style="color:${sideColor};background:${sideBg}">${sideLabel} ${p.price.toFixed(2)}</span>
+    </div>
+    <div class="mon-ring">
+      ${fxProfitSVG(p.profit, p.cap)}
+      <div class="sub mono">${Math.round(p.amount / 10000).toLocaleString()}万円あたりの損益</div>
+    </div>
+    <div class="fx-stats">
+      <div><span>${sideLabel}</span><b>${p.price.toFixed(2)}</b></div>
+      <div><span>値幅</span><b>${(diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(2)}</b></div>
+      <div><span>損益</span><b class="${plCls}">${
+        (p.profit >= 0 ? '+' : '−') + '¥' + Math.abs(Math.round(p.profit)).toLocaleString()
+      }</b></div>
+    </div>
+    <div class="mon-note">損益率 ${(p.ratio >= 0 ? '+' : '−') + Math.abs(p.ratio * 100).toFixed(2)}%</div>
+    <div class="mon-note">${esc(p.date)} 時点</div>`;
+}
+
 function renderMonitorCard(m, snap){
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -1108,6 +1139,8 @@ function renderMonitorCard(m, snap){
     body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${esc(snap.error)}</div>`;
   }else if(snap.fx){
     body = fxBody(snap.fx);
+  }else if(snap.fxpos){
+    body = fxPosBody(snap.fxpos);
   }else if(m.type === 'fx'){
     body = `<div class="mon-offline">データを取得できません</div>
       <div class="mon-err">ダッシュボード用GASを最新の Code.gs に更新し、再デプロイしてください</div>`;
