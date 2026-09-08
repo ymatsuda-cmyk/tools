@@ -255,6 +255,7 @@
   <div class="main-tabs" id="mainTabs">
     <button data-view="links" class="active">リンク</button>
     <button data-view="monitor">稼働状況</button>
+    <button data-view="info">情報</button>
   </div>
 
   <div class="status-line mono" id="statusLine">読み込み中…</div>
@@ -285,6 +286,20 @@
     <div class="monitor-grid" id="monitorGrid"></div>
     <div class="monitor-empty" id="monitorEmpty">
       監視対象が登録されていません。上の「＋ 追加」から登録してください。
+    </div>
+  </div>
+
+  <div class="view" data-view="info" hidden>
+    <div class="monitor-bar">
+      <span class="mono" id="infoClock">—</span>
+      <div class="head-actions">
+        <button class="icon-btn" id="btn-refresh-info">今すぐ更新</button>
+        <button class="add-btn" id="openInfoAdd">＋ 追加</button>
+      </div>
+    </div>
+    <div class="monitor-grid" id="infoGrid"></div>
+    <div class="monitor-empty" id="infoEmpty">
+      情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。
     </div>
   </div>
 </div>
@@ -670,10 +685,11 @@ async function init(){
   applyInitialView();
 }
 
-/** URLの ?view=monitor を反映して初期表示を決める */
+/** URLの ?view= を反映して初期表示を決める */
 function applyInitialView(){
-  if(initialParams.view !== 'monitor') return;
-  const btn = document.querySelector('#mainTabs button[data-view="monitor"]');
+  const view = initialParams.view;
+  if(view !== 'monitor' && view !== 'info') return;
+  const btn = document.querySelector(`#mainTabs button[data-view="${view}"]`);
   if(btn) btn.click();
 }
 
@@ -1083,7 +1099,7 @@ function syncUrl(){
 
   if(activeMonitor.startsWith('type:')) q.set('type', activeMonitor.slice(5));
 
-  if(currentView === 'monitor') q.set('view', 'monitor');
+  if(currentView !== 'links') q.set('view', currentView);
   else q.delete('view');
 
   const qs = q.toString();
@@ -1099,17 +1115,34 @@ function monitorType(m){
   return m.type || 'api';
 }
 
-/** 現在の選択で絞り込んだ監視対象 */
+/* 稼働状況ではなく情報タブに出す種別 */
+const INFO_TYPES = ['fx', 'fxpos'];
+
+function isInfoMonitor(m){
+  return INFO_TYPES.includes(monitorType(m));
+}
+
+/** 稼働状況タブの対象。チップの選択で絞り込む */
 function monitors(){
-  const list = allMonitors();
+  const list = allMonitors().filter(m => !isInfoMonitor(m));
   if(!activeMonitor.startsWith('type:')) return list;
   const t = activeMonitor.slice(5);
   return list.filter(m => monitorType(m) === t);
 }
 
-/** 登録済みの種別一覧 */
+/** 情報タブの対象 */
+function infoMonitors(){
+  return allMonitors().filter(isInfoMonitor);
+}
+
+/** 取得対象。両方のタブぶんをまとめて取りに行く */
+function fetchTargets(){
+  return monitors().concat(infoMonitors());
+}
+
+/** 登録済みの種別一覧（情報タブのものは除く） */
 function monitorTypes(){
-  return [...new Set(allMonitors().map(monitorType))];
+  return [...new Set(allMonitors().filter(m => !isInfoMonitor(m)).map(monitorType))];
 }
 
 function intervalMs(){
@@ -1350,15 +1383,22 @@ function renderMonitorChips(){
 
 function renderMonitors(){
   renderMonitorChips();
-  const list = monitors();
-  const grid = document.getElementById('monitorGrid');
-  const empty = document.getElementById('monitorEmpty');
+  paintMonitorGrid('monitorGrid', 'monitorEmpty', monitors(),
+    allMonitors().length === 0
+      ? '監視対象が登録されていません。上の「＋ 追加」から登録してください。'
+      : 'この条件に一致する監視対象がありません。');
+  paintMonitorGrid('infoGrid', 'infoEmpty', infoMonitors(),
+    '情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。');
+}
+
+function paintMonitorGrid(gridId, emptyId, list, emptyText){
+  const grid = document.getElementById(gridId);
+  const empty = document.getElementById(emptyId);
+  if(!grid || !empty) return;
 
   if(list.length === 0){
     grid.innerHTML = '';
-    empty.textContent = allMonitors().length === 0
-      ? '監視対象が登録されていません。設定 → 監視 から追加してください。'
-      : 'この条件に一致する監視対象がありません。';
+    empty.textContent = emptyText;
     empty.hidden = false;
     return;
   }
@@ -1380,7 +1420,7 @@ function renderMonitors(){
   grid.querySelectorAll('[data-reset]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.reset;
-      const m = monitors().find(x=>x.id===id);
+      const m = allMonitors().find(x=>x.id===id);
       if(confirm(`${(m && m.name) || id} のカウントを0に戻しますか？`)){
         recordManualUsage(id, 0, true);
       }
@@ -1390,7 +1430,7 @@ function renderMonitors(){
   grid.querySelectorAll('[data-fix]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.fix;
-      const m = monitors().find(x=>x.id===id);
+      const m = allMonitors().find(x=>x.id===id);
       const input = prompt(
         `${(m && m.name) || id} の残りを入力してください（${btn.dataset.unit}）\n空欄で保存した修正を解除します。`,
         btn.dataset.value
@@ -1403,7 +1443,7 @@ function renderMonitors(){
 
 /** 取得値と入力値の差をGASに保存し、以降の表示に反映する */
 async function adjustMonitor(id, text){
-  const m = monitors().find(x=>x.id===id);
+  const m = allMonitors().find(x=>x.id===id);
   if(!m) return;
   const reset = text === '';
   if(!reset && !isFinite(Number(text))){
@@ -1419,7 +1459,7 @@ async function adjustMonitor(id, text){
 
 /** 手動カウンタの増減。GAS側に保存するので端末をまたいで揃う */
 async function recordManualUsage(id, delta, reset){
-  const m = monitors().find(x=>x.id===id);
+  const m = allMonitors().find(x=>x.id===id);
   if(!m) return;
   try{
     const res = await callGas({ action:'monitorUsage', monitor:m, delta, reset });
@@ -1429,7 +1469,7 @@ async function recordManualUsage(id, delta, reset){
 }
 
 async function fetchMonitors(){
-  const list = monitors();
+  const list = fetchTargets();
   if(list.length === 0) return;
   try{
     const res = await callGas({ action:'monitorStatus', monitors:list });
@@ -1473,13 +1513,14 @@ async function controlMonitor(id, action){
 }
 
 function updateClock(){
-  const el = document.getElementById('monitorClock');
-  if(!el) return;
-  if(monitors().length === 0){ el.textContent = '—'; return; }
   const left = Math.max(0, Math.ceil((nextFetchAt - Date.now()) / 1000));
   const mm = String(Math.floor(left / 60)).padStart(2,'0');
   const ss = String(left % 60).padStart(2,'0');
-  el.textContent = `次の更新まで ${mm}:${ss}`;
+  const text = fetchTargets().length === 0 ? '—' : `次の更新まで ${mm}:${ss}`;
+  ['monitorClock','infoClock'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = text;
+  });
 }
 
 function startMonitorLoop(){
@@ -1503,17 +1544,17 @@ document.getElementById('mainTabs').addEventListener('click', e=>{
   document.querySelectorAll('.view').forEach(v=>{ v.hidden = v.dataset.view !== currentView; });
 
   syncUrl();
-  if(currentView === 'monitor'){
+  if(currentView === 'links'){
+    stopMonitorLoop();
+  }else{
     renderMonitors();
     startMonitorLoop();
-  }else{
-    stopMonitorLoop();
   }
 });
 
 window.addEventListener('popstate', ()=>{
   readUrlParams();
-  if(currentView === 'monitor'){ renderMonitors(); startMonitorLoop(); }
+  if(currentView !== 'links'){ renderMonitors(); startMonitorLoop(); }
 });
 
 document.getElementById('btn-refresh-monitor').onclick = ()=>{
@@ -1521,10 +1562,15 @@ document.getElementById('btn-refresh-monitor').onclick = ()=>{
   fetchMonitors();
 };
 
+document.getElementById('btn-refresh-info').onclick = ()=>{
+  toast('更新しています…');
+  fetchMonitors();
+};
+
 // タブを離れている間は止めて、戻ったら再開する
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){ stopMonitorLoop(); }
-  else if(currentView === 'monitor'){ startMonitorLoop(); }
+  else if(currentView !== 'links'){ startMonitorLoop(); }
 });
 
 /* ---------- 稼働状況タブからの追加 ---------- */
@@ -1538,7 +1584,8 @@ function syncMonitorForm(){
   });
 }
 
-function openMonitorModal(){
+function openMonitorModal(type){
+  F('mf-type').value = type || 'api';
   F('mf-id').value = '';
   F('mf-name').value = '';
   F('mf-endpoint').value = '';
@@ -1586,7 +1633,8 @@ function buildMonitor(){
 }
 
 F('mf-type').addEventListener('change', syncMonitorForm);
-document.getElementById('openMonitorAdd').onclick = openMonitorModal;
+document.getElementById('openMonitorAdd').onclick = ()=>openMonitorModal('api');
+document.getElementById('openInfoAdd').onclick = ()=>openMonitorModal('fxpos');
 document.getElementById('cancelMonitor').onclick = ()=>monitorOverlay.classList.remove('show');
 
 document.getElementById('saveMonitor').onclick = async ()=>{
@@ -1621,7 +1669,7 @@ document.getElementById('btn-applymonitors').onclick = async ()=>{  try{
     syncUrl();
     monitorSnapshots = {};
     renderMonitors();
-    if(currentView === 'monitor') startMonitorLoop();
+    if(currentView !== 'links') startMonitorLoop();
     toast('監視対象を保存しました');
   }catch(err){
     F('err-monitors').textContent = 'JSONの形式が正しくありません: ' + err.message;
@@ -1633,7 +1681,7 @@ F('s-interval').addEventListener('input', async e=>{
   config.monitorInterval = Number(e.target.value);
   F('v-interval').textContent = config.monitorInterval + '分';
   await persistLocal();
-  if(currentView === 'monitor') startMonitorLoop();
+  if(currentView !== 'links') startMonitorLoop();
 });
 
 initialParams = readUrlParams();
