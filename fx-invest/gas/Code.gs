@@ -139,9 +139,9 @@ function fxSummary() {
   var sum = 0;
   rows.forEach(function (t) {
     if (!t.rate) return;
-    // 売りは建値で売って現在値で買い戻すので、損益の符号が逆になる
-    var ratio = t.side === 'sell' ? 1 - j.rate / t.rate : j.rate / t.rate - 1;
-    profit += FX_POS_AMOUNT * ratio;
+    // 売りは建値で売って現在値で買い戻すので、値幅の符号が逆になる
+    var diff = t.side === 'sell' ? t.rate - j.rate : j.rate - t.rate;
+    profit += FX_POS_UNITS * diff;
     sum += t.rate;
   });
 
@@ -151,7 +151,7 @@ function fxSummary() {
     qty: rows.length,
     avgCost: rows.length ? sum / rows.length : null,
     profit: profit,
-    amount: FX_POS_AMOUNT,
+    units: rows.length * FX_POS_UNITS,
     trades: rows.length
   };
 }
@@ -211,7 +211,7 @@ function fxSend(j) {
    ============================================================ */
 
 var FX_HEADER = ['id', 'at', 'date', 'side', 'rate', 'jpy', 'usd', 'pl'];
-var FX_POS_AMOUNT = 1000000;   // 1件あたりの建て金額
+var FX_POS_UNITS = 10000;   // 1件あたりの数量（アプリの POS_UNITS と揃える）
 
 function fxSheet() {
   var id = fxCfg('FX_SHEET_ID');

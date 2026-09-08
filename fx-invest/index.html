@@ -48,6 +48,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:6px}
 .stats .l{font-size:11px;color:var(--ink2)}
 .stats .n{font-size:19px;font-weight:700;font-family:'DM Mono',monospace}
+.stat-note{text-align:center;font-size:11px;color:var(--ink2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .pos{color:var(--green)}.neg{color:var(--red)}
 
 canvas{width:100%;display:block}
@@ -118,10 +119,11 @@ code{font-family:'DM Mono',monospace;background:var(--bg);padding:1px 5px;border
       <div><div class="l">平均の買値</div><div class="n" id="avg">—</div></div>
       <div><div class="l">損益</div><div class="n" id="pl">¥0</div></div>
     </div>
+    <div class="stat-note" id="posNote"></div>
   </div>
 
   <div class="card">
-    <h2>建値ごとの損益（100万円あたり）</h2>
+    <h2>建値ごとの損益（1万通貨あたり）</h2>
     <div id="posList"></div>
     <button class="btn ghost" id="addPos" style="margin-top:10px">＋ 建値を追加</button>
   </div>
@@ -358,6 +360,12 @@ function render(){
   $('pl').textContent  = yen(totals.profit);
   $('pl').className = 'n ' + cls(totals.profit);
 
+  const units = S.positions.length * POS_UNITS;
+  $('posNote').textContent = units
+    ? `${S.positions.length}件 × ${POS_UNITS.toLocaleString()}通貨 ＝ ${units.toLocaleString()}通貨` +
+      `（1円の変動で ${yen(units)}）`
+    : '';
+
   $('buyBtn').disabled  = !now;
   $('sellBtn').disabled = !now;
 
@@ -440,15 +448,17 @@ function maybeNotify(){
 }
 
 /* ===== 建値リスト（買値／売値と値段だけで損益を見る） ===== */
-const POS_AMOUNT = 1000000;
+// 1件あたりの数量。変えるときは GAS の FX_POS_UNITS も揃える
+const POS_UNITS = 10000;
 
 let posRows = [];
 let posKeys = null;
 
 function positionProfit(p){
   if(!now || !p.price) return null;
-  const ratio = p.side === 'sell' ? 1 - now.rate / p.price : now.rate / p.price - 1;
-  return { ratio, profit: POS_AMOUNT * ratio };
+  // 売りは建値で売って現在値で買い戻すので、値幅の符号が逆になる
+  const diff = p.side === 'sell' ? p.price - now.rate : now.rate - p.price;
+  return { ratio: diff / p.price, profit: POS_UNITS * diff };
 }
 
 function paintPl(row){
