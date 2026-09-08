@@ -686,6 +686,53 @@ function getFxPositionStatus(monitor) {
 }
 
 /* ============================================================
+   残量の手動修正
+
+   取得元の値が実態とずれるときのために、差分を
+   ADJUST_{監視ID} に保存して以降の取得値に加算する。
+   リセット（週次・月次）で取得元が戻ったときは、
+   調整値を解除すること。
+   ============================================================ */
+
+function adjustKey(id) {
+  return 'ADJUST_' + String(id).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+}
+
+function applyAdjust(snap, monitor) {
+  if (!snap || !snap.remaining) return snap;
+
+  var delta = Number(PROP.getProperty(adjustKey(monitor.id)));
+  if (!delta) return snap;
+
+  var max = Number(snap.remaining.max) || 0;
+  var next = (Number(snap.remaining.value) || 0) + delta;
+  snap.remaining.value = Math.max(0, max ? Math.min(max, next) : next);
+
+  var label = '手動調整 ' + (delta > 0 ? '+' : '') + (Math.round(delta * 10) / 10);
+  snap.note = snap.note ? snap.note + ' ／ ' + label : label;
+  return snap;
+}
+
+/** 表示したい残量を受け取り、取得値との差を調整値として保存する */
+function setMonitorAdjust(monitor, value, reset) {
+  var key = adjustKey(monitor.id);
+
+  if (reset) {
+    PROP.deleteProperty(key);
+    return fetchMonitorStatus(monitor);
+  }
+
+  var raw = fetchMonitorRaw(monitor);
+  if (!raw || !raw.remaining) throw new Error('残量を持たない監視対象です');
+
+  var target = Number(value);
+  if (!isFinite(target)) throw new Error('数値を入力してください');
+
+  PROP.setProperty(key, String(target - (Number(raw.remaining.value) || 0)));
+  return applyAdjust(raw, monitor);
+}
+
+/* ============================================================
    稼働状況モニターの中継
 
    各サービスは以下の共通仕様のAPIを用意する（docs/service-api.md 参照）:
@@ -715,10 +762,17 @@ function monitorHeaders(monitor) {
 }
 
 /**
- * 1件分の稼働状況を取得する。
- * 失敗しても例外を投げず、error を含むオブジェクトを返す。
+ * 1件分の稼働状況を取得する。手動調整を反映した値を返す。
  */
 function fetchMonitorStatus(monitor) {
+  return applyAdjust(fetchMonitorRaw(monitor), monitor);
+}
+
+/**
+ * 取得元が返したままの値。
+ * 失敗しても例外を投げず、error を含むオブジェクトを返す。
+ */
+function fetchMonitorRaw(monitor) {
   try {
     // endpoint を持たない種別を先に処理する
     if (monitor.type === 'quota')   return getQuotaStatus(monitor);
@@ -887,6 +941,12 @@ function doPost(e) {
     if (req.action === 'monitorControl') {
       if (!req.monitor) throw new Error('monitor は必須です');
       const snapshot = sendMonitorControl(req.monitor, req.command);
+      return jsonOut({ ok: true, snapshot: snapshot });
+    }
+
+    if (req.action === 'monitorAdjust') {
+      if (!req.monitor) throw new Error('monitor は必須です');
+      const snapshot = setMonitorAdjust(req.monitor, req.value, req.reset === true);
       return jsonOut({ ok: true, snapshot: snapshot });
     }
 

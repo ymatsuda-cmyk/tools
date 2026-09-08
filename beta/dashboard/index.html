@@ -88,6 +88,11 @@
   .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
   .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
   .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
+  .mon-fix{
+    margin-top:6px;background:none;border:none;color:var(--text-muted);
+    font-size:10px;text-decoration:underline;cursor:pointer;padding:2px 4px;
+  }
+  .mon-fix:hover{color:var(--text);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -272,11 +277,14 @@
     <div class="chips" id="monitorChips"></div>
     <div class="monitor-bar">
       <span class="mono" id="monitorClock">—</span>
-      <button class="icon-btn" id="btn-refresh-monitor">今すぐ更新</button>
+      <div class="head-actions">
+        <button class="icon-btn" id="btn-refresh-monitor">今すぐ更新</button>
+        <button class="add-btn" id="openMonitorAdd">＋ 追加</button>
+      </div>
     </div>
     <div class="monitor-grid" id="monitorGrid"></div>
     <div class="monitor-empty" id="monitorEmpty">
-      監視対象が登録されていません。設定 → 監視 から追加してください。
+      監視対象が登録されていません。上の「＋ 追加」から登録してください。
     </div>
   </div>
 </div>
@@ -342,9 +350,107 @@
   </div>
 </div>
 
-<!-- 設定モーダル -->
-<div class="overlay" id="settingsOverlay">
+<!-- 監視対象の追加モーダル -->
+<div class="overlay" id="monitorOverlay">
   <div class="modal">
+    <h2>監視対象を追加</h2>
+    <p class="sub">稼働状況タブに表示するカードを1件登録します</p>
+
+    <div class="field">
+      <label>種類</label>
+      <select id="mf-type">
+        <option value="api">汎用API（共通仕様のendpoint）</option>
+        <option value="kaggle">Kaggle コントローラー</option>
+        <option value="fx">ドル円 かんたん投資</option>
+        <option value="fxpos">ドル円の建値</option>
+        <option value="copilot">GitHub Copilot</option>
+        <option value="manual">手動カウンタ</option>
+        <option value="quota">APIクォータ</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>ID</label>
+      <input type="text" id="mf-id" placeholder="gpu-server">
+      <div class="hint">トークンのプロパティ名に使います。英数字とハイフン推奨</div>
+      <div class="err" id="err-monitor">IDを入力してください</div>
+    </div>
+
+    <div class="field">
+      <label>表示名</label>
+      <input type="text" id="mf-name" placeholder="GPU サーバー">
+    </div>
+
+    <div class="field" data-for="api kaggle fx">
+      <label>endpoint</label>
+      <input type="text" id="mf-endpoint" placeholder="https://example.com/api/resource">
+      <div class="hint">トークンが必要な場合はGASのスクリプトプロパティに登録してください</div>
+    </div>
+
+    <div class="field" data-for="copilot">
+      <label>1か月の上限</label>
+      <input type="number" id="mf-monthlylimit" value="300">
+    </div>
+
+    <div class="field" data-for="manual">
+      <label>上限</label>
+      <input type="number" id="mf-limit" value="100">
+    </div>
+    <div class="field" data-for="manual">
+      <label>単位</label>
+      <input type="text" id="mf-unit" placeholder="回">
+    </div>
+    <div class="field" data-for="manual">
+      <label>周期</label>
+      <select id="mf-cycle">
+        <option value="daily">毎日</option>
+        <option value="monthly">毎月</option>
+        <option value="rolling">ローリング（時間指定）</option>
+      </select>
+    </div>
+    <div class="field" data-for="manual">
+      <label>ローリングの枠（時間）</label>
+      <input type="number" id="mf-windowhours" value="5">
+    </div>
+
+    <div class="field" data-for="quota">
+      <label>サービス名</label>
+      <input type="text" id="mf-service" placeholder="gemini">
+    </div>
+    <div class="field" data-for="quota">
+      <label>モデル名</label>
+      <input type="text" id="mf-model" placeholder="gemini-2.5-flash">
+    </div>
+    <div class="field" data-for="quota">
+      <label>1日の上限</label>
+      <input type="number" id="mf-dailylimit" value="1000">
+    </div>
+
+    <div class="field" data-for="fxpos">
+      <label>売買</label>
+      <select id="mf-side">
+        <option value="buy">買い</option>
+        <option value="sell">売り</option>
+      </select>
+    </div>
+    <div class="field" data-for="fxpos">
+      <label>建値</label>
+      <input type="number" id="mf-price" step="0.01" placeholder="150.55">
+    </div>
+    <div class="field" data-for="fxpos">
+      <label>金額（円）</label>
+      <input type="number" id="mf-amount" step="10000" value="1000000">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelMonitor">キャンセル</button>
+      <button class="btn btn-primary" id="saveMonitor">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="overlay" id="settingsOverlay">  <div class="modal">
     <h2>設定</h2>
     <p class="sub">見た目の調整と、index.json の読み書き</p>
     <div class="tabs" id="settingsTabs">
@@ -1157,6 +1263,8 @@ function renderMonitorCard(m, snap){
         ${ringSVG(pct, remainColor(pct), round1(val) + unit)}
         <div class="sub mono">${max ? '残り / 上限 ' + round1(max) + unit : '残り'}</div>
         ${snap.note ? `<div class="mon-note">${esc(snap.note)}</div>` : ''}
+        ${m.type === 'manual' ? '' :
+          `<button class="mon-fix" data-fix="${m.id}" data-unit="${esc(unit)}" data-value="${round1(val)}">残りを修正</button>`}
       </div>`;
   }
 
@@ -1278,6 +1386,35 @@ function renderMonitors(){
       }
     });
   });
+
+  grid.querySelectorAll('[data-fix]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.fix;
+      const m = monitors().find(x=>x.id===id);
+      const input = prompt(
+        `${(m && m.name) || id} の残りを入力してください（${btn.dataset.unit}）\n空欄で保存した修正を解除します。`,
+        btn.dataset.value
+      );
+      if(input === null) return;
+      adjustMonitor(id, input.trim());
+    });
+  });
+}
+
+/** 取得値と入力値の差をGASに保存し、以降の表示に反映する */
+async function adjustMonitor(id, text){
+  const m = monitors().find(x=>x.id===id);
+  if(!m) return;
+  const reset = text === '';
+  if(!reset && !isFinite(Number(text))){
+    toast('数値を入力してください');
+    return;
+  }
+  try{
+    const res = await callGas({ action:'monitorAdjust', monitor:m, value:Number(text), reset });
+    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    renderMonitors();
+  }catch(err){ toast(err.message); }
 }
 
 /** 手動カウンタの増減。GAS側に保存するので端末をまたいで揃う */
@@ -1390,8 +1527,85 @@ document.addEventListener('visibilitychange', ()=>{
   else if(currentView === 'monitor'){ startMonitorLoop(); }
 });
 
-document.getElementById('btn-applymonitors').onclick = async ()=>{
+/* ---------- 稼働状況タブからの追加 ---------- */
+const monitorOverlay = document.getElementById('monitorOverlay');
+
+/** 選んだ種類に関係する入力欄だけを出す */
+function syncMonitorForm(){
+  const type = F('mf-type').value;
+  monitorOverlay.querySelectorAll('[data-for]').forEach(el=>{
+    el.hidden = !el.dataset.for.split(' ').includes(type);
+  });
+}
+
+function openMonitorModal(){
+  F('mf-id').value = '';
+  F('mf-name').value = '';
+  F('mf-endpoint').value = '';
+  F('mf-price').value = '';
+  F('err-monitor').style.display = 'none';
+  syncMonitorForm();
+  monitorOverlay.classList.add('show');
+  F('mf-id').focus();
+}
+
+function buildMonitor(){
+  const type = F('mf-type').value;
+  const id = F('mf-id').value.trim();
+  if(!id) throw new Error('IDを入力してください');
+  if(allMonitors().some(m => m.id === id)) throw new Error('同じIDがすでに登録されています');
+
+  const m = { id, name: F('mf-name').value.trim() || id };
+  if(type !== 'api') m.type = type;
+
+  if(['api','kaggle','fx'].includes(type)){
+    const endpoint = F('mf-endpoint').value.trim();
+    if(!endpoint) throw new Error('endpoint を入力してください');
+    m.endpoint = endpoint;
+  }
+  if(type === 'copilot') m.monthlyLimit = Number(F('mf-monthlylimit').value) || 300;
+  if(type === 'manual'){
+    m.limit = Number(F('mf-limit').value) || 100;
+    m.unit = F('mf-unit').value.trim() || '回';
+    m.cycle = F('mf-cycle').value;
+    if(m.cycle === 'rolling') m.windowHours = Number(F('mf-windowhours').value) || 5;
+  }
+  if(type === 'quota'){
+    m.service = F('mf-service').value.trim();
+    m.model = F('mf-model').value.trim();
+    if(!m.service || !m.model) throw new Error('サービス名とモデル名を入力してください');
+    m.dailyLimit = Number(F('mf-dailylimit').value) || 0;
+  }
+  if(type === 'fxpos'){
+    m.side = F('mf-side').value;
+    m.price = Number(F('mf-price').value);
+    if(!m.price) throw new Error('建値を入力してください');
+    m.amount = Number(F('mf-amount').value) || 1000000;
+  }
+  return m;
+}
+
+F('mf-type').addEventListener('change', syncMonitorForm);
+document.getElementById('openMonitorAdd').onclick = openMonitorModal;
+document.getElementById('cancelMonitor').onclick = ()=>monitorOverlay.classList.remove('show');
+
+document.getElementById('saveMonitor').onclick = async ()=>{
   try{
+    const m = buildMonitor();
+    config.monitors = allMonitors().concat([m]);
+    await persistLocal();
+    F('s-monitors').value = JSON.stringify(config.monitors, null, 2);
+    monitorOverlay.classList.remove('show');
+    renderMonitors();
+    startMonitorLoop();
+    toast('「' + m.name + '」を追加しました');
+  }catch(err){
+    F('err-monitor').textContent = err.message;
+    F('err-monitor').style.display = 'block';
+  }
+};
+
+document.getElementById('btn-applymonitors').onclick = async ()=>{  try{
     const parsed = JSON.parse(F('s-monitors').value);
     if(!Array.isArray(parsed)) throw new Error('配列で指定してください');
     parsed.forEach(m=>{
