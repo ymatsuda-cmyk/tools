@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <title>財務ダッシュボード</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="style.css?v=20260909a">
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <button class="icon-btn" id="menu-btn" title="メニュー" onclick="openMenu()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M2 4h12M2 8h12M2 12h12" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <span class="title">財務ダッシュボード</span>
+  <span class="version" id="version-label"></span>
+  <span class="demo-badge" id="demo-badge" style="display:none">DEMO</span>
+  <span class="spacer"></span>
+  <button class="live-badge" id="live-badge" title="Excelの変更を自動で取り込みます（クリックで切替）" onclick="toggleLive()">
+    <span class="dot"></span><span id="live-text">自動更新</span>
+  </button>
+  <button class="icon-btn" title="今すぐ再読み込み" onclick="reload(true)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>
+
+<!-- タブバー -->
+<div class="tab-bar" id="tab-bar">
+  <button class="tab active" data-p="p1" onclick="switchTab('p1')">現状</button>
+  <button class="tab" data-p="p2" onclick="switchTab('p2')">損益</button>
+  <button class="tab" data-p="p3" onclick="switchTab('p3')">健全性</button>
+  <button class="tab" data-p="p4" onclick="switchTab('p4')">予測</button>
+  <button class="tab" data-p="p6" onclick="switchTab('p6')">決算賞与</button>
+  <button class="tab" data-p="p5" onclick="switchTab('p5')">明細</button>
+</div>
+
+<!-- 実績確定月バー -->
+<div class="asof-bar">
+  <label for="lastActual">実績確定月</label>
+  <select id="lastActual"></select>
+  <span class="fetched" id="fetched"></span>
+</div>
+
+<!-- ===== 現状 ===== -->
+<div class="pane" id="p1">
+  <div id="loadError"></div>
+  <div class="kpis" id="kpi"></div>
+  <p class="note" id="kpiNote"></p>
+
+  <h2>売上は計画に追いついているか</h2>
+  <p class="lede" id="cumLede"></p>
+  <div id="c_cum"></div>
+
+  <h2>月ごとの営業利益</h2>
+  <p class="lede">黒＝実績、朱＝見込み。月次の振れ幅がそのまま資金繰りの振れ幅になります。</p>
+  <div id="c_op"></div>
+
+  <div id="findings"></div>
+</div>
+
+<!-- ===== 損益 ===== -->
+<div class="pane" id="p2" style="display:none">
+  <h2>売上：月次実績と月次計画</h2>
+  <p class="lede">棒が各月の売上、破線が月次計画（年間計画÷12）です。</p>
+  <div id="c_sales"></div>
+
+  <h2>販管費の内訳推移</h2>
+  <div id="c_sga"></div>
+
+  <h2>売上総利益率と営業利益率</h2>
+  <div id="c_margin"></div>
+
+  <h2>費目別の推移を見る</h2>
+  <div class="btnrow" style="margin-top:6px"><select id="acctSel"></select></div>
+  <p class="note" id="acctNote"></p>
+  <div id="c_acct"></div>
+</div>
+
+<!-- ===== 健全性 ===== -->
+<div class="pane" id="p3" style="display:none">
+  <h2>資産の構成と負債</h2>
+  <p class="lede">積み上げが資産の中身、線が負債合計です。試算表が入力済みの月のみ表示します。</p>
+  <div id="c_bs"></div>
+
+  <h2>現金預金と売掛金</h2>
+  <div id="c_cash"></div>
+
+  <h2>自己資本比率・流動比率</h2>
+  <div id="c_ratio"></div>
+
+  <h2>売掛金回転月数</h2>
+  <p class="lede">売掛金 ÷ 当月売上。1.0前後なら翌月回収が基本のサイクルです。</p>
+  <div id="c_turn"></div>
+</div>
+
+<!-- ===== 予測 ===== -->
+<div class="pane" id="p4" style="display:none">
+  <h2>今期の着地予測</h2>
+  <p class="lede">実績確定月までは試算表の実績、それ以降は下の設定で推計します。</p>
+
+  <div class="tuner">
+    <h3>残り月の置き方</h3>
+    <div class="tgrid">
+      <div class="ctl">
+        <div class="cl"><span>推計方法</span></div>
+        <div class="seg" id="segMethod">
+          <button data-v="sheet" aria-pressed="true">シート見込み</button>
+          <button data-v="ma3" aria-pressed="false">直近3ヶ月平均</button>
+          <button data-v="plan" aria-pressed="false">月次計画</button>
+        </div>
+        <div class="hint">シート見込み＝Excelに入っている見込み値をそのまま使います。</div>
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>売上の上振れ／下振れ</span><span class="cv" id="v_salesAdj">0%</span></div>
+        <input type="range" id="salesAdj" min="-40" max="40" step="1" value="0">
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>売上原価の置き方</span><span class="cv" id="v_cogs">—</span></div>
+        <div class="seg" id="segCogs">
+          <button data-v="method" aria-pressed="true">上と同じ推計</button>
+          <button data-v="rate" aria-pressed="false">原価率で置く</button>
+        </div>
+        <input type="range" id="cogsRate" min="0" max="35" step="0.1" value="10">
+        <div class="hint">仕入は月ごとの振れが大きいため、既定では上の推計方法に合わせます。</div>
+      </div>
+    </div>
+    <h3>販管費カテゴリーの増減（残り月に適用）</h3>
+    <div class="tgrid" id="sgaTuner"></div>
+  </div>
+
+  <div class="kpis" id="kpi4"></div>
+  <div id="c_fc"></div>
+  <div id="fcTable"></div>
+
+  <h2>次期の計画をつくる</h2>
+  <p class="lede">今期の着地見込みを土台に、成長率と費用の増減を置いて次期計画を組み立てます。月別配分は今期の季節性を使います。</p>
+
+  <div class="tuner">
+    <h3>売上</h3>
+    <div class="tgrid">
+      <div class="ctl">
+        <div class="cl"><span>基準にする売上</span></div>
+        <div class="seg" id="segBase">
+          <button data-v="fc37" aria-pressed="true">今期 着地見込み</button>
+          <button data-v="fy36" aria-pressed="false">前期 実績</button>
+          <button data-v="avg" aria-pressed="false">2期平均</button>
+        </div>
+        <div class="hint" id="baseHint"></div>
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>売上成長率</span><span class="cv" id="v_growth">0%</span></div>
+        <input type="range" id="growth" min="-30" max="40" step="1" value="0">
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>季節性の効かせ方</span><span class="cv" id="v_season">100%</span></div>
+        <input type="range" id="season" min="0" max="100" step="5" value="100">
+        <div class="hint">100%＝今期の月別構成比をそのまま、0%＝12等分。</div>
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>売上原価率</span><span class="cv" id="v_nyCogs">—</span></div>
+        <input type="range" id="nyCogsRate" min="0" max="35" step="0.1" value="10">
+        <div class="hint">初期値は今期 着地見込みの実効原価率です。</div>
+      </div>
+    </div>
+    <h3>販管費カテゴリーの増減（対 今期着地）</h3>
+    <div class="tgrid" id="nySgaTuner"></div>
+    <div class="btnrow">
+      <button class="btn" id="btnReset">設定を初期値に戻す</button>
+      <button class="btn" id="btnCopy">設定と結果をコピー</button>
+      <span class="msg" id="copyMsg"></span>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpi38"></div>
+  <div id="c_ny"></div>
+  <div id="nyTable"></div>
+
+  <h2>3期の比較</h2>
+  <div id="c_3y"></div>
+</div>
+
+<!-- ===== 決算賞与 ===== -->
+<div class="pane" id="p6" style="display:none">
+  <h2>決算賞与はいくらまで出せるか</h2>
+  <p class="lede">今期の着地見込みを出発点に、消費税・会社負担の社会保険料・法人税等を差し引いたうえで、賞与前後の利益率と手元に残る現金を試算します。</p>
+
+  <div class="kpis" id="kpiBonus"></div>
+
+  <div class="tuner">
+    <h3>支給額</h3>
+    <div class="ctl" style="border:none">
+      <div class="cl"><span>賞与総額</span><span class="cv" id="v_bt">—</span></div>
+      <input type="range" id="btRange" min="0" max="4000000" step="10000" value="700000">
+      <div class="hint">スライダーを動かすと下の個人別金額が同じ比率で増減します。個人別に直接入力もできます。</div>
+    </div>
+    <div class="tblwrap" style="margin-top:6px">
+      <table class="people"><thead><tr>
+        <th class="nm">支給対象</th><th>支給額</th><th>本人 社保</th><th>源泉所得税</th><th>手取り概算</th><th></th>
+      </tr></thead><tbody id="peopleBody"></tbody></table>
+    </div>
+    <div class="btnrow"><button class="btn" id="btnAddPerson">支給対象を追加</button>
+      <button class="btn" id="btnSyncPeople">Excelの金額に戻す</button></div>
+
+    <h3>会社側の前提</h3>
+    <div class="tgrid">
+      <div class="ctl">
+        <div class="cl"><span>会社負担 社会保険料率</span><span class="cv" id="v_soc">15.0%</span></div>
+        <input type="range" id="socRate" min="0" max="20" step="0.1" value="15">
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>会社負担社保の計上期</span></div>
+        <div class="seg" id="segSoc">
+          <button data-v="this" aria-pressed="true">当期に含める</button>
+          <button data-v="next" aria-pressed="false">翌期に計上</button>
+        </div>
+        <div class="hint">10月支給なら税務上は翌期の費用です。当期に含めると保守的な試算になります。</div>
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>消費税 みなし仕入率</span><span class="cv" id="v_mnashi">50%</span></div>
+        <input type="range" id="mnashi" min="40" max="90" step="10" value="50">
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>法人住民税 均等割</span><span class="cv" id="v_kintou">180,000</span></div>
+        <input type="range" id="kintou" min="70000" max="300000" step="10000" value="180000">
+        <div class="hint">赤字でも発生します。</div>
+      </div>
+    </div>
+
+    <h3>本人側の前提（手取り計算用）</h3>
+    <div class="tgrid">
+      <div class="ctl">
+        <div class="cl"><span>本人負担 社会保険料率</span><span class="cv" id="v_esoc">15.0%</span></div>
+        <input type="range" id="empSoc" min="0" max="20" step="0.1" value="15">
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>賞与の源泉所得税率</span><span class="cv" id="v_etax">10.21%</span></div>
+        <input type="range" id="empTax" min="0" max="30" step="0.01" value="10.21">
+      </div>
+    </div>
+
+    <h3>上限を決める基準</h3>
+    <div class="tgrid">
+      <div class="ctl">
+        <div class="cl"><span>確保したい営業利益率</span><span class="cv" id="v_tgt">3.0%</span></div>
+        <input type="range" id="tgtRate" min="0" max="20" step="0.5" value="3">
+        <div class="hint">消費税調整後・対税抜売上。賞与前は<span id="preRateEcho"></span>です。</div>
+      </div>
+      <div class="ctl">
+        <div class="cl"><span>手元に残す運転資金</span><span class="cv" id="v_res">3ヶ月</span></div>
+        <input type="range" id="resMonths" min="0" max="12" step="1" value="3">
+      </div>
+    </div>
+  </div>
+
+  <h2>3つの上限</h2>
+  <div class="kpis" id="limits"></div>
+
+  <h2>賞与前 → 賞与 → 賞与後</h2>
+  <div id="bonusTable"></div>
+
+  <h2>賞与額を振ったときの利益率</h2>
+  <div id="c_bcurve"></div>
+
+  <h2>賞与額と手元資金</h2>
+  <div id="c_bcash"></div>
+
+  <div id="bonusNotes"></div>
+</div>
+
+<!-- ===== 明細 ===== -->
+<div class="pane" id="p5" style="display:none">
+  <h2>月次PL 明細</h2>
+  <p class="lede">朱色の数字は見込み（実績確定月より後）です。</p>
+  <div id="plTable"></div>
+
+  <h2>月次BS 明細</h2>
+  <div id="bsTable"></div>
+
+  <h2>データの前提と注意点</h2>
+  <div id="caveats"></div>
+</div>
+
+<script src="demo-data.js?v=20260909a"></script>
+<script src="dashboard.js?v=20260909a"></script>
+<script src="app.js?v=20260909a"></script>
+</body>
+</html>
