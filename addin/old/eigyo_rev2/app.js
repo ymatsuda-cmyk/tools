@@ -203,7 +203,7 @@ function restoreGanttCookie() {
 }
 
 /* ---------- 共通スライドメニュー ---------- */
-const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/common";
+const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/addin/common";
 let menuReady = null;
 function openMenu() {
   if (!menuReady) {

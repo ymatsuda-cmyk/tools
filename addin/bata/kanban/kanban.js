@@ -1263,10 +1263,10 @@ function isMatch(t) {
 /* ============================================================
    共通スライドメニュー（遅延ロード）
    ------------------------------------------------------------
-   メニュー項目（名前・URL）は tools/common/menu.json で
+   メニュー項目（名前・URL）は tools/addin/common/menu.json で
    一元管理。menu.json を編集すれば全アプリに反映される。
    ============================================================ */
-const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/common";
+const COMMON_BASE = "https://ymatsuda-cmyk.github.io/tools/addin/common";
 
 let menuReady = null;
 

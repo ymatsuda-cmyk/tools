@@ -51,7 +51,7 @@
 ## デプロイ
 
 1. `weekly/` フォルダを GitHub Pages の `tools/addin/weekly/` へ配置
-2. 更新した `menu.json` を `tools/common/menu.json` へ上書き
+2. 更新した `menu.json` を `tools/addin/common/menu.json` へ上書き
    （「ツール」セクションに `id: weekly` を追加済み。カンバン・営業報告のスライドメニューにも自動で表示されます）
 3. 単体のアドインとして使う場合は `manifest.xml` をサイドロード
    （既存のカンバン／営業報告アドインのメニューから開く場合はマニフェスト追加は不要）

@@ -53,7 +53,7 @@
 2. `manifest.xml` をサイドロード、または Microsoft 365 管理センターから組織展開
 3. Excelで事業計画ブックを開き、ホームタブの「財務ダッシュボード」ボタンでタスクペインを表示
 
-サイドメニューに載せる場合は、共通の `tools/common/menu.json` のツール一覧に次を追加してください。
+サイドメニューに載せる場合は、共通の `tools/addin/common/menu.json` のツール一覧に次を追加してください。
 
 ```json
 { "id": "zaimu", "label": "財務ダッシュボード", "url": "https://ymatsuda-cmyk.github.io/tools/addin/zaimu/" }
