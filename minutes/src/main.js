@@ -374,7 +374,7 @@ function startLineEdit(target, item, state, lineEl) {
     <div class="line-edit-actions">
       <button class="btn btn-line-save">保存</button>
       <button class="btn btn-line-cancel">キャンセル</button>
-      <span class="line-edit-hint">Ctrl+Enterで保存 / Escでキャンセル</span>
+      <span class="line-edit-hint">Enterで保存 / Shift+Enterで改行 / Escでキャンセル</span>
     </div>
   `
   textEl.style.display = 'none'
@@ -405,7 +405,7 @@ function startLineEdit(target, item, state, lineEl) {
     if (e.key === 'Escape') {
       e.preventDefault()
       cancel()
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault()
       save()
     }
