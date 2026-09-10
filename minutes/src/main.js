@@ -950,6 +950,7 @@ function setMarkerText(summary, field, index, sub, value) {
 }
 
 function setupMarkerUI(target, item, state) {
+  document.querySelectorAll('body > .marker-toolbar').forEach((el) => el.remove())
   if (!state.canEditContent || state.searchQuery || !state.summary) {
     currentMarkerContext = null
     return
@@ -960,6 +961,9 @@ function setupMarkerUI(target, item, state) {
     currentMarkerContext = null
     return
   }
+  // 詳細ペインには拡大率(zoom)が掛かっており、その中だとposition:fixedの座標がずれる。
+  // 素の viewport 座標で配置できるよう body 直下へ退避させる。
+  document.body.appendChild(toolbar)
   currentMarkerContext = { target, item, state, toolbar, pending: null }
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
