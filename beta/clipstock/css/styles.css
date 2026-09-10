@@ -578,11 +578,62 @@ mark { background: var(--highlight); color: inherit; }
 .modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .modal-head .modal-title { margin: 0; flex: 1; }
 .modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+/* 本文だけスクロールさせ、キャンセル/保存は常に見えるようにする */
+.modal-sticky { display: flex; flex-direction: column; overflow: hidden; }
+.modal-sticky .modal-title { flex: none; }
+.modal-sticky .modal-body { flex: 1; overflow-y: auto; min-height: 0; padding-right: 2px; }
+.modal-sticky .modal-foot {
+  flex: none;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+  background: var(--surface-2);
+}
+
 .field-label { font-size: 12px; color: var(--text-secondary); display: block; margin: 10px 0 4px; }
 .row { display: flex; gap: 6px; align-items: center; }
 .row + .row { margin-top: 6px; }
-.conn { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px; margin-bottom: 8px; }
-.conn .input { margin-top: 5px; }
+.conn { border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+.conn-sum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  min-width: 0;
+}
+.conn-sum::-webkit-details-marker { display: none; }
+.conn-sum::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.conn[open] > .conn-sum::before { transform: rotate(45deg); }
+.conn[open] > .conn-sum { border-bottom: 0.5px solid var(--border); }
+.conn-sum:hover { background: var(--surface-1); }
+.conn-name { font-size: 13px; font-weight: 600; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-badge {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conn-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-host { flex: 1; min-width: 0; text-align: right; }
+.conn-body { padding: 0 10px 10px; }
+.conn-body .input { margin-top: 5px; }
 .conn-models { display: flex; gap: 5px; flex-wrap: wrap; margin: 8px 0 6px; }
 .json-block { margin: 14px 0 0; }
 .json-block summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
