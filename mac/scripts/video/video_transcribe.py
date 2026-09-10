@@ -12,6 +12,8 @@
      取れない場合は yt-dlp で音声を落とし、mlx-whisper で文字起こし（既定でON）
   4. 既存の本文ブロックをアーカイブしてから新しい文字起こしを追記
   5. 動画タイトル・サムネイル・原文文字数・状態を更新
+  6. 1件でも更新できたら build_clipstock_json.py を呼び、
+     data/clipstock/index.json を作り直す
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
@@ -68,6 +70,9 @@ VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
 STATUS_EMPTY = "空欄"
 WHISPER_MODEL_DEFAULT = "mlx-community/whisper-large-v2-mlx"
 WHISPER_LANGUAGE_DEFAULT = "ja"
+
+CLIPSTOCK_BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
+CLIPSTOCK_OUT_DIR = SCRIPT_DIR.parents[2] / "data" / "clipstock"
 
 # ---------------------------------------------------------------- Notion
 
@@ -636,6 +641,28 @@ def process_page(page, *, set_status_name, is_retry, whisper_enabled,
     return True
 
 
+def rebuild_clipstock_index():
+    """一覧用の index.json を build_clipstock_json.py で作り直す。"""
+    if not CLIPSTOCK_BUILDER.exists():
+        print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため index.json は更新しません")
+        return
+    print(f"\nindex.json を更新中: {CLIPSTOCK_OUT_DIR}")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(CLIPSTOCK_BUILDER), "--out", str(CLIPSTOCK_OUT_DIR)],
+            capture_output=True, text=True, timeout=900)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        print(f"⚠️ index.json の更新に失敗: {type(e).__name__}: {e}")
+        return
+    out = (result.stdout or "").strip()
+    if out:
+        print(out)
+    if result.returncode != 0:
+        print(f"⚠️ index.json の更新に失敗: {(result.stderr or '').strip()[-300:]}")
+    else:
+        print(f"✅ index.json を更新しました: {CLIPSTOCK_OUT_DIR / 'index.json'}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Notion動画DBの文字起こし")
     ap.add_argument("--page-id", help="対象のNotionページID（--statusより優先）")
@@ -705,6 +732,9 @@ def main():
 
     print(f"\n{'='*60}\n完了: {ok_count}/{len(targets)}件  "
           f"{datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S JST')}\n{'='*60}\n")
+
+    if ok_count:
+        rebuild_clipstock_index()
 
 
 if __name__ == "__main__":
