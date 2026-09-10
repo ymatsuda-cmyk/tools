@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import importlib.util, json, os, requests, shlex, shutil, subprocess, sys, tempfile
+import importlib.util, json, os, re, requests, shlex, shutil, subprocess, sys, tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -18,10 +18,45 @@ PLAUD_DOMAIN = os.environ.get("PLAUD_DOMAIN", "https://api-apne1.plaud.ai")
 PLAUD_WS_ID  = "ws_clQPe6Vll0"
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DB_ID = os.environ.get("NOTION_DS_ID", "28b0e7a535dc805697c6d4b9f8032d18")
-WHISPER_MODEL = "mlx-community/whisper-medium-mlx"
+
+# ── 文字起こし設定 ───────────────────────────────────────────
+# medium(769M) → large-v3-turbo(809M) へ。サイズはほぼ同じで精度は大幅に上、
+# かつ MLX の GPU 経路では medium より速い。
+WHISPER_MODEL = os.environ.get(
+    "WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo"
+)
+
+# 幻聴(ハルシネーション)抑止＋精度向上のためのデコード設定
+DECODE_OPTIONS = {
+    "language": "ja",
+    # 直前の出力を次のプロンプトに使わない。幻聴の自己増殖ループを断つ最重要設定
+    "condition_on_previous_text": False,
+    # 尤度の低い区間を温度を上げて再デコードするフォールバック
+    "temperature": (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+    "compression_ratio_threshold": 2.4,
+    "logprob_threshold": -1.0,
+    "no_speech_threshold": 0.6,
+}
+
+# 用語集ファイル（無ければ自動生成される）
+GLOSSARY_PATH = Path(os.environ.get(
+    "PLAUD_GLOSSARY_PATH",
+    str(Path.home() / ".plaud_glossary.json")
+))
+GLOSSARY_TEMPLATE = {
+    "_comment": "hints: initial_promptに渡す正しい表記。replacements: 誤変換→正表記の一括置換",
+    "hints": ["ライターム", "JBA", "PoC", "ロボットアーム"],
+    "replacements": {
+        "ライタイム": "ライターム",
+        "ライタームー": "ライターム"
+    }
+}
+
 JST = timezone(timedelta(hours=9))
 _MLX_WHISPER_CMD = None
+_MLX_WHISPER_MODULE = None
 _RUNTIME_PATH_PREPARED = False
+_GLOSSARY_CACHE = None
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG_LOG_DIR = SCRIPT_DIR / "logs" / "transcribe_debug"
 
@@ -48,6 +83,65 @@ def ms_to_hms(ms):
     elif m > 0: return f"{m}分 {sec}秒"
     else: return f"{sec}秒"
 
+# ── 用語集 ───────────────────────────────────────────────────
+def load_glossary():
+    global _GLOSSARY_CACHE
+    if _GLOSSARY_CACHE is not None:
+        return _GLOSSARY_CACHE
+    if not GLOSSARY_PATH.exists():
+        try:
+            GLOSSARY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            GLOSSARY_PATH.write_text(
+                json.dumps(GLOSSARY_TEMPLATE, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
+            print(f"    ℹ️ 用語集を作成しました: {GLOSSARY_PATH}")
+        except OSError:
+            pass
+        _GLOSSARY_CACHE = dict(GLOSSARY_TEMPLATE)
+        return _GLOSSARY_CACHE
+    try:
+        data = json.loads(GLOSSARY_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"    ⚠️ 用語集を読めませんでした({type(e).__name__})。既定値を使用します")
+        data = dict(GLOSSARY_TEMPLATE)
+    data.setdefault("hints", [])
+    data.setdefault("replacements", {})
+    _GLOSSARY_CACHE = data
+    return _GLOSSARY_CACHE
+
+def build_initial_prompt():
+    """initial_prompt は先頭ウィンドウへのヒント。効果が薄れるので入れ過ぎない。"""
+    hints = [h for h in load_glossary().get("hints", []) if h]
+    if not hints:
+        return None
+    prompt = "、".join(hints[:30])
+    return f"以下は日本語の会議音声です。次の固有名詞が登場します: {prompt}。"
+
+def apply_replacements(text):
+    """毎回同じ誤り方をする語は機械的に置換する。AI判断より確実で速い。"""
+    repl = load_glossary().get("replacements", {})
+    if not text or not repl:
+        return text, 0
+    count = 0
+    # 長い語から置換して部分一致による取りこぼしを防ぐ
+    for wrong in sorted(repl, key=len, reverse=True):
+        right = repl[wrong]
+        if not wrong or wrong == right:
+            continue
+        n = text.count(wrong)
+        if n:
+            text = text.replace(wrong, right)
+            count += n
+    return text, count
+
+def detect_repetition(text, min_len=8, threshold=6):
+    """同一フレーズの連続を検出。幻聴ループの早期警告。"""
+    if not text:
+        return None
+    m = re.search(r"(.{%d,40}?)\1{%d,}" % (min_len, threshold), text)
+    return m.group(1) if m else None
+
+# ── PLAUD ────────────────────────────────────────────────────
 def get_plaud_files():
     all_files = []
     page = 1
@@ -79,6 +173,19 @@ def download_audio(temp_url, dest_path):
                 f.write(chunk)
         return True
     return False
+
+# ── 実行環境の解決 ───────────────────────────────────────────
+def resolve_mlx_whisper_module():
+    """Python API が使えるなら最優先。全デコードオプションを確実に渡せる。"""
+    global _MLX_WHISPER_MODULE
+    if _MLX_WHISPER_MODULE is not None:
+        return _MLX_WHISPER_MODULE or None
+    try:
+        import mlx_whisper  # noqa: F401
+        _MLX_WHISPER_MODULE = mlx_whisper
+    except Exception:
+        _MLX_WHISPER_MODULE = False
+    return _MLX_WHISPER_MODULE or None
 
 def resolve_mlx_whisper_cmd():
     global _MLX_WHISPER_CMD
@@ -150,6 +257,7 @@ def write_transcribe_debug_log(audio_path, cmd, *, result=None, error=None, note
         f"audio_path: {audio_path}",
         f"cwd: {Path(audio_path).parent}",
         f"python: {sys.executable}",
+        f"model: {WHISPER_MODEL}",
         f"path: {os.environ.get('PATH', '')}",
         f"which_ffmpeg: {shutil.which('ffmpeg') or '(not found)'}",
         f"command: {shlex.join(cmd)}",
@@ -181,18 +289,39 @@ def write_transcribe_debug_log(audio_path, cmd, *, result=None, error=None, note
     log_path.write_text("\n".join(lines), encoding="utf-8")
     return log_path
 
-def transcribe(audio_path):
-    audio_path = Path(audio_path)
-    out_dir = audio_path.parent
-    ensure_runtime_path()
-
-    ffmpeg_cmd = resolve_ffmpeg_cmd()
-    if not ffmpeg_cmd:
-        print("  ❌ ffmpeg が見つかりません。")
-        print("     例: brew install ffmpeg")
-        log_path = write_transcribe_debug_log(audio_path, ["ffmpeg"], note="ffmpeg_not_found")
+# ── 文字起こし ───────────────────────────────────────────────
+def _transcribe_via_module(audio_path):
+    """Python API 経路。全デコードオプションを確実に反映できる。"""
+    mlx_whisper = resolve_mlx_whisper_module()
+    if mlx_whisper is None:
+        return None, "module_unavailable"
+    opts = dict(DECODE_OPTIONS)
+    initial_prompt = build_initial_prompt()
+    if initial_prompt:
+        opts["initial_prompt"] = initial_prompt
+    try:
+        result = mlx_whisper.transcribe(
+            str(audio_path),
+            path_or_hf_repo=WHISPER_MODEL,
+            **opts,
+        )
+    except Exception as e:
+        log_path = write_transcribe_debug_log(
+            audio_path, ["python:mlx_whisper.transcribe"],
+            error=e, note="module_transcribe_failed")
+        print(f"  ⚠️ Python API での文字起こしに失敗({type(e).__name__})。CLIを試します")
         print(f"  📝 デバッグログ: {log_path}")
-        return None
+        return None, "module_failed"
+    return (result.get("text") or "").strip(), None
+
+def _transcribe_via_cli(audio_path):
+    """CLI 経路。出力txtは音声ファイル名に対応するものだけを読む。"""
+    audio_path = Path(audio_path)
+    # 出力先を専用ディレクトリに分離する。
+    # 旧実装は tmpdir 直下に出力し、失敗時に out_dir.glob("*.txt")[0] で
+    # 「前のファイルのtxt」を拾って別の会議の内容を登録する事故があり得た。
+    out_dir = audio_path.parent / f"_stt_{audio_path.stem}"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     cmd_prefix = resolve_mlx_whisper_cmd()
     if not cmd_prefix:
@@ -202,18 +331,26 @@ def transcribe(audio_path):
         print(f"  📝 デバッグログ: {log_path}")
         return None
 
+    temps = ",".join(str(t) for t in DECODE_OPTIONS["temperature"])
     cmd = [
         *cmd_prefix, str(audio_path),
         "--model", WHISPER_MODEL,
         "--output-format", "txt",
         "--output-dir", str(out_dir),
         "--language", "ja",
-        "--condition-on-previous-text", "False"
+        "--condition-on-previous-text", "False",
+        "--temperature", temps,
+        "--compression-ratio-threshold", str(DECODE_OPTIONS["compression_ratio_threshold"]),
+        "--logprob-threshold", str(DECODE_OPTIONS["logprob_threshold"]),
+        "--no-speech-threshold", str(DECODE_OPTIONS["no_speech_threshold"]),
     ]
-    print(f"  文字起こし実行中...")
+    initial_prompt = build_initial_prompt()
+    if initial_prompt:
+        cmd += ["--initial-prompt", initial_prompt]
+
     try:
-        env = os.environ.copy()
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(out_dir), env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                timeout=1800, cwd=str(out_dir), env=os.environ.copy())
     except FileNotFoundError:
         print("  ❌ mlx_whisper コマンドを起動できませんでした。")
         print("     例: pip install mlx-whisper")
@@ -230,6 +367,7 @@ def transcribe(audio_path):
         log_path = write_transcribe_debug_log(audio_path, cmd, error=e, note="unexpected_exception")
         print(f"  📝 デバッグログ: {log_path}")
         return None
+
     if result.returncode != 0:
         print(f"  Whisperエラー: {result.stderr[:200]}")
         log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="non_zero_exit")
@@ -240,27 +378,54 @@ def transcribe(audio_path):
         log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="ffmpeg_missing_inside_mlx_whisper")
         print(f"  📝 デバッグログ: {log_path}")
         return None
-    txt_path = out_dir / (audio_path.stem + ".txt")
-    if txt_path.exists():
-        transcript = txt_path.read_text(encoding="utf-8").strip()
-        if transcript:
-            return transcript
-        log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="empty_transcript_primary_txt")
-        print(f"  ⚠️ 文字起こし結果が空です。デバッグログ: {log_path}")
-        return None
-    # ディレクトリ内のtxtを探す
-    txts = list(out_dir.glob("*.txt"))
-    if txts:
-        transcript = txts[0].read_text(encoding="utf-8").strip()
-        if transcript:
-            return transcript
-        log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="empty_transcript_fallback_txt")
-        print(f"  ⚠️ 文字起こし結果が空です。デバッグログ: {log_path}")
-        return None
-    log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="txt_not_found")
-    print(f"  ⚠️ 文字起こし結果ファイルが見つかりません。デバッグログ: {log_path}")
-    return None
 
+    txt_path = out_dir / (audio_path.stem + ".txt")
+    if not txt_path.exists():
+        # 専用ディレクトリなので、ここにあるtxtは必ずこの音声由来
+        candidates = list(out_dir.glob("*.txt"))
+        if not candidates:
+            log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="txt_not_found")
+            print(f"  ⚠️ 文字起こし結果ファイルが見つかりません。デバッグログ: {log_path}")
+            return None
+        txt_path = candidates[0]
+
+    transcript = txt_path.read_text(encoding="utf-8").strip()
+    if not transcript:
+        log_path = write_transcribe_debug_log(audio_path, cmd, result=result, note="empty_transcript")
+        print(f"  ⚠️ 文字起こし結果が空です。デバッグログ: {log_path}")
+        return None
+    return transcript
+
+def transcribe(audio_path):
+    audio_path = Path(audio_path)
+    ensure_runtime_path()
+
+    if not resolve_ffmpeg_cmd():
+        print("  ❌ ffmpeg が見つかりません。")
+        print("     例: brew install ffmpeg")
+        log_path = write_transcribe_debug_log(audio_path, ["ffmpeg"], note="ffmpeg_not_found")
+        print(f"  📝 デバッグログ: {log_path}")
+        return None
+
+    print(f"  文字起こし実行中... (model={WHISPER_MODEL})")
+    transcript, _ = _transcribe_via_module(audio_path)
+    if not transcript:
+        transcript = _transcribe_via_cli(audio_path)
+    if not transcript:
+        return None
+
+    # 幻聴ループの検出（無音区間で定型句を連呼する Whisper 特有の失敗）
+    looped = detect_repetition(transcript)
+    if looped:
+        print(f"  ⚠️ 同一フレーズの連続を検出: 「{looped[:30]}」")
+        print("     録音冒頭の無音や極端に小さい音量が原因のことが多いです")
+
+    transcript, n = apply_replacements(transcript)
+    if n:
+        print(f"  ✏️ 用語辞書で {n}箇所を補正")
+    return transcript
+
+# ── Notion ───────────────────────────────────────────────────
 def notion_headers():
     return {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
 
@@ -392,67 +557,29 @@ def write_minutes_index(pages):
     return entries
 
 def push_minutes_index():
-    # Gitリポジトリのルート
     repo = str(Path.home() / "tools")
-
-    # Gitから見た相対パス
     target_file = "data/minutes/index.json"
-
     branch = "main"
 
     try:
-        #
-        # index.jsonだけステージング
-        #
-        subprocess.run(
-            ["git", "-C", repo, "add", target_file],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run(["git", "-C", repo, "add", target_file],
+                       check=True, capture_output=True, text=True)
 
-        #
-        # index.jsonに変更が無ければ終了
-        #
-        if subprocess.run(
-            ["git", "-C", repo, "diff", "--cached", "--quiet"],
-            capture_output=True,
-            text=True,
-        ).returncode == 0:
+        if subprocess.run(["git", "-C", repo, "diff", "--cached", "--quiet"],
+                          capture_output=True, text=True).returncode == 0:
             print("    差分なしのためcommitをスキップ")
             return
 
-        #
-        # commit
-        #
-        msg = (
-            f"chore: update minutes index "
-            f"({datetime.now(JST).strftime('%Y-%m-%d %H:%M')})"
-        )
-
-        subprocess.run(
-            ["git", "-C", repo, "commit", "-m", msg],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-        #
-        # push
-        #
-        subprocess.run(
-            ["git", "-C", repo, "push", "origin", branch],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-
+        msg = (f"chore: update minutes index "
+               f"({datetime.now(JST).strftime('%Y-%m-%d %H:%M')})")
+        subprocess.run(["git", "-C", repo, "commit", "-m", msg],
+                       check=True, capture_output=True, text=True)
+        subprocess.run(["git", "-C", repo, "push", "origin", branch],
+                       check=True, capture_output=True, text=True, timeout=180)
         print("    ✅ git push 完了")
 
     except subprocess.CalledProcessError as e:
         print(f"    ⚠️ git操作に失敗: {(e.stderr or '')[:500]}")
-
     except subprocess.TimeoutExpired:
         print("    ⚠️ git push がタイムアウトしました")
 
@@ -469,6 +596,8 @@ def main():
     print(f"\n{'='*60}\nPLAUD→文字起こし→Notion開始: {now}\n{'='*60}")
     if not PLAUD_TOKEN or not NOTION_TOKEN:
         print("❌ トークンが設定されていません"); return
+
+    load_glossary()
 
     print("\n[1] Notionの既存ページを取得中...")
     notion_pages = fetch_notion_pages()
@@ -492,17 +621,19 @@ def main():
         return
 
     print(f"\n[4] {len(new_files)}件を処理中...")
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for i, f in enumerate(new_files, 1):
-            file_id = f["id"]
-            filename = f.get("fullname", f"{file_id}.ogg")
-            name = f.get("filename", file_id)
-            print(f"\n  [{i}/{len(new_files)}] {name}")
+    for i, f in enumerate(new_files, 1):
+        file_id = f["id"]
+        filename = f.get("fullname", f"{file_id}.ogg")
+        name = f.get("filename", file_id)
+        print(f"\n  [{i}/{len(new_files)}] {name}")
 
-            temp_url = get_download_url(file_id)
-            if not temp_url:
-                print(f"  ❌ URL取得失敗。スキップ"); continue
+        temp_url = get_download_url(file_id)
+        if not temp_url:
+            print(f"  ❌ URL取得失敗。スキップ"); continue
 
+        # ファイルごとに独立した一時ディレクトリを使う。
+        # 共有tmpdirだと前のファイルのtxtを拾う事故が起き得るため。
+        with tempfile.TemporaryDirectory() as tmpdir:
             audio_path = Path(tmpdir) / filename
             print(f"  → ダウンロード中... ({filename})")
             if not download_audio(temp_url, str(audio_path)):
@@ -510,13 +641,14 @@ def main():
             print(f"  ✅ {audio_path.stat().st_size/1024/1024:.1f} MB")
 
             transcript = transcribe(str(audio_path))
-            if not transcript:
-                print(f"  ❌ 文字起こし失敗。スキップ"); continue
-            print(f"  ✅ 文字起こし完了 ({len(transcript)}文字)")
 
-            page_id = create_notion_page(f, transcript)
-            if page_id:
-                print(f"  ✅ Notion登録完了")
+        if not transcript:
+            print(f"  ❌ 文字起こし失敗。スキップ"); continue
+        print(f"  ✅ 文字起こし完了 ({len(transcript)}文字)")
+
+        page_id = create_notion_page(f, transcript)
+        if page_id:
+            print(f"  ✅ Notion登録完了")
 
     print("\n[5] 最新のNotionページから index.json を更新中...")
     latest_notion_pages = fetch_notion_pages()

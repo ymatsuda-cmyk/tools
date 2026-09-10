@@ -2,7 +2,9 @@
 """文字起こしエンジン切り替え層
 
 settings.json の "label" でエンジンを選ぶ。
-  type = "whisper"   … mlx-whisper のプレーンテキストをそのまま返す
+
+  type = "whisper"   … mlx-whisper で文字起こしし、
+                       ③フィラー除去 ④表記統一 を適用して返す
   type = "qwen3-asr" … Qwen3-ASR（mlx-qwen3-asr）で区間を取得したうえで
                        ①声紋登録 ②話者自動認識 ③フィラー除去
                        ④表記統一 ⑤フォーマット を行う
@@ -13,6 +15,7 @@ settings.json の "label" でエンジンを選ぶ。
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -31,7 +34,19 @@ JST = timezone(timedelta(hours=9))
 DEBUG_LOG_DIR = SCRIPT_DIR / "logs" / "transcribe_debug"
 DEFAULT_SETTINGS_PATH = Path(os.environ.get("TRANSCRIBE_SETTINGS", str(SCRIPT_DIR / "settings.json")))
 
+# settings.json に decode が無い場合の既定値。
+# condition_on_previous_text=False は無音区間の幻聴が自己増殖するのを断つ最重要設定。
+DEFAULT_DECODE = {
+    "condition_on_previous_text": False,
+    "temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    "compression_ratio_threshold": 2.4,
+    "logprob_threshold": -1.0,
+    "no_speech_threshold": 0.6,
+}
+DEFAULT_WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
+
 _MLX_WHISPER_CMD = None
+_MLX_WHISPER_MODULE = None
 _RUNTIME_PATH_PREPARED = False
 _SETTINGS_CACHE = None
 
@@ -89,7 +104,6 @@ def choose_engine(settings, label=None, interactive=True):
     for i, e in enumerate(engines, 1):
         mark = "（既定）" if e.get("label") == default_label else ""
         print(f"  {i}. {e.get('label')}  (type={e.get('type')}){mark}")
-
     raw = input(f"番号またはlabelを入力 [{default_idx}]: ").strip()
     if not raw:
         return engines[default_idx - 1]
@@ -113,7 +127,46 @@ def load_dictionary(settings):
         return {}
 
 
+def build_initial_prompt(dictionary, extra_terms=None, limit=30):
+    """normalize_dict の「正しい表記」側を initial_prompt のヒントに使う。
+
+    initial_prompt は先頭ウィンドウへのヒントで効果が限定的なため、
+    詰め込みすぎず主要な語に絞る。確実な補正は後段の表記統一で行う。
+    """
+    terms = []
+    for value in dictionary.values():
+        if isinstance(value, str) and value and value not in terms:
+            terms.append(value)
+    for t in (extra_terms or []):
+        if t and t not in terms:
+            terms.append(t)
+    if not terms:
+        return None
+    return f"以下は日本語の会議音声です。次の固有名詞が登場します: {'、'.join(terms[:limit])}。"
+
+
+def detect_repetition(text, min_len=8, threshold=6):
+    """同一フレーズの連続を検出する（幻聴ループの早期警告）"""
+    if not text:
+        return None
+    m = re.search(r"(.{%d,40}?)\1{%d,}" % (min_len, threshold), text)
+    return m.group(1) if m else None
+
+
 # ------------------------------------------------------------- whisper実行基盤
+def resolve_mlx_whisper_module():
+    """Python API が使えるなら最優先。全デコードオプションを確実に渡せる。"""
+    global _MLX_WHISPER_MODULE
+    if _MLX_WHISPER_MODULE is not None:
+        return _MLX_WHISPER_MODULE or None
+    try:
+        import mlx_whisper  # noqa: PLC0415
+        _MLX_WHISPER_MODULE = mlx_whisper
+    except Exception:  # noqa: BLE001
+        _MLX_WHISPER_MODULE = False
+    return _MLX_WHISPER_MODULE or None
+
+
 def resolve_mlx_whisper_cmd():
     global _MLX_WHISPER_CMD
     if _MLX_WHISPER_CMD is not None:
@@ -196,17 +249,60 @@ def write_transcribe_debug_log(audio_path, cmd, *, result=None, error=None, note
     if result is not None:
         lines.extend([f"returncode: {result.returncode}", "stdout:", result.stdout or "",
                       "stderr:", result.stderr or ""])
+
     files = sorted(p.name for p in Path(audio_path).parent.glob("*.*")
                    if p.suffix in (".txt", ".json"))
     lines.extend(["output_files_in_dir:", "\n".join(files) if files else "(none)"])
+
     log_path.write_text("\n".join(lines), encoding="utf-8")
     return log_path
 
 
-def _run_whisper(audio_path, model, language, output_format):
-    """mlx_whisperを実行し (成功フラグ, 出力ファイルパス or None) を返す"""
+def _decode_options(engine):
+    opts = dict(DEFAULT_DECODE)
+    opts.update(engine.get("decode") or {})
+    return opts
+
+
+def _whisper_via_module(audio_path, model, language, decode, initial_prompt):
+    """Python API 経路。decode設定を確実に反映できる。"""
+    mlx_whisper = resolve_mlx_whisper_module()
+    if mlx_whisper is None:
+        return None
+
+    kwargs = {"language": language}
+    kwargs["condition_on_previous_text"] = bool(decode.get("condition_on_previous_text", False))
+    temps = decode.get("temperature")
+    if isinstance(temps, (list, tuple)) and temps:
+        kwargs["temperature"] = tuple(float(t) for t in temps)
+    elif isinstance(temps, (int, float)):
+        kwargs["temperature"] = float(temps)
+    for key in ("compression_ratio_threshold", "logprob_threshold",
+                "no_speech_threshold", "hallucination_silence_threshold"):
+        if decode.get(key) is not None:
+            kwargs[key] = float(decode[key])
+    if initial_prompt:
+        kwargs["initial_prompt"] = initial_prompt
+
+    try:
+        result = mlx_whisper.transcribe(str(audio_path), path_or_hf_repo=model, **kwargs)
+    except Exception as e:  # noqa: BLE001
+        log = write_transcribe_debug_log(audio_path, ["python:mlx_whisper.transcribe"],
+                                         error=e, note="module_transcribe_failed")
+        print(f"  ⚠️ Python API での文字起こしに失敗({type(e).__name__})。CLIを試します")
+        print(f"  📝 デバッグログ: {log}")
+        return None
+    return (result.get("text") or "").strip() or None
+
+
+def _run_whisper(audio_path, model, language, output_format, decode, initial_prompt):
+    """mlx_whisper(CLI)を実行し 出力ファイルパス or None を返す"""
     audio_path = Path(audio_path)
-    out_dir = audio_path.parent
+    # 出力先を音声ごとの専用ディレクトリに分離する。
+    # 旧実装は音声と同じディレクトリに出力し、見つからない場合に
+    # glob("*.txt")[0] で「別の音声の結果」を拾う事故があり得た。
+    out_dir = audio_path.parent / f"_stt_{audio_path.stem}"
+    out_dir.mkdir(parents=True, exist_ok=True)
     ensure_runtime_path()
 
     if not resolve_ffmpeg_cmd():
@@ -226,8 +322,29 @@ def _run_whisper(audio_path, model, language, output_format):
         "--output-format", output_format,
         "--output-dir", str(out_dir),
         "--language", language,
-        "--condition-on-previous-text", "False",
+        "--condition-on-previous-text",
+        "True" if decode.get("condition_on_previous_text") else "False",
     ]
+    # mlx_whisper の CLI は --temperature に単一のfloatしか受け付けない
+    # （温度フォールバックのタプルを渡せるのは Python API のみ）。
+    # ここでは先頭値だけを渡し、代わりに幻聴抑止のしきい値で補う。
+    temps = decode.get("temperature")
+    if isinstance(temps, (list, tuple)) and temps:
+        cmd += ["--temperature", str(float(temps[0]))]
+    elif isinstance(temps, (int, float)):
+        cmd += ["--temperature", str(float(temps))]
+    if decode.get("hallucination_silence_threshold") is not None:
+        cmd += ["--hallucination-silence-threshold",
+                str(decode["hallucination_silence_threshold"])]
+    if decode.get("compression_ratio_threshold") is not None:
+        cmd += ["--compression-ratio-threshold", str(decode["compression_ratio_threshold"])]
+    if decode.get("logprob_threshold") is not None:
+        cmd += ["--logprob-threshold", str(decode["logprob_threshold"])]
+    if decode.get("no_speech_threshold") is not None:
+        cmd += ["--no-speech-threshold", str(decode["no_speech_threshold"])]
+    if initial_prompt:
+        cmd += ["--initial-prompt", initial_prompt]
+
     print("  文字起こし実行中...")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
@@ -258,16 +375,31 @@ def _run_whisper(audio_path, model, language, output_format):
     target = out_dir / (audio_path.stem + ext)
     if target.exists():
         return target
+    # 専用ディレクトリなので、ここにある出力は必ずこの音声由来
     candidates = list(out_dir.glob("*" + ext))
     if candidates:
         return candidates[0]
+
     print(f"  ⚠️ 文字起こし結果ファイル({ext})が見つかりません。")
     print(f"  📝 デバッグログ: {write_transcribe_debug_log(audio_path, cmd, result=result, note='output_not_found')}")
     return None
 
 
-def whisper_text(audio_path, model, language="ja"):
-    path = _run_whisper(audio_path, model, language, "txt")
+def whisper_text(audio_path, model, language="ja", decode=None, initial_prompt=None):
+    decode = decode or dict(DEFAULT_DECODE)
+    # PATH整備は Python API 経路より前に必ず行う。
+    # mlx_whisper は内部で ffmpeg をサブプロセス起動するため、
+    # PATHが /usr/bin:/bin のままだと FileNotFoundError: 'ffmpeg' になる。
+    ensure_runtime_path()
+    if not resolve_ffmpeg_cmd():
+        print("  ❌ ffmpeg が見つかりません。（例: brew install ffmpeg）")
+        print(f"  📝 デバッグログ: {write_transcribe_debug_log(audio_path, ['ffmpeg'], note='ffmpeg_not_found')}")
+        return None
+
+    text = _whisper_via_module(audio_path, model, language, decode, initial_prompt)
+    if text:
+        return text
+    path = _run_whisper(audio_path, model, language, "txt", decode, initial_prompt)
     if not path:
         return None
     text = path.read_text(encoding="utf-8").strip()
@@ -288,21 +420,60 @@ def format_transcript(segments, unknown="話者不明"):
     return "\n".join(lines)
 
 
+def refine_plain_text(text, settings, verbose=True):
+    """whisper の素のテキストにも フィラー除去 / 表記統一 を適用する。
+
+    旧実装では qwen3-asr のときだけ llm_refine を通しており、
+    whisper では normalize_dict.json が一度も適用されていなかった。
+    """
+    if not text:
+        return text
+    segments = [{"start": 0.0, "text": line}
+                for line in text.splitlines() if line.strip()]
+    if not segments:
+        segments = [{"start": 0.0, "text": text}]
+    refined = llm_refine.refine_segments(
+        segments,
+        fillers=settings.get("fillers", []),
+        dictionary=load_dictionary(settings),
+        verbose=verbose,
+    )
+    return "\n".join((s.get("text") or "").strip()
+                     for s in refined if (s.get("text") or "").strip())
+
+
 # ------------------------------------------------------------------- メインAPI
 def transcribe(audio_path, label=None, settings=None, verbose=True):
     """labelに応じて文字起こしを行い、文字列を返す（失敗時はNone）"""
     settings = settings or load_settings()
     engine = get_engine(settings, label)
     etype = engine.get("type")
-
     if verbose:
         print(f"  エンジン: {engine.get('label')} (type={etype})")
 
-    # whisper：プレーンテキストをそのまま返す
+    dictionary = load_dictionary(settings)
+
+    # whisper：文字起こし後に フィラー除去・表記統一 を適用して返す
     if etype == "whisper":
-        return whisper_text(audio_path,
-                            engine.get("model", "mlx-community/whisper-medium-mlx"),
-                            engine.get("language", "ja"))
+        model = engine.get("model", DEFAULT_WHISPER_MODEL)
+        decode = _decode_options(engine)
+        initial_prompt = None
+        if engine.get("initialPromptFromDict", True):
+            initial_prompt = build_initial_prompt(dictionary, engine.get("contextTerms"))
+            if initial_prompt and verbose:
+                print(f"  ドメイン語彙: {initial_prompt[:60]}...")
+
+        text = whisper_text(audio_path, model, engine.get("language", "ja"),
+                            decode=decode, initial_prompt=initial_prompt)
+        if not text:
+            return None
+
+        looped = detect_repetition(text)
+        if looped and verbose:
+            print(f"  ⚠️ 同一フレーズの連続を検出: 「{looped[:30]}」")
+            print("     録音冒頭の無音や極端に小さい音量が原因のことが多いです")
+
+        return refine_plain_text(text, settings, verbose=verbose) or None
 
     if etype != "qwen3-asr":
         raise ValueError(f"未対応のtype '{etype}'（label={engine.get('label')}）。"
@@ -314,7 +485,7 @@ def transcribe(audio_path, label=None, settings=None, verbose=True):
         print("  ❌ mlx-qwen3-asr が未導入です（pip install \"mlx-qwen3-asr[aligner]\"）")
         return None
 
-    context = qwen3_asr.build_context(load_dictionary(settings), engine.get("contextTerms"))
+    context = qwen3_asr.build_context(dictionary, engine.get("contextTerms"))
     if context and verbose:
         print(f"  ドメイン語彙: {context[:60]}{'...' if len(context) > 60 else ''}")
 
@@ -360,7 +531,7 @@ def transcribe(audio_path, label=None, settings=None, verbose=True):
     segments = llm_refine.refine_segments(
         segments,
         fillers=settings.get("fillers", []),
-        dictionary=load_dictionary(settings),
+        dictionary=dictionary,
         verbose=verbose,
     )
 
