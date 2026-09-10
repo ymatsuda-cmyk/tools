@@ -546,16 +546,16 @@
 
     <div class="tab-panel" data-panel="data">
       <div class="field">
-        <label>index.json の場所</label>
-        <input type="text" id="s-indexpath" placeholder="index.json">
-        <div class="hint">同じリポジトリに置く場合は index.json のままでOK</div>
+        <label>読み込むファイル名</label>
+        <input type="text" id="s-indexfile" placeholder="index.json">
+        <div class="hint" id="hint-indexfile">https://ymatsuda-cmyk.github.io/tools/data/dashboard/ 配下のファイル名を指定します（.json のみ）</div>
       </div>
       <div class="field">
         <label>公開データの反映</label>
         <button class="icon-btn" id="btn-export" style="width:100%;margin-bottom:8px;">index.json を書き出す</button>
         <button class="icon-btn" id="btn-copyjson" style="width:100%;margin-bottom:8px;">JSONをコピー</button>
-        <button class="icon-btn" id="btn-reload" style="width:100%;">index.json を再読み込み（編集を破棄）</button>
-        <div class="hint">書き出したファイルをリポジトリに置いて push すると、全員に反映されます</div>
+        <button class="icon-btn" id="btn-reload" style="width:100%;">読み込み直す（編集を破棄）</button>
+        <div class="hint">書き出したファイルを data/dashboard/ に置いて push すると、全員に反映されます</div>
       </div>
     </div>
 
@@ -688,8 +688,21 @@ const DEFAULT_CONFIG = {
   gap:14,
   radius:14,
   fade:350,
-  indexPath:'index.json'
+  indexFile:'index.json'
 };
+
+/* データの置き場所は固定。設定で変えられるのはファイル名だけ */
+const DATA_BASE = 'https://ymatsuda-cmyk.github.io/tools/data/dashboard/';
+
+/** パス指定を弾き、.json のファイル名だけを通す */
+function sanitizeIndexFile(name){
+  const clean = String(name || '').trim().replace(/^.*[\\/]/, '');
+  return /^[\w.-]+\.json$/i.test(clean) ? clean : 'index.json';
+}
+
+function indexUrl(){
+  return DATA_BASE + sanitizeIndexFile(config.indexFile) + '?t=' + Date.now();
+}
 
 let config = { ...DEFAULT_CONFIG };
 let resources = [];
@@ -744,30 +757,35 @@ async function persistLocal(){
   await store.set('dashboardState', JSON.stringify({ config, resources }));
 }
 
-/* ---------- 初期読み込み: index.json → ローカル編集を優先 ---------- */
+/* ---------- 初期読み込み: 公開データ → ローカル編集を優先 ---------- */
 async function init(){
-  let published = null;
-  try{
-    const res = await fetch(DEFAULT_CONFIG.indexPath, { cache:'no-store' });
-    if(res.ok) published = await res.json();
-  }catch(e){ /* ファイルが無い場合は無視 */ }
-
   const local = await store.get('dashboardState');
   if(local){
     try{
       const parsed = JSON.parse(local);
       config = { ...DEFAULT_CONFIG, ...(parsed.config || {}) };
       resources = parsed.resources || [];
-      setStatus(published ? 'ローカルの編集内容を表示中（未公開の変更があります）' : 'ローカルの編集内容を表示中');
     }catch(e){
       resources = [];
     }
+  }
+
+  let published = null;
+  try{
+    const res = await fetch(indexUrl(), { cache:'no-store' });
+    if(res.ok) published = await res.json();
+  }catch(e){ /* ファイルが無い場合は無視 */ }
+
+  const file = sanitizeIndexFile(config.indexFile);
+  if(local){
+    setStatus(published ? 'ローカルの編集内容を表示中（未公開の変更があります）' : 'ローカルの編集内容を表示中');
   }else if(published){
-    config = { ...DEFAULT_CONFIG, ...(published.config || {}) };
+    // ファイル名はこの端末の設定なので、公開データの config では上書きしない
+    config = { ...DEFAULT_CONFIG, ...(published.config || {}), indexFile:file };
     resources = published.resources || [];
-    setStatus('index.json を読み込みました');
+    setStatus(file + ' を読み込みました');
   }else{
-    setStatus('index.json が見つかりません。追加した内容は書き出して公開できます');
+    setStatus(file + ' が見つかりません。追加した内容は書き出して公開できます');
   }
   applyConfig();
   render();
@@ -994,7 +1012,8 @@ const settingsOverlay = document.getElementById('settingsOverlay');
 
 function syncSettingsForm(){
   F('s-title').value = config.title;
-  F('s-indexpath').value = config.indexPath;
+  F('s-indexfile').value = sanitizeIndexFile(config.indexFile);
+  F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + sanitizeIndexFile(config.indexFile);
   const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
                  ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']];
   pairs.forEach(([input,label,key,unit])=>{
@@ -1022,7 +1041,11 @@ document.getElementById('settingsTabs').addEventListener('click', e=>{
 });
 
 F('s-title').addEventListener('input', async e=>{ config.title = e.target.value || 'マイリソース'; applyConfig(); await persistLocal(); });
-F('s-indexpath').addEventListener('input', async e=>{ config.indexPath = e.target.value.trim() || 'index.json'; await persistLocal(); });
+F('s-indexfile').addEventListener('input', async e=>{
+  config.indexFile = sanitizeIndexFile(e.target.value);
+  F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + config.indexFile;
+  await persistLocal();
+});
 
 [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
  ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']]
@@ -1060,13 +1083,14 @@ function currentJSON(){
 }
 
 document.getElementById('btn-export').onclick = ()=>{
+  const file = sanitizeIndexFile(config.indexFile);
   const blob = new Blob([currentJSON()], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'index.json';
+  a.download = file;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('index.json を書き出しました');
+  toast(file + ' を書き出しました');
 };
 
 document.getElementById('btn-copyjson').onclick = async ()=>{
@@ -1080,18 +1104,19 @@ document.getElementById('btn-copyjson').onclick = async ()=>{
 };
 
 document.getElementById('btn-reload').onclick = async ()=>{
+  const file = sanitizeIndexFile(config.indexFile);
   try{
-    const res = await fetch(config.indexPath, { cache:'no-store' });
+    const res = await fetch(indexUrl(), { cache:'no-store' });
     if(!res.ok) throw new Error('読み込めませんでした');
     const data = await res.json();
-    config = { ...DEFAULT_CONFIG, ...(data.config || {}) };
+    config = { ...DEFAULT_CONFIG, ...(data.config || {}), indexFile:file };
     resources = data.resources || [];
     await persistLocal();
     applyConfig(); render(); syncSettingsForm();
-    setStatus('index.json を再読み込みしました');
-    toast('index.json を反映しました');
+    setStatus(file + ' を再読み込みしました');
+    toast(file + ' を反映しました');
   }catch(e){
-    toast('index.json を読み込めませんでした');
+    toast(file + ' を読み込めませんでした');
   }
 };
 
