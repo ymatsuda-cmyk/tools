@@ -1,0 +1,184 @@
+{
+  "config": {
+    "title": "ダッシュボード",
+    "cardMin": 210,
+    "thumbH": 170,
+    "gap": 14,
+    "radius": 14,
+    "fade": 350,
+    "indexPath": "index.json",
+    "monitorInterval": 3,
+    "monitors": [
+      {
+        "id": "kaggle-gemma",
+        "name": "gemma4 12b",
+        "type": "kaggle",
+        "endpoint": "https://script.google.com/macros/s/AKfycbzpA72WxTcxQzWoI2Hnx684rMZ4gT82FoXdN8UU6apiX7KrOaWCR1ggdIXIn2OEwGq24w/exec"
+      },
+      {
+        "id": "kaggle-qwen3coder",
+        "name": "qwen3 coder",
+        "type": "kaggle",
+        "endpoint": "https://script.google.com/macros/s/AKfycbxZcx2lumJFU_Eu-CMzY-btxGkOaknS--7F6S_Qo8iMnChrg7KA04z-Q-ZgsuXgc2-Q/exec"
+      },
+      {
+        "id": "kaggle-qwen38",
+        "name": "qwen3.8 27b",
+        "type": "kaggle",
+        "endpoint": "https://script.google.com/macros/s/AKfycbz08SCS4i23ENcrXiqEBhU7apJh6PkcKvIs9IOqUZVQfjaMXc7rfRwd2GyqK4aMQhM/exec"
+      },
+      {
+        "id": "copilot",
+        "name": "GitHub Copilot",
+        "group": "AI",
+        "type": "copilot",
+        "monthlyLimit": 300
+      },
+      {
+        "id": "usd-150",
+        "name": "ドル円（買）",
+        "type": "fxpos",
+        "side": "buy",
+        "price": 154.2,
+        "amount": 1000000
+      },
+      {
+        "id": "fx",
+        "name": "ドル円",
+        "type": "fx",
+        "endpoint": "https://script.google.com/macros/s/AKfycbxH4pglsocIbAU8xLsYZRxXr3HdZgD1PxaUAiONJgezAUQcAe9p_bsB4XMp0cpfYVruMg/exec"
+      },
+      {
+        "id": "あ",
+        "name": "ああ",
+        "type": "manual",
+        "limit": 100,
+        "unit": "回",
+        "cycle": "daily"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "id": "r1788344922567",
+      "title": "議事録ビューア",
+      "url": "https://ymatsuda-cmyk.github.io/tools/LLM/beta/minutes/",
+      "category": "ログ",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/minutes.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/minutes.mp4",
+      "type": "site"
+    },
+    {
+      "id": "r1788345036894",
+      "title": "スケジュール（37期）",
+      "url": "https://jbaasisit.sharepoint.com/:x:/s/-200_/IQCvdMfkJ3GITrNs4_Bk2obtAcNbt6_ZkvgXYJiXvE_hXAc?e=fxoZz4",
+      "category": "Excel",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/kanban.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/kanban.mp4",
+      "type": "excel"
+    },
+    {
+      "id": "r1788345489159",
+      "title": "ステップ集計",
+      "url": "https://jbaasisit.sharepoint.com/:x:/s/-200_/IQCkEv51k5wIQauY2HJg02H9ASgxot7FeHx0QvSdngyrnjg?e=cK3gSe",
+      "category": "アドイン",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/stepcount.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/stepcount.mp4",
+      "type": "excel"
+    },
+    {
+      "id": "r1788345911409",
+      "title": "議事",
+      "url": "https://script.google.com/u/0/home/projects/1xM0vl8NRIpiqijH4CTehr5r_6N88CWZ7g2FugLUtgsYNtZ3DzHT1v2_7/edit?hl=ja",
+      "category": "設定",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788345986385",
+      "title": "kaggle（gemma4）",
+      "url": "https://www.kaggle.com/code/ymatsuda2025/gemma4-12b",
+      "category": "ＡＩ",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788346024009",
+      "title": "GAS（gemma4）",
+      "url": "https://script.google.com/home/projects/1s6AonqDq6V3mqYzQOAOp5tTLz5vb-DfQtt2LIGhs6uyvLOgQgVW6zImg/edit",
+      "category": "設定",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788399742990",
+      "title": "ClipStock",
+      "url": "https://ymatsuda-cmyk.github.io/tools/beta/clipstock/",
+      "category": "情報",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788742383975",
+      "title": "webclip",
+      "url": "https://ymatsuda-cmyk.github.io/tools/news-brief/",
+      "category": "情報",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788746779455",
+      "title": "提案",
+      "url": "https://jbaasisit-my.sharepoint.com/:x:/g/personal/matsuda_jba-net_co_jp/IQDvvo0h-g9VT5ZNY13Uo77TAdPPh1SCWt1tREohI9sM5uo?e=Q3RGgI",
+      "category": "Excel",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "excel"
+    },
+    {
+      "id": "r1788752646745",
+      "title": "MM会議資料",
+      "url": "https://rtarmcojp.sharepoint.com/:f:/s/msteams_16b2a9_343102-MM/IgCCNgJ_1lAAQ52bo6rqYpEUARjIRH1DOr9t3UskfhEeX1c?e=FuMSpp",
+      "category": "資料",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "excel"
+    },
+    {
+      "id": "r1788780404931",
+      "title": "$",
+      "url": "https://ymatsuda-cmyk.github.io/tools/fx-invest/",
+      "category": "情報",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    }
+  ]
+}
