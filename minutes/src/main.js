@@ -269,6 +269,11 @@ function detailTarget(rowEl) {
 
 function paintDetail(target, item, state) {
   const pid = item.notionPageId
+  // 同じ議事録・同じタブの再描画なら、編集やマーカー適用の前後でスクロール位置を保つ
+  const paintKey = `${item.key}::${activeTabByKey[item.key] || 'summary'}`
+  const prevScroll = target.dataset.paintKey === paintKey
+    ? target.querySelector('.detail-scroll')?.scrollTop || 0
+    : 0
   const renderState = {
     ...state,
     tags: tagsByKey[pid],
@@ -281,6 +286,11 @@ function paintDetail(target, item, state) {
     searchQuery,
   }
   target.innerHTML = renderDetailHtml(item, renderState)
+  target.dataset.paintKey = paintKey
+  if (prevScroll) {
+    const scrollEl = target.querySelector('.detail-scroll')
+    if (scrollEl) scrollEl.scrollTop = prevScroll
+  }
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
