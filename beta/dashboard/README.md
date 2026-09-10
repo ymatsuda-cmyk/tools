@@ -16,6 +16,12 @@ your-repo/
 `assets/thumbs/` と `assets/previews/` は空だと Git に登録されないので、
 `.gitkeep` という空ファイルを置いておいてください。
 
+リポジトリ直下ではなくサブディレクトリ（例 `beta/dashboard/`）に置く場合は、
+スクリプトプロパティ `GITHUB_BASE_PATH` にそのディレクトリを指定します。
+GAS はコミット先をすべてそのディレクトリ配下（`beta/dashboard/index.json`、
+`beta/dashboard/assets/...`）に切り替えます。ダッシュボード側の設定や
+`index.json` 内のパスは、これまで通り `index.html` からの相対パスのままで構いません。
+
 ---
 
 ## 1. Notion データベースを作る
@@ -72,6 +78,7 @@ Settings → Developer settings → Personal access tokens → **Fine-grained to
 | `GITHUB_OWNER` | GitHubのユーザー名 |
 | `GITHUB_REPO` | リポジトリ名 |
 | `GITHUB_BRANCH` | `main`（省略可） |
+| `GITHUB_BASE_PATH` | リポジトリ配下のディレクトリ 例 `beta/dashboard`（省略時はリポジトリ直下） |
 | `NOTION_TOKEN` | 手順1のトークン |
 | `NOTION_DATABASE_ID` | 手順1のデータベースID |
 | `SHARED_SECRET` | 自分で決めた任意の文字列 |

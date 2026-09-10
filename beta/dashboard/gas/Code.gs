@@ -11,6 +11,7 @@
  *  GITHUB_OWNER      … GitHubのユーザー名 or Organization名
  *  GITHUB_REPO       … リポジトリ名
  *  GITHUB_BRANCH     … 省略時 main
+ *  GITHUB_BASE_PATH  … リポジトリ配下のディレクトリ（例 beta/dashboard）。省略時はリポジトリ直下
  *  NOTION_TOKEN      … Notion internal integration token（ntn_ で始まる）
  *  NOTION_DATABASE_ID… リンク管理用データベースのID
  *  SHARED_SECRET     … ダッシュボードから呼ぶときの共有パスワード（任意の文字列）
@@ -27,8 +28,25 @@ function cfg(key, fallback) {
    GitHub Contents API
    ============================================================ */
 
+/** GITHUB_BASE_PATH を前後のスラッシュ無しに正規化する */
+function basePath() {
+  return cfg('GITHUB_BASE_PATH', '').replace(/^\/+|\/+$/g, '');
+}
+
+/**
+ * ダッシュボードから見た相対パスを、リポジトリ内の実際のパスに変換する。
+ * 例: GITHUB_BASE_PATH='beta/dashboard' のとき
+ *     'assets/thumbs/bot.png' → 'beta/dashboard/assets/thumbs/bot.png'
+ */
+function repoPath(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  const base = basePath();
+  return base ? base + '/' + clean : clean;
+}
+
 /**
  * リポジトリ内のファイルを作成または更新する。
+ * path は GITHUB_BASE_PATH からの相対パスで渡す。
  * 1回のリクエストでコミットまで完了する（pushは不要）。
  */
 function commitFile(path, base64Content, message) {
@@ -41,7 +59,8 @@ function commitFile(path, base64Content, message) {
     throw new Error('GITHUB_OWNER / GITHUB_REPO / GITHUB_TOKEN が未設定です');
   }
 
-  const base = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + path;
+  const full = repoPath(path);
+  const base = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + full;
   const headers = {
     Authorization: 'Bearer ' + token,
     Accept: 'application/vnd.github+json'
@@ -58,7 +77,7 @@ function commitFile(path, base64Content, message) {
   }
 
   const payload = {
-    message: message || ('update ' + path),
+    message: message || ('update ' + full),
     content: base64Content,
     branch: branch
   };
@@ -196,7 +215,7 @@ function fetchExistingConfig() {
   const owner  = cfg('GITHUB_OWNER');
   const repo   = cfg('GITHUB_REPO');
   const branch = cfg('GITHUB_BRANCH', 'main');
-  const url = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/index.json';
+  const url = 'https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + repoPath('index.json');
 
   const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) return null;
@@ -891,7 +910,7 @@ function doGet(e) {
 /**
  * ダッシュボードからのPOSTを処理
  *
- * リクエスト例:
+ * リクエスト例（path は GITHUB_BASE_PATH からの相対パス）:
  *  { secret:'...', action:'upload',    path:'assets/previews/bot.mp4', contentBase64:'...' }
  *  { secret:'...', action:'saveIndex', json:'{...}' }
  *  { secret:'...', action:'sync' }
@@ -908,6 +927,7 @@ function doPost(e) {
     if (req.action === 'upload') {
       if (!req.path || !req.contentBase64) throw new Error('path と contentBase64 は必須です');
       if (!/^assets\//.test(req.path)) throw new Error('アップロード先は assets/ 配下にしてください');
+      if (req.path.indexOf('..') !== -1) throw new Error('パスに .. は使えません');
       commitFile(req.path, req.contentBase64, 'アップロード: ' + req.path);
       return jsonOut({ ok: true, path: req.path });
     }
@@ -974,6 +994,7 @@ function testGitHubConnection() {
     muteHttpExceptions: true
   });
   Logger.log('GitHub: ' + res.getResponseCode());
+  Logger.log('コミット先: ' + owner + '/' + repo + ' の ' + repoPath('index.json'));
   Logger.log(res.getContentText().slice(0, 300));
 }
 
