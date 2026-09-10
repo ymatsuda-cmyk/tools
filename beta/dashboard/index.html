@@ -142,17 +142,9 @@
   }
   .card{
     background:var(--surface);border:1px solid var(--border);border-radius:var(--card-radius);
-    overflow:hidden;cursor:pointer;position:relative;
-    transition:border-color .2s ease,transform .18s ease,box-shadow .2s ease;
+    overflow:hidden;cursor:pointer;position:relative;transition:border-color .2s ease;
   }
-  .card:hover{
-    border-color:var(--border-strong);
-    transform:scale(1.05);
-    box-shadow:0 10px 26px rgba(0,0,0,0.45);
-    z-index:4;
-  }
-  .card.dragging{opacity:0.4;transform:none;box-shadow:none;cursor:grabbing;}
-  .grid.reordering .card:hover{transform:none;box-shadow:none;}
+  .card:hover{border-color:var(--border-strong);}
   .card[data-size="wide"]{grid-column:span 2;}
   .card[data-size="large"]{grid-column:span 2;}
   .card[data-size="large"] .thumb{height:calc(var(--thumb-h) * 1.7);}
@@ -162,19 +154,14 @@
     position:relative;height:var(--thumb-h);background:var(--surface-2);
     display:flex;align-items:center;justify-content:center;overflow:hidden;
   }
-  .thumb img,.thumb video{
-    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-    pointer-events:none;-webkit-user-drag:none;user-select:none;
-  }
+  .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .base-layer,.hover-layer{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     transition:opacity var(--fade) ease;
   }
   .hover-layer{opacity:0;}
   .card:hover .hover-layer,.card.preview-on .hover-layer{opacity:1;}
-  .card:hover .base-layer,.card.preview-on .base-layer{opacity:0;}
-  /* 動画プレビューはホバーに関係なく常に再生・表示する */
-  .base-layer.always-on,.card:hover .base-layer.always-on{opacity:1;}
+  .card:hover .has-preview .base-layer,.card.preview-on .has-preview .base-layer{opacity:0;}
 
   .type-badge{
     position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
@@ -185,7 +172,10 @@
     position:absolute;bottom:8px;left:8px;font-size:10px;padding:3px 7px;border-radius:5px;
     background:rgba(20,23,28,0.8);color:var(--text-secondary);z-index:2;
   }
-  .fallback-icon{font-size:26px;color:var(--text-muted);}
+  .fallback-art{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  }
+  .fallback-art svg{width:36px;height:36px;}
   .card-actions{position:absolute;top:8px;left:8px;display:none;gap:4px;z-index:3;}
   .card:hover .card-actions{display:flex;}
   .mini-btn{
@@ -268,7 +258,6 @@
   <div class="main-tabs" id="mainTabs">
     <button data-view="links" class="active">リンク</button>
     <button data-view="monitor">稼働状況</button>
-    <button data-view="info">情報</button>
   </div>
 
   <div class="status-line mono" id="statusLine">読み込み中…</div>
@@ -291,28 +280,11 @@
     <div class="chips" id="monitorChips"></div>
     <div class="monitor-bar">
       <span class="mono" id="monitorClock">—</span>
-      <div class="head-actions">
-        <button class="icon-btn" id="btn-refresh-monitor">今すぐ更新</button>
-        <button class="add-btn" id="openMonitorAdd">＋ 追加</button>
-      </div>
+      <button class="icon-btn" id="btn-refresh-monitor">今すぐ更新</button>
     </div>
     <div class="monitor-grid" id="monitorGrid"></div>
     <div class="monitor-empty" id="monitorEmpty">
-      監視対象が登録されていません。上の「＋ 追加」から登録してください。
-    </div>
-  </div>
-
-  <div class="view" data-view="info" hidden>
-    <div class="monitor-bar">
-      <span class="mono" id="infoClock">—</span>
-      <div class="head-actions">
-        <button class="icon-btn" id="btn-refresh-info">今すぐ更新</button>
-        <button class="add-btn" id="openInfoAdd">＋ 追加</button>
-      </div>
-    </div>
-    <div class="monitor-grid" id="infoGrid"></div>
-    <div class="monitor-empty" id="infoEmpty">
-      情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。
+      監視対象が登録されていません。設定 → 監視 から追加してください。
     </div>
   </div>
 </div>
@@ -378,107 +350,9 @@
   </div>
 </div>
 
-<!-- 監視対象の追加モーダル -->
-<div class="overlay" id="monitorOverlay">
-  <div class="modal">
-    <h2>監視対象を追加</h2>
-    <p class="sub">稼働状況タブに表示するカードを1件登録します</p>
-
-    <div class="field">
-      <label>種類</label>
-      <select id="mf-type">
-        <option value="api">汎用API（共通仕様のendpoint）</option>
-        <option value="kaggle">Kaggle コントローラー</option>
-        <option value="fx">ドル円 かんたん投資</option>
-        <option value="fxpos">ドル円の建値</option>
-        <option value="copilot">GitHub Copilot</option>
-        <option value="manual">手動カウンタ</option>
-        <option value="quota">APIクォータ</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>ID</label>
-      <input type="text" id="mf-id" placeholder="gpu-server">
-      <div class="hint">トークンのプロパティ名に使います。英数字とハイフン推奨</div>
-      <div class="err" id="err-monitor">IDを入力してください</div>
-    </div>
-
-    <div class="field">
-      <label>表示名</label>
-      <input type="text" id="mf-name" placeholder="GPU サーバー">
-    </div>
-
-    <div class="field" data-for="api kaggle fx">
-      <label>endpoint</label>
-      <input type="text" id="mf-endpoint" placeholder="https://example.com/api/resource">
-      <div class="hint">トークンが必要な場合はGASのスクリプトプロパティに登録してください</div>
-    </div>
-
-    <div class="field" data-for="copilot">
-      <label>1か月の上限</label>
-      <input type="number" id="mf-monthlylimit" value="300">
-    </div>
-
-    <div class="field" data-for="manual">
-      <label>上限</label>
-      <input type="number" id="mf-limit" value="100">
-    </div>
-    <div class="field" data-for="manual">
-      <label>単位</label>
-      <input type="text" id="mf-unit" placeholder="回">
-    </div>
-    <div class="field" data-for="manual">
-      <label>周期</label>
-      <select id="mf-cycle">
-        <option value="daily">毎日</option>
-        <option value="monthly">毎月</option>
-        <option value="rolling">ローリング（時間指定）</option>
-      </select>
-    </div>
-    <div class="field" data-for="manual">
-      <label>ローリングの枠（時間）</label>
-      <input type="number" id="mf-windowhours" value="5">
-    </div>
-
-    <div class="field" data-for="quota">
-      <label>サービス名</label>
-      <input type="text" id="mf-service" placeholder="gemini">
-    </div>
-    <div class="field" data-for="quota">
-      <label>モデル名</label>
-      <input type="text" id="mf-model" placeholder="gemini-2.5-flash">
-    </div>
-    <div class="field" data-for="quota">
-      <label>1日の上限</label>
-      <input type="number" id="mf-dailylimit" value="1000">
-    </div>
-
-    <div class="field" data-for="fxpos">
-      <label>売買</label>
-      <select id="mf-side">
-        <option value="buy">買い</option>
-        <option value="sell">売り</option>
-      </select>
-    </div>
-    <div class="field" data-for="fxpos">
-      <label>建値</label>
-      <input type="number" id="mf-price" step="0.01" placeholder="150.55">
-    </div>
-    <div class="field" data-for="fxpos">
-      <label>金額（円）</label>
-      <input type="number" id="mf-amount" step="10000" value="1000000">
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="cancelMonitor">キャンセル</button>
-      <button class="btn btn-primary" id="saveMonitor">追加</button>
-    </div>
-  </div>
-</div>
-
 <!-- 設定モーダル -->
-<div class="overlay" id="settingsOverlay">  <div class="modal">
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
     <h2>設定</h2>
     <p class="sub">見た目の調整と、index.json の読み書き</p>
     <div class="tabs" id="settingsTabs">
@@ -605,6 +479,22 @@
 <script>
 const TYPE_ICON = { youtube:'▶', excel:'▦', site:'◎' };
 const RUN_LABEL = { web:'Web', download:'DL', local:'Local' };
+
+/* サムネイルもプレビューも無いときの代替表示 */
+const FALLBACK_SVG = {
+  youtube: '<rect x="2.5" y="5" width="19" height="14" rx="4"/>' +
+           '<path d="M10 9.3l5.2 2.7-5.2 2.7z" fill="currentColor" stroke="none"/>',
+  excel  : '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/>',
+  site   : '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><ellipse cx="12" cy="12" rx="4" ry="9"/>'
+};
+const FALLBACK_COLORS = [
+  { bg:'#CBDDF6', fg:'#2C5FA8' },
+  { bg:'#CCE6CF', fg:'#2F7A3D' },
+  { bg:'#F4CFD2', fg:'#B03A3A' },
+  { bg:'#EDE6D9', fg:'#4A4438' },
+  { bg:'#DBD3EF', fg:'#5B44A8' },
+  { bg:'#F6E2C4', fg:'#9A6A20' }
+];
 const DEFAULT_CONFIG = {
   title:'マイリソース',
   cardMin:180,
@@ -698,11 +588,10 @@ async function init(){
   applyInitialView();
 }
 
-/** URLの ?view= を反映して初期表示を決める */
+/** URLの ?view=monitor を反映して初期表示を決める */
 function applyInitialView(){
-  const view = initialParams.view;
-  if(view !== 'monitor' && view !== 'info') return;
-  const btn = document.querySelector(`#mainTabs button[data-view="${view}"]`);
+  if(initialParams.view !== 'monitor') return;
+  const btn = document.querySelector('#mainTabs button[data-view="monitor"]');
   if(btn) btn.click();
 }
 
@@ -724,16 +613,33 @@ function renderChips(){
   });
 }
 
-function thumbHTML(r){
-  const isVideo = r.preview && /\.mp4($|\?)/i.test(r.preview);
-  // 動画プレビューはホバーを待たず常に再生させたいので、ベース側に置く
-  const base = isVideo
-    ? `<video src="${r.preview}" muted loop playsinline autoplay preload="auto"></video>`
-    : (r.thumb ? `<img src="${r.thumb}" alt="">` : `<span class="fallback-icon">${TYPE_ICON[r.type]||'◎'}</span>`);
-  const hover = (!isVideo && r.preview) ? `<img src="${r.preview}" alt="">` : '';
+/** 同じカードには常に同じ色が当たるよう id から選ぶ */
+function fallbackArt(r){
+  const key = String(r.id || r.title || '');
+  let h = 0;
+  for(let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const c = FALLBACK_COLORS[h % FALLBACK_COLORS.length];
+  const paths = FALLBACK_SVG[r.type] || FALLBACK_SVG.site;
   return `
-    <div class="thumb">
-      <div class="base-layer${isVideo ? ' always-on' : ''}">${base}</div>
+    <div class="fallback-art" style="background:${c.bg};color:${c.fg}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>
+    </div>`;
+}
+
+function thumbHTML(r){
+  const base = r.thumb
+    ? `<img src="${r.thumb}" alt="">`
+    : fallbackArt(r);
+  let hover = '';
+  if(r.preview){
+    hover = /\.mp4($|\?)/i.test(r.preview)
+      ? `<video src="${r.preview}" muted loop playsinline autoplay></video>`
+      : `<img src="${r.preview}" alt="">`;
+  }
+  return `
+    <div class="thumb${hover ? ' has-preview' : ''}">
+      <div class="base-layer">${base}</div>
       ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
       <div class="type-badge">${TYPE_ICON[r.type]||'◎'}</div>
       <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
@@ -759,7 +665,7 @@ function render(){
     return;
   }
   grid.innerHTML = list.map(r=>`
-    <div class="card" draggable="true" data-id="${r.id}" data-url="${r.url}" data-size="${r.cardSize||'normal'}">
+    <div class="card" data-id="${r.id}" data-url="${r.url}" data-size="${r.cardSize||'normal'}">
       ${thumbHTML(r)}
       <div class="card-body">
         <div class="card-title">${r.title}</div>
@@ -767,17 +673,9 @@ function render(){
       </div>
     </div>`).join('');
 
-  // autoplay属性が効かないブラウザでも再生されるよう明示的に呼ぶ
-  grid.querySelectorAll('video').forEach(v=>{
-    v.muted = true;
-    const p = v.play();
-    if(p && p.catch) p.catch(()=>{});
-  });
-
   grid.querySelectorAll('.card').forEach(card=>{
     card.addEventListener('click', e=>{
       if(e.target.closest('.card-actions')) return;
-      if(suppressClick) return;
       window.open(card.dataset.url, '_blank');
     });
   });
@@ -795,61 +693,6 @@ function render(){
 }
 
 document.getElementById('searchInput').addEventListener('input', render);
-
-/* ---------- カードの並び替え（ドラッグ＆ドロップ） ---------- */
-let draggingCard = null;
-let suppressClick = false;
-
-/** DOM上のカードの並びを resources の並びへ反映する（絞り込み中は表示分だけ入れ替える） */
-function commitOrderFromDom(){
-  const gridEl = document.getElementById('grid');
-  const ids = [...gridEl.querySelectorAll('.card')].map(c=>c.dataset.id);
-  const shown = new Set(ids);
-  const byId = new Map(resources.map(r=>[r.id, r]));
-  const slots = [];
-  resources.forEach((r,i)=>{ if(shown.has(r.id)) slots.push(i); });
-  slots.forEach((pos,k)=>{ resources[pos] = byId.get(ids[k]); });
-}
-
-(function setupCardDnD(){
-  const gridEl = document.getElementById('grid');
-
-  gridEl.addEventListener('dragstart', e=>{
-    const card = e.target.closest('.card');
-    if(!card) return;
-    draggingCard = card;
-    gridEl.classList.add('reordering');
-    card.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', card.dataset.id);
-  });
-
-  gridEl.addEventListener('dragover', e=>{
-    if(!draggingCard) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const over = e.target.closest('.card');
-    if(!over || over === draggingCard) return;
-    const rect = over.getBoundingClientRect();
-    const after = (e.clientX - rect.left) > rect.width / 2;
-    gridEl.insertBefore(draggingCard, after ? over.nextSibling : over);
-  });
-
-  gridEl.addEventListener('drop', e=>{ e.preventDefault(); });
-
-  gridEl.addEventListener('dragend', async ()=>{
-    if(!draggingCard) return;
-    draggingCard.classList.remove('dragging');
-    draggingCard = null;
-    gridEl.classList.remove('reordering');
-    // ドラッグ直後のclickでリンクが開かないようにする
-    suppressClick = true;
-    setTimeout(()=>{ suppressClick = false; }, 0);
-    commitOrderFromDom();
-    await persistLocal();
-    setStatus('並び順を変更しました。公開するには index.json を書き出してください');
-  });
-})();
 
 document.getElementById('sizeGroup').addEventListener('click', async e=>{
   const btn = e.target.closest('button');
@@ -1172,7 +1015,7 @@ function syncUrl(){
 
   if(activeMonitor.startsWith('type:')) q.set('type', activeMonitor.slice(5));
 
-  if(currentView !== 'links') q.set('view', currentView);
+  if(currentView === 'monitor') q.set('view', 'monitor');
   else q.delete('view');
 
   const qs = q.toString();
@@ -1188,34 +1031,17 @@ function monitorType(m){
   return m.type || 'api';
 }
 
-/* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos'];
-
-function isInfoMonitor(m){
-  return INFO_TYPES.includes(monitorType(m));
-}
-
-/** 稼働状況タブの対象。チップの選択で絞り込む */
+/** 現在の選択で絞り込んだ監視対象 */
 function monitors(){
-  const list = allMonitors().filter(m => !isInfoMonitor(m));
+  const list = allMonitors();
   if(!activeMonitor.startsWith('type:')) return list;
   const t = activeMonitor.slice(5);
   return list.filter(m => monitorType(m) === t);
 }
 
-/** 情報タブの対象 */
-function infoMonitors(){
-  return allMonitors().filter(isInfoMonitor);
-}
-
-/** 取得対象。両方のタブぶんをまとめて取りに行く */
-function fetchTargets(){
-  return monitors().concat(infoMonitors());
-}
-
-/** 登録済みの種別一覧（情報タブのものは除く） */
+/** 登録済みの種別一覧 */
 function monitorTypes(){
-  return [...new Set(allMonitors().filter(m => !isInfoMonitor(m)).map(monitorType))];
+  return [...new Set(allMonitors().map(monitorType))];
 }
 
 function intervalMs(){
@@ -1456,22 +1282,15 @@ function renderMonitorChips(){
 
 function renderMonitors(){
   renderMonitorChips();
-  paintMonitorGrid('monitorGrid', 'monitorEmpty', monitors(),
-    allMonitors().length === 0
-      ? '監視対象が登録されていません。上の「＋ 追加」から登録してください。'
-      : 'この条件に一致する監視対象がありません。');
-  paintMonitorGrid('infoGrid', 'infoEmpty', infoMonitors(),
-    '情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。');
-}
-
-function paintMonitorGrid(gridId, emptyId, list, emptyText){
-  const grid = document.getElementById(gridId);
-  const empty = document.getElementById(emptyId);
-  if(!grid || !empty) return;
+  const list = monitors();
+  const grid = document.getElementById('monitorGrid');
+  const empty = document.getElementById('monitorEmpty');
 
   if(list.length === 0){
     grid.innerHTML = '';
-    empty.textContent = emptyText;
+    empty.textContent = allMonitors().length === 0
+      ? '監視対象が登録されていません。設定 → 監視 から追加してください。'
+      : 'この条件に一致する監視対象がありません。';
     empty.hidden = false;
     return;
   }
@@ -1493,7 +1312,7 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
   grid.querySelectorAll('[data-reset]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.reset;
-      const m = allMonitors().find(x=>x.id===id);
+      const m = monitors().find(x=>x.id===id);
       if(confirm(`${(m && m.name) || id} のカウントを0に戻しますか？`)){
         recordManualUsage(id, 0, true);
       }
@@ -1503,7 +1322,7 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
   grid.querySelectorAll('[data-fix]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.fix;
-      const m = allMonitors().find(x=>x.id===id);
+      const m = monitors().find(x=>x.id===id);
       const input = prompt(
         `${(m && m.name) || id} の残りを入力してください（${btn.dataset.unit}）\n空欄で保存した修正を解除します。`,
         btn.dataset.value
@@ -1516,7 +1335,7 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
 /** 取得値と入力値の差をGASに保存し、以降の表示に反映する */
 async function adjustMonitor(id, text){
-  const m = allMonitors().find(x=>x.id===id);
+  const m = monitors().find(x=>x.id===id);
   if(!m) return;
   const reset = text === '';
   if(!reset && !isFinite(Number(text))){
@@ -1532,7 +1351,7 @@ async function adjustMonitor(id, text){
 
 /** 手動カウンタの増減。GAS側に保存するので端末をまたいで揃う */
 async function recordManualUsage(id, delta, reset){
-  const m = allMonitors().find(x=>x.id===id);
+  const m = monitors().find(x=>x.id===id);
   if(!m) return;
   try{
     const res = await callGas({ action:'monitorUsage', monitor:m, delta, reset });
@@ -1542,7 +1361,7 @@ async function recordManualUsage(id, delta, reset){
 }
 
 async function fetchMonitors(){
-  const list = fetchTargets();
+  const list = monitors();
   if(list.length === 0) return;
   try{
     const res = await callGas({ action:'monitorStatus', monitors:list });
@@ -1586,14 +1405,13 @@ async function controlMonitor(id, action){
 }
 
 function updateClock(){
+  const el = document.getElementById('monitorClock');
+  if(!el) return;
+  if(monitors().length === 0){ el.textContent = '—'; return; }
   const left = Math.max(0, Math.ceil((nextFetchAt - Date.now()) / 1000));
   const mm = String(Math.floor(left / 60)).padStart(2,'0');
   const ss = String(left % 60).padStart(2,'0');
-  const text = fetchTargets().length === 0 ? '—' : `次の更新まで ${mm}:${ss}`;
-  ['monitorClock','infoClock'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.textContent = text;
-  });
+  el.textContent = `次の更新まで ${mm}:${ss}`;
 }
 
 function startMonitorLoop(){
@@ -1617,17 +1435,17 @@ document.getElementById('mainTabs').addEventListener('click', e=>{
   document.querySelectorAll('.view').forEach(v=>{ v.hidden = v.dataset.view !== currentView; });
 
   syncUrl();
-  if(currentView === 'links'){
-    stopMonitorLoop();
-  }else{
+  if(currentView === 'monitor'){
     renderMonitors();
     startMonitorLoop();
+  }else{
+    stopMonitorLoop();
   }
 });
 
 window.addEventListener('popstate', ()=>{
   readUrlParams();
-  if(currentView !== 'links'){ renderMonitors(); startMonitorLoop(); }
+  if(currentView === 'monitor'){ renderMonitors(); startMonitorLoop(); }
 });
 
 document.getElementById('btn-refresh-monitor').onclick = ()=>{
@@ -1635,98 +1453,14 @@ document.getElementById('btn-refresh-monitor').onclick = ()=>{
   fetchMonitors();
 };
 
-document.getElementById('btn-refresh-info').onclick = ()=>{
-  toast('更新しています…');
-  fetchMonitors();
-};
-
 // タブを離れている間は止めて、戻ったら再開する
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){ stopMonitorLoop(); }
-  else if(currentView !== 'links'){ startMonitorLoop(); }
+  else if(currentView === 'monitor'){ startMonitorLoop(); }
 });
 
-/* ---------- 稼働状況タブからの追加 ---------- */
-const monitorOverlay = document.getElementById('monitorOverlay');
-
-/** 選んだ種類に関係する入力欄だけを出す */
-function syncMonitorForm(){
-  const type = F('mf-type').value;
-  monitorOverlay.querySelectorAll('[data-for]').forEach(el=>{
-    el.hidden = !el.dataset.for.split(' ').includes(type);
-  });
-}
-
-function openMonitorModal(type){
-  F('mf-type').value = type || 'api';
-  F('mf-id').value = '';
-  F('mf-name').value = '';
-  F('mf-endpoint').value = '';
-  F('mf-price').value = '';
-  F('err-monitor').style.display = 'none';
-  syncMonitorForm();
-  monitorOverlay.classList.add('show');
-  F('mf-id').focus();
-}
-
-function buildMonitor(){
-  const type = F('mf-type').value;
-  const id = F('mf-id').value.trim();
-  if(!id) throw new Error('IDを入力してください');
-  if(allMonitors().some(m => m.id === id)) throw new Error('同じIDがすでに登録されています');
-
-  const m = { id, name: F('mf-name').value.trim() || id };
-  if(type !== 'api') m.type = type;
-
-  if(['api','kaggle','fx'].includes(type)){
-    const endpoint = F('mf-endpoint').value.trim();
-    if(!endpoint) throw new Error('endpoint を入力してください');
-    m.endpoint = endpoint;
-  }
-  if(type === 'copilot') m.monthlyLimit = Number(F('mf-monthlylimit').value) || 300;
-  if(type === 'manual'){
-    m.limit = Number(F('mf-limit').value) || 100;
-    m.unit = F('mf-unit').value.trim() || '回';
-    m.cycle = F('mf-cycle').value;
-    if(m.cycle === 'rolling') m.windowHours = Number(F('mf-windowhours').value) || 5;
-  }
-  if(type === 'quota'){
-    m.service = F('mf-service').value.trim();
-    m.model = F('mf-model').value.trim();
-    if(!m.service || !m.model) throw new Error('サービス名とモデル名を入力してください');
-    m.dailyLimit = Number(F('mf-dailylimit').value) || 0;
-  }
-  if(type === 'fxpos'){
-    m.side = F('mf-side').value;
-    m.price = Number(F('mf-price').value);
-    if(!m.price) throw new Error('建値を入力してください');
-    m.amount = Number(F('mf-amount').value) || 1000000;
-  }
-  return m;
-}
-
-F('mf-type').addEventListener('change', syncMonitorForm);
-document.getElementById('openMonitorAdd').onclick = ()=>openMonitorModal('api');
-document.getElementById('openInfoAdd').onclick = ()=>openMonitorModal('fxpos');
-document.getElementById('cancelMonitor').onclick = ()=>monitorOverlay.classList.remove('show');
-
-document.getElementById('saveMonitor').onclick = async ()=>{
+document.getElementById('btn-applymonitors').onclick = async ()=>{
   try{
-    const m = buildMonitor();
-    config.monitors = allMonitors().concat([m]);
-    await persistLocal();
-    F('s-monitors').value = JSON.stringify(config.monitors, null, 2);
-    monitorOverlay.classList.remove('show');
-    renderMonitors();
-    startMonitorLoop();
-    toast('「' + m.name + '」を追加しました');
-  }catch(err){
-    F('err-monitor').textContent = err.message;
-    F('err-monitor').style.display = 'block';
-  }
-};
-
-document.getElementById('btn-applymonitors').onclick = async ()=>{  try{
     const parsed = JSON.parse(F('s-monitors').value);
     if(!Array.isArray(parsed)) throw new Error('配列で指定してください');
     parsed.forEach(m=>{
@@ -1742,7 +1476,7 @@ document.getElementById('btn-applymonitors').onclick = async ()=>{  try{
     syncUrl();
     monitorSnapshots = {};
     renderMonitors();
-    if(currentView !== 'links') startMonitorLoop();
+    if(currentView === 'monitor') startMonitorLoop();
     toast('監視対象を保存しました');
   }catch(err){
     F('err-monitors').textContent = 'JSONの形式が正しくありません: ' + err.message;
@@ -1754,7 +1488,7 @@ F('s-interval').addEventListener('input', async e=>{
   config.monitorInterval = Number(e.target.value);
   F('v-interval').textContent = config.monitorInterval + '分';
   await persistLocal();
-  if(currentView !== 'links') startMonitorLoop();
+  if(currentView === 'monitor') startMonitorLoop();
 });
 
 initialParams = readUrlParams();

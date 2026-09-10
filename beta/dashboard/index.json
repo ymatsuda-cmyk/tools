@@ -32,8 +32,8 @@
         "name": "GitHub Copilot",
         "group": "AI",
         "type": "manual",
-        "limit": 1500,
-        "unit": "credits",
+        "limit": 300,
+        "unit": "回",
         "cycle": "monthly"
       },
       {
