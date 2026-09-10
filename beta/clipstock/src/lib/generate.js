@@ -1,21 +1,31 @@
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
+import { promptOf } from './prompts.js'
 import { serializeSections } from './sections.js'
 import { reconcileTags } from './tags.js'
 import { splitTranscript, resolveQuote, withTimecode, hasTimecodes } from './timecode.js'
 
 /**
- * 生成は3段に分けている。1回のJSONに全部詰めると、
+ * 生成はタブと同じ単位で段に分けている。1回のJSONに全部詰めると、
  *  - 小さいモデルでは後半が切れて丸ごと欠落する
  *  - 途中で失敗したとき全部やり直しになる
  *  - 「分野別だけ作り直す」ができない
  * ため。段ごとに保存できるので、途中で止まっても手前の結果は残る。
  */
 export const STAGES = [
-  { id: 'core', label: 'サマリ・マインドマップ・タグ' },
+  { id: 'summary', label: 'サマリ・タグ' },
+  { id: 'mindmap', label: 'マインドマップ' },
   { id: 'fields', label: '分野別要約' },
-  { id: 'apply', label: '応用と活用アイデア' },
+  { id: 'apply', label: '応用' },
+  { id: 'ideas', label: '活用アイデア' },
 ]
+
+/** 原文を見ない段。サマリ+分野別だけで足りるので軽い */
+const SUMMARY_ONLY_STAGES = ['apply', 'ideas']
+
+export function needsTranscript(stageId) {
+  return !SUMMARY_ONLY_STAGES.includes(stageId)
+}
 
 // 文字起こしをそのまま渡す上限。Gemma(32K)想定で余白を見た値
 const TRANSCRIPT_LIMIT = 30000
@@ -87,9 +97,12 @@ async function ask(connection, system, user, onProgress) {
   }
 }
 
-const NO_FENCE = '前後に説明文やコードフェンス(```)を付けず、JSONだけを出力してください。日本語で書いてください。'
+// ---- プロンプトの組み立て ----
+//
+// 文面そのものは setting.json(画面から編集可)にある。ここが持つのは、
+// 原文の状態によって出し分けが要る差し込み欄だけ。
 
-// ---- 第1段: サマリ / マインドマップ / タグ ----
+const NO_FENCE = '前後に説明文やコードフェンス(```)を付けず、JSONだけを出力してください。日本語で書いてください。'
 
 /**
  * タグは既存の語彙に寄せさせる。生成は動画1本ずつ独立に走るため、
@@ -117,106 +130,37 @@ ${knownTags.map((t) => `- ${t}`).join('\n')}`
  * (2) 自由記述だとインデントや見出し記号をモデルが崩し、markmapの
  * パースに失敗する事故が起きやすい。Markdown文字列はこちらで組み立てる。
  */
-function mindmapNodeShape(withQuotes) {
-  const quote = withQuotes
-    ? `, "quote": "この項目の根拠になった原文の一文。原文から一字一句そのまま写す。無ければ空文字"`
-    : ''
-  return `{ "label": "見出しの語句(40字以内)"${quote}, "children": [ /* 同じ形。無ければ省略可 */ ] }`
-}
+const MINDMAP_QUOTE_FIELD =
+  ', "quote": "この項目の根拠になった原文の一文。原文から一字一句そのまま写す。無ければ空文字"'
 
-function coreSystem(knownTags, withQuotes) {
-  return `あなたは動画の文字起こしを整理するアシスタントです。
-次のJSON形式のみで回答してください。${NO_FENCE}
-
-{
-  "summary": "この動画が何を扱い、何を主張しているかを300〜500字で。前置きや「この動画では」といった枕詞は書かず、内容そのものから始める",
-  "tags": ["内容を表す短い語"],
-  "mindmap": {
-    "title": "動画の主題",
-    "branches": [${mindmapNodeShape(withQuotes)}]
-  }
-}
-
-tags の決め方:
-${tagRule(knownTags)}
-
-mindmap の決め方:
-- branches(大項目)は3〜6個。各branchのchildrenは中項目、そのchildrenは詳細(最大3段)。
-- label は文ではなく要点の語句。40字以内。
-- 全体で40〜80項目を超えないこと(枝を無理に増やさない)。${
-    withQuotes
-      ? `
+const MINDMAP_QUOTE_RULE = `
 - quote は原文に存在する文字列でなければならない。20〜60字程度で写す。自分で言い換えた文を書いてはいけない。
   該当が無い、または要約や見出しとして作った項目(原文の特定の一文に対応しない)には quote を空文字にする。
 - 時刻や秒数は書かないこと。こちらで原文から割り出す。`
-      : ''
-  }`
-}
-
-// ---- 第2段: 分野別要約 ----
 
 /**
  * 時刻は聞かない。要点の根拠になった原文の引用だけを出させて、
  * こちら側で文字列一致から時刻を割り当てる(resolveQuote)。
  * 「何分何秒か」を直接聞くとモデルは平然と作るので、その道は塞ぐ。
  */
-function fieldsSystem(withQuotes) {
-  const pointShape = withQuotes
-    ? `{ "text": "押さえるべき具体的な事実・数値・手順を1行で", "quote": "その根拠になった原文の一文。原文から一字一句そのまま写す(要約・言い換え・省略をしない)" }`
-    : `"押さえるべき具体的な事実・数値・手順を1行で"`
+const FIELDS_POINT_SHAPE_QUOTED =
+  '{ "text": "押さえるべき具体的な事実・数値・手順を1行で", "quote": "その根拠になった原文の一文。原文から一字一句そのまま写す(要約・言い換え・省略をしない)" }'
 
-  return `あなたは動画の内容を分野ごとに切り分けて整理するアシスタントです。
-次のJSON形式のみで回答してください。${NO_FENCE}
+const FIELDS_POINT_SHAPE_PLAIN = '"押さえるべき具体的な事実・数値・手順を1行で"'
 
-{
-  "fields": [
-    {
-      "name": "分野名(例: 技術/経営/マーケティング/組織/法務/学習 など、内容に合うもの)",
-      "summary": "その分野の観点から見たこの動画の要点を80〜150字で",
-      "points": [${pointShape}]
-    }
-  ]
-}
-
-制約:
-- 分野は内容から自然に立つものだけを2〜5件挙げる。無理に埋めない。
-- points は分野ごとに2〜4件。
-- 動画で実際に語られていないことは書かない。推測は入れない。${
-    withQuotes
-      ? `
+const FIELDS_QUOTE_RULE = `
 - quote は原文に存在する文字列でなければならない。20〜60字程度で写す。
   自分で言い換えた文を quote に書いてはいけない。該当が無ければ quote は空文字にする。
 - 時刻や秒数は書かないこと。こちらで原文から割り出す。`
-      : ''
+
+/** setting.json のテンプレートに {{...}} を差し込む。未知の欄は空文字で潰す */
+function fillPrompt(stageId, vars) {
+  const template = promptOf(stageId)
+  if (!template.trim()) {
+    throw new Error(`${stageId} のプロンプトが読み込めていません。setting.json を確認するか、設定から入力してください。`)
   }
-- 全体で1800字以内に収める。`
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '')
 }
-
-// ---- 第3段: 応用(ビジネス展開) / 活用アイデア ----
-
-const APPLY_SYSTEM = `あなたは、動画から得た知識を実務と遊びの両面に落とし込む企画者です。
-次のJSON形式のみで回答してください。${NO_FENCE}
-
-{
-  "apply": [
-    {
-      "title": "ビジネス展開の案。名詞句で短く",
-      "summary": "誰のどんな課題をどう解くのかを80〜150字で",
-      "steps": ["明日から着手できる具体的な一歩を1件1行で。2〜4件"]
-    }
-  ],
-  "ideas": [
-    {
-      "title": "面白い活用方法。実用性より発想の飛び方を優先した案",
-      "summary": "何をするとどう面白いのかを60〜120字で"
-    }
-  ]
-}
-
-制約:
-- apply は2〜4件。「AIを活用する」のような一般論ではなく、この動画の内容が効いている案にする。
-- ideas は2〜4件。個人の趣味・家庭・遊び・学習など、仕事以外の文脈も歓迎する。
-- 全体で1800字以内に収める。`
 
 // ---- マインドマップの組み立て ----
 
@@ -311,7 +255,7 @@ function applyContext(title, summaryText, fieldsText) {
 
 /**
  * 1段だけ生成する。
- * @param {string} stageId 'core' | 'fields' | 'apply'
+ * @param {string} stageId 'summary' | 'mindmap' | 'fields' | 'apply' | 'ideas'
  * @param {{title: string, transcript: string, summary?: string, fields?: string}} ctx
  * @param {(text: string) => void} [onProgress] ストリーミング中の生テキスト
  * @returns {Promise<{detail: object, model: string}>} detail は saveGenerated にそのまま渡せる形
@@ -319,14 +263,12 @@ function applyContext(title, summaryText, fieldsText) {
 export async function generateStage(stageId, ctx, onProgress) {
   const connection = requireConnection()
   const transcript = String(ctx.transcript ?? '').slice(0, TRANSCRIPT_LIMIT)
+  const transcriptInput = `動画タイトル: ${ctx.title}\n\n${transcript}`
 
-  if (stageId === 'core') {
+  if (stageId === 'summary') {
     const knownTags = Array.isArray(ctx.knownTags) ? ctx.knownTags : []
-    // 文字起こしにタイムスタンプが無い(旧データ)なら引用も求めない。無駄に出力が伸びるだけ
-    const timed = hasTimecodes(transcript)
-    const segments = timed ? splitTranscript(transcript) : []
-    const raw = await ask(connection, coreSystem(knownTags, timed), `動画タイトル: ${ctx.title}\n\n${transcript}`, onProgress)
-    const parsed = jsonOf(raw)
+    const system = fillPrompt('summary', { NO_FENCE, TAG_RULE: tagRule(knownTags) })
+    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
     // プロンプトで縛っても表記ゆれは残るので、既存の綴りへ機械的に寄せ直す
     const reconciled = reconcileTags(parsed.tags, knownTags)
     return {
@@ -334,28 +276,45 @@ export async function generateStage(stageId, ctx, onProgress) {
       tagReport: reconciled,
       detail: {
         summary: String(parsed.summary || '').trim(),
-        mindmap: mindmapToText(parsed.mindmap, segments),
         tags: reconciled.tags,
       },
     }
   }
 
-  if (stageId === 'fields') {
+  if (stageId === 'mindmap') {
     // 文字起こしにタイムスタンプが無い(旧データ)なら引用も求めない。無駄に出力が伸びるだけ
     const timed = hasTimecodes(transcript)
     const segments = timed ? splitTranscript(transcript) : []
-    const raw = await ask(connection, fieldsSystem(timed), `動画タイトル: ${ctx.title}\n\n${transcript}`, onProgress)
-    const parsed = jsonOf(raw)
+    const system = fillPrompt('mindmap', {
+      NO_FENCE,
+      QUOTE_FIELD: timed ? MINDMAP_QUOTE_FIELD : '',
+      QUOTE_RULE: timed ? MINDMAP_QUOTE_RULE : '',
+    })
+    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
+    return { model: connection.model, detail: { mindmap: mindmapToText(parsed, segments) } }
+  }
+
+  if (stageId === 'fields') {
+    const timed = hasTimecodes(transcript)
+    const segments = timed ? splitTranscript(transcript) : []
+    const system = fillPrompt('fields', {
+      NO_FENCE,
+      POINT_SHAPE: timed ? FIELDS_POINT_SHAPE_QUOTED : FIELDS_POINT_SHAPE_PLAIN,
+      QUOTE_RULE: timed ? FIELDS_QUOTE_RULE : '',
+    })
+    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
     return { model: connection.model, detail: { fields: fieldsToText(parsed.fields, segments) } }
   }
 
-  if (stageId === 'apply') {
+  if (stageId === 'apply' || stageId === 'ideas') {
     const context = applyContext(ctx.title, ctx.summary || '', ctx.fields || '')
-    const raw = await ask(connection, APPLY_SYSTEM, context, onProgress)
-    const parsed = jsonOf(raw)
+    const parsed = jsonOf(await ask(connection, fillPrompt(stageId, { NO_FENCE }), context, onProgress))
     return {
       model: connection.model,
-      detail: { apply: applyToText(parsed.apply), ideas: ideasToText(parsed.ideas) },
+      detail:
+        stageId === 'apply'
+          ? { apply: applyToText(parsed.apply) }
+          : { ideas: ideasToText(parsed.ideas) },
     }
   }
 

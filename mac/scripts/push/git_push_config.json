@@ -31,5 +31,16 @@
     "branch": "main",
     "commit_message": "auto: update report data",
     "remote_name": "origin"
+  },
+  {
+    "id": "clipstock-data",
+    "description": "動画ナレッジ(clipstock)の一覧JSON。build_clipstock_json.py の --out と source_folder を合わせること",
+    "enabled": true,
+    "source_folder": "/Users/yuya/Claude/app/clipstock/data/",
+    "repository": "git@github.com:ymatsuda-cmyk/tools.git",
+    "repo_subfolder": "data/clipstock",
+    "branch": "main",
+    "commit_message": "auto: update clipstock index",
+    "remote_name": "origin"
   }
 ]

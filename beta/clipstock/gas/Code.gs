@@ -101,6 +101,9 @@ function doPost(e) {
       case 'updateRawCount':
         result = updateRawCount_(body.pageId, body.count);
         break;
+      case 'deleteVideo':
+        result = deleteVideo_(body.pageId);
+        break;
       default:
         throw new Error('unknown action: ' + body.action);
     }
@@ -494,6 +497,17 @@ function updateRawCount_(pageId, count) {
   props[PROP_RAW_COUNT] = { number: Number(count) || 0 };
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true };
+}
+
+/**
+ * ページを削除する。Notion API に完全削除は無いのでアーカイブ(ゴミ箱)になる。
+ * 一覧のクエリには出てこなくなり、Notion側では30日間復元できる。
+ * 「除外」(setStatus)はページを残す論理削除なので、用途が違う。
+ */
+function deleteVideo_(pageId) {
+  if (!pageId) throw new Error('pageId は必須です');
+  notionFetch_('pages/' + pageId, 'patch', { archived: true });
+  return { deleted: true, pageId: pageId };
 }
 
 /**

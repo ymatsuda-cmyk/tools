@@ -10,8 +10,6 @@ import {
 import { openSettings, openEditor } from './ui/settings.js'
 import { openVocabPanel } from './ui/vocab.js'
 import {
-  listVideos,
-  listIdeas,
   fetchDetail,
   fetchTranscript,
   saveGenerated,
@@ -22,15 +20,18 @@ import {
   setStatus,
   updateRawCount,
   mergeTag,
+  deleteVideo,
 } from './lib/gas.js'
+import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
-import { generateAll, generateStage, STAGES } from './lib/generate.js'
+import { initPrompts } from './lib/prompts.js'
+import { generateAll, generateStage, needsTranscript, STAGES } from './lib/generate.js'
 import { renderMindmap } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
 import { addrOf, getMarkedText, setMarkedText, stripMarkers } from './lib/marker-target.js'
-import { getDetailCache, setDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
+import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
   excludeExcluded,
   filterByStatus,
@@ -83,24 +84,22 @@ const ideasState = { phase: 'idle', items: [], kind: 'all', shuffleSeed: 0, mess
 
 async function loadList() {
   const config = loadConfig()
-  if (!isConfigured(config)) {
-    stageEl.innerHTML = `
+  syncEl.textContent = '読み込み中...'
+  try {
+    const data = await listVideos()
+    items = data.items
+    syncEl.textContent = `${items.length}件${sourceNote(data)}`
+  } catch (err) {
+    items = []
+    syncEl.textContent = ''
+    stageEl.innerHTML = !isConfigured(config)
+      ? `
       <div class="empty-state">
         <i class="ti ti-plug-connected-x" aria-hidden="true"></i>
         <p>まず接続の設定が必要です</p>
         <p class="empty-hint">右上の歯車から GAS URL と共有トークンを入れてください</p>
       </div>`
-    return
-  }
-  syncEl.textContent = '読み込み中...'
-  try {
-    const data = await listVideos()
-    items = data.items
-    syncEl.textContent = `${items.length}件`
-  } catch (err) {
-    items = []
-    syncEl.textContent = ''
-    stageEl.innerHTML = `
+      : `
       <div class="empty-state">
         <i class="ti ti-alert-triangle" aria-hidden="true"></i>
         <p>一覧を取得できませんでした</p>
@@ -109,6 +108,14 @@ async function loadList() {
     return
   }
   refresh()
+}
+
+/** 表示内容がいつ時点のものかを出す。JSONは cron が書き出した時刻で止まっている */
+function sourceNote(data) {
+  if (data.source !== 'json') return ''
+  if (!data.fetchedAt) return ' ・JSON'
+  const d = new Date(data.fetchedAt)
+  return ` ・JSON ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 /** 「除外」を外した、この端末で見る対象の全件 */
@@ -668,7 +675,7 @@ async function generateContext(item) {
 
 async function runGenerateAll(item) {
   if (detail.busyStage) return
-  detail.busyStage = 'core'
+  detail.busyStage = STAGES[0].id
   paintBusy('原文を読み込んでいます', '')
   try {
     const ctx = await generateContext(item)
@@ -699,7 +706,7 @@ async function runStage(item, stageId) {
   paintBusy(`${stage?.label ?? stageId} を生成中`, '')
   try {
     const ctx = await generateContext(item)
-    if (stageId !== 'apply' && !ctx.transcript) {
+    if (needsTranscript(stageId) && !ctx.transcript) {
       throw new Error('原文がありません。状態が「完了」になるまで待ってください')
     }
     const { detail: stageDetail, model, tagReport } = await generateStage(stageId, ctx, (text) =>
@@ -821,6 +828,7 @@ function openMoreMenu(anchor, item) {
     <button data-act="title"><i class="ti ti-edit" aria-hidden="true"></i>タイトルを直す</button>
     <button data-act="retry"><i class="ti ti-microphone" aria-hidden="true"></i>文字起こしをやり直す</button>
     <button data-act="exclude" class="danger"><i class="ti ti-archive" aria-hidden="true"></i>一覧から除外する</button>
+    <button data-act="delete" class="danger"><i class="ti ti-trash" aria-hidden="true"></i>Notionから削除する</button>
   `
   document.body.appendChild(menu)
   const rect = anchor.getBoundingClientRect()
@@ -868,6 +876,19 @@ function openMoreMenu(anchor, item) {
           setView('library')
         } catch (err) {
           alert('変更できませんでした: ' + (err.message || err))
+        }
+      }
+      if (act === 'delete') {
+        if (!confirm(`「${item.title}」をNotionのゴミ箱へ移します。このアプリからは戸せません。続けますか?`)) return
+        try {
+          await deleteVideo(item.key)
+          clearDetailCache(item.key)
+          items = items.filter((i) => i.key !== item.key)
+          // 一覧JSONは次のcronまで古いままなので、手元の状態だけ先に揃える
+          ideasState.phase = 'idle'
+          setView('library')
+        } catch (err) {
+          alert('削除できませんでした: ' + (err.message || err))
         }
       }
     })
@@ -1398,4 +1419,6 @@ document.addEventListener('keydown', (e) => {
 })
 
 $('toggle-tags').classList.toggle('on', showTags)
+// プロンプトは生成を押すときまでに揃っていればよいので、一覧の読み込みは待たせない
+initPrompts()
 loadList()

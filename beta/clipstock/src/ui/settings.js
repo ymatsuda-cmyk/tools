@@ -2,6 +2,7 @@ import { escapeHtml } from './render.js'
 import { loadConfig, saveConfig } from '../lib/videos-config.js'
 import { loadSettings, saveSettings, newConnection } from '../lib/llm-settings.js'
 import { verifyCode } from '../lib/gas.js'
+import { PROMPT_IDS, promptLabel, promptOf, defaultPromptOf, savePrompt } from '../lib/prompts.js'
 
 function roleLabel(role) {
   if (!role) return '<span class="muted">未確認</span>'
@@ -23,6 +24,9 @@ export function openSettings(onSaved) {
   let activeId = settings.activeConnectionId
   let activeModel = settings.activeModel
   let verifiedRole = config.role
+  // プロンプトも同じく下書き。保存を押すまでは実際の生成に影響させない
+  const promptDraft = Object.fromEntries(PROMPT_IDS.map((id) => [id, promptOf(id)]))
+  let promptId = PROMPT_IDS[0]
 
   const root = document.getElementById('modal-root')
   root.innerHTML = `
@@ -36,6 +40,10 @@ export function openSettings(onSaved) {
         <label class="field-label">共有トークン</label>
         <input id="cfg-token" class="input" value="${escapeHtml(config.accessToken)}" placeholder="GASの ACCESS_TOKEN と同じ値" />
 
+        <label class="field-label">一覧JSONの場所</label>
+        <input id="cfg-data" class="input" value="${escapeHtml(config.dataUrl)}" placeholder="空欄で data/clipstock/ を使う" />
+        <div class="foot-note">一覧とアイデアはここのJSONから読みます。読めなければNotionから直接取得します</div>
+
         <label class="field-label">コード</label>
         <div class="row">
           <input id="cfg-code" class="input grow" value="${escapeHtml(config.code)}" />
@@ -46,6 +54,18 @@ export function openSettings(onSaved) {
         <label class="field-label">AI接続</label>
         <div id="cfg-conns"></div>
         <button id="cfg-conn-add" class="btn btn-wide"><i class="ti ti-plus" aria-hidden="true"></i>接続を追加</button>
+
+        <details class="json-block">
+          <summary>AIへの指示(プロンプト)</summary>
+          <div class="row">
+            <select id="cfg-prompt-id" class="input grow">
+              ${PROMPT_IDS.map((id) => `<option value="${id}">${escapeHtml(promptLabel(id))}</option>`).join('')}
+            </select>
+            <button id="cfg-prompt-reset" class="btn">既定に戻す</button>
+          </div>
+          <textarea id="cfg-prompt-text" rows="14" class="input mono"></textarea>
+          <div class="foot-note">{{NO_FENCE}} などの差し込み欄はアプリが埋めます。消すとタグの統一や再生リンクが効かなくなります</div>
+        </details>
 
         <details class="json-block">
           <summary>JSONで一括設定</summary>
@@ -158,6 +178,19 @@ export function openSettings(onSaved) {
     paintConns()
   })
 
+  $('cfg-prompt-text').value = promptDraft[promptId]
+  $('cfg-prompt-text').addEventListener('input', (e) => {
+    promptDraft[promptId] = e.target.value
+  })
+  $('cfg-prompt-id').addEventListener('change', (e) => {
+    promptId = e.target.value
+    $('cfg-prompt-text').value = promptDraft[promptId]
+  })
+  $('cfg-prompt-reset').addEventListener('click', () => {
+    promptDraft[promptId] = defaultPromptOf(promptId)
+    $('cfg-prompt-text').value = promptDraft[promptId]
+  })
+
   $('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
 
   $('cfg-json-export').addEventListener('click', () => {
@@ -166,6 +199,7 @@ export function openSettings(onSaved) {
         gasUrl: $('cfg-gas').value.trim(),
         accessToken: $('cfg-token').value.trim(),
         code: $('cfg-code').value.trim(),
+        dataUrl: $('cfg-data').value.trim(),
         connections: draft.map(({ label, baseUrl, apiKey, models }) => ({ label, baseUrl, apiKey, models })),
         activeConnectionLabel: draft.find((c) => c.id === activeId)?.label,
         activeModel,
@@ -186,6 +220,7 @@ export function openSettings(onSaved) {
     if (parsed.gasUrl !== undefined) $('cfg-gas').value = parsed.gasUrl
     if (parsed.accessToken !== undefined) $('cfg-token').value = parsed.accessToken
     if (parsed.code !== undefined) $('cfg-code').value = parsed.code
+    if (parsed.dataUrl !== undefined) $('cfg-data').value = parsed.dataUrl
 
     if (Array.isArray(parsed.connections) && parsed.connections.length) {
       draft.length = 0
@@ -221,9 +256,11 @@ export function openSettings(onSaved) {
       gasUrl: $('cfg-gas').value.trim(),
       accessToken: $('cfg-token').value.trim(),
       code: $('cfg-code').value.trim(),
+      dataUrl: $('cfg-data').value.trim(),
       role: verifiedRole,
     })
     saveSettings({ ...settings, connections: draft, activeConnectionId: activeId, activeModel })
+    PROMPT_IDS.forEach((id) => savePrompt(id, promptDraft[id]))
     root.innerHTML = ''
     onSaved?.()
   })

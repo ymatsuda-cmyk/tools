@@ -21,6 +21,10 @@ export function setDetailCache(pageId, data) {
   return record
 }
 
+export function clearDetailCache(pageId) {
+  localStorage.removeItem(DETAIL_PREFIX + pageId)
+}
+
 /**
  * キャッシュが Notion 側の更新より新しければ再利用できる。
  * 比較基準は last_edited_time(updatedAt)。要約日時では手編集を検知できない。

@@ -1,5 +1,43 @@
 # Change Log
 
+## 1.6.0 - 2026-09-10
+
+### Title
+
+Serve the list from a static JSON; add deletion; move prompts into setting.json
+
+### Changes
+
+- Stopped querying Notion through GAS on every page load. `src/lib/store.js` reads `data/clipstock/index.json` and `ideas.json` — written by a cron job on the Mac — and only falls back to the old GAS path when the JSON cannot be read, so an unconfigured or offline setup still works exactly as before. Thumbnails are untouched: they were always plain image URLs and still load from source.
+- Left the detail screen on Notion. The list is the part that scales with the library size; the per-tab body is one page fetch and has to be fresh right after generating, so caching it into the JSON would trade the wrong thing.
+- Added `mac/scripts/video/build_clipstock_json.py`, which mirrors the shapes returned by `listVideos_`/`listIdeas_` so the two sources stay interchangeable. It writes through a temp file and renames, so a page load landing mid-write cannot read a truncated JSON.
+- Added a delete action (`deleteVideo`) that archives the Notion page, alongside the existing 除外 which only flips the status. 除外 hides a video while keeping the page; delete removes it. Conflating the two would have meant either no way to hide, or no way to actually remove.
+- Split generation from 3 stages into 5, one per tab (サマリ・タグ / マインドマップ / 分野別 / 応用 / 活用). "Regenerate this item" previously redid its neighbours — the mindmap tab redid the summary, the apply tab redid the ideas — because they shared a call.
+- Moved the five system prompts out of `generate.js` into `setting.json`, editable from the settings modal and overridable per device in localStorage. The code now only supplies the parts that must vary at runtime (`{{TAG_RULE}}`, `{{QUOTE_RULE}}` and friends), which is why those placeholders have to survive editing.
+
+### Affected Files
+
+- `beta/clipstock/setting.json` (new)
+- `beta/clipstock/src/lib/store.js` (new)
+- `beta/clipstock/src/lib/prompts.js` (new)
+- `beta/clipstock/src/lib/generate.js`
+- `beta/clipstock/src/lib/gas.js`
+- `beta/clipstock/src/lib/cache.js`
+- `beta/clipstock/src/lib/videos-config.js`
+- `beta/clipstock/src/main.js`
+- `beta/clipstock/src/ui/render.js`
+- `beta/clipstock/src/ui/settings.js`
+- `beta/clipstock/gas/Code.gs`
+- `beta/clipstock/SETUP.md`
+- `mac/scripts/video/build_clipstock_json.py` (new)
+- `mac/scripts/push/git_push_config.json`
+
+### Notes
+
+- The list is now as stale as the last cron run. That is the cost of the speed-up; the top bar shows the JSON's timestamp so the staleness is visible rather than silent.
+- Five stages means five API calls per video instead of three. On a rate-limited free key a bulk run takes longer and burns more of the daily quota.
+- `--out` on the Python script and `source_folder` for `clipstock-data` in `git_push_config.json` must point at the same folder. If they diverge, a stale JSON keeps being published with nothing to indicate it.
+
 ## 1.5.0 - 2026-09-03
 
 ### Title

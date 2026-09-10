@@ -83,6 +83,11 @@ export function updateRawCount(pageId, count) {
   return callGas('updateRawCount', { pageId, count })
 }
 
+/** Notionページをゴミ箱へ移す。Notion側からなら30日間は復元できる */
+export function deleteVideo(pageId) {
+  return callGas('deleteVideo', { pageId })
+}
+
 /** 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため) */
 export async function verifyCode(gasUrl, code) {
   const res = await fetch(gasUrl, {

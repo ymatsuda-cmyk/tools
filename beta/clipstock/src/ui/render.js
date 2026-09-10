@@ -214,7 +214,7 @@ export const TABS = [
 ]
 
 /** どのタブがAI生成物か。ここに載っているタブには「作り直す」ボタンを出す */
-const STAGE_OF_TAB = { summary: 'core', mindmap: 'core', fields: 'fields', apply: 'apply', ideas: 'apply' }
+const STAGE_OF_TAB = { summary: 'summary', mindmap: 'mindmap', fields: 'fields', apply: 'apply', ideas: 'ideas' }
 
 export function detailHtml(item, state) {
   const d = state.detail || {}
@@ -312,7 +312,7 @@ function renderPanel(item, state, tab, d) {
             d.summary,
             escapeHtml
           ).replace(/\n/g, '<br />')}</span></p>`
-        : emptyPanel(item, 'サマリ', 'core')
+        : emptyPanel(item, 'サマリ', 'summary')
     case 'mindmap':
       return '<div id="mindmap-host" class="mindmap-host"></div>'
     case 'fields':
@@ -326,7 +326,7 @@ function renderPanel(item, state, tab, d) {
     case 'ideas':
       return d.ideas
         ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas' })
-        : emptyPanel(item, '活用アイデア', 'apply')
+        : emptyPanel(item, '活用アイデア', 'ideas')
     case 'memo':
       return `<textarea id="memo-input" class="memo-input" placeholder="気づいたこと、あとで試すこと、関連する話などを自由に">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
     case 'chat':
