@@ -255,6 +255,18 @@ mark { background: var(--highlight); color: inherit; }
 }
 .card-foot { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-muted); }
 .card-date { margin-left: auto; font-variant-numeric: tabular-nums; }
+.card-edit {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2px;
+  margin: -2px -2px -2px 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+}
+.card-edit:hover { background: var(--accent-bg); color: var(--text-primary); }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .badge {
@@ -268,6 +280,8 @@ mark { background: var(--highlight); color: inherit; }
 .badge.s-完了 { background: var(--warn-bg); color: var(--warn-text); }
 .badge.s-要約済み { background: var(--ok-bg); color: var(--ok-text); }
 .badge.s-処理中 { background: var(--accent-bg); color: var(--text-secondary); }
+.badge-web { display: inline-flex; align-items: center; gap: 3px; }
+.badge-web i { font-size: 11px; }
 
 /* 生成の進み具合。5つの点が サマリ/マインドマップ/分野別/応用/活用 に対応する */
 .dots { display: inline-flex; gap: 3px; }

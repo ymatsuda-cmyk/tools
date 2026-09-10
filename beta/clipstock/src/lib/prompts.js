@@ -1,14 +1,14 @@
 /**
  * AI生成のプロンプト。
  *
- * 既定値はアプリと同じ場所に置いた setting.json から読む。コードに埋め込まず
+ * 既定値は data/clipstock/setting.json から読む。コードに埋め込まず
  * ファイルに出しているのは、文言を直すたびにJSを触らなくて済むようにするため。
  * 画面から編集した内容は localStorage に上書きとして持ち、setting.json より優先する
  * (既定に戻せば上書きは消える)。
  */
 
 const KEY = 'videos:prompts'
-const SETTING_URL = new URL('../../setting.json', import.meta.url)
+const SETTING_URL = new URL('https://ymatsuda-cmyk.github.io/tools/data/clipstock/setting.json', import.meta.url)
 
 export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas']
 

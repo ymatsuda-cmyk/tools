@@ -15,6 +15,7 @@
  *  - ACCESS_TOKEN   フロントの videos:config.accessToken と一致させる共有トークン
  *  - code           権限コードと権限の対応 JSON 例: {"dfkjnga":"xYz","abc":"team"}
  *  - VIDEO_DB_ID    動画DBのID(省略時は下の DEFAULT_DB_ID を使う)
+ *  - WEB_DB_ID      web記事DBのID(省略時は DEFAULT_WEB_DB_ID。空文字にするとwebを読まない)
  *
  * デプロイ:
  *  - 種類: ウェブアプリ / 実行するユーザー: 自分 / アクセス: 全員
@@ -23,9 +24,11 @@
 
 var NOTION_VERSION = '2022-06-28';
 var DEFAULT_DB_ID = '3630e7a535dc8154ac62d41f7611540f';
+var DEFAULT_WEB_DB_ID = '4130e7a535dc83509c9a01cd6ac0a6a7';
 
 // ---- プロパティ名(Notion側のカラム名とここを一致させること) ----
 var PROP_TITLE    = '動画タイトル';   // title
+var PROP_WEB_TITLE = 'タイトル';       // title  web記事DB側の名前。他のカラム名は動画DBと共通
 var PROP_URL      = 'URL';            // url  ※MCPでは userDefined:URL と表示されるが REST では "URL"
 var PROP_THUMB    = 'サムネイル';     // url
 var PROP_TAGS     = 'タグ';           // multi_select
@@ -129,6 +132,13 @@ function dbId_() {
   return PropertiesService.getScriptProperties().getProperty('VIDEO_DB_ID') || DEFAULT_DB_ID;
 }
 
+/** web記事DBのID。プロパティを空文字にしておけばwebを読まない運用にできる */
+function webDbId_() {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty('WEB_DB_ID');
+  return raw === null ? DEFAULT_WEB_DB_ID : String(raw).trim();
+}
+
 // ============ Notion 共通ヘルパー ============
 
 function notionFetch_(path, method, payload) {
@@ -188,6 +198,18 @@ function titleOf_(properties, name) {
   return prop && prop.title ? plainTextOf_(prop.title) : '';
 }
 
+/** title 型のプロパティ名を探す。DBごとに名前が違う(動画タイトル / タイトル)ため */
+function titlePropName_(properties) {
+  for (var key in properties) {
+    if (properties[key] && properties[key].type === 'title') return key;
+  }
+  return PROP_TITLE;
+}
+
+function titleAnyOf_(properties) {
+  return titleOf_(properties, titlePropName_(properties));
+}
+
 function dateOf_(properties, name) {
   var prop = properties[name];
   return (prop && prop.date && prop.date.start) || null;
@@ -232,44 +254,83 @@ function fetchAllBlocks_(blockId) {
  */
 function listVideos_() {
   var items = [];
+  eachSourcePage_(function (page, source) {
+    var item = toListItem_(page, source);
+    if (item) items.push(item);
+  });
+  return { items: sortByCreatedDesc_(items), fetchedAt: new Date().toISOString() };
+}
+
+/**
+ * 動画DBとweb記事DBを順に走査する。
+ * webDBはあとから足したもので、共有し忘れなどで落ちても動画側は出したいので、
+ * webの取得に失敗しても握りつぶす(一覧が空になるより古い動画一覧のほうがまし)。
+ */
+function eachSourcePage_(fn) {
+  queryDbAll_(dbId_(), [{ property: PROP_CREATED, direction: 'descending' }]).forEach(function (page) {
+    fn(page, 'video');
+  });
+
+  var webId = webDbId_();
+  if (!webId) return;
+  try {
+    // web側は作成日時カラムの有無に依存させたくないので、ページの作成時刻で並べる
+    queryDbAll_(webId, [{ timestamp: 'created_time', direction: 'descending' }]).forEach(function (page) {
+      fn(page, 'web');
+    });
+  } catch (err) {
+    // 一覧は動画だけで返す
+  }
+}
+
+/** DBの全ページを取得する(ページネーション対応) */
+function queryDbAll_(databaseId, sorts) {
+  var pages = [];
   var cursor = null;
   do {
-    var payload = {
-      page_size: 100,
-      sorts: [{ property: PROP_CREATED, direction: 'descending' }],
-    };
+    var payload = { page_size: 100, sorts: sorts };
     if (cursor) payload.start_cursor = cursor;
-    var res = notionFetch_('databases/' + dbId_() + '/query', 'post', payload);
-
-    res.results.forEach(function (page) {
-      var p = page.properties;
-      items.push({
-        key: page.id,
-        title: titleOf_(p, PROP_TITLE) || '(タイトル未取得)',
-        url: urlOf_(p, PROP_URL),
-        thumb: urlOf_(p, PROP_THUMB),
-        status: selectOf_(p, PROP_STATUS) || STATUS_NEW,
-        tags: multiSelectOf_(p, PROP_TAGS),
-        createdAt: (p[PROP_CREATED] && p[PROP_CREATED].created_time) || page.created_time,
-        editedAt: page.last_edited_time,
-        summary: richTextOf_(p, PROP_SUMMARY),
-        model: richTextOf_(p, PROP_MODEL) || null,
-        generatedAt: dateOf_(p, PROP_GENERATED),
-        rawCount: numberOf_(p, PROP_RAW_COUNT),
-        has: {
-          mindmap: Boolean(richTextOf_(p, PROP_MINDMAP)),
-          fields: Boolean(richTextOf_(p, PROP_FIELDS)),
-          apply: Boolean(richTextOf_(p, PROP_APPLY)),
-          ideas: Boolean(richTextOf_(p, PROP_IDEAS)),
-          memo: Boolean(richTextOf_(p, PROP_MEMO)),
-        },
-      });
-    });
-
+    var res = notionFetch_('databases/' + databaseId + '/query', 'post', payload);
+    pages = pages.concat(res.results);
     cursor = res.has_more ? res.next_cursor : null;
   } while (cursor);
+  return pages;
+}
 
-  return { items: items, fetchedAt: new Date().toISOString() };
+function sortByCreatedDesc_(items) {
+  return items.sort(function (a, b) {
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  });
+}
+
+/** 一覧の1件。web記事は状態が空欄のものを取り込まない(下書きが混ざるため) */
+function toListItem_(page, source) {
+  var p = page.properties;
+  var status = selectOf_(p, PROP_STATUS);
+  if (source === 'web' && !status) return null;
+
+  return {
+    key: page.id,
+    source: source,
+    title: titleAnyOf_(p) || '(タイトル未取得)',
+    url: urlOf_(p, PROP_URL),
+    thumb: urlOf_(p, PROP_THUMB),
+    status: status || STATUS_NEW,
+    tags: multiSelectOf_(p, PROP_TAGS),
+    createdAt: (p[PROP_CREATED] && p[PROP_CREATED].created_time) || page.created_time,
+    editedAt: page.last_edited_time,
+    summary: richTextOf_(p, PROP_SUMMARY),
+    model: richTextOf_(p, PROP_MODEL) || null,
+    generatedAt: dateOf_(p, PROP_GENERATED),
+    rawCount: numberOf_(p, PROP_RAW_COUNT),
+    has: {
+      mindmap: Boolean(richTextOf_(p, PROP_MINDMAP)),
+      fields: Boolean(richTextOf_(p, PROP_FIELDS)),
+      apply: Boolean(richTextOf_(p, PROP_APPLY)),
+      ideas: Boolean(richTextOf_(p, PROP_IDEAS)),
+      memo: Boolean(richTextOf_(p, PROP_MEMO)),
+    },
+  };
 }
 
 /**
@@ -278,34 +339,25 @@ function listVideos_() {
  */
 function listIdeas_() {
   var items = [];
-  var cursor = null;
-  do {
-    var payload = {
-      page_size: 100,
-      sorts: [{ property: PROP_CREATED, direction: 'descending' }],
-    };
-    if (cursor) payload.start_cursor = cursor;
-    var res = notionFetch_('databases/' + dbId_() + '/query', 'post', payload);
-
-    res.results.forEach(function (page) {
-      var p = page.properties;
-      var apply = richTextOf_(p, PROP_APPLY);
-      var ideas = richTextOf_(p, PROP_IDEAS);
-      if (!apply && !ideas) return;
-      items.push({
-        key: page.id,
-        title: titleOf_(p, PROP_TITLE),
-        url: urlOf_(p, PROP_URL),
-        thumb: urlOf_(p, PROP_THUMB),
-        tags: multiSelectOf_(p, PROP_TAGS),
-        status: selectOf_(p, PROP_STATUS),
-        apply: apply,
-        ideas: ideas,
-      });
+  eachSourcePage_(function (page, source) {
+    var p = page.properties;
+    var apply = richTextOf_(p, PROP_APPLY);
+    var ideas = richTextOf_(p, PROP_IDEAS);
+    if (!apply && !ideas) return;
+    var status = selectOf_(p, PROP_STATUS);
+    if (source === 'web' && !status) return;
+    items.push({
+      key: page.id,
+      source: source,
+      title: titleAnyOf_(p),
+      url: urlOf_(p, PROP_URL),
+      thumb: urlOf_(p, PROP_THUMB),
+      tags: multiSelectOf_(p, PROP_TAGS),
+      status: status,
+      apply: apply,
+      ideas: ideas,
     });
-
-    cursor = res.has_more ? res.next_cursor : null;
-  } while (cursor);
+  });
 
   return { items: items };
 }
@@ -334,7 +386,7 @@ function fetchDetail_(pageId) {
   var page = notionFetch_('pages/' + pageId, 'get');
   var p = page.properties;
   return {
-    title: titleOf_(p, PROP_TITLE),
+    title: titleAnyOf_(p),
     url: urlOf_(p, PROP_URL),
     thumb: urlOf_(p, PROP_THUMB),
     status: selectOf_(p, PROP_STATUS),
@@ -433,45 +485,58 @@ function mergeTag_(from, to) {
 
   var updated = 0;
   var errors = [];
+  var dbIds = [dbId_()];
+  var webId = webDbId_();
+  if (webId) dbIds.push(webId);
 
-  // 6分の実行上限に収めるための保険。10巡(最大1000件)で打ち切る
-  for (var round = 0; round < 10; round++) {
-    var res = notionFetch_('databases/' + dbId_() + '/query', 'post', {
-      page_size: 100,
-      filter: { property: PROP_TAGS, multi_select: { contains: fromName } },
-    });
-    if (!res.results.length) break;
-
-    var before = updated;
-    res.results.forEach(function (page) {
+  dbIds.forEach(function (databaseId) {
+    // 6分の実行上限に収めるための保険。10巡(最大1000件)で打ち切る
+    for (var round = 0; round < 10; round++) {
+      var res;
       try {
-        var current = multiSelectOf_(page.properties, PROP_TAGS);
-        var next = [];
-        current.forEach(function (t) {
-          var name = t === fromName ? toName : t;
-          if (next.indexOf(name) === -1) next.push(name);
+        res = notionFetch_('databases/' + databaseId + '/query', 'post', {
+          page_size: 100,
+          filter: { property: PROP_TAGS, multi_select: { contains: fromName } },
         });
-        var props = {};
-        props[PROP_TAGS] = {
-          multi_select: next.map(function (name) { return { name: name }; }),
-        };
-        notionFetch_('pages/' + page.id, 'patch', { properties: props });
-        updated++;
       } catch (err) {
-        errors.push(page.id + ': ' + ((err && err.message) || err));
+        errors.push(databaseId + ': ' + ((err && err.message) || err));
+        break;
       }
-    });
+      if (!res.results.length) break;
 
-    // 1件も進まなかったら、同じページで失敗し続けている。無限ループを避けて抜ける
-    if (updated === before) break;
-  }
+      var before = updated;
+      res.results.forEach(function (page) {
+        try {
+          var current = multiSelectOf_(page.properties, PROP_TAGS);
+          var next = [];
+          current.forEach(function (t) {
+            var name = t === fromName ? toName : t;
+            if (next.indexOf(name) === -1) next.push(name);
+          });
+          var props = {};
+          props[PROP_TAGS] = {
+            multi_select: next.map(function (name) { return { name: name }; }),
+          };
+          notionFetch_('pages/' + page.id, 'patch', { properties: props });
+          updated++;
+        } catch (err) {
+          errors.push(page.id + ': ' + ((err && err.message) || err));
+        }
+      });
+
+      // 1件も進まなかったら、同じページで失敗し続けている。無限ループを避けて抜ける
+      if (updated === before) break;
+    }
+  });
 
   return { updated: updated, failed: errors.length, errors: errors, from: fromName, to: toName };
 }
 
 function saveTitle_(pageId, title) {
+  // タイトル欄の名前はDBによって違うので、ページから引く
+  var page = notionFetch_('pages/' + pageId, 'get');
   var props = {};
-  props[PROP_TITLE] = { title: [{ text: { content: String(title || '').slice(0, 2000) } }] };
+  props[titlePropName_(page.properties)] = { title: [{ text: { content: String(title || '').slice(0, 2000) } }] };
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true, title: title };
 }

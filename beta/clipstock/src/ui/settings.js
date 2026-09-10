@@ -15,8 +15,10 @@ function roleLabel(role) {
  * 設定モーダル。
  * AI接続の設定は localStorage キー 'gemma-chat.settings' を
  * 議事録アプリ・gemma-chat と共有しているので、どれかで足せば全部で使える。
+ *
+ * @param {object} [list] 表示中の一覧JSON。{ json(): string, onApply(parsed): void }
  */
-export function openSettings(onSaved) {
+export function openSettings(onSaved, list) {
   const config = loadConfig()
   const settings = loadSettings()
   // 下書き。ここで編集し、保存時にまとめて反映する(キャンセル時は破棄)
@@ -78,6 +80,19 @@ export function openSettings(onSaved) {
             <button id="cfg-json-import" class="btn">この内容を反映</button>
           </div>
         </details>
+
+        ${list
+          ? `<details class="json-block" id="cfg-list-block">
+          <summary>表示中の一覧JSON</summary>
+          <div class="foot-note">いま画面に出ている一覧そのものです。data/clipstock/index.json と同じ形なので、コピーしてそのままファイルに貼れます</div>
+          <textarea id="cfg-list-json" rows="12" class="input mono"></textarea>
+          <div class="row">
+            <button id="cfg-list-copy" class="btn">コピー</button>
+            <button id="cfg-list-apply" class="btn">この内容を画面に反映</button>
+          </div>
+          <div id="cfg-list-msg" class="foot-note">反映しても Notion やファイルは変わりません。再読み込みで元に戻ります</div>
+        </details>`
+          : ''}
 
         </div>
 
@@ -229,6 +244,44 @@ export function openSettings(onSaved) {
     promptDraft[promptId] = defaultPromptOf(promptId)
     $('cfg-prompt-text').value = promptDraft[promptId]
   })
+
+  if (list) wireListJson(list)
+
+  /** 表示中の一覧JSON。中身が大きいので、開いたときに初めて流し込む */
+  function wireListJson(ctx) {
+    const area = $('cfg-list-json')
+    const msg = $('cfg-list-msg')
+    $('cfg-list-block').addEventListener('toggle', (e) => {
+      if (e.target.open && !area.value) area.value = ctx.json()
+    })
+    $('cfg-list-copy').addEventListener('click', async () => {
+      if (!area.value) area.value = ctx.json()
+      const btn = $('cfg-list-copy')
+      try {
+        await navigator.clipboard.writeText(area.value)
+        btn.textContent = 'コピーしました'
+        setTimeout(() => (btn.textContent = 'コピー'), 1500)
+      } catch {
+        area.select()
+        msg.textContent = 'コピーできませんでした。選択したので手動でコピーしてください'
+      }
+    })
+    $('cfg-list-apply').addEventListener('click', () => {
+      let parsed
+      try {
+        parsed = JSON.parse(area.value)
+      } catch (err) {
+        msg.innerHTML = `<span class="error-text">JSONの形式が不正です: ${escapeHtml(String(err.message || err))}</span>`
+        return
+      }
+      if (!Array.isArray(parsed.items)) {
+        msg.innerHTML = '<span class="error-text">items が配列ではありません</span>'
+        return
+      }
+      ctx.onApply(parsed)
+      msg.innerHTML = `<span class="ok-text">${parsed.items.length}件を画面に反映しました(再読み込みで元に戻ります)</span>`
+    })
+  }
 
   $('cfg-cancel').addEventListener('click', () => (root.innerHTML = ''))
 

@@ -37,6 +37,9 @@ import {
   filterByStatus,
   filterByTags,
   filterBySearch,
+  filterBySource,
+  sourceCounts,
+  SOURCE_ORDER,
   buildTagOptions,
   statusCounts,
   STATUS_ORDER,
@@ -67,12 +70,16 @@ const syncEl = $('sync-status')
 
 // ---- アプリの状態 ----
 let items = []
+// 表示中の一覧がいつ時点のものか。設定画面でJSONを見せるときに使う
+let listMeta = { generatedAt: null }
 let view = 'library' // 'library' | 'detail' | 'ideas' | 'crosschat'
 let selectedKey = null
 let searchQuery = ''
 let showTags = true
 const selectedStatuses = new Set()
 const selectedTags = new Set()
+// 取り込み元(動画DB / web記事DB)の絞り込み。空なら全部出す
+const selectedSources = new Set()
 
 // 詳細画面の状態。動画を切り替えるたび作り直す
 let detail = null
@@ -88,6 +95,7 @@ async function loadList() {
   try {
     const data = await listVideos()
     items = data.items
+    listMeta = { generatedAt: data.fetchedAt || null }
     syncEl.textContent = `${items.length}件${sourceNote(data)}`
   } catch (err) {
     items = []
@@ -118,9 +126,9 @@ function sourceNote(data) {
   return ` ・JSON ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** 「除外」を外した、この端末で見る対象の全件 */
+/** 「除外」を外し、取り込み元で絞った、この端末で見る対象の全件 */
 function visibleItems() {
-  return excludeExcluded(items)
+  return filterBySource(excludeExcluded(items), selectedSources)
 }
 
 function currentItems() {
@@ -137,6 +145,7 @@ function itemOf(key) {
 
 function refresh() {
   paintStatusChips()
+  paintSourceChips()
   paintActiveModel()
 
   // 詳細・横断チャットは内側でスクロールさせるので、外側のスクロールは切る
@@ -173,9 +182,154 @@ function refresh() {
   renderLibrary(
     stageEl,
     currentItems(),
-    { searchQuery, showTags, seen: isSeen },
-    { onOpen: openDetail }
+    { searchQuery, showTags, seen: isSeen, canEdit: canEdit(loadConfig()) },
+    { onOpen: openDetail, onEdit: openCardEditor }
   )
+}
+
+/** 設定モーダルに渡す、いま画面に出ている一覧JSON(index.json と同じ形) */
+function listJsonContext() {
+  return {
+    json: () => JSON.stringify({ generatedAt: listMeta.generatedAt, items }, null, 2),
+    onApply: (parsed) => {
+      items = parsed.items
+      listMeta = { generatedAt: parsed.generatedAt || null }
+      syncEl.textContent = `${items.length}件 ・貼り付け`
+      ideasState.phase = 'idle'
+      refresh()
+    },
+  }
+}
+
+// ============ カードの編集 ============
+
+/**
+ * 一覧のカードから直接直す。詳細を開かずに直せるようにするためのもので、
+ * 変更した項目だけを Notion に投げる(触っていない項目の更新日時を動かさない)。
+ */
+function openCardEditor(key) {
+  const item = itemOf(key)
+  if (!item) return
+
+  let tags = [...(item.tags || [])]
+  const known = knownTagsOf(items)
+  const statuses = [...new Set([...STATUS_ORDER, STATUS_EXCLUDED, item.status].filter(Boolean))]
+  const root = $('modal-root')
+  root.innerHTML = `
+    <div class="overlay">
+      <div class="modal modal-sticky">
+        <h2 class="modal-title">カードの情報を直す</h2>
+        <div class="modal-body">
+          <label class="field-label">タイトル</label>
+          <input id="ce-title" class="input" value="${escapeHtml(item.title || '')}" />
+
+          <label class="field-label">状態</label>
+          <select id="ce-status" class="input">
+            ${statuses.map((s) => `<option value="${escapeHtml(s)}" ${s === item.status ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+          </select>
+
+          <label class="field-label">タグ</label>
+          <div id="ce-tags" class="tag-row"></div>
+          <div class="row">
+            <input id="ce-tag-new" class="input sm grow" placeholder="タグを追加" />
+            <button id="ce-tag-add" class="btn">追加</button>
+          </div>
+          ${known.length ? `<div id="ce-tag-known" class="tag-row picker"></div>` : ''}
+
+          <label class="field-label">要約</label>
+          <textarea id="ce-summary" class="input" rows="10">${escapeHtml(plainTextOf(item.summary || ''))}</textarea>
+          <div class="foot-note">変更した項目だけ Notion に書き戻します</div>
+        </div>
+        <div class="modal-foot">
+          <span id="ce-msg" class="foot-note grow"></span>
+          <button id="ce-cancel" class="btn">キャンセル</button>
+          <button id="ce-save" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  `
+
+  function paintTags() {
+    $('ce-tags').innerHTML = tags.length
+      ? tags.map((t) => `<span class="tag tag-edit" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<i class="ti ti-x" aria-hidden="true"></i></span>`).join('')
+      : '<span class="muted">タグなし</span>'
+    $('ce-tags').querySelectorAll('.tag-edit i').forEach((x) =>
+      x.addEventListener('click', () => {
+        tags = tags.filter((t) => t !== x.parentElement.dataset.tag)
+        paintTags()
+      })
+    )
+    const pick = $('ce-tag-known')
+    if (!pick) return
+    pick.innerHTML = known
+      .map((t) => `<button class="chip ${tags.includes(t) ? 'on' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
+      .join('')
+    pick.querySelectorAll('.chip').forEach((chip) =>
+      chip.addEventListener('click', () => {
+        const t = chip.dataset.tag
+        tags = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]
+        paintTags()
+      })
+    )
+  }
+  paintTags()
+
+  const addTagFromInput = () => {
+    const name = $('ce-tag-new').value.trim()
+    if (name && !tags.includes(name)) tags = [...tags, name]
+    $('ce-tag-new').value = ''
+    paintTags()
+  }
+  $('ce-tag-add').addEventListener('click', addTagFromInput)
+  $('ce-tag-new').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    addTagFromInput()
+  })
+
+  $('ce-cancel').addEventListener('click', () => (root.innerHTML = ''))
+
+  $('ce-save').addEventListener('click', async () => {
+    const title = $('ce-title').value.trim()
+    const status = $('ce-status').value
+    // マーカーは画面に出していないので、文言が一致する範囲だけ引き継ぐ
+    const summary = reconcileMarkers(item.summary || '', $('ce-summary').value)
+    if (!title) {
+      $('ce-msg').innerHTML = '<span class="error-text">タイトルは空にできません</span>'
+      return
+    }
+
+    const btn = $('ce-save')
+    btn.disabled = true
+    $('ce-msg').textContent = '保存中...'
+    try {
+      if (title !== item.title) {
+        await saveTitle(key, title)
+        item.title = title
+      }
+      if (summary !== (item.summary || '')) {
+        await saveField(key, 'summary', summary)
+        item.summary = summary
+        item.has = { ...(item.has || {}), summary: Boolean(summary) }
+      }
+      if (tags.join('\u0000') !== (item.tags || []).join('\u0000')) {
+        await saveTags(key, tags)
+        item.tags = tags
+      }
+      if (status !== item.status) {
+        await setStatus(key, status)
+        item.status = status
+      }
+      // 詳細のキャッシュは古くなる。開いたときに取り直させる
+      clearDetailCache(key)
+      ideasState.phase = 'idle'
+      root.innerHTML = ''
+      refresh()
+    } catch (err) {
+      btn.disabled = false
+      $('ce-msg').innerHTML = `<span class="error-text">${escapeHtml(String(err.message || err))}</span>`
+    }
+  })
 }
 
 function paintStatusChips() {
@@ -190,6 +344,32 @@ function paintStatusChips() {
     chip.addEventListener('click', () => {
       const s = chip.dataset.status
       selectedStatuses.has(s) ? selectedStatuses.delete(s) : selectedStatuses.add(s)
+      refresh()
+    })
+  })
+}
+
+/** 取り込み元の絞り込み。件数は「除外」を外した全件から数える(自分自身の絞りは効かせない) */
+function paintSourceChips() {
+  const counts = sourceCounts(excludeExcluded(items))
+  const shown = SOURCE_ORDER.filter((s) => counts.get(s.id))
+  const el = $('source-filter')
+  // 片方しか無いなら絞る意味が無い
+  if (shown.length < 2) {
+    el.innerHTML = ''
+    return
+  }
+  el.innerHTML = shown
+    .map(
+      (s) => `<button class="chip ${selectedSources.has(s.id) ? 'on' : ''}" data-source="${s.id}">
+        ${escapeHtml(s.label)}<span class="chip-count">${counts.get(s.id)}</span>
+      </button>`
+    )
+    .join('')
+  el.querySelectorAll('.chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.source
+      selectedSources.has(s) ? selectedSources.delete(s) : selectedSources.add(s)
       refresh()
     })
   })
@@ -951,6 +1131,7 @@ async function paintIdeas() {
   }
 
   let entries = ideasState.items
+  entries = filterBySource(entries, selectedSources)
   if (ideasState.kind !== 'all') entries = entries.filter((e) => e.kind === ideasState.kind)
   if (selectedTags.size) entries = entries.filter((e) => [...selectedTags].every((t) => e.tags.includes(t)))
   if (searchQuery.trim()) {
@@ -1329,7 +1510,7 @@ $('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
   refresh()
 })
-$('open-settings').addEventListener('click', () => openSettings(() => loadList()))
+$('open-settings').addEventListener('click', () => openSettings(() => loadList(), listJsonContext()))
 $('open-vocab').addEventListener('click', () => {
   openVocabPanel(visibleItems(), {
     dismissed: () => loadDismissed(),
@@ -1365,7 +1546,7 @@ $('active-model').addEventListener('click', () => {
   const settings = loadSettings()
   const models = allModels(settings)
   if (!models.length) {
-    openSettings(() => loadList())
+    openSettings(() => loadList(), listJsonContext())
     return
   }
   document.querySelector('.popmenu')?.remove()

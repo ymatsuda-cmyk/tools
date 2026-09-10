@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Notionの動画DBを読み、動画ナレッジ(clipstock)の一覧用JSONを書き出す。
+"""Notionの動画DBとweb記事DBを読み、動画ナレッジ(clipstock)の一覧用JSONを書き出す。
 
 アプリは開くたびにGAS経由でNotionを全件クエリしていて、件数が増えるほど
 最初の描画までが遅かった。cronでこのスクリプトを回してJSONを先に用意しておき、
@@ -14,6 +14,7 @@
   NOTION_TOKEN       Notion Integration Token(必須)
   VIDEO_ENV_FILE     環境変数を読み込むファイルのパス(既定: ~/.video_notion_sync.env)
   VIDEO_DB_ID        対象データベースID
+  WEB_DB_ID          web記事DBのID(空文字にするとwebを読まない)
   CLIPSTOCK_OUT_DIR  出力先ディレクトリ(--out より弱い)
 
 使い方:
@@ -51,9 +52,11 @@ load_env()
 NOTION_API = "https://api.notion.com/v1"
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
+WEB_DB_ID = os.environ.get("WEB_DB_ID", "4130e7a535dc83509c9a01cd6ac0a6a7").strip()
 
 # Notion側のカラム名。gas/Code.gs の PROP_* と一致させること
 PROP_TITLE = "動画タイトル"
+PROP_WEB_TITLE = "タイトル"  # web記事DB側のタイトル欄。他のカラム名は共通
 PROP_URL = "URL"
 PROP_THUMB = "サムネイル"
 PROP_TAGS = "タグ"
@@ -82,19 +85,16 @@ def notion_headers():
     }
 
 
-def query_all_pages():
+def query_all_pages(db_id, sort):
     """DBの全ページを作成日時の新しい順で取得する。"""
     pages = []
     cursor = None
     while True:
-        payload = {
-            "page_size": 100,
-            "sorts": [{"property": PROP_CREATED, "direction": "descending"}],
-        }
+        payload = {"page_size": 100, "sorts": [sort]}
         if cursor:
             payload["start_cursor"] = cursor
         resp = requests.post(
-            f"{NOTION_API}/databases/{VIDEO_DB_ID}/query",
+            f"{NOTION_API}/databases/{db_id}/query",
             headers=notion_headers(),
             json=payload,
             timeout=60,
@@ -106,6 +106,27 @@ def query_all_pages():
         if not data.get("has_more"):
             break
         cursor = data.get("next_cursor")
+    return pages
+
+
+def collect_pages():
+    """動画DBとweb記事DBのページを (page, source) で返す。
+
+    web側はあとから足したものなので、共有し忘れなどで落ちても動画分は書き出す。
+    webはDBに「作成日時」カラムが無くても並べられるよう、ページの作成時刻でソートする。
+    """
+    pages = [
+        (page, "video")
+        for page in query_all_pages(VIDEO_DB_ID, {"property": PROP_CREATED, "direction": "descending"})
+    ]
+    if WEB_DB_ID:
+        try:
+            pages += [
+                (page, "web")
+                for page in query_all_pages(WEB_DB_ID, {"timestamp": "created_time", "direction": "descending"})
+            ]
+        except Exception as err:  # noqa: BLE001
+            print(f"web記事DBを読めませんでした(動画だけ書き出します): {err}", file=sys.stderr)
     return pages
 
 
@@ -155,15 +176,31 @@ def created_of(page, props):
 # ---------------------------------------------------------------- 変換
 
 
-def to_item(page):
-    """gas/Code.gs の listVideos_ と同じ形にする。"""
+def title_any_of(props):
+    """title型のプロパティを探す。DBごとに名前が違う(動画タイトル / タイトル)ため。"""
+    for name in (PROP_TITLE, PROP_WEB_TITLE):
+        text = title_of(props, name)
+        if text:
+            return text
+    for value in props.values():
+        if isinstance(value, dict) and value.get("type") == "title":
+            return plain_text(value.get("title"))
+    return ""
+
+
+def to_item(page, source):
+    """gas/Code.gs の listVideos_ と同じ形にする。webは状態が空欄なら None。"""
     p = page.get("properties", {})
+    status = select_of(p, PROP_STATUS)
+    if source == "web" and not status:
+        return None
     return {
         "key": page["id"],
-        "title": title_of(p, PROP_TITLE) or "(タイトル未取得)",
+        "source": source,
+        "title": title_any_of(p) or "(タイトル未取得)",
         "url": url_of(p, PROP_URL),
         "thumb": url_of(p, PROP_THUMB),
-        "status": select_of(p, PROP_STATUS) or STATUS_NEW,
+        "status": status or STATUS_NEW,
         "tags": multi_select_of(p, PROP_TAGS),
         "createdAt": created_of(page, p),
         "editedAt": page.get("last_edited_time"),
@@ -181,20 +218,24 @@ def to_item(page):
     }
 
 
-def to_idea(page):
+def to_idea(page, source):
     """gas/Code.gs の listIdeas_ と同じ形。応用も活用も無いページは None を返す。"""
     p = page.get("properties", {})
     apply_text = rich_of(p, PROP_APPLY)
     ideas_text = rich_of(p, PROP_IDEAS)
     if not apply_text and not ideas_text:
         return None
+    status = select_of(p, PROP_STATUS)
+    if source == "web" and not status:
+        return None
     return {
         "key": page["id"],
-        "title": title_of(p, PROP_TITLE),
+        "source": source,
+        "title": title_any_of(p),
         "url": url_of(p, PROP_URL),
         "thumb": url_of(p, PROP_THUMB),
         "tags": multi_select_of(p, PROP_TAGS),
-        "status": select_of(p, PROP_STATUS),
+        "status": status,
         "apply": apply_text,
         "ideas": ideas_text,
     }
@@ -230,12 +271,14 @@ def main():
         print("NOTION_TOKEN が未設定です", file=sys.stderr)
         return 1
 
-    pages = query_all_pages()
-    items = [to_item(page) for page in pages]
-    ideas = [idea for idea in (to_idea(page) for page in pages) if idea]
+    pages = collect_pages()
+    items = [item for item in (to_item(page, source) for page, source in pages) if item]
+    items.sort(key=lambda i: i.get("createdAt") or "", reverse=True)
+    ideas = [idea for idea in (to_idea(page, source) for page, source in pages) if idea]
     generated_at = datetime.now(JST).isoformat()
 
-    print(f"動画 {len(items)}件 / アイデアのあるもの {len(ideas)}件")
+    web_count = sum(1 for i in items if i["source"] == "web")
+    print(f"動画 {len(items) - web_count}件 / web {web_count}件 / アイデアのあるもの {len(ideas)}件")
     if args.dry_run:
         return 0
 

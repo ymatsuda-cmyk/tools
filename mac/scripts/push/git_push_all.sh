@@ -139,6 +139,7 @@ push_with_subfolder() {
   fi
 
   # サブフォルダを作成してファイルをコピー
+  # setting.json はリポジトリ側で管理する設定ファイル。--delete で消されないよう除外する
   local TARGET_DIR="${CACHE_DIR}/${SUBFOLDER}"
   mkdir -p "$TARGET_DIR"
   log_info "  → ファイルをコピー: $SOURCE → $TARGET_DIR"
@@ -147,6 +148,7 @@ push_with_subfolder() {
     --exclude=".DS_Store" \
     --exclude=".Spotlight-V100" \
     --exclude=".Trashes" \
+    --exclude="setting.json" \
     "$SOURCE/" "$TARGET_DIR/" 2>&1 | \
     sed 's/^/    /' | tee -a "$LOG_FILE"
 

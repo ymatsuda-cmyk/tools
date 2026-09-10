@@ -34,7 +34,8 @@ function fallbackThumb(url) {
 function thumbHtml(item, extraClass = '') {
   const src = item.thumb || fallbackThumb(item.url)
   if (!src) {
-    return `<div class="thumb thumb-blank ${extraClass}"><i class="ti ti-video-off" aria-hidden="true"></i></div>`
+    const icon = item.source === 'web' ? 'ti-world' : 'ti-video-off'
+    return `<div class="thumb thumb-blank ${extraClass}"><i class="ti ${icon}" aria-hidden="true"></i></div>`
   }
   return `<div class="thumb ${extraClass}"><img src="${escapeHtml(src)}" alt="" loading="lazy" /></div>`
 }
@@ -103,9 +104,11 @@ export function renderLibrary(container, items, state, handlers) {
             <h3 class="card-title">${highlightText(item.title, state.searchQuery)}</h3>
             <p class="card-summary">${item.summary ? highlightText(plainTextOf(item.summary).slice(0, 110), state.searchQuery) : '<span class="muted">要約はまだありません</span>'}</p>
             <div class="card-foot">
+              ${item.source === 'web' ? '<span class="badge badge-web"><i class="ti ti-world" aria-hidden="true"></i>Web</span>' : ''}
               <span class="badge s-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
               ${progressHtml(item)}
               <span class="card-date">${fmtDate(item.createdAt)}</span>
+              ${state.canEdit ? `<button class="card-edit" data-key="${escapeHtml(item.key)}" aria-label="この動画の情報を編集"><i class="ti ti-pencil" aria-hidden="true"></i></button>` : ''}
             </div>
             ${state.showTags && item.tags?.length ? `<div class="card-tags">${item.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </div>
@@ -123,6 +126,13 @@ export function renderLibrary(container, items, state, handlers) {
         e.preventDefault()
         open()
       }
+    })
+  })
+
+  container.querySelectorAll('.card-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation() // カードのクリック(詳細を開く)と競合させない
+      handlers.onEdit(btn.dataset.key)
     })
   })
 }
@@ -236,7 +246,7 @@ export function detailHtml(item, state) {
           ${d.model ? `<span class="model-badge">${escapeHtml(d.model)}</span>` : ''}
         </div>
       </div>
-      ${item.url ? `<a class="btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" aria-label="YouTubeで開く"><i class="ti ti-external-link" aria-hidden="true"></i></a>` : ''}
+      ${item.url ? `<a class="btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" aria-label="${item.source === 'web' ? '元記事を開く' : 'YouTubeで開く'}"><i class="ti ti-external-link" aria-hidden="true"></i></a>` : ''}
       ${canEdit ? '<button class="btn-ghost btn-more" aria-label="その他の操作"><i class="ti ti-dots" aria-hidden="true"></i></button>' : ''}
     </div>
     <div class="detail-hero">
@@ -422,6 +432,7 @@ export function flattenIdeas(items) {
       parseSections(v[kind]).forEach((s, i) => {
         out.push({
           key: v.key,
+          source: v.source,
           videoTitle: v.title,
           tags: v.tags || [],
           kind,
