@@ -142,9 +142,17 @@
   }
   .card{
     background:var(--surface);border:1px solid var(--border);border-radius:var(--card-radius);
-    overflow:hidden;cursor:pointer;position:relative;transition:border-color .2s ease;
+    overflow:hidden;cursor:pointer;position:relative;
+    transition:border-color .2s ease,transform .18s ease,box-shadow .2s ease;
   }
-  .card:hover{border-color:var(--border-strong);}
+  .card:hover{
+    border-color:var(--border-strong);
+    transform:scale(1.05);
+    box-shadow:0 10px 26px rgba(0,0,0,0.45);
+    z-index:4;
+  }
+  .card.dragging{opacity:0.4;transform:none;box-shadow:none;cursor:grabbing;}
+  .grid.reordering .card:hover{transform:none;box-shadow:none;}
   .card[data-size="wide"]{grid-column:span 2;}
   .card[data-size="large"]{grid-column:span 2;}
   .card[data-size="large"] .thumb{height:calc(var(--thumb-h) * 1.7);}
@@ -154,7 +162,10 @@
     position:relative;height:var(--thumb-h);background:var(--surface-2);
     display:flex;align-items:center;justify-content:center;overflow:hidden;
   }
-  .thumb img,.thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .thumb img,.thumb video{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    pointer-events:none;-webkit-user-drag:none;user-select:none;
+  }
   .base-layer,.hover-layer{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     transition:opacity var(--fade) ease;
@@ -162,6 +173,8 @@
   .hover-layer{opacity:0;}
   .card:hover .hover-layer,.card.preview-on .hover-layer{opacity:1;}
   .card:hover .base-layer,.card.preview-on .base-layer{opacity:0;}
+  /* 動画プレビューはホバーに関係なく常に再生・表示する */
+  .base-layer.always-on,.card:hover .base-layer.always-on{opacity:1;}
 
   .type-badge{
     position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
@@ -712,18 +725,15 @@ function renderChips(){
 }
 
 function thumbHTML(r){
-  const base = r.thumb
-    ? `<img src="${r.thumb}" alt="">`
-    : `<span class="fallback-icon">${TYPE_ICON[r.type]||'◎'}</span>`;
-  let hover = '';
-  if(r.preview){
-    hover = /\.mp4($|\?)/i.test(r.preview)
-      ? `<video src="${r.preview}" muted loop playsinline autoplay></video>`
-      : `<img src="${r.preview}" alt="">`;
-  }
+  const isVideo = r.preview && /\.mp4($|\?)/i.test(r.preview);
+  // 動画プレビューはホバーを待たず常に再生させたいので、ベース側に置く
+  const base = isVideo
+    ? `<video src="${r.preview}" muted loop playsinline autoplay preload="auto"></video>`
+    : (r.thumb ? `<img src="${r.thumb}" alt="">` : `<span class="fallback-icon">${TYPE_ICON[r.type]||'◎'}</span>`);
+  const hover = (!isVideo && r.preview) ? `<img src="${r.preview}" alt="">` : '';
   return `
     <div class="thumb">
-      <div class="base-layer">${base}</div>
+      <div class="base-layer${isVideo ? ' always-on' : ''}">${base}</div>
       ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
       <div class="type-badge">${TYPE_ICON[r.type]||'◎'}</div>
       <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
@@ -749,7 +759,7 @@ function render(){
     return;
   }
   grid.innerHTML = list.map(r=>`
-    <div class="card" data-id="${r.id}" data-url="${r.url}" data-size="${r.cardSize||'normal'}">
+    <div class="card" draggable="true" data-id="${r.id}" data-url="${r.url}" data-size="${r.cardSize||'normal'}">
       ${thumbHTML(r)}
       <div class="card-body">
         <div class="card-title">${r.title}</div>
@@ -757,9 +767,17 @@ function render(){
       </div>
     </div>`).join('');
 
+  // autoplay属性が効かないブラウザでも再生されるよう明示的に呼ぶ
+  grid.querySelectorAll('video').forEach(v=>{
+    v.muted = true;
+    const p = v.play();
+    if(p && p.catch) p.catch(()=>{});
+  });
+
   grid.querySelectorAll('.card').forEach(card=>{
     card.addEventListener('click', e=>{
       if(e.target.closest('.card-actions')) return;
+      if(suppressClick) return;
       window.open(card.dataset.url, '_blank');
     });
   });
@@ -777,6 +795,61 @@ function render(){
 }
 
 document.getElementById('searchInput').addEventListener('input', render);
+
+/* ---------- カードの並び替え（ドラッグ＆ドロップ） ---------- */
+let draggingCard = null;
+let suppressClick = false;
+
+/** DOM上のカードの並びを resources の並びへ反映する（絞り込み中は表示分だけ入れ替える） */
+function commitOrderFromDom(){
+  const gridEl = document.getElementById('grid');
+  const ids = [...gridEl.querySelectorAll('.card')].map(c=>c.dataset.id);
+  const shown = new Set(ids);
+  const byId = new Map(resources.map(r=>[r.id, r]));
+  const slots = [];
+  resources.forEach((r,i)=>{ if(shown.has(r.id)) slots.push(i); });
+  slots.forEach((pos,k)=>{ resources[pos] = byId.get(ids[k]); });
+}
+
+(function setupCardDnD(){
+  const gridEl = document.getElementById('grid');
+
+  gridEl.addEventListener('dragstart', e=>{
+    const card = e.target.closest('.card');
+    if(!card) return;
+    draggingCard = card;
+    gridEl.classList.add('reordering');
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.id);
+  });
+
+  gridEl.addEventListener('dragover', e=>{
+    if(!draggingCard) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const over = e.target.closest('.card');
+    if(!over || over === draggingCard) return;
+    const rect = over.getBoundingClientRect();
+    const after = (e.clientX - rect.left) > rect.width / 2;
+    gridEl.insertBefore(draggingCard, after ? over.nextSibling : over);
+  });
+
+  gridEl.addEventListener('drop', e=>{ e.preventDefault(); });
+
+  gridEl.addEventListener('dragend', async ()=>{
+    if(!draggingCard) return;
+    draggingCard.classList.remove('dragging');
+    draggingCard = null;
+    gridEl.classList.remove('reordering');
+    // ドラッグ直後のclickでリンクが開かないようにする
+    suppressClick = true;
+    setTimeout(()=>{ suppressClick = false; }, 0);
+    commitOrderFromDom();
+    await persistLocal();
+    setStatus('並び順を変更しました。公開するには index.json を書き出してください');
+  });
+})();
 
 document.getElementById('sizeGroup').addEventListener('click', async e=>{
   const btn = e.target.closest('button');
