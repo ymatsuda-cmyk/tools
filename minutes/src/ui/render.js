@@ -223,18 +223,25 @@ export function renderDetailHtml(item, state) {
     ? highlightText(plainTextOf(text || ''), state.searchQuery, escapeHtml)
     : renderMarkedHtml(text || '', escapeHtml)
 
-  /** マーカー選択の対象になる要素を作るためのdata属性 */
-  const markerAttrs = (field, index, sub) =>
-    `class="marker-target" data-field="${field}" data-index="${index}" data-sub="${sub || ''}"`
+  // class属性を2つ書くと後ろが無視されるため、既存クラスもここでまとめて出力する
+  /** マーカー選択の対象になる要素を作るためのclass/data属性 */
+  const markerAttrs = (field, index, sub, extraClass) =>
+    `class="marker-target${extraClass ? ' ' + extraClass : ''}" data-field="${field}" data-index="${index}" data-sub="${sub || ''}"`
+
+  /** 議事の1行を直接編集するためのボタン */
+  const lineEditBtn = (index, sub) =>
+    state.canEditContent
+      ? `<button class="btn-ghost btn-line-edit" data-index="${index}" data-sub="${sub}" aria-label="この行を編集"><i class="ti ti-edit" aria-hidden="true"></i></button>`
+      : ''
 
   const agendaHtml = agenda.length ? `
     <div class="section-label">議事${editBtn('agenda', '議事')}</div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
-          <div class="agenda-topic" ${markerAttrs('agenda', i, 'topic')}><span class="agenda-num">${i + 1}</span>${markerText(a.topic)}</div>
-          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p, j) => `<li ${markerAttrs('agenda', i, `point:${j}`)}>${markerText(p)}</li>`).join('')}</ul>` : ''}
-          ${a.outcome ? `<div class="agenda-outcome" ${markerAttrs('agenda', i, 'outcome')}><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i>${markerText(a.outcome)}</div>` : ''}
+          <div class="agenda-topic agenda-line" data-index="${i}" data-sub="topic"><span class="agenda-num">${i + 1}</span><span ${markerAttrs('agenda', i, 'topic', 'agenda-line-text')}>${markerText(a.topic)}</span>${lineEditBtn(i, 'topic')}</div>
+          ${(a.points || []).length ? `<ul class="agenda-points">${a.points.map((p, j) => `<li class="agenda-line" data-index="${i}" data-sub="point:${j}"><span ${markerAttrs('agenda', i, `point:${j}`, 'agenda-line-text')}>${markerText(p)}</span>${lineEditBtn(i, `point:${j}`)}</li>`).join('')}</ul>` : ''}
+          ${a.outcome ? `<div class="agenda-outcome agenda-line" data-index="${i}" data-sub="outcome"><i class="ti ti-arrow-narrow-right" aria-hidden="true"></i><span ${markerAttrs('agenda', i, 'outcome', 'agenda-line-text')}>${markerText(a.outcome)}</span>${lineEditBtn(i, 'outcome')}</div>` : ''}
         </div>
       `).join('')}
     </div>
@@ -258,7 +265,7 @@ export function renderDetailHtml(item, state) {
   const tabPanels = {
     summary: `
       <div class="section-label">サマリ${editBtn('cardSummary', 'サマリ')}</div>
-      <p class="summary-text" ${markerAttrs('cardSummary', 0)}>${markerText(s.cardSummary)}</p>
+      <p ${markerAttrs('cardSummary', 0, '', 'summary-text')}>${markerText(s.cardSummary)}</p>
       <div class="section-label">論点${editBtn('topics', '論点')}</div>
       ${topics.length ? `<ul class="plain-list">${topics.map((t, i) => `<li ${markerAttrs('topics', i)}>${markerText(t)}</li>`).join('')}</ul>` : '<p class="empty-section">未登録</p>'}
     `,

@@ -313,6 +313,9 @@ function paintDetail(target, item, state) {
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, renderState, el.dataset.field))
   })
+  target.querySelectorAll('.btn-line-edit').forEach((el) => {
+    el.addEventListener('click', () => startLineEdit(target, item, renderState, el.closest('.agenda-line')))
+  })
   target.querySelectorAll('.todo-check').forEach((el) => {
     el.addEventListener('change', () => toggleTodo(target, item, renderState, Number(el.dataset.index), el.checked))
   })
@@ -348,6 +351,97 @@ async function toggleTodo(target, item, state, index, done) {
   } catch (err) {
     apply(prev)
     alert('ToDoの更新に失敗しました: ' + (err.message || err))
+  }
+}
+
+/**
+ * 議事の1行(議題名・箇条書き・結論)をその場でテキストエリアに切り替えて編集する。
+ * 保存時は文言が変わらなかった部分のマーカーだけ引き継ぐ。
+ */
+function startLineEdit(target, item, state, lineEl) {
+  if (!lineEl || lineEl.querySelector('.line-editor')) return
+  const index = Number(lineEl.dataset.index)
+  const sub = lineEl.dataset.sub
+  const raw = getMarkerText(state.summary, 'agenda', index, sub)
+  const textEl = lineEl.querySelector('.agenda-line-text')
+  const editBtn = lineEl.querySelector('.btn-line-edit')
+  if (!textEl) return
+
+  const editor = document.createElement('div')
+  editor.className = 'line-editor'
+  editor.innerHTML = `
+    <textarea class="line-edit-input" rows="1"></textarea>
+    <div class="line-edit-actions">
+      <button class="btn btn-line-save">保存</button>
+      <button class="btn btn-line-cancel">キャンセル</button>
+      <span class="line-edit-hint">Ctrl+Enterで保存 / Escでキャンセル</span>
+    </div>
+  `
+  textEl.style.display = 'none'
+  if (editBtn) editBtn.style.display = 'none'
+  textEl.after(editor)
+
+  const input = editor.querySelector('.line-edit-input')
+  const autoGrow = () => {
+    input.style.height = 'auto'
+    input.style.height = `${input.scrollHeight}px`
+  }
+  input.value = plainTextOf(raw)
+  autoGrow()
+  input.addEventListener('input', autoGrow)
+  input.focus()
+  input.setSelectionRange(input.value.length, input.value.length)
+
+  const cancel = () => {
+    editor.remove()
+    textEl.style.display = ''
+    if (editBtn) editBtn.style.display = ''
+  }
+  const save = () => commitLineEdit(target, item, state, index, sub, input.value)
+
+  editor.querySelector('.btn-line-cancel').addEventListener('click', cancel)
+  editor.querySelector('.btn-line-save').addEventListener('click', save)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      save()
+    }
+  })
+}
+
+/** 行編集の内容を反映してNotionに保存する。箇条書きを空にした場合はその行を削除する */
+async function commitLineEdit(target, item, state, index, sub, value) {
+  const summary = state.summary
+  const raw = getMarkerText(summary, 'agenda', index, sub)
+  const text = value.trim()
+  if (text === plainTextOf(raw)) {
+    paintDetail(target, item, state)
+    return
+  }
+
+  let updated
+  if (!text && sub.startsWith('point:')) {
+    const pj = Number(sub.split(':')[1])
+    const agenda = (summary.detail.agenda || []).map((a, i) =>
+      i === index ? { ...a, points: (a.points || []).filter((_, j) => j !== pj) } : a
+    )
+    updated = { ...summary, detail: { ...summary.detail, agenda } }
+  } else {
+    updated = setMarkerText(summary, 'agenda', index, sub, reconcileMarkers(raw, text))
+  }
+  updated = { ...updated, updatedAt: new Date().toISOString() }
+
+  setDetailCache(item.key, updated)
+  paintDetail(target, item, { ...state, summary: updated })
+  try {
+    await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+  } catch (err) {
+    setDetailCache(item.key, summary)
+    paintDetail(target, item, { ...state, summary })
+    alert('保存に失敗しました: ' + (err.message || err))
   }
 }
 
