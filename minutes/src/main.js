@@ -1032,9 +1032,26 @@ function handleMarkerMouseUp(el) {
     }
     ctx.toolbar.style.display = 'flex'
     ctx.toolbar.style.position = 'fixed'
-    ctx.toolbar.style.left = `${offsets.rect.left}px`
-    ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
+    positionMarkerToolbar(ctx.toolbar, offsets.rect)
   }, 0)
+}
+
+/** 選択範囲のすぐ下にツールバーを出す。下が画面外になる場合は上に回り込ませる */
+function positionMarkerToolbar(toolbar, rect) {
+  const gap = 6
+  const margin = 8
+  const width = toolbar.offsetWidth
+  const height = toolbar.offsetHeight
+
+  let top = rect.bottom + gap
+  if (top + height + margin > window.innerHeight) {
+    top = rect.top - height - gap
+    if (top < margin) top = Math.min(rect.bottom + gap, window.innerHeight - height - margin)
+  }
+  const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin)
+
+  toolbar.style.left = `${Math.max(margin, left)}px`
+  toolbar.style.top = `${Math.max(margin, top)}px`
 }
 
 function handleMarkerDocumentClick(e) {
