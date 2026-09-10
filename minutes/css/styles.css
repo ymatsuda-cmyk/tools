@@ -28,6 +28,8 @@
   --border-danger: #d98f8f;
   --bg-danger: #fcebeb;
   --bg-highlight: #fff3b0;
+  /* メモ欄(textarea)と本文で共通に使うフォント */
+  --font-content: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Hiragino Sans", "Yu Gothic", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -565,6 +567,12 @@ body {
 .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .detail-title { font-size: 18px; font-weight: 500; }
 .detail-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+
+.summary-text,
+.plain-list,
+.agenda-list,
+.todo-box,
+.memo-textarea { font-family: var(--font-content); }
 
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .stat-card { background: var(--surface-1); border-radius: var(--radius); padding: 9px 12px; }
