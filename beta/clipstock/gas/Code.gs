@@ -44,6 +44,7 @@ var PROP_MEMO     = 'メモ';           // rich_text  (要追加)
 var PROP_MODEL    = '要約モデル';     // rich_text  (要追加)
 var PROP_GENERATED = '要約日時';      // date       (要追加)
 var PROP_RAW_COUNT = '原文文字数';    // number     (要追加)
+var PROP_PUBLIC   = '公開';           // checkbox   マインドマップ一覧に並べるか (要追加)
 var PROP_CREATED  = '作成日時';       // created_time
 
 // ---- 状態の値 ----
@@ -105,6 +106,9 @@ function doPost(e) {
         break;
       case 'updateRawCount':
         result = updateRawCount_(body.pageId, body.count, body.source);
+        break;
+      case 'setPublic':
+        result = setPublic_(body.pageId, body.isPublic, body.source);
         break;
       case 'deleteVideo':
         result = deleteVideo_(body.pageId, body.source);
@@ -224,6 +228,11 @@ function multiSelectOf_(properties, name) {
   var prop = properties[name];
   if (!prop || !prop.multi_select) return [];
   return prop.multi_select.map(function (o) { return o.name; });
+}
+
+function checkboxOf_(properties, name) {
+  var prop = properties[name];
+  return Boolean(prop && prop.checkbox);
 }
 
 function titleOf_(properties, name) {
@@ -356,6 +365,7 @@ function toListItem_(page, source) {
     model: richTextOf_(p, PROP_MODEL) || null,
     generatedAt: dateOf_(p, PROP_GENERATED),
     rawCount: numberOf_(p, PROP_RAW_COUNT),
+    isPublic: checkboxOf_(p, PROP_PUBLIC),
     has: {
       mindmap: Boolean(richTextOf_(p, PROP_MINDMAP)),
       fields: Boolean(richTextOf_(p, PROP_FIELDS)),
@@ -433,6 +443,7 @@ function fetchDetail_(pageId, source) {
     model: richTextOf_(p, PROP_MODEL) || null,
     generatedAt: dateOf_(p, PROP_GENERATED),
     rawCount: numberOf_(p, PROP_RAW_COUNT),
+    isPublic: checkboxOf_(p, PROP_PUBLIC),
     updatedAt: page.last_edited_time,
   };
 }
@@ -596,6 +607,14 @@ function updateRawCount_(pageId, count, source) {
   props[PROP_RAW_COUNT] = { number: Number(count) || 0 };
   notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true };
+}
+
+/** マインドマップ一覧に出すかどうか。列が無いDBでは Notion が 400 を返す */
+function setPublic_(pageId, isPublic, source) {
+  var props = {};
+  props[PROP_PUBLIC] = { checkbox: Boolean(isPublic) };
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
+  return { saved: true, isPublic: Boolean(isPublic) };
 }
 
 /**

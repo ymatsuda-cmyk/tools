@@ -73,6 +73,7 @@ PROP_MEMO = "メモ"
 PROP_MODEL = "要約モデル"
 PROP_GENERATED = "要約日時"
 PROP_RAW_COUNT = "原文文字数"
+PROP_PUBLIC = "公開"  # checkbox。マインドマップ一覧に並べるか
 PROP_CREATED = "作成日時"
 
 STATUS_NEW = "新規"
@@ -170,6 +171,10 @@ def number_of(props, name):
     return value if isinstance(value, (int, float)) else 0
 
 
+def checkbox_of(props, name):
+    return bool((props.get(name) or {}).get("checkbox"))
+
+
 def date_of(props, name):
     date = (props.get(name) or {}).get("date")
     return (date or {}).get("start")
@@ -215,6 +220,7 @@ def to_item(page, source):
         "model": rich_of(p, PROP_MODEL) or None,
         "generatedAt": date_of(p, PROP_GENERATED),
         "rawCount": number_of(p, PROP_RAW_COUNT),
+        "isPublic": checkbox_of(p, PROP_PUBLIC),
         "has": {
             "mindmap": bool(rich_of(p, PROP_MINDMAP)),
             "fields": bool(rich_of(p, PROP_FIELDS)),

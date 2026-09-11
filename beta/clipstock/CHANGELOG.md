@@ -1,5 +1,30 @@
 # Change Log
 
+## 1.7.0 - 2026-09-11
+
+### Title
+
+Mark up mindmap branches, and collect the published ones into their own tab
+
+### Changes
+
+- Added markers to the mindmap. markmap draws into SVG, so the drag-to-select flow used by the text tabs does not apply; instead you pick a colour in the footer and click a branch. The colour is stored as the same `<m1>…</m1>` wrapper the other fields use — embedded in the branch's own line — so editing the Markdown later cannot shift a marker onto the wrong branch, and `plainTextOf` keeps stripping it everywhere else.
+- Located the clicked branch by walking the markmap tree in pre-order and pairing it with the non-blank lines of the Markdown. The generator emits exactly one node per line, so the two orders match without depending on markmap's internal payload.
+- Painted the clicked branch directly in the DOM instead of re-rendering. `Markmap.create` refits the view, which would throw away the reader's zoom and pan on every click.
+- Added a 公開 checkbox column in Notion and a toggle on the mindmap tab, plus a third view tab that lists the published mindmaps. The cards only carry the thumbnail and title; the map itself is fetched and drawn when a card is opened, so the tab stays cheap no matter how many are published.
+
+### Affected Files
+
+- `beta/clipstock/index.html`
+- `beta/clipstock/src/lib/mindmap.js`
+- `beta/clipstock/src/lib/gas.js`
+- `beta/clipstock/src/main.js`
+- `beta/clipstock/src/ui/render.js`
+- `beta/clipstock/css/styles.css`
+- `beta/clipstock/gas/Code.gs`
+- `beta/clipstock/SETUP.md`
+- `mac/scripts/video/build_clipstock_json.py`
+
 ## 1.6.1 - 2026-09-11
 
 ### Title

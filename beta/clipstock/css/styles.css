@@ -449,6 +449,27 @@ mark { background: var(--highlight); color: inherit; }
   border-radius: var(--radius);
 }
 
+/* 枝のマーカー。描き直し前は枝のラベルごと、描き直したあとは文字だけ塗られる */
+.mm-mark, .markmap-foreign.mm-marked { border-radius: 3px; padding: 0 2px; }
+
+.mm-tools { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+.mm-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+.mm-swatch.mm-erase { background: var(--surface-2); }
+.mm-swatch.on { border-color: var(--text-primary); }
+
+.btn-publish.on { color: var(--accent); border-color: var(--accent); }
+
+.mm-card .card-body { gap: 6px; }
+
 /* ---- チャット ---- */
 
 .chat-log { display: flex; flex-direction: column; gap: 6px; }

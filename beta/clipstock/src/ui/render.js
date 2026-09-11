@@ -137,6 +137,53 @@ export function renderLibrary(container, items, state, handlers) {
   })
 }
 
+// ============ マインドマップ一覧(公開ONのものだけ) ============
+
+export function renderMindmapGallery(container, items, state, handlers) {
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="ti ti-sitemap" aria-hidden="true"></i>
+        <p>公開中のマインドマップがありません</p>
+        <p class="empty-hint">詳細のマインドマップタブで「公開する」を押すと、ここに並びます</p>
+      </div>`
+    return
+  }
+
+  container.innerHTML = `
+    <div class="grid">
+      ${items
+        .map(
+          (item) => `
+        <article class="card mm-card" data-key="${escapeHtml(item.key)}" tabindex="0">
+          ${thumbHtml(item)}
+          <div class="card-body">
+            <h3 class="card-title">${highlightText(item.title, state.searchQuery)}</h3>
+            <div class="card-foot">
+              ${item.source === 'web' ? '<span class="badge badge-web"><i class="ti ti-world" aria-hidden="true"></i>Web</span>' : ''}
+              <span class="grow"></span>
+              <span class="card-date">${fmtDate(item.createdAt)}</span>
+            </div>
+            ${state.showTags && item.tags?.length ? `<div class="card-tags">${item.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+          </div>
+        </article>`
+        )
+        .join('')}
+    </div>
+  `
+
+  container.querySelectorAll('.card').forEach((el) => {
+    const open = () => handlers.onOpen(el.dataset.key)
+    el.addEventListener('click', open)
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        open()
+      }
+    })
+  })
+}
+
 // ============ セクション表示(分野別 / 応用 / 活用アイデア) ============
 
 /**
@@ -191,6 +238,25 @@ function markerToolbarHtml() {
       <span class="marker-sep"></span>
       <button class="marker-erase" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
     </div>`
+}
+
+/** マインドマップ用。色を選んでから枝をクリックすると、その枝が塗られる */
+function mindmapToolsHtml(current) {
+  return `
+    <span class="mm-tools" title="色を選んでから枝をクリックすると塗れます">
+      ${[1, 2, 3]
+        .map(
+          (c) =>
+            `<button class="mm-swatch ${current === c ? 'on' : ''}" data-color="${c}" style="background:${MARKER_COLORS[c]}" aria-label="マーカー${c}"></button>`
+        )
+        .join('')}
+      <button class="mm-swatch mm-erase ${current ? '' : 'on'}" data-color="0" aria-label="マーカーを消す"><i class="ti ti-eraser" aria-hidden="true"></i></button>
+    </span>`
+}
+
+/** マインドマップ一覧に出すかどうかの切り替え */
+function publishButtonHtml(isPublic) {
+  return `<button class="btn btn-publish ${isPublic ? 'on' : ''}" aria-pressed="${isPublic}"><i class="ti ${isPublic ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${isPublic ? '公開中' : '公開する'}</button>`
 }
 
 /** 原文タブ。タイムスタンプがあれば各かたまりの頭を再生リンクにする */
@@ -300,7 +366,9 @@ export function detailHtml(item, state) {
            </div>`
         : `${canEdit && stage ? `<button class="btn btn-regen" data-stage="${stage}"><i class="ti ti-refresh" aria-hidden="true"></i>この項目を作り直す</button>` : ''}
            ${canEdit && editable ? '<button class="btn btn-edit-field"><i class="ti ti-edit" aria-hidden="true"></i>手で直す</button>' : ''}
+           ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? mindmapToolsHtml(state.mindmapColor) : ''}
            <span class="grow"></span>
+           ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? publishButtonHtml(d.isPublic ?? item.isPublic) : ''}
            ${tab === 'mindmap' && state.tabHasContent('mindmap') ? '<button class="btn btn-mm-full"><i class="ti ti-arrows-maximize" aria-hidden="true"></i>大きく見る</button>' : ''}
            ${['summary', 'mindmap', 'fields', 'apply', 'ideas', 'raw'].includes(tab) ? '<button class="btn btn-copy"><i class="ti ti-copy" aria-hidden="true"></i>コピー</button>' : ''}`
 

@@ -119,6 +119,11 @@ export function updateRawCount(pageId, count) {
   return callGas('updateRawCount', { pageId, count })
 }
 
+/** マインドマップ一覧に出すかどうか(Notionの「公開」チェックボックス) */
+export function setPublic(pageId, isPublic) {
+  return callGas('setPublic', { pageId, isPublic })
+}
+
 /** Notionページをゴミ箱へ移す。Notion側からなら30日間は復元できる */
 export function deleteVideo(pageId) {
   return callGas('deleteVideo', { pageId })

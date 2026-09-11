@@ -4,6 +4,7 @@ import {
   renderLibrary,
   detailHtml,
   renderIdeas,
+  renderMindmapGallery,
   flattenIdeas,
   TABS,
 } from './ui/render.js'
@@ -18,6 +19,7 @@ import {
   saveTags,
   saveTitle,
   setStatus,
+  setPublic,
   updateRawCount,
   mergeTag,
   deleteVideo,
@@ -28,9 +30,9 @@ import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
 import { initPrompts } from './lib/prompts.js'
 import { generateAll, generateStage, needsTranscript, STAGES } from './lib/generate.js'
-import { renderMindmap } from './lib/mindmap.js'
+import { renderMindmap, markNodeLine, nodeMarkerOf } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
-import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
+import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers, MARKER_COLORS } from './lib/markers.js'
 import { addrOf, getMarkedText, setMarkedText, stripMarkers } from './lib/marker-target.js'
 import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
@@ -73,7 +75,7 @@ const syncEl = $('sync-status')
 let items = []
 // 表示中の一覧がいつ時点のものか。設定画面でJSONを見せるときに使う
 let listMeta = { generatedAt: null }
-let view = 'library' // 'library' | 'detail' | 'ideas' | 'crosschat'
+let view = 'library' // 'library' | 'detail' | 'ideas' | 'mindmaps' | 'crosschat'
 let selectedKey = null
 let searchQuery = ''
 let showTags = true
@@ -177,6 +179,11 @@ function refresh() {
 
   if (view === 'ideas') {
     paintIdeas()
+    return
+  }
+
+  if (view === 'mindmaps') {
+    paintMindmaps()
     return
   }
 
@@ -405,6 +412,7 @@ async function openDetail(key) {
     tags: item.tags || [],
     activeTab: 'summary',
     transcript: undefined, // undefined=未取得 / null=取得中 / string=取得済み
+    mindmapColor: 1, // 枝をクリックしたときに塗る色。null なら消しゴム
     memoDraft: null,
     memoDirty: false,
     busyStage: null,
@@ -473,6 +481,14 @@ function wireDetail(item) {
   stageEl.querySelector('.btn-tag-add')?.addEventListener('click', () => addTag(item))
   stageEl.querySelector('.btn-copy')?.addEventListener('click', () => copyCurrentTab())
   stageEl.querySelector('.btn-mm-full')?.addEventListener('click', () => openMindmapFull())
+  stageEl.querySelector('.btn-publish')?.addEventListener('click', (e) => togglePublic(item, e.currentTarget))
+  stageEl.querySelectorAll('.mm-swatch').forEach((el) =>
+    el.addEventListener('click', () => {
+      detail.mindmapColor = Number(el.dataset.color) || null
+      // 塗り替えだけなので、マップを描き直して表示位置を戻さないよう手で付け替える
+      stageEl.querySelectorAll('.mm-swatch').forEach((b) => b.classList.toggle('on', b === el))
+    })
+  )
   stageEl.querySelectorAll('.tag-edit i').forEach((x) =>
     x.addEventListener('click', (e) => removeTag(item, e.target.closest('.tag').dataset.tag))
   )
@@ -483,7 +499,11 @@ function wireDetail(item) {
 
   if (detail.activeTab === 'mindmap') {
     const host = stageEl.querySelector('#mindmap-host')
-    if (host) renderMindmap(host, detail.detail?.mindmap, item.url)
+    if (host) {
+      renderMindmap(host, detail.detail?.mindmap, item.url, {
+        onNodeClick: detail.canEdit ? (index, el) => commitNodeMarker(item, index, el) : null,
+      })
+    }
   }
   if (detail.activeTab === 'memo') setupMemo(item)
   if (detail.activeTab === 'chat') setupChat(item)
@@ -774,6 +794,55 @@ async function commitMarker(colorIndex) {
     detail.detail = { ...detail.detail, [field]: before }
     paintDetail()
     alert('マーカーを保存できませんでした: ' + (err.message || err))
+  }
+}
+
+/**
+ * マインドマップの枝を塗る。選んでいる色をもう一度押したら外す。
+ * 描き直すと拡大位置が戻ってしまうので、クリックされた枝のDOMだけ直に塗る。
+ */
+async function commitNodeMarker(item, nodeIndex, el) {
+  const before = detail.detail?.mindmap ?? ''
+  const current = nodeMarkerOf(before, nodeIndex)
+  const color = detail.mindmapColor && detail.mindmapColor !== current ? detail.mindmapColor : null
+  const next = markNodeLine(before, nodeIndex, color)
+  if (next === before) return
+
+  el.classList.toggle('mm-marked', Boolean(color))
+  el.style.background = color ? MARKER_COLORS[color] : ''
+
+  detail.detail = { ...detail.detail, mindmap: next }
+  try {
+    await saveField(item.key, 'mindmap', next)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+  } catch (err) {
+    detail.detail = { ...detail.detail, mindmap: before }
+    paintDetail()
+    alert('マーカーを保存できませんでした: ' + (err.message || err))
+  }
+}
+
+/** マインドマップ一覧に出すかどうか。ボタンだけ差し替えて、マップは描き直さない */
+async function togglePublic(item, btn) {
+  const before = detail.detail?.isPublic ?? item.isPublic ?? false
+  const next = !before
+  const paint = (on) => {
+    btn.classList.toggle('on', on)
+    btn.setAttribute('aria-pressed', String(on))
+    btn.innerHTML = `<i class="ti ${on ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${on ? '公開中' : '公開する'}`
+  }
+
+  paint(next)
+  detail.detail = { ...detail.detail, isPublic: next }
+  item.isPublic = next
+  try {
+    await setPublic(item.key, next)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+  } catch (err) {
+    paint(before)
+    detail.detail = { ...detail.detail, isPublic: before }
+    item.isPublic = before
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
   }
 }
 
@@ -1101,12 +1170,18 @@ function copyCurrentTab() {
 }
 
 function openMindmapFull() {
+  const item = itemOf(selectedKey)
+  renderMindmap(openMindmapOverlay(item?.title || ''), detail.detail?.mindmap, item?.url)
+}
+
+/** マインドマップを大きく出す枠だけ作る。中身は呼び出し側が描く */
+function openMindmapOverlay(title) {
   const root = $('modal-root')
   root.innerHTML = `
     <div class="overlay">
       <div class="modal modal-wide">
         <div class="modal-head">
-          <h2 class="modal-title">${escapeHtml(itemOf(selectedKey)?.title || '')}</h2>
+          <h2 class="modal-title">${escapeHtml(title)}</h2>
           <button id="mm-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div id="mm-full" class="mindmap-host mindmap-full"></div>
@@ -1114,7 +1189,30 @@ function openMindmapFull() {
     </div>
   `
   $('mm-close').addEventListener('click', () => (root.innerHTML = ''))
-  renderMindmap($('mm-full'), detail.detail?.mindmap, itemOf(selectedKey)?.url)
+  return $('mm-full')
+}
+
+// ============ マインドマップ一覧 ============
+
+/** 「公開」をONにしたものだけを並べる。マップ自体はカードを開いたときに描く */
+function paintMindmaps() {
+  const entries = currentItems().filter((i) => i.isPublic && i.has?.mindmap)
+  renderMindmapGallery(stageEl, entries, { searchQuery, showTags }, { onOpen: openMindmapViewer })
+}
+
+async function openMindmapViewer(key) {
+  const item = itemOf(key)
+  if (!item) return
+  const host = openMindmapOverlay(item.title)
+  host.innerHTML = '<p class="muted">読み込んでいます...</p>'
+  try {
+    const cached = getDetailCache(key)
+    const d = isCacheFresh(cached, item.editedAt) ? cached : setDetailCache(key, await fetchDetail(key))
+    // 読んでいる間に閉じられていることがある
+    if ($('mm-full')) renderMindmap($('mm-full'), d.mindmap, item.url)
+  } catch (err) {
+    if ($('mm-full')) $('mm-full').innerHTML = `<p class="error-text">${escapeHtml(String(err.message || err))}</p>`
+  }
 }
 
 // ============ アイデア一覧 ============
