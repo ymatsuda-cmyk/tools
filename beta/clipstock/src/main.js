@@ -10,6 +10,7 @@ import {
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
 import { openVocabPanel } from './ui/vocab.js'
+import { openMiniPlayer, seekTargetOf } from './ui/player.js'
 import {
   fetchDetail,
   fetchTranscript,
@@ -1710,6 +1711,20 @@ async function runBulkGenerate() {
 }
 
 // ============ トップバーの配線 ============
+
+/**
+ * 時刻付きのリンクは別タブではなく画面隨の小窓で再生する。
+ * 本文・マインドマップ(SVG内のリンク)・チャットのどれも拾えるよう委譲で受ける。
+ * サムネイルや「YouTubeで開く」は時刻が無いのでここでは拾わない。
+ */
+document.addEventListener('click', (e) => {
+  const link = e.target.closest?.('a[href]')
+  if (!link || link.classList.contains('mp-open')) return
+  const hit = seekTargetOf(link.getAttribute('href'))
+  if (!hit) return
+  e.preventDefault()
+  openMiniPlayer(hit.id, hit.at)
+})
 
 $('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
