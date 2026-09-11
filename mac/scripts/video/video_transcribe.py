@@ -480,6 +480,8 @@ def resolve_ffmpeg_cmd():
         return ffmpeg
     for candidate in (Path("/opt/homebrew/bin/ffmpeg"), Path("/usr/local/bin/ffmpeg")):
         if candidate.exists() and os.access(candidate, os.X_OK):
+            # mlx-whisper は内部で "ffmpeg" をPATHから探すため、見つけた場所を通しておく
+            os.environ["PATH"] = str(candidate.parent) + os.pathsep + os.environ.get("PATH", "")
             return str(candidate)
     return None
 
