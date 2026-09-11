@@ -62,7 +62,9 @@ function enqueue(task) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function post(url, body) {
-  const res = await fetch(url, {
+  // 毎回URLを変える。同じURLだと壊れたリダイレクト(302→/exec)を掴んだまま繰り返すことがある
+  const target = url + (url.includes('?') ? '&' : '?') + 'r=' + Date.now().toString(36)
+  const res = await fetch(target, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body,
@@ -86,6 +88,7 @@ async function postWithRetry(url, body) {
       return await post(url, body)
     } catch (err) {
       if (i >= waits.length) throw err
+      console.warn(`[clipstock] GAS通信に失敗。${waits[i] / 1000}秒後に再送します (${i + 1}/${waits.length})`, err.message || err)
       await sleep(waits[i])
     }
   }
