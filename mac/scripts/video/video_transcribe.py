@@ -13,7 +13,7 @@
   4. 既存の本文ブロックをアーカイブしてから新しい文字起こしを追記
   5. 動画タイトル・サムネイル・原文文字数・状態を更新
   6. 1件でも更新できたら build_clipstock_json.py を呼び、
-     data/clipstock/index.json を作り直す
+     data/clipstock/movie.json と web.json を作り直す
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
@@ -642,25 +642,25 @@ def process_page(page, *, set_status_name, is_retry, whisper_enabled,
 
 
 def rebuild_clipstock_index():
-    """一覧用の index.json を build_clipstock_json.py で作り直す。"""
+    """一覧用の movie.json / web.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
-        print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため index.json は更新しません")
+        print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため一覧JSONは更新しません")
         return
-    print(f"\nindex.json を更新中: {CLIPSTOCK_OUT_DIR}")
+    print(f"\n一覧JSONを更新中: {CLIPSTOCK_OUT_DIR}")
     try:
         result = subprocess.run(
             [sys.executable, str(CLIPSTOCK_BUILDER), "--out", str(CLIPSTOCK_OUT_DIR)],
             capture_output=True, text=True, timeout=900)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"⚠️ index.json の更新に失敗: {type(e).__name__}: {e}")
+        print(f"⚠️ 一覧JSONの更新に失敗: {type(e).__name__}: {e}")
         return
     out = (result.stdout or "").strip()
     if out:
         print(out)
     if result.returncode != 0:
-        print(f"⚠️ index.json の更新に失敗: {(result.stderr or '').strip()[-300:]}")
+        print(f"⚠️ 一覧JSONの更新に失敗: {(result.stderr or '').strip()[-300:]}")
     else:
-        print(f"✅ index.json を更新しました: {CLIPSTOCK_OUT_DIR / 'index.json'}")
+        print(f"✅ 一覧JSONを更新しました: {CLIPSTOCK_OUT_DIR / 'movie.json'}")
 
 
 def main():

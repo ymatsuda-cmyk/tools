@@ -84,7 +84,7 @@ export function openSettings(onSaved, list) {
         ${list
           ? `<details class="json-block" id="cfg-list-block">
           <summary>表示中の一覧JSON</summary>
-          <div class="foot-note">いま画面に出ている一覧そのものです。data/clipstock/index.json と同じ形なので、コピーしてそのままファイルに貼れます</div>
+          <div class="foot-note">いま画面に出ている一覧そのものです。data/clipstock/movie.json（webは web.json）と同じ形なので、コピーしてそのままファイルに貼れます</div>
           <textarea id="cfg-list-json" rows="12" class="input mono"></textarea>
           <div class="row">
             <button id="cfg-list-copy" class="btn">コピー</button>

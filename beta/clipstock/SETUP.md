@@ -95,7 +95,8 @@ Attentionの計算量が主題になっている
 
 | キー | 値 |
 | --- | --- |
-| `NOTION_TOKEN` | Notion インテグレーションのシークレット |
+| `NOTION_TOKEN` | Notion インテグレーションのシークレット(動画DB側) |
+| `WEB_NOTION_TOKEN` | web記事DBを別の統合に接続しているときのシークレット(未設定なら `NOTION_TOKEN`) |
 | `ACCESS_TOKEN` | 自分で決める共有トークン。アプリ側の設定と同じ値にする |
 | `code` | 権限コードの対応表 JSON 例: `{"dfkjnga":"xYz"}` |
 | `VIDEO_DB_ID` | 動画DBのID(省略時は `Code.gs` の `DEFAULT_DB_ID`) |
@@ -103,6 +104,8 @@ Attentionの計算量が主題になっている
 
 Notion 側で、そのインテグレーションを動画DBとweb記事DBに接続しておくこと(DBの
 「…」→「接続」)。忘れると `object_not_found` になります。
+動画とwebで統合を分けている場合は、`WEB_NOTION_TOKEN` を入れておけば
+web記事のページへの保存だけそちらのトークンで行います。
 
 デプロイ設定:
 
@@ -153,13 +156,19 @@ AI接続は localStorage のキー `gemma-chat.settings` を議事録アプリ�
 ```
 mac/scripts/video/build_clipstock_json.py
       ↓ Notion 動画DBとweb記事DBを全件クエリ
-  index.json  一覧カード・検索・絞り込みに要る項目
-  ideas.json  応用と活用アイデアの本文(アイデア一覧が使う)
+  movie.json  動画DBの一覧カード・検索・絞り込みに要る項目
+  web.json    web記事DBの同じ形(Notionが別なのでファイルも分ける)
+  ideas.json  応用と活用アイデアの本文(アイデア一覧が使う。両DB分)
       ↓ git push
   data/clipstock/  ← アプリが読む
 ```
 
+アプリは `movie.json` と `web.json` を両方読んで1つの一覧にします。
+`web.json` が無ければ動画ぶんだけ出ます。
+
 web記事DBのIDは環境変数 `WEB_DB_ID` で変えられます(空文字にすると読みません)。
+web記事DBを別のNotion統合に接続しているときは `WEB_NOTION_TOKEN` にその統合の
+トークンを入れてください(未設定なら `NOTION_TOKEN` を使います)。
 web側が読めなくても動画ぶんは書き出します。
 
 cron の例(1時間おき。文字起こしのバッチのあとに回すと噛み合います):

@@ -10,17 +10,19 @@
   2. 本文が空なら本文を抽出。本文があってもサムネイルが空ならそこだけ補う
      （再取得／--force のときは既存本文を捨てて入れ直す）
   3. URL先のHTMLを取得し、本文らしいブロックを抜き出す
+     取れなかったら状態を「未取得」にする（既定の対象から外れるので、
+     やり直すときは状態を「再取得」に戻す）
   4. ページ送りのリンクがあれば1ページ目から順にたどって追記する
   5. og:image などからサムネイルを決め、タイトルとあわせてNotionへ反映
   6. 1件でも更新できたら build_clipstock_json.py を呼び、
-     data/clipstock/index.json を作り直す
+     data/clipstock/movie.json と web.json を作り直す
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
   WEB_NOTION_TOKEN web記事DBを別の統合に接続しているときのトークン（あればこちらを優先）
   WEB_ENV_FILE     環境変数を読み込むファイルのパス（既定: ~/.video_notion_sync.env）
   WEB_DB_ID        対象データベースID（既定: web記事DB）
-  CLIPSTOCK_OUT_DIR index.json の出力先（--clipstock-out より弱い）
+  CLIPSTOCK_OUT_DIR 一覧JSONの出力先（--clipstock-out より弱い）
 
 必要なパッケージ:
   pip install requests beautifulsoup4
@@ -88,12 +90,14 @@ PROP_RAW_COUNT = "原文文字数"
 
 STATUS_EMPTY = "空欄"
 STATUS_RETRY = "再取得"
+# 本文が取れなかった印。次の巡回の対象から外れるので、同じページを毎回叩かずに済む
+STATUS_FAILED = "未取得"
 
 CLIPSTOCK_BUILDER = SCRIPT_DIR.parent / "video" / "build_clipstock_json.py"
 
 
 def clipstock_out_dir():
-    """index.json の書き出し先。見つけられなければ None。"""
+    """一覧JSONの書き出し先。見つけられなければ None。"""
     env = os.environ.get("CLIPSTOCK_OUT_DIR")
     if env:
         return Path(env).expanduser()
@@ -724,9 +728,15 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     articles = collect_articles(resolved, max_pages=max_pages if need_body else 1, delay=delay)
     if not articles:
         print("  ❌ 本文を取得できませんでした。スキップ")
+        update_page_props(
+            page_id,
+            url=resolved if resolved != url else None,  # 中身が取れなくてもURLだけは正しくしておく
+            status=STATUS_FAILED if need_body else None,
+        )
         if resolved != url:
-            update_page_props(page_id, url=resolved)   # 中身が取れなくてもURLだけは正しくしておく
             print("  ✅ URLだけ展開後のものに更新しました")
+        if need_body:
+            print(f"  ✅ 状態を「{STATUS_FAILED}」に更新")
         return False
 
     total_chars = sum(len(t) for art in articles for _, t in art["sections"])
@@ -762,29 +772,29 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
 
 
 def rebuild_clipstock_index(out_dir):
-    """一覧用の index.json を build_clipstock_json.py で作り直す。"""
+    """一覧用の movie.json / web.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
-        print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため index.json は更新しません")
+        print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため一覧JSONは更新しません")
         return
     if out_dir is None:
-        print("⚠️ 出力先を決められないため index.json は更新しません"
+        print("⚠️ 出力先を決められないため一覧JSONは更新しません"
               "（CLIPSTOCK_OUT_DIR または --clipstock-out で data/clipstock を指定してください）")
         return
-    print(f"\nindex.json を更新中: {out_dir}")
+    print(f"\n一覧JSONを更新中: {out_dir}")
     try:
         result = subprocess.run(
             [sys.executable, str(CLIPSTOCK_BUILDER), "--out", str(out_dir)],
             capture_output=True, text=True, timeout=900)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"⚠️ index.json の更新に失敗: {type(e).__name__}: {e}")
+        print(f"⚠️ 一覧JSONの更新に失敗: {type(e).__name__}: {e}")
         return
     out = (result.stdout or "").strip()
     if out:
         print(out)
     if result.returncode != 0:
-        print(f"⚠️ index.json の更新に失敗: {(result.stderr or '').strip()[-300:]}")
+        print(f"⚠️ 一覧JSONの更新に失敗: {(result.stderr or '').strip()[-300:]}")
     else:
-        print(f"✅ index.json を更新しました: {out_dir / 'index.json'}")
+        print(f"✅ 一覧JSONを更新しました: {out_dir / 'movie.json'} / {out_dir / 'web.json'}")
 
 
 def main():
@@ -798,8 +808,8 @@ def main():
     ap.add_argument("--force", action="store_true", help="本文があっても取り直して入れ替える")
     ap.add_argument("--max-pages", type=int, default=20, help="たどるページ送りの上限（既定: 20）")
     ap.add_argument("--delay", type=float, default=1.0, help="ページ取得の間隔・秒（既定: 1.0）")
-    ap.add_argument("--no-rebuild", action="store_true", help="index.json を作り直さない")
-    ap.add_argument("--clipstock-out", help="index.json の出力先（既定: リポジトリの data/clipstock）")
+    ap.add_argument("--no-rebuild", action="store_true", help="一覧JSONを作り直さない")
+    ap.add_argument("--clipstock-out", help="一覧JSONの出力先（既定: リポジトリの data/clipstock）")
     ap.add_argument("--list-db", action="store_true", help="統合がアクセスできるDBを一覧する")
     ap.add_argument("--dry-run", action="store_true", help="対象一覧を表示するだけ")
     args = ap.parse_args()

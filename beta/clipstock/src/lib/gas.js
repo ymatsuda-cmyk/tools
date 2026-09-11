@@ -1,6 +1,20 @@
 import { loadConfig } from './videos-config.js'
 
 /**
+ * ページIDごとの取り込み元。
+ * web記事DBは動画DBと別のNotion(統合も別のことがある)なので、
+ * 書き戻すときにどちらのトークンを使うかをGAS側へ伝える必要がある。
+ */
+const pageSources = new Map()
+
+/** 一覧を読み込んだら呼ぶ。以降そのページへの操作に source が付く */
+export function registerPageSources(items) {
+  ;(items || []).forEach((item) => {
+    if (item && item.key) pageSources.set(item.key, item.source === 'web' ? 'web' : 'video')
+  })
+}
+
+/**
  * GAS の doPost を呼ぶ。
  * Content-Type は必ず text/plain にすること — application/json にすると
  * ブラウザが CORS preflight (OPTIONS) を送るが、GAS は OPTIONS に応答できず
@@ -12,10 +26,12 @@ async function callGas(action, params = {}) {
     throw new Error('GAS の接続設定が未入力です')
   }
 
+  const source = params.pageId ? pageSources.get(params.pageId) : null
+
   const res = await fetch(config.gasUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, token: config.accessToken, ...params }),
+    body: JSON.stringify({ action, token: config.accessToken, ...params, ...(source ? { source } : {}) }),
   })
 
   if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
@@ -24,7 +40,7 @@ async function callGas(action, params = {}) {
   return json.data
 }
 
-/** 一覧を Notion から直接取得する(index.json のような中間ファイルは使わない) */
+/** 一覧を Notion から直接取得する(movie.json のような中間ファイルは使わない) */
 export function listVideos() {
   return callGas('listVideos')
 }

@@ -21,6 +21,7 @@ import {
   updateRawCount,
   mergeTag,
   deleteVideo,
+  registerPageSources,
 } from './lib/gas.js'
 import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
@@ -187,12 +188,13 @@ function refresh() {
   )
 }
 
-/** 設定モーダルに渡す、いま画面に出ている一覧JSON(index.json と同じ形) */
+/** 設定モーダルに渡す、いま画面に出ている一覧JSON(movie.json / web.json と同じ形) */
 function listJsonContext() {
   return {
     json: () => JSON.stringify({ generatedAt: listMeta.generatedAt, items }, null, 2),
     onApply: (parsed) => {
       items = parsed.items
+      registerPageSources(items)
       listMeta = { generatedAt: parsed.generatedAt || null }
       syncEl.textContent = `${items.length}件 ・貼り付け`
       ideasState.phase = 'idle'

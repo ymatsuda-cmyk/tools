@@ -7,11 +7,13 @@
 ここでは一覧とアイデア一覧に要るものだけを書き出す。
 
 出力:
-  index.json  カード表示・検索・絞り込みに要る項目(長文は有無のフラグだけ)
-  ideas.json  応用と活用アイデアの本文(アイデア一覧画面が使う)
+  movie.json  動画DBのカード表示・検索・絞り込みに要る項目(長文は有無のフラグだけ)
+  web.json    web記事DBの同じ形。Notionが別なので動画とはファイルを分ける
+  ideas.json  応用と活用アイデアの本文(アイデア一覧画面が使う。両DB分)
 
 環境変数:
   NOTION_TOKEN       Notion Integration Token(必須)
+  WEB_NOTION_TOKEN   web記事DBを別の統合に接続しているときのトークン(あればこちらを優先)
   VIDEO_ENV_FILE     環境変数を読み込むファイルのパス(既定: ~/.video_notion_sync.env)
   VIDEO_DB_ID        対象データベースID
   WEB_DB_ID          web記事DBのID(空文字にするとwebを読まない)
@@ -51,6 +53,8 @@ load_env()
 
 NOTION_API = "https://api.notion.com/v1"
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
+# web記事DBを別の統合(例:「サイト」)に接続している場合は WEB_NOTION_TOKEN を使う
+WEB_NOTION_TOKEN = os.environ.get("WEB_NOTION_TOKEN") or NOTION_TOKEN
 VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
 WEB_DB_ID = os.environ.get("WEB_DB_ID", "4130e7a535dc83509c9a01cd6ac0a6a7").strip()
 
@@ -77,15 +81,15 @@ STATUS_NEW = "新規"
 # ---------------------------------------------------------------- Notion
 
 
-def notion_headers():
+def notion_headers(token=None):
     return {
-        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Authorization": f"Bearer {token or NOTION_TOKEN}",
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
     }
 
 
-def query_all_pages(db_id, sort):
+def query_all_pages(db_id, sort, token=None):
     """DBの全ページを作成日時の新しい順で取得する。"""
     pages = []
     cursor = None
@@ -95,7 +99,7 @@ def query_all_pages(db_id, sort):
             payload["start_cursor"] = cursor
         resp = requests.post(
             f"{NOTION_API}/databases/{db_id}/query",
-            headers=notion_headers(),
+            headers=notion_headers(token),
             json=payload,
             timeout=60,
         )
@@ -123,7 +127,11 @@ def collect_pages():
         try:
             pages += [
                 (page, "web")
-                for page in query_all_pages(WEB_DB_ID, {"timestamp": "created_time", "direction": "descending"})
+                for page in query_all_pages(
+                    WEB_DB_ID,
+                    {"timestamp": "created_time", "direction": "descending"},
+                    token=WEB_NOTION_TOKEN,
+                )
             ]
         except Exception as err:  # noqa: BLE001
             print(f"web記事DBを読めませんでした(動画だけ書き出します): {err}", file=sys.stderr)
@@ -277,13 +285,17 @@ def main():
     ideas = [idea for idea in (to_idea(page, source) for page, source in pages) if idea]
     generated_at = datetime.now(JST).isoformat()
 
-    web_count = sum(1 for i in items if i["source"] == "web")
-    print(f"動画 {len(items) - web_count}件 / web {web_count}件 / アイデアのあるもの {len(ideas)}件")
+    # 動画とwebはNotionが別(統合も別のことがある)なので、一覧も別ファイルにする。
+    # 片方の取得が失敗しても、もう片方の古いファイルはそのまま残って画面に出る。
+    movies = [i for i in items if i["source"] != "web"]
+    webs = [i for i in items if i["source"] == "web"]
+    print(f"動画 {len(movies)}件 / web {len(webs)}件 / アイデアのあるもの {len(ideas)}件")
     if args.dry_run:
         return 0
 
     out_dir = Path(args.out).expanduser()
-    write_json(out_dir / "index.json", {"generatedAt": generated_at, "items": items})
+    write_json(out_dir / "movie.json", {"generatedAt": generated_at, "items": movies})
+    write_json(out_dir / "web.json", {"generatedAt": generated_at, "items": webs})
     write_json(out_dir / "ideas.json", {"generatedAt": generated_at, "items": ideas})
     print(f"書き出しました: {out_dir}")
     return 0

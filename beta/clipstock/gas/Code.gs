@@ -11,11 +11,13 @@
  *    1つの GAS に両方の action を入れて共用しても動く。
  *
  * 事前設定 (スクリプトプロパティ):
- *  - NOTION_TOKEN   Notion Integration のシークレット
- *  - ACCESS_TOKEN   フロントの videos:config.accessToken と一致させる共有トークン
- *  - code           権限コードと権限の対応 JSON 例: {"dfkjnga":"xYz","abc":"team"}
- *  - VIDEO_DB_ID    動画DBのID(省略時は下の DEFAULT_DB_ID を使う)
- *  - WEB_DB_ID      web記事DBのID(省略時は DEFAULT_WEB_DB_ID。空文字にするとwebを読まない)
+ *  - NOTION_TOKEN     Notion Integration のシークレット(動画DB側)
+ *  - WEB_NOTION_TOKEN web記事DBを別の統合に接続しているときのシークレット
+ *                     (未設定なら NOTION_TOKEN を使う)
+ *  - ACCESS_TOKEN     フロントの videos:config.accessToken と一致させる共有トークン
+ *  - code             権限コードと権限の対応 JSON 例: {"dfkjnga":"xYz","abc":"team"}
+ *  - VIDEO_DB_ID      動画DBのID(省略時は下の DEFAULT_DB_ID を使う)
+ *  - WEB_DB_ID        web記事DBのID(省略時は DEFAULT_WEB_DB_ID。空文字にするとwebを読まない)
  *
  * デプロイ:
  *  - 種類: ウェブアプリ / 実行するユーザー: 自分 / アクセス: 全員
@@ -75,37 +77,37 @@ function doPost(e) {
         result = listIdeas_();
         break;
       case 'fetchTranscript':
-        result = fetchTranscript_(body.pageId);
+        result = fetchTranscript_(body.pageId, body.source);
         break;
       case 'fetchDetail':
-        result = fetchDetail_(body.pageId);
+        result = fetchDetail_(body.pageId, body.source);
         break;
       case 'saveGenerated':
-        result = saveGenerated_(body.pageId, body.detail, body.model, body.rawCount);
+        result = saveGenerated_(body.pageId, body.detail, body.model, body.rawCount, body.source);
         break;
       case 'saveField':
-        result = saveField_(body.pageId, body.field, body.value);
+        result = saveField_(body.pageId, body.field, body.value, body.source);
         break;
       case 'saveMemo':
-        result = saveMemo_(body.pageId, body.memo);
+        result = saveMemo_(body.pageId, body.memo, body.source);
         break;
       case 'saveTags':
-        result = saveTags_(body.pageId, body.tags);
+        result = saveTags_(body.pageId, body.tags, body.source);
         break;
       case 'mergeTag':
         result = mergeTag_(body.from, body.to);
         break;
       case 'saveTitle':
-        result = saveTitle_(body.pageId, body.title);
+        result = saveTitle_(body.pageId, body.title, body.source);
         break;
       case 'setStatus':
-        result = setStatus_(body.pageId, body.status);
+        result = setStatus_(body.pageId, body.status, body.source);
         break;
       case 'updateRawCount':
-        result = updateRawCount_(body.pageId, body.count);
+        result = updateRawCount_(body.pageId, body.count, body.source);
         break;
       case 'deleteVideo':
-        result = deleteVideo_(body.pageId);
+        result = deleteVideo_(body.pageId, body.source);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -139,14 +141,29 @@ function webDbId_() {
   return raw === null ? DEFAULT_WEB_DB_ID : String(raw).trim();
 }
 
+/**
+ * 取り込み元に対応する Notion のシークレット。
+ * web記事DBは別の統合に接続していることがあるため、動画DBとトークンを分けられる。
+ */
+function notionToken_(source) {
+  var props = PropertiesService.getScriptProperties();
+  var base = props.getProperty('NOTION_TOKEN') || '';
+  if (source !== 'web') return base;
+  return props.getProperty('WEB_NOTION_TOKEN') || base;
+}
+
+/** 動画用とweb用で別々のトークンを持っているか */
+function hasSeparateWebToken_() {
+  return notionToken_('web') !== notionToken_('video');
+}
+
 // ============ Notion 共通ヘルパー ============
 
-function notionFetch_(path, method, payload) {
-  var token = PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
+function notionFetch_(path, method, payload, source) {
   var options = {
     method: method || 'get',
     headers: {
-      Authorization: 'Bearer ' + token,
+      Authorization: 'Bearer ' + notionToken_(source),
       'Notion-Version': NOTION_VERSION,
       'Content-Type': 'application/json',
     },
@@ -158,9 +175,25 @@ function notionFetch_(path, method, payload) {
   var code = res.getResponseCode();
   var json = JSON.parse(res.getContentText());
   if (code >= 300) {
-    throw new Error('Notion API ' + code + ': ' + (json.message || res.getContentText()));
+    var err = new Error('Notion API ' + code + ': ' + (json.message || res.getContentText()));
+    err.statusCode = code;
+    throw err;
   }
   return json;
+}
+
+/**
+ * ページ単位の読み書き。
+ * 一覧JSONが古いなどで取り込み元が分からないことがあるので、
+ * 404(その統合に共有されていない)なら、もう片方のトークンで1度だけやり直す。
+ */
+function notionPageFetch_(path, method, payload, source) {
+  try {
+    return notionFetch_(path, method, payload, source);
+  } catch (err) {
+    if (err.statusCode !== 404 || !hasSeparateWebToken_()) throw err;
+    return notionFetch_(path, method, payload, source === 'web' ? 'video' : 'web');
+  }
 }
 
 function plainTextOf_(richTextArray) {
@@ -232,13 +265,13 @@ function richTextProp_(text) {
 }
 
 /** ページ本文のブロックを全件取得する(ページネーション対応) */
-function fetchAllBlocks_(blockId) {
+function fetchAllBlocks_(blockId, source) {
   var blocks = [];
   var cursor = null;
   do {
     var path = 'blocks/' + blockId + '/children?page_size=100';
     if (cursor) path += '&start_cursor=' + cursor;
-    var res = notionFetch_(path, 'get');
+    var res = notionPageFetch_(path, 'get', null, source);
     blocks = blocks.concat(res.results);
     cursor = res.has_more ? res.next_cursor : null;
   } while (cursor);
@@ -267,7 +300,7 @@ function listVideos_() {
  * webの取得に失敗しても握りつぶす(一覧が空になるより古い動画一覧のほうがまし)。
  */
 function eachSourcePage_(fn) {
-  queryDbAll_(dbId_(), [{ property: PROP_CREATED, direction: 'descending' }]).forEach(function (page) {
+  queryDbAll_(dbId_(), [{ property: PROP_CREATED, direction: 'descending' }], 'video').forEach(function (page) {
     fn(page, 'video');
   });
 
@@ -275,7 +308,7 @@ function eachSourcePage_(fn) {
   if (!webId) return;
   try {
     // web側は作成日時カラムの有無に依存させたくないので、ページの作成時刻で並べる
-    queryDbAll_(webId, [{ timestamp: 'created_time', direction: 'descending' }]).forEach(function (page) {
+    queryDbAll_(webId, [{ timestamp: 'created_time', direction: 'descending' }], 'web').forEach(function (page) {
       fn(page, 'web');
     });
   } catch (err) {
@@ -284,13 +317,13 @@ function eachSourcePage_(fn) {
 }
 
 /** DBの全ページを取得する(ページネーション対応) */
-function queryDbAll_(databaseId, sorts) {
+function queryDbAll_(databaseId, sorts, source) {
   var pages = [];
   var cursor = null;
   do {
     var payload = { page_size: 100, sorts: sorts };
     if (cursor) payload.start_cursor = cursor;
-    var res = notionFetch_('databases/' + databaseId + '/query', 'post', payload);
+    var res = notionFetch_('databases/' + databaseId + '/query', 'post', payload, source);
     pages = pages.concat(res.results);
     cursor = res.has_more ? res.next_cursor : null;
   } while (cursor);
@@ -365,9 +398,9 @@ function listIdeas_() {
 /**
  * 文字起こし全文を取得する。ページ本文のテキスト系ブロックを上から連結する。
  */
-function fetchTranscript_(pageId) {
-  var page = notionFetch_('pages/' + pageId, 'get');
-  var blocks = fetchAllBlocks_(pageId);
+function fetchTranscript_(pageId, source) {
+  var page = notionPageFetch_('pages/' + pageId, 'get', null, source);
+  var blocks = fetchAllBlocks_(pageId, source);
 
   var lines = [];
   blocks.forEach(function (b) {
@@ -382,8 +415,8 @@ function fetchTranscript_(pageId) {
 }
 
 /** AI生成物とメモをまとめて取得する(詳細を開いたときの1リクエスト) */
-function fetchDetail_(pageId) {
-  var page = notionFetch_('pages/' + pageId, 'get');
+function fetchDetail_(pageId, source) {
+  var page = notionPageFetch_('pages/' + pageId, 'get', null, source);
   var p = page.properties;
   return {
     title: titleAnyOf_(p),
@@ -418,7 +451,7 @@ var FIELD_MAP = {
  * 「分野別だけ作り直す」のような部分生成にも同じ入口で対応できる。
  * 要約日時・モデル・状態も同時に更新する。
  */
-function saveGenerated_(pageId, detail, model, rawCount) {
+function saveGenerated_(pageId, detail, model, rawCount, source) {
   detail = detail || {};
   var props = {};
   Object.keys(FIELD_MAP).forEach(function (k) {
@@ -434,7 +467,7 @@ function saveGenerated_(pageId, detail, model, rawCount) {
   props[PROP_STATUS] = { select: { name: STATUS_SUMMARIZED } };
   if (typeof rawCount === 'number' && rawCount > 0) props[PROP_RAW_COUNT] = { number: rawCount };
 
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true };
 }
 
@@ -443,29 +476,29 @@ function saveGenerated_(pageId, detail, model, rawCount) {
  * saveGenerated_ と違い、要約日時・モデル・状態は変更しない
  * (AIが生成した時刻とモデルの記録を手編集で上書きしないため)。
  */
-function saveField_(pageId, field, value) {
+function saveField_(pageId, field, value, source) {
   var prop = FIELD_MAP[field];
   if (!prop) throw new Error('unknown field: ' + field);
   var props = {};
   props[prop] = richTextProp_(value);
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true };
 }
 
-function saveMemo_(pageId, memo) {
+function saveMemo_(pageId, memo, source) {
   var props = {};
   props[PROP_MEMO] = richTextProp_(memo);
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true };
 }
 
-function saveTags_(pageId, tags) {
+function saveTags_(pageId, tags, source) {
   var names = (Array.isArray(tags) ? tags : []).filter(Boolean);
   var props = {};
   props[PROP_TAGS] = {
     multi_select: names.map(function (name) { return { name: String(name).slice(0, 100) }; }),
   };
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true, tags: names };
 }
 
@@ -485,11 +518,12 @@ function mergeTag_(from, to) {
 
   var updated = 0;
   var errors = [];
-  var dbIds = [dbId_()];
+  var targets = [{ id: dbId_(), source: 'video' }];
   var webId = webDbId_();
-  if (webId) dbIds.push(webId);
+  if (webId) targets.push({ id: webId, source: 'web' });
 
-  dbIds.forEach(function (databaseId) {
+  targets.forEach(function (target) {
+    var databaseId = target.id;
     // 6分の実行上限に収めるための保険。10巡(最大1000件)で打ち切る
     for (var round = 0; round < 10; round++) {
       var res;
@@ -497,7 +531,7 @@ function mergeTag_(from, to) {
         res = notionFetch_('databases/' + databaseId + '/query', 'post', {
           page_size: 100,
           filter: { property: PROP_TAGS, multi_select: { contains: fromName } },
-        });
+        }, target.source);
       } catch (err) {
         errors.push(databaseId + ': ' + ((err && err.message) || err));
         break;
@@ -517,7 +551,7 @@ function mergeTag_(from, to) {
           props[PROP_TAGS] = {
             multi_select: next.map(function (name) { return { name: name }; }),
           };
-          notionFetch_('pages/' + page.id, 'patch', { properties: props });
+          notionFetch_('pages/' + page.id, 'patch', { properties: props }, target.source);
           updated++;
         } catch (err) {
           errors.push(page.id + ': ' + ((err && err.message) || err));
@@ -532,12 +566,12 @@ function mergeTag_(from, to) {
   return { updated: updated, failed: errors.length, errors: errors, from: fromName, to: toName };
 }
 
-function saveTitle_(pageId, title) {
+function saveTitle_(pageId, title, source) {
   // タイトル欄の名前はDBによって違うので、ページから引く
-  var page = notionFetch_('pages/' + pageId, 'get');
+  var page = notionPageFetch_('pages/' + pageId, 'get', null, source);
   var props = {};
   props[titlePropName_(page.properties)] = { title: [{ text: { content: String(title || '').slice(0, 2000) } }] };
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true, title: title };
 }
 
@@ -548,19 +582,19 @@ function saveTitle_(pageId, title) {
  * Notionのselectは未登録の選択肢名でもAPI側で自動追加されるため、
  * 事前にオプションを作っておく必要はない。
  */
-function setStatus_(pageId, status) {
+function setStatus_(pageId, status, source) {
   var allowed = [STATUS_NEW, STATUS_RUNNING, STATUS_DONE, STATUS_SUMMARIZED, STATUS_EXCLUDED];
   if (allowed.indexOf(status) === -1) throw new Error('unknown status: ' + status);
   var props = {};
   props[PROP_STATUS] = { select: { name: status } };
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true, status: status };
 }
 
-function updateRawCount_(pageId, count) {
+function updateRawCount_(pageId, count, source) {
   var props = {};
   props[PROP_RAW_COUNT] = { number: Number(count) || 0 };
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true };
 }
 
@@ -569,9 +603,9 @@ function updateRawCount_(pageId, count) {
  * 一覧のクエリには出てこなくなり、Notion側では30日間復元できる。
  * 「除外」(setStatus)はページを残す論理削除なので、用途が違う。
  */
-function deleteVideo_(pageId) {
+function deleteVideo_(pageId, source) {
   if (!pageId) throw new Error('pageId は必須です');
-  notionFetch_('pages/' + pageId, 'patch', { archived: true });
+  notionPageFetch_('pages/' + pageId, 'patch', { archived: true }, source);
   return { deleted: true, pageId: pageId };
 }
 

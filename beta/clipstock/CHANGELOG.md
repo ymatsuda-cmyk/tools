@@ -1,5 +1,30 @@
 # Change Log
 
+## 1.6.1 - 2026-09-11
+
+### Title
+
+Split the list JSON per source (movie.json / web.json) and route writes to the right Notion
+
+### Changes
+
+- Split `index.json` into `movie.json` (video DB) and `web.json` (web article DB). The two lists come from different Notion databases that are refreshed by different jobs, so keeping them in one file meant a failure on either side rewrote — or stalled — the whole list. `src/lib/store.js` now reads both and merges them by key; if `web.json` is missing the video list still shows. `movie.json` falls back to the old `index.json` so a repo whose cron has not run yet keeps working.
+- Taught the GAS proxy that the web article DB may live behind a different Notion integration. `WEB_NOTION_TOKEN` (falling back to `NOTION_TOKEN`) is now chosen per request, and every page-scoped read/write carries the item's `source`. `src/lib/gas.js` remembers the source of each page ID from the loaded list, so no call site had to change.
+- Added a single 404 retry with the other token for page operations. The source comes from a list that can be stale, and without the retry an item whose DB moved would fail with `object_not_found` and no way to recover from the UI.
+- `mergeTag` walks both databases with its own token per database, so a tag rename no longer silently skips the web side.
+
+### Affected Files
+
+- `beta/clipstock/src/lib/store.js`
+- `beta/clipstock/src/lib/gas.js`
+- `beta/clipstock/src/main.js`
+- `beta/clipstock/src/ui/settings.js`
+- `beta/clipstock/gas/Code.gs`
+- `beta/clipstock/SETUP.md`
+- `mac/scripts/video/build_clipstock_json.py`
+- `mac/scripts/video/video_transcribe.py`
+- `mac/scripts/web/web_extract.py`
+
 ## 1.6.0 - 2026-09-10
 
 ### Title
