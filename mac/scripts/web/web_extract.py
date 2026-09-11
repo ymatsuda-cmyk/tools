@@ -145,10 +145,10 @@ def build_status_filter(statuses):
 
 
 def query_pages_by_status(statuses):
+    """状態が対象のものに加え、サムネイルが空のページも拾う。"""
     filter_ = build_status_filter(statuses)
-    if filter_ is None:
-        print("    ⚠️ 有効な状態フィルタが無いため検索を中止します。")
-        return []
+    no_thumb = {"property": PROP_THUMB, "url": {"is_empty": True}}
+    filter_ = no_thumb if filter_ is None else {"or": [filter_, no_thumb]}
     pages, has_more, cursor = [], True, None
     while has_more:
         payload = {"page_size": 100, "filter": filter_}
@@ -220,6 +220,10 @@ def page_title(page):
 def page_status(page):
     sel = (page.get("properties", {}).get(PROP_STATUS) or {}).get("select")
     return (sel or {}).get("name") or ""
+
+
+def page_thumb(page):
+    return ((page.get("properties", {}).get(PROP_THUMB)) or {}).get("url") or ""
 
 
 def page_url_value(page):
