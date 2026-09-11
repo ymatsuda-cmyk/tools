@@ -7,7 +7,8 @@
 
 処理の流れ:
   1. Notionから対象ページを取得
-  2. 本文が空のページだけを処理（再取得／--force のときは既存本文を捨てて入れ直す）
+  2. 本文が空なら本文を抽出。本文があってもサムネイルが空ならそこだけ補う
+     （再取得／--force のときは既存本文を捨てて入れ直す）
   3. URL先のHTMLを取得し、本文らしいブロックを抜き出す
   4. ページ送りのリンクがあれば1ページ目から順にたどって追記する
   5. og:image などからサムネイルを決め、タイトルとあわせてNotionへ反映
@@ -646,11 +647,16 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     children = get_all_children(page_id)
     body_exists = has_body(children)
     refill = force or status == STATUS_RETRY
-    if body_exists and not refill:
-        print("  ⏭️  本文がすでにあるためスキップ（入れ直すなら --force か状態を再取得に）")
+    need_body = refill or not body_exists
+    need_thumb = not page_thumb(page)
+    if not need_body and not need_thumb:
+        print("  ⏭️  本文もサムネイルも揃っているためスキップ（入れ直すなら --force か状態を再取得に）")
         return False
+    if not need_body:
+        print("  → 本文はあるのでサムネイルとタイトルだけ補います")
 
-    articles = collect_articles(url, max_pages=max_pages, delay=delay)
+    # サムネイル目的だけなら1ページ目で足りる
+    articles = collect_articles(url, max_pages=max_pages if need_body else 1, delay=delay)
     if not articles:
         print("  ❌ 本文を取得できませんでした。スキップ")
         return False
@@ -658,16 +664,19 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     total_chars = sum(len(t) for art in articles for _, t in art["sections"])
     print(f"  ✅ {len(articles)}ページ / 合計 {total_chars}文字")
 
-    if body_exists:
-        print("    → 既存の本文を削除中...")
-        ok, total = archive_body_children(page_id, children)
-        print(f"    ✅ {ok}/{total} ブロックを削除")
+    if need_body:
+        if body_exists:
+            print("    → 既存の本文を削除中...")
+            ok, total = archive_body_children(page_id, children)
+            print(f"    ✅ {ok}/{total} ブロックを削除")
+        if not append_blocks(page_id, build_body_blocks(articles)):
+            return False
+        print("  ✅ 本文に追記")
 
-    if not append_blocks(page_id, build_body_blocks(articles)):
-        return False
-    print("  ✅ 本文に追記")
-
+    # 本文を入れ直していないときは、手で直したタイトルを壊さないよう空欄のときだけ入れる
     new_title = articles[0]["title"] or None
+    if not need_body and title not in ("", "(無題)", url):
+        new_title = None
     thumbnail = next((a["thumbnail"] for a in articles if a["thumbnail"]), None)
     canonical = articles[0]["url"]
     update_page_props(
@@ -675,7 +684,7 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
         title=new_title,
         url=canonical if canonical != url else None,
         thumbnail=thumbnail,
-        char_count=total_chars,
+        char_count=total_chars if need_body else None,
         status=set_status_name,
     )
     if new_title:
@@ -751,7 +760,8 @@ def main():
 
     print(f"\n対象: {len(targets)}件")
     for p in targets:
-        print(f"  - [{page_status(p) or '(空欄)'}] {page_title(p)[:60]}")
+        mark = "" if page_thumb(p) else "  [サムネイル無し]"
+        print(f"  - [{page_status(p) or '(空欄)'}] {page_title(p)[:60]}{mark}")
 
     if args.dry_run:
         print("\n--dry-run のため処理は行いません。")
