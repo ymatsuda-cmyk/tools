@@ -113,6 +113,12 @@ function doPost(e) {
       case 'deleteVideo':
         result = deleteVideo_(body.pageId, body.source);
         break;
+      case 'requestRebuild':
+        result = requestRebuild_(body.reason);
+        break;
+      case 'takeRebuildRequest':
+        result = takeRebuildRequest_();
+        break;
       default:
         throw new Error('unknown action: ' + body.action);
     }
@@ -647,4 +653,43 @@ function verifyCode_(code) {
   var role = map[input];
   if (!role) return { role: 'err' };
   return { role: role, isAdmin: role === ADMIN_ROLE };
+}
+
+// ============ 一覧JSONの作り直し依頼 ============
+
+/**
+ * 一覧JSON(index-*.json / idea-*.json)は Mac 側の Python が作る。
+ * ブラウザから Mac は叩けないので、ここに「作り直してほしい」という印を置き、
+ * Mac 側の常騐スクリプトが takeRebuildRequest で拾って実行する。
+ */
+var REBUILD_PROP = 'REBUILD_REQUEST';
+
+function requestRebuild_(reason) {
+  var props = PropertiesService.getScriptProperties();
+  var current = parseRebuild_(props.getProperty(REBUILD_PROP));
+  var reasons = current.reasons || [];
+  var label = String(reason || 'unknown');
+  if (reasons.indexOf(label) === -1) reasons.push(label);
+  props.setProperty(REBUILD_PROP, JSON.stringify({
+    requestedAt: new Date().toISOString(),
+    reasons: reasons.slice(0, 20),
+  }));
+  return { requested: true };
+}
+
+/** Mac 側が呼ぶ。印を返して消す（取りこぼしは次回の定期実行で拾う） */
+function takeRebuildRequest_() {
+  var props = PropertiesService.getScriptProperties();
+  var current = parseRebuild_(props.getProperty(REBUILD_PROP));
+  if (current.requestedAt) props.deleteProperty(REBUILD_PROP);
+  return { requestedAt: current.requestedAt || null, reasons: current.reasons || [] };
+}
+
+function parseRebuild_(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) || {};
+  } catch (e) {
+    return {};
+  }
 }

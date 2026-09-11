@@ -148,6 +148,26 @@ export function deleteVideo(pageId) {
   return callGas('deleteVideo', { pageId })
 }
 
+/**
+ * 一覧JSON(index-*.json / idea-*.json)の作り直しを Mac 側に依頼する。
+ * GAS にフラグを置くだけで、実際の生成は Mac の常駐スクリプトが拾って行う。
+ *
+ * 失敗しても画面の操作自体は成功しているため、投げっぱなしにする。
+ * 一括生成のように連続で呼ばれる場面があるので、少し待ってまとめて1回にする。
+ */
+let rebuildTimer = null
+const rebuildReasons = new Set()
+
+export function scheduleRebuild(reason) {
+  rebuildReasons.add(String(reason || 'unknown'))
+  clearTimeout(rebuildTimer)
+  rebuildTimer = setTimeout(() => {
+    const label = [...rebuildReasons].join(',')
+    rebuildReasons.clear()
+    callGas('requestRebuild', { reason: label }).catch(() => {})
+  }, 3000)
+}
+
 /** 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため) */
 export async function verifyCode(gasUrl, code) {
   const body = JSON.stringify({ action: 'verifyCode', code })
