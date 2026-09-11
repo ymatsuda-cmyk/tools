@@ -692,10 +692,7 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
             return False
         print("  ✅ 本文に追記")
 
-    # 本文を入れ直していないときは、手で直したタイトルを壊さないよう空欄のときだけ入れる
     new_title = articles[0]["title"] or None
-    if not need_body and title not in ("", "(無題)", url):
-        new_title = None
     thumbnail = next((a["thumbnail"] for a in articles if a["thumbnail"]), None)
     canonical = articles[0]["url"]
     update_page_props(
