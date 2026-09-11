@@ -924,11 +924,18 @@ mark { background: var(--highlight); color: inherit; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 6px 5px 10px;
+  padding: 5px 6px 5px 6px;
   background: rgba(0, 0, 0, 0.85);
   color: #fff;
   font-size: 11.5px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
+.mini-player.dragging .mp-bar { cursor: grabbing; }
+/* ドラッグ中はiframeがポインタを吸わないようにする */
+.mini-player.dragging .mp-frame { pointer-events: none; }
+.mp-grip { font-size: 14px; opacity: 0.6; }
 .mp-btn {
   border: 0;
   background: transparent;
