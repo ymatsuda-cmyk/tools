@@ -173,6 +173,35 @@ def fetch_page(page_id):
     return resp.json()
 
 
+def list_shared_databases():
+    """統合が見えているDBを一覧する。ID違いなのか共有忘れなのかの切り分け用。"""
+    results, has_more, cursor = [], True, None
+    while has_more:
+        payload = {"page_size": 100, "filter": {"property": "object", "value": "database"}}
+        if cursor:
+            payload["start_cursor"] = cursor
+        resp = requests.post(f"{NOTION_API}/search", headers=notion_headers(),
+                             json=payload, timeout=60)
+        if resp.status_code != 200:
+            print(f"⚠️ 検索失敗: {resp.status_code} {resp.text[:300]}")
+            return 1
+        data = resp.json()
+        results.extend(data.get("results", []))
+        has_more = data.get("has_more", False)
+        cursor = data.get("next_cursor")
+
+    if not results:
+        print("このトークンから見えるDBはありません。NotionでDBに統合を接続してください。")
+        return 1
+    print(f"共有されているDB: {len(results)}件")
+    for db in results:
+        title = "".join(t.get("plain_text", "") for t in db.get("title", [])) or "(無題)"
+        db_id = db.get("id", "").replace("-", "")
+        mark = " ← WEB_DB_ID" if db_id == WEB_DB_ID.replace("-", "") else ""
+        print(f"  {db_id}  {title}{mark}")
+    return 0
+
+
 def page_title(page):
     """title型のプロパティを読む。DBごとに名前が違うので型でも探す。"""
     props = page.get("properties", {})
@@ -685,12 +714,16 @@ def main():
     ap.add_argument("--max-pages", type=int, default=20, help="たどるページ送りの上限（既定: 20）")
     ap.add_argument("--delay", type=float, default=1.0, help="ページ取得の間隔・秒（既定: 1.0）")
     ap.add_argument("--no-rebuild", action="store_true", help="index.json を作り直さない")
+    ap.add_argument("--list-db", action="store_true", help="統合がアクセスできるDBを一覧する")
     ap.add_argument("--dry-run", action="store_true", help="対象一覧を表示するだけ")
     args = ap.parse_args()
 
     if not NOTION_TOKEN:
         print("❌ NOTION_TOKEN が設定されていません")
         return 1
+
+    if args.list_db:
+        return list_shared_databases()
 
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
     print(f"\n{'='*60}\nweb記事DB→本文抽出開始: {now}\n{'='*60}")
