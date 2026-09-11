@@ -3,6 +3,7 @@
 
 対象の指定方法:
   --status 空欄 再取得   状態が空欄／再取得のページをまとめて処理（既定）
+                        状態が「未取得」のページは対象外（--status 未取得 と書けば拾う）
   --page-id <ID>        特定の1ページだけを処理
 
 処理の流れ:
@@ -154,13 +155,12 @@ def get_valid_status_options():
     return {o["name"] for o in prop.get("select", {}).get("options", [])}
 
 
-def build_status_filter(statuses):
+def build_status_filter(statuses, valid_options):
     """状態フィルタを組み立てる。'空欄' は is_empty に変換する。
 
     DBに存在しない選択肢を equals に渡すとNotion APIが400を返すため、
     定義済みの選択肢だけを条件に残す。
     """
-    valid_options = get_valid_status_options()
     conds = []
     for s in statuses:
         if s == STATUS_EMPTY:
@@ -177,10 +177,18 @@ def build_status_filter(statuses):
 
 
 def query_pages_by_status(statuses):
-    """状態が対象のものに加え、サムネイルが空のページも拾う。"""
-    filter_ = build_status_filter(statuses)
+    """状態が対象のものに加え、サムネイルが空のページも拾う。
+
+    「未取得」は本文を取れなかった印なので、明示的に指定されない限り外す。
+    さもないとサムネイルが空のままなので、毎回同じページを取りに行くことになる。
+    """
+    valid_options = get_valid_status_options()
+    filter_ = build_status_filter(statuses, valid_options)
     no_thumb = {"property": PROP_THUMB, "url": {"is_empty": True}}
     filter_ = no_thumb if filter_ is None else {"or": [filter_, no_thumb]}
+    if STATUS_FAILED not in statuses and (valid_options is None or STATUS_FAILED in valid_options):
+        filter_ = {"and": [filter_,
+                           {"property": PROP_STATUS, "select": {"does_not_equal": STATUS_FAILED}}]}
     pages, has_more, cursor = [], True, None
     while has_more:
         payload = {"page_size": 100, "filter": filter_}
@@ -801,7 +809,8 @@ def main():
     ap = argparse.ArgumentParser(description="Notion web記事DBの本文抽出")
     ap.add_argument("--page-id", help="対象のNotionページID（--statusより優先）")
     ap.add_argument("--status", nargs="+", default=[STATUS_EMPTY, STATUS_RETRY],
-                    help=f"対象とする状態（既定: {STATUS_EMPTY} {STATUS_RETRY}）")
+                    help=f"対象とする状態（既定: {STATUS_EMPTY} {STATUS_RETRY}。"
+                         f"{STATUS_FAILED} はここに書いたときだけ拾う）")
     ap.add_argument("--set-status", default="完了",
                     help="処理完了後に設定する状態（既定: 完了。空文字で更新しない）")
     ap.add_argument("--limit", type=int, help="処理する件数の上限")
