@@ -407,11 +407,13 @@ def make_soup(html):
 
 # ---------------------------------------------------------------- 本文の抽出
 
-NOISE_TAGS = ("script", "style", "noscript", "template", "svg", "iframe", "form",
-              "button", "nav", "header", "footer", "aside")
+DROP_TAGS = ("script", "style", "noscript", "template", "svg", "iframe", "form", "button")
+STRUCT_NOISE_TAGS = ("nav", "header", "footer", "aside")
 NOISE_WORDS = re.compile(
     r"(comment|share|social|sidebar|related|recommend|ranking|breadcrumb|pager|pagination|"
     r"advert|\bads?\b|banner|subscribe|newsletter|footer|header|global-?nav|menu)", re.I)
+# ノイズとみなしても消さない大きさの目安（本文のこの割合を超える箱は本文側と見なす）
+NOISE_KEEP_RATIO = 0.4
 CONTENT_HINTS = ("article", "main", "[role=main]", ".entry-content", ".post-content",
                  ".article-body", ".articleBody", ".post-body", ".content-body",
                  "#content", ".content", "#main")
@@ -420,12 +422,26 @@ KIND_BY_TAG = {"h1": "h2", "h2": "h2", "h3": "h3", "h4": "h3", "h5": "h3",
                "li": "li", "dd": "li", "blockquote": "quote"}
 
 
-def strip_noise(soup):
-    for tag in soup.find_all(NOISE_TAGS):
+def drop_scripts(soup):
+    for tag in soup.find_all(DROP_TAGS):
         tag.decompose()
-    for tag in soup.find_all(attrs={"class": NOISE_WORDS}):
-        tag.decompose()
-    for tag in soup.find_all(attrs={"id": NOISE_WORDS}):
+
+
+def strip_noise(container):
+    """本文コンテナの中の飾りを落とす。
+
+    classに header や menu を含むラッパー（例: container small-header）が本文を包んでいる
+    サイトがあるので、文字量が小さい要素だけを消す。
+    """
+    total = text_score(container) or 1
+    targets = list(container.find_all(STRUCT_NOISE_TAGS))
+    targets += container.find_all(attrs={"class": NOISE_WORDS})
+    targets += container.find_all(attrs={"id": NOISE_WORDS})
+    for tag in targets:
+        if tag is container or getattr(tag, "decomposed", False):
+            continue
+        if text_score(tag) > total * NOISE_KEEP_RATIO:
+            continue
         tag.decompose()
 
 
@@ -609,9 +625,12 @@ def collect_articles(start_url, *, max_pages, delay):
             return []
 
         title = extract_title(soup)
-        strip_noise(soup)
+        drop_scripts(soup)
         container = pick_container(soup)
+        strip_noise(container)
         sections = extract_sections(container)
+        if not sections and container is not (soup.body or soup):
+            sections = extract_sections(soup.body or soup)
         if not sections:
             print(f"    ⚠️ 本文を抽出できませんでした: {final_url[:100]}")
             continue
