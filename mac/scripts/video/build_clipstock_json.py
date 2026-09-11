@@ -6,10 +6,9 @@
 画面はそれを読むだけにする。詳細(タブごとの本文)は従来どおりNotionから取るので、
 ここでは一覧とアイデア一覧に要るものだけを書き出す。
 
-出力:
-  movie.json  動画DBのカード表示・検索・絞り込みに要る項目(長文は有無のフラグだけ)
-  web.json    web記事DBの同じ形。Notionが別なので動画とはファイルを分ける
-  ideas.json  応用と活用アイデアの本文(アイデア一覧画面が使う。両DB分)
+出力(取り込み元ごとにNotionが別なので、ファイルも分ける):
+  index-video.json / index-web.json  カード表示・検索・絞り込みに要る項目(長文は有無のフラグだけ)
+  idea-video.json  / idea-web.json   応用と活用アイデアの本文(アイデア一覧画面が使う)
 
 環境変数:
   NOTION_TOKEN       Notion Integration Token(必須)
@@ -285,18 +284,23 @@ def main():
     ideas = [idea for idea in (to_idea(page, source) for page, source in pages) if idea]
     generated_at = datetime.now(JST).isoformat()
 
-    # 動画とwebはNotionが別(統合も別のことがある)なので、一覧も別ファイルにする。
-    # 片方の取得が失敗しても、もう片方の古いファイルはそのまま残って画面に出る。
-    movies = [i for i in items if i["source"] != "web"]
-    webs = [i for i in items if i["source"] == "web"]
-    print(f"動画 {len(movies)}件 / web {len(webs)}件 / アイデアのあるもの {len(ideas)}件")
+    def of_source(rows, source):
+        return [r for r in rows if r["source"] == source]
+
+    print(
+        f"動画 {len(of_source(items, 'video'))}件 / web {len(of_source(items, 'web'))}件"
+        f" / アイデアのあるもの {len(ideas)}件"
+    )
     if args.dry_run:
         return 0
 
+    # 片方のNotionが落ちてももう片方の古いファイルはそのまま残るよう、取り込み元ごとに書く
     out_dir = Path(args.out).expanduser()
-    write_json(out_dir / "movie.json", {"generatedAt": generated_at, "items": movies})
-    write_json(out_dir / "web.json", {"generatedAt": generated_at, "items": webs})
-    write_json(out_dir / "ideas.json", {"generatedAt": generated_at, "items": ideas})
+    for source in ("video", "web"):
+        write_json(out_dir / f"index-{source}.json",
+                   {"generatedAt": generated_at, "items": of_source(items, source)})
+        write_json(out_dir / f"idea-{source}.json",
+                   {"generatedAt": generated_at, "items": of_source(ideas, source)})
     print(f"書き出しました: {out_dir}")
     return 0
 

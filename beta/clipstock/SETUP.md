@@ -156,15 +156,14 @@ AI接続は localStorage のキー `gemma-chat.settings` を議事録アプリ�
 ```
 mac/scripts/video/build_clipstock_json.py
       ↓ Notion 動画DBとweb記事DBを全件クエリ
-  movie.json  動画DBの一覧カード・検索・絞り込みに要る項目
-  web.json    web記事DBの同じ形(Notionが別なのでファイルも分ける)
-  ideas.json  応用と活用アイデアの本文(アイデア一覧が使う。両DB分)
+  index-video.json / index-web.json  一覧カード・検索・絞り込みに要る項目
+  idea-video.json  / idea-web.json   応用と活用アイデアの本文(アイデア一覧が使う)
       ↓ git push
   data/clipstock/  ← アプリが読む
 ```
 
-アプリは `movie.json` と `web.json` を両方読んで1つの一覧にします。
-`web.json` が無ければ動画ぶんだけ出ます。
+取り込み元ごとにNotionが別で、更新するジョブも別なのでファイルを分けています。
+アプリは `-video` と `-web` を両方読んで1つの一覧にします。片方が無ければもう片方だけ出ます。
 
 web記事DBのIDは環境変数 `WEB_DB_ID` で変えられます(空文字にすると読みません)。
 web記事DBを別のNotion統合に接続しているときは `WEB_NOTION_TOKEN` にその統合の

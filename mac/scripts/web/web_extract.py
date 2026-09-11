@@ -15,7 +15,7 @@
   4. ページ送りのリンクがあれば1ページ目から順にたどって追記する
   5. og:image などからサムネイルを決め、タイトルとあわせてNotionへ反映
   6. 1件でも更新できたら build_clipstock_json.py を呼び、
-     data/clipstock/movie.json と web.json を作り直す
+     data/clipstock/ の index-*.json と idea-*.json を作り直す
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
@@ -772,7 +772,7 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
 
 
 def rebuild_clipstock_index(out_dir):
-    """一覧用の movie.json / web.json を build_clipstock_json.py で作り直す。"""
+    """一覧用の index-*.json / idea-*.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
         print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため一覧JSONは更新しません")
         return
@@ -794,7 +794,7 @@ def rebuild_clipstock_index(out_dir):
     if result.returncode != 0:
         print(f"⚠️ 一覧JSONの更新に失敗: {(result.stderr or '').strip()[-300:]}")
     else:
-        print(f"✅ 一覧JSONを更新しました: {out_dir / 'movie.json'} / {out_dir / 'web.json'}")
+        print(f"✅ 一覧JSONを更新しました: {out_dir}")
 
 
 def main():

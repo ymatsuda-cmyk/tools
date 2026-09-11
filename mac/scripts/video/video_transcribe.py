@@ -13,7 +13,7 @@
   4. 既存の本文ブロックをアーカイブしてから新しい文字起こしを追記
   5. 動画タイトル・サムネイル・原文文字数・状態を更新
   6. 1件でも更新できたら build_clipstock_json.py を呼び、
-     data/clipstock/movie.json と web.json を作り直す
+     data/clipstock/ の index-*.json と idea-*.json を作り直す
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
@@ -642,7 +642,7 @@ def process_page(page, *, set_status_name, is_retry, whisper_enabled,
 
 
 def rebuild_clipstock_index():
-    """一覧用の movie.json / web.json を build_clipstock_json.py で作り直す。"""
+    """一覧用の index-*.json / idea-*.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
         print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため一覧JSONは更新しません")
         return
@@ -660,7 +660,7 @@ def rebuild_clipstock_index():
     if result.returncode != 0:
         print(f"⚠️ 一覧JSONの更新に失敗: {(result.stderr or '').strip()[-300:]}")
     else:
-        print(f"✅ 一覧JSONを更新しました: {CLIPSTOCK_OUT_DIR / 'movie.json'}")
+        print(f"✅ 一覧JSONを更新しました: {CLIPSTOCK_OUT_DIR}")
 
 
 def main():

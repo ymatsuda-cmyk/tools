@@ -40,7 +40,7 @@ async function callGas(action, params = {}) {
   return json.data
 }
 
-/** 一覧を Notion から直接取得する(movie.json のような中間ファイルは使わない) */
+/** 一覧を Notion から直接取得する(index-video.json のような中間ファイルは使わない) */
 export function listVideos() {
   return callGas('listVideos')
 }

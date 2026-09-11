@@ -4,14 +4,15 @@
 
 ### Title
 
-Split the list JSON per source (movie.json / web.json) and route writes to the right Notion
+Split the list and idea JSON per source and route writes to the right Notion
 
 ### Changes
 
-- Split `index.json` into `movie.json` (video DB) and `web.json` (web article DB). The two lists come from different Notion databases that are refreshed by different jobs, so keeping them in one file meant a failure on either side rewrote — or stalled — the whole list. `src/lib/store.js` now reads both and merges them by key; if `web.json` is missing the video list still shows. `movie.json` falls back to the old `index.json` so a repo whose cron has not run yet keeps working.
+- Split `index.json` / `ideas.json` into `index-video.json` + `index-web.json` and `idea-video.json` + `idea-web.json`. The two halves come from different Notion databases refreshed by different jobs, so keeping them in one file meant a failure on either side rewrote — or stalled — the whole list. `src/lib/store.js` reads both halves and merges them by key; if one is missing the other still shows. When neither exists it falls back to the pre-split `index.json` / `ideas.json`, so a repo whose cron has not run yet keeps working.
 - Taught the GAS proxy that the web article DB may live behind a different Notion integration. `WEB_NOTION_TOKEN` (falling back to `NOTION_TOKEN`) is now chosen per request, and every page-scoped read/write carries the item's `source`. `src/lib/gas.js` remembers the source of each page ID from the loaded list, so no call site had to change.
 - Added a single 404 retry with the other token for page operations. The source comes from a list that can be stale, and without the retry an item whose DB moved would fail with `object_not_found` and no way to recover from the UI.
 - `mergeTag` walks both databases with its own token per database, so a tag rename no longer silently skips the web side.
+- `web_extract.py` now marks a page 未取得 when no body could be extracted. The default run targets 空欄/再取得, so a failed page drops out of the next pass instead of being retried on every cron tick.
 
 ### Affected Files
 

@@ -188,7 +188,7 @@ function refresh() {
   )
 }
 
-/** 設定モーダルに渡す、いま画面に出ている一覧JSON(movie.json / web.json と同じ形) */
+/** 設定モーダルに渡す、いま画面に出ている一覧JSON(index-video.json / index-web.json と同じ形) */
 function listJsonContext() {
   return {
     json: () => JSON.stringify({ generatedAt: listMeta.generatedAt, items }, null, 2),

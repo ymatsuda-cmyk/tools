@@ -9,13 +9,25 @@ import { listVideos as gasListVideos, listIdeas as gasListIdeas, registerPageSou
  * 取れなかったときだけ従来どおり Notion に問い合わせる。
  * 詳細画面(タブごとの本文)は鮮度が要るので、これまでどおり Notion から取る。
  *
- * 一覧は取り込み元ごとにファイルが分かれている(movie.json / web.json)。
+ * JSONは取り込み元ごとに分かれている(index-video / index-web、idea-video / idea-web)。
  * 元のNotionが別で、更新も別々に走るため、片方が古くても・落ちても
  * もう片方はそのまま出せるようにしている。
  */
 
 // 既定は同じリポジトリの data/clipstock/。設定で別の場所を指せる
 const DEFAULT_BASE = new URL('../../../../data/clipstock/', import.meta.url).href
+
+// 取り込み元ごとのファイル。legacy は分割前の1本だけだった頃のファイル名
+const LIST_FILES = [
+  { name: 'index-video.json', source: 'video' },
+  { name: 'index-web.json', source: 'web' },
+]
+const LIST_LEGACY = 'index.json'
+const IDEA_FILES = [
+  { name: 'idea-video.json', source: 'video' },
+  { name: 'idea-web.json', source: 'web' },
+]
+const IDEA_LEGACY = 'ideas.json'
 
 function baseUrl() {
   const raw = String(loadConfig().dataUrl || '').trim()
@@ -32,7 +44,7 @@ async function fetchJson(name) {
   return res.json()
 }
 
-/** 取れなければ null。web.json のように「無くても一覧は出す」ファイル用 */
+/** 取れなければ null。片方のファイルが無くても、もう片方だけで一覧を出すため */
 async function fetchOptionalJson(name) {
   try {
     const json = await fetchJson(name)
@@ -42,43 +54,41 @@ async function fetchOptionalJson(name) {
   }
 }
 
-/** 動画の一覧。movie.json を置くまでの間は旧 index.json を読む */
-async function fetchMovieJson() {
-  try {
-    return await fetchJson('movie.json')
-  } catch {
-    return await fetchJson('index.json')
-  }
-}
-
 /**
- * 取り込み元ごとのJSONを1つの一覧にする。
- * 旧 index.json には web の分も入っているので、キーが重複したら先勝ちで落とす。
+ * 取り込み元ごとのJSONを1つにまとめる。
+ * 分割前のファイルには web の分も入っているので、キーが重複したら先勝ちで落とす。
  */
-function mergeLists(sources) {
+function mergeParts(parts) {
   const byKey = new Map()
-  sources.forEach(({ json, source }) => {
+  parts.forEach(({ json, source }) => {
     if (!json) return
     json.items.forEach((item) => {
       if (!item || !item.key || byKey.has(item.key)) return
       byKey.set(item.key, { ...item, source: item.source || source })
     })
   })
-  return [...byKey.values()].sort((a, b) =>
-    String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+  return [...byKey.values()]
+}
+
+/** 分割後のファイルを読む。どちらも無ければ分割前の1本を読む(無ければ例外) */
+async function loadParts(files, legacyName) {
+  const parts = await Promise.all(
+    files.map(async (f) => ({ ...f, json: await fetchOptionalJson(f.name) }))
   )
+  if (parts.some((p) => p.json)) {
+    return { items: mergeParts(parts), generatedAt: (parts.find((p) => p.json).json || {}).generatedAt || null }
+  }
+  const legacy = await fetchJson(legacyName)
+  if (!Array.isArray(legacy.items)) throw new Error(`${legacyName} の形式が不正です`)
+  return { items: mergeParts([{ json: legacy, source: 'video' }]), generatedAt: legacy.generatedAt || null }
 }
 
 export async function listVideos() {
   try {
-    const [movie, web] = await Promise.all([fetchMovieJson(), fetchOptionalJson('web.json')])
-    if (!Array.isArray(movie.items)) throw new Error('movie.json の形式が不正です')
-    const items = mergeLists([
-      { json: movie, source: 'video' },
-      { json: web, source: 'web' },
-    ])
+    const { items, generatedAt } = await loadParts(LIST_FILES, LIST_LEGACY)
+    items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
     registerPageSources(items)
-    return { items, fetchedAt: movie.generatedAt || null, source: 'json' }
+    return { items, fetchedAt: generatedAt, source: 'json' }
   } catch (err) {
     console.warn('一覧JSONを使えないため Notion から直接読み込みます:', err)
     const data = await gasListVideos()
@@ -89,12 +99,11 @@ export async function listVideos() {
 
 export async function listIdeas() {
   try {
-    const json = await fetchJson('ideas.json')
-    if (!Array.isArray(json.items)) throw new Error('ideas.json の形式が不正です')
-    registerPageSources(json.items)
-    return { items: json.items, source: 'json' }
+    const { items } = await loadParts(IDEA_FILES, IDEA_LEGACY)
+    registerPageSources(items)
+    return { items, source: 'json' }
   } catch (err) {
-    console.warn('ideas.json を使えないため Notion から直接読み込みます:', err)
+    console.warn('アイデアJSONを使えないため Notion から直接読み込みます:', err)
     const data = await gasListIdeas()
     registerPageSources(data.items)
     return { ...data, source: 'notion' }
