@@ -162,6 +162,20 @@ function fillPrompt(stageId, vars) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '')
 }
 
+/**
+ * 段ごとの指示は system ではなく本文の末尾に置く。
+ *
+ * ローカルLLMは「直前のプロンプトと先頭から一致している範囲」の読み込みを省ける。
+ * 指示を system に入れるとプロンプトの1行目から段ごとに変わってしまい、
+ * 同じ原文を3回とも読み直すことになる。原文を先・指示を後ろにすれば、
+ * 2段目以降は原文ぶんの読み込みをまるごと飛ばせる。
+ */
+const SHARED_SYSTEM = '日本語で回答してください。'
+
+function withInstructions(context, instructions) {
+  return `${context}\n\n----------------\n\n${instructions}`
+}
+
 // ---- マインドマップの組み立て ----
 
 /**
@@ -267,8 +281,8 @@ export async function generateStage(stageId, ctx, onProgress) {
 
   if (stageId === 'summary') {
     const knownTags = Array.isArray(ctx.knownTags) ? ctx.knownTags : []
-    const system = fillPrompt('summary', { NO_FENCE, TAG_RULE: tagRule(knownTags) })
-    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
+    const instructions = fillPrompt('summary', { NO_FENCE, TAG_RULE: tagRule(knownTags) })
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, instructions), onProgress))
     // プロンプトで縛っても表記ゆれは残るので、既存の綴りへ機械的に寄せ直す
     const reconciled = reconcileTags(parsed.tags, knownTags)
     return {
@@ -285,30 +299,31 @@ export async function generateStage(stageId, ctx, onProgress) {
     // 文字起こしにタイムスタンプが無い(旧データ)なら引用も求めない。無駄に出力が伸びるだけ
     const timed = hasTimecodes(transcript)
     const segments = timed ? splitTranscript(transcript) : []
-    const system = fillPrompt('mindmap', {
+    const instructions = fillPrompt('mindmap', {
       NO_FENCE,
       QUOTE_FIELD: timed ? MINDMAP_QUOTE_FIELD : '',
       QUOTE_RULE: timed ? MINDMAP_QUOTE_RULE : '',
     })
-    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, instructions), onProgress))
     return { model: connection.model, detail: { mindmap: mindmapToText(parsed, segments) } }
   }
 
   if (stageId === 'fields') {
     const timed = hasTimecodes(transcript)
     const segments = timed ? splitTranscript(transcript) : []
-    const system = fillPrompt('fields', {
+    const instructions = fillPrompt('fields', {
       NO_FENCE,
       POINT_SHAPE: timed ? FIELDS_POINT_SHAPE_QUOTED : FIELDS_POINT_SHAPE_PLAIN,
       QUOTE_RULE: timed ? FIELDS_QUOTE_RULE : '',
     })
-    const parsed = jsonOf(await ask(connection, system, transcriptInput, onProgress))
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, instructions), onProgress))
     return { model: connection.model, detail: { fields: fieldsToText(parsed.fields, segments) } }
   }
 
   if (stageId === 'apply' || stageId === 'ideas') {
     const context = applyContext(ctx.title, ctx.summary || '', ctx.fields || '')
-    const parsed = jsonOf(await ask(connection, fillPrompt(stageId, { NO_FENCE }), context, onProgress))
+    const instructions = fillPrompt(stageId, { NO_FENCE })
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(context, instructions), onProgress))
     return {
       model: connection.model,
       detail:
@@ -324,6 +339,10 @@ export async function generateStage(stageId, ctx, onProgress) {
 /**
  * 全段をまとめて生成する。段が終わるたびに onStage で通知するので、
  * 呼び出し側はその都度Notionへ保存できる(途中で失敗しても手前は残る)。
+ *
+ * 同じ原文を見る段を続けて直列に走らせるのは意図的。ローカルLLMは直前の
+ * プロンプトと先頭が一致していればその分の読み込みを省けるので、
+ * 同時に投げるよりも順番に投げたほうが速い。
  * @param {(stageId: string, detail: object, model: string) => Promise<void>|void} onStage
  */
 export async function generateAll(ctx, { onStage, onStageStart, onProgress } = {}) {
