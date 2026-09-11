@@ -109,6 +109,7 @@ export function renderLibrary(container, items, state, handlers) {
               ${progressHtml(item)}
               <span class="card-date">${fmtDate(item.createdAt)}</span>
               ${state.canEdit ? `<button class="card-edit" data-key="${escapeHtml(item.key)}" aria-label="この動画の情報を編集"><i class="ti ti-pencil" aria-hidden="true"></i></button>` : ''}
+              ${state.canEdit ? `<button class="card-edit card-delete" data-key="${escapeHtml(item.key)}" aria-label="この動画を削除"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}
             </div>
             ${state.showTags && item.tags?.length ? `<div class="card-tags">${item.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </div>
@@ -132,7 +133,8 @@ export function renderLibrary(container, items, state, handlers) {
   container.querySelectorAll('.card-edit').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation() // カードのクリック(詳細を開く)と競合させない
-      handlers.onEdit(btn.dataset.key)
+      if (btn.classList.contains('card-delete')) handlers.onDelete(btn.dataset.key)
+      else handlers.onEdit(btn.dataset.key)
     })
   })
 }
@@ -336,6 +338,10 @@ export function detailHtml(item, state) {
       ${item.url ? `<a class="btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" aria-label="${item.source === 'web' ? '元記事を開く' : 'YouTubeで開く'}"><i class="ti ti-external-link" aria-hidden="true"></i></a>` : ''}
       ${canEdit ? '<button class="btn-ghost btn-more" aria-label="その他の操作"><i class="ti ti-dots" aria-hidden="true"></i></button>' : ''}
     </div>
+  `
+
+  // サムネイルとタグはスクロールで送れるように本文側に置き、タブ列だけ上端に貼り付ける
+  const hero = `
     <div class="detail-hero">
       ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${thumbHtml(item, 'thumb-hero')}</a>` : thumbHtml(item, 'thumb-hero')}
       <div class="hero-side">
@@ -397,7 +403,10 @@ export function detailHtml(item, state) {
     <div class="detail">
       ${markerToolbarHtml()}
       <div class="detail-fixed">${head}</div>
-      <div class="detail-scroll" id="detail-scroll">${panel}</div>
+      <div class="detail-scroll detail-scroll-flush" id="detail-scroll">
+        ${hero}
+        <div class="detail-panel">${panel}</div>
+      </div>
       <div class="detail-foot">${foot}</div>
     </div>
   `
@@ -498,19 +507,25 @@ export function renderIdeas(container, entries, state, handlers) {
     </div>
     <div class="idea-feed">
       ${entries
-        .map(
-          (e) => `
+        .map((e) => {
+          const body = e.body ? `<p class="idea-body">${escapeHtml(plainTextOf(e.body))}</p>` : ''
+          const points = e.points.length
+            ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(plainTextOf(splitLabel(p).text))}</li>`).join('')}</ul>`
+            : ''
+          return `
         <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}">
           <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}</div>
           ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
-          <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
-          ${e.body ? `<p class="idea-body">${escapeHtml(plainTextOf(e.body))}</p>` : ''}
-          ${e.points.length ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(plainTextOf(splitLabel(p).text))}</li>`).join('')}</ul>` : ''}
+          <button class="idea-toggle" aria-expanded="false" ${body || points ? '' : 'disabled'}>
+            <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
+            ${body || points ? '<i class="ti ti-chevron-down idea-caret" aria-hidden="true"></i>' : ''}
+          </button>
+          <div class="idea-detail"><div class="idea-detail-inner">${body}${points}</div></div>
           <button class="idea-source">
             <i class="ti ti-movie" aria-hidden="true"></i>${escapeHtml(e.videoTitle)}
           </button>
         </article>`
-        )
+        })
         .join('')}
     </div>
   `
@@ -519,6 +534,12 @@ export function renderIdeas(container, entries, state, handlers) {
     el.addEventListener('click', () => handlers.onKind(el.dataset.kind))
   })
   container.querySelector('.btn-shuffle')?.addEventListener('click', handlers.onShuffle)
+  container.querySelectorAll('.idea-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const open = btn.closest('.idea').classList.toggle('open')
+      btn.setAttribute('aria-expanded', String(open))
+    })
+  })
   container.querySelectorAll('.idea-source').forEach((el) => {
     el.addEventListener('click', () => handlers.onOpen(el.closest('.idea').dataset.key))
   })

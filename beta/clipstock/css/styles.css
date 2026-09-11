@@ -267,6 +267,7 @@ mark { background: var(--highlight); color: inherit; }
   font-size: 14px;
 }
 .card-edit:hover { background: var(--accent-bg); color: var(--text-primary); }
+.card-delete:hover { background: var(--accent-bg); color: var(--danger-text); }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .badge {
@@ -322,6 +323,9 @@ mark { background: var(--highlight); color: inherit; }
 .detail { display: flex; flex-direction: column; height: 100%; }
 .detail-fixed { background: var(--surface-1); border-bottom: 0.5px solid var(--border); }
 .detail-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 20px; }
+/* サムネイルとタグも一緒に流すので、余白は中の .detail-panel 側に持たせる */
+.detail-scroll-flush { padding: 0; }
+.detail-panel { padding: 14px 16px 20px; }
 .detail-foot {
   display: flex;
   align-items: center;
@@ -349,7 +353,18 @@ mark { background: var(--highlight); color: inherit; }
 .thumb-hero { width: 208px; border-radius: var(--radius); flex-shrink: 0; }
 .hero-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 
-.tabs { display: flex; gap: 2px; padding: 0 10px; overflow-x: auto; scrollbar-width: none; }
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface-1);
+  border-bottom: 0.5px solid var(--border);
+}
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
   border: 0;
@@ -554,14 +569,18 @@ mark { background: var(--highlight); color: inherit; }
 }
 .seg-btn.on { background: var(--accent); color: #fff; }
 
-.idea-feed { columns: 2 300px; column-gap: 14px; }
+/* 段組みだと1枚開いただけで全列が組み直されるため、位置が動かないグリッドにする */
+.idea-feed {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
 .idea {
-  break-inside: avoid;
   background: var(--surface-2);
   border: 0.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 12px 14px;
-  margin-bottom: 14px;
   box-shadow: var(--shadow-card);
   position: relative;
 }
@@ -582,7 +601,26 @@ mark { background: var(--highlight); color: inherit; }
 .idea-kind { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; }
 .idea-kind.apply { color: var(--warn-text); }
 .idea-kind.ideas { color: var(--ok-text); }
-.idea-title { margin: 0 0 5px; font-size: 14px; font-weight: 600; line-height: 1.45; }
+.idea-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.idea-toggle:disabled { cursor: default; }
+.idea-caret { flex: none; font-size: 15px; color: var(--text-muted); transition: transform 0.2s; margin-top: 2px; }
+.idea.open .idea-caret { transform: rotate(180deg); }
+.idea-title { margin: 0 0 5px; font-size: 14px; font-weight: 600; line-height: 1.45; flex: 1; min-width: 0; }
+.idea-detail { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+.idea.open .idea-detail { max-height: 1200px; }
+.idea-detail-inner { padding-top: 4px; }
 .idea-body { margin: 0 0 7px; font-size: 12.5px; color: var(--text-secondary); }
 .idea .sec-points { font-size: 12.5px; }
 .idea-source {
@@ -759,7 +797,7 @@ mark { background: var(--highlight); color: inherit; }
   .card-summary { -webkit-line-clamp: 2; }
   .detail-hero { flex-direction: column; }
   .thumb-hero { width: 100%; }
-  .idea-feed { columns: 1; }
+  .idea-feed { grid-template-columns: 1fr; }
   .mindmap-host { height: 62vh; }
 }
 

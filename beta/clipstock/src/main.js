@@ -198,7 +198,7 @@ function refresh() {
     stageEl,
     currentItems(),
     { searchQuery, showTags, seen: isSeen, canEdit: canEdit(loadConfig()) },
-    { onOpen: openDetail, onEdit: openCardEditor }
+    { onOpen: openDetail, onEdit: openCardEditor, onDelete: deleteCard }
   )
 }
 
@@ -218,6 +218,22 @@ function listJsonContext() {
 }
 
 // ============ カードの編集 ============
+
+/** 一覧からその場で消す。Notionではゴミ箱なので30日間は復元できる */
+async function deleteCard(key) {
+  const item = itemOf(key)
+  if (!item) return
+  if (!confirm(`「${item.title}」をNotionのゴミ箱へ移します。このアプリからは戻せません。続けますか?`)) return
+  try {
+    await deleteVideo(key)
+    clearDetailCache(key)
+    items = items.filter((i) => i.key !== key)
+    ideasState.phase = 'idle' // 一覧JSONは次のcronまで古いままなので手元だけ先に揃える
+    refresh()
+  } catch (err) {
+    alert('削除できませんでした: ' + (err.message || err))
+  }
+}
 
 /**
  * 一覧のカードから直接直す。詳細を開かずに直せるようにするためのもので、
