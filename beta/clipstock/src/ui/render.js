@@ -346,7 +346,9 @@ function renderPanel(item, state, tab, d) {
         ? '<p class="muted">原文を読み込んでいます...</p>'
         : state.transcript
           ? transcriptHtml(state.transcript, item.url)
-          : '<p class="empty-section">原文がまだありません。状態が「完了」になるとここに入ります</p>'
+          : state.transcriptError
+            ? `<p class="error-text">原文を取得できませんでした: ${escapeHtml(state.transcriptError)}</p>`
+            : emptyRawHtml(d.rawCount || item.rawCount)
     default:
       return ''
   }
@@ -360,6 +362,14 @@ function emptyPanel(item, label, stage) {
     return `<p class="empty-section">${escapeHtml(label)}はまだありません。下の「この項目を作り直す」で生成できます</p>`
   }
   return `<p class="empty-section">${escapeHtml(label)}はまだありません</p>`
+}
+
+/** 原文タブの空表示。字数だけ残っているのは Notion のページ本文が消えている状態 */
+function emptyRawHtml(rawCount) {
+  if (rawCount) {
+    return `<p class="empty-section">Notionのページ本文が空です(記録上は ${rawCount.toLocaleString()}字)。状態を「再取得」にすると取り込み直します</p>`
+  }
+  return '<p class="empty-section">原文がまだありません。状態が「完了」になるとここに入ります</p>'
 }
 
 // ============ アイデア一覧(横断して掘り起こす画面) ============

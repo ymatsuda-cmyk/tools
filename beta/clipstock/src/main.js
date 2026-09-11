@@ -539,12 +539,14 @@ async function ensureTranscript(item) {
     try {
       const { text } = await fetchTranscript(item.key)
       detail.transcript = text
+      detail.transcriptError = ''
       if (!item.rawCount && text.length) {
         item.rawCount = text.length
         updateRawCount(item.key, text.length).catch(() => {})
       }
     } catch (err) {
       detail.transcript = ''
+      detail.transcriptError = String(err.message || err)
       console.error('原文の取得に失敗しました:', err)
     }
     transcriptInFlight = null

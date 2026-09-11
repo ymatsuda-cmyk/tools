@@ -752,13 +752,14 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     print(f"  ✅ {len(articles)}ページ / 合計 {total_chars}文字")
 
     if need_body:
+        # 先に追記してから古い本文を消す。逆にすると追記が失敗したとき本文が空のまま残る
+        if not append_blocks(page_id, build_body_blocks(articles)):
+            return False
+        print("  ✅ 本文に追記")
         if body_exists:
             print("    → 既存の本文を削除中...")
             ok, total = archive_body_children(page_id, children)
             print(f"    ✅ {ok}/{total} ブロックを削除")
-        if not append_blocks(page_id, build_body_blocks(articles)):
-            return False
-        print("  ✅ 本文に追記")
 
     new_title = articles[0]["title"] or None
     thumbnail = next((a["thumbnail"] for a in articles if a["thumbnail"]), None)
