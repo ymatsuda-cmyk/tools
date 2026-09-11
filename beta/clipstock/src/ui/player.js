@@ -23,8 +23,12 @@ export function closeMiniPlayer() {
   document.getElementById(HOST_ID)?.remove()
 }
 
-// 閉じて開き直しても同じ場所に出す。null のうちは CSS の既定位置(右下)のまま
+// 閉じて開き直しても同じ場所・同じ大きさで出す。null のうちは CSS の既定のまま
 let placed = null
+let sized = null
+
+const MIN_WIDTH = 220
+const MAX_WIDTH = 900
 
 function clampAndPlace(host, left, top) {
   const w = host.offsetWidth
@@ -66,6 +70,36 @@ function enableDrag(host) {
   bar.addEventListener('pointercancel', end)
 }
 
+/** 右下の角で横幅を変える。高さは 16:9 のまま追従する */
+function enableResize(host) {
+  const grip = host.querySelector('.mp-resize')
+  let from = null
+
+  grip.addEventListener('pointerdown', (e) => {
+    const box = host.getBoundingClientRect()
+    // 右下基準のままだと掴んだ角と反対側が動いてしまうので、先に左上基準に直す
+    if (!placed) clampAndPlace(host, box.left, box.top)
+    from = { x: e.clientX, width: box.width }
+    grip.setPointerCapture(e.pointerId)
+    host.classList.add('dragging')
+    e.preventDefault()
+  })
+
+  grip.addEventListener('pointermove', (e) => {
+    if (!from) return
+    const max = Math.min(MAX_WIDTH, window.innerWidth - (placed?.left ?? 0) - 8)
+    sized = Math.min(Math.max(from.width + (e.clientX - from.x), MIN_WIDTH), Math.max(MIN_WIDTH, max))
+    host.style.width = `${sized}px`
+  })
+
+  const end = () => {
+    from = null
+    host.classList.remove('dragging')
+  }
+  grip.addEventListener('pointerup', end)
+  grip.addEventListener('pointercancel', end)
+}
+
 export function openMiniPlayer(id, at) {
   let host = document.getElementById(HOST_ID)
   if (!host) {
@@ -80,10 +114,13 @@ export function openMiniPlayer(id, at) {
         <a class="mp-btn mp-open" target="_blank" rel="noopener" aria-label="YouTubeで開く"><i class="ti ti-external-link" aria-hidden="true"></i></a>
         <button class="mp-btn mp-close" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
       </div>
-      <div class="mp-frame"></div>`
+      <div class="mp-frame"></div>
+      <div class="mp-resize" aria-hidden="true"></div>`
     document.body.appendChild(host)
     host.querySelector('.mp-close').addEventListener('click', closeMiniPlayer)
     enableDrag(host)
+    enableResize(host)
+    if (sized) host.style.width = `${sized}px`
     if (placed) clampAndPlace(host, placed.left, placed.top)
   }
 

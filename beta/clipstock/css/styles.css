@@ -950,6 +950,16 @@ mark { background: var(--highlight); color: inherit; }
 .mp-btn:hover { background: rgba(255, 255, 255, 0.18); }
 .mp-frame { aspect-ratio: 16 / 9; }
 .mp-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.mp-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.55) 50%);
+}
 
 @media (max-width: 720px) {
   .mini-player { right: 8px; left: 8px; bottom: 8px; width: auto; }
