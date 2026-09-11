@@ -1,0 +1,11 @@
+{
+  "id": "clipstock-data",
+  "description": "動画ナレッジ(clipstock)の一覧JSON",
+  "enabled": true,
+  "source_folder": "/Users/yuya/scripts/data/clipstock",
+  "repository_root": "/Users/yuya/tools",
+  "repo_subfolder": "data/clipstock",
+  "branch": "main",
+  "commit_message": "auto: update clipstock index",
+  "remote_name": "origin"
+}

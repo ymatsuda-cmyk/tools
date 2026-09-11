@@ -9,12 +9,14 @@ clipstock の画面(GitHub Pages)から Mac は直接叩けないため、GAS �
   - マインドマップの公開 / 非公開の切り替え
 
 印があれば build_clipstock_json.py で index-*.json / idea-*.json を作り直し、
---push を付けていれば git_push_all.sh で GitHub へ反映する。
+--push を付けていれば github_sync.py で GitHub へ反映する。
 
 環境変数 (既定で ~/.video_notion_sync.env からも読む):
   CLIPSTOCK_GAS_URL       GASウェブアプリの /exec URL(必須)
   CLIPSTOCK_ACCESS_TOKEN  GASのスクリプトプロパティ ACCESS_TOKEN と同じ値(必須)
   CLIPSTOCK_OUT_DIR       出力先(省略時はリポジトリの data/clipstock)
+  CLIPSTOCK_SYNC_CONFIG   github_sync.py に渡す設定JSON(省略時は ../github/config/clipstock.json)
+  GITHUB_SYNC_SCRIPT      github_sync.py のパス
   VIDEO_ENV_FILE          環境変数ファイルのパス
 
 使い方:
@@ -37,8 +39,8 @@ JST = timezone(timedelta(hours=9))
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
-PUSH_SCRIPT = REPO_ROOT / "mac" / "scripts" / "push" / "git_push_all.sh"
-PUSH_ENTRY_ID = "clipstock-data"
+SYNC_SCRIPT = Path(os.environ.get("GITHUB_SYNC_SCRIPT", str(SCRIPT_DIR.parent / "github" / "github_sync.py")))
+SYNC_CONFIG = Path(os.environ.get("CLIPSTOCK_SYNC_CONFIG", str(SCRIPT_DIR.parent / "github" / "config" / "clipstock.json")))
 
 ENV_FILE = Path(os.environ.get("VIDEO_ENV_FILE", str(Path.home() / ".video_notion_sync.env")))
 
@@ -98,12 +100,18 @@ def rebuild():
 
 
 def push():
-    if not PUSH_SCRIPT.exists():
-        log(f"⚠️ {PUSH_SCRIPT.name} が見つからないためpushしません")
+    if not SYNC_SCRIPT.exists():
+        log(f"⚠️ {SYNC_SCRIPT} が見つからないためpushしません")
+        return
+    if not SYNC_CONFIG.exists():
+        log(f"⚠️ {SYNC_CONFIG} が見つからないためpushしません")
         return
     result = subprocess.run(
-        ["bash", str(PUSH_SCRIPT), PUSH_ENTRY_ID],
+        [sys.executable, str(SYNC_SCRIPT), "--config", str(SYNC_CONFIG)],
         capture_output=True, text=True, timeout=900)
+    out = (result.stdout or "").strip()
+    if out:
+        print(out, flush=True)
     if result.returncode != 0:
         log(f"⚠️ pushに失敗: {(result.stderr or result.stdout or '').strip()[-300:]}")
     else:

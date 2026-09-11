@@ -235,16 +235,12 @@ push_direct() {
 # ============================================================
 # メイン処理
 # ============================================================
-ONLY_ID="${1:-}"   # 引数で id を指定すると、その1件だけpushする
 ENTRY_COUNT=$(jq 'length' "$CONFIG_FILE")
 
 for i in $(seq 0 $((ENTRY_COUNT - 1))); do
   ENTRY=$(jq ".[$i]" "$CONFIG_FILE")
 
   ID=$(echo "$ENTRY"          | jq -r '.id')
-  if [ -n "$ONLY_ID" ] && [ "$ID" != "$ONLY_ID" ]; then
-    continue
-  fi
   DESCRIPTION=$(echo "$ENTRY" | jq -r '.description')
   ENABLED=$(echo "$ENTRY"     | jq -r '.enabled')
   SOURCE=$(echo "$ENTRY"      | jq -r '.source_folder')
