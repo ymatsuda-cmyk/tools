@@ -35,14 +35,25 @@ async function callGas(action, params = {}) {
 }
 
 /**
- * GAS へのリクエストは1本ずつ流す。
- * 同時に投げると Google 側がリダイレクト先(script.googleusercontent.com/macros/echo)を
+ * GAS へのリクエストは1本ずつ、しかも一定の間隔を空けて流す。
+ * 立て続けに投げると Google 側がリダイレクト先(script.googleusercontent.com/macros/echo)を
  * 404 で返すことがあり、ブラウザからは CORS エラーとして見えてしまう。
+ * 「すべて生成」は段ごとに保存するため短時間に何本も飛ぶので、ここで間引く。
  */
+const MIN_INTERVAL_MS = 1200
 let queueTail = Promise.resolve()
+let lastSentAt = 0
 
 function enqueue(task) {
-  const run = queueTail.then(task, task)
+  const run = queueTail.then(async () => {
+    const wait = lastSentAt + MIN_INTERVAL_MS - Date.now()
+    if (wait > 0) await sleep(wait)
+    try {
+      return await task()
+    } finally {
+      lastSentAt = Date.now()
+    }
+  })
   queueTail = run.catch(() => {})
   return run
 }
@@ -68,7 +79,7 @@ async function post(url, body) {
  * Notion 由来のエラーは ok:false で返ってくるため、ここでは再送しない。
  */
 async function postWithRetry(url, body) {
-  const waits = [800, 2000, 5000]
+  const waits = [1500, 4000, 10000, 20000]
   for (let i = 0; ; i++) {
     try {
       return await post(url, body)
