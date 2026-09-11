@@ -98,12 +98,22 @@ def notion_headers():
     }
 
 
+def warn_not_found(resp):
+    """404はほぼ共有忘れなので、やることをその場で示す。"""
+    if resp.status_code != 404:
+        return
+    print(f"    → DBを統合に共有してください（NotionでDBを開く → 右上の ••• → 接続 → 統合を追加）\n"
+          f"      インラインDBのときは親ページに接続を追加します。\n"
+          f"      現在の WEB_DB_ID={WEB_DB_ID}（DBのフルページURLの ID と一致しているか確認）")
+
+
 def get_valid_status_options():
     """DBの「状態」プロパティに定義済みの選択肢一覧を取得する。"""
     resp = requests.get(f"{NOTION_API}/databases/{WEB_DB_ID}",
                         headers=notion_headers(), timeout=60)
     if resp.status_code != 200:
         print(f"    ⚠️ DBスキーマ取得失敗: {resp.status_code} {resp.text[:200]}")
+        warn_not_found(resp)
         return None
     prop = resp.json().get("properties", {}).get(PROP_STATUS, {})
     return {o["name"] for o in prop.get("select", {}).get("options", [])}
@@ -145,6 +155,7 @@ def query_pages_by_status(statuses):
                              headers=notion_headers(), json=payload, timeout=60)
         if resp.status_code != 200:
             print(f"    ⚠️ Notion検索失敗: {resp.status_code} {resp.text[:300]}")
+            warn_not_found(resp)
             break
         data = resp.json()
         pages.extend(data.get("results", []))
@@ -157,6 +168,7 @@ def fetch_page(page_id):
     resp = requests.get(f"{NOTION_API}/pages/{page_id}", headers=notion_headers(), timeout=60)
     if resp.status_code != 200:
         print(f"  ❌ ページ取得失敗: {resp.status_code} {resp.text[:300]}")
+        warn_not_found(resp)
         return None
     return resp.json()
 
