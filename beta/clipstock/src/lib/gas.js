@@ -41,7 +41,7 @@ async function callGas(action, params = {}) {
  * 404 で返すことがあり、ブラウザからは CORS エラーとして見えてしまう。
  * 「すべて生成」は段ごとに保存するため短時間に何本も飛ぶので、ここで間引く。
  */
-const MIN_INTERVAL_MS = 1200
+const MIN_INTERVAL_MS = 2500
 let queueTail = Promise.resolve()
 let lastSentAt = 0
 
@@ -184,17 +184,27 @@ const REBUILD_ACTIONS = new Set([
 
 let rebuildTimer = null
 const rebuildReasons = new Set()
+let rebuildSentAt = 0
+
+// 生成は1段ごとに保存するので、静かになるのを待つだけだと一括処理の合間に何度も飛ぶ。
+// 「静かになってから送る」に加えて「一定時間に1回まで」でも絞る。
+const REBUILD_DEBOUNCE_MS = 30000
+const REBUILD_MIN_GAP_MS = 5 * 60 * 1000
 
 function scheduleRebuild(reason) {
   rebuildReasons.add(String(reason || 'unknown'))
-  clearTimeout(rebuildTimer)
+  if (rebuildTimer) return
+
+  const wait = Math.max(REBUILD_DEBOUNCE_MS, rebuildSentAt + REBUILD_MIN_GAP_MS - Date.now())
   rebuildTimer = setTimeout(() => {
+    rebuildTimer = null
+    rebuildSentAt = Date.now()
     const label = [...rebuildReasons].join(',')
     rebuildReasons.clear()
     callGas('requestRebuild', { reason: label })
       .then(() => console.info('[clipstock] 一覧JSONの作り直しを依頼しました:', label))
       .catch((err) => console.warn('[clipstock] 作り直しの依頼に失敗:', err.message || err))
-  }, 3000)
+  }, wait)
 }
 
 /** 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため) */
