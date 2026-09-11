@@ -45,6 +45,10 @@ var PROP_MODEL    = '要約モデル';     // rich_text  (要追加)
 var PROP_GENERATED = '要約日時';      // date       (要追加)
 var PROP_RAW_COUNT = '原文文字数';    // number     (要追加)
 var PROP_PUBLIC   = '公開';           // checkbox   マインドマップ一覧に並べるか (要追加)
+// アイデアは既定で公開にしたいが、Notionのチェックボックスは未設定が false なので、
+// 反対の「非公開」を持つ。アプリに渡すときに反転する。
+var PROP_HIDE_APPLY = '応用を非公開'; // checkbox   (要追加)
+var PROP_HIDE_IDEAS = '活用を非公開'; // checkbox   (要追加)
 var PROP_CREATED  = '作成日時';       // created_time
 
 // ---- 状態の値 ----
@@ -109,6 +113,9 @@ function doPost(e) {
         break;
       case 'setPublic':
         result = setPublic_(body.pageId, body.isPublic, body.source);
+        break;
+      case 'setIdeaPublic':
+        result = setIdeaPublic_(body.pageId, body.kind, body.isPublic, body.source);
         break;
       case 'deleteVideo':
         result = deleteVideo_(body.pageId, body.source);
@@ -399,6 +406,8 @@ function listIdeas_() {
       status: status,
       apply: apply,
       ideas: ideas,
+      publicApply: !checkboxOf_(p, PROP_HIDE_APPLY),
+      publicIdeas: !checkboxOf_(p, PROP_HIDE_IDEAS),
     });
   });
 
@@ -444,6 +453,8 @@ function fetchDetail_(pageId, source) {
     generatedAt: dateOf_(p, PROP_GENERATED),
     rawCount: numberOf_(p, PROP_RAW_COUNT),
     isPublic: checkboxOf_(p, PROP_PUBLIC),
+    publicApply: !checkboxOf_(p, PROP_HIDE_APPLY),
+    publicIdeas: !checkboxOf_(p, PROP_HIDE_IDEAS),
     updatedAt: page.last_edited_time,
   };
 }
@@ -615,6 +626,18 @@ function setPublic_(pageId, isPublic, source) {
   props[PROP_PUBLIC] = { checkbox: Boolean(isPublic) };
   notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true, isPublic: Boolean(isPublic) };
+}
+
+var HIDE_PROP_BY_KIND = { apply: PROP_HIDE_APPLY, ideas: PROP_HIDE_IDEAS };
+
+/** 応用 / 活用をアイデア一覧に出すかどうか */
+function setIdeaPublic_(pageId, kind, isPublic, source) {
+  var prop = HIDE_PROP_BY_KIND[kind];
+  if (!prop) throw new Error('unknown kind: ' + kind);
+  var props = {};
+  props[prop] = { checkbox: !isPublic };
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
+  return { saved: true, kind: kind, isPublic: Boolean(isPublic) };
 }
 
 /**

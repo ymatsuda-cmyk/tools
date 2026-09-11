@@ -74,6 +74,9 @@ PROP_MODEL = "要約モデル"
 PROP_GENERATED = "要約日時"
 PROP_RAW_COUNT = "原文文字数"
 PROP_PUBLIC = "公開"  # checkbox。マインドマップ一覧に並べるか
+# アイデアは既定で公開にしたいが、Notionのチェックボックスは未設定が false なので反対の値を持つ
+PROP_HIDE_APPLY = "応用を非公開"
+PROP_HIDE_IDEAS = "活用を非公開"
 PROP_CREATED = "作成日時"
 
 STATUS_NEW = "新規"
@@ -251,6 +254,8 @@ def to_idea(page, source):
         "status": status,
         "apply": apply_text,
         "ideas": ideas_text,
+        "publicApply": not checkbox_of(p, PROP_HIDE_APPLY),
+        "publicIdeas": not checkbox_of(p, PROP_HIDE_IDEAS),
     }
 
 

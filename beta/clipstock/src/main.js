@@ -6,6 +6,8 @@ import {
   renderIdeas,
   renderMindmapGallery,
   flattenIdeas,
+  isPublishedOn,
+  PUBLISH_FIELD,
   TABS,
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
@@ -20,6 +22,7 @@ import {
   saveTitle,
   setStatus,
   setPublic,
+  setIdeaPublic,
   updateRawCount,
   mergeTag,
   deleteVideo,
@@ -822,28 +825,40 @@ async function commitNodeMarker(item, nodeIndex, el) {
   }
 }
 
-/** マインドマップ一覧に出すかどうか。ボタンだけ差し替えて、マップは描き直さない */
+/** 今見ているタブの公開を入れ替える。ボタンだけ差し替えて、マップは描き直さない */
 async function togglePublic(item, btn) {
-  const before = detail.detail?.isPublic ?? item.isPublic ?? false
+  const tab = detail.activeTab
+  const field = PUBLISH_FIELD[tab]
+  if (!field) return
+  const before = isPublishedOn(item, detail.detail || {}, tab)
   const next = !before
   const paint = (on) => {
     btn.classList.toggle('on', on)
     btn.setAttribute('aria-pressed', String(on))
-    btn.innerHTML = `<i class="ti ${on ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${on ? '公開中' : '公開する'}`
+    btn.innerHTML = `<i class="ti ${on ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${on ? '公開中' : '非公開'}`
   }
 
   paint(next)
-  detail.detail = { ...detail.detail, isPublic: next }
-  item.isPublic = next
+  detail.detail = { ...detail.detail, [field]: next }
+  if (tab === 'mindmap') item.isPublic = next
+  else setIdeaVisibility(item.key, tab, next)
   try {
-    await setPublic(item.key, next)
+    await (tab === 'mindmap' ? setPublic(item.key, next) : setIdeaPublic(item.key, tab, next))
     setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
   } catch (err) {
     paint(before)
-    detail.detail = { ...detail.detail, isPublic: before }
-    item.isPublic = before
+    detail.detail = { ...detail.detail, [field]: before }
+    if (tab === 'mindmap') item.isPublic = before
+    else setIdeaVisibility(item.key, tab, before)
     alert('公開の切り替えができませんでした: ' + (err.message || err))
   }
+}
+
+/** 読み込み済みのアイデア一覧にも反映する。JSONは次のバッチまで古いままのため */
+function setIdeaVisibility(key, kind, isPublic) {
+  ideasState.items.forEach((e) => {
+    if (e.key === key && e.kind === kind) e.isPublic = isPublic
+  })
 }
 
 // ---- 生成 ----
@@ -1197,7 +1212,27 @@ function openMindmapOverlay(title) {
 /** 「公開」をONにしたものだけを並べる。マップ自体はカードを開いたときに描く */
 function paintMindmaps() {
   const entries = currentItems().filter((i) => i.isPublic && i.has?.mindmap)
-  renderMindmapGallery(stageEl, entries, { searchQuery, showTags }, { onOpen: openMindmapViewer })
+  renderMindmapGallery(
+    stageEl,
+    entries,
+    { searchQuery, showTags, canEdit: canEdit(loadConfig()) },
+    { onOpen: openMindmapViewer, onHide: hideMindmap }
+  )
+}
+
+/** 一覧からその場で公開をやめる。戻すときは詳細のタブから */
+async function hideMindmap(key) {
+  const item = itemOf(key)
+  if (!item) return
+  item.isPublic = false
+  refresh()
+  try {
+    await setPublic(key, false)
+  } catch (err) {
+    item.isPublic = true
+    refresh()
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
 }
 
 async function openMindmapViewer(key) {
@@ -1232,7 +1267,7 @@ async function paintIdeas() {
     if (view !== 'ideas') return
   }
 
-  let entries = ideasState.items
+  let entries = ideasState.items.filter((e) => e.isPublic)
   entries = filterBySource(entries, selectedSources)
   if (ideasState.kind !== 'all') entries = entries.filter((e) => e.kind === ideasState.kind)
   if (selectedTags.size) entries = entries.filter((e) => [...selectedTags].every((t) => e.tags.includes(t)))
@@ -1247,7 +1282,7 @@ async function paintIdeas() {
   }
   if (ideasState.shuffleSeed) entries = pickRandom(entries, 6, ideasState.shuffleSeed)
 
-  renderIdeas(stageEl, entries, ideasState, {
+  renderIdeas(stageEl, entries, { ...ideasState, canEdit: canEdit(loadConfig()) }, {
     onKind: (kind) => {
       ideasState.kind = kind
       ideasState.shuffleSeed = 0
@@ -1258,11 +1293,25 @@ async function paintIdeas() {
       paintIdeas()
     },
     onOpen: (key) => openDetail(key),
+    onHide: hideIdea,
   })
   stageEl.querySelector('.btn-retry')?.addEventListener('click', () => {
     ideasState.phase = 'idle'
     paintIdeas()
   })
+}
+
+/** 同じ動画の同じ種別(応用 / 活用)はまとめて非公開になる。Notionの列が1つのため */
+async function hideIdea(key, kind) {
+  setIdeaVisibility(key, kind, false)
+  paintIdeas()
+  try {
+    await setIdeaPublic(key, kind, false)
+  } catch (err) {
+    setIdeaVisibility(key, kind, true)
+    paintIdeas()
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
 }
 
 /** 決め打ちのシードで並べ替えて先頭n件。再描画しても同じ並びになる */

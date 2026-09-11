@@ -549,7 +549,22 @@ mark { background: var(--highlight); color: inherit; }
   padding: 12px 14px;
   margin-bottom: 14px;
   box-shadow: var(--shadow-card);
+  position: relative;
 }
+.idea-hide {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+}
+.idea-hide:hover { background: var(--accent-bg); color: var(--text-primary); }
 .idea-kind { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; }
 .idea-kind.apply { color: var(--warn-text); }
 .idea-kind.ideas { color: var(--ok-text); }

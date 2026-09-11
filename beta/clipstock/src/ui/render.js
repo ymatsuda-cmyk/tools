@@ -163,6 +163,7 @@ export function renderMindmapGallery(container, items, state, handlers) {
               ${item.source === 'web' ? '<span class="badge badge-web"><i class="ti ti-world" aria-hidden="true"></i>Web</span>' : ''}
               <span class="grow"></span>
               <span class="card-date">${fmtDate(item.createdAt)}</span>
+              ${state.canEdit ? hideButtonHtml('card-edit') : ''}
             </div>
             ${state.showTags && item.tags?.length ? `<div class="card-tags">${item.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </div>
@@ -180,6 +181,13 @@ export function renderMindmapGallery(container, items, state, handlers) {
         e.preventDefault()
         open()
       }
+    })
+  })
+
+  container.querySelectorAll('.btn-hide').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation() // カードのクリック(大きく見る)と競合させない
+      handlers.onHide(btn.closest('.card').dataset.key)
     })
   })
 }
@@ -254,9 +262,22 @@ function mindmapToolsHtml(current) {
     </span>`
 }
 
-/** マインドマップ一覧に出すかどうかの切り替え */
+/** タブごとの公開フラグ。応用と活用は既定ONなので、値が無ければ公開とみなす */
+export const PUBLISH_FIELD = { mindmap: 'isPublic', apply: 'publicApply', ideas: 'publicIdeas' }
+
+export function isPublishedOn(item, d, tab) {
+  if (tab === 'mindmap') return Boolean(d.isPublic ?? item.isPublic)
+  return PUBLISH_FIELD[tab] ? d[PUBLISH_FIELD[tab]] !== false : false
+}
+
+/** 公開の入り切り。押すと反転する状態ボタン */
 function publishButtonHtml(isPublic) {
-  return `<button class="btn btn-publish ${isPublic ? 'on' : ''}" aria-pressed="${isPublic}"><i class="ti ${isPublic ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${isPublic ? '公開中' : '公開する'}</button>`
+  return `<button class="btn btn-publish ${isPublic ? 'on' : ''}" aria-pressed="${isPublic}"><i class="ti ${isPublic ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i>${isPublic ? '公開中' : '非公開'}</button>`
+}
+
+/** 一覧のカードからその場で非公開にするスイッチ */
+function hideButtonHtml(cls) {
+  return `<button class="${cls} btn-hide" aria-label="非公開にする" title="非公開にする"><i class="ti ti-eye-off" aria-hidden="true"></i></button>`
 }
 
 /** 原文タブ。タイムスタンプがあれば各かたまりの頭を再生リンクにする */
@@ -368,7 +389,7 @@ export function detailHtml(item, state) {
            ${canEdit && editable ? '<button class="btn btn-edit-field"><i class="ti ti-edit" aria-hidden="true"></i>手で直す</button>' : ''}
            ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? mindmapToolsHtml(state.mindmapColor) : ''}
            <span class="grow"></span>
-           ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? publishButtonHtml(d.isPublic ?? item.isPublic) : ''}
+           ${canEdit && PUBLISH_FIELD[tab] && state.tabHasContent(tab) ? publishButtonHtml(isPublishedOn(item, d, tab)) : ''}
            ${tab === 'mindmap' && state.tabHasContent('mindmap') ? '<button class="btn btn-mm-full"><i class="ti ti-arrows-maximize" aria-hidden="true"></i>大きく見る</button>' : ''}
            ${['summary', 'mindmap', 'fields', 'apply', 'ideas', 'raw'].includes(tab) ? '<button class="btn btn-copy"><i class="ti ti-copy" aria-hidden="true"></i>コピー</button>' : ''}`
 
@@ -479,8 +500,9 @@ export function renderIdeas(container, entries, state, handlers) {
       ${entries
         .map(
           (e) => `
-        <article class="idea" data-key="${escapeHtml(e.key)}">
+        <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}">
           <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}</div>
+          ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
           <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
           ${e.body ? `<p class="idea-body">${escapeHtml(plainTextOf(e.body))}</p>` : ''}
           ${e.points.length ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(plainTextOf(splitLabel(p).text))}</li>`).join('')}</ul>` : ''}
@@ -500,6 +522,10 @@ export function renderIdeas(container, entries, state, handlers) {
   container.querySelectorAll('.idea-source').forEach((el) => {
     el.addEventListener('click', () => handlers.onOpen(el.closest('.idea').dataset.key))
   })
+  container.querySelectorAll('.btn-hide').forEach((btn) => {
+    const idea = btn.closest('.idea')
+    btn.addEventListener('click', () => handlers.onHide(idea.dataset.key, idea.dataset.kind))
+  })
 }
 
 /** listIdeas の結果を1件1アイデアのフィード用配列に展開する */
@@ -514,6 +540,7 @@ export function flattenIdeas(items) {
           videoTitle: v.title,
           tags: v.tags || [],
           kind,
+          isPublic: (kind === 'apply' ? v.publicApply : v.publicIdeas) !== false,
           heading: s.heading || '(無題)',
           body: s.body,
           points: s.points,
