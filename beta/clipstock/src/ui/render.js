@@ -1,4 +1,4 @@
-import { parseSections } from '../lib/sections.js'
+import { parseSections, isSectionHidden, visibleHeading } from '../lib/sections.js'
 import { splitLabel, splitTranscript, formatTimecode, youtubeUrlAt } from '../lib/timecode.js'
 import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
 import { addrAttrs } from '../lib/marker-target.js'
@@ -207,7 +207,7 @@ function timeChip(at, videoUrl) {
   return `<a class="tc tc-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${label} から再生"><i class="ti ti-player-play" aria-hidden="true"></i>${label}</a>`
 }
 
-function sectionsHtml(text, { numbered = false, videoUrl = '', field = null } = {}) {
+function sectionsHtml(text, { numbered = false, videoUrl = '', field = null, publishable = false } = {}) {
   const sections = parseSections(text)
   if (!sections.length) return '<p class="empty-section">まだありません</p>'
   // field が渡されたときだけマーカーを引けるようにする(読み取り専用のときは付けない)
@@ -218,10 +218,13 @@ function sectionsHtml(text, { numbered = false, videoUrl = '', field = null } = 
 
   return `<div class="sections">${sections
     .map((s, i) => {
-      const head = splitLabel(s.heading || '(無題)')
+      const hidden = isSectionHidden(s.heading)
+      const head = splitLabel(visibleHeading(s.heading) || '(無題)')
       return `
-    <section class="sec">
-      <h4 class="sec-head">${numbered ? `<span class="sec-num">${i + 1}</span>` : ''}${escapeHtml(plainTextOf(head.text))}${timeChip(head.at, videoUrl)}</h4>
+    <section class="sec ${hidden ? 'sec-hidden' : ''}">
+      <h4 class="sec-head">${numbered ? `<span class="sec-num">${i + 1}</span>` : ''}${escapeHtml(plainTextOf(head.text))}${timeChip(head.at, videoUrl)}${
+        publishable ? sectionPublishHtml(i, !hidden) : ''
+      }</h4>
       ${s.body ? `<p class="sec-body">${mark(s.body, 'body', i, null).replace(/\n/g, '<br />')}</p>` : ''}
       ${s.points.length
         ? `<ul class="sec-points">${s.points
@@ -262,12 +265,9 @@ function mindmapToolsHtml(current) {
     </span>`
 }
 
-/** タブごとの公開フラグ。応用と活用は既定ONなので、値が無ければ公開とみなす */
-export const PUBLISH_FIELD = { mindmap: 'isPublic', apply: 'publicApply', ideas: 'publicIdeas' }
-
-export function isPublishedOn(item, d, tab) {
-  if (tab === 'mindmap') return Boolean(d.isPublic ?? item.isPublic)
-  return PUBLISH_FIELD[tab] ? d[PUBLISH_FIELD[tab]] !== false : false
+/** アイデア1件の公開の入り切り。見出しの右に出す */
+function sectionPublishHtml(index, isPublic) {
+  return `<button class="sec-publish ${isPublic ? '' : 'off'}" data-sec="${index}" aria-pressed="${isPublic}" title="${isPublic ? 'アイデア一覧に出しています' : 'アイデア一覧に出しません'}"><i class="ti ${isPublic ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i></button>`
 }
 
 /** 公開の入り切り。押すと反転する状態ボタン */
@@ -389,7 +389,7 @@ export function detailHtml(item, state) {
            ${canEdit && editable ? '<button class="btn btn-edit-field"><i class="ti ti-edit" aria-hidden="true"></i>手で直す</button>' : ''}
            ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? mindmapToolsHtml(state.mindmapColor) : ''}
            <span class="grow"></span>
-           ${canEdit && PUBLISH_FIELD[tab] && state.tabHasContent(tab) ? publishButtonHtml(isPublishedOn(item, d, tab)) : ''}
+           ${tab === 'mindmap' && canEdit && state.tabHasContent('mindmap') ? publishButtonHtml(Boolean(d.isPublic ?? item.isPublic)) : ''}
            ${tab === 'mindmap' && state.tabHasContent('mindmap') ? '<button class="btn btn-mm-full"><i class="ti ti-arrows-maximize" aria-hidden="true"></i>大きく見る</button>' : ''}
            ${['summary', 'mindmap', 'fields', 'apply', 'ideas', 'raw'].includes(tab) ? '<button class="btn btn-copy"><i class="ti ti-copy" aria-hidden="true"></i>コピー</button>' : ''}`
 
@@ -420,11 +420,11 @@ function renderPanel(item, state, tab, d) {
         : emptyPanel(item, '分野別要約', 'fields')
     case 'apply':
       return d.apply
-        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply' })
+        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply', publishable: canEdit })
         : emptyPanel(item, '応用', 'apply')
     case 'ideas':
       return d.ideas
-        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas' })
+        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas', publishable: canEdit })
         : emptyPanel(item, '活用アイデア', 'ideas')
     case 'memo':
       return `<textarea id="memo-input" class="memo-input" placeholder="気づいたこと、あとで試すこと、関連する話などを自由に">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
@@ -500,7 +500,7 @@ export function renderIdeas(container, entries, state, handlers) {
       ${entries
         .map(
           (e) => `
-        <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}">
+        <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}">
           <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}</div>
           ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
           <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
@@ -524,7 +524,7 @@ export function renderIdeas(container, entries, state, handlers) {
   })
   container.querySelectorAll('.btn-hide').forEach((btn) => {
     const idea = btn.closest('.idea')
-    btn.addEventListener('click', () => handlers.onHide(idea.dataset.key, idea.dataset.kind))
+    btn.addEventListener('click', () => handlers.onHide(idea.dataset.key, idea.dataset.kind, Number(idea.dataset.sec)))
   })
 }
 
@@ -540,8 +540,9 @@ export function flattenIdeas(items) {
           videoTitle: v.title,
           tags: v.tags || [],
           kind,
-          isPublic: (kind === 'apply' ? v.publicApply : v.publicIdeas) !== false,
-          heading: s.heading || '(無題)',
+          sec: i,
+          isPublic: !isSectionHidden(s.heading),
+          heading: visibleHeading(s.heading) || '(無題)',
           body: s.body,
           points: s.points,
           id: `${v.key}:${kind}:${i}`,

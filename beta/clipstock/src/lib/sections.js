@@ -72,3 +72,43 @@ export function serializeSections(sections) {
 export function sectionsCharCount(text) {
   return String(text ?? '').length
 }
+
+// ---- アイデア1件ごとの公開 / 非公開 ----
+//
+// 見出しの先頭に印を置くだけにしている。アイデアは応用・活用の本文の中に
+// 並んでいるので、Notionの列では1件ずつ持てない。番号で覚えると作り直しや
+// 並べ替えでずれるため、その見出し自身に書く。既定は公開(印が無ければ公開)。
+
+const HIDDEN_TAG = '[非公開]'
+
+export function isSectionHidden(heading) {
+  return String(heading ?? '').trimStart().startsWith(HIDDEN_TAG)
+}
+
+/** 表示や検索に使う、印を外した見出し */
+export function visibleHeading(heading) {
+  const s = String(heading ?? '').trimStart()
+  return isSectionHidden(s) ? s.slice(HIDDEN_TAG.length).trim() : s.trim()
+}
+
+export function withHidden(heading, hidden) {
+  const bare = visibleHeading(heading)
+  return hidden ? `${HIDDEN_TAG} ${bare}` : bare
+}
+
+/** index 番目のアイデアの公開を入れ替えた、フィールド全体の新しい文字列 */
+export function setSectionHidden(text, index, hidden) {
+  const sections = parseSections(text)
+  if (!sections[index]) return String(text ?? '')
+  sections[index] = { ...sections[index], heading: withHidden(sections[index].heading, hidden) }
+  return serializeSections(sections)
+}
+
+/**
+ * 見出しで探して入れ替える。一覧は静的JSONから作っていて並びが古いことがあるので、
+ * 番号だけで当てにいくと別のアイデアを隠してしまう。見つからなければ元のまま返す。
+ */
+export function setSectionHiddenByHeading(text, heading, hidden) {
+  const index = parseSections(text).findIndex((s) => visibleHeading(s.heading) === heading)
+  return index === -1 ? String(text ?? '') : setSectionHidden(text, index, hidden)
+}

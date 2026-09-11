@@ -124,11 +124,6 @@ export function setPublic(pageId, isPublic) {
   return callGas('setPublic', { pageId, isPublic })
 }
 
-/** アイデア一覧に出すかどうか。kind は 'apply'(応用) か 'ideas'(活用) */
-export function setIdeaPublic(pageId, kind, isPublic) {
-  return callGas('setIdeaPublic', { pageId, kind, isPublic })
-}
-
 /** Notionページをゴミ箱へ移す。Notion側からなら30日間は復元できる */
 export function deleteVideo(pageId) {
   return callGas('deleteVideo', { pageId })

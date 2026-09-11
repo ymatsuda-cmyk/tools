@@ -379,6 +379,20 @@ mark { background: var(--highlight); color: inherit; }
 
 .sections { display: flex; flex-direction: column; gap: 18px; max-width: 68ch; }
 .sec-head { margin: 0 0 4px; font-size: 14px; font-weight: 600; display: flex; align-items: baseline; gap: 7px; }
+.sec-publish {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+}
+.sec-publish:hover { background: var(--accent-bg); color: var(--text-primary); }
+.sec-publish.off { color: var(--warn-text); }
+.sec-hidden .sec-head, .sec-hidden .sec-body, .sec-hidden .sec-points { opacity: 0.55; }
 .sec-num {
   font-size: 11px;
   color: var(--text-muted);

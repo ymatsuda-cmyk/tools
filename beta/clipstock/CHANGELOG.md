@@ -12,8 +12,8 @@ Mark up mindmap branches, and collect the published ones into their own tab
 - Located the clicked branch by walking the markmap tree in pre-order and pairing it with the non-blank lines of the Markdown. The generator emits exactly one node per line, so the two orders match without depending on markmap's internal payload.
 - Painted the clicked branch directly in the DOM instead of re-rendering. `Markmap.create` refits the view, which would throw away the reader's zoom and pan on every click.
 - Added a 公開 checkbox column in Notion and a toggle on the mindmap tab, plus a third view tab that lists the published mindmaps. The cards only carry the thumbnail and title; the map itself is fetched and drawn when a card is opened, so the tab stays cheap no matter how many are published.
-- Gave 応用 and 活用 their own publish flags, defaulting to on. Notion checkboxes read as false when unset, so the columns hold the inverse (`応用を非公開` / `活用を非公開`) and GAS flips them at the boundary — the app never sees the inversion.
-- Put a hide switch on each card in the idea feed and the mindmap tab, so something can be dropped from the published view where you noticed it. The detail tabs keep the full toggle, which is the only way back once an item is hidden from the list.
+- Gave each idea its own publish switch, defaulting to on. A Notion column cannot hold a per-idea flag — 応用 and 活用 each pack several ideas into one text property — so the state lives in the idea's own heading as a leading `[非公開]`. Storing an index instead would break the moment a regeneration reorders them.
+- Put a hide switch on each card in the idea feed and the mindmap tab, so something can be dropped from the published view where you noticed it. The detail tabs keep the full toggle, which is the only way back once an item is hidden from the list. Hiding from the feed matches on the heading rather than the index, because the feed is built from a JSON snapshot that can lag behind Notion.
 
 ### Affected Files
 

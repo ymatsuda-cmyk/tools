@@ -6,8 +6,6 @@ import {
   renderIdeas,
   renderMindmapGallery,
   flattenIdeas,
-  isPublishedOn,
-  PUBLISH_FIELD,
   TABS,
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
@@ -22,7 +20,6 @@ import {
   saveTitle,
   setStatus,
   setPublic,
-  setIdeaPublic,
   updateRawCount,
   mergeTag,
   deleteVideo,
@@ -37,6 +34,13 @@ import { renderMindmap, markNodeLine, nodeMarkerOf } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers, MARKER_COLORS } from './lib/markers.js'
 import { addrOf, getMarkedText, setMarkedText, stripMarkers } from './lib/marker-target.js'
+import {
+  parseSections,
+  isSectionHidden,
+  visibleHeading,
+  setSectionHidden,
+  setSectionHiddenByHeading,
+} from './lib/sections.js'
 import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
   excludeExcluded,
@@ -492,6 +496,11 @@ function wireDetail(item) {
       stageEl.querySelectorAll('.mm-swatch').forEach((b) => b.classList.toggle('on', b === el))
     })
   )
+  stageEl.querySelectorAll('.sec-publish').forEach((btn) =>
+    btn.addEventListener('click', () =>
+      toggleSectionPublic(item, detail.activeTab, Number(btn.dataset.sec), btn.getAttribute('aria-pressed') !== 'true')
+    )
+  )
   stageEl.querySelectorAll('.tag-edit i').forEach((x) =>
     x.addEventListener('click', (e) => removeTag(item, e.target.closest('.tag').dataset.tag))
   )
@@ -825,12 +834,9 @@ async function commitNodeMarker(item, nodeIndex, el) {
   }
 }
 
-/** 今見ているタブの公開を入れ替える。ボタンだけ差し替えて、マップは描き直さない */
+/** マインドマップ一覧に出すかどうか。ボタンだけ差し替えて、マップは描き直さない */
 async function togglePublic(item, btn) {
-  const tab = detail.activeTab
-  const field = PUBLISH_FIELD[tab]
-  if (!field) return
-  const before = isPublishedOn(item, detail.detail || {}, tab)
+  const before = Boolean(detail.detail?.isPublic ?? item.isPublic)
   const next = !before
   const paint = (on) => {
     btn.classList.toggle('on', on)
@@ -839,25 +845,48 @@ async function togglePublic(item, btn) {
   }
 
   paint(next)
-  detail.detail = { ...detail.detail, [field]: next }
-  if (tab === 'mindmap') item.isPublic = next
-  else setIdeaVisibility(item.key, tab, next)
+  detail.detail = { ...detail.detail, isPublic: next }
+  item.isPublic = next
   try {
-    await (tab === 'mindmap' ? setPublic(item.key, next) : setIdeaPublic(item.key, tab, next))
+    await setPublic(item.key, next)
     setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
   } catch (err) {
     paint(before)
+    detail.detail = { ...detail.detail, isPublic: before }
+    item.isPublic = before
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
+}
+
+/**
+ * 応用 / 活用の1件をアイデア一覧に出すかどうか。
+ * 印は見出しに入るので、保存先は本文そのもの(新しい列は要らない)。
+ */
+async function toggleSectionPublic(item, field, index, isPublic) {
+  const before = detail.detail?.[field] ?? ''
+  const next = setSectionHidden(before, index, !isPublic)
+  if (next === before) return
+
+  detail.detail = { ...detail.detail, [field]: next }
+  paintDetail()
+  try {
+    await saveField(item.key, field, next)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+    syncIdeaFeed(item.key, field, next)
+  } catch (err) {
     detail.detail = { ...detail.detail, [field]: before }
-    if (tab === 'mindmap') item.isPublic = before
-    else setIdeaVisibility(item.key, tab, before)
+    paintDetail()
     alert('公開の切り替えができませんでした: ' + (err.message || err))
   }
 }
 
 /** 読み込み済みのアイデア一覧にも反映する。JSONは次のバッチまで古いままのため */
-function setIdeaVisibility(key, kind, isPublic) {
+function syncIdeaFeed(key, kind, text) {
+  const hiddenOf = new Map(
+    parseSections(text).map((s) => [visibleHeading(s.heading), isSectionHidden(s.heading)])
+  )
   ideasState.items.forEach((e) => {
-    if (e.key === key && e.kind === kind) e.isPublic = isPublic
+    if (e.key === key && e.kind === kind && hiddenOf.has(e.heading)) e.isPublic = !hiddenOf.get(e.heading)
   })
 }
 
@@ -1301,14 +1330,23 @@ async function paintIdeas() {
   })
 }
 
-/** 同じ動画の同じ種別(応用 / 活用)はまとめて非公開になる。Notionの列が1つのため */
-async function hideIdea(key, kind) {
-  setIdeaVisibility(key, kind, false)
+/** アイデア1件を一覧から外す。戻すときは詳細の応用 / 活用タブから */
+async function hideIdea(key, kind, sec) {
+  const entry = ideasState.items.find((e) => e.key === key && e.kind === kind && e.sec === sec)
+  if (!entry) return
+  entry.isPublic = false
   paintIdeas()
   try {
-    await setIdeaPublic(key, kind, false)
+    const item = itemOf(key)
+    const cached = getDetailCache(key)
+    const d = isCacheFresh(cached, item?.editedAt) ? cached : setDetailCache(key, await fetchDetail(key))
+    const before = d[kind] ?? ''
+    const next = setSectionHiddenByHeading(before, entry.heading, true)
+    if (next === before) throw new Error('このアイデアが見つかりません。作り直された可能性があります')
+    await saveField(key, kind, next)
+    setDetailCache(key, { ...d, [kind]: next, updatedAt: new Date().toISOString() })
   } catch (err) {
-    setIdeaVisibility(key, kind, true)
+    entry.isPublic = true
     paintIdeas()
     alert('公開の切り替えができませんでした: ' + (err.message || err))
   }
