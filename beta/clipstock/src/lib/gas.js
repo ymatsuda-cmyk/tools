@@ -29,34 +29,53 @@ async function callGas(action, params = {}) {
   const source = params.pageId ? pageSources.get(params.pageId) : null
   const body = JSON.stringify({ action, token: config.accessToken, ...params, ...(source ? { source } : {}) })
 
-  const json = await postWithRetry(config.gasUrl, body)
+  const json = await enqueue(() => postWithRetry(config.gasUrl, body))
   if (!json.ok) throw new Error(json.error || 'GAS がエラーを返しました')
   return json.data
 }
+
+/**
+ * GAS へのリクエストは1本ずつ流す。
+ * 同時に投げると Google 側がリダイレクト先(script.googleusercontent.com/macros/echo)を
+ * 404 で返すことがあり、ブラウザからは CORS エラーとして見えてしまう。
+ */
+let queueTail = Promise.resolve()
+
+function enqueue(task) {
+  const run = queueTail.then(task, task)
+  queueTail = run.catch(() => {})
+  return run
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function post(url, body) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body,
+    redirect: 'follow',
   })
   if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
   return res.json()
 }
 
 /**
- * 通信そのものが失敗したときだけ一度やり直す。
- * GAS は再デプロイ直後などに 404 や "Failed to fetch"(リダイレクト先がCORSを返さない)を
+ * 通信そのものが失敗したときだけやり直す。
+ * GAS は再デプロイ直後や連続アクセス時に 404 や "Failed to fetch"(リダイレクト先がCORSを返さない)を
  * 返すことがあり、Notion への保存は成功しているのに失敗表示になっていた。
  * どの action も同じ値を書き直すだけなので、投げ直しても副作用は増えない。
  * Notion 由来のエラーは ok:false で返ってくるため、ここでは再送しない。
  */
 async function postWithRetry(url, body) {
-  try {
-    return await post(url, body)
-  } catch {
-    await new Promise((resolve) => setTimeout(resolve, 800))
-    return post(url, body)
+  const waits = [800, 2000, 5000]
+  for (let i = 0; ; i++) {
+    try {
+      return await post(url, body)
+    } catch (err) {
+      if (i >= waits.length) throw err
+      await sleep(waits[i])
+    }
   }
 }
 
@@ -131,13 +150,8 @@ export function deleteVideo(pageId) {
 
 /** 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため) */
 export async function verifyCode(gasUrl, code) {
-  const res = await fetch(gasUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'verifyCode', code }),
-  })
-  if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
-  const json = await res.json()
+  const body = JSON.stringify({ action: 'verifyCode', code })
+  const json = await enqueue(() => postWithRetry(gasUrl, body))
   if (!json.ok) throw new Error(json.error || 'GAS がエラーを返しました')
   return json.data
 }
