@@ -31,6 +31,7 @@ async function callGas(action, params = {}) {
 
   const json = await enqueue(() => postWithRetry(config.gasUrl, body))
   if (!json.ok) throw new Error(json.error || 'GAS がエラーを返しました')
+  if (REBUILD_ACTIONS.has(action)) scheduleRebuild(action)
   return json.data
 }
 
@@ -166,10 +167,22 @@ export function deleteVideo(pageId) {
  * 失敗しても画面の操作自体は成功しているため、投げっぱなしにする。
  * 一括生成のように連続で呼ばれる場面があるので、少し待ってまとめて1回にする。
  */
+const REBUILD_ACTIONS = new Set([
+  'saveGenerated',
+  'saveField',
+  'saveTags',
+  'saveTitle',
+  'setStatus',
+  'setPublic',
+  'updateRawCount',
+  'mergeTag',
+  'deleteVideo',
+])
+
 let rebuildTimer = null
 const rebuildReasons = new Set()
 
-export function scheduleRebuild(reason) {
+function scheduleRebuild(reason) {
   rebuildReasons.add(String(reason || 'unknown'))
   clearTimeout(rebuildTimer)
   rebuildTimer = setTimeout(() => {

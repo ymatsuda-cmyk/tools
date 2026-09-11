@@ -24,7 +24,6 @@ import {
   mergeTag,
   deleteVideo,
   registerPageSources,
-  scheduleRebuild,
 } from './lib/gas.js'
 import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
@@ -851,7 +850,6 @@ async function togglePublic(item, btn) {
   try {
     await setPublic(item.key, next)
     setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
-    scheduleRebuild('setPublic')
   } catch (err) {
     paint(before)
     detail.detail = { ...detail.detail, isPublic: before }
@@ -991,7 +989,6 @@ async function runGenerateAll(item) {
     detail.busyStage = null
     paintDetail()
     reportTags(tagReport)
-    scheduleRebuild('generateAll')
   } catch (err) {
     detail.busyStage = null
     paintDetail()
@@ -1017,7 +1014,6 @@ async function runStage(item, stageId) {
     detail.busyStage = null
     paintDetail()
     reportTags(tagReport)
-    scheduleRebuild('regenerate:' + stageId)
   } catch (err) {
     detail.busyStage = null
     paintDetail()
@@ -1685,7 +1681,6 @@ async function runBulkGenerate() {
         bar.innerHTML = ''
         alert(`${i + 1}/${targets.length}件まで処理したところで1日の利用上限に達しました。\n日付が変わってから残りを実行してください。`)
         ideasState.phase = 'idle'
-        if (i > 0) scheduleRebuild('bulkGenerate')
         refresh()
         return
       }
@@ -1694,7 +1689,6 @@ async function runBulkGenerate() {
 
   bar.innerHTML = ''
   ideasState.phase = 'idle' // アイデア一覧を作り直させる
-  scheduleRebuild('bulkGenerate')
   refresh()
   if (failures.length) alert(`${failures.length}件でエラーが出ました:\n\n` + failures.slice(0, 8).join('\n'))
 }
