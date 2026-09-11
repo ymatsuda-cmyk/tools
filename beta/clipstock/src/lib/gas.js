@@ -164,7 +164,9 @@ export function scheduleRebuild(reason) {
   rebuildTimer = setTimeout(() => {
     const label = [...rebuildReasons].join(',')
     rebuildReasons.clear()
-    callGas('requestRebuild', { reason: label }).catch(() => {})
+    callGas('requestRebuild', { reason: label })
+      .then(() => console.info('[clipstock] 一覧JSONの作り直しを依頼しました:', label))
+      .catch((err) => console.warn('[clipstock] 作り直しの依頼に失敗:', err.message || err))
   }, 3000)
 }
 
