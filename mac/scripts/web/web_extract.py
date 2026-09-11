@@ -16,6 +16,7 @@
 
 環境変数:
   NOTION_TOKEN     Notion Integration Token（必須）
+  WEB_NOTION_TOKEN web記事DBを別の統合に接続しているときのトークン（あればこちらを優先）
   WEB_ENV_FILE     環境変数を読み込むファイルのパス（既定: ~/.video_notion_sync.env）
   WEB_DB_ID        対象データベースID（既定: web記事DB）
 
@@ -62,7 +63,8 @@ def load_env():
 load_env()
 
 NOTION_API = "https://api.notion.com/v1"
-NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
+# web記事DBを別の統合（例:「サイト」）に接続している場合は WEB_NOTION_TOKEN を使う
+NOTION_TOKEN = os.environ.get("WEB_NOTION_TOKEN") or os.environ.get("NOTION_TOKEN", "")
 WEB_DB_ID = os.environ.get("WEB_DB_ID", "4130e7a535dc83509c9a01cd6ac0a6a7")
 
 # Notion側のカラム名。build_clipstock_json.py の PROP_* と一致させること
@@ -104,6 +106,7 @@ def warn_not_found(resp):
         return
     print(f"    → DBを統合に共有してください（NotionでDBを開く → 右上の ••• → 接続 → 統合を追加）\n"
           f"      インラインDBのときは親ページに接続を追加します。\n"
+          f"      別の統合に接続済みなら WEB_NOTION_TOKEN にその統合のトークンを設定しても良いです。\n"
           f"      現在の WEB_DB_ID={WEB_DB_ID}（DBのフルページURLの ID と一致しているか確認）")
 
 
