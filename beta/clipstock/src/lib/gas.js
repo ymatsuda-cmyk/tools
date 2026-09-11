@@ -27,17 +27,37 @@ async function callGas(action, params = {}) {
   }
 
   const source = params.pageId ? pageSources.get(params.pageId) : null
+  const body = JSON.stringify({ action, token: config.accessToken, ...params, ...(source ? { source } : {}) })
 
-  const res = await fetch(config.gasUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, token: config.accessToken, ...params, ...(source ? { source } : {}) }),
-  })
-
-  if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
-  const json = await res.json()
+  const json = await postWithRetry(config.gasUrl, body)
   if (!json.ok) throw new Error(json.error || 'GAS がエラーを返しました')
   return json.data
+}
+
+async function post(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body,
+  })
+  if (!res.ok) throw new Error(`GAS HTTP ${res.status}`)
+  return res.json()
+}
+
+/**
+ * 通信そのものが失敗したときだけ一度やり直す。
+ * GAS は再デプロイ直後などに 404 や "Failed to fetch"(リダイレクト先がCORSを返さない)を
+ * 返すことがあり、Notion への保存は成功しているのに失敗表示になっていた。
+ * どの action も同じ値を書き直すだけなので、投げ直しても副作用は増えない。
+ * Notion 由来のエラーは ok:false で返ってくるため、ここでは再送しない。
+ */
+async function postWithRetry(url, body) {
+  try {
+    return await post(url, body)
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    return post(url, body)
+  }
 }
 
 /** 一覧を Notion から直接取得する(index-video.json のような中間ファイルは使わない) */
