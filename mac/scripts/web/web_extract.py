@@ -20,6 +20,7 @@
   WEB_NOTION_TOKEN web記事DBを別の統合に接続しているときのトークン（あればこちらを優先）
   WEB_ENV_FILE     環境変数を読み込むファイルのパス（既定: ~/.video_notion_sync.env）
   WEB_DB_ID        対象データベースID（既定: web記事DB）
+  CLIPSTOCK_OUT_DIR index.json の出力先（--clipstock-out より弱い）
 
 必要なパッケージ:
   pip install requests beautifulsoup4
@@ -45,7 +46,17 @@ import requests
 
 JST = timezone(timedelta(hours=9))
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[2]
+
+
+def find_repo_root():
+    """リポジトリの位置を探す。~/scripts などにコピーして使うことがあるため。"""
+    for d in (SCRIPT_DIR, *SCRIPT_DIR.parents):
+        if (d / ".git").exists() or (d / "data" / "clipstock").is_dir():
+            return d
+    return None
+
+
+REPO_ROOT = find_repo_root()
 
 # ---------------------------------------------------------------- 環境変数
 
@@ -79,13 +90,29 @@ STATUS_EMPTY = "空欄"
 STATUS_RETRY = "再取得"
 
 CLIPSTOCK_BUILDER = SCRIPT_DIR.parent / "video" / "build_clipstock_json.py"
-CLIPSTOCK_OUT_DIR = REPO_ROOT / "data" / "clipstock"
+
+
+def clipstock_out_dir():
+    """index.json の書き出し先。見つけられなければ None。"""
+    env = os.environ.get("CLIPSTOCK_OUT_DIR")
+    if env:
+        return Path(env).expanduser()
+    return REPO_ROOT / "data" / "clipstock" if REPO_ROOT else None
 
 BROWSER_HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "ja,en;q=0.8",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
 }
+# 展開しないと記事URLが分からない短縮リンク
+SHORT_LINK_HOSTS = ("share.google", "goo.gl", "bit.ly", "t.co", "lnkd.in", "amzn.to",
+                    "tinyurl.com", "ow.ly", "buff.ly")
 MAX_HTML_BYTES = 5 * 1024 * 1024
 NOTION_TEXT_LIMIT = 2000
 NOTION_URL_LIMIT = 2000
@@ -366,6 +393,19 @@ def update_page_props(page_id, *, title=None, url=None, thumbnail=None,
 
 # ---------------------------------------------------------------- HTML取得
 
+def resolve_short_link(url):
+    """短縮URLを最終的なURLへ展開する。中身が取れなくてもURL欄は正しくしておく。"""
+    host = urlparse(url).netloc.lower()
+    if not any(host == h or host.endswith("." + h) for h in SHORT_LINK_HOSTS):
+        return url
+    try:
+        with requests.get(url, headers=BROWSER_HEADERS, timeout=30,
+                          allow_redirects=True, stream=True) as resp:
+            return resp.url or url
+    except requests.RequestException:
+        return url
+
+
 def fetch_html(url):
     """HTMLを取得して (本文, 最終URL) を返す。取れなければ (None, None)。"""
     if not re.match(r"^https?://", url or "", re.I):
@@ -379,6 +419,8 @@ def fetch_html(url):
     with resp:
         if resp.status_code != 200:
             print(f"    ⚠️ HTTP {resp.status_code}: {url[:100]}")
+            if resp.status_code in (401, 403, 429):
+                print("      → ボット対策で拒否されています。このサイトは自動取得できません")
             return None, None
         ctype = resp.headers.get("Content-Type", "")
         if ctype and "html" not in ctype.lower() and "xml" not in ctype.lower():
@@ -674,10 +716,17 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     if not need_body:
         print("  → 本文はあるのでサムネイルとタイトルだけ補います")
 
+    resolved = resolve_short_link(url)
+    if resolved != url:
+        print(f"    → 短縮URLを展開: {resolved[:100]}")
+
     # サムネイル目的だけなら1ページ目で足りる
-    articles = collect_articles(url, max_pages=max_pages if need_body else 1, delay=delay)
+    articles = collect_articles(resolved, max_pages=max_pages if need_body else 1, delay=delay)
     if not articles:
         print("  ❌ 本文を取得できませんでした。スキップ")
+        if resolved != url:
+            update_page_props(page_id, url=resolved)   # 中身が取れなくてもURLだけは正しくしておく
+            print("  ✅ URLだけ展開後のものに更新しました")
         return False
 
     total_chars = sum(len(t) for art in articles for _, t in art["sections"])
@@ -712,15 +761,19 @@ def process_page(page, *, set_status_name, force, max_pages, delay):
     return True
 
 
-def rebuild_clipstock_index():
+def rebuild_clipstock_index(out_dir):
     """一覧用の index.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
         print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため index.json は更新しません")
         return
-    print(f"\nindex.json を更新中: {CLIPSTOCK_OUT_DIR}")
+    if out_dir is None:
+        print("⚠️ 出力先を決められないため index.json は更新しません"
+              "（CLIPSTOCK_OUT_DIR または --clipstock-out で data/clipstock を指定してください）")
+        return
+    print(f"\nindex.json を更新中: {out_dir}")
     try:
         result = subprocess.run(
-            [sys.executable, str(CLIPSTOCK_BUILDER), "--out", str(CLIPSTOCK_OUT_DIR)],
+            [sys.executable, str(CLIPSTOCK_BUILDER), "--out", str(out_dir)],
             capture_output=True, text=True, timeout=900)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         print(f"⚠️ index.json の更新に失敗: {type(e).__name__}: {e}")
@@ -731,7 +784,7 @@ def rebuild_clipstock_index():
     if result.returncode != 0:
         print(f"⚠️ index.json の更新に失敗: {(result.stderr or '').strip()[-300:]}")
     else:
-        print(f"✅ index.json を更新しました: {CLIPSTOCK_OUT_DIR / 'index.json'}")
+        print(f"✅ index.json を更新しました: {out_dir / 'index.json'}")
 
 
 def main():
@@ -746,6 +799,7 @@ def main():
     ap.add_argument("--max-pages", type=int, default=20, help="たどるページ送りの上限（既定: 20）")
     ap.add_argument("--delay", type=float, default=1.0, help="ページ取得の間隔・秒（既定: 1.0）")
     ap.add_argument("--no-rebuild", action="store_true", help="index.json を作り直さない")
+    ap.add_argument("--clipstock-out", help="index.json の出力先（既定: リポジトリの data/clipstock）")
     ap.add_argument("--list-db", action="store_true", help="統合がアクセスできるDBを一覧する")
     ap.add_argument("--dry-run", action="store_true", help="対象一覧を表示するだけ")
     args = ap.parse_args()
@@ -798,7 +852,8 @@ def main():
           f"{datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S JST')}\n{'='*60}\n")
 
     if ok_count and not args.no_rebuild:
-        rebuild_clipstock_index()
+        out_dir = Path(args.clipstock_out).expanduser() if args.clipstock_out else clipstock_out_dir()
+        rebuild_clipstock_index(out_dir)
     return 0
 
 
