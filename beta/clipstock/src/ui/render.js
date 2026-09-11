@@ -420,11 +420,11 @@ function renderPanel(item, state, tab, d) {
         : emptyPanel(item, '分野別要約', 'fields')
     case 'apply':
       return d.apply
-        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply', publishable: canEdit })
+        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply', publishable: state.canEdit })
         : emptyPanel(item, '応用', 'apply')
     case 'ideas':
       return d.ideas
-        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas', publishable: canEdit })
+        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas', publishable: state.canEdit })
         : emptyPanel(item, '活用アイデア', 'ideas')
     case 'memo':
       return `<textarea id="memo-input" class="memo-input" placeholder="気づいたこと、あとで試すこと、関連する話などを自由に">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
