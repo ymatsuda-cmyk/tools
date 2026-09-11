@@ -155,8 +155,8 @@ def get_valid_status_options():
     return {o["name"] for o in prop.get("select", {}).get("options", [])}
 
 
-def build_status_filter(statuses, valid_options):
-    """状態フィルタを組み立てる。'空欄' は is_empty に変換する。
+def build_status_conditions(statuses, valid_options):
+    """状態のOR条件を平らなリストで返す。'空欄' は is_empty に変換する。
 
     DBに存在しない選択肢を equals に渡すとNotion APIが400を返すため、
     定義済みの選択肢だけを条件に残す。
@@ -171,9 +171,7 @@ def build_status_filter(statuses, valid_options):
                   f"（利用可能: {', '.join(sorted(valid_options))}）")
             continue
         conds.append({"property": PROP_STATUS, "select": {"equals": s}})
-    if not conds:
-        return None
-    return conds[0] if len(conds) == 1 else {"or": conds}
+    return conds
 
 
 def query_pages_by_status(statuses):
@@ -181,11 +179,14 @@ def query_pages_by_status(statuses):
 
     「未取得」は本文を取れなかった印なので、明示的に指定されない限り外す。
     さもないとサムネイルが空のままなので、毎回同じページを取りに行くことになる。
+
+    Notionの複合フィルタは and/or を2階層までしか入れ子にできない。
+    したがって or の中はプロパティ条件だけを平らに並べる。
     """
     valid_options = get_valid_status_options()
-    filter_ = build_status_filter(statuses, valid_options)
-    no_thumb = {"property": PROP_THUMB, "url": {"is_empty": True}}
-    filter_ = no_thumb if filter_ is None else {"or": [filter_, no_thumb]}
+    conds = build_status_conditions(statuses, valid_options)
+    conds.append({"property": PROP_THUMB, "url": {"is_empty": True}})
+    filter_ = conds[0] if len(conds) == 1 else {"or": conds}
     if STATUS_FAILED not in statuses and (valid_options is None or STATUS_FAILED in valid_options):
         filter_ = {"and": [filter_,
                            {"property": PROP_STATUS, "select": {"does_not_equal": STATUS_FAILED}}]}
