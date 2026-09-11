@@ -179,7 +179,7 @@
 
   .tile{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    background:var(--tile-bg,#F5F3EE);color:var(--tile-fg,#3D3A34);
+    background:var(--surface-2);color:var(--text-muted);
   }
   .tile svg{
     width:36%;height:auto;min-width:26px;max-width:60px;
@@ -187,18 +187,28 @@
   }
   .card:hover .tile svg{transform:scale(1.1);}
 
+  /* カテゴリごとの背景色とアイコン色。ダーク背景でも視認できる彩度・明度に調整 */
+  .tile.cat-ai      {background:#2A2440;color:#A79CE8;}
+  .tile.cat-excel   {background:#1D3323;color:#7FC48D;}
+  .tile.cat-youtube {background:#3A2020;color:#E2807F;}
+  .tile.cat-site    {background:#1D2C3D;color:#7FB0E0;}
+  .tile.cat-code    {background:#16332F;color:#6FC9BC;}
+  .tile.cat-doc     {background:#3A2A18;color:#E0A05F;}
+  .tile.cat-db      {background:#15302E;color:#59C2B0;}
+  .tile.cat-cloud   {background:#1D2C3D;color:#7FB0E0;}
+  .tile.cat-chat    {background:#3A1F2C;color:#E0709D;}
+  .tile.cat-calendar{background:#3A311A;color:#E0BA5F;}
+
   .type-badge{
     position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
     background:rgba(20,23,28,0.8);display:flex;align-items:center;justify-content:center;
     font-size:11px;color:var(--text-secondary);z-index:2;
   }
   .type-badge svg{width:13px;height:13px;}
-  .type-badge.on-tile{background:rgba(255,255,255,0.7);color:#2A2E36;}
   .run-badge{
     position:absolute;bottom:8px;left:8px;font-size:10px;padding:3px 7px;border-radius:5px;
     background:rgba(20,23,28,0.8);color:var(--text-secondary);z-index:2;
   }
-  .run-badge.on-tile{background:rgba(255,255,255,0.7);color:#2A2E36;}
   .card-actions{position:absolute;top:8px;left:8px;display:none;gap:4px;z-index:3;}
   .card:hover .card-actions{display:flex;}
   .mini-btn{
@@ -347,8 +357,8 @@
       <div class="err" id="err-url">http:// または https:// から始まるURLを入力してください</div>
     </div>
     <div class="field">
-      <label>カテゴリ</label>
-      <input type="text" id="f-category" placeholder="例: AI / 資料 / アプリ">
+      <label>タグ</label>
+      <input type="text" id="f-tag" placeholder="例: AI / 資料 / アプリ">
     </div>
     <div class="field">
       <label>実行方法</label>
@@ -357,6 +367,23 @@
         <option value="download">ダウンロードして使う</option>
         <option value="local">ローカル実行</option>
       </select>
+    </div>
+    <div class="field">
+      <label>アイコン種別</label>
+      <select id="f-category">
+        <option value="">自動判定（URLから推測）</option>
+        <option value="ai">AI・ボット</option>
+        <option value="excel">Excel・表計算</option>
+        <option value="youtube">動画・YouTube</option>
+        <option value="site">サイト・リンク</option>
+        <option value="code">コード・開発</option>
+        <option value="doc">資料・ドキュメント</option>
+        <option value="db">データベース</option>
+        <option value="cloud">クラウド</option>
+        <option value="chat">チャット</option>
+        <option value="calendar">勤怠・カレンダー</option>
+      </select>
+      <div class="hint">サムネイル画像が無いときに表示されるアイコンと背景色</div>
     </div>
     <div class="field">
       <label>カードの大きさ</label>
@@ -632,7 +659,11 @@ const ICON_PATHS = {
   app:'<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
   book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
   chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'
+  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  code:'<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/><path d="m14 4-4 16"/>',
+  database:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9"/>',
+  calendar:'<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M16 2v4"/>'
 };
 
 function svgIcon(name){
@@ -640,46 +671,49 @@ function svgIcon(name){
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
 
-/* カテゴリ名からアイコンを決めるルール（上から順に判定） */
-const CATEGORY_ICON_RULES = [
-  { re:/(bot|ボット|チャット|chat|問い合わせ)/i, icon:'bot' },
-  { re:/(要約|ai|llm|gpt|機械学習|\bml\b)/i,      icon:'brain' },
-  { re:/(excel|エクセル|表|集計|売上|スプレッド|sheet|台帳)/i, icon:'table' },
-  { re:/(動画|video|youtube|映像|解説)/i,          icon:'video' },
-  { re:/(分析|グラフ|chart|dashboard|ダッシュボード|レポート|report)/i, icon:'chart' },
-  { re:/(資料|ドキュメント|document|マニュアル|仕様|手順)/i, icon:'file' },
-  { re:/(議事|メモ|note|ブック|book|ナレッジ)/i,    icon:'book' },
-  { re:/(アプリ|app|システム)/i,                   icon:'app' },
-  { re:/(ツール|tool|開発|運用|保守)/i,            icon:'tool' },
-  { re:/(サイト|site|web|リンク|ポータル)/i,       icon:'globe' },
-  { re:/(フォルダ|共有|ストレージ|drive)/i,        icon:'folder' }
-];
+/* アイコン種別。キーは入力フォームの値と .tile の cat-* クラスに対応する */
+const CATEGORY_ICON = {
+  ai:'bot', excel:'table', youtube:'video', site:'globe', code:'code',
+  doc:'file', db:'database', cloud:'cloud', chat:'chat', calendar:'calendar'
+};
 const TYPE_ICON_NAME = { youtube:'play', excel:'file', site:'globe' };
-const TILE_PALETTE = [
-  { bg:'#CFE0FB', fg:'#1F5FD0' },
-  { bg:'#C8EBCC', fg:'#1E7A38' },
-  { bg:'#F8CFD4', fg:'#C0392F' },
-  { bg:'#F5F3EE', fg:'#3D3A34' },
-  { bg:'#FBE3C2', fg:'#B0700F' },
-  { bg:'#E3D6F7', fg:'#6B3FC4' },
-  { bg:'#CDEFF0', fg:'#12797E' },
-  { bg:'#F6E7A8', fg:'#877007' }
-];
 
-function hashString(s){
-  let h = 0;
-  for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
-  return h;
+/** URLから最も近いカテゴリを推測する。手動で選び直すことも常に可能 */
+function detectCategory(url){
+  const u = String(url || '').toLowerCase();
+  if(/youtube\.com|youtu\.be/.test(u)) return 'youtube';
+  if(/office\.com|sharepoint\.com|docs\.google\.com\/spreadsheets|\.xlsx|\.xls\b/.test(u)) return 'excel';
+  if(/github\.com|gitlab\.com|codepen\.io|replit\.com/.test(u)) return 'code';
+  if(/docs\.google\.com\/document|notion\.so|confluence|\.pdf/.test(u)) return 'doc';
+  if(/calendar\.google|attendance\.moneyforward|勤怠/.test(u)) return 'calendar';
+  if(/drive\.google|dropbox\.com|box\.com|onedrive/.test(u)) return 'cloud';
+  if(/slack\.com|discord\.com|chat\.openai\.com|gemini\.google/.test(u)) return 'chat';
+  if(/kaggle\.com|colab\.research\.google|huggingface\.co/.test(u)) return 'ai';
+  if(/mysql|postgres|supabase\.com|firebase\.google/.test(u)) return 'db';
+  return 'site';
 }
 
-/** 画像・動画が無いカード用に、カテゴリからタイル色とアイコンを決める */
-function tileVisual(r){
-  const cat = (r.category || '').trim();
-  const hay = cat + ' ' + (r.title || '');
-  const rule = CATEGORY_ICON_RULES.find(x => x.re.test(cat)) || CATEGORY_ICON_RULES.find(x => x.re.test(hay));
-  const icon = rule ? rule.icon : (TYPE_ICON_NAME[r.type] || 'globe');
-  const palette = TILE_PALETTE[hashString(cat || r.type || 'site') % TILE_PALETTE.length];
-  return { icon, ...palette };
+/* URLで判別できないときに、タグ名とタイトルから推測するルール（上から順に判定） */
+const CATEGORY_TEXT_RULES = [
+  { re:/(bot|ボット|チャット|chat|問い合わせ)/i, cat:'chat' },
+  { re:/(要約|ai|llm|gpt|機械学習|\bml\b)/i,     cat:'ai' },
+  { re:/(excel|エクセル|表|集計|売上|スプレッド|sheet|台帳)/i, cat:'excel' },
+  { re:/(動画|video|youtube|映像|解説)/i,        cat:'youtube' },
+  { re:/(コード|code|開発|運用|保守|ツール|tool)/i, cat:'code' },
+  { re:/(資料|ドキュメント|document|マニュアル|仕様|手順|議事|メモ|レポート|report)/i, cat:'doc' },
+  { re:/(データベース|database|\bdb\b|分析|集約)/i, cat:'db' },
+  { re:/(クラウド|cloud|共有|ストレージ|drive|フォルダ)/i, cat:'cloud' },
+  { re:/(勤怠|カレンダー|calendar|予定|スケジュール)/i, cat:'calendar' }
+];
+
+/** 画像・動画が無いカードに出すアイコン種別。手動指定 > URL判定 > 文字列判定 */
+function categoryOf(r){
+  if(r.category_icon && CATEGORY_ICON[r.category_icon]) return r.category_icon;
+  const byUrl = detectCategory(r.url);
+  if(byUrl !== 'site') return byUrl;
+  const hay = (r.category || '') + ' ' + (r.title || '');
+  const rule = CATEGORY_TEXT_RULES.find(x => x.re.test(hay));
+  return rule ? rule.cat : 'site';
 }
 const DEFAULT_CONFIG = {
   title:'マイリソース',
@@ -820,21 +854,20 @@ function renderChips(){
 
 function thumbHTML(r){
   const isVideo = r.preview && /\.mp4($|\?)/i.test(r.preview);
-  const tile = (!isVideo && !r.thumb) ? tileVisual(r) : null;
+  const cat = (!isVideo && !r.thumb) ? categoryOf(r) : null;
   // 動画プレビューはホバーを待たず常に再生させたいので、ベース側に置く
   const base = isVideo
     ? `<video src="${r.preview}" muted loop playsinline autoplay preload="auto"></video>`
     : (r.thumb
         ? `<img src="${r.thumb}" alt="">`
-        : `<div class="tile" style="--tile-bg:${tile.bg};--tile-fg:${tile.fg}">${svgIcon(tile.icon)}</div>`);
+        : `<div class="tile cat-${cat}">${svgIcon(CATEGORY_ICON[cat])}</div>`);
   const hover = (!isVideo && r.preview) ? `<img src="${r.preview}" alt="">` : '';
-  const onTile = tile ? ' on-tile' : '';
   return `
     <div class="thumb${hover ? ' has-hover' : ''}">
       <div class="base-layer${isVideo ? ' always-on' : ''}">${base}</div>
       ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
-      <div class="type-badge${onTile}">${svgIcon(TYPE_ICON_NAME[r.type] || 'globe')}</div>
-      <div class="run-badge mono${onTile}">${RUN_LABEL[r.runType]||'Web'}</div>
+      <div class="type-badge">${svgIcon(TYPE_ICON_NAME[r.type] || 'globe')}</div>
+      <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
       <div class="card-actions">
         <button class="mini-btn edit" data-edit="${r.id}" title="編集">✎</button>
         <button class="mini-btn del" data-del="${r.id}" title="削除">✕</button>
@@ -966,7 +999,8 @@ function openItemModal(id){
   F('itemModalTitle').textContent = r ? 'リンクを編集' : 'リンクを追加';
   F('f-title').value = r ? (r.title||'') : '';
   F('f-url').value = r ? (r.url||'') : '';
-  F('f-category').value = r ? (r.category||'') : '';
+  F('f-tag').value = r ? (r.category||'') : '';
+  F('f-category').value = r ? (r.category_icon||'') : '';
   F('f-runtype').value = r ? (r.runType||'web') : 'web';
   F('f-cardsize').value = r ? (r.cardSize||'normal') : 'normal';
   F('f-thumb').value = r ? (r.thumb||'') : '';
@@ -988,7 +1022,8 @@ document.getElementById('saveItem').onclick = async ()=>{
 
   const data = {
     title, url,
-    category: F('f-category').value.trim(),
+    category: F('f-tag').value.trim(),
+    category_icon: F('f-category').value || null,
     runType: F('f-runtype').value,
     cardSize: F('f-cardsize').value,
     thumb: F('f-thumb').value.trim() || null,
