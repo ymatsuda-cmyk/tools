@@ -8,7 +8,6 @@ import { loadSettings, connectionOf } from './llm-settings.js'
 const MAX_LEN = 10 // ノードの文字数上限。超える分は「…」で丸める
 const MAX_CHILDREN = 8
 const MAX_DEPTH = 2 // 中心テーマを0とした階層の深さ(合計3階層)
-const COLORS = ['purple', 'green', 'orange', 'yellow', 'pink']
 
 let host = null // mount()は1度だけ。この要素をタブのDOMへ移動して使い回す
 let changeHandler = null
@@ -58,7 +57,8 @@ const INSTRUCTION = `次の原文を日本語のマインドマップに構造�
 制約:
 - すべてのtextは日本語10文字以内。超えそうなら削って体言止めにする
 - 第1階層は3〜7個、第2階層は各0〜4個、3階層まで
-- 原文にない情報を足さない`
+- 原文にない情報を足さない
+- 色は付けない(colorは出力しない)`
 
 /** 要約をAIへ渡すプレーンテキストにする */
 function summaryText(item, summary) {
@@ -84,12 +84,12 @@ function extractJson(text) {
   return JSON.parse(trimmed.slice(start, end + 1))
 }
 
-/** AIの出力を文字数・階層・色の制約に収める */
+/** AIの出力を文字数・階層の制約に収める(色は付けない) */
 function sanitizeNode(raw, depth) {
   const children = depth < MAX_DEPTH && Array.isArray(raw?.children)
     ? raw.children.map((c) => sanitizeNode(c, depth + 1))
     : []
-  return node(raw?.text, COLORS.includes(raw?.color) ? raw.color : null, children)
+  return node(raw?.text, null, children)
 }
 
 /** 要約をもとにAIでマインドマップのツリーを生成する */
