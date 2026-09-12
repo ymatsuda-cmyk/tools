@@ -231,36 +231,45 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     const at = indexes[pos]
     const original = splitPrefix(lines[at]).label.trim()
 
+    // SVGのforeignObject内は文字入力を受け付けないブラウザがあるため、
+    // 枝と同じ位置にHTMLの入力欄を重ねて編集する
+    const rect = div.getBoundingClientRect()
+    const base = container.getBoundingClientRect()
+    const scale = div.offsetWidth ? rect.width / div.offsetWidth : 1
+    const input = document.createElement('input')
+    input.className = 'mm-editor'
+    input.value = original
+    input.style.left = `${rect.left - base.left}px`
+    input.style.top = `${rect.top - base.top}px`
+    input.style.minWidth = `${Math.max(rect.width + 16, 80)}px`
+    input.style.height = `${Math.max(rect.height, 20)}px`
+    input.style.fontSize = `${parseFloat(getComputedStyle(div).fontSize || '14') * scale}px`
+    container.appendChild(input)
+
     editing = true
-    div.textContent = original
-    div.contentEditable = 'true'
-    div.classList.add('mm-editing')
-    div.focus()
-    const range = document.createRange()
-    range.selectNodeContents(div)
-    const selection = window.getSelection()
-    selection.removeAllRanges()
-    selection.addRange(range)
+    input.focus()
+    input.select()
 
     const finish = (commit) => {
       if (!editing) return
       editing = false
-      const text = div.textContent.replace(/\s+/g, ' ').trim()
+      const text = input.value.replace(/\s+/g, ' ').trim()
+      input.remove()
       if (commit && text && text !== original) {
         const next = [...lines]
         next[at] = splitPrefix(next[at]).prefix + text
         apply(next.join('\n'), pos, { changed: true })
-      } else {
-        apply(state.markdown, pos)
       }
+      container.focus({ preventScroll: true })
     }
 
-    div.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', (e) => {
       e.stopPropagation()
+      if (e.isComposing) return // 変換中のEnterは入力の確定に使わせる
       if (e.key === 'Enter') { e.preventDefault(); finish(true) }
       else if (e.key === 'Escape') { e.preventDefault(); finish(false) }
     })
-    div.addEventListener('blur', () => finish(true), { once: true })
+    input.addEventListener('blur', () => finish(true))
   }
 
   function addNode(kind) {
@@ -286,6 +295,8 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
 
   container.addEventListener('keydown', (e) => {
     if (editing) return
+    // マップにカーソルがある間は、画面側のキー操作へ流さない
+    e.stopPropagation()
     if (e.key === 'ArrowDown') { e.preventDefault(); move(1) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1) }
     else if (e.key === 'ArrowRight') {
