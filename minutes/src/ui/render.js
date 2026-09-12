@@ -342,7 +342,7 @@ export function renderDetailHtml(item, state) {
       ` : activeTab === 'mindmap' ? `
         <span id="mindmap-save-status" class="memo-save-status">${state.mindmapDirty ? "未保存の変更があります" : ""}</span>
         <span style="flex:1"></span>
-        <button class="btn btn-mm-create"><i class="ti ti-sparkles" aria-hidden="true"></i>${state.mindmap ? '要約から作り直す' : '要約から作成'}</button>
+        <button class="btn btn-mm-create"><i class="ti ti-sparkles" aria-hidden="true"></i>${state.mindmap ? 'AIで作り直す' : 'AIで作成'}</button>
         ${state.mindmap ? '<button class="btn btn-mm-save">保存</button>' : ''}
       ` : activeTab === 'memo' ? `
         <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>

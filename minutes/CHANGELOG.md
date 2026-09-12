@@ -9,7 +9,8 @@ Mindmap tab for the detail pane
 ### Release Changes
 
 - Added a "マインドマップ" tab next to サマリ in the detail pane.
-- Added mindmap view module that builds a tree (nodes are 10 chars or fewer) from the summary and renders it with `api/mindmap/mindmap.api.js`.
+- Generate the tree with the active LLM connection (nodes are 10 chars or fewer, 3 levels max); falls back to the summary structure when generation fails.
+- Added mindmap view module that renders the tree with `api/mindmap/mindmap.api.js`.
 - Added Notion「マインドマップ」column (rich_text, JSON) with `saveMindmap` action; the tab shows nothing when the column is empty.
 - Creating from the summary saves the JSON to the column; node edits update the JSON as an unsaved draft and are stored with the 保存 button.
 - Warn before leaving the tab while the mindmap has unsaved edits.

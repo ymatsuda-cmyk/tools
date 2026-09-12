@@ -2,9 +2,13 @@
 // 描画本体は api/mindmap/mindmap.api.js (window.MindMap)。
 // ツリーのJSONはNotionの「マインドマップ」カラムに保存する(保存処理は main.js 側)。
 import { plainTextOf } from './markers.js'
+import { streamChat } from './llm-client.js'
+import { loadSettings, connectionOf } from './llm-settings.js'
 
 const MAX_LEN = 10 // ノードの文字数上限。超える分は「…」で丸める
 const MAX_CHILDREN = 8
+const MAX_DEPTH = 2 // 中心テーマを0とした階層の深さ(合計3階層)
+const COLORS = ['purple', 'green', 'orange', 'yellow', 'pink']
 
 let host = null // mount()は1度だけ。この要素をタブのDOMへ移動して使い回す
 let changeHandler = null
@@ -46,6 +50,70 @@ export function buildTreeFromSummary(item, summary) {
   if (d.topics?.length) children.push(node('論点', 'pink', d.topics.map((x) => node(x))))
 
   return { text: short(item.title) || '議事録', children }
+}
+
+const SYSTEM_PROMPT = `あなたは会議の要約をマインドマップに構造化するアシスタントです。
+必ず次のJSON形式のみで回答してください。前後に説明文やコードフェンスを付けないこと。
+
+{"text":"中心テーマ","children":[{"text":"見出し","color":"green","children":[{"text":"要点"}]}]}
+
+制約:
+- すべてのtextは日本語10文字以内。超えそうなら削って体言止めにする
+- 第1階層は3〜7個、第2階層は各0〜4個、中心テーマを含めて3階層まで
+- colorは purple / green / orange / yellow / pink のいずれか、または省略
+- 要約に無い情報を足さない
+- 日本語で出力する`
+
+/** 要約をAIへ渡すプレーンテキストにする */
+function summaryText(item, summary) {
+  const d = summary?.detail || {}
+  const lines = [`会議名: ${item.title}`]
+  if (summary?.cardSummary) lines.push('サマリ: ' + plainTextOf(summary.cardSummary))
+  ;(d.agenda || []).forEach((a, i) => {
+    lines.push(`議題${i + 1}: ${plainTextOf(a.topic || '')}`)
+    ;(a.points || []).forEach((p) => lines.push('- ' + plainTextOf(p)))
+    if (a.outcome) lines.push('結論: ' + plainTextOf(a.outcome))
+  })
+  if (d.decisions?.length) lines.push('決定事項: ' + d.decisions.map((x) => plainTextOf(x)).join(' / '))
+  if (d.todos?.length) lines.push('ToDo: ' + d.todos.map((t) => plainTextOf(t?.text ?? t)).join(' / '))
+  if (d.topics?.length) lines.push('論点: ' + d.topics.map((x) => plainTextOf(x)).join(' / '))
+  return lines.join('\n')
+}
+
+function extractJson(text) {
+  const trimmed = text.trim()
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('LLM応答からJSONを抽出できませんでした')
+  return JSON.parse(trimmed.slice(start, end + 1))
+}
+
+/** AIの出力を文字数・階層・色の制約に収める */
+function sanitizeNode(raw, depth) {
+  const children = depth < MAX_DEPTH && Array.isArray(raw?.children)
+    ? raw.children.map((c) => sanitizeNode(c, depth + 1))
+    : []
+  return node(raw?.text, COLORS.includes(raw?.color) ? raw.color : null, children)
+}
+
+/** 要約をもとにAIでマインドマップのツリーを生成する */
+export async function generateTreeWithAI(item, summary) {
+  const connection = connectionOf(loadSettings())
+  if (!connection) throw new Error('LLM接続が未設定です。設定から接続先とモデルを追加してください。')
+
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: summaryText(item, summary).slice(0, 30000) },
+  ]
+
+  let full = ''
+  for await (const chunk of streamChat(connection, messages)) {
+    if (chunk.delta) full += chunk.delta
+  }
+
+  const tree = sanitizeNode(extractJson(full), 0)
+  if (!tree.children?.length) throw new Error('ノードが生成されませんでした')
+  return tree
 }
 
 /** 「マインドマップ」カラムの文字列をツリーに戻す。空・壊れていればnull */

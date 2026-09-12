@@ -8,7 +8,7 @@ import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } fro
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
-import { setupMindmapTab, buildTreeFromSummary, parseTree } from './lib/mindmap-view.js'
+import { setupMindmapTab, buildTreeFromSummary, generateTreeWithAI, parseTree } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -692,13 +692,31 @@ function hasUnsavedMindmap(pageId) {
   return draft !== undefined && draft !== (mindmapByKey[pageId] ?? '')
 }
 
-/** 要約からマインドマップを作り直し、そのままNotionの「マインドマップ」カラムへ保存する */
+/** 要約をもとにAIでマインドマップを作り、Notionの「マインドマップ」カラムへ保存する */
 async function createMindmap(target, item, state) {
   const pid = item.notionPageId
-  if (mindmapByKey[pid] && !confirm('現在のマインドマップを要約から作り直します。よろしいですか?')) return
+  if (mindmapByKey[pid] && !confirm('現在のマインドマップをAIで作り直します。よろしいですか?')) return
 
-  const json = JSON.stringify(buildTreeFromSummary(item, state.summary))
-  mindmapDraftByKey[pid] = json
+  const statusEl = target.querySelector('#mindmap-save-status')
+  const createBtn = target.querySelector('.btn-mm-create')
+  if (createBtn) createBtn.disabled = true
+  if (statusEl) statusEl.textContent = 'AIで作成しています...'
+
+  let tree
+  try {
+    tree = await generateTreeWithAI(item, state.summary)
+  } catch (err) {
+    // AIが使えないときも作成できるよう、要約の構造をそのまま使う手段を残す
+    const useLocal = confirm('AIでの生成に失敗しました: ' + (err.message || err) + '\n要約の構成をそのまま使って作成しますか?')
+    if (!useLocal) {
+      if (createBtn) createBtn.disabled = false
+      if (statusEl) statusEl.textContent = mindmapDraftByKey[pid] !== undefined ? '未保存の変更があります' : ''
+      return
+    }
+    tree = buildTreeFromSummary(item, state.summary)
+  }
+
+  mindmapDraftByKey[pid] = JSON.stringify(tree)
   paintDetail(target, item, state)
   await saveMindmapField(target, item)
 }
