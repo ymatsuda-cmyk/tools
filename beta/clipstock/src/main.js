@@ -99,7 +99,7 @@ const selectedSources = new Set()
 let detail = null
 
 // アイデア一覧の状態
-const ideasState = { phase: 'idle', items: [], kind: 'all', shuffleSeed: 0, message: '' }
+const ideasState = { phase: 'idle', items: [], kind: 'all', shuffleSeed: 0, message: '', selected: new Set() }
 
 // ============ 一覧の取得 ============
 
@@ -1376,6 +1376,15 @@ async function paintIdeas() {
     onOpen: (key) => openDetail(key),
     onHide: hideIdea,
     onRank: rankIdea,
+    onSelect: (id, on) => {
+      on ? ideasState.selected.add(id) : ideasState.selected.delete(id)
+      paintIdeas()
+    },
+    onClearSelect: () => {
+      ideasState.selected.clear()
+      paintIdeas()
+    },
+    onBulkRank: bulkRankIdeas,
   })
   stageEl.querySelector('.btn-retry')?.addEventListener('click', () => {
     ideasState.phase = 'idle'
@@ -1425,6 +1434,50 @@ async function rankIdea(key, kind, sec, rank) {
     entry.rank = prevRank
     paintIdeas()
     alert('ランクを変えられませんでした: ' + (err.message || err))
+  }
+}
+
+/**
+ * 選んだアイデアにまとめて★を付ける。
+ * 同じ動画・同じ種別の分は1つのテキストにまとめて書き戻す
+ * (1件ずつ保存すると同じプロパティへの上書きが競合し、先に書いた分が消える)。
+ */
+async function bulkRankIdeas(rank) {
+  const targets = ideasState.items.filter((e) => ideasState.selected.has(e.id))
+  if (!targets.length) return
+
+  const prevRanks = new Map(targets.map((e) => [e.id, e.rank]))
+  targets.forEach((e) => { e.rank = rank })
+  ideasState.selected.clear()
+  paintIdeas()
+
+  const groups = new Map()
+  targets.forEach((e) => {
+    const gk = `${e.key}::${e.kind}`
+    if (!groups.has(gk)) groups.set(gk, [])
+    groups.get(gk).push(e)
+  })
+
+  const failed = []
+  for (const [gk, list] of groups) {
+    const [key, kind] = gk.split('::')
+    try {
+      const item = itemOf(key)
+      const cached = getDetailCache(key)
+      const d = isCacheFresh(cached, item?.editedAt) ? cached : setDetailCache(key, await fetchDetail(key))
+      let next = d[kind] ?? ''
+      list.forEach((e) => { next = setSectionRankByHeading(next, e.heading, rank) })
+      await saveField(key, kind, next)
+      setDetailCache(key, { ...d, [kind]: next, updatedAt: new Date().toISOString() })
+    } catch (err) {
+      list.forEach((e) => { e.rank = prevRanks.get(e.id) ?? 0 })
+      failed.push(`${itemOf(key)?.title || key}: ${err.message || err}`)
+    }
+  }
+
+  if (failed.length) {
+    paintIdeas()
+    alert('★を変えられなかったものがあります:\n' + failed.join('\n'))
   }
 }
 

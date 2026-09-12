@@ -1,5 +1,25 @@
 # Change Log
 
+## 1.8.0 - 2026-09-12
+
+### Title
+
+Rate the ideas yourself, one by one or in bulk
+
+### Changes
+
+- Stopped asking the model for a rank on 応用 and 活用. Every generated idea now starts at zero stars, so the ordering reflects your own reading rather than the model's self-assessment.
+- Added multi-select to the idea feed with a bulk star action in the toolbar. Setting or clearing stars applies to every selected idea at once.
+- Grouped the bulk write by video and kind before saving. 応用 and 活用 each pack several ideas into one text property, so saving per idea would overwrite the previous write and lose the earlier stars.
+- Rolled back the stars of any group whose save failed and reported it, leaving the groups that succeeded untouched.
+
+### Affected Files
+
+- `beta/clipstock/src/lib/generate.js`
+- `beta/clipstock/src/main.js`
+- `beta/clipstock/src/ui/render.js`
+- `beta/clipstock/css/styles.css`
+
 ## 1.7.0 - 2026-09-11
 
 ### Title

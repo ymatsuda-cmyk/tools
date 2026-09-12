@@ -513,6 +513,18 @@ export function renderIdeas(container, entries, state, handlers) {
     return
   }
 
+  const selected = state.selected || new Set()
+  const bulkHtml = state.canEdit && selected.size
+    ? `<div class="idea-bulk">
+         <span class="idea-bulk-count">${selected.size}件選択</span>
+         <span class="rank">${[1, 2, 3]
+           .map((n) => `<button class="star bulk-star" data-rank="${n}" aria-label="星${n}をまとめて付ける">★</button>`)
+           .join('')}</span>
+         <button class="btn btn-bulk-clear">★を外す</button>
+         <button class="btn btn-bulk-cancel">選択解除</button>
+       </div>`
+    : ''
+
   container.innerHTML = `
     <div class="idea-toolbar">
       <div class="seg">
@@ -521,6 +533,7 @@ export function renderIdeas(container, entries, state, handlers) {
         <button class="seg-btn ${state.kind === 'ideas' ? 'on' : ''}" data-kind="ideas">面白い活用</button>
       </div>
       <button class="btn btn-shuffle"><i class="ti ti-dice" aria-hidden="true"></i>掘り起こす</button>
+      ${bulkHtml}
     </div>
     <div class="idea-feed">
       ${entries
@@ -530,8 +543,11 @@ export function renderIdeas(container, entries, state, handlers) {
             ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(plainTextOf(splitLabel(p).text))}</li>`).join('')}</ul>`
             : ''
           return `
-        <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}">
-          <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}${rankHtml(e.sec, e.rank, state.canEdit)}</div>
+        <article class="idea ${selected.has(e.id) ? 'selected' : ''}" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}" data-id="${escapeHtml(e.id)}">
+          <div class="idea-kind ${e.kind}">
+            ${state.canEdit ? `<input type="checkbox" class="idea-select" ${selected.has(e.id) ? 'checked' : ''} aria-label="このアイデアを選ぶ" />` : ''}
+            ${e.kind === 'apply' ? 'ビジネス' : '活用'}${rankHtml(e.sec, e.rank, state.canEdit)}
+          </div>
           ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
           <button class="idea-toggle" aria-expanded="false" ${body || points ? '' : 'disabled'}>
             <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
@@ -571,6 +587,14 @@ export function renderIdeas(container, entries, state, handlers) {
     const idea = btn.closest('.idea')
     btn.addEventListener('click', () => handlers.onHide(idea.dataset.key, idea.dataset.kind, Number(idea.dataset.sec)))
   })
+  container.querySelectorAll('.idea-select').forEach((el) => {
+    el.addEventListener('change', () => handlers.onSelect(el.closest('.idea').dataset.id, el.checked))
+  })
+  container.querySelectorAll('.bulk-star').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onBulkRank(Number(btn.dataset.rank)))
+  })
+  container.querySelector('.btn-bulk-clear')?.addEventListener('click', () => handlers.onBulkRank(0))
+  container.querySelector('.btn-bulk-cancel')?.addEventListener('click', handlers.onClearSelect)
 }
 
 /** listIdeas の結果を1件1アイデアのフィード用配列に展開する */

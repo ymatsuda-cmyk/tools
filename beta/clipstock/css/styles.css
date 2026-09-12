@@ -569,6 +569,12 @@ mark { background: var(--highlight); color: inherit; }
 }
 .seg-btn.on { background: var(--accent); color: #fff; }
 
+.idea-bulk { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.idea-bulk-count { font-size: 12px; color: var(--text-secondary); }
+.idea-bulk .btn { font-size: 12px; padding: 4px 10px; }
+.idea-select { width: 14px; height: 14px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.idea.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
 /* 段組みだと1枚開いただけで全列が組み直されるため、位置が動かないグリッドにする */
 .idea-feed {
   display: grid;
