@@ -301,7 +301,8 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
       }
     } else if (e.key === ' ') { e.preventDefault(); startEdit() }
     else if (e.key === 'Tab') { e.preventDefault(); addNode('child') }
-    else if (e.key === 'Enter') { e.preventDefault(); addNode('sibling') }
+    // Enterは編集中の「決定」に使う。同じ階層に足すのはShift+Enter
+    else if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? addNode('sibling') : startEdit() }
   })
 
   paint()

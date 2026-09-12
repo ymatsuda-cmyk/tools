@@ -289,7 +289,7 @@ export function renderDetailHtml(item, state) {
         ? `<textarea id="mindmap-source" class="mindmap-source" spellcheck="false">${escapeHtml(state.mindmap)}</textarea>
            <p class="mindmap-hint">markmap用のMarkdownです。「#」が中心、「##」が大項目、「-」が枝になります。</p>`
         : `<div id="mindmap-host" class="mindmap-host"></div>
-           <p class="mindmap-hint">↑↓で移動、←→で開閉、スペースでその場編集、Tabで子を追加、Enterで同じ階層に追加できます。</p>`,
+           <p class="mindmap-hint">↑↓で移動、←→で開閉、スペースで編集しEnterで決定(Escで取消)、Tabで子を追加、Shift+Enterで同じ階層に追加できます。</p>`,
     memo: `<textarea class="memo-textarea" id="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>`,
     chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
