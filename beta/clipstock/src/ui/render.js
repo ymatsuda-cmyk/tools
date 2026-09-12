@@ -531,7 +531,7 @@ export function renderIdeas(container, entries, state, handlers) {
             : ''
           return `
         <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}">
-          <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}${rankHtml(e.sec, e.rank)}</div>
+          <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}${rankHtml(e.sec, e.rank, state.canEdit)}</div>
           ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
           <button class="idea-toggle" aria-expanded="false" ${body || points ? '' : 'disabled'}>
             <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
@@ -559,6 +559,13 @@ export function renderIdeas(container, entries, state, handlers) {
   })
   container.querySelectorAll('.idea-source').forEach((el) => {
     el.addEventListener('click', () => handlers.onOpen(el.closest('.idea').dataset.key))
+  })
+  container.querySelectorAll('.idea .rank button.star').forEach((btn) => {
+    const idea = btn.closest('.idea')
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handlers.onRank(idea.dataset.key, idea.dataset.kind, Number(idea.dataset.sec), Number(btn.dataset.rank))
+    })
   })
   container.querySelectorAll('.btn-hide').forEach((btn) => {
     const idea = btn.closest('.idea')

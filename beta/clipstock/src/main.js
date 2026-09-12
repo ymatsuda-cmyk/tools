@@ -43,6 +43,7 @@ import {
   setSectionHidden,
   setSectionHiddenByHeading,
   setSectionRank,
+  setSectionRankByHeading,
 } from './lib/sections.js'
 import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
@@ -1374,6 +1375,7 @@ async function paintIdeas() {
     },
     onOpen: (key) => openDetail(key),
     onHide: hideIdea,
+    onRank: rankIdea,
   })
   stageEl.querySelector('.btn-retry')?.addEventListener('click', () => {
     ideasState.phase = 'idle'
@@ -1400,6 +1402,29 @@ async function hideIdea(key, kind, sec) {
     entry.isPublic = true
     paintIdeas()
     alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
+}
+
+/** 一覧からその場で★を付け直す。並びもすぐ入れ替わる */
+async function rankIdea(key, kind, sec, rank) {
+  const entry = ideasState.items.find((e) => e.key === key && e.kind === kind && e.sec === sec)
+  if (!entry) return
+  const prevRank = entry.rank
+  entry.rank = rank
+  paintIdeas()
+  try {
+    const item = itemOf(key)
+    const cached = getDetailCache(key)
+    const d = isCacheFresh(cached, item?.editedAt) ? cached : setDetailCache(key, await fetchDetail(key))
+    const before = d[kind] ?? ''
+    const next = setSectionRankByHeading(before, entry.heading, rank)
+    if (next === before) throw new Error('このアイデアが見つかりません。作り直された可能性があります')
+    await saveField(key, kind, next)
+    setDetailCache(key, { ...d, [kind]: next, updatedAt: new Date().toISOString() })
+  } catch (err) {
+    entry.rank = prevRank
+    paintIdeas()
+    alert('ランクを変えられませんでした: ' + (err.message || err))
   }
 }
 
