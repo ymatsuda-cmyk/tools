@@ -76,19 +76,23 @@ async function post(url, body) {
 
 /**
  * 通信そのものが失敗したときだけやり直す。
- * GAS は再デプロイ直後や連続アクセス時に 404 や "Failed to fetch"(リダイレクト先がCORSを返さない)を
- * 返すことがあり、Notion への保存は成功しているのに失敗表示になっていた。
+ * GAS はリダイレクト先(script.googleusercontent.com/macros/echo)を気まぐれに 404 で返すことがあり、
+ * Notion への保存は成功しているのに失敗表示になっていた。
+ * 一時的なもので投げ直せばほぼ通るため、まず短く1回、それでも駄目なら間を空ける。
  * どの action も同じ値を書き直すだけなので、投げ直しても副作用は増えない。
  * Notion 由来のエラーは ok:false で返ってくるため、ここでは再送しない。
  */
 async function postWithRetry(url, body) {
-  const waits = [1500, 4000, 10000, 20000]
+  const waits = [400, 1500, 4000, 10000, 20000]
   for (let i = 0; ; i++) {
     try {
       return await post(url, body)
     } catch (err) {
-      if (i >= waits.length) throw err
-      console.warn(`[clipstock] GAS通信に失敗。${waits[i] / 1000}秒後に再送します (${i + 1}/${waits.length})`, err.message || err)
+      if (i >= waits.length) {
+        console.warn('[clipstock] GAS通信に失敗しました(再送しきりました)', err.message || err)
+        throw err
+      }
+      console.debug(`[clipstock] GAS通信をやり直します (${i + 1}/${waits.length})`, err.message || err)
       await sleep(waits[i])
     }
   }
