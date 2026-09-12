@@ -228,13 +228,41 @@ def chunk_text(text: str, size: int = BLOCK_LIMIT) -> list[str]:
     return out
 
 
+_schema_cache: dict | None = None
+
+
+def db_schema() -> dict:
+    """DBのプロパティ定義。無いカラムを送るとNotionが400を返すため先に確かめる"""
+    global _schema_cache
+    if _schema_cache is None:
+        _schema_cache = notion("GET", f"databases/{CONTENTS_DB_ID}").get("properties", {})
+    return _schema_cache
+
+
+def title_prop_name() -> str:
+    """title型のカラム名。DBごとに名前が違うことがある"""
+    for name, spec in db_schema().items():
+        if spec.get("type") == "title":
+            return name
+    return PROP_TITLE
+
+
+def keep_existing(props: dict) -> dict:
+    """DBに無いカラムは落とす。任意のカラムが未作成でも取り込みだけは通す"""
+    schema = db_schema()
+    dropped = [k for k in props if k not in schema]
+    if dropped:
+        log(f"   -- DBに無いカラムは送りません: {', '.join(dropped)}")
+    return {k: v for k, v in props.items() if k in schema}
+
+
 def create_page(video: Path, meta: dict, text: str) -> str:
     title = str(meta.get("title") or video.stem)
     tags = [t for t in (meta.get("tags") or []) if t]
     drive_id = meta.get("driveFileId")
 
     props = {
-        PROP_TITLE: {"title": [{"text": {"content": title[:2000]}}]},
+        title_prop_name(): {"title": [{"text": {"content": title[:2000]}}]},
         PROP_FILE: {"rich_text": [{"text": {"content": video.name[:2000]}}]},
         PROP_KIND: {"select": {"name": video.suffix.lower().lstrip(".")}},
         PROP_STATUS: {"select": {"name": STATUS_DONE}},
@@ -244,6 +272,7 @@ def create_page(video: Path, meta: dict, text: str) -> str:
         props[PROP_TAGS] = {"multi_select": [{"name": str(t)[:100]} for t in tags]}
     if drive_id:
         props[PROP_DRIVE] = {"url": f"https://drive.google.com/file/d/{drive_id}/view"}
+    props = keep_existing(props)
 
     children = [
         {
@@ -301,6 +330,7 @@ def run_once(dry_run: bool = False) -> int:
         if dry_run:
             log(f"   (dry-run) タイトル: {meta.get('title') or video.stem}")
             continue
+        text = ""
         try:
             text = transcribe(video)
             if not text.strip():
@@ -314,6 +344,10 @@ def run_once(dry_run: bool = False) -> int:
         except Exception as e:  # noqa: BLE001  1件失敗しても次へ進む
             log(f"   !! 失敗: {type(e).__name__}: {e}")
             try:
+                FAILED.mkdir(parents=True, exist_ok=True)
+                # 文字起こしはやり直すと時間がかかるので、取れていれば残す
+                if text.strip():
+                    (FAILED / f"{video.stem}.txt").write_text(text, encoding="utf-8")
                 move_to(video, FAILED)
                 if sidecar:
                     move_to(sidecar, FAILED)

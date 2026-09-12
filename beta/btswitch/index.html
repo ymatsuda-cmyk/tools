@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>イヤホン切替</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="./css/styles.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <i class="ti ti-headphones brand-icon" aria-hidden="true"></i>
+    <span class="brand">Soundcore Liberty 2 Pro</span>
+    <span id="status" class="status"></span>
+    <button id="reload" class="btn-ghost" aria-label="更新"><i class="ti ti-refresh" aria-hidden="true"></i></button>
+    <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
+  </header>
+
+  <main class="stage">
+    <p class="lead">つなぎたい端末を選ぶと、いま使っている端末が自動で切断して切り替わります。</p>
+    <div id="devices" class="devices"></div>
+    <div class="actions">
+      <button id="release" class="btn"><i class="ti ti-device-mobile" aria-hidden="true"></i>すべて切断(スマホで使う)</button>
+    </div>
+    <h2 class="section">履歴</h2>
+    <ul id="history" class="history"></ul>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
