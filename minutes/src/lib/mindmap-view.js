@@ -217,8 +217,14 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
   async function apply(nextMarkdown, cursorPos, opts = {}) {
     const folds = all.map((n) => (n.payload?.fold ? 1 : 0))
     const nextRoot = toRoot(nextMarkdown)
+    // 入れ替え前の何番目にあたるかを引いて、開閉を新しい木へ写す
+    const oldPos = (i) => {
+      if (opts.insertedAt != null) return i < opts.insertedAt ? i : i === opts.insertedAt ? -1 : i - 1
+      if (opts.removedAt != null) return i < opts.removedAt ? i : i + opts.removedCount
+      return i
+    }
     contentNodes(nextRoot).forEach((node, i) => {
-      const from = opts.insertedAt == null || i < opts.insertedAt ? i : i === opts.insertedAt ? -1 : i - 1
+      const from = oldPos(i)
       node.payload = { ...(node.payload || {}), fold: from >= 0 ? folds[from] || 0 : 0 }
     })
 
@@ -331,6 +337,20 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     apply(next.join('\n'), endPos + 1, { changed: true, edit: true, insertedAt: endPos + 1 })
   }
 
+  /** カーソルの枝を、ぶら下がっている分ごと削除する */
+  function removeNode() {
+    if (!editable || editing) return
+    const pos = posOf(current)
+    if (pos <= 0) return // 中心テーマは消さない
+    const endPos = subtreeEnd(lines, indexes, pos)
+    const count = endPos - pos + 1
+    if (count > 1 && !confirm(`この枝と、ぶら下がる${count - 1}件を削除します。よろしいですか?`)) return
+
+    const next = [...lines]
+    next.splice(indexes[pos], indexes[endPos] - indexes[pos] + 1)
+    apply(next.join('\n'), pos - 1, { changed: true, removedAt: pos, removedCount: count })
+  }
+
   svg.addEventListener('click', (e) => {
     const g = e.target.closest('g.markmap-node')
     const node = g && window.d3?.select(g).datum()
@@ -357,6 +377,7 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
       }
     } else if (e.key === ' ') { e.preventDefault(); startEdit() }
     else if (e.key === 'Tab') { e.preventDefault(); addNode('child') }
+    else if (e.key === 'Delete') { e.preventDefault(); removeNode() }
     // 編集中のEnterは入力欄側で「決定」に使う
     else if (e.key === 'Enter') { e.preventDefault(); addNode('sibling') }
   })
