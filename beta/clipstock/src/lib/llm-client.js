@@ -25,21 +25,32 @@ export async function fetchModels(s, signal) {
 export async function* streamChat(s, messages, signal) {
   const isOllamaLike = s.baseUrl?.includes('ngrok')
 
-  const res = await fetch(`${s.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: headers(s),
-    signal,
-    body: JSON.stringify({
-      model: s.model,
-      messages,
-      stream: true,
-      temperature: s.temperature,
-      // num_ctx はOllama独自のパラメータ。OpenAI互換API標準には存在せず、
-      // Gemini等に送ると「Unknown name "num_ctx"」でHTTP 400になる。
-      ...(isOllamaLike ? { num_ctx: s.numCtx } : {}),
-      ...(isOllamaLike && typeof s.think === 'boolean' ? { think: s.think } : {}),
-    }),
-  })
+  let res
+  try {
+    res = await fetch(`${s.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: headers(s),
+      signal,
+      body: JSON.stringify({
+        model: s.model,
+        messages,
+        stream: true,
+        temperature: s.temperature,
+        // num_ctx はOllama独自のパラメータ。OpenAI互換API標準には存在せず、
+        // Gemini等に送ると「Unknown name "num_ctx"」でHTTP 400になる。
+        ...(isOllamaLike ? { num_ctx: s.numCtx } : {}),
+        ...(isOllamaLike && typeof s.think === 'boolean' ? { think: s.think } : {}),
+      }),
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+    // 到達できないのかCORSで弾かれたのかはブラウザからは区別できないが、
+    // 自前ホストのときは原因がだいたい後者なので、直し方まで出す
+    throw new Error(
+      `AIサーバーに接続できませんでした (${s.baseUrl})。` +
+        'サーバーが起動しているか、このサイトからの呼び出しを許可しているか(Ollamaなら OLLAMA_ORIGINS)を確認してください。'
+    )
+  }
 
   if (!res.ok || !res.body) {
     const body = await res.text().catch(() => '')
