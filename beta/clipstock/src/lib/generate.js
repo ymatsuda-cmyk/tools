@@ -1,7 +1,7 @@
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
 import { promptOf } from './prompts.js'
-import { serializeSections } from './sections.js'
+import { serializeSections, withRank } from './sections.js'
 import { reconcileTags } from './tags.js'
 import { splitTranscript, resolveQuote, withTimecode, hasTimecodes } from './timecode.js'
 
@@ -243,7 +243,7 @@ function fieldsToText(list, segments) {
 function applyToText(list) {
   return serializeSections(
     (Array.isArray(list) ? list : []).map((a) => ({
-      heading: String(a?.title ?? '').trim(),
+      heading: withRank(String(a?.title ?? '').trim(), rankOf(a)),
       body: String(a?.summary ?? '').trim(),
       points: Array.isArray(a?.steps) ? a.steps : [],
     }))
@@ -253,12 +253,26 @@ function applyToText(list) {
 function ideasToText(list) {
   return serializeSections(
     (Array.isArray(list) ? list : []).map((a) => ({
-      heading: String(a?.title ?? '').trim(),
+      heading: withRank(String(a?.title ?? '').trim(), rankOf(a)),
       body: String(a?.summary ?? '').trim(),
       points: [],
     }))
   )
 }
+
+/** モデルが出した rank を1〜3に丸める。数字以外や範囲外は未設定(0)にする */
+function rankOf(item) {
+  const n = Math.round(Number(item?.rank))
+  return n >= 1 && n <= 3 ? n : 0
+}
+
+/** 応用と活用は件数が増えるほど玉石混交になるので、価値の順に並べ替えられるようにする */
+const RANK_RULE = `
+各項目に "rank" を付けてください。値は 3 / 2 / 1 の整数です。
+- 3: すぐ試せて効果が大きい。この動画から得られた一番の収穫
+- 2: 有用だが、条件が揃ったときや手間をかけたときに効く
+- 1: 参考程度。思いつきに近い
+すべてを3にしないこと。3は多くても2件までにしてください。`
 
 /** 第3段のコンテキスト。原文全文ではなくサマリ+分野別で足りるので軽い */
 function applyContext(title, summaryText, fieldsText) {
@@ -322,7 +336,7 @@ export async function generateStage(stageId, ctx, onProgress) {
 
   if (stageId === 'apply' || stageId === 'ideas') {
     const context = applyContext(ctx.title, ctx.summary || '', ctx.fields || '')
-    const instructions = fillPrompt(stageId, { NO_FENCE })
+    const instructions = fillPrompt(stageId, { NO_FENCE }) + '\n' + RANK_RULE
     const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(context, instructions), onProgress))
     return {
       model: connection.model,

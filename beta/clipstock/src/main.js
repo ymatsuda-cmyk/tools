@@ -39,8 +39,10 @@ import {
   parseSections,
   isSectionHidden,
   visibleHeading,
+  sectionRank,
   setSectionHidden,
   setSectionHiddenByHeading,
+  setSectionRank,
 } from './lib/sections.js'
 import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
 import {
@@ -518,6 +520,11 @@ function wireDetail(item) {
       toggleSectionPublic(item, detail.activeTab, Number(btn.dataset.sec), btn.getAttribute('aria-pressed') !== 'true')
     )
   )
+  stageEl.querySelectorAll('.rank .star[data-sec]').forEach((btn) =>
+    btn.addEventListener('click', () =>
+      changeSectionRank(item, detail.activeTab, Number(btn.dataset.sec), Number(btn.dataset.rank))
+    )
+  )
   stageEl.querySelectorAll('.tag-edit i').forEach((x) =>
     x.addEventListener('click', (e) => removeTag(item, e.target.closest('.tag').dataset.tag))
   )
@@ -897,13 +904,39 @@ async function toggleSectionPublic(item, field, index, isPublic) {
   }
 }
 
+/** 応用 / 活用の1件に★を付け直す。0 を渡すと未設定に戻る */
+async function changeSectionRank(item, field, index, rank) {
+  const before = detail.detail?.[field] ?? ''
+  const next = setSectionRank(before, index, rank)
+  if (next === before) return
+
+  detail.detail = { ...detail.detail, [field]: next }
+  paintDetail()
+  try {
+    await saveField(item.key, field, next)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+    syncIdeaFeed(item.key, field, next)
+  } catch (err) {
+    detail.detail = { ...detail.detail, [field]: before }
+    paintDetail()
+    alert('ランクを変えられませんでした: ' + (err.message || err))
+  }
+}
+
 /** 読み込み済みのアイデア一覧にも反映する。JSONは次のバッチまで古いままのため */
 function syncIdeaFeed(key, kind, text) {
-  const hiddenOf = new Map(
-    parseSections(text).map((s) => [visibleHeading(s.heading), isSectionHidden(s.heading)])
+  const state = new Map(
+    parseSections(text).map((s) => [
+      visibleHeading(s.heading),
+      { hidden: isSectionHidden(s.heading), rank: sectionRank(s.heading) },
+    ])
   )
   ideasState.items.forEach((e) => {
-    if (e.key === key && e.kind === kind && hiddenOf.has(e.heading)) e.isPublic = !hiddenOf.get(e.heading)
+    const found = state.get(e.heading)
+    if (e.key === key && e.kind === kind && found) {
+      e.isPublic = !found.hidden
+      e.rank = found.rank
+    }
   })
 }
 
@@ -1327,6 +1360,7 @@ async function paintIdeas() {
     )
   }
   if (ideasState.shuffleSeed) entries = pickRandom(entries, 6, ideasState.shuffleSeed)
+  else entries = [...entries].sort((a, b) => b.rank - a.rank)
 
   renderIdeas(stageEl, entries, { ...ideasState, canEdit: canEdit(loadConfig()) }, {
     onKind: (kind) => {

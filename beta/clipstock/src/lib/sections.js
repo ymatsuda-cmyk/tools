@@ -73,27 +73,70 @@ export function sectionsCharCount(text) {
   return String(text ?? '').length
 }
 
-// ---- アイデア1件ごとの公開 / 非公開 ----
+// ---- アイデア1件ごとの公開 / 非公開 と ランク ----
 //
-// 見出しの先頭に印を置くだけにしている。アイデアは応用・活用の本文の中に
+// どちらも見出しの先頭に印を置くだけにしている。アイデアは応用・活用の本文の中に
 // 並んでいるので、Notionの列では1件ずつ持てない。番号で覚えると作り直しや
-// 並べ替えでずれるため、その見出し自身に書く。既定は公開(印が無ければ公開)。
+// 並べ替えでずれるため、その見出し自身に書く。
+// 既定は公開(印が無ければ公開)、ランクは未設定(0)。
+//
+//   ## [非公開] [★★★] アイデアの題名
 
 const HIDDEN_TAG = '[非公開]'
+const RANK_RE = /^\[(★{1,3})\]/
+
+/** 見出しの先頭に並んだ印を読み取る */
+function tagsOf(heading) {
+  let rest = String(heading ?? '').trimStart()
+  let hidden = false
+  let rank = 0
+  for (;;) {
+    if (rest.startsWith(HIDDEN_TAG)) {
+      hidden = true
+      rest = rest.slice(HIDDEN_TAG.length).trimStart()
+      continue
+    }
+    const m = rest.match(RANK_RE)
+    if (m) {
+      rank = m[1].length
+      rest = rest.slice(m[0].length).trimStart()
+      continue
+    }
+    break
+  }
+  return { hidden, rank, bare: rest.trim() }
+}
+
+function buildHeading(bare, hidden, rank) {
+  const parts = []
+  if (hidden) parts.push(HIDDEN_TAG)
+  if (rank >= 1 && rank <= 3) parts.push(`[${'★'.repeat(rank)}]`)
+  parts.push(bare)
+  return parts.join(' ').trim()
+}
 
 export function isSectionHidden(heading) {
-  return String(heading ?? '').trimStart().startsWith(HIDDEN_TAG)
+  return tagsOf(heading).hidden
+}
+
+/** 1〜3。印が無ければ 0(未設定) */
+export function sectionRank(heading) {
+  return tagsOf(heading).rank
 }
 
 /** 表示や検索に使う、印を外した見出し */
 export function visibleHeading(heading) {
-  const s = String(heading ?? '').trimStart()
-  return isSectionHidden(s) ? s.slice(HIDDEN_TAG.length).trim() : s.trim()
+  return tagsOf(heading).bare
 }
 
 export function withHidden(heading, hidden) {
-  const bare = visibleHeading(heading)
-  return hidden ? `${HIDDEN_TAG} ${bare}` : bare
+  const { rank, bare } = tagsOf(heading)
+  return buildHeading(bare, hidden, rank)
+}
+
+export function withRank(heading, rank) {
+  const { hidden, bare } = tagsOf(heading)
+  return buildHeading(bare, hidden, rank)
 }
 
 /** index 番目のアイデアの公開を入れ替えた、フィールド全体の新しい文字列 */
@@ -104,6 +147,13 @@ export function setSectionHidden(text, index, hidden) {
   return serializeSections(sections)
 }
 
+export function setSectionRank(text, index, rank) {
+  const sections = parseSections(text)
+  if (!sections[index]) return String(text ?? '')
+  sections[index] = { ...sections[index], heading: withRank(sections[index].heading, rank) }
+  return serializeSections(sections)
+}
+
 /**
  * 見出しで探して入れ替える。一覧は静的JSONから作っていて並びが古いことがあるので、
  * 番号だけで当てにいくと別のアイデアを隠してしまう。見つからなければ元のまま返す。
@@ -111,4 +161,9 @@ export function setSectionHidden(text, index, hidden) {
 export function setSectionHiddenByHeading(text, heading, hidden) {
   const index = parseSections(text).findIndex((s) => visibleHeading(s.heading) === heading)
   return index === -1 ? String(text ?? '') : setSectionHidden(text, index, hidden)
+}
+
+export function setSectionRankByHeading(text, heading, rank) {
+  const index = parseSections(text).findIndex((s) => visibleHeading(s.heading) === heading)
+  return index === -1 ? String(text ?? '') : setSectionRank(text, index, rank)
 }

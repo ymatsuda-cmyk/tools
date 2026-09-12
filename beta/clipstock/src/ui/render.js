@@ -1,4 +1,4 @@
-import { parseSections, isSectionHidden, visibleHeading } from '../lib/sections.js'
+import { parseSections, isSectionHidden, visibleHeading, sectionRank } from '../lib/sections.js'
 import { splitLabel, splitTranscript, formatTimecode, youtubeUrlAt } from '../lib/timecode.js'
 import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
 import { addrAttrs } from '../lib/marker-target.js'
@@ -209,9 +209,13 @@ function timeChip(at, videoUrl) {
   return `<a class="tc tc-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${label} から再生"><i class="ti ti-player-play" aria-hidden="true"></i>${label}</a>`
 }
 
-function sectionsHtml(text, { numbered = false, videoUrl = '', field = null, publishable = false } = {}) {
-  const sections = parseSections(text)
-  if (!sections.length) return '<p class="empty-section">まだありません</p>'
+function sectionsHtml(text, { numbered = false, videoUrl = '', field = null, publishable = false, ranked = false } = {}) {
+  const parsed = parseSections(text)
+  if (!parsed.length) return '<p class="empty-section">まだありません</p>'
+  // 並べ替えても保存先の番号とずれないよう、元の位置を持たせておく
+  const sections = parsed.map((s, i) => ({ ...s, at: i, rank: sectionRank(s.heading) }))
+  if (ranked) sections.sort((a, b) => b.rank - a.rank)
+
   // field が渡されたときだけマーカーを引けるようにする(読み取り専用のときは付けない)
   const mark = (raw, kind, sec, point) =>
     field
@@ -219,14 +223,15 @@ function sectionsHtml(text, { numbered = false, videoUrl = '', field = null, pub
       : escapeHtml(plainTextOf(raw))
 
   return `<div class="sections">${sections
-    .map((s, i) => {
+    .map((s, order) => {
+      const i = s.at
       const hidden = isSectionHidden(s.heading)
       const head = splitLabel(visibleHeading(s.heading) || '(無題)')
       return `
     <section class="sec ${hidden ? 'sec-hidden' : ''}">
-      <h4 class="sec-head">${numbered ? `<span class="sec-num">${i + 1}</span>` : ''}${escapeHtml(plainTextOf(head.text))}${timeChip(head.at, videoUrl)}${
-        publishable ? sectionPublishHtml(i, !hidden) : ''
-      }</h4>
+      <h4 class="sec-head">${numbered ? `<span class="sec-num">${order + 1}</span>` : ''}${escapeHtml(plainTextOf(head.text))}${timeChip(head.at, videoUrl)}${
+        ranked ? rankHtml(i, s.rank, publishable) : ''
+      }${publishable ? sectionPublishHtml(i, !hidden) : ''}</h4>
       ${s.body ? `<p class="sec-body">${mark(s.body, 'body', i, null).replace(/\n/g, '<br />')}</p>` : ''}
       ${s.points.length
         ? `<ul class="sec-points">${s.points
@@ -270,6 +275,18 @@ function mindmapToolsHtml(current) {
 /** アイデア1件の公開の入り切り。見出しの右に出す */
 function sectionPublishHtml(index, isPublic) {
   return `<button class="sec-publish ${isPublic ? '' : 'off'}" data-sec="${index}" aria-pressed="${isPublic}" title="${isPublic ? 'アイデア一覧に出しています' : 'アイデア一覧に出しません'}"><i class="ti ${isPublic ? 'ti-eye' : 'ti-eye-off'}" aria-hidden="true"></i></button>`
+}
+
+/** 価値の目安の3つ星。編集できるときは星を押して変えられる */
+function rankHtml(index, rank, editable = false) {
+  const stars = [1, 2, 3]
+    .map((n) =>
+      editable
+        ? `<button class="star ${n <= rank ? 'on' : ''}" data-sec="${index}" data-rank="${n === rank ? 0 : n}" aria-label="星${n}">★</button>`
+        : `<span class="star ${n <= rank ? 'on' : ''}">★</span>`
+    )
+    .join('')
+  return `<span class="rank" title="${rank ? `星${rank}` : '未設定'}">${stars}</span>`
 }
 
 /** 公開の入り切り。押すと反転する状態ボタン */
@@ -429,11 +446,11 @@ function renderPanel(item, state, tab, d) {
         : emptyPanel(item, '分野別要約', 'fields')
     case 'apply':
       return d.apply
-        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply', publishable: state.canEdit })
+        ? sectionsHtml(d.apply, { numbered: true, videoUrl: item.url, field: 'apply', publishable: state.canEdit, ranked: true })
         : emptyPanel(item, '応用', 'apply')
     case 'ideas':
       return d.ideas
-        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas', publishable: state.canEdit })
+        ? sectionsHtml(d.ideas, { videoUrl: item.url, field: 'ideas', publishable: state.canEdit, ranked: true })
         : emptyPanel(item, '活用アイデア', 'ideas')
     case 'memo':
       return `<textarea id="memo-input" class="memo-input" placeholder="気づいたこと、あとで試すこと、関連する話などを自由に">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
@@ -514,7 +531,7 @@ export function renderIdeas(container, entries, state, handlers) {
             : ''
           return `
         <article class="idea" data-key="${escapeHtml(e.key)}" data-kind="${e.kind}" data-sec="${e.sec}">
-          <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}</div>
+          <div class="idea-kind ${e.kind}">${e.kind === 'apply' ? 'ビジネス' : '活用'}${rankHtml(e.sec, e.rank)}</div>
           ${state.canEdit ? hideButtonHtml('idea-hide') : ''}
           <button class="idea-toggle" aria-expanded="false" ${body || points ? '' : 'disabled'}>
             <h4 class="idea-title">${escapeHtml(plainTextOf(e.heading))}</h4>
@@ -563,6 +580,7 @@ export function flattenIdeas(items) {
           kind,
           sec: i,
           isPublic: !isSectionHidden(s.heading),
+          rank: sectionRank(s.heading),
           heading: visibleHeading(s.heading) || '(無題)',
           body: s.body,
           points: s.points,

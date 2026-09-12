@@ -598,9 +598,23 @@ mark { background: var(--highlight); color: inherit; }
   font-size: 14px;
 }
 .idea-hide:hover { background: var(--accent-bg); color: var(--text-primary); }
-.idea-kind { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; }
+.idea-kind { font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
 .idea-kind.apply { color: var(--warn-text); }
 .idea-kind.ideas { color: var(--ok-text); }
+
+/* 価値の目安の3つ星。応用 / 活用の並び順にも使う */
+.rank { display: inline-flex; align-items: center; gap: 1px; margin-left: 6px; line-height: 1; }
+.rank .star {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  color: var(--border-strong);
+  line-height: 1;
+}
+.rank .star.on { color: #e0a200; }
+.rank button.star { cursor: pointer; }
+.rank button.star:hover { color: #e0a200; }
 .idea-toggle {
   display: flex;
   align-items: flex-start;
