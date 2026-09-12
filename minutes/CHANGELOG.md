@@ -8,14 +8,10 @@ Mindmap tab for the detail pane
 
 ### Release Changes
 
-- Added a "マインドマップ" tab next to サマリ in the detail pane.
-- Generate the tree with the active LLM connection (nodes are 10 chars or fewer, 3 levels max); falls back to the summary structure when generation fails.
-- Added mindmap view module that renders the tree with `api/mindmap/mindmap.api.js`.
-- Added Notion「マインドマップ」column (rich_text, JSON) with `saveMindmap` action; the tab shows nothing when the column is empty.
-- Creating from the summary saves the JSON to the column; node edits update the JSON as an unsaved draft and are stored with the 保存 button.
-- Warn before leaving the tab while the mindmap has unsaved edits.
-- Mounted the renderer once and reused the viewport across tab switches.
-- Added zoom / fit controls and scoped mindmap styles so they do not collide with the app styles.
+- Added a "マインドマップ" tab next to サマリ in the detail pane, using the same mechanism as clipstock: markmap renders Markdown loaded from CDN.
+- Added Notion「マインドマップ」column (rich_text, markmap Markdown) with `saveMindmap` action; the tab shows nothing when the column is empty.
+- Generate from the transcript with the active LLM connection as structured JSON (`{title, branches}`) and build the Markdown here, so a model cannot break the markmap parse. Falls back to the summary structure when generation fails.
+- Added a 手で直す mode that edits the Markdown directly, with the unsaved-changes warning when leaving the tab.
 
 ### Release Affected Files
 

@@ -283,21 +283,12 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
-    mindmap: state.mindmap ? `
-      <div class="mindmap-panel">
-        <div class="mindmap-bar">
-          <span style="flex:1"></span>
-          <div class="mindmap-zoom">
-            <button class="btn-ghost" data-mm="out" aria-label="縮小"><i class="ti ti-minus" aria-hidden="true"></i></button>
-            <span class="mindmap-zoom-level">100%</span>
-            <button class="btn-ghost" data-mm="in" aria-label="拡大"><i class="ti ti-plus" aria-hidden="true"></i></button>
-            <button class="btn-ghost" data-mm="fit" aria-label="全体表示"><i class="ti ti-maximize" aria-hidden="true"></i></button>
-          </div>
-        </div>
-        <div id="mindmap-slot" class="mindmap-slot"></div>
-        <p class="mindmap-hint">クリックで選択、ダブルクリックで編集、Tabで子を追加、Deleteで削除。背景ドラッグで移動できます。</p>
-      </div>
-    ` : '<p class="empty-section">未作成</p>',
+    mindmap: !state.mindmap
+      ? '<p class="empty-section">未作成</p>'
+      : state.mindmapEditing
+        ? `<textarea id="mindmap-source" class="mindmap-source" spellcheck="false">${escapeHtml(state.mindmap)}</textarea>
+           <p class="mindmap-hint">markmap用のMarkdownです。「#」が中心、「##」が大項目、「-」が枝になります。</p>`
+        : '<div id="mindmap-host" class="mindmap-host"></div>',
     memo: `<textarea class="memo-textarea" id="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>`,
     chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
@@ -343,6 +334,7 @@ export function renderDetailHtml(item, state) {
         <span id="mindmap-save-status" class="memo-save-status">${state.mindmapDirty ? "未保存の変更があります" : ""}</span>
         <span style="flex:1"></span>
         <button class="btn btn-mm-create"><i class="ti ti-sparkles" aria-hidden="true"></i>${state.mindmap ? 'AIで作り直す' : 'AIで作成'}</button>
+        ${state.mindmap ? `<button class="btn btn-mm-edit"><i class="ti ti-edit" aria-hidden="true"></i>${state.mindmapEditing ? '地図に戻す' : '手で直す'}</button>` : ''}
         ${state.mindmap ? '<button class="btn btn-mm-save">保存</button>' : ''}
       ` : activeTab === 'memo' ? `
         <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>

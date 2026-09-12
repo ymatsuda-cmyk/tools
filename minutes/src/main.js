@@ -8,7 +8,7 @@ import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } fro
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
-import { setupMindmapTab, buildTreeFromSummary, generateTreeWithAI, parseTree } from './lib/mindmap-view.js'
+import { renderMindmapTab, buildMarkdownFromSummary, generateMarkdownWithAI } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -23,8 +23,9 @@ let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
 const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
-const mindmapByKey = {} // pageId -> string、Notionの「マインドマップ」カラムに保存済みのJSON
-const mindmapDraftByKey = {} // pageId -> string、ノード編集後の未保存JSON
+const mindmapByKey = {} // pageId -> string、Notionの「マインドマップ」カラムに保存済みのMarkdown
+const mindmapDraftByKey = {} // pageId -> string、手直し中の未保存Markdown
+const mindmapEditingByKey = {} // item.key -> boolean、Markdownを直接編集中かどうか
 const activeTabByKey = {} // item.key -> 'summary'|'mindmap'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
@@ -285,6 +286,7 @@ function paintDetail(target, item, state) {
     memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
     mindmap: mindmapDraftByKey[pid] !== undefined ? mindmapDraftByKey[pid] : mindmapByKey[pid],
     mindmapDirty: hasUnsavedMindmap(pid),
+    mindmapEditing: Boolean(mindmapEditingByKey[item.key]),
     activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
@@ -328,19 +330,21 @@ function paintDetail(target, item, state) {
   if (target.querySelector('#rawchat-messages')) {
     setupRawChatTab(target, item, renderState)
   }
-  if (target.querySelector('#mindmap-slot')) {
-    const tree = parseTree(renderState.mindmap)
-    if (tree) {
-      setupMindmapTab(target, tree, (edited) => {
-        mindmapDraftByKey[pid] = JSON.stringify(edited)
-        const statusEl = target.querySelector('#mindmap-save-status')
-        if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
-      })
-    } else {
-      target.querySelector('#mindmap-slot').innerHTML = '<p class="empty-section">マインドマップのデータを読み取れませんでした</p>'
-    }
+  if (target.querySelector('#mindmap-host')) {
+    renderMindmapTab(target, renderState.mindmap)
   }
+  // Markdownを直接直している間は、入力のたびに下書きへ退避する
+  const mindmapEl = target.querySelector('#mindmap-source')
+  mindmapEl?.addEventListener('input', () => {
+    mindmapDraftByKey[pid] = mindmapEl.value
+    const statusEl = target.querySelector('#mindmap-save-status')
+    if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
+  })
   target.querySelector('.btn-mm-create')?.addEventListener('click', () => createMindmap(target, item, renderState))
+  target.querySelector('.btn-mm-edit')?.addEventListener('click', () => {
+    mindmapEditingByKey[item.key] = !mindmapEditingByKey[item.key]
+    paintDetail(target, item, state)
+  })
   target.querySelector('.btn-mm-save')?.addEventListener('click', () => saveMindmapField(target, item))
   setupMarkerUI(target, item, renderState)
 
@@ -692,7 +696,7 @@ function hasUnsavedMindmap(pageId) {
   return draft !== undefined && draft !== (mindmapByKey[pageId] ?? '')
 }
 
-/** 要約をもとにAIでマインドマップを作り、Notionの「マインドマップ」カラムへ保存する */
+/** 原文(文字起こし全文)をもとにAIでマインドマップを作り、Notionの「マインドマップ」カラムへ保存する */
 async function createMindmap(target, item, state) {
   const pid = item.notionPageId
   if (mindmapByKey[pid] && !confirm('現在のマインドマップをAIで作り直します。よろしいですか?')) return
@@ -702,43 +706,45 @@ async function createMindmap(target, item, state) {
   if (createBtn) createBtn.disabled = true
   if (statusEl) statusEl.textContent = 'AIで作成しています...'
 
-  let tree
+  let markdown
   try {
-    tree = await generateTreeWithAI(item, state.summary)
+    const { text } = await fetchTranscript(pid)
+    markdown = await generateMarkdownWithAI(item, text)
   } catch (err) {
     // AIが使えないときも作成できるよう、要約の構造をそのまま使う手段を残す
     const useLocal = confirm('AIでの生成に失敗しました: ' + (err.message || err) + '\n要約の構成をそのまま使って作成しますか?')
     if (!useLocal) {
       if (createBtn) createBtn.disabled = false
-      if (statusEl) statusEl.textContent = mindmapDraftByKey[pid] !== undefined ? '未保存の変更があります' : ''
+      if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
       return
     }
-    tree = buildTreeFromSummary(item, state.summary)
+    markdown = buildMarkdownFromSummary(item, state.summary)
   }
 
-  mindmapDraftByKey[pid] = JSON.stringify(tree)
+  mindmapDraftByKey[pid] = markdown
+  mindmapEditingByKey[item.key] = false
   paintDetail(target, item, state)
   await saveMindmapField(target, item)
 }
 
-/** 編集中のマインドマップJSONをNotionの「マインドマップ」カラムへ保存する */
+/** 編集中のマインドマップMarkdownをNotionの「マインドマップ」カラムへ保存する */
 async function saveMindmapField(target, item) {
   const pid = item.notionPageId
-  const json = mindmapDraftByKey[pid] ?? mindmapByKey[pid] ?? ''
+  const markdown = mindmapDraftByKey[pid] ?? mindmapByKey[pid] ?? ''
   const statusEl = target.querySelector('#mindmap-save-status')
   const prev = mindmapByKey[pid]
 
-  mindmapByKey[pid] = json // 楽観的に即反映
+  mindmapByKey[pid] = markdown // 楽観的に即反映
   if (statusEl) statusEl.textContent = '保存中...'
 
   try {
-    await saveMindmap(pid, json)
+    await saveMindmap(pid, markdown)
     delete mindmapDraftByKey[pid]
     if (statusEl) statusEl.textContent = '保存しました'
     setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
   } catch (err) {
     mindmapByKey[pid] = prev
-    mindmapDraftByKey[pid] = json // 失敗時は編集内容を残す
+    mindmapDraftByKey[pid] = markdown // 失敗時は編集内容を残す
     if (statusEl) statusEl.textContent = '未保存の変更があります'
     alert('マインドマップの保存に失敗しました: ' + (err.message || err))
   }
