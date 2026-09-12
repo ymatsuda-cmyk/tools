@@ -52,17 +52,13 @@ export function buildTreeFromSummary(item, summary) {
   return { text: short(item.title) || '議事録', children }
 }
 
-const SYSTEM_PROMPT = `あなたは会議の要約をマインドマップに構造化するアシスタントです。
-必ず次のJSON形式のみで回答してください。前後に説明文やコードフェンスを付けないこと。
-
-{"text":"中心テーマ","children":[{"text":"見出し","color":"green","children":[{"text":"要点"}]}]}
-
+const INSTRUCTION = `次の原文を日本語のマインドマップに構造化してください。
+出力はJSONのみ。前置き・コードフェンス・説明は一切書かないこと。
+形式: {"text":"中心テーマ","children":[{"text":"見出し","children":[{"text":"要点"}]}]}
 制約:
 - すべてのtextは日本語10文字以内。超えそうなら削って体言止めにする
-- 第1階層は3〜7個、第2階層は各0〜4個、中心テーマを含めて3階層まで
-- colorは purple / green / orange / yellow / pink のいずれか、または省略
-- 要約に無い情報を足さない
-- 日本語で出力する`
+- 第1階層は3〜7個、第2階層は各0〜4個、3階層まで
+- 原文にない情報を足さない`
 
 /** 要約をAIへ渡すプレーンテキストにする */
 function summaryText(item, summary) {
@@ -102,8 +98,7 @@ export async function generateTreeWithAI(item, summary) {
   if (!connection) throw new Error('LLM接続が未設定です。設定から接続先とモデルを追加してください。')
 
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: summaryText(item, summary).slice(0, 30000) },
+    { role: 'user', content: INSTRUCTION + '\n\n原文:\n' + summaryText(item, summary).slice(0, 30000) },
   ]
 
   let full = ''
