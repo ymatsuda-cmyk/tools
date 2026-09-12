@@ -1,13 +1,14 @@
-// 要約(サマリ・議事・決定事項・ToDo・論点)をマインドマップとして描画する。
-// 描画本体は api/mindmap/mindmap.api.js (window.MindMap) を利用する。
+// 要約(サマリ・議事・決定事項・ToDo・論点)からマインドマップのツリーを作り、描画する。
+// 描画本体は api/mindmap/mindmap.api.js (window.MindMap)。
+// ツリーのJSONはNotionの「マインドマップ」カラムに保存する(保存処理は main.js 側)。
 import { plainTextOf } from './markers.js'
 
-const MAX_LEN = 10 // MindMap側のノード文字数上限。超過分は自前で「…」に丸める
+const MAX_LEN = 10 // ノードの文字数上限。超える分は「…」で丸める
 const MAX_CHILDREN = 8
 
-const treeByKey = {} // item.key -> 編集後のツリー(タブ切替やノード編集の結果を保つ)
 let host = null // mount()は1度だけ。この要素をタブのDOMへ移動して使い回す
-let currentKey = null
+let changeHandler = null
+let suppressChange = false // 初期描画のemitを「編集」と誤認しないための抑止フラグ
 
 function short(text) {
   const s = plainTextOf(String(text ?? '')).replace(/\s+/g, ' ').trim().replace(/[。．.]+$/, '')
@@ -47,8 +48,22 @@ export function buildTreeFromSummary(item, summary) {
   return { text: short(item.title) || '議事録', children }
 }
 
-/** マインドマップタブのDOMに描画領域を差し込み、ツールバーを配線する */
-export function setupMindmapTab(target, item, state) {
+/** 「マインドマップ」カラムの文字列をツリーに戻す。空・壊れていればnull */
+export function parseTree(json) {
+  if (!json) return null
+  try {
+    const tree = JSON.parse(json)
+    return tree && typeof tree.text === 'string' ? tree : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * マインドマップタブのDOMに描画領域を差し込み、ツールバーを配線する。
+ * @param {(tree: object) => void} onChange ノード編集のたびに最新ツリーを受け取る
+ */
+export function setupMindmapTab(target, tree, onChange) {
   const slot = target.querySelector('#mindmap-slot')
   if (!slot) return
 
@@ -62,8 +77,8 @@ export function setupMindmapTab(target, item, state) {
     host = document.createElement('div')
     host.className = 'mm-viewport'
     MM.mount(host)
-    MM.on('change', (tree) => {
-      if (currentKey && tree) treeByKey[currentKey] = tree
+    MM.on('change', (edited) => {
+      if (!suppressChange && edited) changeHandler?.(edited)
     })
     MM.on('zoom', (z) => {
       document.querySelectorAll('.mindmap-zoom-level').forEach((el) => {
@@ -71,19 +86,14 @@ export function setupMindmapTab(target, item, state) {
       })
     })
   }
+  changeHandler = onChange
   slot.appendChild(host)
-  currentKey = item.key
 
-  const draw = (tree) => {
-    MM.render(tree)
-    requestAnimationFrame(() => MM.fit())
-  }
-  draw(treeByKey[item.key] || buildTreeFromSummary(item, state.summary))
+  suppressChange = true
+  MM.render(tree)
+  suppressChange = false
+  requestAnimationFrame(() => MM.fit())
 
-  target.querySelector('.btn-mm-rebuild')?.addEventListener('click', () => {
-    delete treeByKey[item.key]
-    draw(buildTreeFromSummary(item, state.summary))
-  })
   target.querySelectorAll('[data-mm]').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (btn.dataset.mm === 'in') MM.zoomIn()

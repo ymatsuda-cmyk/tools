@@ -33,7 +33,7 @@ export function fetchTranscript(pageId) {
   return callGas('fetchTranscript', { pageId })
 }
 
-/** @returns {Promise<{cardSummary: string|null, detail: object|null, model: string|null, generatedAt: string|null, updatedAt: string}>} */
+/** @returns {Promise<{cardSummary: string|null, detail: object|null, model: string|null, generatedAt: string|null, updatedAt: string, mindmap: string}>} */
 export function fetchSummary(pageId) {
   return callGas('fetchSummary', { pageId })
 }
@@ -82,6 +82,11 @@ export function savePermissions(pageIds, permissions, mode = 'add') {
 /** メモ(自由記述)を更新する */
 export function saveMemo(pageId, memo) {
   return callGas('saveMemo', { pageId, memo })
+}
+
+/** マインドマップのツリーJSONを「マインドマップ」カラムへ保存する */
+export function saveMindmap(pageId, mindmap) {
+  return callGas('saveMindmap', { pageId, mindmap })
 }
 
 /** 状態を「再取得」にし、次回バッチでの文字起こしやり直しをリクエストする */

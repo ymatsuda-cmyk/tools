@@ -283,10 +283,9 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
-    mindmap: `
+    mindmap: state.mindmap ? `
       <div class="mindmap-panel">
         <div class="mindmap-bar">
-          <button class="btn btn-mm-rebuild"><i class="ti ti-refresh" aria-hidden="true"></i>要約から作り直す</button>
           <span style="flex:1"></span>
           <div class="mindmap-zoom">
             <button class="btn-ghost" data-mm="out" aria-label="縮小"><i class="ti ti-minus" aria-hidden="true"></i></button>
@@ -298,7 +297,7 @@ export function renderDetailHtml(item, state) {
         <div id="mindmap-slot" class="mindmap-slot"></div>
         <p class="mindmap-hint">クリックで選択、ダブルクリックで編集、Tabで子を追加、Deleteで削除。背景ドラッグで移動できます。</p>
       </div>
-    `,
+    ` : '<p class="empty-section">未作成</p>',
     memo: `<textarea class="memo-textarea" id="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>`,
     chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
@@ -340,6 +339,11 @@ export function renderDetailHtml(item, state) {
             <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
           </div>
         </div>
+      ` : activeTab === 'mindmap' ? `
+        <span id="mindmap-save-status" class="memo-save-status">${state.mindmapDirty ? "未保存の変更があります" : ""}</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-mm-create"><i class="ti ti-sparkles" aria-hidden="true"></i>${state.mindmap ? '要約から作り直す' : '要約から作成'}</button>
+        ${state.mindmap ? '<button class="btn btn-mm-save">保存</button>' : ''}
       ` : activeTab === 'memo' ? `
         <span id="memo-save-status" class="memo-save-status">${state.memoDirty ? "未保存の変更があります" : ""}</span>
         <span style="flex:1"></span>

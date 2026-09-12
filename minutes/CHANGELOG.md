@@ -9,9 +9,12 @@ Mindmap tab for the detail pane
 ### Release Changes
 
 - Added a "マインドマップ" tab next to サマリ in the detail pane.
-- Added mindmap view module that builds a tree from the summary (サマリ・議事・決定事項・ToDo・論点) and renders it with `api/mindmap/mindmap.api.js`.
-- Mounted the renderer once and reused the viewport across tab switches, keeping node edits per item.
-- Added zoom / fit / rebuild controls and scoped mindmap styles so they do not collide with the app styles.
+- Added mindmap view module that builds a tree (nodes are 10 chars or fewer) from the summary and renders it with `api/mindmap/mindmap.api.js`.
+- Added Notion「マインドマップ」column (rich_text, JSON) with `saveMindmap` action; the tab shows nothing when the column is empty.
+- Creating from the summary saves the JSON to the column; node edits update the JSON as an unsaved draft and are stored with the 保存 button.
+- Warn before leaving the tab while the mindmap has unsaved edits.
+- Mounted the renderer once and reused the viewport across tab switches.
+- Added zoom / fit controls and scoped mindmap styles so they do not collide with the app styles.
 
 ### Release Affected Files
 
@@ -19,6 +22,8 @@ Mindmap tab for the detail pane
 - `minutes/src/main.js`
 - `minutes/src/ui/render.js`
 - `minutes/src/lib/mindmap-view.js`
+- `minutes/src/lib/gas.js`
+- `minutes/gas/Code.gs`
 - `minutes/css/styles.css`
 
 ## 1.2.0 - 2026-09-04

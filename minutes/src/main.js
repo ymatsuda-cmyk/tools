@@ -1,5 +1,5 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem, updateRawContextCount } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, saveMindmap, deleteItem, updateRawContextCount } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -8,7 +8,7 @@ import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } fro
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
-import { setupMindmapTab } from './lib/mindmap-view.js'
+import { setupMindmapTab, buildTreeFromSummary, parseTree } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -23,6 +23,8 @@ let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
 const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
+const mindmapByKey = {} // pageId -> string、Notionの「マインドマップ」カラムに保存済みのJSON
+const mindmapDraftByKey = {} // pageId -> string、ノード編集後の未保存JSON
 const activeTabByKey = {} // item.key -> 'summary'|'mindmap'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
@@ -281,6 +283,8 @@ function paintDetail(target, item, state) {
     // 未保存の下書きがあればそれを表示する(タブを切り替えても入力内容を失わないため)
     memo: memoDraftByKey[pid] !== undefined ? memoDraftByKey[pid] : memoByKey[pid],
     memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
+    mindmap: mindmapDraftByKey[pid] !== undefined ? mindmapDraftByKey[pid] : mindmapByKey[pid],
+    mindmapDirty: hasUnsavedMindmap(pid),
     activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
@@ -309,6 +313,11 @@ function paintDetail(target, item, state) {
 
   target.querySelectorAll('.detail-tab').forEach((el) => {
     el.addEventListener('click', () => {
+      // マインドマップの編集内容はNotionに自動保存されないため、離れる前に知らせる
+      if (activeTabByKey[item.key] === 'mindmap' && el.dataset.tab !== 'mindmap' && hasUnsavedMindmap(pid)) {
+        const ok = confirm('マインドマップに未保存の変更があります。保存してください。\n保存せずにタブを移動しますか?')
+        if (!ok) return
+      }
       activeTabByKey[item.key] = el.dataset.tab
       paintDetail(target, item, state)
     })
@@ -320,8 +329,19 @@ function paintDetail(target, item, state) {
     setupRawChatTab(target, item, renderState)
   }
   if (target.querySelector('#mindmap-slot')) {
-    setupMindmapTab(target, item, renderState)
+    const tree = parseTree(renderState.mindmap)
+    if (tree) {
+      setupMindmapTab(target, tree, (edited) => {
+        mindmapDraftByKey[pid] = JSON.stringify(edited)
+        const statusEl = target.querySelector('#mindmap-save-status')
+        if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
+      })
+    } else {
+      target.querySelector('#mindmap-slot').innerHTML = '<p class="empty-section">マインドマップのデータを読み取れませんでした</p>'
+    }
   }
+  target.querySelector('.btn-mm-create')?.addEventListener('click', () => createMindmap(target, item, renderState))
+  target.querySelector('.btn-mm-save')?.addEventListener('click', () => saveMindmapField(target, item))
   setupMarkerUI(target, item, renderState)
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
@@ -664,6 +684,46 @@ async function saveMemoField(target, item, state) {
 function hasUnsavedMemo(pageId) {
   const draft = memoDraftByKey[pageId]
   return draft !== undefined && draft !== (memoByKey[pageId] ?? '')
+}
+
+/** 未保存のマインドマップ編集があるか調べる */
+function hasUnsavedMindmap(pageId) {
+  const draft = mindmapDraftByKey[pageId]
+  return draft !== undefined && draft !== (mindmapByKey[pageId] ?? '')
+}
+
+/** 要約からマインドマップを作り直し、そのままNotionの「マインドマップ」カラムへ保存する */
+async function createMindmap(target, item, state) {
+  const pid = item.notionPageId
+  if (mindmapByKey[pid] && !confirm('現在のマインドマップを要約から作り直します。よろしいですか?')) return
+
+  const json = JSON.stringify(buildTreeFromSummary(item, state.summary))
+  mindmapDraftByKey[pid] = json
+  paintDetail(target, item, state)
+  await saveMindmapField(target, item)
+}
+
+/** 編集中のマインドマップJSONをNotionの「マインドマップ」カラムへ保存する */
+async function saveMindmapField(target, item) {
+  const pid = item.notionPageId
+  const json = mindmapDraftByKey[pid] ?? mindmapByKey[pid] ?? ''
+  const statusEl = target.querySelector('#mindmap-save-status')
+  const prev = mindmapByKey[pid]
+
+  mindmapByKey[pid] = json // 楽観的に即反映
+  if (statusEl) statusEl.textContent = '保存中...'
+
+  try {
+    await saveMindmap(pid, json)
+    delete mindmapDraftByKey[pid]
+    if (statusEl) statusEl.textContent = '保存しました'
+    setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
+  } catch (err) {
+    mindmapByKey[pid] = prev
+    mindmapDraftByKey[pid] = json // 失敗時は編集内容を残す
+    if (statusEl) statusEl.textContent = '未保存の変更があります'
+    alert('マインドマップの保存に失敗しました: ' + (err.message || err))
+  }
 }
 
 /**
@@ -1206,6 +1266,7 @@ async function onSelect(item, rowEl) {
     const remote = await fetchSummary(item.notionPageId)
     tagsByKey[item.notionPageId] = remote.tags || []
     memoByKey[item.notionPageId] = remote.memo || ''
+    mindmapByKey[item.notionPageId] = remote.mindmap || ''
 
     if (!remote.generatedAt) {
       paintDetail(target, item, { phase: 'no-summary' })

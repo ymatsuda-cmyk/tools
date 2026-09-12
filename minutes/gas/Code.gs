@@ -35,6 +35,7 @@ var STATUS_DELETED = '削除';       // 削除ボタン押下時にセットす�
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
+var PROP_MINDMAP   = 'マインドマップ'; // マインドマップのツリー (rich_text、JSON文字列で格納)
 var PROP_RAW_COUNT = '原文文字数'; // 文字起こし全文の文字数キャッシュ (number)
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
@@ -85,6 +86,9 @@ function doPost(e) {
         break;
       case 'saveMemo':
         result = saveMemo_(body.pageId, body.memo);
+        break;
+      case 'saveMindmap':
+        result = saveMindmap_(body.pageId, body.mindmap);
         break;
       case 'updateRawContextCount':
         result = updateRawContextCount_(body.pageId, body.count);
@@ -216,6 +220,7 @@ function fetchSummary_(pageId) {
       updatedAt: page.last_edited_time,
       tags: tagsOf_(props),
       memo: richTextOf_(props, PROP_MEMO),
+      mindmap: richTextOf_(props, PROP_MINDMAP),
       rawContextCount: numberOf_(props, PROP_RAW_COUNT),
     };
   }
@@ -233,6 +238,7 @@ function fetchSummary_(pageId) {
     updatedAt: page.last_edited_time,
     tags: tagsOf_(props),
     memo: richTextOf_(props, PROP_MEMO),
+    mindmap: richTextOf_(props, PROP_MINDMAP),
     rawContextCount: numberOf_(props, PROP_RAW_COUNT),
   };
 }
@@ -385,6 +391,14 @@ function savePermissions_(pageIds, permissions, mode) {
 function saveMemo_(pageId, memo) {
   var props = {};
   props[PROP_MEMO] = richTextProp_(memo);
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/** マインドマップのツリーをJSON文字列のまま保存する */
+function saveMindmap_(pageId, mindmap) {
+  var props = {};
+  props[PROP_MINDMAP] = richTextProp_(mindmap);
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true };
 }
