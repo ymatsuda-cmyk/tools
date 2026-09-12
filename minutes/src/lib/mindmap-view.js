@@ -174,6 +174,33 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
   }
 
   /**
+   * カーソルの枝が見えていなければ、見える位置まで盤面を動かす。
+   * markmapのzoomをd3のtransition経由で動かすので、滑り込むように寄る。
+   * 枝の遷移中は位置が定まらないため、呼び出し側が待ち時間を指定する。
+   */
+  let revealTimer = null
+  function reveal(delay = 0) {
+    clearTimeout(revealTimer)
+    revealTimer = setTimeout(() => {
+      const g = gOf(current)
+      const d3 = window.d3
+      if (!g || !d3 || !mm.svg || !mm.zoom) return
+      const box = g.getBoundingClientRect()
+      const view = container.getBoundingClientRect()
+      const margin = 48
+      let dx = 0
+      let dy = 0
+      if (box.left < view.left + margin) dx = view.left + margin - box.left
+      else if (box.right > view.right - margin) dx = view.right - margin - box.right
+      if (box.top < view.top + margin) dy = view.top + margin - box.top
+      else if (box.bottom > view.bottom - margin) dy = view.bottom - margin - box.bottom
+      if (!dx && !dy) return
+      const t = d3.zoomTransform(mm.svg.node())
+      mm.svg.transition().duration(320).call(mm.zoom.transform, t.translate(dx / t.k, dy / t.k))
+    }, delay)
+  }
+
+  /**
    * Markdownを差し替える。描き直しではなく markmap にデータだけ渡すので、
    * 表示位置と拡大率はそのままで、増えた枝だけが現れる。
    * setData は initialExpandLevel を当て直してしまうため、開閉は自分で持ち回して
@@ -196,6 +223,9 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     ;({ lines, indexes } = nodeLineIndexes(state.markdown))
     current = all[Math.min(Math.max(cursorPos, 0), all.length - 1)] || all[0]
     paint()
+    // 枝の描き直しが終わってから、もう一度カーソルを当て直す
+    requestAnimationFrame(paint)
+    reveal(260)
     if (opts.changed) options.onChange?.(nextMarkdown)
     if (opts.edit) requestAnimationFrame(() => startEdit())
   }
@@ -215,12 +245,14 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     const at = list.indexOf(current)
     current = list[Math.min(list.length - 1, Math.max(0, at + delta))] || current
     paint()
+    reveal()
   }
 
   async function toggle() {
     if (!current.children?.length) return
     await mm.toggleNode(current)
     paint()
+    reveal(260)
   }
 
   function startEdit() {
@@ -302,13 +334,13 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     else if (e.key === 'ArrowRight') {
       e.preventDefault()
       if (current.payload?.fold) toggle()
-      else if (current.children?.length) { current = current.children[0]; paint() }
+      else if (current.children?.length) { current = current.children[0]; paint(); reveal() }
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault()
       if (!current.payload?.fold && current.children?.length) toggle()
       else {
         const parent = all.find((n) => (n.children || []).includes(current))
-        if (parent) { current = parent; paint() }
+        if (parent) { current = parent; paint(); reveal() }
       }
     } else if (e.key === ' ') { e.preventDefault(); startEdit() }
     else if (e.key === 'Tab') { e.preventDefault(); addNode('child') }
