@@ -153,7 +153,7 @@ function markerToHtml(markdown) {
  * @param {HTMLElement} container
  * @param {string} value Notionの「マインドマップ」プロパティの生値
  * @param {string} videoUrl
- * @param {{onNodeClick?: (nodeIndex: number) => void, onChange?: (markdown: string) => void, cursorIndex?: number, editOnRender?: boolean, autoFocus?: boolean}} options
+ * @param {{onNodeClick?: (nodeIndex: number) => void, onChange?: (markdown: string) => void, autoFocus?: boolean}} options
  */
 export async function renderMindmap(container, value, videoUrl = '', options = {}) {
   const raw = String(value ?? '').trim()
@@ -179,13 +179,12 @@ export async function renderMindmap(container, value, videoUrl = '', options = {
 
   try {
     const { Markmap, Transformer } = await loadMarkmap()
-    const { root } = new Transformer().transform(markerToHtml(linkTimecodes(raw, videoUrl)))
-    const mm = Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12 }, root)
-    if (options.onNodeClick) bindNodeClick(svg, root, options.onNodeClick)
-    bindCursor(container, svg, mm, root, raw, options, (next, cursorIndex, opts = {}) => {
-      if (opts.changed) options.onChange?.(next)
-      renderMindmap(container, next, videoUrl, { ...options, cursorIndex, editOnRender: Boolean(opts.edit) })
-    })
+    const transformer = new Transformer()
+    const toRoot = (md) => transformer.transform(markerToHtml(linkTimecodes(md, videoUrl))).root
+    const state = { markdown: raw, root: toRoot(raw) }
+    const mm = Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12 }, state.root)
+    if (options.onNodeClick) bindNodeClick(svg, state, options.onNodeClick)
+    bindCursor(container, svg, mm, state, options, toRoot)
   } catch (err) {
     // 描画できなくても内容は読めるようにしておく
     container.innerHTML = `
@@ -235,17 +234,23 @@ function bareLabel(line) {
   return splitLabel(splitPrefix(line).label).text.replace(MARKER_TAG, '$2').trim()
 }
 
-function bindCursor(container, svg, mm, root, markdown, options, redraw) {
-  const all = []
+/** 内容のあるノードを前順で。Markdownの非空行と同じ並びになる */
+function contentNodes(root) {
+  const out = []
   ;(function walk(node) {
-    if (String(node?.content ?? '').trim()) all.push(node)
+    if (String(node?.content ?? '').trim()) out.push(node)
     ;(node?.children || []).forEach(walk)
   })(root)
+  return out
+}
+
+function bindCursor(container, svg, mm, state, options, toRoot) {
+  const editable = typeof options.onChange === 'function'
+  let all = contentNodes(state.root)
   if (!all.length) return
 
-  const { lines, indexes } = nodeLineIndexes(markdown)
-  const editable = typeof options.onChange === 'function'
-  let current = all[Math.min(Math.max(options.cursorIndex ?? 0, 0), all.length - 1)]
+  let { lines, indexes } = nodeLineIndexes(state.markdown)
+  let current = all[0]
   let editing = false
 
   container.tabIndex = 0
@@ -259,13 +264,41 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
     gOf(current)?.classList.add('mm-current')
   }
 
+  /**
+   * Markdownを差し替える。描き直しではなく markmap にデータだけ渡すので、
+   * 表示位置と拡大率はそのままで、増えた枝だけが現れる。
+   * setData は initialExpandLevel を当て直してしまうため、開閉は自分で持ち回して
+   * 新しい木へ写し、以後は -1(データの指定に従う)に切り替える。
+   */
+  function apply(nextMarkdown, cursorPos, opts = {}) {
+    const folds = all.map((n) => (n.payload?.fold ? 1 : 0))
+    const nextRoot = toRoot(nextMarkdown)
+    const nextAll = contentNodes(nextRoot)
+    nextAll.forEach((node, i) => {
+      const from = opts.insertedAt == null || i < opts.insertedAt ? i : i === opts.insertedAt ? -1 : i - 1
+      node.payload = { ...(node.payload || {}), fold: from >= 0 ? folds[from] || 0 : 0 }
+    })
+
+    state.markdown = nextMarkdown
+    state.root = nextRoot
+    mm.setData(nextRoot, { initialExpandLevel: -1 })
+
+    // setData はノードを複製するので、DOMに結び付いた実体を取り直す
+    all = contentNodes(state.root)
+    ;({ lines, indexes } = nodeLineIndexes(state.markdown))
+    current = all[Math.min(Math.max(cursorPos, 0), all.length - 1)] || all[0]
+    paint()
+    if (opts.changed) options.onChange?.(nextMarkdown)
+    if (opts.edit) requestAnimationFrame(() => startEdit())
+  }
+
   function visible() {
     const out = []
     ;(function walk(node) {
       if (String(node?.content ?? '').trim()) out.push(node)
       if (node?.payload?.fold) return
       ;(node?.children || []).forEach(walk)
-    })(root)
+    })(state.root)
     return out
   }
 
@@ -287,6 +320,7 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
     const div = g?.querySelector('.markmap-foreign') || g?.querySelector('foreignObject div')
     if (!editable || editing || !div) return
     const at = lineOf(current)
+    const pos = posOf(current)
     const original = bareLabel(lines[at])
 
     editing = true
@@ -308,10 +342,10 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
         const next = [...lines]
         const { prefix, label } = splitPrefix(next[at])
         next[at] = prefix + withTimecode(text, splitLabel(label).at)
-        redraw(next.join('\n'), posOf(current), { changed: true })
+        apply(next.join('\n'), pos, { changed: true })
       } else {
-        // 編集欄に生の文言を出しているため、やめたときは描き直して見た目を戻す
-        redraw(markdown, posOf(current), { changed: false })
+        // 編集欄に生の文言を出しているため、やめたときは同じMarkdownで描き直して見た目を戻す
+        apply(state.markdown, pos)
       }
     }
 
@@ -333,7 +367,8 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
     const endPos = subtreeEnd(lines, indexes, pos)
     const next = [...lines]
     next.splice(indexes[endPos] + 1, 0, prefix + NEW_LABEL)
-    redraw(next.join('\n'), endPos + 1, { changed: true, edit: true })
+    if (asChild && current.payload?.fold) current.payload = { ...current.payload, fold: 0 }
+    apply(next.join('\n'), endPos + 1, { changed: true, edit: true, insertedAt: endPos + 1 })
   }
 
   svg.addEventListener('click', (e) => {
@@ -365,7 +400,6 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
 
   paint()
   if (options.autoFocus !== false) container.focus({ preventScroll: true })
-  if (options.editOnRender) startEdit()
 }
 
 /**
@@ -373,21 +407,14 @@ function bindCursor(container, svg, mm, root, markdown, options, redraw) {
  * 木を前順でたどった順番と、Markdownの空行を除いた行の順番は一致する。
  * 折りたたみの丸とリンクは markmap 側の操作なので拾わない。
  */
-function bindNodeClick(svg, root, onNodeClick) {
-  const indexOf = new Map()
-  // 先頭が見出しでないMarkdownでは、中身の無い根が1つ足される。数えると1つずれる
-  ;(function walk(node) {
-    if (!node) return
-    if (String(node.content ?? '').trim()) indexOf.set(node, indexOf.size)
-    ;(node.children || []).forEach(walk)
-  })(root)
-
+function bindNodeClick(svg, state, onNodeClick) {
   svg.addEventListener('click', (e) => {
     if (e.target.closest('a') || e.target.closest('circle')) return
     const g = e.target.closest('g.markmap-node')
     if (!g) return
-    const index = indexOf.get(window.d3?.select(g).datum())
-    if (index === undefined) return
+    // 枝を足したあとは木が入れ替わるため、対応表は作り置きせずその都度たどる
+    const index = contentNodes(state.root).indexOf(window.d3?.select(g).datum())
+    if (index < 0) return
     const label = g.querySelector('.markmap-foreign') || g.querySelector('foreignObject div')
     if (label) onNodeClick(index, label)
   })

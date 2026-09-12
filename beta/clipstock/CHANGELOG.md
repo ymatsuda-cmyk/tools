@@ -15,6 +15,7 @@ Rate the ideas yourself, one by one or in bulk
 - Rolled back the stars of any group whose save failed and reported it, leaving the groups that succeeded untouched.
 - Asked for the list JSON rebuild right away after a star change instead of letting it sit in the 30s/5min throttle. The feed is drawn from `idea-*.json`, so without it the new order only appeared after the next unrelated save.
 - Put a cursor on the mindmap. It starts on the centre node, moves with the arrow keys, and Space edits the branch in place by turning markmap's own label element into a contenteditable seeded with the raw Markdown text (so markers and timecodes are not swallowed into the label). Tab adds a child, Enter adds a sibling, and the edit is written back into the Markdown and saved.
+- Fed the edited Markdown back through `setData` instead of rebuilding the map, so only the new branch animates in and the zoom and pan stay put. Folds are carried over by hand because `setData` would otherwise re-apply `initialExpandLevel` and close everything the reader had opened.
 
 ### Affected Files
 

@@ -13,6 +13,7 @@ Mindmap tab for the detail pane
 - Generate from the transcript with the active LLM connection as structured JSON (`{title, branches}`) and build the Markdown here, so a model cannot break the markmap parse. Falls back to the summary structure when generation fails.
 - Added a 手で直す mode that edits the Markdown directly, with the unsaved-changes warning when leaving the tab.
 - Put a cursor on the map: it starts on the centre node, moves with the arrow keys, folds with ←/→, edits in place with Space, and adds a child with Tab or a sibling with Enter. Edits are written back into the Markdown as an unsaved draft.
+- Fed the edited Markdown back through `setData` instead of rebuilding the map, so only the new branch appears and the zoom, pan and folds stay as they were.
 
 ### Release Affected Files
 
