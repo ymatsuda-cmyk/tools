@@ -10,7 +10,7 @@ import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
 
 // 中心テーマ(深さ0)と大項目(##、深さ1)まで開き、第3階層以降は畳んだ状態で描く
-const EXPAND_LEVEL = 1
+const EXPAND_LEVEL = 2
 
 /**
  * ファイル名を直接指定しないこと。
