@@ -9,6 +9,9 @@ import { plainTextOf } from './markers.js'
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
 
+// 中心テーマ(深さ0)と大項目(##、深さ1)まで開き、第3階層以降は畳んだ状態で描く
+const EXPAND_LEVEL = 1
+
 /**
  * ファイル名を直接指定しないこと。
  * ブラウザ向けの実体は markmap-view が dist/browser/index.js なのに対し、
@@ -73,7 +76,7 @@ export async function renderMindmap(container, markdown) {
   try {
     const { Markmap, Transformer } = await loadMarkmap()
     const { root } = new Transformer().transform(raw)
-    Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12 }, root)
+    Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12, initialExpandLevel: EXPAND_LEVEL }, root)
   } catch (err) {
     // 描画できなくても内容は読めるようにしておく
     container.innerHTML = `
