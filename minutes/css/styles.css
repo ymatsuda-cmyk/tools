@@ -551,7 +551,9 @@ body {
 
 /* --- マインドマップタブ(markmapで描画) --- */
 .mindmap-host { width: 100%; height: calc(100vh - 340px); min-height: 300px; background: var(--surface-2); border-radius: var(--radius); }
+.mindmap-host:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-bg); }
 .mindmap-svg { width: 100%; height: 100%; display: block; }
+.markmap-node.mm-current .markmap-foreign { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
 .mindmap-source {
   width: 100%;
   height: calc(100vh - 360px);

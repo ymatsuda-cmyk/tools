@@ -76,7 +76,8 @@ export async function renderMindmap(container, markdown) {
   try {
     const { Markmap, Transformer } = await loadMarkmap()
     const { root } = new Transformer().transform(raw)
-    Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12, initialExpandLevel: EXPAND_LEVEL }, root)
+    const mm = Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12, initialExpandLevel: EXPAND_LEVEL }, root)
+    bindKeyboard(container, svg, mm, root)
   } catch (err) {
     // 描画できなくても内容は読めるようにしておく
     container.innerHTML = `
@@ -84,6 +85,85 @@ export async function renderMindmap(container, markdown) {
       <pre class="mindmap-fallback">${raw.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>
     `
   }
+}
+
+/** 折りたたまれていない、画面に出ている順のノード */
+function visibleNodes(root) {
+  const out = []
+  ;(function walk(node) {
+    out.push(node)
+    if (node.payload?.fold) return
+    ;(node.children || []).forEach(walk)
+  })(root)
+  return out
+}
+
+function parentOf(root, target) {
+  for (const node of visibleNodes(root)) {
+    if ((node.children || []).includes(target)) return node
+  }
+  return null
+}
+
+/**
+ * カーソルキーでの移動と、スペースでの開閉。
+ * 枝の識別はd3が要素に結び付けたデータで行う(markmapが振る属性に依存しない)。
+ */
+function bindKeyboard(container, svg, mm, root) {
+  container.tabIndex = 0
+  let current = root
+
+  const gOf = (node) =>
+    [...svg.querySelectorAll('g.markmap-node')].find((g) => window.d3?.select(g).datum() === node)
+
+  function paint() {
+    svg.querySelectorAll('g.mm-current').forEach((g) => g.classList.remove('mm-current'))
+    const g = gOf(current)
+    if (g) g.classList.add('mm-current')
+  }
+
+  async function toggle() {
+    if (!current.children?.length) return
+    await mm.toggleNode(current)
+    paint()
+  }
+
+  function move(delta) {
+    const list = visibleNodes(root)
+    const at = list.indexOf(current)
+    const next = list[Math.min(list.length - 1, Math.max(0, at + delta))]
+    if (next) current = next
+    paint()
+  }
+
+  svg.addEventListener('click', (e) => {
+    const g = e.target.closest('g.markmap-node')
+    const node = g && window.d3?.select(g).datum()
+    if (node) { current = node; paint() }
+    container.focus({ preventScroll: true })
+  })
+
+  container.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); move(1) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1) }
+    else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      if (current.payload?.fold) toggle()
+      else if (current.children?.length) { current = current.children[0]; paint() }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      if (!current.payload?.fold && current.children?.length) toggle()
+      else {
+        const parent = parentOf(root, current)
+        if (parent) { current = parent; paint() }
+      }
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      toggle()
+    }
+  })
+
+  paint()
 }
 
 /** マインドマップタブの描画先に、保存済みのMarkdownを描く */
