@@ -25,6 +25,7 @@ import {
   mergeTag,
   deleteVideo,
   registerPageSources,
+  requestRebuildNow,
 } from './lib/gas.js'
 import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
@@ -917,6 +918,7 @@ async function changeSectionRank(item, field, index, rank) {
     await saveField(item.key, field, next)
     setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
     syncIdeaFeed(item.key, field, next)
+    requestRebuildNow('rank')
   } catch (err) {
     detail.detail = { ...detail.detail, [field]: before }
     paintDetail()
@@ -1435,6 +1437,7 @@ async function rankIdea(key, kind, sec, rank) {
     if (next === before) throw new Error('このアイデアが見つかりません。作り直された可能性があります')
     await saveField(key, kind, next)
     setDetailCache(key, { ...d, [kind]: next, updatedAt: new Date().toISOString() })
+    requestRebuildNow('rank')
   } catch (err) {
     entry.rank = prevRank
     paintIdeas()
@@ -1484,6 +1487,7 @@ async function bulkRankIdeas(rank) {
     paintIdeas()
     alert('★を変えられなかったものがあります:\n' + failed.join('\n'))
   }
+  if (failed.length < groups.size) requestRebuildNow('rank')
 }
 
 /** 決め打ちのシードで並べ替えて先頭n件。再描画しても同じ並びになる */

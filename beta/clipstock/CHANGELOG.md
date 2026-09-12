@@ -13,6 +13,7 @@ Rate the ideas yourself, one by one or in bulk
 - Added drag-to-select over the cards. The rubber band only starts after the pointer travels 5px, so a plain click still opens a card, and Shift/Ctrl while releasing adds to the current selection instead of replacing it.
 - Grouped the bulk write by video and kind before saving. 応用 and 活用 each pack several ideas into one text property, so saving per idea would overwrite the previous write and lose the earlier stars.
 - Rolled back the stars of any group whose save failed and reported it, leaving the groups that succeeded untouched.
+- Asked for the list JSON rebuild right away after a star change instead of letting it sit in the 30s/5min throttle. The feed is drawn from `idea-*.json`, so without it the new order only appeared after the next unrelated save.
 
 ### Affected Files
 

@@ -202,13 +202,27 @@ function scheduleRebuild(reason) {
   const wait = Math.max(REBUILD_DEBOUNCE_MS, rebuildSentAt + REBUILD_MIN_GAP_MS - Date.now())
   rebuildTimer = setTimeout(() => {
     rebuildTimer = null
-    rebuildSentAt = Date.now()
-    const label = [...rebuildReasons].join(',')
-    rebuildReasons.clear()
-    callGas('requestRebuild', { reason: label })
-      .then(() => console.info('[clipstock] 一覧JSONの作り直しを依頼しました:', label))
-      .catch((err) => console.warn('[clipstock] 作り直しの依頼に失敗:', err.message || err))
+    sendRebuild()
   }, wait)
+}
+
+function sendRebuild() {
+  rebuildSentAt = Date.now()
+  const label = [...rebuildReasons].join(',')
+  rebuildReasons.clear()
+  return callGas('requestRebuild', { reason: label })
+    .then(() => console.info('[clipstock] 一覧JSONの作り直しを依頼しました:', label))
+    .catch((err) => console.warn('[clipstock] 作り直しの依頼に失敗:', err.message || err))
+}
+
+/** 間引きを飛ばしてすぐ依頼する。★の付け直しのように一覧の並びへ即反映したい操作用 */
+export function requestRebuildNow(reason) {
+  rebuildReasons.add(String(reason || 'rank'))
+  if (rebuildTimer) {
+    clearTimeout(rebuildTimer)
+    rebuildTimer = null
+  }
+  return sendRebuild()
 }
 
 /** 権限コードを検証する。共有トークンは不要(初回はまだ手元に無いため) */
