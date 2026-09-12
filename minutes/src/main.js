@@ -8,6 +8,7 @@ import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } fro
 import { renderMarkdown } from './lib/markdown.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
+import { setupMindmapTab } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -22,7 +23,7 @@ let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
 const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
-const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
+const activeTabByKey = {} // item.key -> 'summary'|'mindmap'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
@@ -317,6 +318,9 @@ function paintDetail(target, item, state) {
 
   if (target.querySelector('#rawchat-messages')) {
     setupRawChatTab(target, item, renderState)
+  }
+  if (target.querySelector('#mindmap-slot')) {
+    setupMindmapTab(target, item, renderState)
   }
   setupMarkerUI(target, item, renderState)
 

@@ -283,6 +283,22 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}</div>` : '<p class="empty-section">未登録</p>'}
     `,
+    mindmap: `
+      <div class="mindmap-panel">
+        <div class="mindmap-bar">
+          <button class="btn btn-mm-rebuild"><i class="ti ti-refresh" aria-hidden="true"></i>要約から作り直す</button>
+          <span style="flex:1"></span>
+          <div class="mindmap-zoom">
+            <button class="btn-ghost" data-mm="out" aria-label="縮小"><i class="ti ti-minus" aria-hidden="true"></i></button>
+            <span class="mindmap-zoom-level">100%</span>
+            <button class="btn-ghost" data-mm="in" aria-label="拡大"><i class="ti ti-plus" aria-hidden="true"></i></button>
+            <button class="btn-ghost" data-mm="fit" aria-label="全体表示"><i class="ti ti-maximize" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div id="mindmap-slot" class="mindmap-slot"></div>
+        <p class="mindmap-hint">クリックで選択、ダブルクリックで編集、Tabで子を追加、Deleteで削除。背景ドラッグで移動できます。</p>
+      </div>
+    `,
     memo: `<textarea class="memo-textarea" id="memo-textarea" placeholder="自由に記入できます">${escapeHtml(state.memo ?? '')}</textarea>`,
     chat: `<div id="rawchat-messages" class="chat-messages"></div>`,
   }
@@ -297,6 +313,7 @@ export function renderDetailHtml(item, state) {
       </div>
       <div class="detail-tabs">
         <button class="detail-tab ${tab('summary')}" data-tab="summary">サマリ</button>
+        <button class="detail-tab ${tab('mindmap')}" data-tab="mindmap">マインドマップ</button>
         <button class="detail-tab ${tab('agenda')}" data-tab="agenda">議事</button>
         <button class="detail-tab ${tab('decisions')}" data-tab="decisions">決定事項</button>
         <button class="detail-tab ${tab('todos')}" data-tab="todos">ToDo</button>

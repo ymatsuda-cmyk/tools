@@ -1,5 +1,26 @@
 # Change Log
 
+## 1.3.0 - 2026-09-12
+
+### Release Title
+
+Mindmap tab for the detail pane
+
+### Release Changes
+
+- Added a "マインドマップ" tab next to サマリ in the detail pane.
+- Added mindmap view module that builds a tree from the summary (サマリ・議事・決定事項・ToDo・論点) and renders it with `api/mindmap/mindmap.api.js`.
+- Mounted the renderer once and reused the viewport across tab switches, keeping node edits per item.
+- Added zoom / fit / rebuild controls and scoped mindmap styles so they do not collide with the app styles.
+
+### Release Affected Files
+
+- `minutes/index.html`
+- `minutes/src/main.js`
+- `minutes/src/ui/render.js`
+- `minutes/src/lib/mindmap-view.js`
+- `minutes/css/styles.css`
+
 ## 1.2.0 - 2026-09-04
 
 ### Release Title

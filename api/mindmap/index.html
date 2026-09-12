@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>マインドマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mindmap.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">マインドマップ<span>原文から構造化して編集する</span></div>
+    <div class="bar-spacer"></div>
+    <button class="btn" id="togglePanel">原文パネル</button>
+    <div class="zoom">
+      <button id="zoomOut" aria-label="縮小">−</button>
+      <span id="zoomLabel">100%</span>
+      <button id="zoomIn" aria-label="拡大">＋</button>
+      <button id="zoomFit" aria-label="全体表示" title="全体表示">⤢</button>
+    </div>
+    <button class="btn" id="copyJson">JSONをコピー</button>
+  </header>
+
+  <div class="main">
+    <aside class="side" id="side">
+      <div class="tabs">
+        <button id="tabText" class="on">原文から作る</button>
+        <button id="tabJson">作成済みを表示</button>
+      </div>
+      <div class="side-body">
+        <div class="pane on" id="paneText">
+          <p class="lead">原文を貼り付けて生成すると、10文字以内の要素に分解します。生成後はノードを直接編集できます。</p>
+          <textarea id="src" placeholder="議事録、メモ、記事などを貼り付けてください"></textarea>
+          <label class="opt"><input type="checkbox" id="useAI" checked> Claudeで構造化する（オフでローカル解析）</label>
+          <div class="side-actions">
+            <button class="btn primary" id="gen">マインドマップを作る</button>
+            <button class="btn" id="sample">例を入れる</button>
+          </div>
+        </div>
+        <div class="pane" id="paneJson">
+          <p class="lead">生成済みのツリーJSONを貼り付けると、AIを使わずそのまま描画します。編集やマーカーの変更は、ここへ自動で反映されます。</p>
+          <textarea id="json" placeholder='{"text":"中心テーマ","children":[{"text":"見出し"}]}'></textarea>
+          <div class="side-actions">
+            <button class="btn primary" id="load">表示する</button>
+            <button class="btn" id="jsonSample">例を入れる</button>
+          </div>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+    </aside>
+
+    <div class="mm-viewport" id="viewport">
+      <div class="empty" id="empty">原文を入れて「マインドマップを作る」を押してください</div>
+      <div class="hints">
+        <span><b>背景ドラッグ</b> 移動</span>
+        <span><b>クリック</b> 選択</span>
+        <span><b>ダブルクリック / Enter</b> 編集</span>
+        <span><b>Tab</b> 子を追加</span>
+        <span><b>Delete</b> 削除</span>
+        <span><b>Ctrl+Z</b> 取り消し</span>
+      </div>
+    </div>
+  </div>
+
+  <details class="api">
+    <summary>API仕様</summary>
+<pre>
+ファイル構成
+
+  index.html        画面のマークアップと、このページ固有の配線
+  mindmap.css       スタイル
+  mindmap.api.js    生成・描画・編集の本体（window.MindMap）
+
+ツリー形式（サーバーAPIのレスポンスもこの形にすると、そのまま描画できます）
+
+  {
+    "id": "n1",
+    "text": "原文テーマ",        // 10文字以内
+    "color": "green",           // purple | green | orange | yellow | pink | 省略で白
+    "collapsed": false,
+    "children": [ { ...同じ形... } ]
+  }
+
+パターン1: 原文からAIで生成する
+
+  MindMap.mount("#viewport");
+  MindMap.fromText(原文, { useAI: true }).then(MindMap.render);
+
+  POST https://api.anthropic.com/v1/messages を呼びます。
+  自前サーバーを使う場合は mindmap.api.js の callModel() を差し替えてください。
+  失敗時はローカル解析に自動で切り替わり、MindMap.lastSource が "local" になります。
+
+パターン2: 生成済みのツリーを渡して表示する
+
+  a) 「作成済みを表示」タブにJSONを貼り付ける
+  b) fetch("/api/mindmap?id=123").then(r =&gt; r.json()).then(MindMap.render)
+  c) 読み込み前に window.MINDMAP_DATA = {...} を定義しておく
+
+そのほか
+
+  MindMap.getData()          現在の編集結果（色の変更もここに入ります）
+  MindMap.toJSON()           整形済みJSON文字列
+  MindMap.on("change", fn)   編集のたびにツリーを受け取る
+  MindMap.on("zoom", fn)     倍率の変化を受け取る
+  MindMap.fit() / zoomIn() / zoomOut() / undo()
+</pre>
+  </details>
+</div>
+
+<script src="mindmap.api.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var TEXT_SAMPLE =
+    "新サービスのキックオフ会議\n" +
+    "背景\n" +
+    "・前回の施策から半年が経過した\n" +
+    "・市場環境が大きく変わっている\n" +
+    "決定事項\n" +
+    "・納期を二週間延長する\n" +
+    "・担当を田中から佐藤に交代する\n" +
+    "課題点\n" +
+    "・人員が不足している\n" +
+    "・仕様がまだ確定していない\n" +
+    "次回までの宿題\n" +
+    "・見積を再提出する\n" +
+    "・議事録を全員に共有する";
+
+  var JSON_SAMPLE = JSON.stringify({
+    text: "キックオフ",
+    children: [
+      { text: "背景", color: "green", children: [{ text: "半年が経過" }, { text: "市場が変化" }] },
+      { text: "決定事項", color: "orange", children: [{ text: "納期を延長" }, { text: "担当を交代" }] },
+      { text: "課題点", children: [{ text: "人員が不足" }, { text: "仕様が未確定" }] },
+      { text: "次回宿題", color: "yellow", children: [{ text: "見積を再提出" }, { text: "議事録を共有" }] }
+    ]
+  }, null, 2);
+
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $("status"), emptyEl = $("empty"), jsonBox = $("json");
+
+  function setStatus(msg, isErr) {
+    statusEl.textContent = msg || "";
+    statusEl.classList.toggle("err", !!isErr);
+  }
+
+  MindMap.mount("#viewport");
+
+  MindMap.on("change", function (tree) {
+    emptyEl.style.display = tree ? "none" : "flex";
+    if (document.activeElement !== jsonBox) {
+      jsonBox.value = tree ? JSON.stringify(tree, null, 2) : "";
+    }
+  });
+  MindMap.on("zoom", function (z) {
+    $("zoomLabel").textContent = Math.round(z * 100) + "%";
+  });
+
+  /* タブ */
+  function setTab(which) {
+    var t = (which === "text");
+    $("tabText").classList.toggle("on", t);
+    $("tabJson").classList.toggle("on", !t);
+    $("paneText").classList.toggle("on", t);
+    $("paneJson").classList.toggle("on", !t);
+    setStatus("");
+  }
+  $("tabText").onclick = function () { setTab("text"); };
+  $("tabJson").onclick = function () { setTab("json"); };
+
+  /* パターン1: 原文から生成 */
+  $("sample").onclick = function () { $("src").value = TEXT_SAMPLE; };
+  $("gen").onclick = function () {
+    var src = $("src").value.trim();
+    if (!src) { setStatus("原文を入れてください", true); return; }
+    var useAI = $("useAI").checked;
+    var btn = this;
+    btn.disabled = true;
+    setStatus(useAI ? "Claudeで構造化しています…" : "解析しています…");
+    MindMap.fromText(src, { useAI: useAI }).then(function (tree) {
+      MindMap.render(tree);
+      if (MindMap.lastSource === "local" && useAI) {
+        setStatus("AIに接続できなかったため、ローカル解析で作成しました（" + MindMap.count() + "要素）", true);
+      } else {
+        setStatus(MindMap.count() + "要素を作成しました。ノードをクリックして編集できます");
+      }
+    }).catch(function (err) {
+      setStatus("作成に失敗しました: " + err.message, true);
+    }).then(function () { btn.disabled = false; });
+  };
+
+  /* パターン2: 生成済みJSONを表示 */
+  $("jsonSample").onclick = function () { jsonBox.value = JSON_SAMPLE; };
+  $("load").onclick = function () {
+    var raw = jsonBox.value.trim();
+    if (!raw) { setStatus("JSONを入れてください", true); return; }
+    var tree;
+    try { tree = JSON.parse(raw); }
+    catch (err) { setStatus("JSONを読めませんでした: " + err.message, true); return; }
+    if (!tree || typeof tree.text !== "string") { setStatus("最上位に text が必要です", true); return; }
+    MindMap.render(tree);
+    setStatus(MindMap.count() + "要素を表示しました");
+  };
+
+  /* 表示操作 */
+  $("zoomIn").onclick = function () { MindMap.zoomIn(); };
+  $("zoomOut").onclick = function () { MindMap.zoomOut(); };
+  $("zoomFit").onclick = function () { MindMap.fit(); };
+  $("togglePanel").onclick = function () {
+    $("side").classList.toggle("hidden");
+    setTimeout(function () { MindMap.fit(); }, 0);
+  };
+  $("copyJson").onclick = function () {
+    var t = MindMap.toJSON();
+    if (t === "null") { setStatus("まだマインドマップがありません", true); return; }
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    setStatus("JSONをクリップボードにコピーしました");
+  };
+
+  /* 外部から渡されたデータ */
+  if (window.MINDMAP_DATA) {
+    try { MindMap.render(window.MINDMAP_DATA); setTab("json"); }
+    catch (err) { setStatus("MINDMAP_DATA を読めませんでした: " + err.message, true); }
+  }
+})();
+</script>
+</body>
+</html>
