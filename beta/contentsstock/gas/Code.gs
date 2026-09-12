@@ -15,19 +15,24 @@
  *  - ACCESS_TOKEN    フロントの contents:config.accessToken と一致させる共有トークン
  *  - code            権限コードと権限の対応 JSON 例: {"dfkjnga":"xYz","abc":"team"}
  *  - CONTENTS_DB_ID  コンテンツDBのID(省略時は下の DEFAULT_DB_ID を使う)
+ *  - INBOX_FOLDER_ID 動画の取り込み先フォルダのID(省略時は DEFAULT_INBOX_FOLDER_ID)
  *
  * デプロイ:
  *  - 種類: ウェブアプリ / 実行するユーザー: 自分 / アクセス: 全員
  *    (URLを知っていれば誰でも叩けるため ACCESS_TOKEN のチェックを必ず通す)
+ *  - 高度なサービスで Drive API を有効にしておくこと(動画アップロードで使う)
  */
 
 var NOTION_VERSION = '2022-06-28';
 var DEFAULT_DB_ID = 'd600e7a535dc83caadf381afe7abea03';
+// 動画の取り込み先(inbox)。Mac側の監視スクリプトがここを見て文字起こしする
+var DEFAULT_INBOX_FOLDER_ID = '10dNn2zgtWCL4FpyYzam_EayKNtD7mGkz';
 
 // ---- プロパティ名(Notion側のカラム名とここを一致させること) ----
 var PROP_TITLE     = 'タイトル';       // title
 var PROP_FILE      = 'ファイル名';     // rich_text  取り込み元のファイル名
-var PROP_KIND      = '種別';           // select     pdf / docx / xlsx / pptx / txt
+var PROP_DRIVE     = 'Driveリンク';     // url        取り込んだ元ファイル(動画はここから再生)
+var PROP_KIND      = '種別';           // select     mp4 / mov / pdf / docx ...
 var PROP_TAGS      = 'タグ';           // multi_select
 var PROP_STATUS    = '状態';           // select
 var PROP_SUMMARY   = '要約';           // rich_text  カード用サマリ
@@ -113,6 +118,15 @@ function doPost(e) {
       case 'takeRebuildRequest':
         result = takeRebuildRequest_();
         break;
+      case 'initUpload':
+        result = initUpload_(body);
+        break;
+      case 'putChunk':
+        result = putChunk_(body);
+        break;
+      case 'writeSidecar':
+        result = writeSidecar_(body);
+        break;
       default:
         throw new Error('unknown action: ' + body.action);
     }
@@ -195,6 +209,11 @@ function multiSelectOf_(properties, name) {
 function checkboxOf_(properties, name) {
   var prop = properties[name];
   return Boolean(prop && prop.checkbox);
+}
+
+function urlOf_(properties, name) {
+  var prop = properties[name];
+  return (prop && prop.url) || '';
 }
 
 function titleOf_(properties, name) {
@@ -289,6 +308,7 @@ function toListItem_(page) {
     source: 'doc',
     title: titleAnyOf_(p) || richTextOf_(p, PROP_FILE) || '(タイトル未設定)',
     file: richTextOf_(p, PROP_FILE),
+    driveUrl: urlOf_(p, PROP_DRIVE),
     kind: selectOf_(p, PROP_KIND),
     status: selectOf_(p, PROP_STATUS) || STATUS_DONE,
     tags: multiSelectOf_(p, PROP_TAGS),
@@ -358,6 +378,7 @@ function fetchDetail_(pageId) {
   return {
     title: titleAnyOf_(p),
     file: richTextOf_(p, PROP_FILE),
+    driveUrl: urlOf_(p, PROP_DRIVE),
     kind: selectOf_(p, PROP_KIND),
     status: selectOf_(p, PROP_STATUS),
     tags: multiSelectOf_(p, PROP_TAGS),
@@ -596,4 +617,114 @@ function parseRebuild_(raw) {
   } catch (e) {
     return {};
   }
+}
+
+// ============ 動画のアップロード(ログイン不要) ============
+//
+// ブラウザ -> GAS -> Drive の inbox フォルダ、という中継にしている。
+// ブラウザから Drive の resumable セッションURLへ直接PUTするとCORSで弾かれるため、
+// バイト列もここを通す。1回の doPost は数MBのチャンクなので50MB制限には当たらない。
+
+function inboxFolderId_() {
+  return PropertiesService.getScriptProperties().getProperty('INBOX_FOLDER_ID') || DEFAULT_INBOX_FOLDER_ID;
+}
+
+/**
+ * Drive API(高度なサービス)を実際に呼ぶことで、Apps Script の静的解析に
+ * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() の
+ * トークンに Drive の書き込みスコープを含めさせる。
+ * 事前に「サービス」から Drive API を追加しておくこと。
+ */
+function touchDriveScope_() {
+  try {
+    Drive.About.get({ fields: 'user' });
+  } catch (e) {
+    // 未追加でも致命的ではない。本当にスコープが付かない場合は初回の403で気づける
+  }
+}
+
+/** アップロード先のセッションURLを、このスクリプトの権限で発行する */
+function initUpload_(body) {
+  touchDriveScope_();
+  var folderId = inboxFolderId_();
+  if (!folderId) throw new Error('INBOX_FOLDER_ID が未設定です');
+
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'application/json; charset=UTF-8',
+      headers: {
+        Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+        'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
+        'X-Upload-Content-Length': String(body.size || 0),
+      },
+      payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('Drive session failed (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+  var headers = res.getAllHeaders();
+  var sessionUrl = headers['Location'] || headers['location'];
+  if (!sessionUrl) throw new Error('セッションURLが取得できませんでした');
+  return { sessionUrl: sessionUrl };
+}
+
+/** 音声・動画のバイト列を中継する。308 はまだ途中、200/201 で完了 */
+function putChunk_(body) {
+  var bytes = Utilities.base64Decode(body.chunk);
+  var start = body.offset;
+  var end = start + bytes.length - 1;
+
+  var res = UrlFetchApp.fetch(body.sessionUrl, {
+    method: 'put',
+    contentType: 'application/octet-stream',
+    headers: { 'Content-Range': 'bytes ' + start + '-' + end + '/' + body.total },
+    payload: bytes,
+    muteHttpExceptions: true,
+  });
+
+  var code = res.getResponseCode();
+  if (code === 200 || code === 201) return { done: true, file: JSON.parse(res.getContentText()) };
+  if (code === 308) return { done: false };
+  throw new Error('chunk upload failed (' + code + '): ' + res.getContentText());
+}
+
+/**
+ * タイトルやメモなどのメタデータを、同じ名前の .json として同じフォルダに置く。
+ * Mac 側の取り込みスクリプトは、この出現を処理開始の合図として使う。
+ */
+function writeSidecar_(body) {
+  touchDriveScope_();
+  var folderId = inboxFolderId_();
+  if (!folderId) throw new Error('INBOX_FOLDER_ID が未設定です');
+
+  var boundary = '-------contentsUploader' + Date.now();
+  var payload =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify({ name: body.name, parents: [folderId] }) + '\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(body.meta) + '\r\n' +
+    '--' + boundary + '--';
+
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'multipart/related; boundary=' + boundary,
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      payload: payload,
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('JSON登録に失敗 (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+  return JSON.parse(res.getContentText());
 }
