@@ -1,0 +1,11 @@
+{
+  "id": "contentsstock-data",
+  "description": "文書ナレッジ(contentsstock)の一覧JSON",
+  "enabled": true,
+  "source_folder": "/Users/yuya/scripts/data/contentsstock",
+  "repository_root": "/Users/yuya/tools",
+  "repo_subfolder": "data/contentsstock",
+  "branch": "main",
+  "commit_message": "auto: update contentsstock index",
+  "remote_name": "origin"
+}
