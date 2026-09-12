@@ -331,7 +331,12 @@ function paintDetail(target, item, state) {
     setupRawChatTab(target, item, renderState)
   }
   if (target.querySelector('#mindmap-host')) {
-    renderMindmapTab(target, renderState.mindmap)
+    // 枝をその場で直した結果は下書きに溜め、保存ボタンでNotionへ送る
+    renderMindmapTab(target, renderState.mindmap, (markdown) => {
+      mindmapDraftByKey[pid] = markdown
+      const statusEl = target.querySelector('#mindmap-save-status')
+      if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
+    })
   }
   // Markdownを直接直している間は、入力のたびに下書きへ退避する
   const mindmapEl = target.querySelector('#mindmap-source')

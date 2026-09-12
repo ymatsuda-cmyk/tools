@@ -540,6 +540,7 @@ function wireDetail(item) {
     if (host) {
       renderMindmap(host, detail.detail?.mindmap, item.url, {
         onNodeClick: detail.canEdit ? (index, el) => commitNodeMarker(item, index, el) : null,
+        onChange: detail.canEdit ? (markdown) => saveMindmapEdit(item, markdown) : null,
       })
     }
   }
@@ -857,6 +858,22 @@ async function commitNodeMarker(item, nodeIndex, el) {
     detail.detail = { ...detail.detail, mindmap: before }
     paintDetail()
     alert('マーカーを保存できませんでした: ' + (err.message || err))
+  }
+}
+
+/** キーボードで直した枝を保存する。マップは描き直し済みなのでここでは触らない */
+async function saveMindmapEdit(item, markdown) {
+  const before = detail.detail?.mindmap ?? ''
+  if (markdown === before) return
+
+  detail.detail = { ...detail.detail, mindmap: markdown }
+  try {
+    await saveField(item.key, 'mindmap', markdown)
+    setDetailCache(item.key, { ...detail.detail, updatedAt: new Date().toISOString() })
+  } catch (err) {
+    detail.detail = { ...detail.detail, mindmap: before }
+    paintDetail()
+    alert('マインドマップを保存できませんでした: ' + (err.message || err))
   }
 }
 

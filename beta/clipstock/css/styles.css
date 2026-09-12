@@ -481,6 +481,15 @@ mark { background: var(--highlight); color: inherit; }
 /* 枝のマーカー。描き直し前は枝のラベルごと、描き直したあとは文字だけ塗られる */
 .mm-mark, .markmap-foreign.mm-marked { border-radius: 3px; padding: 0 2px; }
 
+.mindmap-host:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-bg); }
+.markmap-node.mm-current .markmap-foreign { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
+.markmap-foreign.mm-editing {
+  outline: 2px solid var(--accent);
+  background: var(--surface-2);
+  min-width: 60px;
+  cursor: text;
+}
+
 .mm-tools { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
 .mm-swatch {
   width: 20px;

@@ -153,7 +153,7 @@ function markerToHtml(markdown) {
  * @param {HTMLElement} container
  * @param {string} value Notionの「マインドマップ」プロパティの生値
  * @param {string} videoUrl
- * @param {{onNodeClick?: (nodeIndex: number) => void}} options
+ * @param {{onNodeClick?: (nodeIndex: number) => void, onChange?: (markdown: string) => void, cursorIndex?: number, editOnRender?: boolean, autoFocus?: boolean}} options
  */
 export async function renderMindmap(container, value, videoUrl = '', options = {}) {
   const raw = String(value ?? '').trim()
@@ -180,8 +180,12 @@ export async function renderMindmap(container, value, videoUrl = '', options = {
   try {
     const { Markmap, Transformer } = await loadMarkmap()
     const { root } = new Transformer().transform(markerToHtml(linkTimecodes(raw, videoUrl)))
-    Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12 }, root)
+    const mm = Markmap.create(svg, { duration: 200, spacingVertical: 6, paddingX: 12 }, root)
     if (options.onNodeClick) bindNodeClick(svg, root, options.onNodeClick)
+    bindCursor(container, svg, mm, root, raw, options, (next, cursorIndex, opts = {}) => {
+      if (opts.changed) options.onChange?.(next)
+      renderMindmap(container, next, videoUrl, { ...options, cursorIndex, editOnRender: Boolean(opts.edit) })
+    })
   } catch (err) {
     // 描画できなくても内容は読めるようにしておく
     container.innerHTML = `
@@ -189,6 +193,179 @@ export async function renderMindmap(container, value, videoUrl = '', options = {
       <pre class="mindmap-fallback">${raw.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>
     `
   }
+}
+
+// ---- カーソル操作とその場編集 ----
+//
+// 位置は「非空行の何番目か」で持つ。markmapの木を前順でたどった順番と一致するので、
+// 描き直しても同じ枝に戻れる。行の中身(マーカー・タイムコード)はMarkdown側で扱う。
+
+const NEW_LABEL = '新しい項目'
+
+/** その行がマップの何段目になるか。見出しの数とリストのインデントから決まる */
+function lineDepth(line) {
+  const heading = line.match(/^(#{1,6})\s/)
+  if (heading) return heading[1].length - 1
+  const item = line.match(/^(\s*)[-*+]\s/)
+  if (item) return 2 + Math.floor(item[1].length / 2)
+  return 99
+}
+
+/** その枝の1段下に足すときの行頭 */
+function childPrefixOf(line) {
+  const heading = line.match(/^(#{1,6})\s/)
+  if (heading) return heading[1].length < 2 ? '#'.repeat(heading[1].length + 1) + ' ' : '- '
+  const item = line.match(/^(\s*)[-*+]\s/)
+  return item ? ' '.repeat(item[1].length + 2) + '- ' : '- '
+}
+
+/** pos番目のノードの、ぶら下がりを含めた最後の位置 */
+function subtreeEnd(lines, indexes, pos) {
+  const depth = lineDepth(lines[indexes[pos]])
+  let last = pos
+  for (let i = pos + 1; i < indexes.length; i++) {
+    if (lineDepth(lines[indexes[i]]) <= depth) break
+    last = i
+  }
+  return last
+}
+
+/** 編集欄に出す、マーカーもタイムコードも外した文言 */
+function bareLabel(line) {
+  return splitLabel(splitPrefix(line).label).text.replace(MARKER_TAG, '$2').trim()
+}
+
+function bindCursor(container, svg, mm, root, markdown, options, redraw) {
+  const all = []
+  ;(function walk(node) {
+    if (String(node?.content ?? '').trim()) all.push(node)
+    ;(node?.children || []).forEach(walk)
+  })(root)
+  if (!all.length) return
+
+  const { lines, indexes } = nodeLineIndexes(markdown)
+  const editable = typeof options.onChange === 'function'
+  let current = all[Math.min(Math.max(options.cursorIndex ?? 0, 0), all.length - 1)]
+  let editing = false
+
+  container.tabIndex = 0
+  const gOf = (node) =>
+    [...svg.querySelectorAll('g.markmap-node')].find((g) => window.d3?.select(g).datum() === node)
+  const posOf = (node) => all.indexOf(node)
+  const lineOf = (node) => indexes[posOf(node)]
+
+  function paint() {
+    svg.querySelectorAll('g.mm-current').forEach((g) => g.classList.remove('mm-current'))
+    gOf(current)?.classList.add('mm-current')
+  }
+
+  function visible() {
+    const out = []
+    ;(function walk(node) {
+      if (String(node?.content ?? '').trim()) out.push(node)
+      if (node?.payload?.fold) return
+      ;(node?.children || []).forEach(walk)
+    })(root)
+    return out
+  }
+
+  function move(delta) {
+    const list = visible()
+    const at = list.indexOf(current)
+    current = list[Math.min(list.length - 1, Math.max(0, at + delta))] || current
+    paint()
+  }
+
+  async function toggle() {
+    if (!current.children?.length) return
+    await mm.toggleNode(current)
+    paint()
+  }
+
+  function startEdit() {
+    const g = gOf(current)
+    const div = g?.querySelector('.markmap-foreign') || g?.querySelector('foreignObject div')
+    if (!editable || editing || !div) return
+    const at = lineOf(current)
+    const original = bareLabel(lines[at])
+
+    editing = true
+    div.textContent = original
+    div.contentEditable = 'true'
+    div.classList.add('mm-editing')
+    div.focus()
+    const range = document.createRange()
+    range.selectNodeContents(div)
+    const selection = window.getSelection()
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    const finish = (commit) => {
+      if (!editing) return
+      editing = false
+      const text = div.textContent.replace(/\s+/g, ' ').trim()
+      if (commit && text && text !== original) {
+        const next = [...lines]
+        const { prefix, label } = splitPrefix(next[at])
+        next[at] = prefix + withTimecode(text, splitLabel(label).at)
+        redraw(next.join('\n'), posOf(current), { changed: true })
+      } else {
+        // 編集欄に生の文言を出しているため、やめたときは描き直して見た目を戻す
+        redraw(markdown, posOf(current), { changed: false })
+      }
+    }
+
+    div.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') { e.preventDefault(); finish(true) }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false) }
+    })
+    div.addEventListener('blur', () => finish(true), { once: true })
+  }
+
+  function addNode(kind) {
+    if (!editable || editing) return
+    const pos = posOf(current)
+    const line = lines[indexes[pos]]
+    // 中心テーマに兄弟を足すとh1が2つになり、根が分かれてしまうので子として足す
+    const asChild = kind === 'child' || pos === 0
+    const prefix = asChild ? childPrefixOf(line) : splitPrefix(line).prefix
+    const endPos = subtreeEnd(lines, indexes, pos)
+    const next = [...lines]
+    next.splice(indexes[endPos] + 1, 0, prefix + NEW_LABEL)
+    redraw(next.join('\n'), endPos + 1, { changed: true, edit: true })
+  }
+
+  svg.addEventListener('click', (e) => {
+    const g = e.target.closest('g.markmap-node')
+    const node = g && window.d3?.select(g).datum()
+    if (node && posOf(node) !== -1) { current = node; paint() }
+    if (!editing) container.focus({ preventScroll: true })
+  })
+
+  container.addEventListener('keydown', (e) => {
+    if (editing) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); move(1) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1) }
+    else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      if (current.payload?.fold) toggle()
+      else if (current.children?.length) { current = current.children[0]; paint() }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      if (!current.payload?.fold && current.children?.length) toggle()
+      else {
+        const parent = all.find((n) => (n.children || []).includes(current))
+        if (parent) { current = parent; paint() }
+      }
+    } else if (e.key === ' ') { e.preventDefault(); startEdit() }
+    else if (e.key === 'Tab') { e.preventDefault(); addNode('child') }
+    else if (e.key === 'Enter') { e.preventDefault(); addNode('sibling') }
+  })
+
+  paint()
+  if (options.autoFocus !== false) container.focus({ preventScroll: true })
+  if (options.editOnRender) startEdit()
 }
 
 /**
