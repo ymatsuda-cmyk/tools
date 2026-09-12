@@ -1380,6 +1380,11 @@ async function paintIdeas() {
       on ? ideasState.selected.add(id) : ideasState.selected.delete(id)
       paintIdeas()
     },
+    onSelectMany: (ids, additive) => {
+      if (!additive) ideasState.selected.clear()
+      ids.forEach((id) => ideasState.selected.add(id))
+      paintIdeas()
+    },
     onClearSelect: () => {
       ideasState.selected.clear()
       paintIdeas()

@@ -10,6 +10,7 @@ Rate the ideas yourself, one by one or in bulk
 
 - Stopped asking the model for a rank on 応用 and 活用. Every generated idea now starts at zero stars, so the ordering reflects your own reading rather than the model's self-assessment.
 - Added multi-select to the idea feed with a bulk star action in the toolbar. Setting or clearing stars applies to every selected idea at once.
+- Added drag-to-select over the cards. The rubber band only starts after the pointer travels 5px, so a plain click still opens a card, and Shift/Ctrl while releasing adds to the current selection instead of replacing it.
 - Grouped the bulk write by video and kind before saving. 応用 and 活用 each pack several ideas into one text property, so saving per idea would overwrite the previous write and lose the earlier stars.
 - Rolled back the stars of any group whose save failed and reported it, leaving the groups that succeeded untouched.
 

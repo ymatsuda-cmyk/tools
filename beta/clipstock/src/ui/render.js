@@ -595,6 +595,65 @@ export function renderIdeas(container, entries, state, handlers) {
   })
   container.querySelector('.btn-bulk-clear')?.addEventListener('click', () => handlers.onBulkRank(0))
   container.querySelector('.btn-bulk-cancel')?.addEventListener('click', handlers.onClearSelect)
+  if (state.canEdit) bindMarquee(container.querySelector('.idea-feed'), handlers)
+}
+
+/**
+ * カードの上をマウスでなぞって範囲選択する。
+ * 枠はclient座標のまま body に置く(フィード自身に置くとスクロール量の補正が要る)。
+ * 5px動くまではドラッグと見なさないので、カードのクリックはそのまま通る。
+ */
+function bindMarquee(feed, handlers) {
+  if (!feed) return
+
+  feed.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button, a, input')) return
+    const startX = e.clientX
+    const startY = e.clientY
+    let box = null
+
+    const areaOf = (x, y) => ({
+      left: Math.min(startX, x),
+      top: Math.min(startY, y),
+      right: Math.max(startX, x),
+      bottom: Math.max(startY, y),
+    })
+
+    const move = (ev) => {
+      if (!box && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return
+      if (!box) {
+        box = document.createElement('div')
+        box.className = 'marquee'
+        document.body.appendChild(box)
+        feed.classList.add('selecting')
+      }
+      ev.preventDefault()
+      const a = areaOf(ev.clientX, ev.clientY)
+      box.style.left = `${a.left}px`
+      box.style.top = `${a.top}px`
+      box.style.width = `${a.right - a.left}px`
+      box.style.height = `${a.bottom - a.top}px`
+      feed.querySelectorAll('.idea').forEach((el) => {
+        const r = el.getBoundingClientRect()
+        const hit = r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top
+        el.classList.toggle('marquee-hit', hit)
+      })
+    }
+
+    const up = (ev) => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      if (!box) return
+      box.remove()
+      feed.classList.remove('selecting')
+      const hits = [...feed.querySelectorAll('.idea.marquee-hit')]
+      hits.forEach((el) => el.classList.remove('marquee-hit'))
+      handlers.onSelectMany(hits.map((el) => el.dataset.id), ev.shiftKey || ev.ctrlKey || ev.metaKey)
+    }
+
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  })
 }
 
 /** listIdeas の結果を1件1アイデアのフィード用配列に展開する */
