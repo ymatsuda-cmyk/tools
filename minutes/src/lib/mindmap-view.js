@@ -173,6 +173,14 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
     gOf(current)?.classList.add('mm-current')
   }
 
+  // markmapは枝の大きさを測ってから描き、描き直しのたびにclassを付け直す。
+  // 一度付けただけだとカーソルが消えるので、描画が落ち着くまで付け直す
+  function paintSoon() {
+    paint()
+    requestAnimationFrame(paint)
+    setTimeout(paint, 300)
+  }
+
   /**
    * カーソルの枝が見えていなければ、見える位置まで盤面を動かす。
    * markmapのzoomをd3のtransition経由で動かすので、滑り込むように寄る。
@@ -206,7 +214,7 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
    * setData は initialExpandLevel を当て直してしまうため、開閉は自分で持ち回して
    * 新しい木へ写し、以後は -1(データの指定に従う)に切り替える。
    */
-  function apply(nextMarkdown, cursorPos, opts = {}) {
+  async function apply(nextMarkdown, cursorPos, opts = {}) {
     const folds = all.map((n) => (n.payload?.fold ? 1 : 0))
     const nextRoot = toRoot(nextMarkdown)
     contentNodes(nextRoot).forEach((node, i) => {
@@ -216,18 +224,23 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
 
     state.markdown = nextMarkdown
     state.root = nextRoot
-    mm.setData(nextRoot, { initialExpandLevel: -1 })
+    if (opts.changed) options.onChange?.(nextMarkdown)
+
+    // setData は大きさを測ってから描くため、終わるのを待たないと枝がまだDOMに無い
+    await mm.setData(nextRoot, { initialExpandLevel: -1 })
 
     // setData はノードを複製するので、DOMに結び付いた実体を取り直す
     all = contentNodes(state.root)
     ;({ lines, indexes } = nodeLineIndexes(state.markdown))
     current = all[Math.min(Math.max(cursorPos, 0), all.length - 1)] || all[0]
-    paint()
-    // 枝の描き直しが終わってから、もう一度カーソルを当て直す
-    requestAnimationFrame(paint)
-    reveal(260)
-    if (opts.changed) options.onChange?.(nextMarkdown)
-    if (opts.edit) requestAnimationFrame(() => startEdit())
+    paintSoon()
+    // 入力欄は枝の位置に重ねるので、枝の移動と盤面の寄せが終わってから出す
+    if (opts.edit) {
+      reveal(160)
+      setTimeout(startEdit, 500)
+    } else {
+      reveal(260)
+    }
   }
 
   function visible() {
@@ -251,7 +264,7 @@ function bindCursor(container, svg, mm, state, options, toRoot) {
   async function toggle() {
     if (!current.children?.length) return
     await mm.toggleNode(current)
-    paint()
+    paintSoon()
     reveal(260)
   }
 
