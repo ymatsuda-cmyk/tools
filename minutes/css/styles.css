@@ -549,28 +549,8 @@ body {
 .detail-tab:hover { color: var(--text-primary); }
 .detail-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); font-weight: 500; }
 
-/* --- マインドマップタブ(markmapで描画) --- */
-.mindmap-host { width: 100%; height: calc(100vh - 340px); min-height: 300px; background: var(--surface-2); border-radius: var(--radius); position: relative; }
-.mindmap-host:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-bg); }
-.mindmap-svg { width: 100%; height: 100%; display: block; }
-/* カーソル中の枝。foreignObjectは枝の大きさで切り抜かれるため、枠は内側に描く */
-.markmap-node.mm-current .markmap-foreign {
-  background: var(--accent-bg);
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-.markmap-node.mm-current > line { stroke: var(--accent); stroke-width: 3; }
-.mm-editor {
-  position: absolute;
-  z-index: 5;
-  padding: 1px 5px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--text-primary);
-  font-family: inherit;
-  line-height: 1.2;
-}
+/* --- マインドマップタブ(描画まわりの共通分は api/mindmap2/mindmap2.css) --- */
+.mindmap-host { width: 100%; height: calc(100vh - 340px); min-height: 300px; background: var(--surface-2); border-radius: var(--radius); }
 .mindmap-source {
   width: 100%;
   height: calc(100vh - 360px);
@@ -584,13 +564,6 @@ body {
   background: transparent;
   color: var(--text-primary);
   resize: vertical;
-}
-.mindmap-fallback {
-  white-space: pre-wrap;
-  font-size: 12px;
-  background: var(--surface-1);
-  padding: 10px;
-  border-radius: var(--radius);
 }
 .mindmap-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0 0; }
 

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mindmap2 サンプル</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./mindmap2.css">
+<style>
+  :root {
+    --surface-0: #f1efe8;
+    --surface-1: #f7f5f0;
+    --surface-2: #ffffff;
+    --border: rgba(0, 0, 0, 0.1);
+    --text-primary: #2c2c2a;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --accent: #444441;
+    --accent-bg: #e8e6df;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--surface-0);
+    color: var(--text-primary);
+  }
+  header { padding: 10px 14px; border-bottom: 0.5px solid var(--border); background: var(--surface-1); }
+  h1 { margin: 0; font-size: 14px; font-weight: 500; }
+  .hint { margin: 4px 0 0; font-size: 11.5px; color: var(--text-muted); }
+  main { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 12px; }
+  .pane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pane.source { width: 320px; flex: none; }
+  .pane.map { flex: 1; }
+  label { font-size: 11.5px; color: var(--text-secondary); }
+  textarea {
+    flex: 1;
+    resize: none;
+    padding: 10px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  #map { flex: 1; min-height: 0; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: var(--radius); }
+  @media (max-width: 800px) {
+    main { flex-direction: column; }
+    .pane.source { width: auto; height: 180px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>mindmap2 — マインドマップAPIのサンプル</h1>
+  <p class="hint">↑↓で移動 / ←→で開閉 / スペースで編集(Enterで決定・Escで取消) / Tabで子を追加 / Enterで同じ階層に追加 / Deleteで削除</p>
+</header>
+
+<main>
+  <section class="pane source">
+    <label for="src">Markdown(保存する値)</label>
+    <textarea id="src" spellcheck="false"></textarea>
+  </section>
+  <section class="pane map">
+    <label>マインドマップ</label>
+    <div id="map"></div>
+  </section>
+</main>
+
+<script type="module">
+import { renderMindmap } from './mindmap2.js'
+
+const SAMPLE = `# キックオフ
+## 背景
+- 前回から半年が経過
+- 市場環境が変化
+## 決定事項
+- 納期を二週間延長
+- 担当を交代
+## 課題
+- 人員が不足
+- 仕様が未確定
+## 次回までの宿題
+- 見積を再提出
+- 議事録を共有`
+
+const srcEl = document.getElementById('src')
+const mapEl = document.getElementById('map')
+
+srcEl.value = SAMPLE
+draw(SAMPLE)
+
+// 編集結果は onChange で受け取る。実際のアプリではここで保存する
+function draw(markdown) {
+  renderMindmap(mapEl, markdown, {
+    emptyText: 'Markdownを入力するとマインドマップになります',
+    onChange: (next) => { srcEl.value = next },
+  })
+}
+
+let timer = null
+srcEl.addEventListener('input', () => {
+  clearTimeout(timer)
+  timer = setTimeout(() => draw(srcEl.value), 400)
+})
+</script>
+</body>
+</html>

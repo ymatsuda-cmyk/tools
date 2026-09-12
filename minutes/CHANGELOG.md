@@ -14,9 +14,13 @@ Mindmap tab for the detail pane
 - Added a 手で直す mode that edits the Markdown directly, with the unsaved-changes warning when leaving the tab.
 - Put a cursor on the map: it starts on the centre node, moves with the arrow keys, folds with ←/→, edits in place with Space, and adds a child with Tab or a sibling with Enter. Edits are written back into the Markdown as an unsaved draft.
 - Fed the edited Markdown back through `setData` instead of rebuilding the map, so only the new branch appears and the zoom, pan and folds stay as they were.
+- Moved the mindmap engine into `api/mindmap2` (shared with the video knowledge app) and left only the summary-to-Markdown generation here.
 
 ### Release Affected Files
 
+- `api/mindmap2/mindmap2.js`
+- `api/mindmap2/mindmap2.css`
+- `api/mindmap2/index.html`
 - `minutes/index.html`
 - `minutes/src/main.js`
 - `minutes/src/ui/render.js`

@@ -464,42 +464,13 @@ mark { background: var(--highlight); color: inherit; }
   margin: 0;
 }
 
-/* ---- マインドマップ ---- */
+/* ---- マインドマップ(描画まわりの共通分は api/mindmap2/mindmap2.css) ---- */
 
-.mindmap-host { width: 100%; height: 58vh; background: var(--surface-2); border-radius: var(--radius); position: relative; }
+.mindmap-host { width: 100%; height: 58vh; background: var(--surface-2); border-radius: var(--radius); }
 .mindmap-host.mindmap-full { height: 72vh; }
-.mindmap-svg { width: 100%; height: 100%; display: block; }
-.mindmap-frame { width: 100%; height: 100%; border: 0; border-radius: var(--radius); background: #fff; }
-.mindmap-fallback {
-  white-space: pre-wrap;
-  font-size: 12px;
-  background: var(--surface-1);
-  padding: 10px;
-  border-radius: var(--radius);
-}
 
 /* 枝のマーカー。描き直し前は枝のラベルごと、描き直したあとは文字だけ塗られる */
 .mm-mark, .markmap-foreign.mm-marked { border-radius: 3px; padding: 0 2px; }
-
-.mindmap-host:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-bg); }
-/* カーソル中の枝。foreignObjectは枝の大きさで切り抜かれるため、枠は内側に描く */
-.markmap-node.mm-current .markmap-foreign {
-  background: var(--accent-bg);
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-.markmap-node.mm-current > line { stroke: var(--accent); stroke-width: 3; }
-.mm-editor {
-  position: absolute;
-  z-index: 5;
-  padding: 1px 5px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--text-primary);
-  font-family: inherit;
-  line-height: 1.2;
-}
 
 .mm-tools { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
 .mm-swatch {

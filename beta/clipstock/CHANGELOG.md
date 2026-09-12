@@ -16,10 +16,17 @@ Rate the ideas yourself, one by one or in bulk
 - Asked for the list JSON rebuild right away after a star change instead of letting it sit in the 30s/5min throttle. The feed is drawn from `idea-*.json`, so without it the new order only appeared after the next unrelated save.
 - Put a cursor on the mindmap. It starts on the centre node, moves with the arrow keys, and Space edits the branch in place by turning markmap's own label element into a contenteditable seeded with the raw Markdown text (so markers and timecodes are not swallowed into the label). Tab adds a child, Enter adds a sibling, and the edit is written back into the Markdown and saved.
 - Fed the edited Markdown back through `setData` instead of rebuilding the map, so only the new branch animates in and the zoom and pan stay put. Folds are carried over by hand because `setData` would otherwise re-apply `initialExpandLevel` and close everything the reader had opened.
+- Moved the whole mindmap engine into `api/mindmap2` and left only the video-specific decoration here (playback links and markers), which it now passes in as hooks. The議事録 app draws from the same file, so the two cannot drift apart again.
 
 ### Affected Files
 
+- `api/mindmap2/mindmap2.js`
+- `api/mindmap2/mindmap2.css`
+- `api/mindmap2/index.html`
+- `beta/clipstock/index.html`
 - `beta/clipstock/src/lib/generate.js`
+- `beta/clipstock/src/lib/mindmap.js`
+- `beta/clipstock/src/lib/gas.js`
 - `beta/clipstock/src/main.js`
 - `beta/clipstock/src/ui/render.js`
 - `beta/clipstock/css/styles.css`
