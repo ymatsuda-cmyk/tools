@@ -112,7 +112,7 @@ function doPost(e) {
         result = setPublic_(body.pageId, body.isPublic);
         break;
       case 'linkDrive':
-        result = linkDrive_(body.pageId, body.url);
+        result = linkDrive_(body.pageId, body.url, body.filename);
         break;
       case 'deleteContent':
         result = deleteContent_(body.pageId);
@@ -577,17 +577,21 @@ function setPublic_(pageId, isPublic) {
  * Driveに直接置いた分はIDが分からず空のままになる。リンクが無いと再生も
  * タイムスタンプの飛び先も出せないため、ファイル名から探して埋められるようにしている。
  * url を渡されたときは探さずにそれを使う。
+ * filename は取り込み直後の呼び出し用。Notionのファイル名より新しいことがある。
  */
-function linkDrive_(pageId, url) {
+function linkDrive_(pageId, url, filename) {
   if (!pageId) throw new Error('pageId は必須です');
   var found = String(url || '').trim();
 
   if (!found) {
-    var page = notionFetch_('pages/' + pageId, 'get', null);
-    var filename = richTextOf_(page.properties, PROP_FILE);
-    if (!filename) throw new Error('ファイル名が空なので探せません。URLを直接入力してください');
-    var id = findDriveFileId_(filename);
-    if (!id) throw new Error('Drive に「' + filename + '」が見つかりませんでした');
+    var name = String(filename || '').trim();
+    if (!name) {
+      var page = notionFetch_('pages/' + pageId, 'get', null);
+      name = richTextOf_(page.properties, PROP_FILE);
+    }
+    if (!name) throw new Error('ファイル名が空なので探せません。URLを直接入力してください');
+    var id = findDriveFileId_(name);
+    if (!id) throw new Error('Drive に「' + name + '」が見つかりませんでした');
     found = 'https://drive.google.com/file/d/' + id + '/view';
   }
 

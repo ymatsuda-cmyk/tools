@@ -102,9 +102,15 @@ NOTION_TOKEN=secret_xxx
 CONTENTS_DB_ID=d600e7a535dc83caadf381afe7abea03
 CONTENTS_INBOX=/Users/you/Google Drive/マイドライブ/contents-inbox
 CONTENTS_STORE=/Users/you/Google Drive/マイドライブ/contents
+CONTENTS_GAS_URL=https://script.google.com/macros/s/xxx/exec
+CONTENTS_ACCESS_TOKEN=画面の共有トークンと同じ値
 WHISPER_MODEL=mlx-community/whisper-large-v2-mlx
 WHISPER_LANGUAGE=ja
 ```
+
+`CONTENTS_GAS_URL` / `CONTENTS_ACCESS_TOKEN` は Driveリンクを埋めるのに使う。
+アプリからアップロードした動画はファイルIDが分かるので不要だが、Finder から直接置いた分は
+IDが分からないため、取り込み後に GAS へファイル名で探してもらう。未設定でも取り込みは通る。
 
 導入:
 

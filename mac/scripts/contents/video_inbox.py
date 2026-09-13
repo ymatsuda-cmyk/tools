@@ -20,6 +20,8 @@ JSONが無い(Finderから直接置いた)場合はファイル名をタイト�
   CONTENTS_DB_ID        コンテンツDBのID(既定は下の DEFAULT_DB_ID)
   CONTENTS_INBOX        監視するフォルダ(必須。Driveミラーの inbox)
   CONTENTS_STORE        済んだ動画の置き場(既定: inboxの隣の contents)
+  CONTENTS_GAS_URL      GASの /exec URL。Driveリンクを探してもらうのに使う
+  CONTENTS_ACCESS_TOKEN GASの ACCESS_TOKEN と同じ値
   CONTENTS_ENV_FILE     環境変数ファイルのパス
   WHISPER_MODEL         既定: mlx-community/whisper-large-v2-mlx
   WHISPER_LANGUAGE      既定: ja
@@ -63,6 +65,10 @@ NOTION_VERSION = "2022-06-28"
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 DEFAULT_DB_ID = "d600e7a535dc83caadf381afe7abea03"
 CONTENTS_DB_ID = os.environ.get("CONTENTS_DB_ID", DEFAULT_DB_ID)
+
+# Driveリンクを探すのにGASを使う。Mac側にDriveのAPI資格情報を置かないため
+GAS_URL = os.environ.get("CONTENTS_GAS_URL", "").strip()
+ACCESS_TOKEN = os.environ.get("CONTENTS_ACCESS_TOKEN", "").strip()
 
 INBOX = Path(os.environ.get("CONTENTS_INBOX", str(Path.home() / "Google Drive/マイドライブ/contents-inbox")))
 STORE = Path(os.environ.get("CONTENTS_STORE", str(INBOX.parent / "contents")))
@@ -358,6 +364,59 @@ def move_to(path: Path, dest_dir: Path):
     return target
 
 
+# ---------------------------------------------------------------- Driveリンク
+
+# GASは正しいリクエストでもリダイレクト先が404を返すことがある
+RETRY_WAITS = [1, 3, 8]
+RETRY_CODES = {404, 429, 500, 502, 503, 504}
+
+
+def gas_call(payload: dict) -> dict:
+    last = None
+    for wait in [0] + RETRY_WAITS:
+        if wait:
+            time.sleep(wait)
+        # 毎回URLを変える。同じURLだと壊れたリダイレクトを掛んだまま繰り返す
+        sep = "&" if "?" in GAS_URL else "?"
+        try:
+            res = requests.post(
+                f"{GAS_URL}{sep}r={int(time.time() * 1000):x}",
+                data=json.dumps({**payload, "token": ACCESS_TOKEN}).encode("utf-8"),
+                headers={"Content-Type": "text/plain;charset=utf-8"},
+                timeout=60,
+            )
+            if res.status_code in RETRY_CODES:
+                last = RuntimeError(f"HTTP {res.status_code}")
+                continue
+            res.raise_for_status()
+            body = res.json()
+            if not body.get("ok"):
+                raise RuntimeError(body.get("error") or "GASがエラーを返しました")
+            return body.get("data") or {}
+        except requests.RequestException as e:
+            last = e
+    raise last
+
+
+def ensure_drive_link(page_id: str, filename: str, meta: dict):
+    """DriveリンクをNotionに入れる。
+
+    アプリからのアップロードはサイドカーにIDが入っているのでcreate_pageで済んでいる。
+    Finderから直接置いた分はIDが分からないので、GASにファイル名で探してもらう。
+    リンクが無いと再生もタイムスタンプの飛び先も出せない。
+    """
+    if meta.get("driveFileId"):
+        return
+    if not GAS_URL or not ACCESS_TOKEN:
+        log("   -- CONTENTS_GAS_URL 未設定のため Driveリンクは空のままです")
+        return
+    try:
+        data = gas_call({"action": "linkDrive", "pageId": page_id, "filename": filename})
+        log(f"   Driveリンクを設定しました: {data.get('driveUrl')}")
+    except Exception as e:  # noqa: BLE001  リンクが無くても取り込み自体は成功している
+        log(f"   -- Driveリンクを設定できませんでした: {type(e).__name__}: {e}")
+
+
 def run_once(dry_run: bool = False) -> int:
     jobs = collect()
     if not jobs:
@@ -377,9 +436,11 @@ def run_once(dry_run: bool = False) -> int:
                 raise RuntimeError("文字起こしの結果が空でした")
             page_id = create_page(video, meta, text)
             log(f"   Notionに登録しました({len(text)}字): {page_id}")
-            move_to(video, STORE)
+            moved = move_to(video, STORE)
             if sidecar:
                 sidecar.unlink(missing_ok=True)
+            # Drive内の移動なのでファイルIDは変わらないが、探す側は移動後の名前で当てる
+            ensure_drive_link(page_id, moved.name, meta)
             done += 1
         except Exception as e:  # noqa: BLE001  1件失敗しても次へ進む
             # 取り込み中に消えたなら、別のプロセスが処理し終えて移したとみなす
