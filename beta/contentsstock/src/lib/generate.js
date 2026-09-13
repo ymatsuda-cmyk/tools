@@ -8,6 +8,7 @@
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
 import { serializeSections } from './sections.js'
+import { splitTranscript, resolveQuote, withTimecode, hasTimecodes } from './timecode.js'
 
 export const STAGES = [
   { id: 'summary', label: 'サマリ' },
@@ -64,6 +65,17 @@ function tagRule(knownTags) {
 ${knownTags.map((t) => `- ${t}`).join('\n')}`
 }
 
+/**
+ * 時刻は聞かない。要点の根拠になった原文の引用だけを出させて、
+ * こちら側で文字列一致から時刻を割り当てる(resolveQuote)。
+ * 「何分何秒か」を直接聞くとモデルは平然と作るので、その道は塞ぐ。
+ * 時刻の無い原文(PDF・Word など)では引用も聞かない。
+ */
+const QUOTE_RULE = `
+- quote は原文に存在する文字列でなければならない。20〜60字程度で写す。自分で言い換えた文を書いてはいけない。
+  該当が無い、または見出しとして作った項目(原文の特定の一文に対応しない)には quote を空文字にする。
+- 時刻や秒数は書かないこと。こちらで原文から割り出す。`
+
 const PROMPTS = {
   summary: (knownTags) => `あなたは動画の文字起こしを整理するアシスタントです。
 次のJSON形式のみで回答してください。${NO_FENCE}
@@ -76,22 +88,22 @@ const PROMPTS = {
 tags の決め方:
 ${tagRule(knownTags)}`,
 
-  mindmap: `あなたは動画の内容をマインドマップに整理するアシスタントです。
+  mindmap: (timed) => `あなたは動画の内容をマインドマップに整理するアシスタントです。
 次のJSON形式のみで回答してください。${NO_FENCE}
 
 {
   "title": "動画の主題",
   "branches": [
-    { "label": "見出しの語句(40字以内)", "children": [ { "label": "同じ形。無ければ省略可" } ] }
+    { "label": "見出しの語句(40字以内)"${timed ? ', "quote": "この項目の根拠になった原文の一文。原文から一字一句そのまま写す。無ければ空文字"' : ''}, "children": [ { "label": "同じ形。無ければ省略可" } ] }
   ]
 }
 
 制約:
 - branches(大項目)は3〜6個。各branchのchildrenは中項目、そのchildrenは詳細(最大3段)。
 - label は文ではなく要点の語句。40字以内。
-- 原文にない情報を足さない。`,
+- 原文にない情報を足さない。${timed ? QUOTE_RULE : ''}`,
 
-  fields: `あなたは動画の内容を分野ごとに切り分けて整理するアシスタントです。
+  fields: (timed) => `あなたは動画の内容を分野ごとに切り分けて整理するアシスタントです。
 次のJSON形式のみで回答してください。${NO_FENCE}
 
 {
@@ -99,7 +111,9 @@ ${tagRule(knownTags)}`,
     {
       "name": "分野名(例: 技術/経営/マーケティング/組織/法務/学習 など、内容に合うもの)",
       "summary": "その分野の観点から見たこの動画の要点を80〜150字で",
-      "points": ["押さえるべき具体的な事実・数値・手順を1行で"]
+      "points": [${timed
+        ? '{ "text": "押さえるべき具体的な事実・数値・手順を1行で", "quote": "その根拠になった原文の一文。原文から一字一句そのまま写す(要約・言い換え・省略をしない)" }'
+        : '"押さえるべき具体的な事実・数値・手順を1行で"'}]
     }
   ]
 }
@@ -108,7 +122,7 @@ ${tagRule(knownTags)}`,
 - 分野は内容から自然に立つものだけを2〜5件。無理に埋めない。
 - points は分野ごとに2〜4件。
 - 実際に語られていないことは書かない。推測は入れない。
-- 全体で1800字以内に収める。`,
+- 全体で1800字以内に収める。${timed ? QUOTE_RULE : ''}`,
 
   apply: `あなたは、動画から得た知識を実務に落とし込む企画者です。
 次のJSON形式のみで回答してください。${NO_FENCE}
@@ -150,15 +164,20 @@ function withInstructions(context, instructions) {
   return `${context}\n\n----------------\n\n${instructions}`
 }
 
-/** mindmapのJSONをmarkmap用のMarkdownに組み立てる */
-function mindmapToText(parsed) {
+/**
+ * mindmapのJSONをmarkmap用のMarkdownに組み立てる。
+ * quote が原文で見つかった枝にだけ末尾へ [mm:ss] を付ける。
+ */
+function mindmapToText(parsed, segments) {
   const lines = [`# ${String(parsed?.title ?? '').trim() || '動画の主題'}`]
 
   function walk(nodes, depth) {
     for (const raw of Array.isArray(nodes) ? nodes : []) {
       const label = String(raw?.label ?? '').replace(/\s+/g, ' ').trim()
       if (!label) continue
-      lines.push(depth === 0 ? `## ${label}` : `${'  '.repeat(depth - 1)}- ${label}`)
+      const at = segments.length ? resolveQuote(String(raw?.quote ?? ''), segments) : null
+      const text = withTimecode(label, at)
+      lines.push(depth === 0 ? `## ${text}` : `${'  '.repeat(depth - 1)}- ${text}`)
       if (Array.isArray(raw?.children) && raw.children.length) walk(raw.children, depth + 1)
     }
   }
@@ -167,15 +186,31 @@ function mindmapToText(parsed) {
   return lines.join('\n')
 }
 
-function fieldsToText(list) {
+/**
+ * points は文字列でも {text, quote} でも受ける(モデルが形を崩しても落ちないように)。
+ * 見出しにはその分野で最も早い時刻を付ける。
+ */
+function fieldsToText(list, segments) {
   return serializeSections(
-    (Array.isArray(list) ? list : []).map((f) => ({
-      heading: String(f?.name ?? '').trim(),
-      body: String(f?.summary ?? '').trim(),
-      points: (Array.isArray(f?.points) ? f.points : []).map((p) =>
-        String((typeof p === 'string' ? p : p?.text) ?? '').trim()
-      ),
-    }))
+    (Array.isArray(list) ? list : []).map((f) => {
+      const points = []
+      let earliest = null
+
+      ;(Array.isArray(f?.points) ? f.points : []).forEach((p) => {
+        const text = String((typeof p === 'string' ? p : p?.text) ?? '').trim()
+        if (!text) return
+        const quote = typeof p === 'string' ? '' : String(p?.quote ?? '')
+        const at = segments.length ? resolveQuote(quote, segments) : null
+        if (at !== null && (earliest === null || at < earliest)) earliest = at
+        points.push(withTimecode(text, at))
+      })
+
+      return {
+        heading: withTimecode(String(f?.name ?? '').trim(), earliest),
+        body: String(f?.summary ?? '').trim(),
+        points,
+      }
+    })
   )
 }
 
@@ -231,13 +266,17 @@ export async function generateStage(stageId, ctx, onProgress) {
   }
 
   if (stageId === 'mindmap') {
-    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, PROMPTS.mindmap), onProgress))
-    return { model: connection.model, detail: { mindmap: mindmapToText(parsed) } }
+    const timed = hasTimecodes(transcript)
+    const segments = timed ? splitTranscript(transcript) : []
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, PROMPTS.mindmap(timed)), onProgress))
+    return { model: connection.model, detail: { mindmap: mindmapToText(parsed, segments) } }
   }
 
   if (stageId === 'fields') {
-    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, PROMPTS.fields), onProgress))
-    return { model: connection.model, detail: { fields: fieldsToText(parsed.fields) } }
+    const timed = hasTimecodes(transcript)
+    const segments = timed ? splitTranscript(transcript) : []
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(transcriptInput, PROMPTS.fields(timed)), onProgress))
+    return { model: connection.model, detail: { fields: fieldsToText(parsed.fields, segments) } }
   }
 
   if (stageId === 'apply' || stageId === 'ideas') {

@@ -8,6 +8,7 @@ import {
 } from './ui/render.js'
 import { openSettings } from './ui/settings.js'
 import { openVocabPanel } from './ui/vocab.js'
+import { openMiniPlayer } from './ui/player.js'
 import {
   fetchDetail,
   fetchTranscript,
@@ -28,7 +29,8 @@ import { streamChat } from './lib/llm-client.js'
 import { generateStage, generateAll, STAGES } from './lib/generate.js'
 import { setSectionRank, setSectionHidden } from './lib/sections.js'
 import { loadDismissed, dismissPair, clearDismissed } from './lib/vocab.js'
-import { renderMindmap } from '../../../api/mindmap2/mindmap2.js'
+import { parseTimecode } from './lib/timecode.js'
+import { renderMindmap, nodeLineIndexes } from '../../../api/mindmap2/mindmap2.js'
 import { uploadVideo } from './upload.js'
 
 const stageEl = document.getElementById('stage')
@@ -176,7 +178,17 @@ async function openMindmapViewer(key) {
       detailCache.set(key, data)
     }
     // 読んでいる間に閉じられていることがある
-    if ($('mm-full')) renderMindmap($('mm-full'), data.mindmap, { emptyText: 'マインドマップはまだありません', initialExpandLevel: 2 })
+    if ($('mm-full')) {
+      renderMindmap($('mm-full'), data.mindmap, {
+        emptyText: 'マインドマップはまだありません',
+        initialExpandLevel: 2,
+        onNodeClick: (index) => {
+          const { lines, indexes } = nodeLineIndexes(data.mindmap)
+          const at = parseTimecode(lines[indexes[index]] ?? '')
+          if (at !== null) openMiniPlayer(item.driveUrl, at, item.title)
+        },
+      })
+    }
   } catch (err) {
     if ($('mm-full')) $('mm-full').innerHTML = `<p class="error-text">${escapeHtml(String(err.message || err))}</p>`
   }
@@ -340,21 +352,38 @@ function wireDetail() {
   stageEl.querySelectorAll('.sec-pub').forEach((btn) =>
     btn.addEventListener('click', () => changeSectionHidden(detail.activeTab, Number(btn.dataset.sec), btn.dataset.on === '1'))
   )
+  stageEl.querySelector('.btn-play')?.addEventListener('click', () => play(0))
+  stageEl.querySelectorAll('.tc-link').forEach((btn) =>
+    btn.addEventListener('click', () => play(Number(btn.dataset.at)))
+  )
 
   if (detail.phase !== 'ready' || detail.busyStage) return
 
   if (detail.activeTab === 'mindmap') {
     const host = stageEl.querySelector('#mindmap-host')
     if (host) {
-      renderMindmap(host, detail.detail?.mindmap, {
+      const markdown = detail.detail?.mindmap
+      renderMindmap(host, markdown, {
         emptyText: 'マインドマップはまだありません',
         initialExpandLevel: 2,
-        onChange: detail.canEdit ? (markdown) => saveMindmapEdit(markdown) : null,
+        onChange: detail.canEdit ? (md) => saveMindmapEdit(md) : null,
+        // 枝の末尾に付いている [12:34] を、その枝を押したときの再生位置として使う
+        onNodeClick: (index) => {
+          const { lines, indexes } = nodeLineIndexes(detail.detail?.mindmap ?? markdown)
+          const at = parseTimecode(lines[indexes[index]] ?? '')
+          if (at !== null) play(at)
+        },
       })
     }
   }
   if (detail.activeTab === 'memo') setupMemo()
   if (detail.activeTab === 'chat') setupChat()
+}
+
+/** その秒数から小窓で再生する。再生できない種別のときは何も起きない */
+function play(at) {
+  const url = detail.detail?.driveUrl || detail.item.driveUrl
+  openMiniPlayer(url, at, detail.detail?.title || detail.item.title)
 }
 
 async function ensureTranscript() {

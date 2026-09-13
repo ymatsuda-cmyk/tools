@@ -1,4 +1,5 @@
 import { parseSections, visibleHeading, sectionRank, isSectionHidden } from '../lib/sections.js'
+import { splitLabel, formatTimecode, splitTranscript, mediaSourceOf } from '../lib/timecode.js'
 
 export function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
@@ -224,21 +225,40 @@ export const TABS = [
   { id: 'chat', label: 'チャット' },
 ]
 
+/**
+ * 見出しや箇条書きに付いた "[12:34]" を、その時刻から再生するボタンにする。
+ * 再生できない(文書など)ときはただの文字として出す。
+ * リンクの有無そのものが「根拠を原文で確認できたか」の印になっている。
+ */
+function timeChip(at, playable) {
+  if (at === null || at === undefined) return ''
+  const label = formatTimecode(at)
+  if (!playable) return `<span class="tc">${label}</span>`
+  return `<button class="tc tc-link" data-at="${at}" title="${label} から再生"><i class="ti ti-player-play" aria-hidden="true"></i>${label}</button>`
+}
+
 /** 分野別・応用・活用の本文。見出し+本文+箇条書きで出す */
-function sectionsHtml(text, { ranked = false, editable = false } = {}) {
+function sectionsHtml(text, { ranked = false, editable = false, playable = false } = {}) {
   const sections = parseSections(text)
   if (!sections.length) return '<p class="muted">まだありません</p>'
   return sections.map((s, i) => {
     const shown = !isSectionHidden(s.heading)
+    const head = splitLabel(visibleHeading(s.heading))
     return `
     <section class="sec ${shown ? '' : 'sec-hidden'}" data-sec="${i}">
       <div class="sec-head">
-        <h4>${escapeHtml(visibleHeading(s.heading) || '(無題)')}</h4>
+        <h4>${escapeHtml(head.text || '(無題)')}</h4>
+        ${timeChip(head.at, playable)}
         ${ranked ? rankHtml(i, sectionRank(s.heading), editable) : ''}
         ${ranked && editable ? `<button class="btn-ghost sec-pub" data-sec="${i}" data-on="${shown ? '1' : '0'}" aria-label="${shown ? 'アイデア一覧から外す' : 'アイデア一覧に戻す'}"><i class="ti ti-eye${shown ? '' : '-off'}"></i></button>` : ''}
       </div>
       ${s.body ? `<p class="sec-body">${escapeHtml(s.body).replace(/\n/g, '<br>')}</p>` : ''}
-      ${s.points.length ? `<ul class="sec-points">${s.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
+      ${s.points.length
+        ? `<ul class="sec-points">${s.points.map((p) => {
+            const point = splitLabel(p)
+            return `<li>${escapeHtml(point.text)}${timeChip(point.at, playable)}</li>`
+          }).join('')}</ul>`
+        : ''}
     </section>
   `
   }).join('')
@@ -247,6 +267,18 @@ function sectionsHtml(text, { ranked = false, editable = false } = {}) {
 /** マインドマップ一覧に並べるかの切り替え */
 function publishHtml(on) {
   return `<button class="btn btn-publish" data-on="${on ? '1' : '0'}"><i class="ti ti-${on ? 'eye-off' : 'eye'}" aria-hidden="true"></i>${on ? '一覧から外す' : 'マインドマップ一覧に公開'}</button>`
+}
+
+/** 原文タブ。時刻付きの行はその時刻から再生できるようにする */
+function transcriptHtml(text, playable) {
+  const segments = splitTranscript(text)
+  if (!segments.length) return '<p class="muted">(原文がありません)</p>'
+  if (segments.every((s) => s.at === null)) {
+    return `<pre class="raw">${escapeHtml(text)}</pre>`
+  }
+  return `<div class="tr-list">${segments.map((s) => `
+    <div class="tr-row">${timeChip(s.at, playable)}<p class="tr-text">${escapeHtml(s.text)}</p></div>
+  `).join('')}</div>`
 }
 
 /** 価値の目安の3つ星。編集できるときは星を押して変えられる */
@@ -261,6 +293,8 @@ export function renderDetail(container, item, state) {
   const d = state.detail || {}
   const tab = state.activeTab || 'summary'
   const canEdit = state.canEdit
+  const videoUrl = d.driveUrl || item.driveUrl || ''
+  const playable = mediaSourceOf(videoUrl) !== null
 
   const head = `
     <div class="detail-head">
@@ -268,7 +302,8 @@ export function renderDetail(container, item, state) {
       <h2 class="detail-title">${escapeHtml(d.title || item.title)}</h2>
       ${canEdit ? '<button class="btn-ghost btn-edit-title" aria-label="タイトルを編集"><i class="ti ti-edit" aria-hidden="true"></i></button>' : ''}
       <span class="grow"></span>
-      ${item.driveUrl ? `<a class="btn" href="${escapeHtml(item.driveUrl)}" target="_blank" rel="noopener"><i class="ti ti-player-play" aria-hidden="true"></i>動画を開く</a>` : ''}
+      ${playable ? '<button class="btn btn-play"><i class="ti ti-player-play" aria-hidden="true"></i>再生</button>' : ''}
+      ${!playable && videoUrl ? `<a class="btn" href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i>元ファイル</a>` : ''}
       ${canEdit ? '<button class="btn btn-generate-all"><i class="ti ti-sparkles" aria-hidden="true"></i>すべて生成</button>' : ''}
       <button class="btn-ghost btn-more" aria-label="その他"><i class="ti ti-dots" aria-hidden="true"></i></button>
     </div>
@@ -294,13 +329,13 @@ export function renderDetail(container, item, state) {
   } else if (tab === 'mindmap') {
     panel = '<div id="mindmap-host" class="mindmap-host"></div><p class="hint">↑↓で移動 / ←→で開閉 / スペースで編集 / Tabで子を追加 / Enterで同じ階層に追加 / Deleteで削除</p>'
   } else if (tab === 'fields') {
-    panel = sectionsHtml(d.fields)
+    panel = sectionsHtml(d.fields, { playable })
   } else if (tab === 'apply' || tab === 'ideas') {
-    panel = sectionsHtml(d[tab], { ranked: true, editable: canEdit })
+    panel = sectionsHtml(d[tab], { ranked: true, editable: canEdit, playable })
   } else if (tab === 'raw') {
     panel = state.transcript === null
       ? '<p class="muted">読み込んでいます...</p>'
-      : `<pre class="raw">${escapeHtml(state.transcript || '(原文がありません)')}</pre>`
+      : transcriptHtml(state.transcript, playable)
   } else if (tab === 'memo') {
     panel = `<textarea id="memo-input" class="memo" placeholder="自由に記入できます">${escapeHtml(state.memoDraft ?? d.memo ?? '')}</textarea>`
   } else {

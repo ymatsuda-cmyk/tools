@@ -301,6 +301,94 @@ body {
 
 .mindmap-host { width: 100%; height: 58vh; background: var(--surface-2); border-radius: var(--radius); }
 
+/* ---- タイムコード ---- */
+
+/* リンクの有無そのものが「根拠を原文で確認できたか」の印になっている。
+   時刻が取れなかった項目には何も出さないので、静かな見た目を保つ */
+.tc {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.tc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: inherit;
+  padding: 0 6px 0 4px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.tc-link:hover { background: var(--accent-bg); color: var(--text-primary); }
+.tc-link i { font-size: 11px; }
+
+.tr-list { display: flex; flex-direction: column; gap: 2px; max-width: 70ch; }
+.tr-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.tr-row .tc { margin-left: 0; flex-shrink: 0; }
+.tr-text { margin: 0; font-size: 12.5px; line-height: 1.8; }
+.tr-row:hover { background: var(--surface-1); border-radius: 4px; }
+
+/* ---- 途中再生の小窓 ---- */
+
+.mini-player {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  background: #000;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  z-index: 60;
+}
+.mp-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 11.5px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.mini-player.dragging .mp-bar { cursor: grabbing; }
+/* ドラッグ中はiframeがポインタを吸わないようにする */
+.mini-player.dragging .mp-frame { pointer-events: none; }
+.mp-grip { font-size: 14px; opacity: 0.6; }
+.mp-time { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-btn {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  padding: 3px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 15px;
+  text-decoration: none;
+}
+.mp-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.mp-frame { aspect-ratio: 16 / 9; }
+.mp-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.mp-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.55) 50%);
+}
+
 .memo {
   width: 100%;
   min-height: 50vh;
@@ -428,4 +516,5 @@ body {
 @media (max-width: 720px) {
   .search-input { width: 120px; }
   .cards { grid-template-columns: 1fr; }
+  .mini-player { right: 8px; left: 8px; bottom: 8px; width: auto; }
 }
