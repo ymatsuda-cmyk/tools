@@ -128,6 +128,11 @@ export function setPublic(pageId, isPublic) {
   return callGas('setPublic', { pageId, isPublic })
 }
 
+/** Driveリンクを付け直す。url を省くとファイル名から Drive を探す */
+export function linkDrive(pageId, url) {
+  return callGas('linkDrive', { pageId, url })
+}
+
 export function deleteContent(pageId) {
   return callGas('deleteContent', { pageId })
 }

@@ -27,6 +27,8 @@ var NOTION_VERSION = '2022-06-28';
 var DEFAULT_DB_ID = 'd600e7a535dc83caadf381afe7abea03';
 // 動画の取り込み先(inbox)。Mac側の監視スクリプトがここを見て文字起こしする
 var DEFAULT_INBOX_FOLDER_ID = '10dNn2zgtWCL4FpyYzam_EayKNtD7mGkz';
+// 文字起こし後の動画の置き場。Driveリンクを後から探すときに使う
+var DEFAULT_STORE_FOLDER_ID = '16SN7XBWosS7WfbpEPUby4gWPDyAAY_px';
 
 // ---- プロパティ名(Notion側のカラム名とここを一致させること) ----
 var PROP_TITLE     = 'タイトル';       // title
@@ -108,6 +110,9 @@ function doPost(e) {
         break;
       case 'setPublic':
         result = setPublic_(body.pageId, body.isPublic);
+        break;
+      case 'linkDrive':
+        result = linkDrive_(body.pageId, body.url);
         break;
       case 'deleteContent':
         result = deleteContent_(body.pageId);
@@ -547,6 +552,52 @@ function setPublic_(pageId, isPublic) {
   props[PROP_PUBLIC] = { checkbox: Boolean(isPublic) };
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true, isPublic: Boolean(isPublic) };
+}
+
+/**
+ * Driveリンクを付け直す。
+ *
+ * アプリから上げた動画はサイドカーのJSONにファイルIDが入るので取り込み時に入るが、
+ * Driveに直接置いた分はIDが分からず空のままになる。リンクが無いと再生も
+ * タイムスタンプの飛び先も出せないため、ファイル名から探して埋められるようにしている。
+ * url を渡されたときは探さずにそれを使う。
+ */
+function linkDrive_(pageId, url) {
+  if (!pageId) throw new Error('pageId は必須です');
+  var found = String(url || '').trim();
+
+  if (!found) {
+    var page = notionFetch_('pages/' + pageId, 'get', null);
+    var filename = richTextOf_(page.properties, PROP_FILE);
+    if (!filename) throw new Error('ファイル名が空なので探せません。URLを直接入力してください');
+    var id = findDriveFileId_(filename);
+    if (!id) throw new Error('Drive に「' + filename + '」が見つかりませんでした');
+    found = 'https://drive.google.com/file/d/' + id + '/view';
+  }
+
+  var props = {};
+  props[PROP_DRIVE] = { url: found };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, driveUrl: found };
+}
+
+/** 取り込み先と保管先の両方を同じ名前で探す */
+function findDriveFileId_(filename) {
+  var folders = [storeFolderId_(), inboxFolderId_()];
+  for (var i = 0; i < folders.length; i++) {
+    if (!folders[i]) continue;
+    try {
+      var files = DriveApp.getFolderById(folders[i]).getFilesByName(filename);
+      if (files.hasNext()) return files.next().getId();
+    } catch (err) {
+      // フォルダがID違い・権限無しのときは次を見る
+    }
+  }
+  return null;
+}
+
+function storeFolderId_() {
+  return PropertiesService.getScriptProperties().getProperty('CONTENTS_FOLDER_ID') || DEFAULT_STORE_FOLDER_ID;
 }
 
 /**

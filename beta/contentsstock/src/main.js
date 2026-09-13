@@ -20,6 +20,7 @@ import {
   setStatus,
   setPublic,
   mergeTag,
+  linkDrive,
   deleteContent,
 } from './lib/gas.js'
 import { listContents, listIdeas } from './lib/store.js'
@@ -353,6 +354,7 @@ function wireDetail() {
     btn.addEventListener('click', () => changeSectionHidden(detail.activeTab, Number(btn.dataset.sec), btn.dataset.on === '1'))
   )
   stageEl.querySelector('.btn-play')?.addEventListener('click', () => play(0))
+  stageEl.querySelector('.btn-link-drive')?.addEventListener('click', relinkDrive)
   stageEl.querySelectorAll('.tc-link').forEach((btn) =>
     btn.addEventListener('click', () => play(Number(btn.dataset.at)))
   )
@@ -647,6 +649,7 @@ function openMoreMenu(e) {
   const menu = document.createElement('div')
   menu.className = 'menu'
   menu.innerHTML = `
+    <button data-act="link">動画リンクを設定する</button>
     <button data-act="exclude">一覧から除外する</button>
     <button data-act="delete" class="danger">Notionから削除する</button>
   `
@@ -657,6 +660,10 @@ function openMoreMenu(e) {
 
   menu.querySelectorAll('button').forEach((btn) => btn.addEventListener('click', async () => {
     menu.remove()
+    if (btn.dataset.act === 'link') {
+      await relinkDrive()
+      return
+    }
     if (btn.dataset.act === 'exclude') {
       if (!confirm('この動画を一覧から除外します。よろしいですか?')) return
       await setStatus(detail.key, '除外')
@@ -677,6 +684,38 @@ function openMoreMenu(e) {
     }
     document.addEventListener('click', once)
   }, 0)
+}
+
+/**
+ * Driveリンクを付け直す。
+ * Drive に直接置いた動画はファイルIDが分からず取り込み時に空のままになるので、
+ * まずファイル名で探させ、見つからなければURLを手で入れてもらう。
+ */
+async function relinkDrive() {
+  statusEl.textContent = 'Driveを探しています...'
+  try {
+    const { driveUrl } = await linkDrive(detail.key)
+    applyDriveUrl(driveUrl)
+    return
+  } catch (err) {
+    statusEl.textContent = ''
+    const input = prompt(`自動で見つかりませんでした(${err.message || err})\nDriveの共有URLを貼ってください`, detail.item.driveUrl || '')
+    if (!input?.trim()) return
+    try {
+      const { driveUrl } = await linkDrive(detail.key, input.trim())
+      applyDriveUrl(driveUrl)
+    } catch (e2) {
+      alert('動画リンクを保存できませんでした: ' + (e2.message || e2))
+    }
+  }
+}
+
+function applyDriveUrl(driveUrl) {
+  detail.detail = { ...detail.detail, driveUrl }
+  detail.item.driveUrl = driveUrl
+  detailCache.set(detail.key, detail.detail)
+  statusEl.textContent = ''
+  paintDetail()
 }
 
 // ---- チャット ----

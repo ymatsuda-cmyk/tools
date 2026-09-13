@@ -54,6 +54,7 @@ CONTENTS_DB_ID = os.environ.get("CONTENTS_DB_ID", "d600e7a535dc83caadf381afe7abe
 # Notion側のカラム名。gas/Code.gs の PROP_* と一致させること
 PROP_TITLE = "タイトル"
 PROP_FILE = "ファイル名"
+PROP_DRIVE = "Driveリンク"
 PROP_KIND = "種別"
 PROP_TAGS = "タグ"
 PROP_STATUS = "状態"
@@ -131,6 +132,10 @@ def checkbox_of(props, name):
     return bool((props.get(name) or {}).get("checkbox"))
 
 
+def url_of(props, name):
+    return (props.get(name) or {}).get("url") or ""
+
+
 def date_of(props, name):
     date = (props.get(name) or {}).get("date")
     return (date or {}).get("start")
@@ -162,6 +167,7 @@ def to_item(page):
         "source": "doc",
         "title": title_any_of(p) or rich_of(p, PROP_FILE) or "(タイトル未設定)",
         "file": rich_of(p, PROP_FILE),
+        "driveUrl": url_of(p, PROP_DRIVE),
         "kind": select_of(p, PROP_KIND),
         "status": select_of(p, PROP_STATUS) or STATUS_DONE,
         "tags": multi_select_of(p, PROP_TAGS),

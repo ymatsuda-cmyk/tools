@@ -304,6 +304,7 @@ export function renderDetail(container, item, state) {
       <span class="grow"></span>
       ${playable ? '<button class="btn btn-play"><i class="ti ti-player-play" aria-hidden="true"></i>再生</button>' : ''}
       ${!playable && videoUrl ? `<a class="btn" href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i>元ファイル</a>` : ''}
+      ${!videoUrl && canEdit && item.kind !== 'pdf' && item.kind !== 'docx' ? '<button class="btn btn-link-drive" title="Notionの「Driveリンク」が空です"><i class="ti ti-link" aria-hidden="true"></i>動画リンク未設定</button>' : ''}
       ${canEdit ? '<button class="btn btn-generate-all"><i class="ti ti-sparkles" aria-hidden="true"></i>すべて生成</button>' : ''}
       <button class="btn-ghost btn-more" aria-label="その他"><i class="ti ti-dots" aria-hidden="true"></i></button>
     </div>

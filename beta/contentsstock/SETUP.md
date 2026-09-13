@@ -153,6 +153,12 @@ AIに時刻を答えさせず「根拠になった原文の一文」だけを出
 再生は Drive のプレビューを使うので、時刻を変えるたびに読み込み直しになる。
 文書(PDF/Word など)は時刻を持たないので、リンクも小窓も出ない。
 
+再生には Notion の `Driveリンク` 列が要る。アプリからアップロードした動画には自動で入るが、
+Drive に直接置いた動画はファイルIDが分からず空のままになる。その場合は詳細ヘッダの
+「動画リンク未設定」または「…」メニューの「動画リンクを設定する」を押すと、
+ファイル名で Drive を探して埋める(見つからなければ共有URLを手で貼る)。
+探す先は `INBOX_FOLDER_ID` と `CONTENTS_FOLDER_ID`(省略時 `16SN7XBWosS7WfbpEPUby4gWPDyAAY_px`)。
+
 ## 補足
 
 - 文書(PDF/Word など)の取り込みは従来どおり `mac/scripts/contentsstock/contents_watch.py` が担当する。

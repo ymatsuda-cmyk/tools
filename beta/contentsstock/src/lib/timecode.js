@@ -140,7 +140,8 @@ export function resolveQuote(quote, segments) {
  */
 export function mediaSourceOf(url) {
   const raw = String(url ?? '')
-  const drive = raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/)?.[1]
+  // 共有URL、open?id=、uc?id= のどの形で貼られても同じように受ける
+  const drive = raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/)?.[1] || raw.match(/drive\.google\.com\/[^?]*\?.*\bid=([\w-]+)/)?.[1]
   if (drive) return { kind: 'drive', id: drive }
   const youtube = raw.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/)?.[1]
   if (youtube) return { kind: 'youtube', id: youtube }
