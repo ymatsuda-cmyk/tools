@@ -700,10 +700,9 @@ function inboxFolderId_() {
 /**
  * Drive の書き込みスコープを確実に付けるための空打ち。
  *
- * Apps Script は「コードに出てくるAPI」から要求スコープを決める。
- * アップロードは UrlFetchApp で Drive の REST を直接叩いているため、
- * これが無いとトークンに Drive のスコープが入らず 403 (ACCESS_TOKEN_SCOPE_INSUFFICIENT) になる。
- * スコープを増やしたあとは、一度エディタから関数を実行して承認し直すこと。
+ * Apps Script は「コードに出てくるAPI」から要求スコープを決める。読み取りだけを
+ * 書いていると drive.readonly で足りると判断され、files.create が 403 になる。
+ * authorize() の createFile をコードに残しておくことで auth/drive(読み書き)を要求させる。
  */
 function touchDriveScope_() {
   DriveApp.getRootFolder().getId();
@@ -712,14 +711,31 @@ function touchDriveScope_() {
 /**
  * 承認をやり直すための入口。エディタの実行メニューから選んで走らせる。
  * 末尾が "_" の関数はメニューに出ないので、この名前で公開している。
+ * 実際に作って捨てるところまでやるので、これが通れば本番のアップロードも通る。
  */
 function authorize() {
-  touchDriveScope_();
+  DriveApp.createFile('contentsstock-scope-check.txt', '').setTrashed(true);
+
   UrlFetchApp.fetch('https://api.notion.com/v1/users/me', {
     headers: { Authorization: 'Bearer ' + notionToken_(), 'Notion-Version': NOTION_VERSION },
     muteHttpExceptions: true,
   });
-  Logger.log('OK: Drive と外部リクエストの権限を確認しました');
+
+  Logger.log('OK: Drive への書き込みと外部リクエストを確認しました');
+  Logger.log('付与されているスコープ: ' + grantedScopes_());
+}
+
+/** いま持っているトークンのスコープ。403 の切り分け用 */
+function grantedScopes_() {
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + ScriptApp.getOAuthToken(),
+    { muteHttpExceptions: true }
+  );
+  try {
+    return JSON.parse(res.getContentText()).scope || '(不明)';
+  } catch (e) {
+    return res.getContentText();
+  }
 }
 
 /** アップロード先のセッションURLを、このスクリプトの権限で発行する */
@@ -743,6 +759,12 @@ function initUpload_(body) {
     }
   );
 
+  if (res.getResponseCode() === 403) {
+    throw new Error(
+      'Drive の権限が足りません。GASエディタで authorize を実行して承認し直し、' +
+      'デプロイを「新しいバージョン」で更新してください。付与済み: ' + grantedScopes_()
+    );
+  }
   if (res.getResponseCode() >= 300) {
     throw new Error('Drive session failed (' + res.getResponseCode() + '): ' + res.getContentText());
   }
