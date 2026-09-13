@@ -190,6 +190,21 @@ function plainTextOf_(richTextArray) {
   return (richTextArray || []).map(function (t) { return t.plain_text; }).join('');
 }
 
+/**
+ * 列が無ければ作る。
+ * このDBは手で作ることもMac側の取り込みが作ることもあり、任意の列は揃っていない前提。
+ * 無い列に書くと Notion は 400 を返して操作ごと失敗するので、書く直前に足しておく。
+ * @param {string} name 列名
+ * @param {object} spec 例: { url: {} } / { checkbox: {} }
+ */
+function ensureProp_(name, spec) {
+  var db = notionFetch_('databases/' + dbId_(), 'get', null);
+  if (db.properties && db.properties[name]) return;
+  var props = {};
+  props[name] = spec;
+  notionFetch_('databases/' + dbId_(), 'patch', { properties: props });
+}
+
 function richTextOf_(properties, name) {
   var prop = properties[name];
   return prop && prop.rich_text ? plainTextOf_(prop.rich_text) : '';
@@ -546,10 +561,11 @@ function updateRawCount_(pageId, count) {
   return { saved: true };
 }
 
-/** マインドマップ一覧に出すかどうか。列が無いDBでは Notion が400を返す */
+/** マインドマップ一覧に出すかどうか */
 function setPublic_(pageId, isPublic) {
   var props = {};
   props[PROP_PUBLIC] = { checkbox: Boolean(isPublic) };
+  ensureProp_(PROP_PUBLIC, { checkbox: {} });
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true, isPublic: Boolean(isPublic) };
 }
@@ -577,6 +593,7 @@ function linkDrive_(pageId, url) {
 
   var props = {};
   props[PROP_DRIVE] = { url: found };
+  ensureProp_(PROP_DRIVE, { url: {} });
   notionFetch_('pages/' + pageId, 'patch', { properties: props });
   return { saved: true, driveUrl: found };
 }
@@ -681,17 +698,28 @@ function inboxFolderId_() {
 }
 
 /**
- * Drive API(高度なサービス)を実際に呼ぶことで、Apps Script の静的解析に
- * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() の
- * トークンに Drive の書き込みスコープを含めさせる。
- * 事前に「サービス」から Drive API を追加しておくこと。
+ * Drive の書き込みスコープを確実に付けるための空打ち。
+ *
+ * Apps Script は「コードに出てくるAPI」から要求スコープを決める。
+ * アップロードは UrlFetchApp で Drive の REST を直接叩いているため、
+ * これが無いとトークンに Drive のスコープが入らず 403 (ACCESS_TOKEN_SCOPE_INSUFFICIENT) になる。
+ * スコープを増やしたあとは、一度エディタから関数を実行して承認し直すこと。
  */
 function touchDriveScope_() {
-  try {
-    Drive.About.get({ fields: 'user' });
-  } catch (e) {
-    // 未追加でも致命的ではない。本当にスコープが付かない場合は初回の403で気づける
-  }
+  DriveApp.getRootFolder().getId();
+}
+
+/**
+ * 承認をやり直すための入口。エディタの実行メニューから選んで走らせる。
+ * 末尾が "_" の関数はメニューに出ないので、この名前で公開している。
+ */
+function authorize() {
+  touchDriveScope_();
+  UrlFetchApp.fetch('https://api.notion.com/v1/users/me', {
+    headers: { Authorization: 'Bearer ' + notionToken_(), 'Notion-Version': NOTION_VERSION },
+    muteHttpExceptions: true,
+  });
+  Logger.log('OK: Drive と外部リクエストの権限を確認しました');
 }
 
 /** アップロード先のセッションURLを、このスクリプトの権限で発行する */

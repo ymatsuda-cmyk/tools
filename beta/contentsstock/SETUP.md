@@ -53,11 +53,24 @@ Notion Integration をこのDBに「接続」しておくこと。
   - `NOTION_TOKEN` … Notion Integration のシークレット
   - `ACCESS_TOKEN` … 画面の「共有トークン」と同じ文字列(自分で決める)
   - `INBOX_FOLDER_ID` … `10dNn2zgtWCL4FpyYzam_EayKNtD7mGkz`
+  - `CONTENTS_FOLDER_ID` … `16SN7XBWosS7WfbpEPUby4gWPDyAAY_px`(省略可)
   - `CONTENTS_DB_ID` … 省略可(既定で上のDB)
   - `code` … 権限コードの対応表。例 `{"dfkjnga":"xYz"}`
 - デプロイ: ウェブアプリ / 実行するユーザー: 自分 / アクセス: **全員**
 
-デプロイ後、初回だけ実行を承認する(Drive と外部リクエストの権限)。
+### 権限(スコープ)
+
+アップロードは Drive の REST を `UrlFetchApp` で直接叩くため、トークンに Drive の
+書き込みスコープが入っていないと `Drive session failed (403)` になる。
+`beta/contentsstock/gas/appsscript.json` の内容を、プロジェクト設定で
+「`appsscript.json` マニフェスト ファイルをエディタで表示する」を有効にして貼り付ける。
+
+スコープを変えたあとは、**承認をやり直してからデプロイし直す**こと。
+既存のデプロイは古いスコープのトークンを持ち続けるため、貼り替えただけでは直らない。
+
+1. エディタで `authorize` を選んで実行 → 権限の確認画面で許可する
+2. デプロイ → デプロイを管理 → 鉛筆アイコン → バージョン「新しいバージョン」→ デプロイ
+   (URLは変わらない。「新しいデプロイ」にするとURLが変わるので設定の貼り直しが要る)
 
 ## 3. 画面
 
@@ -158,6 +171,7 @@ Drive に直接置いた動画はファイルIDが分からず空のままにな
 「動画リンク未設定」または「…」メニューの「動画リンクを設定する」を押すと、
 ファイル名で Drive を探して埋める(見つからなければ共有URLを手で貼る)。
 探す先は `INBOX_FOLDER_ID` と `CONTENTS_FOLDER_ID`(省略時 `16SN7XBWosS7WfbpEPUby4gWPDyAAY_px`)。
+`Driveリンク` と `公開` の列がDBに無い場合は、書き込む直前に GAS が作る。
 
 ## 補足
 

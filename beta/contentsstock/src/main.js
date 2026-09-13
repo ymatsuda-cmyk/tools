@@ -789,7 +789,7 @@ function paintChat(box, messages) {
 
 // ============ アップロード ============
 
-function openUpload() {
+function openUpload(preset) {
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div class="modal-overlay">
@@ -799,8 +799,12 @@ function openUpload() {
           <label>タイトル(省略時はファイル名)</label>
           <input id="up-title" class="input" />
           <label>動画ファイル</label>
-          <input id="up-file" type="file" accept="video/*,audio/*" />
-          <p class="foot-note">Google Drive の inbox へ送ります。文字起こしはMac側で行われ、終わると一覧に並びます。</p>
+          <div id="up-drop" class="dropzone" tabindex="0">
+            <i class="ti ti-upload" aria-hidden="true"></i>
+            <span id="up-name">ここにドラッグ、またはクリックして選ぶ</span>
+          </div>
+          <input id="up-file" type="file" accept="video/*,audio/*" hidden />
+          <p class="foot-note">Google Drive の inbox へ送ります。文字起こしはMac側で行われ、終わると一覧に並びます。1件ずつ送ります。</p>
           <div class="progress"><div id="up-bar" class="progress-bar"></div></div>
           <p id="up-status" class="foot-note"></p>
         </div>
@@ -814,18 +818,50 @@ function openUpload() {
   const close = () => (root.innerHTML = '')
   root.querySelector('.btn-close').addEventListener('click', close)
   root.querySelector('.btn-cancel').addEventListener('click', close)
+
+  const drop = root.querySelector('#up-drop')
+  const input = root.querySelector('#up-file')
+  let picked = null
+
+  const setFile = (file) => {
+    picked = file
+    root.querySelector('#up-name').textContent = file ? file.name : 'ここにドラッグ、またはクリックして選ぶ'
+    root.querySelector('#up-status').textContent = ''
+  }
+
+  drop.addEventListener('click', () => input.click())
+  drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      input.click()
+    }
+  })
+  input.addEventListener('change', () => setFile(input.files?.[0] || null))
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    drop.classList.add('over')
+  })
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'))
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault()
+    drop.classList.remove('over')
+    const file = e.dataTransfer?.files?.[0]
+    if (file) setFile(file)
+  })
+
+  if (preset) setFile(preset)
+
   root.querySelector('.btn-send').addEventListener('click', async () => {
-    const file = root.querySelector('#up-file').files?.[0]
     const status = root.querySelector('#up-status')
     const bar = root.querySelector('#up-bar')
-    if (!file) {
+    if (!picked) {
       status.textContent = 'ファイルを選んでください'
       return
     }
     root.querySelector('.btn-send').disabled = true
     status.textContent = 'アップロードしています...'
     try {
-      await uploadVideo(file, {
+      await uploadVideo(picked, {
         title: root.querySelector('#up-title').value.trim(),
         onProgress: (ratio) => {
           bar.style.width = `${Math.round(ratio * 100)}%`
@@ -840,6 +876,35 @@ function openUpload() {
   })
 }
 
+/** 画面のどこに落としてもアップロード画面が開くようにする */
+function wireWindowDrop() {
+  const overlay = document.getElementById('drop-overlay')
+  let depth = 0 // 子要素をまたぐたびに dragleave が飛ぶので数える
+
+  const hasFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files')
+
+  window.addEventListener('dragenter', (e) => {
+    if (!hasFile(e)) return
+    depth++
+    overlay.classList.add('on')
+  })
+  window.addEventListener('dragover', (e) => {
+    if (hasFile(e)) e.preventDefault()
+  })
+  window.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1)
+    if (!depth) overlay.classList.remove('on')
+  })
+  window.addEventListener('drop', (e) => {
+    if (!hasFile(e)) return
+    e.preventDefault()
+    depth = 0
+    overlay.classList.remove('on')
+    const file = e.dataTransfer.files[0]
+    if (file) openUpload(file)
+  })
+}
+
 // ============ 起動 ============
 
 $('search').addEventListener('input', (e) => {
@@ -848,9 +913,10 @@ $('search').addEventListener('input', (e) => {
 })
 document.querySelectorAll('.viewtab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)))
 $('open-vocab').addEventListener('click', openVocab)
-$('open-upload').addEventListener('click', openUpload)
+$('open-upload').addEventListener('click', () => openUpload())
 $('open-settings').addEventListener('click', () => openSettings(() => loadList()))
 $('reload').addEventListener('click', loadList)
+wireWindowDrop()
 
 if (!isConfigured(loadConfig())) {
   library = { phase: 'error', message: '設定からGASのURLと共有トークンを入力してください' }

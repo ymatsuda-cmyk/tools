@@ -489,6 +489,53 @@ body {
 .progress { height: 6px; background: var(--surface-1); border-radius: 99px; overflow: hidden; margin-top: 8px; }
 .progress-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
 
+/* ---- ドラッグ&ドロップ ---- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 22px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  word-break: break-all;
+}
+.dropzone i { font-size: 20px; }
+.dropzone:hover { background: var(--accent-bg); color: var(--text-secondary); }
+.dropzone.over { border-color: var(--accent); background: var(--accent-bg); color: var(--text-primary); }
+
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  /* オーバーレイ自身がポインタを拾うと dragleave が暴れるので素通りさせる */
+  pointer-events: none;
+}
+#drop-overlay.on { display: flex; }
+.drop-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 26px;
+  border: 2px dashed #fff;
+  border-radius: var(--radius-lg);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+}
+.drop-card i { font-size: 20px; }
+
 .menu {
   position: fixed;
   z-index: 50;
