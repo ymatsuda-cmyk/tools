@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_note": "表示対象の定義。URLの ?space=<id> で切り替える。sources に取り込み元(一覧JSONとNotionDB)を1つずつ書き、spaces でその組み合わせに名前を付ける。db は GAS 側が書き戻し先のDBを選ぶためのキーで、Code.gs の source と一致させること。",
+  "_note": "表示対象の定義。URLの ?space=<id> で切り替える。sources に取り込み元(一覧JSONとNotionDB)を1つずつ書き、spaces でその組み合わせに名前を付ける。db は GAS 側が書き戻し先のDBを選ぶためのキーで、Code.gs の source と一致させること。「分類」カラムのぶんは build_clipstock_json.py が auto:true を付けて足す(分類が消えると自動で消えるので、手で直したいものは auto を外すこと)。",
   "default": "all",
   "sources": {
     "video": {

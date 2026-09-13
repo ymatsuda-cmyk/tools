@@ -1,5 +1,5 @@
 import { listVideos as gasListVideos, listIdeas as gasListIdeas, registerPageSources } from './gas.js'
-import { baseUrl, sourcesOf, sourceIdsOf } from './spaces.js'
+import { baseUrl, sourcesOf } from './spaces.js'
 
 /**
  * 一覧・アイデア一覧の読み込み口。
@@ -39,7 +39,11 @@ async function fetchOptionalJson(name) {
 
 /**
  * 取り込み元ごとのJSONを1つにまとめる。
- * 分割前のファイルには web の分も入っているので、キーが重複したら先勝ちで落とす。
+ * 同じページが複数のファイルに出たら先勝ちで落とす。
+ *
+ * source はファイル側の値ではなく、読んだファイルの取り込み元IDで上書きする。
+ * 分類ごとのファイルの中身は source:"video" のままなので、そのままだと
+ * 絞り込みチップや書き戻し先の対応が取れなくなる。
  */
 function mergeParts(parts) {
   const byKey = new Map()
@@ -47,13 +51,13 @@ function mergeParts(parts) {
     if (!json) return
     json.items.forEach((item) => {
       if (!item || !item.key || byKey.has(item.key)) return
-      byKey.set(item.key, { ...item, source: item.source || source })
+      byKey.set(item.key, { ...item, source })
     })
   })
   return [...byKey.values()]
 }
 
-/** 分割後のファイルを読む。どちらも無ければ分割前の1本を読む(無ければ例外) */
+/** 分割後のファイルを読む。どれも無ければ分割前の1本を読む(無ければ例外) */
 async function loadParts(pick, legacyName) {
   const files = sourcesOf().map((s) => ({ name: pick(s), source: s.id }))
   const parts = await Promise.all(
@@ -62,17 +66,29 @@ async function loadParts(pick, legacyName) {
   if (parts.some((p) => p.json)) {
     return { items: mergeParts(parts), generatedAt: (parts.find((p) => p.json).json || {}).generatedAt || null }
   }
-  // 分割前の1本には全部入っているので、いまのスペースのぶんだけ残す
+  // 分割前の1本には全部入っている。分類は持っていないので、分類なしのスペースでだけ使える
+  const plain = plainSources()
+  if (!plain.length) throw new Error(`${legacyName} には分類ぶんが入っていません`)
   const legacy = await fetchJson(legacyName)
   if (!Array.isArray(legacy.items)) throw new Error(`${legacyName} の形式が不正です`)
-  const merged = mergeParts([{ json: legacy, source: 'video' }])
-  return { items: keepSpace(merged), generatedAt: legacy.generatedAt || null }
+  return { items: adoptByDb(legacy.items, plain), generatedAt: legacy.generatedAt || null }
 }
 
-/** いまのスペースに属さない取り込み元を落とす。source が無い古いJSONは動画として扱う */
-function keepSpace(items) {
-  const ids = new Set(sourceIdsOf())
-  return items.filter((i) => ids.has(i.source || 'video'))
+/** 分類で絞っていない取り込み元。JSONが無いときの受け皿になれるのはこれだけ */
+function plainSources() {
+  return sourcesOf().filter((s) => !s.category)
+}
+
+/**
+ * source が 'video' / 'web' しか入っていない一覧(分割前のJSON、GASの応答)を、
+ * いまのスペースの取り込み元に割り当てる。受け皿が無いものは落とす。
+ */
+function adoptByDb(items, targets) {
+  const byDb = new Map(targets.map((s) => [s.db || 'video', s.id]))
+  return (items || []).flatMap((item) => {
+    const id = byDb.get(item.source || 'video')
+    return id ? [{ ...item, source: id }] : []
+  })
 }
 
 export async function listVideos() {
@@ -84,8 +100,8 @@ export async function listVideos() {
   } catch (err) {
     console.warn('一覧JSONを使えないため Notion から直接読み込みます:', err)
     const data = await gasListVideos()
-    // GASは常に全DBを返すので、ここでスペースに合わせて絞る
-    const items = keepSpace(data.items || [])
+    // GASは分類を見ないので、分類で絞るスペースはJSONが無いと出せない
+    const items = adoptByDb(data.items, plainSources())
     registerPageSources(items)
     return { ...data, items, source: 'notion' }
   }
@@ -99,7 +115,7 @@ export async function listIdeas() {
   } catch (err) {
     console.warn('アイデアJSONを使えないため Notion から直接読み込みます:', err)
     const data = await gasListIdeas()
-    const items = keepSpace(data.items || [])
+    const items = adoptByDb(data.items, plainSources())
     registerPageSources(items)
     return { ...data, items, source: 'notion' }
   }

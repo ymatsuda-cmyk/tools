@@ -10,6 +10,10 @@
   index-video.json / index-web.json  カード表示・検索・絞り込みに要る項目(長文は有無のフラグだけ)
   idea-video.json  / idea-web.json   応用と活用アイデアの本文(アイデア一覧画面が使う)
 
+「分類」カラムが入っているページは上のファイルには入れず、分類ごとに分けて書く:
+  index-<分類>-video.json / idea-<分類>-web.json ...
+分類が増えたら spaces.json にも足すので、画面側は ?space=<分類> で切り替えられる。
+
 環境変数:
   NOTION_TOKEN       Notion Integration Token(必須)
   WEB_NOTION_TOKEN   web記事DBを別の統合に接続しているときのトークン(あればこちらを優先)
@@ -75,8 +79,12 @@ PROP_GENERATED = "要約日時"
 PROP_RAW_COUNT = "原文文字数"
 PROP_PUBLIC = "公開"  # checkbox。マインドマップ一覧に並べるか
 PROP_CREATED = "作成日時"
+PROP_CATEGORY = "分類"  # 空ならまとめて1つ、入っていれば分類ごとにファイルを分ける
 
 STATUS_NEW = "新規"
+
+# spaces.json で取り込み元とスペースのIDに使えない名前(基本の3つとぶつかる)
+RESERVED_IDS = {"all", "video", "web"}
 
 # ---------------------------------------------------------------- Notion
 
@@ -185,6 +193,29 @@ def created_of(page, props):
     return prop.get("created_time") or page.get("created_time")
 
 
+def category_of(props):
+    """分類。select / multi_select / テキストのどれで作られていても読む。"""
+    prop = props.get(PROP_CATEGORY) or {}
+    kind = prop.get("type")
+    if kind == "select":
+        return ((prop.get("select") or {}).get("name") or "").strip()
+    if kind == "multi_select":
+        names = [o.get("name", "") for o in prop.get("multi_select") or []]
+        return (names[0] if names else "").strip()
+    if kind == "rich_text":
+        return plain_text(prop.get("rich_text")).strip()
+    return ""
+
+
+def slug(category):
+    """分類名をファイル名とIDに使える形にする。日本語はそのまま残す。"""
+    name = "".join(c for c in str(category) if c.isprintable() and c not in '/\\:*?"<>|')
+    name = "_".join(name.split()).strip("._")[:40]
+    if not name:
+        return ""
+    return f"c-{name}" if name in RESERVED_IDS else name
+
+
 # ---------------------------------------------------------------- 変換
 
 
@@ -209,6 +240,7 @@ def to_item(page, source):
     return {
         "key": page["id"],
         "source": source,
+        "category": category_of(p),
         "title": title_any_of(p) or "(タイトル未取得)",
         "url": url_of(p, PROP_URL),
         "thumb": url_of(p, PROP_THUMB),
@@ -244,6 +276,7 @@ def to_idea(page, source):
     return {
         "key": page["id"],
         "source": source,
+        "category": category_of(p),
         "title": title_any_of(p),
         "url": url_of(p, PROP_URL),
         "thumb": url_of(p, PROP_THUMB),
@@ -270,6 +303,85 @@ def write_json(path, payload):
         raise
 
 
+def file_name(prefix, category, source):
+    """分類なしは従来どおりの名前にする(既存のリンクとフォールバックを壊さないため)。"""
+    key = slug(category)
+    return f"{prefix}-{key}-{source}.json" if key else f"{prefix}-{source}.json"
+
+
+SOURCE_LABELS = {"video": "動画", "web": "Web"}
+
+
+def base_spaces():
+    return {
+        "version": 1,
+        "_note": "build_clipstock_json.py が分類ぶんを自動で足す。auto が付いた項目は"
+                 "分類が消えると自動で消えるので、手で直したいものは auto を外すこと。",
+        "default": "all",
+        "sources": {
+            "video": {"label": "動画", "list": "index-video.json", "idea": "idea-video.json", "db": "video"},
+            "web": {"label": "Web", "list": "index-web.json", "idea": "idea-web.json", "db": "web"},
+        },
+        "spaces": [
+            {"id": "all", "label": "すべて", "sources": ["video", "web"]},
+            {"id": "video", "label": "動画", "sources": ["video"]},
+            {"id": "web", "label": "Web記事", "sources": ["web"]},
+        ],
+    }
+
+
+def update_spaces(out_dir, categories):
+    """分類の増減を spaces.json に反映する。
+
+    手で足した項目や書き換えたラベルを消さないよう、面倒を見るのは auto を付けた項目だけ。
+    分類が消えたときは、その auto 項目だけ取り下げる(書き出したJSONは残る)。
+    """
+    path = out_dir / "spaces.json"
+    doc = base_spaces()
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and loaded.get("sources") and loaded.get("spaces"):
+                doc = loaded
+        except Exception as err:  # noqa: BLE001  壊れていたら作り直す
+            print(f"spaces.json を読めないため作り直します: {err}", file=sys.stderr)
+
+    sources = doc.setdefault("sources", {})
+    spaces = doc.setdefault("spaces", [])
+    keys = {slug(c) for c in categories}
+    keys.discard("")
+
+    for key, category in sorted({slug(c): c for c in categories}.items()):
+        if not key:
+            continue
+        ids = []
+        for source in ("video", "web"):
+            sid = f"{key}-{source}"
+            ids.append(sid)
+            if sid not in sources:
+                sources[sid] = {
+                    "label": f"{category}({SOURCE_LABELS[source]})",
+                    "list": file_name("index", category, source),
+                    "idea": file_name("idea", category, source),
+                    "db": source,
+                    "category": category,
+                    "auto": True,
+                }
+        if not any(s.get("id") == key for s in spaces):
+            spaces.append({"id": key, "label": category, "sources": ids, "auto": True})
+
+    # 無くなった分類の自動項目を取り下げる
+    doc["spaces"] = [s for s in spaces if not s.get("auto") or s.get("id") in keys]
+    doc["sources"] = {
+        sid: spec
+        for sid, spec in sources.items()
+        if not spec.get("auto") or sid.rsplit("-", 1)[0] in keys
+    }
+
+    write_json(path, doc)
+    return path
+
+
 def main():
     parser = argparse.ArgumentParser(description="動画ナレッジの一覧JSONを書き出す")
     parser.add_argument(
@@ -290,23 +402,31 @@ def main():
     ideas = [idea for idea in (to_idea(page, source) for page, source in pages) if idea]
     generated_at = datetime.now(JST).isoformat()
 
-    def of_source(rows, source):
-        return [r for r in rows if r["source"] == source]
+    def pick(rows, category, source):
+        return [r for r in rows if r["source"] == source and (r.get("category") or "") == category]
+
+    # 分類名はJSONのキーではなくファイル名になるので、空でないものだけ集める
+    categories = sorted({(r.get("category") or "") for r in items + ideas} - {""})
 
     print(
-        f"動画 {len(of_source(items, 'video'))}件 / web {len(of_source(items, 'web'))}件"
+        f"動画 {len([r for r in items if r['source'] == 'video'])}件"
+        f" / web {len([r for r in items if r['source'] == 'web'])}件"
         f" / アイデアのあるもの {len(ideas)}件"
     )
+    if categories:
+        print("分類: " + " / ".join(f"{c}({len([r for r in items if r.get('category') == c])})" for c in categories))
     if args.dry_run:
         return 0
 
     # 片方のNotionが落ちてももう片方の古いファイルはそのまま残るよう、取り込み元ごとに書く
     out_dir = Path(args.out).expanduser()
-    for source in ("video", "web"):
-        write_json(out_dir / f"index-{source}.json",
-                   {"generatedAt": generated_at, "items": of_source(items, source)})
-        write_json(out_dir / f"idea-{source}.json",
-                   {"generatedAt": generated_at, "items": of_source(ideas, source)})
+    for category in [""] + categories:
+        for source in ("video", "web"):
+            write_json(out_dir / file_name("index", category, source),
+                       {"generatedAt": generated_at, "items": pick(items, category, source)})
+            write_json(out_dir / file_name("idea", category, source),
+                       {"generatedAt": generated_at, "items": pick(ideas, category, source)})
+    update_spaces(out_dir, categories)
     print(f"書き出しました: {out_dir}")
     return 0
 
