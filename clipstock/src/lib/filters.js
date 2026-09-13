@@ -19,15 +19,20 @@ export function filterByStatus(items, selected) {
   return items.filter((i) => selected.has(i.status))
 }
 
-/** 取り込み元で絞る。source が無い古いJSONは動画として扱う */
+/** 取り込み元(動画DB / web記事DB)で絞る。source が無い古いJSONは動画として扱う */
 export function filterBySource(items, selected) {
   if (!selected.size) return items
   return items.filter((i) => selected.has(sourceOf(i)))
 }
 
 export function sourceOf(item) {
-  return item.source || 'video'
+  return item.source === 'web' ? 'web' : 'video'
 }
+
+export const SOURCE_ORDER = [
+  { id: 'video', label: '動画' },
+  { id: 'web', label: 'Web' },
+]
 
 /** 取り込み元ごとの件数 */
 export function sourceCounts(items) {

@@ -31,7 +31,6 @@ import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
 import { initPrompts } from './lib/prompts.js'
-import { initSpaces, activeSpace, spaceList, sourcesOf, spaceHref } from './lib/spaces.js'
 import { generateAll, generateStage, needsTranscript, STAGES } from './lib/generate.js'
 import { renderMindmap, markNodeLine, nodeMarkerOf } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
@@ -55,6 +54,7 @@ import {
   filterBySearch,
   filterBySource,
   sourceCounts,
+  SOURCE_ORDER,
   buildTagOptions,
   statusCounts,
   STATUS_ORDER,
@@ -389,7 +389,7 @@ function paintStatusChips() {
 /** 取り込み元の絞り込み。件数は「除外」を外した全件から数える(自分自身の絞りは効かせない) */
 function paintSourceChips() {
   const counts = sourceCounts(excludeExcluded(items))
-  const shown = sourcesOf().filter((s) => counts.get(s.id))
+  const shown = SOURCE_ORDER.filter((s) => counts.get(s.id))
   const el = $('source-filter')
   // 片方しか無いなら絞る意味が無い
   if (shown.length < 2) {
@@ -1960,22 +1960,4 @@ document.addEventListener('keydown', (e) => {
 $('toggle-tags').classList.toggle('on', showTags)
 // プロンプトは生成を押すときまでに揃っていればよいので、一覧の読み込みは待たせない
 initPrompts()
-// どのJSONを読むかがスペースで決まるので、一覧より先に解決させる
-initSpaces().then(() => {
-  paintSpaceSwitch()
-  loadList()
-})
-
-/** 表示対象の切り替え。選択はURLに入るのでリンクとして配れる */
-function paintSpaceSwitch() {
-  const spaces = spaceList()
-  const el = $('space-switch')
-  if (spaces.length < 2) {
-    el.innerHTML = ''
-    return
-  }
-  const now = activeSpace()
-  el.innerHTML = spaces
-    .map((s) => `<a class="space-tab ${s.id === now?.id ? 'on' : ''}" href="${escapeHtml(spaceHref(s.id))}">${escapeHtml(s.label)}</a>`)
-    .join('')
-}
+loadList()

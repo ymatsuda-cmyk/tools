@@ -1,8 +1,7 @@
 import { loadConfig } from './videos-config.js'
-import { dbOf } from './spaces.js'
 
 /**
- * ページIDごとの書き戻し先。
+ * ページIDごとの取り込み元。
  * web記事DBは動画DBと別のNotion(統合も別のことがある)なので、
  * 書き戻すときにどちらのトークンを使うかをGAS側へ伝える必要がある。
  */
@@ -11,7 +10,7 @@ const pageSources = new Map()
 /** 一覧を読み込んだら呼ぶ。以降そのページへの操作に source が付く */
 export function registerPageSources(items) {
   ;(items || []).forEach((item) => {
-    if (item && item.key) pageSources.set(item.key, dbOf(item.source || 'video'))
+    if (item && item.key) pageSources.set(item.key, item.source === 'web' ? 'web' : 'video')
   })
 }
 

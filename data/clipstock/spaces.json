@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "_note": "表示対象の定義。URLの ?space=<id> で切り替える。sources に取り込み元(一覧JSONとNotionDB)を1つずつ書き、spaces でその組み合わせに名前を付ける。db は GAS 側が書き戻し先のDBを選ぶためのキーで、Code.gs の source と一致させること。",
+  "default": "all",
+  "sources": {
+    "video": {
+      "label": "動画",
+      "list": "index-video.json",
+      "idea": "idea-video.json",
+      "db": "video"
+    },
+    "web": {
+      "label": "Web",
+      "list": "index-web.json",
+      "idea": "idea-web.json",
+      "db": "web"
+    }
+  },
+  "spaces": [
+    { "id": "all", "label": "すべて", "sources": ["video", "web"] },
+    { "id": "video", "label": "動画", "sources": ["video"] },
+    { "id": "web", "label": "Web記事", "sources": ["web"] }
+  ]
+}
