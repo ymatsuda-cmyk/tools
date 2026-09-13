@@ -789,22 +789,23 @@ function paintChat(box, messages) {
 
 // ============ アップロード ============
 
-function openUpload(preset) {
+function openUpload(presetFiles) {
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div class="modal-overlay">
       <div class="modal">
         <div class="modal-head"><span>動画をアップロード</span><button class="btn-ghost btn-close" aria-label="閉じる"><i class="ti ti-x"></i></button></div>
         <div class="modal-body">
-          <label>タイトル(省略時はファイル名)</label>
+          <label>タイトル(省略時はファイル名。複数選んだときはファイル名になります)</label>
           <input id="up-title" class="input" />
           <label>動画ファイル</label>
           <div id="up-drop" class="dropzone" tabindex="0">
             <i class="ti ti-upload" aria-hidden="true"></i>
-            <span id="up-name">ここにドラッグ、またはクリックして選ぶ</span>
+            <span>ここにドラッグ、またはクリックして選ぶ(複数可)</span>
           </div>
-          <input id="up-file" type="file" accept="video/*,audio/*" hidden />
-          <p class="foot-note">Google Drive の inbox へ送ります。文字起こしはMac側で行われ、終わると一覧に並びます。1件ずつ送ります。</p>
+          <input id="up-file" type="file" accept="video/*,audio/*" multiple hidden />
+          <ul id="up-list" class="up-list"></ul>
+          <p class="foot-note">Google Drive の inbox へ送ります。文字起こしはMac側で行われ、終わると一覧に並びます。</p>
           <div class="progress"><div id="up-bar" class="progress-bar"></div></div>
           <p id="up-status" class="foot-note"></p>
         </div>
@@ -821,12 +822,45 @@ function openUpload(preset) {
 
   const drop = root.querySelector('#up-drop')
   const input = root.querySelector('#up-file')
-  let picked = null
+  const list = root.querySelector('#up-list')
+  const status = root.querySelector('#up-status')
+  const bar = root.querySelector('#up-bar')
+  const sendBtn = root.querySelector('.btn-send')
 
-  const setFile = (file) => {
-    picked = file
-    root.querySelector('#up-name').textContent = file ? file.name : 'ここにドラッグ、またはクリックして選ぶ'
-    root.querySelector('#up-status').textContent = ''
+  // { file, state: 'wait'|'busy'|'done'|'error', message }
+  let queue = []
+  let sending = false
+
+  function paintList() {
+    root.querySelector('#up-title').disabled = queue.length > 1
+    list.innerHTML = queue.map((q, i) => `
+      <li class="up-item ${q.state}">
+        <span class="up-item-name">${escapeHtml(q.file.name)}</span>
+        <span class="up-item-state">${escapeHtml(q.message || '')}</span>
+        ${q.state === 'wait' && !sending ? `<button class="btn-ghost up-item-del" data-i="${i}" aria-label="外す"><i class="ti ti-x"></i></button>` : ''}
+      </li>
+    `).join('')
+    list.querySelectorAll('.up-item-del').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        queue.splice(Number(btn.dataset.i), 1)
+        paintList()
+      })
+    )
+  }
+
+  function addFiles(files) {
+    if (sending) return
+    const incoming = [...(files || [])]
+    // 同じファイルを二重に積まない。名前とサイズが一致すれば同じものとみなす
+    const key = (f) => `${f.name}:${f.size}`
+    const known = new Set(queue.map((q) => key(q.file)))
+    incoming.forEach((file) => {
+      if (known.has(key(file))) return
+      known.add(key(file))
+      queue.push({ file, state: 'wait', message: '' })
+    })
+    status.textContent = ''
+    paintList()
   }
 
   drop.addEventListener('click', () => input.click())
@@ -836,7 +870,7 @@ function openUpload(preset) {
       input.click()
     }
   })
-  input.addEventListener('change', () => setFile(input.files?.[0] || null))
+  input.addEventListener('change', () => addFiles(input.files))
   drop.addEventListener('dragover', (e) => {
     e.preventDefault()
     drop.classList.add('over')
@@ -845,34 +879,58 @@ function openUpload(preset) {
   drop.addEventListener('drop', (e) => {
     e.preventDefault()
     drop.classList.remove('over')
-    const file = e.dataTransfer?.files?.[0]
-    if (file) setFile(file)
+    addFiles(e.dataTransfer?.files)
   })
 
-  if (preset) setFile(preset)
+  if (presetFiles) addFiles(presetFiles)
 
-  root.querySelector('.btn-send').addEventListener('click', async () => {
-    const status = root.querySelector('#up-status')
-    const bar = root.querySelector('#up-bar')
-    if (!picked) {
+  sendBtn.addEventListener('click', async () => {
+    const waiting = queue.filter((q) => q.state === 'wait')
+    if (!waiting.length) {
       status.textContent = 'ファイルを選んでください'
       return
     }
-    root.querySelector('.btn-send').disabled = true
-    status.textContent = 'アップロードしています...'
-    try {
-      await uploadVideo(picked, {
-        title: root.querySelector('#up-title').value.trim(),
-        onProgress: (ratio) => {
-          bar.style.width = `${Math.round(ratio * 100)}%`
-          status.textContent = `アップロード中 ${Math.round(ratio * 100)}%`
-        },
-      })
-      status.textContent = '送信しました。文字起こしが終わると一覧に並びます。'
-    } catch (err) {
-      status.textContent = '失敗しました: ' + (err.message || err)
+    // 1本ずつ順に送る。GASの中継を挟むので、同時に投げても速くならない
+    sending = true
+    sendBtn.disabled = true
+    const title = root.querySelector('#up-title').value.trim()
+    let ok = 0
+
+    for (let i = 0; i < waiting.length; i++) {
+      const item = waiting[i]
+      item.state = 'busy'
+      item.message = '0%'
+      paintList()
+      try {
+        await uploadVideo(item.file, {
+          title: waiting.length === 1 ? title : '',
+          onProgress: (ratio) => {
+            const pct = Math.round(ratio * 100)
+            item.message = `${pct}%`
+            bar.style.width = `${Math.round(((i + ratio) / waiting.length) * 100)}%`
+            status.textContent = `${i + 1}/${waiting.length} ${item.file.name} ${pct}%`
+            const el = list.querySelectorAll('.up-item-state')[queue.indexOf(item)]
+            if (el) el.textContent = item.message
+          },
+        })
+        item.state = 'done'
+        item.message = '送信しました'
+        ok++
+      } catch (err) {
+        item.state = 'error'
+        item.message = String(err.message || err)
+      }
+      paintList()
     }
-    root.querySelector('.btn-send').disabled = false
+
+    bar.style.width = '100%'
+    const failed = waiting.length - ok
+    status.textContent = failed
+      ? `${ok}件を送信、${failed}件が失敗しました`
+      : `${ok}件を送信しました。文字起こしが終わると一覧に並びます。`
+    sending = false
+    sendBtn.disabled = false
+    paintList()
   })
 }
 
@@ -900,8 +958,7 @@ function wireWindowDrop() {
     e.preventDefault()
     depth = 0
     overlay.classList.remove('on')
-    const file = e.dataTransfer.files[0]
-    if (file) openUpload(file)
+    if (e.dataTransfer.files.length) openUpload(e.dataTransfer.files)
   })
 }
 
