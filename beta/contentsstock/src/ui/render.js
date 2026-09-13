@@ -1,4 +1,4 @@
-import { parseSections, visibleHeading, sectionRank } from '../lib/sections.js'
+import { parseSections, visibleHeading, sectionRank, isSectionHidden } from '../lib/sections.js'
 
 export function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
@@ -72,6 +72,145 @@ export function renderLibrary(container, items, state, handlers) {
   })
 }
 
+// ============ マインドマップ一覧(公開ONのものだけ) ============
+
+/** マップ自体は重いのでカードには描かない。開いたときに1枚だけ描く */
+export function renderMindmapGallery(container, items, state, handlers) {
+  if (state.phase === 'loading') {
+    container.innerHTML = '<p class="muted">読み込んでいます...</p>'
+    return
+  }
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="ti ti-sitemap" aria-hidden="true"></i>
+        <p>公開中のマインドマップがありません</p>
+        <p class="empty-hint">詳細のマインドマップタブで「公開する」を押すと、ここに並びます</p>
+      </div>`
+    return
+  }
+
+  container.innerHTML = `
+    <div class="cards">
+      ${items.map((item) => `
+        <article class="card mm-card" data-key="${escapeHtml(item.key)}">
+          <div class="card-kind"><i class="ti ti-sitemap" aria-hidden="true"></i>マインドマップ</div>
+          <h3 class="card-title">${escapeHtml(item.title)}</h3>
+          <div class="card-tags">${(item.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+          <div class="card-foot">
+            <span class="grow"></span>
+            <span class="card-date">${fmtDate(item.createdAt)}</span>
+            ${state.canEdit ? '<button class="btn-ghost btn-hide" aria-label="一覧から外す"><i class="ti ti-eye-off"></i></button>' : ''}
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `
+
+  container.querySelectorAll('.card').forEach((el) => {
+    el.addEventListener('click', () => handlers.onOpen(el.dataset.key))
+  })
+  container.querySelectorAll('.btn-hide').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation() // カードのクリック(大きく見る)と競合させない
+      handlers.onHide(btn.closest('.card').dataset.key)
+    })
+  })
+}
+
+// ============ アイデア一覧 ============
+
+/** listIdeas の結果を1件1アイデアの配列に展開する */
+export function flattenIdeas(items) {
+  const out = []
+  items.forEach((v) => {
+    ;['apply', 'ideas'].forEach((kind) => {
+      parseSections(v[kind]).forEach((s, i) => {
+        out.push({
+          id: `${v.key}:${kind}:${i}`,
+          key: v.key,
+          contentTitle: v.title,
+          tags: v.tags || [],
+          kind,
+          sec: i,
+          isPublic: !isSectionHidden(s.heading),
+          rank: sectionRank(s.heading),
+          heading: visibleHeading(s.heading) || '(無題)',
+          body: s.body,
+          points: s.points,
+        })
+      })
+    })
+  })
+  return out
+}
+
+const IDEA_KINDS = [
+  { id: 'all', label: 'すべて' },
+  { id: 'apply', label: '応用' },
+  { id: 'ideas', label: '活用' },
+]
+
+export function renderIdeaGallery(container, entries, state, handlers) {
+  if (state.phase === 'loading') {
+    container.innerHTML = '<p class="muted">読み込んでいます...</p>'
+    return
+  }
+  if (state.phase === 'error') {
+    container.innerHTML = `<p class="error-text">${escapeHtml(state.message)}</p><button class="btn btn-retry">もう一度読み込む</button>`
+    return
+  }
+
+  const filters = `
+    <div class="idea-filters">
+      ${IDEA_KINDS.map((k) => `<button class="chip idea-kind ${k.id === state.kind ? 'on' : ''}" data-kind="${k.id}">${k.label}</button>`).join('')}
+      <span class="grow"></span>
+      <span class="foot-note">${entries.length}件</span>
+    </div>`
+
+  const body = entries.length
+    ? `<div class="cards">
+        ${entries.map((e) => `
+          <article class="card idea-card" data-id="${escapeHtml(e.id)}">
+            <div class="card-kind">
+              <i class="ti ti-bulb" aria-hidden="true"></i>${e.kind === 'apply' ? '応用' : '活用'}
+              <span class="grow"></span>
+              ${e.rank ? `<span class="rank">${[1, 2, 3].map((n) => `<span class="star ${n <= e.rank ? 'on' : ''}">★</span>`).join('')}</span>` : ''}
+            </div>
+            <h3 class="card-title">${escapeHtml(e.heading)}</h3>
+            ${e.body ? `<p class="card-summary">${escapeHtml(e.body)}</p>` : ''}
+            ${e.points.length ? `<ul class="sec-points">${e.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
+            <div class="card-tags">${e.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+            <div class="card-foot">
+              <span class="idea-from">${escapeHtml(e.contentTitle || '')}</span>
+              <span class="grow"></span>
+              ${state.canEdit ? '<button class="btn-ghost btn-hide" aria-label="一覧から外す"><i class="ti ti-eye-off"></i></button>' : ''}
+            </div>
+          </article>
+        `).join('')}
+      </div>`
+    : `<div class="empty-state">
+         <i class="ti ti-bulb" aria-hidden="true"></i>
+         <p>公開中のアイデアがありません</p>
+         <p class="empty-hint">詳細の「応用」「活用」タブで生成すると、ここに並びます</p>
+       </div>`
+
+  container.innerHTML = filters + body
+
+  container.querySelectorAll('.idea-kind').forEach((btn) =>
+    btn.addEventListener('click', () => handlers.onKind(btn.dataset.kind))
+  )
+  container.querySelectorAll('.idea-card').forEach((el) => {
+    el.addEventListener('click', () => handlers.onOpen(el.dataset.id))
+  })
+  container.querySelectorAll('.btn-hide').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation() // カードのクリック(詳細を開く)と競合させない
+      handlers.onHide(btn.closest('.idea-card').dataset.id)
+    })
+  })
+}
+
 // ============ 詳細 ============
 
 export const TABS = [
@@ -89,16 +228,25 @@ export const TABS = [
 function sectionsHtml(text, { ranked = false, editable = false } = {}) {
   const sections = parseSections(text)
   if (!sections.length) return '<p class="muted">まだありません</p>'
-  return sections.map((s, i) => `
-    <section class="sec" data-sec="${i}">
+  return sections.map((s, i) => {
+    const shown = !isSectionHidden(s.heading)
+    return `
+    <section class="sec ${shown ? '' : 'sec-hidden'}" data-sec="${i}">
       <div class="sec-head">
         <h4>${escapeHtml(visibleHeading(s.heading) || '(無題)')}</h4>
         ${ranked ? rankHtml(i, sectionRank(s.heading), editable) : ''}
+        ${ranked && editable ? `<button class="btn-ghost sec-pub" data-sec="${i}" data-on="${shown ? '1' : '0'}" aria-label="${shown ? 'アイデア一覧から外す' : 'アイデア一覧に戻す'}"><i class="ti ti-eye${shown ? '' : '-off'}"></i></button>` : ''}
       </div>
       ${s.body ? `<p class="sec-body">${escapeHtml(s.body).replace(/\n/g, '<br>')}</p>` : ''}
       ${s.points.length ? `<ul class="sec-points">${s.points.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
     </section>
-  `).join('')
+  `
+  }).join('')
+}
+
+/** マインドマップ一覧に並べるかの切り替え */
+function publishHtml(on) {
+  return `<button class="btn btn-publish" data-on="${on ? '1' : '0'}"><i class="ti ti-${on ? 'eye-off' : 'eye'}" aria-hidden="true"></i>${on ? '一覧から外す' : 'マインドマップ一覧に公開'}</button>`
 }
 
 /** 価値の目安の3つ星。編集できるときは星を押して変えられる */
@@ -170,6 +318,7 @@ export function renderDetail(container, item, state) {
            <button id="chat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
          </div>`
       : `${canEdit && stage ? `<button class="btn btn-regen" data-stage="${stage.id}"><i class="ti ti-refresh" aria-hidden="true"></i>この項目を作り直す</button>` : ''}
+         ${canEdit && tab === 'mindmap' ? publishHtml(d.isPublic ?? item.isPublic) : ''}
          <span class="grow"></span>
          <button class="btn btn-copy"><i class="ti ti-copy" aria-hidden="true"></i>コピー</button>`
 

@@ -111,6 +111,11 @@ export function saveTags(pageId, tags) {
   return callGas('saveTags', { pageId, tags })
 }
 
+/** from が付いている全ページを from -> to に書き換える。件数ぶん時間がかかる */
+export function mergeTag(from, to) {
+  return callGas('mergeTag', { from, to })
+}
+
 export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }

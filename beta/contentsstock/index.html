@@ -27,11 +27,20 @@
     </div>
   </header>
 
+  <nav class="viewtabs">
+    <button class="viewtab on" data-view="library"><i class="ti ti-files" aria-hidden="true"></i>コンテンツ</button>
+    <button class="viewtab" data-view="ideas"><i class="ti ti-bulb" aria-hidden="true"></i>アイデア</button>
+    <button class="viewtab" data-view="mindmaps"><i class="ti ti-sitemap" aria-hidden="true"></i>マインドマップ</button>
+    <span class="grow"></span>
+    <button id="open-vocab" class="btn-ghost" aria-label="タグを整理"><i class="ti ti-tags" aria-hidden="true"></i></button>
+  </nav>
+
   <div id="tag-bar" class="tag-bar"></div>
   <main id="stage" class="stage"></main>
 </div>
 
 <div id="modal-root"></div>
+<div id="mm-root"></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

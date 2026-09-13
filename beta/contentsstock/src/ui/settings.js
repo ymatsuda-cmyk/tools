@@ -28,6 +28,8 @@ export function openSettings(onClose) {
               <button class="btn btn-verify">確認</button>
               <span id="cfg-role" class="foot-note">${config.role ? `権限: ${escapeHtml(config.role)}` : ''}</span>
             </div>
+            <label>一覧JSONの置き場所(空なら data/contentsstock/)</label>
+            <input id="cfg-data" class="input" value="${escapeHtml(config.dataUrl)}" placeholder="https://.../data/contentsstock/" />
 
             <h4>AI接続</h4>
             ${draft.connections.map((c) => `
@@ -130,6 +132,7 @@ export function openSettings(onClose) {
         gasUrl: root.querySelector('#cfg-gas').value.trim(),
         accessToken: root.querySelector('#cfg-token').value.trim(),
         code: root.querySelector('#cfg-code').value.trim(),
+        dataUrl: root.querySelector('#cfg-data').value.trim(),
       })
       saveSettings(draft)
       close()

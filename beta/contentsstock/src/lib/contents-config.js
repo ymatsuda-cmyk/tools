@@ -5,6 +5,7 @@ const DEFAULTS = {
   accessToken: '', // GASの ACCESS_TOKEN と一致させる共有トークン(Notionのシークレットではない)
   code: '', // 権限コード。GAS側スクリプトプロパティ "code" と照合する
   role: '', // 検証済みの権限。'xYz' は管理者、'err' は権限なし
+  dataUrl: '', // 一覧JSONの置き場所。空なら同じリポジトリの data/contentsstock/ を見る
 }
 
 export function loadConfig() {

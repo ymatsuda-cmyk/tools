@@ -1,7 +1,14 @@
-import { renderLibrary, renderDetail, escapeHtml } from './ui/render.js'
-import { openSettings } from './ui/settings.js'
 import {
-  listContents,
+  renderLibrary,
+  renderDetail,
+  renderIdeaGallery,
+  renderMindmapGallery,
+  flattenIdeas,
+  escapeHtml,
+} from './ui/render.js'
+import { openSettings } from './ui/settings.js'
+import { openVocabPanel } from './ui/vocab.js'
+import {
   fetchDetail,
   fetchTranscript,
   saveGenerated,
@@ -10,13 +17,17 @@ import {
   saveTags,
   saveTitle,
   setStatus,
+  setPublic,
+  mergeTag,
   deleteContent,
 } from './lib/gas.js'
+import { listContents, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/contents-config.js'
 import { loadSettings, connectionOf, activeModelName } from './lib/llm-settings.js'
 import { streamChat } from './lib/llm-client.js'
 import { generateStage, generateAll, STAGES } from './lib/generate.js'
-import { setSectionRank } from './lib/sections.js'
+import { setSectionRank, setSectionHidden } from './lib/sections.js'
+import { loadDismissed, dismissPair, clearDismissed } from './lib/vocab.js'
 import { renderMindmap } from '../../../api/mindmap2/mindmap2.js'
 import { uploadVideo } from './upload.js'
 
@@ -24,11 +35,15 @@ const stageEl = document.getElementById('stage')
 const statusEl = document.getElementById('sync-status')
 const $ = (id) => document.getElementById(id)
 
-let view = 'library' // 'library' | 'detail'
+let view = 'library' // 'library' | 'ideas' | 'mindmaps' | 'detail'
+let lastListView = 'library' // 詳細から戻る先
 let items = []
 let library = { phase: 'idle', message: '' }
 let searchQuery = ''
 const selectedTags = new Set()
+
+// アイデア一覧は開いたときに1度だけ読む(一覧JSONとは別ファイル)
+let ideas = { phase: 'idle', source: [], entries: [], kind: 'all', message: '' }
 
 let detail = null // { key, item, phase, detail, activeTab, transcript, memoDraft, busyStage, busyText }
 
@@ -39,11 +54,12 @@ const detailCache = new Map()
 
 async function loadList() {
   library = { phase: 'loading' }
+  ideas = { ...ideas, phase: 'idle' }
   paint()
   try {
     const data = await listContents()
     items = (data.items || []).filter((i) => i.status !== '除外')
-    library = { phase: 'ready' }
+    library = { phase: 'ready', source: data.source }
   } catch (err) {
     library = { phase: 'error', message: String(err.message || err) }
   }
@@ -81,15 +97,185 @@ function paintTags() {
 
 function paint() {
   $('active-model').textContent = activeModelName(loadSettings()) ? `AI: ${activeModelName(loadSettings())}` : '(AI未設定)'
+  document.querySelectorAll('.viewtab').forEach((t) => t.classList.toggle('on', t.dataset.view === lastListView))
 
   if (view === 'detail' && detail) {
     paintDetail()
     return
   }
   paintTags()
+
+  if (view === 'ideas') {
+    paintIdeas()
+    return
+  }
+  if (view === 'mindmaps') {
+    paintMindmaps()
+    return
+  }
+
   const list = filtered()
-  statusEl.textContent = library.phase === 'ready' ? `${list.length}件` : ''
+  statusEl.textContent = library.phase === 'ready'
+    ? `${list.length}件${library.source === 'notion' ? ' ・Notion直読み' : ''}`
+    : ''
   renderLibrary(stageEl, list, library, { onOpen: openDetail, onRetry: loadList })
+}
+
+function setView(next) {
+  view = next
+  lastListView = next
+  detail = null
+  paint()
+}
+
+// ============ マインドマップ一覧 ============
+
+/** 「公開」をONにしたものだけを並べる。マップ自体はカードを開いたときに描く */
+function paintMindmaps() {
+  const list = filtered().filter((i) => i.isPublic && i.has?.mindmap)
+  statusEl.textContent = `${list.length}件`
+  renderMindmapGallery(stageEl, list, { phase: library.phase, canEdit: canEdit(loadConfig()) }, {
+    onOpen: openMindmapViewer,
+    onHide: hideMindmap,
+  })
+}
+
+/** 一覧からその場で公開をやめる。戻すときは詳細のマインドマップタブから */
+async function hideMindmap(key) {
+  const item = items.find((i) => i.key === key)
+  if (!item) return
+  item.isPublic = false
+  paint()
+  try {
+    await setPublic(key, false)
+  } catch (err) {
+    item.isPublic = true
+    paint()
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
+}
+
+async function openMindmapViewer(key) {
+  const item = items.find((i) => i.key === key)
+  if (!item) return
+  const root = $('mm-root')
+  root.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal modal-full">
+        <div class="modal-head"><span>${escapeHtml(item.title)}</span><button class="btn-ghost btn-close" aria-label="閉じる"><i class="ti ti-x"></i></button></div>
+        <div id="mm-full" class="mindmap-host mindmap-full"><p class="muted">読み込んでいます...</p></div>
+      </div>
+    </div>
+  `
+  root.querySelector('.btn-close').addEventListener('click', () => (root.innerHTML = ''))
+
+  try {
+    let data = detailCache.get(key)
+    if (!data) {
+      data = await fetchDetail(key)
+      detailCache.set(key, data)
+    }
+    // 読んでいる間に閉じられていることがある
+    if ($('mm-full')) renderMindmap($('mm-full'), data.mindmap, { emptyText: 'マインドマップはまだありません', initialExpandLevel: 2 })
+  } catch (err) {
+    if ($('mm-full')) $('mm-full').innerHTML = `<p class="error-text">${escapeHtml(String(err.message || err))}</p>`
+  }
+}
+
+// ============ アイデア一覧 ============
+
+async function paintIdeas() {
+  if (ideas.phase === 'idle') {
+    ideas = { ...ideas, phase: 'loading' }
+    renderIdeaGallery(stageEl, [], ideas, {})
+    try {
+      const data = await listIdeas()
+      ideas = { ...ideas, phase: 'ready', source: data.items || [], entries: flattenIdeas(data.items || []) }
+    } catch (err) {
+      ideas = { ...ideas, phase: 'error', message: String(err.message || err) }
+    }
+    if (view !== 'ideas') return
+  }
+
+  let entries = ideas.entries.filter((e) => e.isPublic)
+  if (ideas.kind !== 'all') entries = entries.filter((e) => e.kind === ideas.kind)
+  if (selectedTags.size) entries = entries.filter((e) => [...selectedTags].every((t) => e.tags.includes(t)))
+  const q = searchQuery.trim().toLowerCase()
+  if (q) {
+    entries = entries.filter((e) =>
+      [e.heading, e.body, e.points.join(' '), e.contentTitle].join(' ').toLowerCase().includes(q)
+    )
+  }
+  entries = [...entries].sort((a, b) => b.rank - a.rank)
+
+  statusEl.textContent = ideas.phase === 'ready' ? `${entries.length}件` : ''
+  renderIdeaGallery(stageEl, entries, { ...ideas, canEdit: canEdit(loadConfig()) }, {
+    onKind: (kind) => {
+      ideas.kind = kind
+      paintIdeas()
+    },
+    onOpen: (id) => openDetail(ideas.entries.find((e) => e.id === id)?.key),
+    onHide: hideIdea,
+  })
+  stageEl.querySelector('.btn-retry')?.addEventListener('click', () => {
+    ideas.phase = 'idle'
+    paintIdeas()
+  })
+}
+
+/** アイデア1件を一覧から外す。戻すときは詳細の応用 / 活用タブから */
+async function hideIdea(id) {
+  const entry = ideas.entries.find((e) => e.id === id)
+  const src = ideas.source.find((v) => v.key === entry?.key)
+  if (!entry || !src) return
+  const before = src[entry.kind] || ''
+  const next = setSectionHidden(before, entry.sec, true)
+  entry.isPublic = false
+  src[entry.kind] = next
+  paint()
+  try {
+    await saveField(entry.key, entry.kind, next)
+    // 詳細を開き直したときに古い本文が出ないようにする
+    const cached = detailCache.get(entry.key)
+    if (cached) detailCache.set(entry.key, { ...cached, [entry.kind]: next })
+  } catch (err) {
+    entry.isPublic = true
+    src[entry.kind] = before
+    paint()
+    alert('一覧から外せませんでした: ' + (err.message || err))
+  }
+}
+
+// ============ タグの整理 ============
+
+function openVocab() {
+  let dismissed = loadDismissed()
+  openVocabPanel(items, {
+    dismissed: () => dismissed,
+    onKeep: (key) => {
+      dismissed = dismissPair(key)
+    },
+    onResetDismissed: () => {
+      clearDismissed()
+      dismissed = loadDismissed()
+    },
+    onMerge: async (from, to) => {
+      const res = await mergeTag(from, to)
+      // Notion 側は書き換わっている。JSON の再生成を待たずに手元も揃えておく
+      items.forEach((i) => {
+        if (!(i.tags || []).includes(from)) return
+        i.tags = [...new Set(i.tags.map((t) => (t === from ? to : t)))]
+      })
+      ideas.entries.forEach((e) => {
+        if (!e.tags.includes(from)) return
+        e.tags = [...new Set(e.tags.map((t) => (t === from ? to : t)))]
+      })
+      selectedTags.delete(from)
+      detailCache.clear()
+      paint()
+      return res
+    },
+  })
 }
 
 // ============ 詳細 ============
@@ -136,14 +322,11 @@ function switchTab(tab) {
 }
 
 function wireDetail() {
-  stageEl.querySelector('.btn-back')?.addEventListener('click', () => {
-    view = 'library'
-    detail = null
-    paint()
-  })
+  stageEl.querySelector('.btn-back')?.addEventListener('click', () => setView(lastListView))
   stageEl.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)))
   stageEl.querySelector('.btn-generate-all')?.addEventListener('click', runGenerateAll)
   stageEl.querySelector('.btn-regen')?.addEventListener('click', (e) => runStage(e.currentTarget.dataset.stage))
+  stageEl.querySelector('.btn-publish')?.addEventListener('click', (e) => togglePublic(e.currentTarget.dataset.on !== '1'))
   stageEl.querySelector('.btn-copy')?.addEventListener('click', copyCurrentTab)
   stageEl.querySelector('.btn-edit-title')?.addEventListener('click', editTitle)
   stageEl.querySelector('.btn-more')?.addEventListener('click', openMoreMenu)
@@ -153,6 +336,9 @@ function wireDetail() {
   )
   stageEl.querySelectorAll('.rank .star[data-sec]').forEach((btn) =>
     btn.addEventListener('click', () => changeRank(detail.activeTab, Number(btn.dataset.sec), Number(btn.dataset.rank)))
+  )
+  stageEl.querySelectorAll('.sec-pub').forEach((btn) =>
+    btn.addEventListener('click', () => changeSectionHidden(detail.activeTab, Number(btn.dataset.sec), btn.dataset.on === '1'))
   )
 
   if (detail.phase !== 'ready' || detail.busyStage) return
@@ -314,6 +500,41 @@ async function changeRank(field, index, rank) {
   }
 }
 
+/** アイデア1件をアイデア一覧に出すかどうか。見出しの印で持つ */
+async function changeSectionHidden(field, index, hidden) {
+  const before = detail.detail?.[field] ?? ''
+  const next = setSectionHidden(before, index, hidden)
+  if (next === before) return
+  detail.detail = { ...detail.detail, [field]: next }
+  detailCache.set(detail.key, detail.detail)
+  // アイデア一覧は別のJSONから読んでいるので、次に開いたときに取り直す
+  ideas.phase = 'idle'
+  paintDetail()
+  try {
+    await saveField(detail.key, field, next)
+  } catch (err) {
+    detail.detail = { ...detail.detail, [field]: before }
+    paintDetail()
+    alert('切り替えられませんでした: ' + (err.message || err))
+  }
+}
+
+/** マインドマップ一覧に並べるかどうか */
+async function togglePublic(next) {
+  detail.detail = { ...detail.detail, isPublic: next }
+  detail.item.isPublic = next
+  detailCache.set(detail.key, detail.detail)
+  paintDetail()
+  try {
+    await setPublic(detail.key, next)
+  } catch (err) {
+    detail.detail = { ...detail.detail, isPublic: !next }
+    detail.item.isPublic = !next
+    paintDetail()
+    alert('公開の切り替えができませんでした: ' + (err.message || err))
+  }
+}
+
 function setupMemo() {
   const input = stageEl.querySelector('#memo-input')
   const saveBtn = stageEl.querySelector('.btn-memo-save')
@@ -415,9 +636,7 @@ function openMoreMenu(e) {
       await deleteContent(detail.key)
     }
     items = items.filter((i) => i.key !== detail.key)
-    view = 'library'
-    detail = null
-    paint()
+    setView(lastListView)
   }))
 
   setTimeout(() => {
@@ -557,8 +776,10 @@ function openUpload() {
 
 $('search').addEventListener('input', (e) => {
   searchQuery = e.target.value
-  if (view === 'library') paint()
+  if (view !== 'detail') paint()
 })
+document.querySelectorAll('.viewtab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)))
+$('open-vocab').addEventListener('click', openVocab)
 $('open-upload').addEventListener('click', openUpload)
 $('open-settings').addEventListener('click', () => openSettings(() => loadList()))
 $('reload').addEventListener('click', loadList)
