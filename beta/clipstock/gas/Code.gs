@@ -45,6 +45,7 @@ var PROP_MODEL    = '要約モデル';     // rich_text  (要追加)
 var PROP_GENERATED = '要約日時';      // date       (要追加)
 var PROP_RAW_COUNT = '原文文字数';    // number     (要追加)
 var PROP_PUBLIC   = '公開';           // checkbox   マインドマップ一覧に並べるか (要追加)
+var PROP_CATEGORY = '分類';           // select     空ならまとめて1つ、入っていれば一覧JSONを分ける
 var PROP_CREATED  = '作成日時';       // created_time
 
 // ---- 状態の値 ----
@@ -100,6 +101,9 @@ function doPost(e) {
         break;
       case 'saveTitle':
         result = saveTitle_(body.pageId, body.title, body.source);
+        break;
+      case 'saveCategory':
+        result = saveCategory_(body.pageId, body.category, body.source);
         break;
       case 'setStatus':
         result = setStatus_(body.pageId, body.status, body.source);
@@ -361,6 +365,7 @@ function toListItem_(page, source) {
     key: page.id,
     source: source,
     title: titleAnyOf_(p) || '(タイトル未取得)',
+    category: selectOf_(p, PROP_CATEGORY),
     url: urlOf_(p, PROP_URL),
     thumb: urlOf_(p, PROP_THUMB),
     status: status || STATUS_NEW,
@@ -590,6 +595,19 @@ function saveTitle_(pageId, title, source) {
   props[titlePropName_(page.properties)] = { title: [{ text: { content: String(title || '').slice(0, 2000) } }] };
   notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
   return { saved: true, title: title };
+}
+
+/**
+ * 分類を保存する。空文字なら外す。
+ * 一覧JSONの分かれ方が変わるが、反映は次のcronでJSONを作り直してからになる。
+ * Notionのselectは未登録の選択肢名でもAPI側で自動追加される。
+ */
+function saveCategory_(pageId, category, source) {
+  var name = String(category || '').trim();
+  var props = {};
+  props[PROP_CATEGORY] = { select: name ? { name: name.slice(0, 100) } : null };
+  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
+  return { saved: true, category: name };
 }
 
 /**

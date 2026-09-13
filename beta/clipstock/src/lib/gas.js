@@ -149,6 +149,11 @@ export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }
 
+/** 分類。空文字で外せる。一覧JSONの分かれ先が変わるので作り直しを依頼する */
+export function saveCategory(pageId, category) {
+  return callGas('saveCategory', { pageId, category })
+}
+
 /** 状態変更。'新規' に戻すと次回バッチで文字起こしをやり直す。'除外' は論理削除 */
 export function setStatus(pageId, status) {
   return callGas('setStatus', { pageId, status })
@@ -180,6 +185,7 @@ const REBUILD_ACTIONS = new Set([
   'saveField',
   'saveTags',
   'saveTitle',
+  'saveCategory',
   'setStatus',
   'setPublic',
   'updateRawCount',

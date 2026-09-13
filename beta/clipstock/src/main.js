@@ -19,6 +19,7 @@ import {
   saveMemo,
   saveTags,
   saveTitle,
+  saveCategory,
   setStatus,
   setPublic,
   updateRawCount,
@@ -251,6 +252,8 @@ function openCardEditor(key) {
   let tags = [...(item.tags || [])]
   const known = knownTagsOf(items)
   const statuses = [...new Set([...STATUS_ORDER, STATUS_EXCLUDED, item.status].filter(Boolean))]
+  // いま使われている分類。表記ゆれで別グループにならないよう、まず選ばせる
+  const categories = [...new Set(items.map((i) => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
   const root = $('modal-root')
   root.innerHTML = `
     <div class="overlay">
@@ -259,6 +262,13 @@ function openCardEditor(key) {
         <div class="modal-body">
           <label class="field-label">タイトル</label>
           <input id="ce-title" class="input" value="${escapeHtml(item.title || '')}" />
+
+          <label class="field-label">分類</label>
+          <input id="ce-category" class="input" list="ce-category-list" placeholder="空欄なら分類なし" value="${escapeHtml(item.category || '')}" />
+          <datalist id="ce-category-list">
+            ${categories.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}
+          </datalist>
+          <div class="foot-note">一覧JSONの分かれ先が変わります。反映は次回の作り直しのあとです</div>
 
           <label class="field-label">状態</label>
           <select id="ce-status" class="input">
@@ -329,6 +339,7 @@ function openCardEditor(key) {
   $('ce-save').addEventListener('click', async () => {
     const title = $('ce-title').value.trim()
     const status = $('ce-status').value
+    const category = $('ce-category').value.trim()
     // マーカーは画面に出していないので、文言が一致する範囲だけ引き継ぐ
     const summary = reconcileMarkers(item.summary || '', $('ce-summary').value)
     if (!title) {
@@ -356,6 +367,10 @@ function openCardEditor(key) {
       if (status !== item.status) {
         await setStatus(key, status)
         item.status = status
+      }
+      if (category !== (item.category || '')) {
+        await saveCategory(key, category)
+        item.category = category
       }
       // 詳細のキャッシュは古くなる。開いたときに取り直させる
       clearDetailCache(key)
