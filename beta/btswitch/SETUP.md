@@ -51,28 +51,37 @@ cd beta\btswitch\agent
 ```
 
 - `btcom.exe` が見つかればそれを使う(管理者権限なし)
-- 見つからない場合は PnP デバイスの無効化 / 有効化で代用する → **管理者として実行**が必要
+- 見つからない場合、または btcom が効かない機種は PnP デバイスの無効化 / 有効化で代用する
+  → **管理者として実行**が必要
 
-### 文字コード
-
-`bt_agent.ps1` は **UTF-8 (BOM付き)** で置くこと。Windows PowerShell 5.1 は BOM が無いと
-ANSI(CP932)として読むため、日本語の直後にある `"` や `)` を巻き込んで
-「文字列に終端記号 ' がありません」といった構文エラーになる。
-
-コピーして持っていくときは BOM が落ちない方法で取る。
+btcom は「サービスの有効化 / 無効化」であって接続 / 切断そのものではないため、
+機種によっては A2DP に対して `System Error. Code: 87` を返して何も起きない。
+その場合は `-Mac` を付けずに、管理者権限で PnP 方式を使う。
 
 ```powershell
-# GitHub から取り直す(BOMごと保存される)
-Invoke-WebRequest -UseBasicParsing `
-  -Uri https://raw.githubusercontent.com/ymatsuda-cmyk/tools/main/beta/btswitch/agent/bt_agent.ps1 `
-  -OutFile C:\btswitch\agent\bt_agent.ps1
-
-# 手元のファイルにBOMを付け直す場合
-$p = 'C:\btswitch\agent\bt_agent.ps1'
-[IO.File]::WriteAllText($p, [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8), [Text.UTF8Encoding]::new($true))
+# 管理者として実行
+.\bt_agent.ps1 -GasUrl https://script.google.com/macros/s/xxx/exec `
+               -Token himitsu -DeviceId pc-home -Label "自宅デスクトップ" `
+               -Name "Soundcore Liberty"
 ```
 
-PowerShell 7 (`pwsh`) は BOM 無しでも UTF-8 として読むため、この問題は起きない。
+PnP 方式は、他の端末の番のあいだデバイスを**無効のままにしておく**。
+有効に戻すと Windows がすぐ拾い直してしまい、スマホに渡らないため。
+エージェントを止めるときは自動で有効に戻すが、強制終了した場合は
+デバイスマネージャーから手で有効化すること。
+
+### 接続しているかの見分け方
+
+切断しても AVRCP・COM ポート・`DEV_` のノードは残る。これは正常で、
+使用中かどうかは音に関わるサービスが居るかで判断する。
+
+```powershell
+Get-PnpDevice -PresentOnly | Where-Object InstanceId -match '0000(110B|111E|1108)' |
+  Select-Object FriendlyName, Class, Status
+```
+
+`SWD\MMDEVAPI\...` のオーディオエンドポイント(「ヘッドセット (...)」など)は
+切断後も残り続けるので、接続判定には使えない。
 
 自動起動はタスクスケジューラで「ログオン時」に上記コマンドを登録する
 (`powershell -WindowStyle Hidden -File C:\path\bt_agent.ps1 -GasUrl ... `)。

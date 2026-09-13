@@ -34,6 +34,10 @@
 .PARAMETER Name
   イヤホンのデバイス名の一部。PnP方式で使う(既定: Liberty)
 
+.PARAMETER Service
+  btcom に渡すプロファイルの短縮UUID。上から順に試し、最初に通ったものを以降使い続ける。
+  110B=A2DP(音楽) / 1108=Headset / 111E=Handsfree。受け付ける組み合わせは機種によって違う。
+
 .EXAMPLE
   .\bt_agent.ps1 -GasUrl https://script.google.com/macros/s/xxx/exec -Token himitsu `
                  -DeviceId pc-home -Label "自宅デスクトップ" -Mac 00:11:22:33:44:55
@@ -45,10 +49,17 @@ param(
   [string]$Label = $env:COMPUTERNAME,
   [string]$Mac = '',
   [string]$Name = 'Liberty',
+  [string[]]$Service = @('110B', '1108', '111E'),
   [int]$IntervalSeconds = 10
 )
 
 $ErrorActionPreference = 'Stop'
+
+# btcom は短縮UUIDを受け付けず、Bluetooth ベースUUID に埋めたフル GUID を要求する
+$ServiceGuids = $Service | ForEach-Object { "{0000$($_.ToUpper())-0000-1000-8000-00805F9B34FB}" }
+
+# 一度通ったプロファイルを覚えておく。毎回先頭から試すと切り替えがそのぶん遅くなる
+$script:GoodGuid = $null
 
 function Write-Log([string]$msg) {
   Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $msg"
@@ -56,11 +67,29 @@ function Write-Log([string]$msg) {
 
 function Invoke-Gas([hashtable]$body) {
   $body['token'] = $Token
-  # text/plain にしないと CORS ではなく GAS 側のリダイレクト処理で落ちることがある
-  $res = Invoke-RestMethod -Uri $GasUrl -Method Post -ContentType 'text/plain;charset=utf-8' `
-    -Body ($body | ConvertTo-Json -Compress) -MaximumRedirection 5
-  if (-not $res.ok) { throw "GAS: $($res.error)" }
-  return $res.data
+  $json = $body | ConvertTo-Json -Compress
+  # GASは正しいリクエストでもリダイレクト先が404を返すことがある。
+  # ここで粘りすぎると切り替えが遅れるので、短く数回だけ。
+  # それ以上続く不調は、10秒ごとに回る本体のループが拾い直す。
+  $waits = @(1, 3)
+  for ($i = 0; ; $i++) {
+    # 毎回URLを変える。同じURLだと壊れたリダイレクトを掴んだまま繰り返す
+    $sep = if ($GasUrl -like '*?*') { '&' } else { '?' }
+    $url = $GasUrl + $sep + 'r=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $res = $null
+    try {
+      # text/plain にしないと CORS ではなく GAS 側のリダイレクト処理で落ちることがある
+      $res = Invoke-RestMethod -Uri $url -Method Post -ContentType 'text/plain;charset=utf-8' `
+        -Body $json -MaximumRedirection 5
+    } catch {
+      if ($i -ge $waits.Count) { throw }
+      Start-Sleep -Seconds $waits[$i]
+      continue
+    }
+    # GAS が受け取ったうえで返したエラーは、投げ直しても同じなので即座に上げる
+    if (-not $res.ok) { throw "GAS: $($res.error)" }
+    return $res.data
+  }
 }
 
 # ---- Bluetooth 操作 ----
@@ -72,38 +101,67 @@ function Get-BtDevices {
 }
 
 function Test-Connected {
-  $devices = Get-BtDevices
-  if (-not $devices) { return $false }
-  # 接続中はオーディオ側のエンドポイントが OK になる
-  [bool]($devices | Where-Object { $_.Status -eq 'OK' -and $_.Class -in @('AudioEndpoint', 'MEDIA') })
+  # 接続の有無は BTHENUM のサービスノードが居るかで見る。
+  # SWD\MMDEVAPI のオーディオエンドポイントは切断後も残るため当てにならない
+  $addr = ($Mac -replace '[^0-9A-Fa-f]', '').ToUpper()
+  $nodes = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+    Where-Object { $_.InstanceId -like 'BTHENUM\{*' -and $_.Status -eq 'OK' }
+  if ($addr) {
+    $nodes = $nodes | Where-Object { $_.InstanceId -match $addr }
+  } else {
+    $nodes = $nodes | Where-Object { $_.FriendlyName -like "*$Name*" }
+  }
+  # 110B=A2DP / 111E=Handsfree / 1108=Headset。どれか生きていれば使用中
+  [bool]($nodes | Where-Object { $_.InstanceId -match '0000(110B|111E|1108)' })
 }
 
 function Use-Btcom { [bool](Get-Command btcom.exe -ErrorAction SilentlyContinue) }
 
-function Connect-Earbuds {
-  if ((Use-Btcom) -and $Mac) {
-    # -s110b = A2DP(オーディオ)サービスに接続する
-    & btcom.exe -b"$Mac" -s110b -c | Out-Null
-    return
+function Invoke-Btcom([string]$flag, [switch]$All) {
+  # 書式は btcom {-c|-r} -b<addr> -s<GUID>。成否は ERRORLEVEL で見る。
+  # 標準エラーを 2>&1 で拾うと $ErrorActionPreference='Stop' の下では
+  # 例外になって残りの候補を試せなくなるので、出力は捨てて終了コードだけ見る。
+  $candidates = if ($script:GoodGuid) { @($script:GoodGuid) + $ServiceGuids } else { $ServiceGuids }
+  $ok = $false
+  foreach ($guid in ($candidates | Select-Object -Unique)) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      & btcom.exe $flag "-b$Mac" "-s$guid" 2>$null | Out-Null
+    } finally {
+      $ErrorActionPreference = $prev
+    }
+    if ($LASTEXITCODE -eq 0) {
+      $script:GoodGuid = $guid
+      $ok = $true
+      if (-not $All) { return $true }
+    }
   }
+  return $ok
+}
+
+# PnPデバイスの有効化 / 無効化。管理者権限が要るが、機種を選ばず効く
+function Set-PnpConnected([bool]$on) {
   foreach ($d in Get-BtDevices) {
-    if ($d.Status -ne 'OK') { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue }
+    if ($on) {
+      Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+    } else {
+      Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
+    }
   }
 }
 
+function Connect-Earbuds {
+  if ((Use-Btcom) -and $Mac -and (Invoke-Btcom '-c')) { return }
+  Set-PnpConnected $true
+}
+
 function Disconnect-Earbuds {
-  if ((Use-Btcom) -and $Mac) {
-    & btcom.exe -b"$Mac" -s110b -d | Out-Null
-    return
-  }
-  # PnP方式は「無効化して即有効化」で切断する。無効のままだと次に掴めない
-  foreach ($d in Get-BtDevices) {
-    Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
-  }
-  Start-Sleep -Seconds 2
-  foreach ($d in Get-BtDevices) {
-    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
-  }
+  # 片方だけ落とすと Windows が張り直すので、音に関わるサービスは全部落とす
+  if ((Use-Btcom) -and $Mac -and (Invoke-Btcom '-r' -All)) { return }
+  # PnP方式は無効のままにしておく。有効に戻すと Windows がすぐ拾い直してしまい、
+  # 他の端末に渡らない。自分の番が来たら Connect-Earbuds が有効に戻す
+  Set-PnpConnected $false
 }
 
 # ---- 本体 ----
@@ -112,32 +170,40 @@ $mode = if ((Use-Btcom) -and $Mac) { 'btcom' } else { 'pnp(要管理者)' }
 Write-Log "開始します: $DeviceId ($Label) / 操作方法: $mode / $IntervalSeconds 秒ごと"
 
 $lastOwner = $null
-while ($true) {
-  try {
-    $state = Invoke-Gas @{ action = 'getState' }
-    $owner = [string]$state.owner
-    $connected = Test-Connected
-
-    if ($owner -eq $DeviceId -and -not $connected) {
-      Write-Log '自分の番になりました。接続します'
-      Connect-Earbuds
-      Start-Sleep -Seconds 3
+try {
+  while ($true) {
+    try {
+      $state = Invoke-Gas @{ action = 'getState' }
+      $owner = [string]$state.owner
       $connected = Test-Connected
-    } elseif ($owner -ne $DeviceId -and $connected) {
-      Write-Log "他の端末($owner)に渡します。切断します"
-      Disconnect-Earbuds
-      Start-Sleep -Seconds 3
-      $connected = Test-Connected
-    }
 
-    if ($owner -ne $lastOwner) {
-      Write-Log "現在の使用端末: $(if ($owner) { $owner } else { '(なし)' })"
-      $lastOwner = $owner
-    }
+      if ($owner -eq $DeviceId -and -not $connected) {
+        Write-Log '自分の番になりました。接続します'
+        Connect-Earbuds
+        Start-Sleep -Seconds 3
+        $connected = Test-Connected
+      } elseif ($owner -ne $DeviceId -and $connected) {
+        Write-Log "他の端末($owner)に渡します。切断します"
+        Disconnect-Earbuds
+        Start-Sleep -Seconds 3
+        $connected = Test-Connected
+      }
 
-    Invoke-Gas @{ action = 'heartbeat'; deviceId = $DeviceId; label = $Label; connected = $connected; note = $mode } | Out-Null
-  } catch {
-    Write-Log "!! $($_.Exception.Message)"
+      if ($owner -ne $lastOwner) {
+        Write-Log "現在の使用端末: $(if ($owner) { $owner } else { '(なし)' })"
+        $lastOwner = $owner
+      }
+
+      Invoke-Gas @{ action = 'heartbeat'; deviceId = $DeviceId; label = $Label; connected = $connected; note = $mode } | Out-Null
+    } catch {
+      Write-Log "!! $($_.Exception.Message)"
+    }
+    Start-Sleep -Seconds $IntervalSeconds
   }
-  Start-Sleep -Seconds $IntervalSeconds
+} finally {
+  # 無効にしたまま終わると、次に手で有効化するまでイヤホンが使えなくなる
+  if (-not ((Use-Btcom) -and $Mac)) {
+    Write-Log 'デバイスを有効に戻します'
+    Set-PnpConnected $true
+  }
 }
