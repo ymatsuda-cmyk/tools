@@ -65,17 +65,40 @@ def log(msg):
     print(f"[{datetime.now(JST).strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+# GASは正しいリクエストでもリダイレクト先(script.googleusercontent.com)が
+# 404を返すことがある。投げ直せば通るので、諦める前に何度か試す。
+RETRY_WAITS = [1, 3, 8, 20, 40]
+RETRY_CODES = {404, 429, 500, 502, 503, 504}
+
+
+def post_gas(payload):
+    last = None
+    for wait in [0] + RETRY_WAITS:
+        if wait:
+            time.sleep(wait)
+        # 毎回URLを変える。同じURLだと壊れたリダイレクトを掴んだまま繰り返す
+        sep = "&" if "?" in GAS_URL else "?"
+        url = f"{GAS_URL}{sep}r={int(time.time() * 1000):x}"
+        try:
+            resp = requests.post(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "text/plain;charset=utf-8"},
+                timeout=60,
+            )
+            if resp.status_code in RETRY_CODES:
+                last = requests.HTTPError(f"HTTP {resp.status_code}")
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            last = e
+    raise last
+
+
 def take_request():
     """GASに溜まった依頼を引き取る。取れたら {'requestedAt':..., 'reasons':[...]}。"""
-    payload = {"action": "takeRebuildRequest", "token": ACCESS_TOKEN}
-    resp = requests.post(
-        GAS_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "text/plain;charset=utf-8"},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    body = resp.json()
+    body = post_gas({"action": "takeRebuildRequest", "token": ACCESS_TOKEN})
     if not body.get("ok"):
         raise RuntimeError(body.get("error") or "GASがエラーを返しました")
     data = body.get("data") or {}
