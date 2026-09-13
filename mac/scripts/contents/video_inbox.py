@@ -32,6 +32,7 @@ JSONが無い(Finderから直接置いた)場合はファイル名をタイト�
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import shutil
@@ -66,6 +67,7 @@ CONTENTS_DB_ID = os.environ.get("CONTENTS_DB_ID", DEFAULT_DB_ID)
 INBOX = Path(os.environ.get("CONTENTS_INBOX", str(Path.home() / "Google Drive/マイドライブ/contents-inbox")))
 STORE = Path(os.environ.get("CONTENTS_STORE", str(INBOX.parent / "contents")))
 FAILED = INBOX / "failed"
+LOCK_FILE = Path(os.environ.get("CONTENTS_LOCK_FILE", str(Path.home() / ".contentsstock_video_inbox.lock")))
 
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "mlx-community/whisper-large-v2-mlx")
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "ja")
@@ -88,6 +90,25 @@ BLOCK_LIMIT = 1900  # rich_text は2000文字まで。改行の都合で少し�
 
 def log(*a):
     print(f"[{datetime.now(JST):%Y-%m-%d %H:%M:%S}]", *a, flush=True)
+
+
+def acquire_lock():
+    """多重起動を防ぐ。
+
+    常駐と手動実行が重なると同じ動画を両方が拾い、先に終わった側が
+    ファイルを移すため、もう片方が FileNotFoundError で落ちる。
+    文字起こしは数分かかるので、interval より長引くと自分自身とも重なる。
+    このハンドルはプロセスが終わるまで持ち続けること。
+    """
+    handle = open(LOCK_FILE, "w")  # noqa: SIM115
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    handle.write(str(os.getpid()))
+    handle.flush()
+    return handle
 
 
 # ---------------------------------------------------------------- 収集
@@ -361,6 +382,10 @@ def run_once(dry_run: bool = False) -> int:
                 sidecar.unlink(missing_ok=True)
             done += 1
         except Exception as e:  # noqa: BLE001  1件失敗しても次へ進む
+            # 取り込み中に消えたなら、別のプロセスが処理し終えて移したとみなす
+            if not video.exists():
+                log("   -- 他で処理済みのようなので飛ばします")
+                continue
             log(f"   !! 失敗: {type(e).__name__}: {e}")
             try:
                 FAILED.mkdir(parents=True, exist_ok=True)
@@ -385,6 +410,12 @@ def main():
     if not NOTION_TOKEN:
         log("!! NOTION_TOKEN が未設定です")
         return 1
+
+    if not args.dry_run:
+        lock = acquire_lock()
+        if not lock:
+            log("-- すでに別の取り込みが走っているので終了します")
+            return 0
 
     if args.once or args.dry_run:
         run_once(args.dry_run)

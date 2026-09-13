@@ -53,6 +53,27 @@ cd beta\btswitch\agent
 - `btcom.exe` が見つかればそれを使う(管理者権限なし)
 - 見つからない場合は PnP デバイスの無効化 / 有効化で代用する → **管理者として実行**が必要
 
+### 文字コード
+
+`bt_agent.ps1` は **UTF-8 (BOM付き)** で置くこと。Windows PowerShell 5.1 は BOM が無いと
+ANSI(CP932)として読むため、日本語の直後にある `"` や `)` を巻き込んで
+「文字列に終端記号 ' がありません」といった構文エラーになる。
+
+コピーして持っていくときは BOM が落ちない方法で取る。
+
+```powershell
+# GitHub から取り直す(BOMごと保存される)
+Invoke-WebRequest -UseBasicParsing `
+  -Uri https://raw.githubusercontent.com/ymatsuda-cmyk/tools/main/beta/btswitch/agent/bt_agent.ps1 `
+  -OutFile C:\btswitch\agent\bt_agent.ps1
+
+# 手元のファイルにBOMを付け直す場合
+$p = 'C:\btswitch\agent\bt_agent.ps1'
+[IO.File]::WriteAllText($p, [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8), [Text.UTF8Encoding]::new($true))
+```
+
+PowerShell 7 (`pwsh`) は BOM 無しでも UTF-8 として読むため、この問題は起きない。
+
 自動起動はタスクスケジューラで「ログオン時」に上記コマンドを登録する
 (`powershell -WindowStyle Hidden -File C:\path\bt_agent.ps1 -GasUrl ... `)。
 
