@@ -160,6 +160,22 @@ def format_timestamp(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+def resolve_ffmpeg_cmd():
+    """mlx-whisper は内部で PATH から "ffmpeg" を探す。
+
+    launchd / cron の PATH は /usr/bin:/bin だけなので、Homebrew に入れていても
+    見つからず FileNotFoundError になる。見つけた場所を PATH に通しておく。
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
+    for candidate in (Path("/opt/homebrew/bin/ffmpeg"), Path("/usr/local/bin/ffmpeg")):
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            os.environ["PATH"] = str(candidate.parent) + os.pathsep + os.environ.get("PATH", "")
+            return str(candidate)
+    return None
+
+
 def transcribe(video: Path) -> str:
     """mlx-whisper で文字起こしし、[mm:ss] 付きの行にする。
 
@@ -170,6 +186,9 @@ def transcribe(video: Path) -> str:
         import mlx_whisper
     except ImportError as e:  # noqa: F841
         raise RuntimeError("mlx-whisper が未導入です (pip install mlx-whisper)")
+
+    if not resolve_ffmpeg_cmd():
+        raise RuntimeError("ffmpeg が見つかりません (brew install ffmpeg)")
 
     result = mlx_whisper.transcribe(
         str(video),
