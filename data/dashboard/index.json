@@ -69,6 +69,15 @@
           { "label": "資源ごみ", "color": "#5FA8A0", "days": [3] },
           { "label": "不燃ごみ", "color": "#8A857C", "days": [4], "weeks": [2] }
         ]
+      },
+      {
+        "id": "calc",
+        "name": "電卓",
+        "type": "calc",
+        "lines": 1,
+        "rows": [
+          { "label": "", "expr": "" }
+        ]
       }
     ]
   },

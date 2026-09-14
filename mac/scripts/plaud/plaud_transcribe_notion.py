@@ -23,7 +23,7 @@ def load_plaud_accounts():
     accounts = []
     for idx in range(1, PLAUD_MAX_ACCOUNTS + 1):
         sfx = "" if idx == 1 else f"_{idx}"
-        token = os.environ.get(f"PLAUD_TOKEN{sfx}", "").strip()
+        token = os.environ.get(f"PLAUD_TOKEN{sfx}", "").strip().strip('"').strip("'")
         if not token:
             continue
         accounts.append({
@@ -104,6 +104,28 @@ def find_account(name):
             return acc
     return None
 
+def _is_auth_error(resp):
+    if resp.status_code in (401, 403):
+        return True
+    try:
+        return resp.json().get("status") == -3900
+    except ValueError:
+        return False
+
+def _toggle_bearer(token):
+    return token[7:].strip() if token.lower().startswith("bearer ") else f"Bearer {token}"
+
+def plaud_get(account, url):
+    """Authorization に Bearer を付けるかは取得元によって違うので、認証失敗時に1度だけ反転して再試行する。"""
+    resp = requests.get(url, headers=plaud_headers(account), timeout=60)
+    if _is_auth_error(resp) and not account.get("_bearer_toggled"):
+        account["token"] = _toggle_bearer(account["token"])
+        account["_bearer_toggled"] = True
+        resp = requests.get(url, headers=plaud_headers(account), timeout=60)
+        if not _is_auth_error(resp):
+            print(f"    ℹ️ [{account['name']}] Authorizationの Bearer 有無を自動調整しました")
+    return resp
+
 def ms_to_hms(ms):
     s = int(ms / 1000)
     h, r = divmod(s, 3600)
@@ -178,20 +200,36 @@ def get_plaud_files_for_account(account):
         url = f"{account['domain']}/file/simple/web?pageSize=50&pageNum={page}"
         if account["workspace"]:
             url += f"&workspaceId={account['workspace']}"
-        resp = requests.get(url, headers=plaud_headers(account), timeout=60)
+        resp = plaud_get(account, url)
         if resp.status_code != 200:
-            print(f"    ⚠️ [{account['name']}] 一覧取得失敗: {resp.status_code} {resp.text[:120]}")
+            print(f"    ⚠️ [{account['name']}] 一覧取得失敗: {resp.status_code} {resp.text[:200]}")
             break
         data = resp.json()
         files = data.get("data_file_list", [])
         total = data.get("data_file_total", 0)
-        if not files: break
+        if not files:
+            if page == 1:
+                report_empty_listing(account, data)
+            break
         for f in files:
             f["_account"] = account["name"]
         all_files.extend(files)
         if len(all_files) >= total or len(files) < 50: break
         page += 1
     return all_files
+
+def report_empty_listing(account, data):
+    """200だが0件。トークン切れとworkspaceId未指定のどちらかを判別できる情報を出す。"""
+    code = data.get("code") or data.get("status")
+    msg = data.get("msg") or data.get("message") or ""
+    print(f"    ℹ️ [{account['name']}] total={data.get('data_file_total')} "
+          f"code={code} msg={msg} keys={list(data)[:6]}")
+    if code == -3900 or "auth" in str(msg).lower():
+        print(f"       トークンが無効または期限切れです。PLAUD_TOKEN_n を取り直してください")
+    if not account["workspace"]:
+        print(f"       workspaceId 未指定です。web.plaud.ai にそのアカウントでログインし、"
+              f"DevToolsのNetworkで file/simple/web の workspaceId を控えて"
+              f"PLAUD_WS_ID_n に設定してください")
 
 def get_plaud_files(accounts=None):
     """全アカウントのファイルを結合する。同一IDは先に見つかったアカウントを採用。"""
@@ -212,8 +250,7 @@ def get_download_url(file_id, account=None):
     """account 未指定時は全アカウントを順に試す（再文字起こし用）。"""
     for acc in ([account] if account else PLAUD_ACCOUNTS):
         try:
-            resp = requests.get(f"{acc['domain']}/file/temp-url/{file_id}",
-                                headers=plaud_headers(acc), timeout=60)
+            resp = plaud_get(acc, f"{acc['domain']}/file/temp-url/{file_id}")
         except requests.RequestException:
             continue
         if resp.status_code == 200:

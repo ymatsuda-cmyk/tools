@@ -117,6 +117,23 @@
     font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .rule-list .n{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rule-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+  .calc-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .calc-row{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:7px 9px;}
+  .calc-row.on{border-color:var(--accent);}
+  .calc-label{font-size:9px;color:var(--text-muted);margin-bottom:2px;}
+  .calc-expr{width:100%;background:none;border:none;outline:none;padding:0;text-align:right;
+    color:var(--text);font-size:13px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .calc-out{min-height:18px;margin-top:3px;text-align:right;font-size:15px;font-weight:600;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .calc-out.err{font-size:10px;font-weight:400;color:var(--danger);}
+  .calc-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;
+    border-top:1px solid var(--border);padding-top:10px;}
+  .calc-pad button{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:13px;padding:8px 0;cursor:pointer;transition:all .15s ease;}
+  .calc-pad button:hover{background:var(--surface);color:var(--text);}
+  .calc-pad button.op{color:var(--accent);}
+  .calc-pad button.fn{color:var(--text-muted);}
   .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
   .mon-actions button{
     flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
@@ -348,7 +365,7 @@
     </div>
     <div class="monitor-grid" id="infoGrid"></div>
     <div class="monitor-empty" id="infoEmpty">
-      情報カードが登録されていません。上の「＋ 追加」からドル円やルールのカードを登録できます。
+      情報カードが登録されていません。上の「＋ 追加」からドル円・ルール・電卓のカードを登録できます。
     </div>
   </div>
 </div>
@@ -445,6 +462,7 @@
         <option value="fx">ドル円 かんたん投資</option>
         <option value="fxpos">ドル円の建値</option>
         <option value="rule">ルール（曜日で決まる予定）</option>
+        <option value="calc">電卓</option>
         <option value="copilot">GitHub Copilot</option>
         <option value="manual">手動カウンタ</option>
         <option value="quota">APIクォータ</option>
@@ -534,6 +552,12 @@
       <input type="text" id="mf-leadlabel" placeholder="今夜出す">
       <div class="hint">予定ごとの曜日は、登録後に 設定 →監視のJSONで rules を編集してください。
         はじめはゴミ出しの例（可燃 火・金 ／ 資源 水 ／ 不燃 第2木）が入ります</div>
+    </div>
+
+    <div class="field" data-for="calc">
+      <label>式の行数</label>
+      <input type="number" id="mf-lines" value="1" min="1" max="20">
+      <div class="hint">行ごとに式を持ちます。式はカード上でいつでも書き換えられます</div>
     </div>
 
     <div class="modal-actions">
@@ -1301,10 +1325,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule'];
+const LOCAL_TYPES = ['rule', 'calc'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1314,6 +1338,7 @@ const TYPE_LABELS = {
   fx     : 'ドル円',
   fxpos  : 'ドル円建値',
   rule   : 'ルール',
+  calc   : '電卓',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1359,7 +1384,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos', 'rule'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -1598,8 +1623,170 @@ function renderRuleCard(m){
     </div>`;
 }
 
+/* ============================================================
+   電卓
+   式は文字列のまま持ち、いつでも直せる。評価は自前の構文解析で行う
+   ============================================================ */
+
+const CALC_KEYS = [
+  '7','8','9','÷',
+  '4','5','6','×',
+  '1','2','3','−',
+  '0','.','%','+',
+  '(',')','←','C'
+];
+
+/** カードごとの入力中の行。テンキーの入力先になる */
+const calcActive = {};
+let calcSaveTimer = null;
+
+function calcRows(m){
+  const n = Math.max(1, Math.min(20, Number(m.lines) || 1));
+  if(!Array.isArray(m.rows)) m.rows = [];
+  while(m.rows.length < n) m.rows.push({ expr:'' });
+  return m.rows.slice(0, n);
+}
+
+/**
+ * 四則演算と括弧、末尾の % だけを解釈する。
+ * eval を使うと式に書いた任意のJSが動いてしまうため、自前で読む。
+ * @returns {number|null} 空の式は null
+ */
+function evalExpr(src){
+  const s = String(src == null ? '' : src)
+    .replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[×✕]/g, '*')
+    .replace(/[÷]/g, '/')
+    .replace(/[−–—ー]/g, '-')
+    .replace(/,/g, '');
+  if(!s.trim()) return null;
+
+  let i = 0;
+  const ws = ()=>{ while(s[i] === ' ') i++; };
+
+  function expr(){
+    let v = term();
+    for(;;){
+      ws();
+      if(s[i] === '+'){ i++; v += term(); }
+      else if(s[i] === '-'){ i++; v -= term(); }
+      else return v;
+    }
+  }
+  function term(){
+    let v = unary();
+    for(;;){
+      ws();
+      if(s[i] === '*'){ i++; v *= unary(); }
+      else if(s[i] === '/'){ i++; v /= unary(); }
+      else if(s[i] === '%'){ i++; v /= 100; }   // 後置の % は百分率
+      else return v;
+    }
+  }
+  function unary(){
+    ws();
+    if(s[i] === '+'){ i++; return unary(); }
+    if(s[i] === '-'){ i++; return -unary(); }
+    return atom();
+  }
+  function atom(){
+    ws();
+    if(s[i] === '('){
+      i++;
+      const v = expr();
+      ws();
+      if(s[i] !== ')') throw new Error('括弧が閉じていません');
+      i++;
+      return v;
+    }
+    const m = /^(?:\d+(?:\.\d+)?|\.\d+)/.exec(s.slice(i));
+    if(!m) throw new Error('式が途中です');
+    i += m[0].length;
+    return Number(m[0]);
+  }
+
+  const v = expr();
+  ws();
+  if(i < s.length) throw new Error('読めない文字があります');
+  if(!isFinite(v)) throw new Error('計算できません');
+  return v;
+}
+
+function fmtCalc(v){
+  return (Math.round(v * 1e10) / 1e10).toLocaleString('ja-JP', { maximumFractionDigits:10 });
+}
+
+function calcKeyClass(k){
+  if(['÷','×','−','+','%'].includes(k)) return 'op';
+  if(['←','C'].includes(k)) return 'fn';
+  return '';
+}
+
+function calcOutHtml(exprText){
+  try{
+    const v = evalExpr(exprText);
+    return `<div class="calc-out">${v === null ? '' : esc(fmtCalc(v))}</div>`;
+  }catch(err){
+    return `<div class="calc-out err">${esc(err.message)}</div>`;
+  }
+}
+
+function renderCalcCard(m){
+  const rows = calcRows(m);
+  const active = calcActive[m.id] || 0;
+
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:#5FA8A0"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+      </div>
+      <div class="calc-rows">
+        ${rows.map((r, i) => `
+          <div class="calc-row${i === active ? ' on' : ''}">
+            ${r.label ? `<div class="calc-label">${esc(r.label)}</div>` : ''}
+            <input class="calc-expr" data-calc-row="${i}" inputmode="decimal" autocomplete="off"
+              value="${esc(r.expr || '')}" placeholder="式を入力"
+              aria-label="${esc(r.label || (m.name || '電卓') + ' ' + (i + 1) + '行目')}">
+            ${calcOutHtml(r.expr)}
+          </div>`).join('')}
+      </div>
+      <div class="calc-pad">
+        ${CALC_KEYS.map(k =>
+          `<button data-calc-key="${esc(k)}" class="${calcKeyClass(k)}">${esc(k)}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+/** 式の欄だけを直接書き換える。行ごと描き直すとカーソルが飛ぶため */
+function paintCalcOut(input){
+  const out = input.parentElement.querySelector('.calc-out');
+  if(!out) return;
+  out.outerHTML = calcOutHtml(input.value);
+}
+
+function scheduleCalcSave(){
+  clearTimeout(calcSaveTimer);
+  calcSaveTimer = setTimeout(persistLocal, 600);
+}
+
+function calcKey(input, key){
+  input.focus();
+  const s = input.selectionStart, e = input.selectionEnd;
+  if(key === 'C'){
+    input.value = '';
+  }else if(key === '←'){
+    if(s !== e) input.setRangeText('', s, e, 'end');
+    else if(s > 0) input.setRangeText('', s - 1, s, 'end');
+  }else{
+    input.setRangeText(key, s, e, 'end');
+  }
+  input.dispatchEvent(new Event('input'));
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
+  if(monitorType(m) === 'calc') return renderCalcCard(m);
 
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -1724,7 +1911,7 @@ function renderMonitors(){
       ? '監視対象が登録されていません。上の「＋ 追加」から登録してください。'
       : 'この条件に一致する監視対象がありません。');
   paintMonitorGrid('infoGrid', 'infoEmpty', infoMonitors(),
-    '情報カードが登録されていません。上の「＋ 追加」からドル円やルールのカードを登録できます。');
+    '情報カードが登録されていません。上の「＋ 追加」からドル円・ルール・電卓のカードを登録できます。');
 }
 
 function paintMonitorGrid(gridId, emptyId, list, emptyText){
@@ -1739,7 +1926,50 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
     return;
   }
   empty.hidden = true;
+
+  // 定期更新の描き直しで、入力中の電卓からカーソルが飛ばないようにする
+  const focused = document.activeElement;
+  const keep = focused && focused.classList.contains('calc-expr') && grid.contains(focused)
+    ? { id: focused.closest('[data-monitor]').dataset.monitor, row: focused.dataset.calcRow,
+        start: focused.selectionStart, end: focused.selectionEnd }
+    : null;
+
   grid.innerHTML = list.map(m => renderMonitorCard(m, monitorSnapshots[m.id])).join('');
+
+  if(keep){
+    const el = grid.querySelector(
+      `[data-monitor="${CSS.escape(keep.id)}"] .calc-expr[data-calc-row="${keep.row}"]`);
+    if(el){ el.focus(); el.setSelectionRange(keep.start, keep.end); }
+  }
+
+  grid.querySelectorAll('.calc-expr').forEach(input=>{
+    const id = input.closest('[data-monitor]').dataset.monitor;
+    const i = Number(input.dataset.calcRow);
+    input.addEventListener('focus', ()=>{
+      calcActive[id] = i;
+      input.closest('.calc-rows').querySelectorAll('.calc-row')
+        .forEach((row, j) => row.classList.toggle('on', j === i));
+    });
+    input.addEventListener('input', ()=>{
+      const m = allMonitors().find(x => x.id === id);
+      if(!m || !m.rows || !m.rows[i]) return;
+      m.rows[i].expr = input.value;
+      paintCalcOut(input);
+      scheduleCalcSave();
+    });
+  });
+
+  grid.querySelectorAll('[data-calc-key]').forEach(btn=>{
+    // 押した拍子に式の欄からフォーカスが外れると、挿入位置が分からなくなる
+    btn.addEventListener('mousedown', e=>e.preventDefault());
+    btn.addEventListener('click', ()=>{
+      const card = btn.closest('[data-monitor]');
+      const i = calcActive[card.dataset.monitor] || 0;
+      const input = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
+        || card.querySelector('.calc-expr');
+      if(input) calcKey(input, btn.dataset.calcKey);
+    });
+  });
 
   grid.querySelectorAll('[data-toggle]').forEach(sw=>{
     sw.addEventListener('change', ()=>{
@@ -1929,6 +2159,7 @@ function openMonitorModal(type){
   F('mf-price').value = '';
   F('mf-lead').value = '1';
   F('mf-leadlabel').value = '';
+  F('mf-lines').value = '1';
   F('err-monitor').style.display = 'none';
   syncMonitorForm();
   monitorOverlay.classList.add('show');
@@ -1974,6 +2205,10 @@ function buildMonitor(){
     const leadLabel = F('mf-leadlabel').value.trim();
     if(leadLabel) m.leadLabel = leadLabel;
     m.rules = SAMPLE_RULES;
+  }
+  if(type === 'calc'){
+    m.lines = Math.max(1, Math.min(20, Number(F('mf-lines').value) || 1));
+    m.rows = Array.from({ length:m.lines }, ()=>({ expr:'' }));
   }
   return m;
 }
