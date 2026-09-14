@@ -34,6 +34,24 @@ pip install resemblyzer
 mlx-qwen3-asr --doctor
 ```
 
+## PLAUDアカウント（複数対応）
+
+`~/.plaud_notion_sync.env` にトークンを並べるだけで、全アカウントを横断して
+未登録ファイルを拾い、同じNotion DBに登録します。
+
+```
+PLAUD_TOKEN=xxxxx
+PLAUD_WS_ID=ws_clQPe6Vll0
+
+PLAUD_TOKEN_2=yyyyy
+# PLAUD_WS_ID_2=ws_xxxxxxxx   ← 未設定なら workspaceId なしで既定ワークスペースを見る
+```
+
+`_3` `_4` `_5` と最大5アカウントまで。`PLAUD_DOMAIN_n` はリージョンが違う場合のみ指定。
+ログ上の名前は `account1` `account2` と自動で付きます。
+Notion側の重複判定は `https://web.plaud.ai/file/{id}` で行うため、アカウントが増えても
+二重登録にはなりません。
+
 ## まず検証
 
 ```bash

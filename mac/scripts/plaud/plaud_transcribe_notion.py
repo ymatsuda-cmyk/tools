@@ -13,9 +13,31 @@ def load_env():
                 os.environ.setdefault(k.strip(), v.strip())
 load_env()
 
-PLAUD_TOKEN  = os.environ.get("PLAUD_TOKEN", "")
-PLAUD_DOMAIN = os.environ.get("PLAUD_DOMAIN", "https://api-apne1.plaud.ai")
-PLAUD_WS_ID  = "ws_clQPe6Vll0"
+DEFAULT_PLAUD_DOMAIN = "https://api-apne1.plaud.ai"
+DEFAULT_PLAUD_WS_ID  = "ws_clQPe6Vll0"
+PLAUD_MAX_ACCOUNTS   = 5
+
+def load_plaud_accounts():
+    """PLAUD_TOKEN, PLAUD_TOKEN_2 … を順に読み、複数アカウント分の設定を返す。
+    2つ目以降で PLAUD_WS_ID_n が未設定なら workspaceId を付けずに既定ワークスペースを見る。"""
+    accounts = []
+    for idx in range(1, PLAUD_MAX_ACCOUNTS + 1):
+        sfx = "" if idx == 1 else f"_{idx}"
+        token = os.environ.get(f"PLAUD_TOKEN{sfx}", "").strip()
+        if not token:
+            continue
+        accounts.append({
+            "name": f"account{idx}",
+            "token": token,
+            "domain": (os.environ.get(f"PLAUD_DOMAIN{sfx}", "").strip() or DEFAULT_PLAUD_DOMAIN).rstrip("/"),
+            "workspace": os.environ.get(
+                f"PLAUD_WS_ID{sfx}", DEFAULT_PLAUD_WS_ID if idx == 1 else "").strip(),
+        })
+    return accounts
+
+PLAUD_ACCOUNTS = load_plaud_accounts()
+# retranscribe.py など外部から参照されるため1つ目のトークンは残す
+PLAUD_TOKEN  = PLAUD_ACCOUNTS[0]["token"] if PLAUD_ACCOUNTS else ""
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DB_ID = os.environ.get("NOTION_DS_ID", "28b0e7a535dc805697c6d4b9f8032d18")
 
@@ -68,12 +90,19 @@ MINUTES_INDEX_PATH = Path(os.environ.get(
 GIT_AUTO_PUSH = False
 #GIT_AUTO_PUSH = os.environ.get("MINUTES_GIT_PUSH", "0") == "1"
 
-PLAUD_HEADERS = {
-    "Authorization": PLAUD_TOKEN,
-    "Origin": "https://web.plaud.ai",
-    "Referer": "https://web.plaud.ai/",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36"
-}
+def plaud_headers(account):
+    return {
+        "Authorization": account["token"],
+        "Origin": "https://web.plaud.ai",
+        "Referer": "https://web.plaud.ai/",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36"
+    }
+
+def find_account(name):
+    for acc in PLAUD_ACCOUNTS:
+        if acc["name"] == name:
+            return acc
+    return None
 
 def ms_to_hms(ms):
     s = int(ms / 1000)
@@ -142,27 +171,56 @@ def detect_repetition(text, min_len=8, threshold=6):
     return m.group(1) if m else None
 
 # ── PLAUD ────────────────────────────────────────────────────
-def get_plaud_files():
+def get_plaud_files_for_account(account):
     all_files = []
     page = 1
     while True:
-        url = f"{PLAUD_DOMAIN}/file/simple/web?pageSize=50&pageNum={page}&workspaceId={PLAUD_WS_ID}"
-        resp = requests.get(url, headers=PLAUD_HEADERS, timeout=60)
-        if resp.status_code != 200: break
+        url = f"{account['domain']}/file/simple/web?pageSize=50&pageNum={page}"
+        if account["workspace"]:
+            url += f"&workspaceId={account['workspace']}"
+        resp = requests.get(url, headers=plaud_headers(account), timeout=60)
+        if resp.status_code != 200:
+            print(f"    ⚠️ [{account['name']}] 一覧取得失敗: {resp.status_code} {resp.text[:120]}")
+            break
         data = resp.json()
         files = data.get("data_file_list", [])
         total = data.get("data_file_total", 0)
         if not files: break
+        for f in files:
+            f["_account"] = account["name"]
         all_files.extend(files)
         if len(all_files) >= total or len(files) < 50: break
         page += 1
     return all_files
 
-def get_download_url(file_id):
-    resp = requests.get(f"{PLAUD_DOMAIN}/file/temp-url/{file_id}", headers=PLAUD_HEADERS, timeout=60)
-    if resp.status_code == 200:
-        data = resp.json()
-        return data.get("temp_url") or data.get("temp_url_opus")
+def get_plaud_files(accounts=None):
+    """全アカウントのファイルを結合する。同一IDは先に見つかったアカウントを採用。"""
+    accounts = PLAUD_ACCOUNTS if accounts is None else accounts
+    merged, seen = [], set()
+    for acc in accounts:
+        files = get_plaud_files_for_account(acc)
+        print(f"    [{acc['name']}] {len(files)}件")
+        for f in files:
+            fid = f.get("id")
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            merged.append(f)
+    return merged
+
+def get_download_url(file_id, account=None):
+    """account 未指定時は全アカウントを順に試す（再文字起こし用）。"""
+    for acc in ([account] if account else PLAUD_ACCOUNTS):
+        try:
+            resp = requests.get(f"{acc['domain']}/file/temp-url/{file_id}",
+                                headers=plaud_headers(acc), timeout=60)
+        except requests.RequestException:
+            continue
+        if resp.status_code == 200:
+            data = resp.json()
+            url = data.get("temp_url") or data.get("temp_url_opus")
+            if url:
+                return url
     return None
 
 def download_audio(temp_url, dest_path):
@@ -594,8 +652,9 @@ def build_index(pages=None):
 def main():
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
     print(f"\n{'='*60}\nPLAUD→文字起こし→Notion開始: {now}\n{'='*60}")
-    if not PLAUD_TOKEN or not NOTION_TOKEN:
+    if not PLAUD_ACCOUNTS or not NOTION_TOKEN:
         print("❌ トークンが設定されていません"); return
+    print(f"PLAUDアカウント: {len(PLAUD_ACCOUNTS)}件 ({', '.join(a['name'] for a in PLAUD_ACCOUNTS)})")
 
     load_glossary()
 
@@ -625,9 +684,11 @@ def main():
         file_id = f["id"]
         filename = f.get("fullname", f"{file_id}.ogg")
         name = f.get("filename", file_id)
-        print(f"\n  [{i}/{len(new_files)}] {name}")
+        account = find_account(f.get("_account"))
+        origin = f" <{account['name']}>" if account else ""
+        print(f"\n  [{i}/{len(new_files)}] {name}{origin}")
 
-        temp_url = get_download_url(file_id)
+        temp_url = get_download_url(file_id, account)
         if not temp_url:
             print(f"  ❌ URL取得失敗。スキップ"); continue
 
