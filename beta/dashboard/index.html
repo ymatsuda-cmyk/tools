@@ -135,18 +135,11 @@
   .calc-out{min-height:18px;margin-top:3px;text-align:right;font-size:15px;font-weight:600;
     font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-out.err{font-size:10px;font-weight:400;color:var(--danger);}
-  .calc-vars{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+  .calc-vars{display:flex;flex-wrap:wrap;gap:5px;}
   .calc-vars:empty{display:none;}
   .calc-vars button{background:rgba(95,168,160,0.14);border:1px solid var(--border);border-radius:99px;
     color:var(--accent);font-size:10px;padding:3px 9px;cursor:pointer;}
   .calc-vars button:hover{background:rgba(95,168,160,0.26);}
-  .calc-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;
-    border-top:1px solid var(--border);padding-top:10px;}
-  .calc-pad button{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
-    color:var(--text-secondary);font-size:13px;padding:8px 0;cursor:pointer;transition:all .15s ease;}
-  .calc-pad button:hover{background:var(--surface);color:var(--text);}
-  .calc-pad button.op{color:var(--accent);}
-  .calc-pad button.fn{color:var(--text-muted);}
   .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
   .mon-actions button{
     flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
@@ -1641,15 +1634,7 @@ function renderRuleCard(m){
    式は文字列のまま持ち、いつでも直せる。評価は自前の構文解析で行う
    ============================================================ */
 
-const CALC_KEYS = [
-  '7','8','9','÷',
-  '4','5','6','×',
-  '1','2','3','−',
-  '0','.','%','+',
-  '(',')','←','C'
-];
-
-/** カードごとの入力中の行。テンキーの入力先になる */
+/** カードごとの入力中の行。変数ボタンの差し込み先になる */
 const calcActive = {};
 let calcSaveTimer = null;
 
@@ -1805,12 +1790,6 @@ function fmtCalc(v){
   return (Math.round(v * 1e10) / 1e10).toLocaleString('ja-JP', { maximumFractionDigits:10 });
 }
 
-function calcKeyClass(k){
-  if(['÷','×','−','+','%'].includes(k)) return 'op';
-  if(['←','C'].includes(k)) return 'fn';
-  return '';
-}
-
 const CALC_OP_SIGN = { '*':'×', '/':'÷', '-':'−' };
 
 function calcOutHtml(exprText, scope){
@@ -1868,10 +1847,6 @@ function renderCalcCard(m){
           </div>`).join('')}
       </div>
       ${calcVarsHtml(scope.names)}
-      <div class="calc-pad">
-        ${CALC_KEYS.map(k =>
-          `<button data-calc-key="${esc(k)}" class="${calcKeyClass(k)}">${esc(k)}</button>`).join('')}
-      </div>
     </div>`;
 }
 
@@ -1900,7 +1875,7 @@ function scheduleCalcSave(){
   calcSaveTimer = setTimeout(persistLocal, 600);
 }
 
-/** テンキーと変数ボタンの入力先。最後に触れた式の欄へ差し込む */
+/** 変数ボタンの入力先。最後に触れた式の欄へ差し込む */
 function calcInsert(card, text){
   const i = calcActive[card.dataset.monitor] || 0;
   const input = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
@@ -1908,15 +1883,7 @@ function calcInsert(card, text){
   if(!input) return;
 
   input.focus();
-  const s = input.selectionStart, e = input.selectionEnd;
-  if(text === 'C'){
-    input.value = '';
-  }else if(text === '←'){
-    if(s !== e) input.setRangeText('', s, e, 'end');
-    else if(s > 0) input.setRangeText('', s - 1, s, 'end');
-  }else{
-    input.setRangeText(text, s, e, 'end');
-  }
+  input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end');
   input.dispatchEvent(new Event('input'));
 }
 
@@ -2114,12 +2081,6 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
       paintCalcCard(card);
       scheduleCalcSave();
     });
-  });
-
-  grid.querySelectorAll('[data-calc-key]').forEach(btn=>{
-    // 押した拍子に式の欄からフォーカスが外れると、挿入位置が分からなくなる
-    btn.addEventListener('mousedown', e=>e.preventDefault());
-    btn.addEventListener('click', ()=>calcInsert(btn.closest('[data-monitor]'), btn.dataset.calcKey));
   });
 
   grid.querySelectorAll('.mon-card').forEach(wireCalcVars);
