@@ -1658,8 +1658,8 @@ function calcRows(m){
 function calcNormalize(src){
   return String(src == null ? '' : src)
     .replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[×✕]/g, '*')
-    .replace(/[÷]/g, '/')
+    .replace(/[×✕＊]/g, '*')
+    .replace(/[÷／]/g, '/')
     .replace(/[−－–—]/g, '-')     // 長音「ー」は名前に使うので変換しない
     .replace(/[（]/g, '(')
     .replace(/[）]/g, ')')
@@ -1795,7 +1795,7 @@ function calcScope(m){
 }
 
 /* 正規化すると演算子・括弧・区切りになる文字。名前の切れ目になる */
-const CALC_DELIM_RE = /[\s+\-*/%()×✕÷−－–—（）,，]/;
+const CALC_DELIM_RE = /[\s+\-*/%()×✕÷−－–—（）＊／,，]/;
 
 /**
  * 式の中で名前として現れている部分だけを置き換える。
