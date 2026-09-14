@@ -1653,6 +1653,14 @@ const CALC_KEYS = [
 const calcActive = {};
 let calcSaveTimer = null;
 
+/** lines ぶんの行を確保して返す。足りなければ空行を足す */
+function calcRows(m){
+  const n = Math.max(1, Math.min(20, Number(m.lines) || 1));
+  if(!Array.isArray(m.rows)) m.rows = [];
+  while(m.rows.length < n) m.rows.push({ label:'', expr:'' });
+  return m.rows.slice(0, n);
+}
+
 /** 入力を正規化する。名前の突き合わせにも使うので、式と名前で同じものを通す */
 function calcNormalize(src){
   return String(src == null ? '' : src)
