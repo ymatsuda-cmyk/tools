@@ -125,8 +125,15 @@
   .calc-name{width:36%;min-width:0;background:none;border:none;outline:none;padding:0;
     color:var(--text-muted);font-size:10px;}
   .calc-name:focus{color:var(--text-secondary);}
-  .calc-expr{flex:1;min-width:0;background:none;border:none;outline:none;padding:0;text-align:right;
+  .calc-expr{flex:1;min-width:0;outline:none;text-align:right;white-space:pre-wrap;word-break:break-all;
     color:var(--accent);font-size:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .calc-expr:empty::before{content:attr(data-placeholder);color:var(--text-muted);}
+  .calc-expr.over{box-shadow:0 0 0 1px var(--accent);border-radius:4px;}
+  .calc-chip{display:inline-block;background:rgba(95,168,160,0.18);border-radius:5px;
+    padding:0 4px;margin:0 1px;cursor:grab;user-select:none;}
+  .calc-chip.sel{background:rgba(95,168,160,0.4);outline:1px solid var(--accent);}
+  .calc-chip.bad{background:rgba(217,105,79,0.18);color:var(--danger);}
+  .calc-chip.drag{opacity:.4;}
   .calc-out{min-height:18px;margin-top:3px;text-align:right;font-size:15px;font-weight:600;
     font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-out.err{font-size:10px;font-weight:400;color:var(--danger);}
@@ -1729,6 +1736,24 @@ function evalExpr(src, lookup){
   return v;
 }
 
+/** 式を名前・数値・記号に切り直す。画面のチップを組み立てるのに使う */
+function calcTokens(src){
+  const s = calcNormalize(src);
+  const out = [];
+  let i = 0;
+  while(i < s.length){
+    if(s[i] === ' '){ out.push({ t:'sp', v:' ' }); i++; continue; }
+    const rest = s.slice(i);
+    const num = CALC_NUM_RE.exec(rest);
+    if(num){ out.push({ t:'num', v:num[0] }); i += num[0].length; continue; }
+    if('+-*/%()'.includes(s[i])){ out.push({ t:'op', v:s[i] }); i++; continue; }
+    const id = CALC_ID_RE.exec(rest);
+    if(id){ out.push({ t:'id', v:id[0] }); i += id[0].length; continue; }
+    i++;
+  }
+  return out;
+}
+
 /**
  * カード内の名前付き行を変数として引けるようにする。
  * 参照されたときに初めて計算するので、行の並び順に縛られない。
@@ -1818,8 +1843,31 @@ function calcOutHtml(exprText, scope){
 }
 
 function calcVarsHtml(names){
-  return `<div class="calc-vars">${names
+  return `<div class="calc-vars" data-names="${esc(JSON.stringify(names))}">${names
     .map(n => `<button data-calc-var="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+}
+
+/* 式の欄に直接打てる文字。変数はボタンからしか入れられない */
+const CALC_TYPABLE_RE = /^[0-9.+\-*/%() ]*$/;
+
+/** 変数はチップにする。定義の無い名前は赤くして、消せることが分かるようにする */
+function calcExprHtml(exprText, scope){
+  const known = new Set(scope.names);
+  return calcTokens(exprText).map(t=>{
+    if(t.t !== 'id') return esc(t.v);
+    const bad = known.has(calcNormalize(t.v).trim()) ? '' : ' bad';
+    return `<span class="calc-chip${bad}" data-name="${esc(t.v)}" draggable="true" contenteditable="false">${esc(t.v)}</span>`;
+  }).join('');
+}
+
+function calcChipEl(name){
+  const el = document.createElement('span');
+  el.className = 'calc-chip';
+  el.dataset.name = name;
+  el.draggable = true;
+  el.contentEditable = 'false';
+  el.textContent = name;
+  return el;
 }
 
 function renderCalcCard(m){
@@ -1839,8 +1887,9 @@ function renderCalcCard(m){
             <div class="calc-line">
               <input class="calc-name" data-calc-label="${i}" autocomplete="off"
                 value="${esc(r.label || '')}" placeholder="名前" aria-label="${i + 1}行目の名前">
-              <input class="calc-expr" data-calc-row="${i}" inputmode="decimal" autocomplete="off"
-                value="${esc(r.expr || '')}" placeholder="式を入力" aria-label="${i + 1}行目の式">
+              <div class="calc-expr" data-calc-row="${i}" contenteditable="true" role="textbox"
+                inputmode="decimal" data-placeholder="式" aria-label="${i + 1}行目の式"
+              >${calcExprHtml(r.expr, scope)}</div>
             </div>
             ${calcOutHtml(r.expr, scope)}
           </div>`).join('')}
@@ -1861,7 +1910,8 @@ function paintCalcCard(card){
     row.querySelector('.calc-out').outerHTML = calcOutHtml((m.rows[i] || {}).expr, scope);
   });
   const vars = card.querySelector('.calc-vars');
-  if(vars){
+  // 名前が増減したときだけ組み直す。1文字打つたびにボタンが作り直されるのを避ける
+  if(vars && vars.dataset.names !== JSON.stringify(scope.names)){
     vars.outerHTML = calcVarsHtml(scope.names);
     wireCalcVars(card);
   }
@@ -1872,16 +1922,127 @@ function scheduleCalcSave(){
   calcSaveTimer = setTimeout(persistLocal, 600);
 }
 
-/** 変数ボタンの入力先。最後に触れた式の欄へ差し込む */
-function calcInsert(card, text){
-  const i = calcActive[card.dataset.monitor] || 0;
-  const input = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
-    || card.querySelector('.calc-expr');
-  if(!input) return;
+/** 式の欄の中身をそのまま保存する。チップは名前のテキストとして数えられる */
+function syncCalcExpr(el){
+  const card = el.closest('[data-monitor]');
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  const i = Number(el.dataset.calcRow);
+  if(!m || !m.rows || !m.rows[i]) return;
+  m.rows[i].expr = el.textContent;
+  paintCalcCard(card);
+  scheduleCalcSave();
+}
 
-  input.focus();
-  input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end');
-  input.dispatchEvent(new Event('input'));
+/** 名前を変えたときなど、式の中身ごと組み直す */
+function repaintCalcExprs(card){
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  if(!m) return;
+  const scope = calcScope(m);
+  card.querySelectorAll('.calc-expr').forEach(el=>{
+    el.innerHTML = calcExprHtml((m.rows[Number(el.dataset.calcRow)] || {}).expr, scope);
+    el.querySelectorAll('.calc-chip').forEach(wireCalcChip);
+  });
+}
+
+function clearChipSelection(){
+  document.querySelectorAll('.calc-chip.sel').forEach(c => c.classList.remove('sel'));
+}
+
+let calcDragChip = null;
+
+function wireCalcChip(chip){
+  chip.addEventListener('dragstart', e=>{
+    calcDragChip = chip;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', chip.dataset.name);
+    chip.classList.add('drag');
+  });
+  chip.addEventListener('dragend', ()=>{
+    chip.classList.remove('drag');
+    calcDragChip = null;
+  });
+}
+
+function caretRangeAt(x, y){
+  if(document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+  const pos = document.caretPositionFromPoint && document.caretPositionFromPoint(x, y);
+  if(!pos) return null;
+  const r = document.createRange();
+  r.setStart(pos.offsetNode, pos.offset);
+  r.collapse(true);
+  return r;
+}
+
+/** 差し込み位置。カーソルが式の欄の中にあればそこ、無ければ末尾 */
+function calcInsertRange(el){
+  const sel = window.getSelection();
+  if(sel && sel.rangeCount && el.contains(sel.anchorNode)) return sel.getRangeAt(0);
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(false);
+  return r;
+}
+
+function placeCaretAfter(node){
+  const r = document.createRange();
+  r.setStartAfter(node);
+  r.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+/** テキストとして数えた何文字目にカーソルがあるか */
+function caretOffsetIn(el){
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+  const cur = sel.getRangeAt(0);
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.setEnd(cur.endContainer, cur.endOffset);
+  return r.toString().length;
+}
+
+function setCaretOffset(el, offset){
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let seen = 0;
+  let node;
+  while((node = walker.nextNode())){
+    const len = node.textContent.length;
+    if(seen + len >= offset){
+      const r = document.createRange();
+      r.setStart(node, offset - seen);
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return;
+    }
+    seen += len;
+  }
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+/** 変数ボタンの入力先。最後に触れた式の欄へチップを差し込む */
+function calcInsert(card, name){
+  const i = calcActive[card.dataset.monitor] || 0;
+  const el = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
+    || card.querySelector('.calc-expr');
+  if(!el) return;
+
+  el.focus();
+  const chip = calcChipEl(name);
+  const range = calcInsertRange(el);
+  range.deleteContents();
+  range.insertNode(chip);
+  wireCalcChip(chip);
+  placeCaretAfter(chip);
+  syncCalcExpr(el);
 }
 
 function wireCalcVars(card){
@@ -2036,37 +2197,91 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   // 定期更新の描き直しで、入力中の電卓からカーソルが飛ばないようにする
   const focused = document.activeElement;
-  const keep = focused && grid.contains(focused)
-    && (focused.classList.contains('calc-expr') || focused.classList.contains('calc-name'))
-    ? { id: focused.closest('[data-monitor]').dataset.monitor,
-        sel: focused.classList.contains('calc-expr')
-          ? `.calc-expr[data-calc-row="${focused.dataset.calcRow}"]`
-          : `.calc-name[data-calc-label="${focused.dataset.calcLabel}"]`,
-        start: focused.selectionStart, end: focused.selectionEnd }
-    : null;
+  let keep = null;
+  if(focused && grid.contains(focused)){
+    const id = focused.closest('[data-monitor]')?.dataset.monitor;
+    if(focused.classList.contains('calc-name')){
+      keep = { id, sel:`.calc-name[data-calc-label="${focused.dataset.calcLabel}"]`,
+        start: focused.selectionStart, end: focused.selectionEnd };
+    }else if(focused.classList.contains('calc-expr')){
+      keep = { id, sel:`.calc-expr[data-calc-row="${focused.dataset.calcRow}"]`,
+        offset: caretOffsetIn(focused) };
+    }
+  }
 
   grid.innerHTML = list.map(m => renderMonitorCard(m, monitorSnapshots[m.id])).join('');
 
   if(keep){
     const el = grid.querySelector(`[data-monitor="${CSS.escape(keep.id)}"] ${keep.sel}`);
-    if(el){ el.focus(); el.setSelectionRange(keep.start, keep.end); }
+    if(el){
+      el.focus();
+      if(keep.offset != null) setCaretOffset(el, keep.offset);
+      else el.setSelectionRange(keep.start, keep.end);
+    }
   }
 
-  grid.querySelectorAll('.calc-expr').forEach(input=>{
-    const card = input.closest('[data-monitor]');
-    const i = Number(input.dataset.calcRow);
-    input.addEventListener('focus', ()=>{
+  grid.querySelectorAll('.calc-expr').forEach(el=>{
+    const card = el.closest('[data-monitor]');
+    const i = Number(el.dataset.calcRow);
+
+    el.addEventListener('focus', ()=>{
       calcActive[card.dataset.monitor] = i;
       card.querySelectorAll('.calc-row').forEach((row, j) => row.classList.toggle('on', j === i));
     });
-    input.addEventListener('input', ()=>{
-      const m = allMonitors().find(x => x.id === card.dataset.monitor);
-      if(!m || !m.rows || !m.rows[i]) return;
-      m.rows[i].expr = input.value;
-      paintCalcCard(card);
-      scheduleCalcSave();
+
+    // 変数はボタンからしか入れられない。打てるのは数字と演算子だけ
+    el.addEventListener('beforeinput', e=>{
+      if(e.inputType.startsWith('delete') || e.inputType.startsWith('history')) return;
+      const text = e.data != null
+        ? e.data
+        : (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
+      if(!CALC_TYPABLE_RE.test(text)) e.preventDefault();
+    });
+
+    el.addEventListener('input', ()=>syncCalcExpr(el));
+
+    el.addEventListener('click', e=>{
+      const chip = e.target.closest('.calc-chip');
+      clearChipSelection();
+      if(chip) chip.classList.add('sel');
+    });
+
+    // 選んだチップは Del / BS でまるごと消す
+    el.addEventListener('keydown', e=>{
+      if(e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const chip = el.querySelector('.calc-chip.sel');
+      if(!chip) return;
+      e.preventDefault();
+      chip.remove();
+      syncCalcExpr(el);
+    });
+
+    el.addEventListener('dragover', e=>{
+      if(!calcDragChip) return;
+      e.preventDefault();
+      el.classList.add('over');
+    });
+    el.addEventListener('dragleave', ()=>el.classList.remove('over'));
+    el.addEventListener('drop', e=>{
+      el.classList.remove('over');
+      if(!calcDragChip) return;
+      e.preventDefault();
+
+      const chip = calcDragChip;
+      const from = chip.closest('.calc-expr');
+      const range = caretRangeAt(e.clientX, e.clientY);
+      if(range && chip.contains(range.startContainer)) return;   // 自分の上に落とした
+
+      chip.remove();
+      if(range && el.contains(range.startContainer)) range.insertNode(chip);
+      else el.appendChild(chip);
+
+      if(from && from !== el) syncCalcExpr(from);
+      syncCalcExpr(el);
     });
   });
+
+  grid.querySelectorAll('.calc-chip').forEach(wireCalcChip);
 
   grid.querySelectorAll('.calc-name').forEach(input=>{
     const card = input.closest('[data-monitor]');
@@ -2089,12 +2304,9 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
       if(!m) return;
       const changed = renameCalcVar(m, calcRenameFrom[key], input.value);
       delete calcRenameFrom[key];
-      if(!changed) return;
-      card.querySelectorAll('.calc-expr').forEach(el=>{
-        const j = Number(el.dataset.calcRow);
-        if(m.rows[j]) el.value = m.rows[j].expr;
-      });
       paintCalcCard(card);
+      repaintCalcExprs(card);
+      if(!changed) return;
       scheduleCalcSave();
       toast(`${changed}件の式の「${input.value.trim()}」を直しました`);
     });
@@ -2234,6 +2446,10 @@ function stopMonitorLoop(){
   if(monitorCountdown) clearInterval(monitorCountdown);
   monitorTimer = null; monitorCountdown = null;
 }
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.calc-chip')) clearChipSelection();
+});
 
 document.getElementById('mainTabs').addEventListener('click', e=>{
   const btn = e.target.closest('button');
