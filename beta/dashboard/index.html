@@ -118,15 +118,28 @@
   .rule-list .n{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rule-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 
-  .calc-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .calc-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
   .calc-row{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:7px 9px;}
   .calc-row.on{border-color:var(--accent);}
-  .calc-label{font-size:9px;color:var(--text-muted);margin-bottom:2px;}
-  .calc-expr{width:100%;background:none;border:none;outline:none;padding:0;text-align:right;
+  .calc-line{display:flex;align-items:baseline;gap:6px;}
+  .calc-name{width:36%;min-width:0;background:none;border:none;outline:none;padding:0;
+    color:var(--text-muted);font-size:10px;}
+  .calc-name:focus{color:var(--text-secondary);}
+  .calc-expr{flex:1;min-width:0;background:none;border:none;outline:none;padding:0;text-align:right;
     color:var(--text);font-size:13px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .calc-ruby{margin-top:6px;text-align:right;line-height:1.1;
+    font-size:11px;color:var(--text-secondary);font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .calc-ruby:empty{display:none;}
+  .calc-ruby rt{font-size:8px;color:var(--accent);}
+  .calc-ruby .calc-op{color:var(--text-muted);margin:0 2px;}
   .calc-out{min-height:18px;margin-top:3px;text-align:right;font-size:15px;font-weight:600;
     font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-out.err{font-size:10px;font-weight:400;color:var(--danger);}
+  .calc-vars{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+  .calc-vars:empty{display:none;}
+  .calc-vars button{background:rgba(95,168,160,0.14);border:1px solid var(--border);border-radius:99px;
+    color:var(--accent);font-size:10px;padding:3px 9px;cursor:pointer;}
+  .calc-vars button:hover{background:rgba(95,168,160,0.26);}
   .calc-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;
     border-top:1px solid var(--border);padding-top:10px;}
   .calc-pad button{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
@@ -557,7 +570,7 @@
     <div class="field" data-for="calc">
       <label>式の行数</label>
       <input type="number" id="mf-lines" value="1" min="1" max="20">
-      <div class="hint">行ごとに式を持ちます。式はカード上でいつでも書き換えられます</div>
+      <div class="hint">行ごとに名前と式を持ちます。名前を付けると、他の行の式から変数として使えます</div>
     </div>
 
     <div class="modal-actions">
@@ -1640,25 +1653,30 @@ const CALC_KEYS = [
 const calcActive = {};
 let calcSaveTimer = null;
 
-function calcRows(m){
-  const n = Math.max(1, Math.min(20, Number(m.lines) || 1));
-  if(!Array.isArray(m.rows)) m.rows = [];
-  while(m.rows.length < n) m.rows.push({ expr:'' });
-  return m.rows.slice(0, n);
-}
-
-/**
- * 四則演算と括弧、末尾の % だけを解釈する。
- * eval を使うと式に書いた任意のJSが動いてしまうため、自前で読む。
- * @returns {number|null} 空の式は null
- */
-function evalExpr(src){
-  const s = String(src == null ? '' : src)
+/** 入力を正規化する。名前の突き合わせにも使うので、式と名前で同じものを通す */
+function calcNormalize(src){
+  return String(src == null ? '' : src)
     .replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[×✕]/g, '*')
     .replace(/[÷]/g, '/')
-    .replace(/[−–—ー]/g, '-')
-    .replace(/,/g, '');
+    .replace(/[−－–—]/g, '-')     // 長音「ー」は名前に使うので変換しない
+    .replace(/[（]/g, '(')
+    .replace(/[）]/g, ')')
+    .replace(/[,，]/g, '');
+}
+
+/* 名前として使える範囲。演算子・括弧・空白以外なら日本語でもよい */
+const CALC_ID_RE = /^[^\s+\-*/%()]+/;
+const CALC_NUM_RE = /^(?:\d+(?:\.\d+)?|\.\d+)/;
+
+/**
+ * 四則演算・括弧・後置の % と、名前（変数）を解釈する。
+ * eval を使うと式に書いた任意のJSが動いてしまうため、自前で読む。
+ * @param {(name: string) => number} [lookup] 名前を数値に解決する
+ * @returns {number|null} 空の式は null
+ */
+function evalExpr(src, lookup){
+  const s = calcNormalize(src);
   if(!s.trim()) return null;
 
   let i = 0;
@@ -1699,10 +1717,19 @@ function evalExpr(src){
       i++;
       return v;
     }
-    const m = /^(?:\d+(?:\.\d+)?|\.\d+)/.exec(s.slice(i));
-    if(!m) throw new Error('式が途中です');
-    i += m[0].length;
-    return Number(m[0]);
+    const rest = s.slice(i);
+    const num = CALC_NUM_RE.exec(rest);
+    if(num){
+      i += num[0].length;
+      return Number(num[0]);
+    }
+    const id = CALC_ID_RE.exec(rest);
+    if(id){
+      i += id[0].length;
+      if(!lookup) throw new Error(`「${id[0]}」が使えません`);
+      return lookup(id[0]);
+    }
+    throw new Error('式が途中です');
   }
 
   const v = expr();
@@ -1710,6 +1737,60 @@ function evalExpr(src){
   if(i < s.length) throw new Error('読めない文字があります');
   if(!isFinite(v)) throw new Error('計算できません');
   return v;
+}
+
+/** 表示用の分解。式をそのまま読み直して、名前と数値と記号に切る */
+function calcTokens(src){
+  const s = calcNormalize(src);
+  const out = [];
+  let i = 0;
+  while(i < s.length){
+    if(s[i] === ' '){ out.push({ t:'sp' }); i++; continue; }
+    const rest = s.slice(i);
+    const num = CALC_NUM_RE.exec(rest);
+    if(num){ out.push({ t:'num', v:num[0] }); i += num[0].length; continue; }
+    if('+-*/%()'.includes(s[i])){ out.push({ t:'op', v:s[i] }); i++; continue; }
+    const id = CALC_ID_RE.exec(rest);
+    if(id){ out.push({ t:'id', v:id[0] }); i += id[0].length; continue; }
+    i++;
+  }
+  return out;
+}
+
+/**
+ * カード内の名前付き行を変数として引けるようにする。
+ * 参照されたときに初めて計算するので、行の並び順に縛られない。
+ */
+function calcScope(m){
+  const rows = calcRows(m);
+  const byName = new Map();
+  rows.forEach(r=>{
+    const name = calcNormalize(r.label).trim();
+    if(name && !byName.has(name)) byName.set(name, r);
+  });
+
+  const done = new Map();
+  const visiting = new Set();
+
+  function valueOf(rawName){
+    const name = calcNormalize(rawName).trim();
+    if(done.has(name)) return done.get(name);
+    const row = byName.get(name);
+    if(!row) throw new Error(`「${name}」がありません`);
+    if(visiting.has(name)) throw new Error(`「${name}」が循環しています`);
+
+    visiting.add(name);
+    try{
+      const v = evalExpr(row.expr, valueOf);
+      if(v === null) throw new Error(`「${name}」が空です`);
+      done.set(name, v);
+      return v;
+    }finally{
+      visiting.delete(name);
+    }
+  }
+
+  return { names:[...byName.keys()], valueOf };
 }
 
 function fmtCalc(v){
@@ -1722,18 +1803,42 @@ function calcKeyClass(k){
   return '';
 }
 
-function calcOutHtml(exprText){
+const CALC_OP_SIGN = { '*':'×', '/':'÷', '-':'−' };
+
+function calcOutHtml(exprText, scope){
   try{
-    const v = evalExpr(exprText);
+    const v = evalExpr(exprText, scope.valueOf);
     return `<div class="calc-out">${v === null ? '' : esc(fmtCalc(v))}</div>`;
   }catch(err){
     return `<div class="calc-out err">${esc(err.message)}</div>`;
   }
 }
 
+/** 変数を数字に開き、その上に名前をルビで乗せる。名前が出てこない式では何も出さない */
+function calcRubyHtml(exprText, scope){
+  const toks = calcTokens(exprText);
+  const inner = toks.some(t => t.t === 'id')
+    ? toks.map(t=>{
+        if(t.t === 'sp') return ' ';
+        if(t.t === 'op') return `<span class="calc-op">${esc(CALC_OP_SIGN[t.v] || t.v)}</span>`;
+        if(t.t === 'num') return esc(t.v);
+        let shown;
+        try{ shown = fmtCalc(scope.valueOf(t.v)); }catch(err){ shown = '?'; }
+        return `<ruby>${esc(shown)}<rt>${esc(t.v)}</rt></ruby>`;
+      }).join('')
+    : '';
+  return `<div class="calc-ruby">${inner}</div>`;
+}
+
+function calcVarsHtml(names){
+  return `<div class="calc-vars">${names
+    .map(n => `<button data-calc-var="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+}
+
 function renderCalcCard(m){
   const rows = calcRows(m);
   const active = calcActive[m.id] || 0;
+  const scope = calcScope(m);
 
   return `
     <div class="mon-card" data-monitor="${esc(m.id)}">
@@ -1744,13 +1849,17 @@ function renderCalcCard(m){
       <div class="calc-rows">
         ${rows.map((r, i) => `
           <div class="calc-row${i === active ? ' on' : ''}">
-            ${r.label ? `<div class="calc-label">${esc(r.label)}</div>` : ''}
-            <input class="calc-expr" data-calc-row="${i}" inputmode="decimal" autocomplete="off"
-              value="${esc(r.expr || '')}" placeholder="式を入力"
-              aria-label="${esc(r.label || (m.name || '電卓') + ' ' + (i + 1) + '行目')}">
-            ${calcOutHtml(r.expr)}
+            <div class="calc-line">
+              <input class="calc-name" data-calc-label="${i}" autocomplete="off"
+                value="${esc(r.label || '')}" placeholder="名前" aria-label="${i + 1}行目の名前">
+              <input class="calc-expr" data-calc-row="${i}" inputmode="decimal" autocomplete="off"
+                value="${esc(r.expr || '')}" placeholder="式を入力" aria-label="${i + 1}行目の式">
+            </div>
+            ${calcRubyHtml(r.expr, scope)}
+            ${calcOutHtml(r.expr, scope)}
           </div>`).join('')}
       </div>
+      ${calcVarsHtml(scope.names)}
       <div class="calc-pad">
         ${CALC_KEYS.map(k =>
           `<button data-calc-key="${esc(k)}" class="${calcKeyClass(k)}">${esc(k)}</button>`).join('')}
@@ -1758,11 +1867,24 @@ function renderCalcCard(m){
     </div>`;
 }
 
-/** 式の欄だけを直接書き換える。行ごと描き直すとカーソルが飛ぶため */
-function paintCalcOut(input){
-  const out = input.parentElement.querySelector('.calc-out');
-  if(!out) return;
-  out.outerHTML = calcOutHtml(input.value);
+/**
+ * 結果とルビだけを差し替える。入力欄には触れないのでカーソルが残る。
+ * 1行直すと、その名前を使っている行も変わるのでカード全体を計算し直す。
+ */
+function paintCalcCard(card){
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  if(!m) return;
+  const scope = calcScope(m);
+  card.querySelectorAll('.calc-row').forEach((row, i)=>{
+    const expr = (m.rows[i] || {}).expr;
+    row.querySelector('.calc-ruby').outerHTML = calcRubyHtml(expr, scope);
+    row.querySelector('.calc-out').outerHTML = calcOutHtml(expr, scope);
+  });
+  const vars = card.querySelector('.calc-vars');
+  if(vars){
+    vars.outerHTML = calcVarsHtml(scope.names);
+    wireCalcVars(card);
+  }
 }
 
 function scheduleCalcSave(){
@@ -1770,18 +1892,31 @@ function scheduleCalcSave(){
   calcSaveTimer = setTimeout(persistLocal, 600);
 }
 
-function calcKey(input, key){
+/** テンキーと変数ボタンの入力先。最後に触れた式の欄へ差し込む */
+function calcInsert(card, text){
+  const i = calcActive[card.dataset.monitor] || 0;
+  const input = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
+    || card.querySelector('.calc-expr');
+  if(!input) return;
+
   input.focus();
   const s = input.selectionStart, e = input.selectionEnd;
-  if(key === 'C'){
+  if(text === 'C'){
     input.value = '';
-  }else if(key === '←'){
+  }else if(text === '←'){
     if(s !== e) input.setRangeText('', s, e, 'end');
     else if(s > 0) input.setRangeText('', s - 1, s, 'end');
   }else{
-    input.setRangeText(key, s, e, 'end');
+    input.setRangeText(text, s, e, 'end');
   }
   input.dispatchEvent(new Event('input'));
+}
+
+function wireCalcVars(card){
+  card.querySelectorAll('[data-calc-var]').forEach(btn=>{
+    btn.addEventListener('mousedown', e=>e.preventDefault());
+    btn.addEventListener('click', ()=>calcInsert(card, btn.dataset.calcVar));
+  });
 }
 
 function renderMonitorCard(m, snap){
@@ -1929,32 +2064,46 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   // 定期更新の描き直しで、入力中の電卓からカーソルが飛ばないようにする
   const focused = document.activeElement;
-  const keep = focused && focused.classList.contains('calc-expr') && grid.contains(focused)
-    ? { id: focused.closest('[data-monitor]').dataset.monitor, row: focused.dataset.calcRow,
+  const keep = focused && grid.contains(focused)
+    && (focused.classList.contains('calc-expr') || focused.classList.contains('calc-name'))
+    ? { id: focused.closest('[data-monitor]').dataset.monitor,
+        sel: focused.classList.contains('calc-expr')
+          ? `.calc-expr[data-calc-row="${focused.dataset.calcRow}"]`
+          : `.calc-name[data-calc-label="${focused.dataset.calcLabel}"]`,
         start: focused.selectionStart, end: focused.selectionEnd }
     : null;
 
   grid.innerHTML = list.map(m => renderMonitorCard(m, monitorSnapshots[m.id])).join('');
 
   if(keep){
-    const el = grid.querySelector(
-      `[data-monitor="${CSS.escape(keep.id)}"] .calc-expr[data-calc-row="${keep.row}"]`);
+    const el = grid.querySelector(`[data-monitor="${CSS.escape(keep.id)}"] ${keep.sel}`);
     if(el){ el.focus(); el.setSelectionRange(keep.start, keep.end); }
   }
 
   grid.querySelectorAll('.calc-expr').forEach(input=>{
-    const id = input.closest('[data-monitor]').dataset.monitor;
+    const card = input.closest('[data-monitor]');
     const i = Number(input.dataset.calcRow);
     input.addEventListener('focus', ()=>{
-      calcActive[id] = i;
-      input.closest('.calc-rows').querySelectorAll('.calc-row')
-        .forEach((row, j) => row.classList.toggle('on', j === i));
+      calcActive[card.dataset.monitor] = i;
+      card.querySelectorAll('.calc-row').forEach((row, j) => row.classList.toggle('on', j === i));
     });
     input.addEventListener('input', ()=>{
-      const m = allMonitors().find(x => x.id === id);
+      const m = allMonitors().find(x => x.id === card.dataset.monitor);
       if(!m || !m.rows || !m.rows[i]) return;
       m.rows[i].expr = input.value;
-      paintCalcOut(input);
+      paintCalcCard(card);
+      scheduleCalcSave();
+    });
+  });
+
+  grid.querySelectorAll('.calc-name').forEach(input=>{
+    const card = input.closest('[data-monitor]');
+    const i = Number(input.dataset.calcLabel);
+    input.addEventListener('input', ()=>{
+      const m = allMonitors().find(x => x.id === card.dataset.monitor);
+      if(!m || !m.rows || !m.rows[i]) return;
+      m.rows[i].label = input.value;
+      paintCalcCard(card);
       scheduleCalcSave();
     });
   });
@@ -1962,14 +2111,10 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
   grid.querySelectorAll('[data-calc-key]').forEach(btn=>{
     // 押した拍子に式の欄からフォーカスが外れると、挿入位置が分からなくなる
     btn.addEventListener('mousedown', e=>e.preventDefault());
-    btn.addEventListener('click', ()=>{
-      const card = btn.closest('[data-monitor]');
-      const i = calcActive[card.dataset.monitor] || 0;
-      const input = card.querySelector(`.calc-expr[data-calc-row="${i}"]`)
-        || card.querySelector('.calc-expr');
-      if(input) calcKey(input, btn.dataset.calcKey);
-    });
+    btn.addEventListener('click', ()=>calcInsert(btn.closest('[data-monitor]'), btn.dataset.calcKey));
   });
+
+  grid.querySelectorAll('.mon-card').forEach(wireCalcVars);
 
   grid.querySelectorAll('[data-toggle]').forEach(sw=>{
     sw.addEventListener('change', ()=>{
@@ -2208,7 +2353,7 @@ function buildMonitor(){
   }
   if(type === 'calc'){
     m.lines = Math.max(1, Math.min(20, Number(F('mf-lines').value) || 1));
-    m.rows = Array.from({ length:m.lines }, ()=>({ expr:'' }));
+    m.rows = Array.from({ length:m.lines }, ()=>({ label:'', expr:'' }));
   }
   return m;
 }

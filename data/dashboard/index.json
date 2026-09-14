@@ -74,9 +74,11 @@
         "id": "calc",
         "name": "電卓",
         "type": "calc",
-        "lines": 1,
+        "lines": 3,
         "rows": [
-          { "label": "", "expr": "" }
+          { "label": "単価", "expr": "1200" },
+          { "label": "個数", "expr": "3" },
+          { "label": "税込", "expr": "単価*個数*1.1" }
         ]
       }
     ]
