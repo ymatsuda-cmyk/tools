@@ -126,12 +126,7 @@
     color:var(--text-muted);font-size:10px;}
   .calc-name:focus{color:var(--text-secondary);}
   .calc-expr{flex:1;min-width:0;background:none;border:none;outline:none;padding:0;text-align:right;
-    color:var(--text);font-size:13px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
-  .calc-ruby{margin-top:6px;text-align:right;line-height:1.1;
-    font-size:11px;color:var(--text-secondary);font-family:ui-monospace,"SF Mono",Menlo,monospace;}
-  .calc-ruby:empty{display:none;}
-  .calc-ruby rt{font-size:8px;color:var(--accent);}
-  .calc-ruby .calc-op{color:var(--text-muted);margin:0 2px;}
+    color:var(--accent);font-size:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-out{min-height:18px;margin-top:3px;text-align:right;font-size:15px;font-weight:600;
     font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-out.err{font-size:10px;font-weight:400;color:var(--danger);}
@@ -1734,24 +1729,6 @@ function evalExpr(src, lookup){
   return v;
 }
 
-/** 表示用の分解。式をそのまま読み直して、名前と数値と記号に切る */
-function calcTokens(src){
-  const s = calcNormalize(src);
-  const out = [];
-  let i = 0;
-  while(i < s.length){
-    if(s[i] === ' '){ out.push({ t:'sp' }); i++; continue; }
-    const rest = s.slice(i);
-    const num = CALC_NUM_RE.exec(rest);
-    if(num){ out.push({ t:'num', v:num[0] }); i += num[0].length; continue; }
-    if('+-*/%()'.includes(s[i])){ out.push({ t:'op', v:s[i] }); i++; continue; }
-    const id = CALC_ID_RE.exec(rest);
-    if(id){ out.push({ t:'id', v:id[0] }); i += id[0].length; continue; }
-    i++;
-  }
-  return out;
-}
-
 /**
  * カード内の名前付き行を変数として引けるようにする。
  * 参照されたときに初めて計算するので、行の並び順に縛られない。
@@ -1831,8 +1808,6 @@ function fmtCalc(v){
   return (Math.round(v * 1e10) / 1e10).toLocaleString('ja-JP', { maximumFractionDigits:10 });
 }
 
-const CALC_OP_SIGN = { '*':'×', '/':'÷', '-':'−' };
-
 function calcOutHtml(exprText, scope){
   try{
     const v = evalExpr(exprText, scope.valueOf);
@@ -1840,22 +1815,6 @@ function calcOutHtml(exprText, scope){
   }catch(err){
     return `<div class="calc-out err">${esc(err.message)}</div>`;
   }
-}
-
-/** 変数を数字に開き、その上に名前をルビで乗せる。名前が出てこない式では何も出さない */
-function calcRubyHtml(exprText, scope){
-  const toks = calcTokens(exprText);
-  const inner = toks.some(t => t.t === 'id')
-    ? toks.map(t=>{
-        if(t.t === 'sp') return ' ';
-        if(t.t === 'op') return `<span class="calc-op">${esc(CALC_OP_SIGN[t.v] || t.v)}</span>`;
-        if(t.t === 'num') return esc(t.v);
-        let shown;
-        try{ shown = fmtCalc(scope.valueOf(t.v)); }catch(err){ shown = '?'; }
-        return `<ruby>${esc(shown)}<rt>${esc(t.v)}</rt></ruby>`;
-      }).join('')
-    : '';
-  return `<div class="calc-ruby">${inner}</div>`;
 }
 
 function calcVarsHtml(names){
@@ -1883,7 +1842,6 @@ function renderCalcCard(m){
               <input class="calc-expr" data-calc-row="${i}" inputmode="decimal" autocomplete="off"
                 value="${esc(r.expr || '')}" placeholder="式を入力" aria-label="${i + 1}行目の式">
             </div>
-            ${calcRubyHtml(r.expr, scope)}
             ${calcOutHtml(r.expr, scope)}
           </div>`).join('')}
       </div>
@@ -1892,7 +1850,7 @@ function renderCalcCard(m){
 }
 
 /**
- * 結果とルビだけを差し替える。入力欄には触れないのでカーソルが残る。
+ * 結果だけを差し替える。入力欄には触れないのでカーソルが残る。
  * 1行直すと、その名前を使っている行も変わるのでカード全体を計算し直す。
  */
 function paintCalcCard(card){
@@ -1900,9 +1858,7 @@ function paintCalcCard(card){
   if(!m) return;
   const scope = calcScope(m);
   card.querySelectorAll('.calc-row').forEach((row, i)=>{
-    const expr = (m.rows[i] || {}).expr;
-    row.querySelector('.calc-ruby').outerHTML = calcRubyHtml(expr, scope);
-    row.querySelector('.calc-out').outerHTML = calcOutHtml(expr, scope);
+    row.querySelector('.calc-out').outerHTML = calcOutHtml((m.rows[i] || {}).expr, scope);
   });
   const vars = card.querySelector('.calc-vars');
   if(vars){
