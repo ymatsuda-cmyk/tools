@@ -56,6 +56,19 @@
         "limit": 100,
         "unit": "回",
         "cycle": "daily"
+      },
+      {
+        "id": "trash",
+        "name": "ゴミ出し",
+        "type": "rule",
+        "lead": 1,
+        "leadLabel": "今夜出す",
+        "noneLabel": "出すものなし",
+        "rules": [
+          { "label": "可燃ごみ", "color": "#D9694F", "days": [2, 5] },
+          { "label": "資源ごみ", "color": "#5FA8A0", "days": [3] },
+          { "label": "不燃ごみ", "color": "#8A857C", "days": [4], "weeks": [2] }
+        ]
       }
     ]
   },

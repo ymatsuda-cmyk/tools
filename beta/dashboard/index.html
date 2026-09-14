@@ -104,6 +104,19 @@
   .fx-stats b{font-size:13px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-plus{color:#5FA8A0;}
   .fx-minus{color:#D9694F;}
+
+  .rule-main{display:flex;flex-direction:column;gap:2px;text-align:center;margin-bottom:3px;}
+  .rule-main b{font-size:20px;font-weight:600;line-height:1.3;}
+  .rule-main.rule-none{font-size:15px;font-weight:600;color:var(--text-muted);padding:7px 0;}
+  .rule-when{font-size:11px;color:var(--text-secondary);text-align:center;}
+  .rule-today{font-size:10px;color:var(--text-muted);text-align:center;margin-top:6px;}
+  .rule-list{display:flex;flex-direction:column;gap:6px;
+    border-top:1px solid var(--border);padding-top:10px;margin-top:12px;}
+  .rule-list div{display:flex;align-items:center;gap:7px;font-size:11px;}
+  .rule-list .d{flex-shrink:0;color:var(--text-muted);
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .rule-list .n{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rule-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
   .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
   .mon-actions button{
     flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
@@ -335,7 +348,7 @@
     </div>
     <div class="monitor-grid" id="infoGrid"></div>
     <div class="monitor-empty" id="infoEmpty">
-      情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。
+      情報カードが登録されていません。上の「＋ 追加」からドル円やルールのカードを登録できます。
     </div>
   </div>
 </div>
@@ -431,6 +444,7 @@
         <option value="kaggle">Kaggle コントローラー</option>
         <option value="fx">ドル円 かんたん投資</option>
         <option value="fxpos">ドル円の建値</option>
+        <option value="rule">ルール（曜日で決まる予定）</option>
         <option value="copilot">GitHub Copilot</option>
         <option value="manual">手動カウンタ</option>
         <option value="quota">APIクォータ</option>
@@ -508,6 +522,18 @@
     <div class="field" data-for="fxpos">
       <label>金額（円）</label>
       <input type="number" id="mf-amount" step="10000" value="1000000">
+    </div>
+
+    <div class="field" data-for="rule">
+      <label>何日前に出すか</label>
+      <input type="number" id="mf-lead" value="1">
+      <div class="hint">1 なら翌日の予定を主役にします（ゴミ出しは前の晩に出すので 1）。0 なら当日</div>
+    </div>
+    <div class="field" data-for="rule">
+      <label>見出しの語</label>
+      <input type="text" id="mf-leadlabel" placeholder="今夜出す">
+      <div class="hint">予定ごとの曜日は、登録後に 設定 →監視のJSONで rules を編集してください。
+        はじめはゴミ出しの例（可燃 火・金 ／ 資源 水 ／ 不燃 第2木）が入ります</div>
     </div>
 
     <div class="modal-actions">
@@ -1275,7 +1301,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule'];
+
+/* GASに問い合わず、ブラウザだけで組み立てる種別 */
+const LOCAL_TYPES = ['rule'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1284,6 +1313,7 @@ const TYPE_LABELS = {
   quota  : 'APIクォータ',
   fx     : 'ドル円',
   fxpos  : 'ドル円建値',
+  rule   : 'ルール',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1329,7 +1359,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -1350,7 +1380,7 @@ function infoMonitors(){
 
 /** 取得対象。両方のタブぶんをまとめて取りに行く */
 function fetchTargets(){
-  return monitors().concat(infoMonitors());
+  return monitors().concat(infoMonitors()).filter(m => !LOCAL_TYPES.includes(monitorType(m)));
 }
 
 /** 登録済みの種別一覧（情報タブのものは除く） */
@@ -1477,7 +1507,100 @@ function fxPosBody(p){
     <div class="mon-note">${esc(p.date)} 時点</div>`;
 }
 
+/* ============================================================
+   ルール
+   曜日や第n週で決まっている繰り返しの予定を出す。ゴミ出しなど
+   ============================================================ */
+
+/* 「＋ 追加」で入る雛形。ゴミ出しの例をそのまま入れて、あとからJSONで直す */
+const SAMPLE_RULES = [
+  { label:'可燃ごみ', color:'#D9694F', days:[2, 5] },
+  { label:'資源ごみ', color:'#5FA8A0', days:[3] },
+  { label:'不燃ごみ', color:'#8A857C', days:[4], weeks:[2] }
+];
+
+const WEEKDAY_JA = ['日','月','火','水','木','金','土'];
+
+function startOfDay(d){
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addDays(d, n){
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+/** その日に当てはまるルール。days は 0=日、weeks があればその第n週だけ */
+function rulesOn(rules, date){
+  const dow = date.getDay();
+  const nth = Math.floor((date.getDate() - 1) / 7) + 1;
+  return rules.filter(r =>
+    (r.days || []).includes(dow) && (!r.weeks || r.weeks.includes(nth))
+  );
+}
+
+function ruleDateLabel(d){
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_JA[d.getDay()]})`;
+}
+
+function renderRuleCard(m){
+  const rules = Array.isArray(m.rules) ? m.rules : [];
+  if(!rules.length){
+    return `
+      <div class="mon-card" data-monitor="${esc(m.id)}">
+        <div class="mon-head">
+          <span class="mon-dot" style="background:#66625A"></span>
+          <span class="mon-name">${esc(m.name || m.id)}</span>
+        </div>
+        <div class="mon-offline">ルールが未設定です</div>
+        <div class="mon-note">設定 →監視 のJSONで rules を登録してください</div>
+      </div>`;
+  }
+
+  // lead は何日前に知らせるか。ゴミ出しは前の晩に出すので既定は1日前
+  const lead = m.lead == null ? 1 : Number(m.lead);
+  const today = startOfDay(new Date());
+  const target = addDays(today, lead);
+  const hit = rulesOn(rules, target);
+  const todayHit = lead === 0 ? [] : rulesOn(rules, today);
+
+  // 対象日より先の予定。5週ぶん見れば第n週のルールも必ず拾える
+  const upcoming = [];
+  for(let i = lead + 1; i <= lead + 35 && upcoming.length < 3; i++){
+    const d = addDays(today, i);
+    const on = rulesOn(rules, d);
+    if(on.length) upcoming.push({ date:d, on });
+  }
+
+  const dot = hit.length ? (hit[0].color || '#E0B252') : '#66625A';
+  const main = hit.length
+    ? `<div class="rule-main">${hit.map(r =>
+        `<b${r.color ? ` style="color:${esc(r.color)}"` : ''}>${esc(r.label)}</b>`).join('')}</div>`
+    : `<div class="rule-main rule-none">${esc(m.noneLabel || 'なし')}</div>`;
+
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${esc(dot)}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${esc(hit.length ? (m.leadLabel || '次の予定') : 'なし')}</span>
+      </div>
+      ${main}
+      <div class="rule-when">${ruleDateLabel(target)}</div>
+      ${todayHit.length
+        ? `<div class="rule-today">今日は ${todayHit.map(r => esc(r.label)).join('・')}</div>`
+        : ''}
+      ${upcoming.length ? `<div class="rule-list">${upcoming.map(u => `
+        <div>
+          <span class="rule-dot" style="background:${esc(u.on[0].color || '#66625A')}"></span>
+          <span class="d">${ruleDateLabel(u.date)}</span>
+          <span class="n">${u.on.map(r => esc(r.label)).join('・')}</span>
+        </div>`).join('')}</div>` : ''}
+    </div>`;
+}
+
 function renderMonitorCard(m, snap){
+  if(monitorType(m) === 'rule') return renderRuleCard(m);
+
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
   const busy = state === 'starting' || state === 'stopping';
@@ -1601,7 +1724,7 @@ function renderMonitors(){
       ? '監視対象が登録されていません。上の「＋ 追加」から登録してください。'
       : 'この条件に一致する監視対象がありません。');
   paintMonitorGrid('infoGrid', 'infoEmpty', infoMonitors(),
-    '情報カードが登録されていません。上の「＋ 追加」からドル円のカードを登録できます。');
+    '情報カードが登録されていません。上の「＋ 追加」からドル円やルールのカードを登録できます。');
 }
 
 function paintMonitorGrid(gridId, emptyId, list, emptyText){
@@ -1683,7 +1806,8 @@ async function recordManualUsage(id, delta, reset){
 
 async function fetchMonitors(){
   const list = fetchTargets();
-  if(list.length === 0) return;
+  // 取得の要らないカード（ゴミ出し）だけのときも、日付が変われば描き直す
+  if(list.length === 0){ renderMonitors(); return; }
   try{
     const res = await callGas({ action:'monitorStatus', monitors:list });
     (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
@@ -1803,6 +1927,8 @@ function openMonitorModal(type){
   F('mf-name').value = '';
   F('mf-endpoint').value = '';
   F('mf-price').value = '';
+  F('mf-lead').value = '1';
+  F('mf-leadlabel').value = '';
   F('err-monitor').style.display = 'none';
   syncMonitorForm();
   monitorOverlay.classList.add('show');
@@ -1841,6 +1967,13 @@ function buildMonitor(){
     m.price = Number(F('mf-price').value);
     if(!m.price) throw new Error('建値を入力してください');
     m.amount = Number(F('mf-amount').value) || 1000000;
+  }
+  // 雛形として例の予定を書き出しておく。設定のJSONから直せるようにするため
+  if(type === 'rule'){
+    m.lead = Number(F('mf-lead').value) || 0;
+    const leadLabel = F('mf-leadlabel').value.trim();
+    if(leadLabel) m.leadLabel = leadLabel;
+    m.rules = SAMPLE_RULES;
   }
   return m;
 }
