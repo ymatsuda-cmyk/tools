@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Music</title>
+<style>
+  :root{
+    --bg:      #ffffff;
+    --soft:    #f4f5f7;
+    --ink:     #101114;
+    --ink-2:   #8b8e99;
+    --ink-3:   #c8cbd3;
+    --line:    #ececf0;
+    --accent:  #f2464b;
+    --dark:    #17181c;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Noto Sans JP",sans-serif;
+  }
+  body{ overflow:hidden; }
+  button{ font-family:inherit; cursor:pointer; }
+
+  #app{ height:100dvh; height:100vh; display:flex; flex-direction:column; }
+  #panels{ flex:1; min-height:0; display:flex; }
+  .panel{ min-width:0; display:flex; flex-direction:column; background:var(--bg); }
+
+  #panel-home, #panel-play{ flex:1; display:none; }
+  body.v-home #panel-home{ display:flex; }
+  body.v-play #panel-play{ display:flex; }
+
+  @media (min-width: 980px){
+    body{ background:#eeeff2; }
+    #app{ max-width:1100px; margin:0 auto; padding:26px; }
+    #panels{ gap:24px; }
+    #panel-home{ display:flex !important; flex:1; }
+    #panel-play{ display:flex !important; flex:0 0 420px; }
+    .panel{ border-radius:30px; overflow:hidden; box-shadow:0 20px 50px rgba(16,17,20,.10); }
+    #mini{ display:none !important; }
+    .back-btn{ display:none !important; }
+  }
+
+  /* ============ HOME ============ */
+  #home-head{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding:22px 20px 8px; flex-shrink:0;
+  }
+  .big-title{ font-size:27px; font-weight:800; letter-spacing:-.03em; margin:0; }
+  .title-underline{
+    display:flex; gap:4px; margin-top:6px;
+  }
+  .title-underline i{ width:16px; height:3px; border-radius:2px; background:var(--ink); display:block; }
+  .title-underline i.dim{ width:6px; background:var(--ink-3); }
+  .round-btn{
+    width:38px; height:38px; border-radius:50%; border:none; background:var(--dark); color:#fff;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .round-btn svg{ width:16px; height:16px; }
+
+  #home-scroll{ flex:1; min-height:0; overflow-y:auto; padding:0 20px 110px; }
+  #home-scroll::-webkit-scrollbar{ width:6px; }
+  #home-scroll::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
+
+  #hero{
+    position:relative; width:100%; aspect-ratio:2.2/1; border-radius:18px;
+    background-size:cover; background-position:center; background-color:var(--soft);
+    overflow:hidden; margin:10px 0 4px; cursor:pointer;
+  }
+  #hero::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 62%);
+  }
+  #hero-text{
+    position:absolute; left:16px; bottom:14px; z-index:2; color:#fff;
+  }
+  #hero-text .k{ font-size:10px; font-weight:700; opacity:.85; letter-spacing:.08em; }
+  #hero-text .t{ font-size:16px; font-weight:800; margin-top:3px; max-width:70%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .sec-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin:22px 0 12px;
+  }
+  .sec-head h3{ font-size:16px; font-weight:800; margin:0; letter-spacing:-.02em; }
+  .see-all{
+    border:none; background:none; font-size:11.5px; font-weight:600; color:var(--ink-2);
+    display:flex; align-items:center; gap:3px; padding:0;
+  }
+  .see-all svg{ width:12px; height:12px; }
+
+  #albums{
+    display:flex; gap:12px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;
+  }
+  #albums::-webkit-scrollbar{ display:none; }
+  .album{
+    flex-shrink:0; width:104px; border:none; background:none; padding:0; text-align:left;
+  }
+  .album .cov{
+    width:104px; height:104px; border-radius:14px;
+    background-size:cover; background-position:center; background-color:var(--soft);
+    box-shadow:0 8px 20px rgba(16,17,20,.14); margin-bottom:9px;
+    position:relative; overflow:hidden;
+  }
+  .album.active .cov{ outline:2.5px solid var(--ink); outline-offset:-2.5px; }
+  .album .nm{ font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .album .ct{ font-size:11px; color:var(--ink-2); margin-top:2px; }
+  .album.add .cov{
+    background:var(--soft); box-shadow:none; border:1.5px dashed var(--ink-3);
+    display:flex; align-items:center; justify-content:center; color:var(--ink-3);
+  }
+  .album.add .cov svg{ width:24px; height:24px; }
+
+  #tracklist{ display:flex; flex-direction:column; gap:2px; }
+  .row{
+    display:flex; align-items:center; gap:12px;
+    padding:9px 6px; border-radius:14px;
+    user-select:none; touch-action:pan-y;
+  }
+  .row:hover{ background:var(--soft); }
+  .row.playing{ background:var(--soft); }
+  .row.dragging{ background:#fff; box-shadow:0 12px 28px rgba(16,17,20,.18); position:relative; z-index:5; }
+  .row.drop-target{ box-shadow: inset 0 2px 0 0 var(--ink); }
+  .handle{
+    width:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-3); cursor:grab; touch-action:none; opacity:0; transition:opacity .12s;
+  }
+  .row:hover .handle{ opacity:1; }
+  @media (hover:none){ .handle{ opacity:1; } }
+  .handle svg{ width:12px; height:12px; }
+  .r-thumb{
+    width:46px; height:46px; border-radius:50%; flex-shrink:0;
+    background-size:cover; background-position:center; background-color:var(--soft);
+  }
+  .r-meta{ flex:1; min-width:0; cursor:pointer; }
+  .r-title{ font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .r-sub{
+    font-size:11.5px; color:var(--ink-2); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:flex; align-items:center; gap:5px;
+  }
+  .r-tag{ font-size:9.5px; padding:1.5px 7px; border-radius:999px; background:var(--soft); color:var(--ink-2); font-weight:700; }
+  .row:hover .r-tag, .row.playing .r-tag{ background:#fff; }
+  .r-btn{
+    width:30px; height:30px; border-radius:9px; border:none; background:none; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:var(--ink-3);
+  }
+  .r-btn:hover{ background:#fff; color:var(--ink); }
+  .r-btn.on{ color:var(--accent); }
+  .r-btn svg{ width:15px; height:15px; }
+  .eq{ display:flex; align-items:flex-end; gap:2px; height:13px; width:15px; flex-shrink:0; }
+  .eq i{ flex:1; background:var(--ink); border-radius:1px; animation:bounce .9s ease-in-out infinite; }
+  .eq i:nth-child(2){ animation-delay:.15s; }
+  .eq i:nth-child(3){ animation-delay:.3s; }
+  @keyframes bounce{ 0%,100%{height:30%} 50%{height:100%} }
+  #empty{ text-align:center; color:var(--ink-2); font-size:12.5px; padding:36px 18px; }
+
+  /* ============ PLAY ============ */
+  #play-head{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding:22px 22px 4px; flex-shrink:0;
+  }
+  .icon-btn{
+    width:36px; height:36px; border:none; background:none; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; color:var(--ink-2);
+  }
+  .icon-btn:hover{ background:var(--soft); color:var(--ink); }
+  .icon-btn svg{ width:18px; height:18px; }
+
+  #play-body{
+    flex:1; min-height:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:0 0 4px;
+  }
+
+  /* album card + vinyl */
+  #stage{
+    position:relative; width:100%; height:min(260px, 40vh);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; overflow:hidden; touch-action:pan-y;
+  }
+  #disc{
+    position:absolute; z-index:1;
+    width:min(180px,45vw); height:min(180px,45vw); border-radius:50%;
+    background:radial-gradient(circle at center, #4b4d55 0 14%, #17181c 15% 100%);
+    transform:translateX(46%);
+    box-shadow:0 10px 26px rgba(16,17,20,.3);
+  }
+  #disc::after{
+    content:""; position:absolute; inset:44%; border-radius:50%; background:var(--soft);
+  }
+  #disc.spinning{ animation:spin 6s linear infinite; }
+  @keyframes spin{ from{transform:translateX(46%) rotate(0)} to{transform:translateX(46%) rotate(360deg)} }
+
+  .card{
+    position:absolute; border-radius:18px; overflow:hidden;
+    background:var(--soft); z-index:2;
+    width:min(196px,50vw); height:min(216px,55vw);
+    box-shadow:0 16px 36px rgba(16,17,20,.22);
+    transition:transform .34s cubic-bezier(.3,.8,.4,1), opacity .34s ease;
+    display:flex; align-items:center; justify-content:center;
+    background-size:cover; background-position:center;
+  }
+  .card.center{ transform:translateX(0) scale(1); opacity:1; z-index:3; }
+  .card.right { transform:translateX(122%) scale(.9); opacity:.45; z-index:1; }
+
+  #play-title{
+    font-size:22px; font-weight:800; letter-spacing:.16em; text-transform:uppercase;
+    margin:32px 0 6px; text-align:center; max-width:80%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  #title-row{ display:flex; align-items:center; justify-content:center; gap:14px; width:100%; padding:0 24px; }
+  #play-artist{ font-size:12px; color:var(--ink-2); text-align:center; margin:0; }
+  #play-tags{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:12px; min-height:20px; }
+  .mini-tag{ font-size:10.5px; padding:3px 10px; border-radius:999px; background:var(--soft); color:var(--ink-2); font-weight:700; }
+  #fav-btn{ color:var(--ink-3); }
+  #fav-btn.on{ color:var(--accent); }
+  #fav-btn svg{ width:22px; height:22px; }
+
+  /* curvy progress */
+  #wave-wrap{ width:100%; padding:0 24px; margin-top:28px; }
+  #wave-svg{ width:100%; height:46px; display:block; cursor:pointer; }
+  #wave-times{
+    display:flex; justify-content:space-between; margin-top:2px;
+    font-size:11px; color:var(--ink-2); font-variant-numeric:tabular-nums;
+  }
+
+  #transport{
+    display:flex; align-items:center; justify-content:space-between;
+    width:100%; padding:0 30px; margin-top:26px;
+  }
+  .t-btn{
+    border:none; background:none; color:var(--ink);
+    display:flex; align-items:center; justify-content:center; padding:6px;
+    transition:transform .12s, color .14s;
+  }
+  .t-btn:active{ transform:scale(.9); }
+  .t-btn svg{ width:21px; height:21px; }
+  .t-btn.dim{ color:var(--ink-2); }
+  .t-btn.dim.on{ color:var(--ink); }
+  #play-btn{
+    width:60px; height:60px; border-radius:50%;
+    background:var(--dark); color:#fff;
+    box-shadow:0 10px 24px rgba(16,17,20,.28);
+  }
+  #play-btn svg{ width:22px; height:22px; }
+  #play-foot{ padding:18px 0 calc(20px + env(safe-area-inset-bottom)); flex-shrink:0; }
+
+  /* ============ floating mini player ============ */
+  #mini{
+    position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
+    background:var(--dark); border-radius:999px;
+    padding:8px 14px 8px 10px; display:none; align-items:center; gap:11px; z-index:20;
+    box-shadow:0 14px 34px rgba(16,17,20,.34);
+  }
+  body.v-home #mini{ display:flex; }
+  #mini-eq{ display:flex; align-items:flex-end; gap:2px; height:16px; width:14px; flex-shrink:0; }
+  #mini-eq i{ flex:1; background:var(--accent); border-radius:1px; height:40%; }
+  #mini-eq.on i{ animation:bounce .9s ease-in-out infinite; }
+  #mini-eq.on i:nth-child(2){ animation-delay:.15s; }
+  #mini-eq.on i:nth-child(3){ animation-delay:.3s; }
+  #mini-thumb{ width:38px; height:38px; border-radius:11px; background-size:cover; background-position:center; background-color:#33353c; }
+  #mini-meta{ flex:1; min-width:0; color:#fff; cursor:pointer; }
+  #mini-title{ font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #mini-artist{ font-size:11px; color:#9a9da6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .m-btn{
+    border:none; background:none; color:#fff; padding:4px; display:flex; flex-shrink:0;
+  }
+  .m-btn svg{ width:16px; height:16px; }
+  #mini-play{
+    width:34px; height:34px; border-radius:50%; background:#fff; color:var(--dark);
+    display:flex; align-items:center; justify-content:center;
+  }
+  #mini-play svg{ width:14px; height:14px; }
+
+  /* sheet */
+  #overlay{
+    position:fixed; inset:0; background:rgba(16,17,20,.4);
+    display:none; align-items:flex-end; justify-content:center; z-index:60;
+  }
+  #overlay.open{ display:flex; }
+  #sheet{
+    width:100%; max-width:430px; background:#fff;
+    border-radius:24px 24px 0 0; padding:22px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  @media (min-width:980px){ #overlay{ align-items:center; } #sheet{ border-radius:24px; } }
+  #sheet h3{ font-size:15.5px; font-weight:800; margin:0 0 4px; }
+  #sheet .sub{ font-size:11.5px; color:var(--ink-2); margin:0 0 18px; }
+  #sheet-tags{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .sel-tag{
+    padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+    background:#fff; font-size:12.5px; font-weight:600; color:var(--ink-2);
+  }
+  .sel-tag.on{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  #new-tag-row{ display:flex; gap:9px; margin-bottom:16px; }
+  #new-tag-input{
+    flex:1; border:1px solid var(--line); background:var(--soft); outline:none;
+    border-radius:12px; padding:11px 14px; font-size:13px; color:var(--ink); font-family:inherit;
+  }
+  .btn-primary{
+    border:none; border-radius:12px; padding:11px 18px;
+    background:var(--ink); color:#fff; font-size:12.5px; font-weight:700;
+  }
+  .btn-ghost{
+    border:1px solid var(--line); background:#fff; border-radius:12px;
+    padding:12px 0; width:100%; font-size:12.5px; font-weight:700; color:var(--ink-2);
+  }
+
+  #yt-mount{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+
+  #sync{ font-size:10.5px; color:var(--ink-3); margin-top:8px; line-height:1.5; }
+  #sync.warn{ color:var(--accent); }
+  #skiprow{ display:flex; justify-content:center; gap:8px; margin-top:4px; }
+  .skip-btn{
+    border:1px solid var(--line); background:#fff; border-radius:999px;
+    padding:5px 13px; font-size:11px; font-weight:700; color:var(--ink-2);
+  }
+  .skip-btn:hover{ color:var(--ink); }
+</style>
+</head>
+<body class="v-home">
+
+<div id="app">
+  <div id="panels">
+
+    <!-- ====== HOME ====== -->
+    <section class="panel" id="panel-home">
+      <div id="home-head">
+        <div>
+          <h1 class="big-title">Music</h1>
+          <div class="title-underline"><i></i><i class="dim"></i></div>
+          <div id="sync">読み込み中…</div>
+        </div>
+        <button class="round-btn" id="manage-btn" aria-label="プレイリストを管理">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        </button>
+      </div>
+
+      <div id="home-scroll">
+        <div id="hero">
+          <div id="hero-text">
+            <div class="k">NOW PLAYING</div>
+            <div class="t" id="hero-title">—</div>
+          </div>
+        </div>
+
+        <div class="sec-head">
+          <h3>Playlists</h3>
+          <button class="see-all" id="see-all-pl">
+            See all <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <div id="albums"></div>
+
+        <div class="sec-head">
+          <h3 id="list-title">Song List</h3>
+          <span class="see-all" id="list-count">—</span>
+        </div>
+        <div id="tracklist"></div>
+      </div>
+    </section>
+
+    <!-- ====== PLAY ====== -->
+    <section class="panel" id="panel-play">
+      <div id="play-head">
+        <div>
+          <h1 class="big-title">Play</h1>
+          <div class="title-underline"><i></i><i class="dim"></i></div>
+        </div>
+        <button class="icon-btn back-btn" id="play-back" aria-label="ホームへ">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="12" r="2"/><circle cx="15" cy="12" r="2"/></svg>
+        </button>
+      </div>
+
+      <div id="play-body">
+        <div id="stage">
+          <div id="disc"></div>
+          <div class="card right"  id="card-right"></div>
+          <div class="card center" id="card-center"></div>
+        </div>
+
+        <div id="title-row">
+          <h2 id="play-title">—</h2>
+          <button class="icon-btn" id="fav-btn" aria-label="お気に入り">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5 5 0 00-7.1 0L12 7.3l-1.7-1.7a5 5 0 10-7.1 7.1l8.8 8.8 8.8-8.8a5 5 0 000-7.1z"/></svg>
+          </button>
+        </div>
+        <p id="play-artist">—</p>
+        <div id="play-tags"></div>
+
+        <div id="wave-wrap">
+          <svg id="wave-svg" viewBox="0 0 300 46" preserveAspectRatio="none">
+            <path id="wave-bg"   fill="none" stroke="#e2e4e9" stroke-width="2.2" stroke-linecap="round"/>
+            <path id="wave-fill" fill="none" stroke="#101114" stroke-width="2.4" stroke-linecap="round"/>
+            <circle id="wave-dot" r="5.5" fill="#101114"/>
+          </svg>
+          <div id="wave-times"><span id="cur-time">0:00</span><span id="dur-time">0:00</span></div>
+        </div>
+
+        <div id="skiprow">
+          <button class="skip-btn" id="back15">−15秒</button>
+          <button class="skip-btn" id="fwd15">+15秒</button>
+        </div>
+
+        <div id="transport">
+          <button class="t-btn dim" id="repeat-btn" aria-label="リピート">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4M3 11v-1a4 4 0 014-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 01-4 4H3"/></svg>
+          </button>
+          <button class="t-btn" id="prev-btn" aria-label="前の曲">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2.2v12H6zm3.6 6l8.4 6V6z"/></svg>
+          </button>
+          <button class="t-btn" id="play-btn" aria-label="再生・一時停止">
+            <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="t-btn" id="next-btn" aria-label="次の曲">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.8 6H18v12h-2.2zM14.4 12L6 6v12z"/></svg>
+          </button>
+          <button class="t-btn dim" id="queue-btn" aria-label="曲一覧">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="play-foot"></div>
+    </section>
+
+  </div>
+
+  <div id="mini">
+    <div id="mini-eq"><i></i><i></i><i></i></div>
+    <div id="mini-thumb"></div>
+    <div id="mini-meta">
+      <div id="mini-title">—</div>
+      <div id="mini-artist">—</div>
+    </div>
+    <button class="m-btn" id="mini-prev" aria-label="前の曲">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2.2v12H6zm3.6 6l8.4 6V6z"/></svg>
+    </button>
+    <button id="mini-play" aria-label="再生・一時停止">
+      <svg id="mini-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="m-btn" id="mini-next" aria-label="次の曲">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.8 6H18v12h-2.2zM14.4 12L6 6v12z"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="sheet">
+    <h3 id="sheet-title">プレイリストに追加</h3>
+    <p class="sub" id="sheet-sub">—</p>
+    <div id="sheet-tags"></div>
+    <div id="new-tag-row">
+      <input id="new-tag-input" type="text" placeholder="新しいプレイリスト名" maxlength="16">
+      <button class="btn-primary" id="add-tag-btn">作成</button>
+    </div>
+    <button class="btn-ghost" id="close-sheet">閉じる</button>
+  </div>
+</div>
+
+<div id="yt-mount"></div>
+
+<script>
+/* =============================================================
+   ■ 曲データ
+   clipstock が書き出した静的JSONを読む。Notionへは直接行かない
+   （GitHub Pages から見えるのは data/ 配下だけのため）。
+   お気に入り・並び順・手で付けたプレイリストは端末側に残す。
+   ============================================================= */
+const DATA_URL = new URL('../../data/clipstock/idea-music-video.json', location.href);
+
+const store = {
+  read(k,f){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; }catch(e){ return f; } },
+  write(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+let tracks   = [];
+let allTags  = [];
+let activeTag = 'ALL';
+let currentId = null;
+let shuffle = false, repeat = false;
+let player, isReady = false, sheetTargetId = null;
+
+function save(){ store.write('mp5_tracks', tracks); store.write('mp5_tags', allTags); }
+
+const $ = id => document.getElementById(id);
+const thumbUrl = id => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+const artUrl   = id => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+const fmt = s => { s = (isFinite(s)&&s>0)?s:0; return Math.floor(s/60)+':'+Math.floor(s%60).toString().padStart(2,'0'); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tracksOf = tag => tag === 'ALL' ? tracks : tracks.filter(t => (t.tags||[]).includes(tag));
+const visibleTracks = () => tracksOf(activeTag);
+const trackById = id => tracks.find(t => t.videoId === id);
+const coverOf = tag => { const l = tracksOf(tag); return l.length ? artUrl(l[0].videoId) : ''; };
+
+/* ============ 曲データの取り込み ============ */
+
+/** YouTubeのURLから動画IDを取る。取れないものは曲として扱わない */
+function videoIdOf(url){
+  const m = String(url || '').match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+function toTrack(item){
+  const videoId = videoIdOf(item && item.url);
+  if(!videoId) return null;
+  return {
+    videoId,
+    title: (item.title || '').trim() || '(無題)',
+    // JSONにアーティスト欄が無いので、いちばん内容を表すタグで代用する
+    artist: (item.tags || [])[0] || item.category || 'YouTube',
+    tags: [...(item.tags || [])],
+    fav: false
+  };
+}
+
+async function fetchTracks(){
+  const url = new URL(DATA_URL);
+  url.searchParams.set('t', Date.now());   // Pagesのキャッシュで古いJSONを掴まないように
+  const res = await fetch(url, { cache:'no-store' });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const items = (json.items || []).map(toTrack).filter(Boolean);
+  // 同じ動画が複数のアイデアに出てくることがある
+  const seen = new Set();
+  return {
+    generatedAt: json.generatedAt || null,
+    items: items.filter(t => !seen.has(t.videoId) && seen.add(t.videoId))
+  };
+}
+
+/**
+ * JSONを正とし、端末に残した編集（お気に入り・追加したタグ・並び順）を被せる。
+ * 新しく増えた曲は先頭へ置く。JSONから消えた曲は落とす。
+ */
+function mergeTracks(remote, local){
+  const order = (local || []).map(t => t.videoId);
+  const byLocal = new Map((local || []).map(t => [t.videoId, t]));
+  const merged = remote.map(r=>{
+    const old = byLocal.get(r.videoId);
+    if(!old) return r;
+    return { ...r, fav: !!old.fav, tags: [...new Set([...(old.tags || []), ...r.tags])] };
+  });
+  const known = merged.filter(t => byLocal.has(t.videoId))
+    .sort((a, b) => order.indexOf(a.videoId) - order.indexOf(b.videoId));
+  return [...merged.filter(t => !byLocal.has(t.videoId)), ...known];
+}
+
+function setSync(text, warn){
+  $('sync').textContent = text;
+  $('sync').classList.toggle('warn', !!warn);
+}
+
+function fmtStamp(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+/* ============ 波形ライン ============ */
+const wavePath = $('wave-bg');
+function buildWavePath(id){
+  let h = 0;
+  for(let i=0;i<(id||'x').length;i++) h = (h*31 + id.charCodeAt(i)) >>> 0;
+  const rnd = () => { h = (h*1103515245 + 12345) >>> 0; return (h % 1000) / 1000; };
+  const pts = [];
+  const N = 7;
+  for(let i=0;i<=N;i++){
+    const x = (300/N) * i;
+    const y = 23 + (rnd()*2 - 1) * (i === 0 || i === N ? 4 : 14);
+    pts.push([x, y]);
+  }
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for(let i=1;i<pts.length;i++){
+    const [px,py] = pts[i-1], [cx,cy] = pts[i];
+    const mx = (px+cx)/2;
+    d += ` C ${mx} ${py}, ${mx} ${cy}, ${cx} ${cy}`;
+  }
+  $('wave-bg').setAttribute('d', d);
+  $('wave-fill').setAttribute('d', d);
+  const len = $('wave-bg').getTotalLength();
+  $('wave-fill').style.strokeDasharray = len;
+  $('wave-fill').style.strokeDashoffset = len;
+  paintWave(0);
+}
+function paintWave(pct){
+  const p = $('wave-bg');
+  if(!p.getAttribute('d')) return;
+  const len = p.getTotalLength();
+  $('wave-fill').style.strokeDashoffset = len * (1 - pct/100);
+  const pt = p.getPointAtLength(len * (pct/100));
+  $('wave-dot').setAttribute('cx', pt.x);
+  $('wave-dot').setAttribute('cy', pt.y);
+}
+$('wave-svg').addEventListener('click', e => {
+  if(!isReady) return;
+  const rect = $('wave-svg').getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left)/rect.width));
+  player.seekTo(pct * player.getDuration(), true);
+  paintWave(pct*100);
+});
+
+/* ============ RENDER ============ */
+function renderAlbums(){
+  const box = $('albums'); box.innerHTML = '';
+  const mk = (label, key) => {
+    const b = document.createElement('button');
+    b.className = 'album' + (activeTag === key ? ' active' : '');
+    const cover = coverOf(key);
+    b.innerHTML = `
+      <div class="cov" style="${cover ? `background-image:url('${cover}')` : ''}"></div>
+      <div class="nm">${esc(label)}</div>
+      <div class="ct">${tracksOf(key).length}曲</div>`;
+    b.onclick = () => selectTag(key);
+    box.appendChild(b);
+  };
+  mk('All Songs','ALL');
+  allTags.forEach(t => mk(t, t));
+  const add = document.createElement('button');
+  add.className = 'album add';
+  add.innerHTML = `
+    <div class="cov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="nm">新規作成</div>
+    <div class="ct">&nbsp;</div>`;
+  add.onclick = () => openSheet(null);
+  box.appendChild(add);
+}
+
+function selectTag(key){
+  activeTag = key;
+  $('list-title').textContent = key === 'ALL' ? 'Song List' : key;
+  renderAlbums(); renderList();
+}
+
+function renderList(){
+  const list = $('tracklist'), items = visibleTracks();
+  $('list-count').textContent = `${items.length}曲`;
+  list.innerHTML = '';
+  if(!items.length){
+    list.innerHTML = '<div id="empty">このプレイリストの曲はまだありません。<br>各曲の「…」から追加できます。</div>';
+    return;
+  }
+  items.forEach(t => {
+    const playing = t.videoId === currentId;
+    const row = document.createElement('div');
+    row.className = 'row' + (playing ? ' playing' : '');
+    row.dataset.id = t.videoId;
+    const tagHtml = (t.tags||[]).slice(0,2).map(x => `<span class="r-tag">${esc(x)}</span>`).join('');
+    row.innerHTML = `
+      <div class="handle" title="ドラッグで並び替え">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>
+      </div>
+      <div class="r-thumb" style="background-image:url('${thumbUrl(t.videoId)}')"></div>
+      <div class="r-meta">
+        <div class="r-title">${esc(t.title)}</div>
+        <div class="r-sub"><span>${esc(t.artist)}</span>${tagHtml}</div>
+      </div>
+      ${playing ? '<div class="eq"><i></i><i></i><i></i></div>' : ''}
+      <button class="r-btn act-fav ${t.fav?'on':''}" aria-label="お気に入り">
+        <svg viewBox="0 0 24 24" fill="${t.fav?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5 5 0 00-7.1 0L12 7.3l-1.7-1.7a5 5 0 10-7.1 7.1l8.8 8.8 8.8-8.8a5 5 0 000-7.1z"/></svg>
+      </button>
+      <button class="r-btn act-tag" aria-label="プレイリストに追加">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/></svg>
+      </button>`;
+    row.querySelector('.r-meta').onclick = () => { playTrack(t.videoId, true); setView('play'); };
+    row.querySelector('.act-fav').onclick = e => { e.stopPropagation(); t.fav = !t.fav; save(); renderList(); renderNow(); };
+    row.querySelector('.act-tag').onclick = e => { e.stopPropagation(); openSheet(t.videoId); };
+    attachDrag(row);
+    list.appendChild(row);
+  });
+}
+
+function renderNow(){
+  const t = trackById(currentId);
+  if(!t){
+    $('play-title').textContent = '—';
+    $('play-artist').textContent = '—';
+    $('play-tags').innerHTML = '';
+    $('hero-title').textContent = '—';
+    $('mini-title').textContent = '—';
+    $('mini-artist').textContent = '—';
+    return;
+  }
+  const items = visibleTracks().length ? visibleTracks() : tracks;
+  let i = items.findIndex(x => x.videoId === currentId); if(i < 0) i = 0;
+  const next = items[(i+1)%items.length];
+  $('card-center').style.backgroundImage = `url('${artUrl(t.videoId)}')`;
+  $('card-right').style.backgroundImage  = `url('${artUrl(next.videoId)}')`;
+  $('play-title').textContent = t.title;
+  $('play-artist').textContent = t.artist;
+  $('play-tags').innerHTML = (t.tags||[]).map(x => `<span class="mini-tag">${esc(x)}</span>`).join('');
+  $('fav-btn').classList.toggle('on', !!t.fav);
+  $('fav-btn').querySelector('svg').setAttribute('fill', t.fav ? 'currentColor' : 'none');
+  $('hero').style.backgroundImage = `url('${artUrl(t.videoId)}')`;
+  $('hero-title').textContent = t.title;
+  $('mini-thumb').style.backgroundImage = `url('${thumbUrl(t.videoId)}')`;
+  $('mini-title').textContent = t.title;
+  $('mini-artist').textContent = t.artist;
+  buildWavePath(t.videoId);
+}
+
+/* カードのスワイプ／タップで曲送り */
+$('card-right').onclick = () => goNext(false);
+(function(){
+  let sx = null; const c = $('stage');
+  c.addEventListener('pointerdown', e => { sx = e.clientX; });
+  c.addEventListener('pointerup', e => {
+    if(sx === null) return;
+    const dx = e.clientX - sx; sx = null;
+    if(dx < -45) goNext(false); else if(dx > 45) goPrev();
+  });
+})();
+$('hero').onclick = () => setView('play');
+$('mini-meta').onclick = () => setView('play');
+
+/* ============ 並び替え ============ */
+function attachDrag(row){
+  const handle = row.querySelector('.handle');
+  handle.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    handle.setPointerCapture(ev.pointerId);
+    const rows = [...$('tracklist').querySelectorAll('.row')];
+    const startY = ev.clientY, origRect = row.getBoundingClientRect();
+    row.classList.add('dragging');
+    let targetRow = null;
+    const move = e => {
+      const dy = e.clientY - startY;
+      row.style.transform = `translateY(${dy}px)`;
+      const cy = origRect.top + origRect.height/2 + dy;
+      targetRow = null;
+      rows.forEach(r => {
+        r.classList.remove('drop-target');
+        if(r === row) return;
+        const rect = r.getBoundingClientRect();
+        if(cy > rect.top && cy < rect.bottom){ r.classList.add('drop-target'); targetRow = r; }
+      });
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      row.classList.remove('dragging'); row.style.transform = '';
+      rows.forEach(r => r.classList.remove('drop-target'));
+      if(targetRow) reorder(row.dataset.id, targetRow.dataset.id);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  });
+}
+function reorder(fromId, toId){
+  const from = tracks.findIndex(t => t.videoId === fromId);
+  const to   = tracks.findIndex(t => t.videoId === toId);
+  if(from < 0 || to < 0 || from === to) return;
+  const [m] = tracks.splice(from, 1);
+  tracks.splice(to, 0, m);
+  save(); renderList(); renderAlbums(); renderNow();
+}
+
+/* ============ タグ編集 ============ */
+function openSheet(trackId){
+  sheetTargetId = trackId;
+  const t = trackId ? trackById(trackId) : null;
+  $('sheet-title').textContent = t ? 'プレイリストに追加' : 'プレイリストを管理';
+  $('sheet-sub').textContent = t ? `${t.title} / ${t.artist}` : '新しいプレイリストを作成できます';
+  $('new-tag-input').value = '';
+  renderSheetTags();
+  $('overlay').classList.add('open');
+}
+function renderSheetTags(){
+  const box = $('sheet-tags'); box.innerHTML = '';
+  const t = sheetTargetId ? trackById(sheetTargetId) : null;
+  if(!allTags.length){ box.innerHTML = '<span style="font-size:12px;color:var(--ink-2)">まだありません</span>'; return; }
+  allTags.forEach(tag => {
+    const on = t ? (t.tags||[]).includes(tag) : false;
+    const b = document.createElement('button');
+    b.className = 'sel-tag' + (on ? ' on' : '');
+    b.textContent = tag;
+    b.onclick = () => {
+      if(!t){ closeSheet(); selectTag(tag); setView('home'); return; }
+      t.tags = t.tags || [];
+      const i = t.tags.indexOf(tag);
+      if(i >= 0) t.tags.splice(i,1); else t.tags.push(tag);
+      save(); renderSheetTags(); renderList(); renderAlbums(); renderNow();
+    };
+    box.appendChild(b);
+  });
+}
+function closeSheet(){ $('overlay').classList.remove('open'); }
+$('add-tag-btn').onclick = () => {
+  const name = $('new-tag-input').value.trim(); if(!name) return;
+  if(!allTags.includes(name)) allTags.push(name);
+  const t = sheetTargetId ? trackById(sheetTargetId) : null;
+  if(t){ t.tags = t.tags || []; if(!t.tags.includes(name)) t.tags.push(name); }
+  $('new-tag-input').value = '';
+  save(); renderSheetTags(); renderAlbums(); renderList(); renderNow();
+};
+$('new-tag-input').addEventListener('keydown', e => { if(e.key === 'Enter') $('add-tag-btn').click(); });
+$('close-sheet').onclick = closeSheet;
+$('overlay').addEventListener('click', e => { if(e.target === $('overlay')) closeSheet(); });
+$('manage-btn').onclick = () => openSheet(null);
+$('see-all-pl').onclick = () => openSheet(null);
+
+/* ============ 再生 ============ */
+function playTrack(id, autoplay){
+  currentId = id; renderNow(); renderList();
+  if(isReady){ player.loadVideoById(id); if(autoplay) player.playVideo(); }
+}
+function pick(dir){
+  const items = visibleTracks(); if(!items.length) return null;
+  let i = items.findIndex(t => t.videoId === currentId); if(i < 0) i = 0;
+  if(shuffle && items.length > 1){
+    let n; do { n = Math.floor(Math.random()*items.length); } while(n === i);
+    return items[n].videoId;
+  }
+  return items[(i+dir+items.length)%items.length].videoId;
+}
+function goNext(auto){
+  if(auto && repeat && isReady){ player.seekTo(0, true); player.playVideo(); return; }
+  const id = pick(1); if(id) playTrack(id, true);
+}
+function goPrev(){ const id = pick(-1); if(id) playTrack(id, true); }
+function togglePlay(){
+  if(!isReady) return;
+  player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+}
+
+/** 前振りやスポンサー読みを飛ばす。末尾を踏み越さないよう手前で止める */
+function nudge(sec){
+  if(!isReady) return;
+  const d = player.getDuration() || 0;
+  const next = (player.getCurrentTime() || 0) + sec;
+  player.seekTo(Math.min(Math.max(0, next), d ? d - 0.5 : next), true);
+}
+$('back15').onclick = () => nudge(-15);
+$('fwd15').onclick  = () => nudge(15);
+$('play-btn').onclick = togglePlay;
+$('mini-play').onclick = togglePlay;
+$('next-btn').onclick = () => goNext(false);
+$('mini-next').onclick = () => goNext(false);
+$('prev-btn').onclick = goPrev;
+$('mini-prev').onclick = goPrev;
+$('repeat-btn').onclick = () => { repeat = !repeat; $('repeat-btn').classList.toggle('on', repeat); };
+$('queue-btn').onclick  = () => setView('home');
+$('fav-btn').onclick = () => { const t = trackById(currentId); if(!t) return; t.fav = !t.fav; save(); renderNow(); renderList(); };
+
+function setView(v){
+  document.body.classList.remove('v-home','v-play');
+  document.body.classList.add('v-' + v);
+}
+$('play-back').onclick = () => setView('home');
+
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT') return;
+  if(e.code === 'Space'){ e.preventDefault(); togglePlay(); }
+  else if(e.code === 'ArrowRight') e.shiftKey ? nudge(15)  : goNext(false);
+  else if(e.code === 'ArrowLeft')  e.shiftKey ? nudge(-15) : goPrev();
+});
+
+/* ============ YouTube ============ */
+function onYouTubeIframeAPIReady(){
+  player = new YT.Player('yt-mount', {
+    height:'1', width:'1', videoId: currentId || undefined,
+    playerVars:{ autoplay:0, controls:0, playsinline:1 },
+    events:{
+      onReady: () => { isReady = true; },
+      onStateChange: e => {
+        const playing = e.data === YT.PlayerState.PLAYING;
+        const icon = playing ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+        $('play-icon').innerHTML = icon;
+        $('mini-play-icon').innerHTML = icon;
+        $('disc').classList.toggle('spinning', playing);
+        $('mini-eq').classList.toggle('on', playing);
+        if(e.data === YT.PlayerState.ENDED) goNext(true);
+      }
+    }
+  });
+}
+window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+setInterval(() => {
+  if(!isReady) return;
+  const d = player.getDuration() || 0, c = player.getCurrentTime() || 0;
+  $('cur-time').textContent = fmt(c);
+  $('dur-time').textContent = fmt(d);
+  paintWave(d ? (c/d)*100 : 0);
+}, 350);
+
+async function boot(){
+  const local = store.read('mp5_tracks', null);
+  try{
+    const { items, generatedAt } = await fetchTracks();
+    if(!items.length) throw new Error('曲が入っていません');
+    tracks = mergeTracks(items, local);
+    allTags = [...new Set([...(store.read('mp5_tags', null) || []), ...items.flatMap(t => t.tags)])];
+    save();
+    setSync(`${tracks.length}曲（${fmtStamp(generatedAt) || '更新日不明'}時点）`);
+  }catch(err){
+    tracks = local || [];
+    allTags = store.read('mp5_tags', null) || [];
+    setSync(tracks.length
+      ? '一覧を更新できませんでした。前回のぶんを出しています'
+      : `曲を読み込めませんでした: ${err.message}`, true);
+  }
+
+  if(!trackById(currentId)) currentId = tracks.length ? tracks[0].videoId : null;
+  selectTag('ALL');
+  renderNow();
+
+  const tag = document.createElement('script');
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.body.appendChild(tag);
+}
+boot();
+</script>
+
+</body>
+</html>
