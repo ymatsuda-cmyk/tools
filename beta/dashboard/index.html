@@ -121,11 +121,17 @@
   .calc-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
   .calc-row{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:7px 9px;}
   .calc-row.on{border-color:var(--accent);}
-  .calc-line{display:flex;align-items:baseline;gap:6px;}
-  .calc-name{width:36%;min-width:0;background:none;border:none;outline:none;padding:0;
-    color:var(--text-muted);font-size:10px;}
-  .calc-name:focus{color:var(--text-secondary);}
-  .calc-expr{flex:1;min-width:0;background:none;border:none;outline:none;padding:0;text-align:right;
+  .calc-line{display:flex;align-items:stretch;gap:6px;}
+  .calc-name, .calc-expr{
+    min-width:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:7px;
+    outline:none;padding:5px 7px;transition:border-color .15s ease,box-shadow .15s ease;
+  }
+  .calc-name:focus, .calc-expr:focus{
+    border-color:var(--accent);box-shadow:0 0 0 2px rgba(95,168,160,0.18);
+  }
+  .calc-name::placeholder, .calc-expr::placeholder{color:var(--text-muted);opacity:.7;}
+  .calc-name{width:36%;color:var(--text-secondary);font-size:10px;}
+  .calc-expr{flex:1;text-align:right;
     color:var(--text);font-size:13px;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .calc-ruby{margin-top:6px;text-align:right;line-height:1.1;
     font-size:11px;color:var(--text-secondary);font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -1636,6 +1642,8 @@ function renderRuleCard(m){
 
 /** カードごとの入力中の行。変数ボタンの差し込み先になる */
 const calcActive = {};
+/** 名前欄に触れたときの値。"監視ID:行" で覚え、確定時に旧名として使う */
+const calcRenameFrom = {};
 let calcSaveTimer = null;
 
 /** lines ぶんの行を確保して返す。足りなければ空行を足す */
@@ -1784,6 +1792,45 @@ function calcScope(m){
   }
 
   return { names:[...byName.keys()], valueOf };
+}
+
+/* 正規化すると演算子・括弧・区切りになる文字。名前の切れ目になる */
+const CALC_DELIM_RE = /[\s+\-*/%()×✕÷−－–—（）,，]/;
+
+/**
+ * 式の中で名前として現れている部分だけを置き換える。
+ * 単純な文字列置換だと「単価」が「単価合計」の一部まで巻き込むため、
+ * 区切り文字でいったん切ってから、まるごと一致したものだけを差し替える。
+ */
+function renameInExpr(exprText, from, to){
+  const src = String(exprText == null ? '' : exprText);
+  let out = '';
+  let buf = '';
+  const flush = ()=>{
+    if(!buf) return;
+    out += calcNormalize(buf).trim() === from ? to : buf;
+    buf = '';
+  };
+  for(const ch of src){
+    if(CALC_DELIM_RE.test(ch)){ flush(); out += ch; }
+    else buf += ch;
+  }
+  flush();
+  return out;
+}
+
+/** 名前を変えたときに、その名前を使っている式を追従させる */
+function renameCalcVar(m, fromRaw, toRaw){
+  const from = calcNormalize(fromRaw).trim();
+  const to = String(toRaw == null ? '' : toRaw).trim();
+  if(!from || !to || from === calcNormalize(to).trim()) return 0;
+
+  let changed = 0;
+  (m.rows || []).forEach(r=>{
+    const next = renameInExpr(r.expr, from, to);
+    if(next !== r.expr){ r.expr = next; changed++; }
+  });
+  return changed;
 }
 
 function fmtCalc(v){
@@ -2074,6 +2121,12 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
   grid.querySelectorAll('.calc-name').forEach(input=>{
     const card = input.closest('[data-monitor]');
     const i = Number(input.dataset.calcLabel);
+    const key = card.dataset.monitor + ':' + i;
+
+    // 定期更新で描き直されても編集前の名前を見失わないよう、カードの外に覚えておく
+    input.addEventListener('focus', ()=>{
+      if(!(key in calcRenameFrom)) calcRenameFrom[key] = input.value;
+    });
     input.addEventListener('input', ()=>{
       const m = allMonitors().find(x => x.id === card.dataset.monitor);
       if(!m || !m.rows || !m.rows[i]) return;
@@ -2081,6 +2134,21 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
       paintCalcCard(card);
       scheduleCalcSave();
     });
+    input.addEventListener('change', ()=>{
+      const m = allMonitors().find(x => x.id === card.dataset.monitor);
+      if(!m) return;
+      const changed = renameCalcVar(m, calcRenameFrom[key], input.value);
+      delete calcRenameFrom[key];
+      if(!changed) return;
+      card.querySelectorAll('.calc-expr').forEach(el=>{
+        const j = Number(el.dataset.calcRow);
+        if(m.rows[j]) el.value = m.rows[j].expr;
+      });
+      paintCalcCard(card);
+      scheduleCalcSave();
+      toast(`${changed}件の式の「${input.value.trim()}」を直しました`);
+    });
+    input.addEventListener('blur', ()=>{ delete calcRenameFrom[key]; });
   });
 
   grid.querySelectorAll('.mon-card').forEach(wireCalcVars);
