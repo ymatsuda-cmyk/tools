@@ -23,6 +23,51 @@ def run(cmd):
     return result
 
 
+def run_quiet(cmd):
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True
+    )
+
+
+def git(repo_root, *args):
+    return [
+        "git",
+        "-C",
+        str(repo_root),
+        *args
+    ]
+
+
+def unmerged_files(repo_root):
+    result = run_quiet(
+        git(repo_root, "diff", "--name-only", "--diff-filter=U")
+    )
+
+    return [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip()
+    ]
+
+
+def abort_unfinished(repo_root):
+    """前回の実行が残したrebase/mergeを畳む。残っているとpullが弾かれる。"""
+
+    git_dir = Path(
+        run(git(repo_root, "rev-parse", "--absolute-git-dir")).stdout.strip()
+    )
+
+    if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
+        print("前回のrebaseが途中のままだったため中断します")
+        run_quiet(git(repo_root, "rebase", "--abort"))
+
+    elif (git_dir / "MERGE_HEAD").exists():
+        print("前回のmergeが途中のままだったため中断します")
+        run_quiet(git(repo_root, "merge", "--abort"))
+
+
 def sync_config(config_path):
 
     config = json.loads(
@@ -43,6 +88,8 @@ def sync_config(config_path):
     )
 
     print(f"同期開始 : {config['id']}")
+
+    abort_unfinished(repo_root)
 
     target_folder.mkdir(
         parents=True,
@@ -85,6 +132,19 @@ def sync_config(config_path):
     ])
 
     #
+    # 同期対象外の衝突
+    #
+    # 同期フォルダの衝突は上のコピーとaddで解消済み。それ以外は手で直すしかない
+    #
+    conflicts = unmerged_files(repo_root)
+
+    if conflicts:
+        raise RuntimeError(
+            "未解決の衝突が残っているため中止します:\n  "
+            + "\n  ".join(conflicts)
+        )
+
+    #
     # 差分確認
     #
     diff = subprocess.run([
@@ -118,6 +178,9 @@ def sync_config(config_path):
         ])
 
     except Exception as e:
+
+        # 途中のまま残すと次回の実行もpullで弾かれる
+        abort_unfinished(repo_root)
 
         print(f"rebase失敗: {e}")
         raise
