@@ -50,6 +50,17 @@ import requests
 JST = timezone(timedelta(hours=9))
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+
+def find_repo_root():
+    """リポジトリの位置を探す。~/scripts などにコピーして使うことがあるため。"""
+    for d in (SCRIPT_DIR, *SCRIPT_DIR.parents):
+        if (d / ".git").exists() or (d / "data" / "clipstock").is_dir():
+            return d
+    return None
+
+
+REPO_ROOT = find_repo_root()
+
 # ---------------------------------------------------------------- 環境変数
 
 ENV_FILE = Path(os.environ.get("VIDEO_ENV_FILE", str(Path.home() / ".video_notion_sync.env")))
@@ -83,7 +94,11 @@ WHISPER_LANGUAGE_DEFAULT = "ja"
 DESCRIPTION_CATEGORIES = {"music"}
 
 CLIPSTOCK_BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
-CLIPSTOCK_OUT_DIR = SCRIPT_DIR.parents[2] / "data" / "clipstock"
+CLIPSTOCK_OUT_DIR = (
+    Path(os.environ["CLIPSTOCK_OUT_DIR"]).expanduser()
+    if os.environ.get("CLIPSTOCK_OUT_DIR")
+    else (REPO_ROOT / "data" / "clipstock" if REPO_ROOT else None)
+)
 
 # Whisperはマシンの負荷が高いので、同時に2つ以上走らせないためのPIDロック
 WHISPER_LOCK_FILE = Path(os.environ.get(
@@ -756,6 +771,10 @@ def rebuild_clipstock_index():
     """一覧用の index-*.json / idea-*.json を build_clipstock_json.py で作り直す。"""
     if not CLIPSTOCK_BUILDER.exists():
         print(f"⚠️ {CLIPSTOCK_BUILDER.name} が見つからないため一覧JSONは更新しません")
+        return
+    if CLIPSTOCK_OUT_DIR is None:
+        print("⚠️ 一覧JSONの出力先を決められないため更新しません"
+              "（CLIPSTOCK_OUT_DIR で data/clipstock を指定してください）")
         return
     print(f"\n一覧JSONを更新中: {CLIPSTOCK_OUT_DIR}")
     try:

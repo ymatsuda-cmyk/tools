@@ -40,7 +40,17 @@ import requests
 
 JST = timezone(timedelta(hours=9))
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[2]
+
+
+def find_repo_root():
+    """リポジトリの位置を探す。~/scripts などにコピーして使うことがあるため。"""
+    for d in (SCRIPT_DIR, *SCRIPT_DIR.parents):
+        if (d / ".git").exists() or (d / "data" / "clipstock").is_dir():
+            return d
+    return None
+
+
+REPO_ROOT = find_repo_root()
 
 ENV_FILE = Path(os.environ.get("VIDEO_ENV_FILE", str(Path.home() / ".video_notion_sync.env")))
 
@@ -427,11 +437,17 @@ def main():
     parser = argparse.ArgumentParser(description="動画ナレッジの一覧JSONを書き出す")
     parser.add_argument(
         "--out",
-        default=os.environ.get("CLIPSTOCK_OUT_DIR", str(REPO_ROOT / "data" / "clipstock")),
+        default=os.environ.get("CLIPSTOCK_OUT_DIR")
+        or (str(REPO_ROOT / "data" / "clipstock") if REPO_ROOT else None),
         help="出力先ディレクトリ",
     )
     parser.add_argument("--dry-run", action="store_true", help="件数だけ表示して書き出さない")
     args = parser.parse_args()
+
+    if not args.out:
+        print("出力先を決められません。CLIPSTOCK_OUT_DIR または --out で data/clipstock を指定してください",
+              file=sys.stderr)
+        return 1
 
     if not NOTION_TOKEN:
         print("NOTION_TOKEN が未設定です", file=sys.stderr)

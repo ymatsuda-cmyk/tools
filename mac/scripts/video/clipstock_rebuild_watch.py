@@ -39,7 +39,17 @@ import requests
 
 JST = timezone(timedelta(hours=9))
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[2]
+
+
+def find_repo_root():
+    """リポジトリの位置を探す。~/scripts などにコピーして使うことがあるため。"""
+    for d in (SCRIPT_DIR, *SCRIPT_DIR.parents):
+        if (d / ".git").exists() or (d / "data" / "clipstock").is_dir():
+            return d
+    return None
+
+
+REPO_ROOT = find_repo_root()
 BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
 SYNC_SCRIPT = Path(os.environ.get("GITHUB_SYNC_SCRIPT", str(SCRIPT_DIR.parent / "github" / "github_sync.py")))
 SYNC_CONFIG = Path(os.environ.get("CLIPSTOCK_SYNC_CONFIG", str(SCRIPT_DIR.parent / "github" / "config" / "clipstock.json")))
@@ -60,7 +70,11 @@ load_env()
 
 GAS_URL = os.environ.get("CLIPSTOCK_GAS_URL", "").strip()
 ACCESS_TOKEN = os.environ.get("CLIPSTOCK_ACCESS_TOKEN", "").strip()
-OUT_DIR = Path(os.environ.get("CLIPSTOCK_OUT_DIR", str(REPO_ROOT / "data" / "clipstock"))).expanduser()
+OUT_DIR = (
+    Path(os.environ["CLIPSTOCK_OUT_DIR"]).expanduser()
+    if os.environ.get("CLIPSTOCK_OUT_DIR")
+    else (REPO_ROOT / "data" / "clipstock" if REPO_ROOT else None)
+)
 LOCK_FILE = Path(os.environ.get("CLIPSTOCK_REBUILD_WATCH_LOCK_FILE", str(Path.home() / ".clipstock_rebuild_watch.lock")))
 
 
@@ -133,6 +147,9 @@ def take_request():
 def rebuild():
     if not BUILDER.exists():
         log(f"❌ {BUILDER.name} が見つかりません")
+        return False
+    if OUT_DIR is None:
+        log("❌ 出力先を決められません。CLIPSTOCK_OUT_DIR で data/clipstock を指定してください")
         return False
     result = subprocess.run(
         [sys.executable, str(BUILDER), "--out", str(OUT_DIR)],
