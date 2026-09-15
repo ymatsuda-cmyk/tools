@@ -154,7 +154,7 @@ export function saveCategory(pageId, category) {
   return callGas('saveCategory', { pageId, category })
 }
 
-/** 状態変更。'新規' に戻すと次回バッチで文字起こしをやり直す。'除外' は論理削除 */
+/** 状態変更。'再取得' に戻すと次回バッチで文字起こしをやり直す。'除外' は論理削除 */
 export function setStatus(pageId, status) {
   return callGas('setStatus', { pageId, status })
 }

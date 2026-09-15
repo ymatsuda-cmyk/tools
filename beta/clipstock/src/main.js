@@ -60,7 +60,7 @@ import {
   statusCounts,
   STATUS_ORDER,
   STATUS_DONE,
-  STATUS_NEW,
+  STATUS_RETRY,
   STATUS_SUMMARIZED,
   STATUS_EXCLUDED,
 } from './lib/filters.js'
@@ -1253,10 +1253,10 @@ function openMoreMenu(anchor, item) {
         })
       }
       if (act === 'retry') {
-        if (!confirm('状態を「新規」に戻します。次回のバッチで文字起こしをやり直します。')) return
+        if (!confirm('状態を「再取得」に戻します。次回のバッチで文字起こしをやり直します。')) return
         try {
-          await setStatus(item.key, STATUS_NEW)
-          item.status = STATUS_NEW
+          await setStatus(item.key, STATUS_RETRY)
+          item.status = STATUS_RETRY
           paintDetail()
         } catch (err) {
           alert('変更できませんでした: ' + (err.message || err))

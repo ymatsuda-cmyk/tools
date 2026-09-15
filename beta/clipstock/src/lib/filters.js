@@ -1,6 +1,7 @@
 import { plainTextOf } from './markers.js'
 
 export const STATUS_NEW = '新規'
+export const STATUS_RETRY = '再取得'
 export const STATUS_RUNNING = '処理中'
 export const STATUS_DONE = '完了'
 export const STATUS_SUMMARIZED = '要約済み'

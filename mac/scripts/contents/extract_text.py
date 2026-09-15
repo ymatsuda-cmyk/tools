@@ -111,8 +111,11 @@ def read_pptx(path):
 
 
 def read_pdf_text(path):
-    """テキスト層だけを読む。スキャンPDFでは空に近い文字列が返る。"""
-    from pypdf import PdfReader
+    """テキスト層だけを読む。pypdf が無いときは空で返し、OCR側で補完する。"""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return "", 0, "pypdf"
 
     reader = PdfReader(str(path))
     pages = []
@@ -121,7 +124,7 @@ def read_pdf_text(path):
             pages.append(page.extract_text() or "")
         except Exception:  # noqa: BLE001  1ページ壊れていても残りは読む
             pages.append("")
-    return "\n".join(pages), len(reader.pages)
+    return "\n".join(pages), len(reader.pages), None
 
 
 # ---------------------------------------------------------------- OCR
@@ -234,14 +237,16 @@ def extract(path, log=print):
         if suffix == ".pptx":
             return squeeze(read_pptx(path)), "PowerPoint"
         if suffix == ".pdf":
-            text, pages = read_pdf_text(path)
+            text, pages, missing_lib = read_pdf_text(path)
             text = squeeze(text)
             if pages and len(text) >= pages * OCR_MIN_CHARS_PER_PAGE:
                 return text, "PDF"
             log("    テキスト層がほぼ空 → OCRにフォールバック")
             ocr = squeeze(ocr_pdf(path, log))
-            if len(ocr) > len(text):
+            if ocr and (len(ocr) > len(text) or missing_lib == "pypdf"):
                 return ocr, "PDF(OCR)"
+            if missing_lib == "pypdf" and not ocr:
+                return None, "ライブラリが未導入です (pypdf)"
             return text, "PDF"
     except ImportError as e:
         return None, f"ライブラリが未導入です ({e.name})"

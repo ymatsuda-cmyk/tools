@@ -27,6 +27,8 @@
     python3 build_clipstock_json.py --out ~/Claude/app/clipstock/data
 """
 import argparse
+import fcntl
+from functools import wraps
 import json
 import os
 import sys
@@ -82,9 +84,32 @@ PROP_CREATED = "作成日時"
 PROP_CATEGORY = "分類"  # 空ならまとめて1つ、入っていれば分類ごとにファイルを分ける
 
 STATUS_NEW = "新規"
+LOCK_FILE = Path(os.environ.get("CLIPSTOCK_BUILD_LOCK_FILE", str(Path.home() / ".clipstock_build_clipstock_json.lock")))
 
 # spaces.json で取り込み元とスペースのIDに使えない名前(基本の3つとぶつかる)
 RESERVED_IDS = {"all", "video", "web"}
+
+
+def single_instance(lock_file):
+    def decorate(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            handle = open(lock_file, "w")
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                handle.close()
+                print(f"別の一覧生成処理が実行中のため終了します: {lock_file}")
+                return 0
+            try:
+                handle.write(str(os.getpid()))
+                handle.flush()
+                return function(*args, **kwargs)
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                handle.close()
+        return wrapped
+    return decorate
 
 # ---------------------------------------------------------------- Notion
 
@@ -390,6 +415,7 @@ def update_spaces(out_dir, categories):
     return path
 
 
+@single_instance(LOCK_FILE)
 def main():
     parser = argparse.ArgumentParser(description="動画ナレッジの一覧JSONを書き出す")
     parser.add_argument(

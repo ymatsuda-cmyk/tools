@@ -25,6 +25,8 @@ clipstock の画面(GitHub Pages)から Mac は直接叩けないため、GAS �
     python3 clipstock_rebuild_watch.py --interval 60     # 常駐して60秒ごとに確認
 """
 import argparse
+import fcntl
+from functools import wraps
 import json
 import os
 import subprocess
@@ -59,6 +61,29 @@ load_env()
 GAS_URL = os.environ.get("CLIPSTOCK_GAS_URL", "").strip()
 ACCESS_TOKEN = os.environ.get("CLIPSTOCK_ACCESS_TOKEN", "").strip()
 OUT_DIR = Path(os.environ.get("CLIPSTOCK_OUT_DIR", str(REPO_ROOT / "data" / "clipstock"))).expanduser()
+LOCK_FILE = Path(os.environ.get("CLIPSTOCK_REBUILD_WATCH_LOCK_FILE", str(Path.home() / ".clipstock_rebuild_watch.lock")))
+
+
+def single_instance(lock_file):
+    def decorate(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            handle = open(lock_file, "w")
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                handle.close()
+                log(f"別の一覧再生成ウォッチャーが実行中のため終了します: {lock_file}")
+                return 0
+            try:
+                handle.write(str(os.getpid()))
+                handle.flush()
+                return function(*args, **kwargs)
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                handle.close()
+        return wrapped
+    return decorate
 
 
 def log(msg):
@@ -154,6 +179,7 @@ def run_once(do_push):
         push()
 
 
+@single_instance(LOCK_FILE)
 def main():
     ap = argparse.ArgumentParser(description="clipstockの一覧JSON作り直し依頼を拾う")
     ap.add_argument("--once", action="store_true", help="1回だけ確認して終わる(cron向け)")
