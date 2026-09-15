@@ -289,19 +289,26 @@ def to_item(page, source):
 
 
 def to_idea(page, source):
-    """gas/Code.gs の listIdeas_ と同じ形。応用も活用も無いページは None を返す。"""
+    """gas/Code.gs の listIdeas_ と同じ形。応用も活用も無いページは None を返す。
+
+    musicスペースだけは例外で、原文があればAI生成前でも残す。
+    プレイヤーは idea-music-video.json を曲リストとして読むため。
+    """
     p = page.get("properties", {})
     apply_text = rich_of(p, PROP_APPLY)
     ideas_text = rich_of(p, PROP_IDEAS)
+    category = category_of(p)
     if not apply_text and not ideas_text:
-        return None
+        is_music = SPACE_MODES.get(category) == "music"
+        if not (is_music and number_of(p, PROP_RAW_COUNT) > 0):
+            return None
     status = select_of(p, PROP_STATUS)
     if source == "web" and not status:
         return None
     return {
         "key": page["id"],
         "source": source,
-        "category": category_of(p),
+        "category": category,
         "title": title_any_of(p),
         "url": url_of(p, PROP_URL),
         "thumb": url_of(p, PROP_THUMB),
