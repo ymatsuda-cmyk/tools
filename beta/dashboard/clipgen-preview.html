@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>clipstock まとめて生成 カードの見本</title>
+<style>
+  /* 見た目は index.html の監視カードと同じ。値だけを手で動かせるようにした見本 */
+  :root{
+    --bg:#14171C;
+    --surface:#1C2028;
+    --surface-2:#242833;
+    --border:#2E323C;
+    --border-strong:#3B4049;
+    --text:#EDEBE6;
+    --text-secondary:#9A968D;
+    --text-muted:#66625A;
+    --accent:#5FA8A0;
+    --accent-soft:rgba(95,168,160,0.16);
+    --danger:#D9694F;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 80px;}
+  header h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:0.2px;}
+  header p{margin:0 0 18px;font-size:12px;color:var(--text-muted);}
+  h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--text-secondary);}
+
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 260px minmax(0,360px);gap:16px;align-items:start;}
+  @media (max-width:980px){ .cols{grid-template-columns:minmax(0,1fr);} }
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .panel + .panel{margin-top:16px;}
+  .fields{display:flex;flex-direction:column;gap:12px;}
+  .fields label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);}
+  .fields input,.fields select{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);font-size:12px;padding:6px 8px;outline:none;width:100%;
+  }
+  .fields input:focus,.fields select:focus{border-color:var(--border-strong);}
+  .fields input[type="range"]{padding:0;}
+  .check{flex-direction:row !important;align-items:center;gap:7px !important;
+    font-size:12px !important;color:var(--text-secondary) !important;cursor:pointer;}
+  .check input{width:auto;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .sep{border-top:1px solid var(--border);margin:2px 0 0;padding-top:12px;}
+
+  .mon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;max-width:240px;}
+  .mon-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+  .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mon-state{font-size:10px;color:var(--text-muted);}
+  .mon-ring{text-align:center;margin-bottom:12px;}
+  .mon-ring svg{width:96px;height:96px;display:block;margin:0 auto;}
+  .mon-ring .sub{font-size:11px;color:var(--text-secondary);margin-top:5px;}
+  .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
+  .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
+  .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
+  .mon-actions{display:flex;gap:6px;border-top:1px solid var(--border);padding-top:12px;}
+  .mon-actions button{
+    flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:7px 8px;cursor:pointer;transition:all .15s ease;
+  }
+  .mon-actions button:hover:not(:disabled){border-color:var(--border-strong);color:var(--text);}
+  .mon-actions button:disabled{opacity:0.35;cursor:not-allowed;}
+  .mon-actions button.use{color:var(--accent);border-color:var(--accent-soft);}
+
+  .gen-picks{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .gen-picks select{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:6px 8px;outline:none;cursor:pointer;
+  }
+  .gen-picks select:focus{border-color:var(--border-strong);}
+  .gen-picks select:disabled{opacity:0.4;cursor:not-allowed;}
+  .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* 並べ替え用の持ち手。実物のカードには出ない */
+  .part{position:relative;border:1px dashed transparent;border-radius:10px;}
+  .edit .part{cursor:grab;padding:8px 6px 2px;margin:0 -6px 4px;}
+  .edit .part:hover{border-color:var(--border-strong);}
+  .edit .part::after{
+    content:attr(data-name);position:absolute;top:0;right:5px;
+    font-size:9px;color:var(--text-muted);pointer-events:none;
+  }
+  .part.dragging{opacity:0.35;}
+  .part.over{border-color:var(--accent);background:var(--accent-soft);}
+  .part.ghost{opacity:0.45;border-color:var(--border);}
+  .ghost-body{font-size:10px;color:var(--text-muted);text-align:center;padding:10px 0;}
+
+  .json{background:var(--bg);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;
+    color:var(--text-secondary);white-space:pre-wrap;word-break:break-all;margin:0;
+    max-height:58vh;overflow:auto;}
+  .btn{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:7px 12px;cursor:pointer;}
+  .btn:hover{border-color:var(--border-strong);color:var(--text);}
+  .btn.use{color:var(--accent);border-color:var(--accent-soft);}
+  .bar{display:flex;gap:10px;align-items:center;margin-top:10px;}
+  .bar .status{font-size:11px;color:var(--text-muted);}
+  .caption{font-size:11px;color:var(--text-muted);margin:0 0 12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>clipstock まとめて生成 — カードの見本</h1>
+    <p>ダッシュボードの <span class="mono">type: "clipgen"</span> カードを、通信せずに見た目だけ再現した見本です。
+       カードの中身はドラッグで並べ替えられ、設定JSONはその場で書き換わります。</p>
+  </header>
+
+  <div class="cols">
+    <div>
+      <div class="panel">
+        <h2>カード</h2>
+        <p class="caption">中の要素をドラッグすると並びが変わります。非表示の要素は薄い枠で置いてあり、これもドラッグできます。</p>
+        <div id="live"></div>
+        <div class="bar">
+          <label class="check" style="font-size:11px;color:var(--text-muted);">
+            <input type="checkbox" id="edit" checked> 並べ替えの持ち手を出す
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>条件</h2>
+        <div class="fields">
+          <label>ID<input type="text" id="id" value="clipgen"></label>
+          <label>表示名<input type="text" id="name" value="clipstock 生成"></label>
+          <label>グループ<input type="text" id="group" value="AI"></label>
+          <div class="row2">
+            <label>総数(total)<input type="number" id="total" value="30" min="0" max="999"></label>
+            <label>実行できる最小件数<input type="number" id="threshold" value="1" min="1" max="999"></label>
+          </div>
+          <label>既定の分類(space)
+            <select id="space"></select>
+          </label>
+          <label>既定のAI(model)
+            <select id="model"></select>
+          </label>
+          <div class="sep"></div>
+          <label class="check"><input type="checkbox" id="showSpace"> 分類のコンボボックスを出す</label>
+          <label class="check"><input type="checkbox" id="showModel" checked> AIのコンボボックスを出す</label>
+          <label class="check"><input type="checkbox" id="showRun" checked> 「まとめて生成」ボタンを出す</label>
+          <label class="check"><input type="checkbox" id="includePartial" checked> 項目が欠けているものも対象にする</label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>数える状態</h2>
+        <p class="caption">リングに出す件数の条件です。複数選べます。</p>
+        <div class="fields">
+          <label>条件
+            <select id="statusMatch">
+              <option value="in" selected>選んだ状態に一致する</option>
+              <option value="notIn">選んだ状態に一致しない</option>
+            </select>
+          </label>
+          <div id="status-picks" class="fields"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>プレビュー用のダミー件数</h2>
+        <p class="caption">JSONには出ません。実物では Notion から取った件数が入ります。</p>
+        <div class="fields">
+          <label>カードの状態
+            <select id="phase">
+              <option value="loading">読み込み中</option>
+              <option value="idle">待機中</option>
+              <option value="running">生成中</option>
+              <option value="done" selected>完了</option>
+              <option value="error">エラー</option>
+            </select>
+          </label>
+          <div id="status-counts" class="fields"></div>
+          <label>「要約済み」で項目が欠けている件数
+            <input type="number" id="partial" value="0" min="0" max="999">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>設定JSON</h2>
+        <p class="caption">ダッシュボードの 設定 → 監視 に貼り付けて使います。既定と同じ値は書き出しません。</p>
+        <pre class="json" id="config"></pre>
+        <div class="bar">
+          <button class="btn use" id="copy">コピー</button>
+          <span class="status" id="status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   以下の描画関数は index.html の clipgen カードと同じもの。
+   違うのは、api/updateclip を呼ばずに作り物の状態を渡している点だけ。
+   ============================================================ */
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function ringSVG(pct, color, center){
+  const p = Math.max(0, Math.min(100, pct));
+  const circ = 251;
+  const offset = Math.round(circ * (1 - p / 100));
+  return `
+    <svg viewBox="0 0 100 100" role="img" aria-label="${center} (${Math.round(p)}%)">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface-2)" stroke-width="9"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="9"
+        stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"
+        transform="rotate(-90 50 50)"/>
+      <text x="50" y="55" text-anchor="middle" font-size="19" font-weight="600"
+        fill="var(--text)">${center}</text>
+    </svg>`;
+}
+
+function metricColor(pct){
+  if(pct >= 90) return '#D9694F';
+  if(pct >= 70) return '#E0B252';
+  return '#5FA8A0';
+}
+
+const CLIPGEN_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  idle   : { color:'#5FA8A0', label:'待機中'   },
+  running: { color:'#E0B252', label:'生成中'   },
+  done   : { color:'#5FA8A0', label:'完了'     },
+  error  : { color:'#D9694F', label:'エラー'   }
+};
+
+const CLIPGEN_PARTS = ['picks', 'ring', 'note', 'actions'];
+const PART_NAMES = { picks:'コンボボックス', ring:'リング', note:'件数メモ', actions:'ボタン' };
+
+const CLIPGEN_DEFAULT_STATUSES = ['完了'];
+
+function clipgenStatuses(m){
+  const list = (Array.isArray(m.statuses) ? m.statuses : [])
+    .map(s => String(s).trim()).filter(Boolean);
+  return list.length ? list : CLIPGEN_DEFAULT_STATUSES;
+}
+
+function clipgenMatched(m, counts){
+  const wanted = clipgenStatuses(m);
+  const notIn = m.statusMatch === 'notIn';
+  return Object.entries(counts || {})
+    .reduce((sum, [status, n]) => sum + (wanted.includes(status) !== notIn ? n : 0), 0);
+}
+
+function clipgenRingLabel(m){
+  const list = clipgenStatuses(m);
+  const head = list.length > 2 ? `${list.slice(0, 2).join('・')}ほか${list.length - 2}` : list.join('・');
+  return m.statusMatch === 'notIn' ? `${head} 以外` : head;
+}
+
+function clipgenReady(m, st){
+  if(!st.count) return 0;
+  return st.count.fresh + (m.includePartial === false ? 0 : st.count.partial);
+}
+
+function clipgenCountText(m, st){
+  if(st.error && !st.count) return st.error;
+  if(!st.count) return '対象を確認中…';
+  const parts = [];
+  if(st.count.fresh) parts.push(`未生成 ${st.count.fresh}件`);
+  if(st.count.partial && m.includePartial !== false) parts.push(`欠け ${st.count.partial}件`);
+  if(!parts.length) return '生成する対象はありません';
+  return parts.join(' / ');
+}
+
+function clipgenTotal(m, st){
+  const fixed = Number(m.total);
+  if(fixed > 0) return fixed;
+  return st.count ? st.count.total : 0;
+}
+
+function clipgenIdleRing(m, st){
+  if(!st.count) return '';
+  const hit = clipgenMatched(m, st.count.counts);
+  const total = clipgenTotal(m, st);
+  const pct = total ? (hit / total) * 100 : 0;
+  return `
+    <div class="mon-ring">
+      ${ringSVG(pct, metricColor(pct), `${hit}`)}
+      <div class="sub">${esc(clipgenRingLabel(m))}(${m.total ? '設定した総数' : '一覧の全件'} ${total}件)</div>
+    </div>`;
+}
+
+function clipgenPicks(m, st){
+  const disabled = st.phase === 'loading' ? 'disabled' : '';
+  const rows = [];
+  if(m.showSpace !== false){
+    rows.push(`<select ${disabled} aria-label="パターン">
+        ${st.spaces.map(s => `<option ${s.id === st.spaceId ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+      </select>`);
+  }
+  if(m.showModel !== false){
+    rows.push(`<select ${disabled} aria-label="使うAI">
+        ${st.models.map(x => `<option ${x.key === st.modelKey ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+      </select>`);
+  }
+  return rows.length ? `<div class="gen-picks">${rows.join('')}</div>` : '';
+}
+
+function clipgenLayout(m){
+  const wanted = Array.isArray(m.layout) ? m.layout.filter(p => CLIPGEN_PARTS.includes(p)) : [];
+  const order = [...new Set(wanted)];
+  return order.length ? order : CLIPGEN_PARTS;
+}
+
+/** 並べ替えの持ち手を付けられるよう、実物の中身を部品ごとに分けて返す */
+function clipgenParts(m, st){
+  if(st.phase === 'running'){
+    const pct = st.total ? (st.index / st.total) * 100 : 0;
+    return {
+      picks: '',
+      ring: `
+        <div class="mon-ring">
+          ${ringSVG(pct, '#E0B252', `${st.index}`)}
+          <div class="sub">${esc(st.stage || '準備中')}</div>
+          <div class="gen-now">${esc(st.title || '')}</div>
+        </div>`,
+      note: '',
+      actions: '<div class="mon-actions"><button>中止</button></div>'
+    };
+  }
+
+  let note;
+  if(st.phase === 'loading'){
+    note = '<div class="mon-offline">読み込み中…</div>';
+  }else if(st.phase === 'error'){
+    note = `<div class="mon-err">${esc(st.error)}</div>`;
+  }else if(st.phase === 'done' && st.result){
+    const r = st.result;
+    const tail = r.cancelled ? '（中止）' : r.stopped === 'quota' ? '（利用上限で打ち切り）' : '';
+    note = `<div class="mon-note">${r.done}件生成${r.failed ? ` / ${r.failed}件失敗` : ''}${tail}</div>
+      ${r.failures.length ? `<div class="mon-err">${esc(r.failures[0])}</div>` : ''}
+      <div class="mon-note">${esc(clipgenCountText(m, st))}</div>`;
+  }else{
+    note = `<div class="mon-note">${esc(clipgenCountText(m, st))}</div>`;
+  }
+
+  const threshold = Math.max(1, Number(m.threshold) || 1);
+  const runnable = st.phase !== 'loading' && st.spaceId && st.modelKey
+    && clipgenReady(m, st) >= threshold;
+
+  return {
+    picks: clipgenPicks(m, st),
+    ring: clipgenIdleRing(m, st),
+    note,
+    // 中止は隠さない。隠すと動き出したものを止められなくなる
+    actions: m.showRun === false ? '' : `
+      <div class="mon-actions">
+        <button class="use" ${runnable ? '' : 'disabled'}>まとめて生成</button>
+      </div>`
+  };
+}
+
+function renderClipgenCard(m, st, editing){
+  const meta = CLIPGEN_STATE_META[st.phase] || CLIPGEN_STATE_META.idle;
+  const parts = clipgenParts(m, st);
+  const body = clipgenLayout(m).map(p => {
+    const html = parts[p];
+    // 出ない部品も並べ替えられるよう薄く置く。実物のカードには出ない
+    if(!html && !editing) return '';
+    return `<div class="part${html ? '' : ' ghost'}" draggable="true"
+      data-part="${p}" data-name="${esc(PART_NAMES[p])}">
+      ${html || `<div class="ghost-body">${esc(PART_NAMES[p])}(非表示)</div>`}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="mon-card${editing ? ' edit' : ''}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="clipgen-body">${body}</div>
+    </div>`;
+}
+
+/* ============================================================
+   作り物の状態
+   ============================================================ */
+
+const SPACES = [
+  { id:'all',   label:'すべて' },
+  { id:'video', label:'動画'   },
+  { id:'web',   label:'Web記事' },
+  { id:'music', label:'music'  }
+];
+
+const MODELS = [
+  { key:'ollama::qwen3:14b',   label:'ローカル / qwen3:14b' },
+  { key:'openai::gpt-4o-mini', label:'OpenAI / gpt-4o-mini' }
+];
+
+/* clipstock の状態。実物では Notion の「状態」プロパティの値 */
+const STATUSES = ['新規', '再取得', '処理中', '完了', '要約済み', '除外'];
+
+/** 設定と、見え方を確かめるためのダミー件数から作る状態 */
+function sampleState(m, { phase, counts, partial }){
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const st = {
+    phase,
+    spaces: SPACES,
+    models: MODELS,
+    spaceId: m.space || SPACES[0].id,
+    modelKey: m.model || MODELS[0].key,
+    count: { fresh: counts['完了'] || 0, partial, total, counts, source:'notion' },
+    index: 0, total: 0, title:'', stage:'', error:'', result:null, cancel:false
+  };
+
+  if(phase === 'loading'){
+    st.count = null;
+    st.spaces = [];
+    st.models = [];
+  }
+  if(phase === 'running'){
+    st.total = clipgenReady(m, st);
+    st.index = Math.round(st.total * 0.4);
+    st.stage = 'サマリを作成中';
+    st.title = '【解説】2026年の生成AIはどこまで来たか';
+  }
+  if(phase === 'done'){
+    st.result = { done: clipgenReady(m, st), failed: 0, failures: [], cancelled: false, stopped: null };
+  }
+  if(phase === 'error'){
+    st.error = 'clipstock の接続設定が未入力です。clipstock の設定でGASのURLと共有トークンを入れてください';
+    st.count = null;
+  }
+  return st;
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+
+const F = (id) => document.getElementById(id);
+
+let layout = [...CLIPGEN_PARTS];
+
+function fillSelect(el, options){
+  el.innerHTML = options.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+}
+fillSelect(F('space'), SPACES.map(s => ({ value:s.id, label:`${s.label}(${s.id})` })));
+fillSelect(F('model'), [{ value:'', label:'clipstock で選択中のもの' }]
+  .concat(MODELS.map(x => ({ value:x.key, label:x.label }))));
+
+/* 数える状態のチェックと、状態ごとのダミー件数 */
+F('status-picks').innerHTML = STATUSES.map(s => `
+  <label class="check"><input type="checkbox" data-status="${esc(s)}"
+    ${s === '完了' ? 'checked' : ''}> ${esc(s)}</label>`).join('');
+F('status-counts').innerHTML = STATUSES.map(s => `
+  <label>${esc(s)}
+    <input type="number" data-count="${esc(s)}" min="0" max="999" value="${s === '完了' ? 30 : 0}">
+  </label>`).join('');
+
+function pickedStatuses(){
+  return [...F('status-picks').querySelectorAll('input:checked')].map(el => el.dataset.status);
+}
+
+/** フォームから監視設定を組み立てる。既定と同じ値は書き出さない */
+function monitor(){
+  const m = {
+    id: F('id').value.trim() || 'clipgen',
+    name: F('name').value.trim() || 'clipstock 生成',
+    type: 'clipgen'
+  };
+  const group = F('group').value.trim();
+  if(group) m.group = group;
+
+  const total = Number(F('total').value) || 0;
+  if(total > 0) m.total = total;
+
+  if(F('space').value) m.space = F('space').value;
+  if(F('model').value) m.model = F('model').value;
+
+  if(!F('showSpace').checked) m.showSpace = false;
+  if(!F('showModel').checked) m.showModel = false;
+  if(!F('showRun').checked) m.showRun = false;
+  if(!F('includePartial').checked) m.includePartial = false;
+
+  const threshold = Number(F('threshold').value) || 1;
+  if(threshold > 1) m.threshold = threshold;
+
+  const statuses = pickedStatuses();
+  if(statuses.join() !== CLIPGEN_DEFAULT_STATUSES.join()) m.statuses = statuses;
+  if(F('statusMatch').value === 'notIn') m.statusMatch = 'notIn';
+
+  if(layout.join() !== CLIPGEN_PARTS.join()) m.layout = [...layout];
+  return m;
+}
+
+/** JSONには出ない、プレビュー用の件数 */
+function dummy(){
+  const counts = {};
+  F('status-counts').querySelectorAll('[data-count]').forEach(el=>{
+    counts[el.dataset.count] = Math.max(0, Number(el.value) || 0);
+  });
+  return {
+    phase: F('phase').value,
+    counts,
+    partial: Math.max(0, Number(F('partial').value) || 0)
+  };
+}
+
+function paint(){
+  const m = monitor();
+  const editing = F('edit').checked;
+  F('live').innerHTML = renderClipgenCard({ ...m, layout }, sampleState(m, dummy()), editing);
+  wireDrag();
+  F('config').textContent = JSON.stringify(m, null, 2);
+}
+
+/* ---------- ドラッグで並べ替え ---------- */
+
+let dragging = null;
+
+function wireDrag(){
+  F('live').querySelectorAll('.part').forEach(el=>{
+    el.addEventListener('dragstart', ()=>{
+      dragging = el.dataset.part;
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', ()=>{ dragging = null; paint(); });
+    el.addEventListener('dragover', (e)=>{
+      if(!dragging || dragging === el.dataset.part) return;
+      e.preventDefault();
+      el.classList.add('over');
+    });
+    el.addEventListener('dragleave', ()=>el.classList.remove('over'));
+    el.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      el.classList.remove('over');
+      if(!dragging || dragging === el.dataset.part) return;
+      const rest = layout.filter(p => p !== dragging);
+      const at = rest.indexOf(el.dataset.part);
+      // 落とした相手の下半分なら後ろ、上半分なら手前に入れる
+      const after = (e.clientY - el.getBoundingClientRect().top) > el.offsetHeight / 2;
+      rest.splice(after ? at + 1 : at, 0, dragging);
+      layout = rest;
+      dragging = null;
+      paint();
+    });
+  });
+}
+
+/* ---------- 入力 ---------- */
+
+['id','name','group','total','threshold','space','model',
+ 'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit']
+  .forEach(id => F(id).addEventListener('input', paint));
+
+[F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
+
+F('copy').addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(F('config').textContent);
+    F('status').textContent = 'コピーしました';
+  }catch{
+    F('status').textContent = 'コピーできません。JSONを手で選んでください';
+  }
+  setTimeout(()=>{ F('status').textContent = ''; }, 3000);
+});
+
+paint();
+</script>
+</body>
+</html>

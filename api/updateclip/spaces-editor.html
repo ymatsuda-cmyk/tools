@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spaces.json エディタ</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #fff;
+    --line: #d8dbe0;
+    --text: #23262b;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --danger: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0 12px 0 0; font-size: 16px; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 16px;
+    padding: 16px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  section + section { margin-top: 16px; }
+  h2 { margin: 0 0 4px; font-size: 14px; }
+  .hint { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  label.field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+  label.field input, label.field select { width: 100%; }
+  input[type="text"], select, textarea {
+    padding: 5px 7px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+  }
+  input[type="text"] { min-width: 120px; }
+  textarea { width: 100%; min-height: 120px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  button {
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { color: #fff; filter: brightness(1.1); }
+  button.remove { border-color: transparent; color: var(--danger); padding: 4px 8px; }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #fbfbfc;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .card-head strong { font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+  .checks label, .toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text); }
+  pre {
+    margin: 0;
+    padding: 10px;
+    background: #1e2227;
+    color: #e6e6e6;
+    border-radius: 6px;
+    overflow: auto;
+    max-height: 60vh;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .issues { margin: 0 0 10px; padding-left: 18px; color: var(--danger); font-size: 12px; }
+  .issues:empty { display: none; }
+  .ok { color: #15803d; font-size: 12px; margin: 0 0 10px; }
+  .spacer { flex: 1; }
+  .status { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>spaces.json エディタ</h1>
+  <button id="add-source">取り込み元を追加</button>
+  <button id="add-space">スペースを追加</button>
+  <span class="spacer"></span>
+  <button id="load-file">ファイルから読み込み</button>
+  <button id="load-current">いまの spaces.json を読み込み</button>
+  <button id="copy">コピー</button>
+  <button id="download" class="primary">ダウンロード</button>
+  <span id="status" class="status"></span>
+  <input type="file" id="file" accept="application/json,.json" hidden>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>全体</h2>
+      <p class="hint">default は画面を開いた直後に選ばれるスペース。_note は spaces.json に残すメモで、空なら出力しない。</p>
+      <div class="row">
+        <label class="field">既定のスペース
+          <select id="default-space"></select>
+        </label>
+        <label class="field" style="flex:1; min-width:260px;">メモ(_note)
+          <input type="text" id="note">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>取り込み元(sources)</h2>
+      <p class="hint">一覧JSONとNotionの書き戻し先の組。ID を入れると list / idea の既定値が入る。auto は build_clipstock_json.py が自動生成した印。</p>
+      <div id="sources"></div>
+    </section>
+
+    <section>
+      <h2>スペース(spaces)</h2>
+      <p class="hint">取り込み元の組み合わせに名前を付けたもの。URL の ?space=&lt;ID&gt; で選ぶ。mode を空にすると通常の要約向け表示になる。</p>
+      <div id="spaces"></div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>出力</h2>
+      <ul id="issues" class="issues"></ul>
+      <p id="valid" class="ok" hidden>問題は見つかりませんでした。</p>
+      <label class="toggle" style="margin-bottom:8px;">
+        <input type="checkbox" id="minify" checked> 1行にまとめる(いまの spaces.json と同じ形式)
+      </label>
+      <pre id="out"></pre>
+    </section>
+
+    <section>
+      <h2>貼り付けて読み込み</h2>
+      <p class="hint">既存の spaces.json を貼り付けて「読み込む」を押すと、上のフォームに展開する。</p>
+      <textarea id="paste" placeholder='{"version":1,"default":"all","sources":{...},"spaces":[...]}'></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button id="parse">読み込む</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const DB_OPTIONS = ['video', 'web'];
+const CURRENT_URL = '../../data/clipstock/spaces.json';
+
+let state = {
+  version: 1,
+  note: '',
+  default: '',
+  sources: [],
+  spaces: [],
+};
+
+let seq = 0;
+const uid = () => 'r' + (++seq);
+
+function newSource() {
+  return { uid: uid(), id: '', label: '', list: '', idea: '', db: 'video', category: '', auto: false };
+}
+function newSpace() {
+  return { uid: uid(), id: '', label: '', mode: '', sources: [], auto: false };
+}
+
+/* ---------- 入力の組み立て ---------- */
+
+function field(labelText, value, onInput, opts = {}) {
+  const label = document.createElement('label');
+  label.className = 'field';
+  label.append(document.createTextNode(labelText));
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = value ?? '';
+  if (opts.placeholder) input.placeholder = opts.placeholder;
+  input.addEventListener('input', () => onInput(input.value));
+  label.append(input);
+  return label;
+}
+
+function selectField(labelText, value, options, onChange) {
+  const label = document.createElement('label');
+  label.className = 'field';
+  label.append(document.createTextNode(labelText));
+  const select = document.createElement('select');
+  options.forEach((opt) => {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    select.append(o);
+  });
+  select.value = value ?? '';
+  select.addEventListener('change', () => onChange(select.value));
+  label.append(select);
+  return label;
+}
+
+function checkbox(labelText, checked, onChange) {
+  const label = document.createElement('label');
+  label.className = 'toggle';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = Boolean(checked);
+  input.addEventListener('change', () => onChange(input.checked));
+  label.append(input, document.createTextNode(labelText));
+  return label;
+}
+
+function cardHead(title, onRemove) {
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  const strong = document.createElement('strong');
+  strong.textContent = title;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'remove';
+  button.textContent = '削除';
+  button.addEventListener('click', onRemove);
+  head.append(strong, button);
+  return head;
+}
+
+/* ---------- 描画 ---------- */
+
+function renderSources() {
+  const box = document.getElementById('sources');
+  box.textContent = '';
+  state.sources.forEach((s) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.append(cardHead(s.id || '(ID未入力)', () => {
+      state.sources = state.sources.filter((x) => x !== s);
+      render();
+    }));
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    grid.append(
+      field('ID', s.id, (v) => {
+        const before = s.id;
+        s.id = v.trim();
+        // ID を変えたら、それを参照しているスペース側も追従させる
+        state.spaces.forEach((sp) => {
+          sp.sources = sp.sources.map((id) => (id === before ? s.id : id));
+        });
+        if (!s.list || s.list === `index-${before}.json`) s.list = s.id ? `index-${s.id}.json` : '';
+        if (!s.idea || s.idea === `idea-${before}.json`) s.idea = s.id ? `idea-${s.id}.json` : '';
+        render();
+      }, { placeholder: 'music-video' }),
+      field('表示名', s.label, (v) => { s.label = v; renderOutput(); }, { placeholder: 'music(動画)' }),
+      field('一覧JSON(list)', s.list, (v) => { s.list = v.trim(); renderOutput(); }, { placeholder: 'index-xxx.json' }),
+      field('アイデアJSON(idea)', s.idea, (v) => { s.idea = v.trim(); renderOutput(); }, { placeholder: 'idea-xxx.json' }),
+      selectField('書き戻し先(db)', s.db, DB_OPTIONS.map((v) => ({ value: v, label: v })), (v) => { s.db = v; renderOutput(); }),
+      field('分類(category・任意)', s.category, (v) => { s.category = v.trim(); renderOutput(); }, { placeholder: 'music' }),
+    );
+    card.append(grid);
+
+    const checks = document.createElement('div');
+    checks.className = 'checks';
+    checks.append(checkbox('auto(分類から自動生成)', s.auto, (v) => { s.auto = v; renderOutput(); }));
+    card.append(checks);
+
+    box.append(card);
+  });
+
+  if (!state.sources.length) {
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.textContent = '取り込み元がありません。「取り込み元を追加」から作ってください。';
+    box.append(p);
+  }
+}
+
+function renderSpaces() {
+  const box = document.getElementById('spaces');
+  box.textContent = '';
+  state.spaces.forEach((sp) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.append(cardHead(sp.id || '(ID未入力)', () => {
+      state.spaces = state.spaces.filter((x) => x !== sp);
+      render();
+    }));
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    grid.append(
+      field('ID', sp.id, (v) => { sp.id = v.trim(); render(); }, { placeholder: 'music' }),
+      field('表示名', sp.label, (v) => { sp.label = v; renderOutput(); }, { placeholder: 'music' }),
+      field('mode(任意)', sp.mode, (v) => { sp.mode = v.trim(); renderOutput(); }, { placeholder: 'music' }),
+    );
+    card.append(grid);
+
+    const checks = document.createElement('div');
+    checks.className = 'checks';
+    state.sources.forEach((s) => {
+      if (!s.id) return;
+      checks.append(checkbox(s.id, sp.sources.includes(s.id), (on) => {
+        sp.sources = on
+          ? [...sp.sources, s.id]
+          : sp.sources.filter((id) => id !== s.id);
+        renderOutput();
+      }));
+    });
+    // 取り込み元一覧から消えた参照も、消せるように出しておく
+    sp.sources.filter((id) => !state.sources.some((s) => s.id === id)).forEach((id) => {
+      checks.append(checkbox(id + '(未定義)', true, () => {
+        sp.sources = sp.sources.filter((x) => x !== id);
+        render();
+      }));
+    });
+    card.append(checks);
+
+    const flags = document.createElement('div');
+    flags.className = 'checks';
+    flags.append(checkbox('auto(分類から自動生成)', sp.auto, (v) => { sp.auto = v; renderOutput(); }));
+    card.append(flags);
+
+    box.append(card);
+  });
+
+  if (!state.spaces.length) {
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.textContent = 'スペースがありません。「スペースを追加」から作ってください。';
+    box.append(p);
+  }
+}
+
+function renderDefault() {
+  const select = document.getElementById('default-space');
+  select.textContent = '';
+  const ids = state.spaces.map((s) => s.id).filter(Boolean);
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = '(指定しない)';
+  select.append(empty);
+  ids.forEach((id) => {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = id;
+    select.append(o);
+  });
+  select.value = ids.includes(state.default) ? state.default : '';
+  state.default = select.value;
+}
+
+/* ---------- 出力 ---------- */
+
+function build() {
+  const sources = {};
+  state.sources.forEach((s) => {
+    if (!s.id) return;
+    const entry = { label: s.label || s.id, list: s.list, idea: s.idea, db: s.db };
+    if (s.category) entry.category = s.category;
+    if (s.auto) entry.auto = true;
+    sources[s.id] = entry;
+  });
+
+  const spaces = state.spaces
+    .filter((s) => s.id)
+    .map((s) => {
+      const entry = { id: s.id, label: s.label || s.id, sources: [...s.sources] };
+      if (s.auto) entry.auto = true;
+      if (s.mode) entry.mode = s.mode;
+      return entry;
+    });
+
+  const json = { version: state.version || 1 };
+  if (state.note) json._note = state.note;
+  json.default = state.default || spaces[0]?.id || '';
+  json.sources = sources;
+  json.spaces = spaces;
+  return json;
+}
+
+function validate(json) {
+  const issues = [];
+  const sourceIds = Object.keys(json.sources);
+
+  if (!sourceIds.length) issues.push('取り込み元が1つもありません。');
+  if (!json.spaces.length) issues.push('スペースが1つもありません。');
+
+  const dupSource = state.sources.map((s) => s.id).filter(Boolean)
+    .filter((id, i, all) => all.indexOf(id) !== i);
+  [...new Set(dupSource)].forEach((id) => issues.push(`取り込み元のIDが重複しています: ${id}`));
+
+  const dupSpace = json.spaces.map((s) => s.id).filter((id, i, all) => all.indexOf(id) !== i);
+  [...new Set(dupSpace)].forEach((id) => issues.push(`スペースのIDが重複しています: ${id}`));
+
+  if (state.sources.some((s) => !s.id)) issues.push('IDが空の取り込み元があります(出力されません)。');
+  if (state.spaces.some((s) => !s.id)) issues.push('IDが空のスペースがあります(出力されません)。');
+
+  Object.entries(json.sources).forEach(([id, s]) => {
+    if (!s.list) issues.push(`${id}: 一覧JSON(list)が未入力です。`);
+  });
+
+  json.spaces.forEach((s) => {
+    if (!s.sources.length) issues.push(`${s.id}: 取り込み元が選ばれていません(clipstock 側で無視されます)。`);
+    s.sources.filter((sid) => !sourceIds.includes(sid))
+      .forEach((sid) => issues.push(`${s.id}: 未定義の取り込み元を参照しています: ${sid}`));
+  });
+
+  if (json.default && !json.spaces.some((s) => s.id === json.default)) {
+    issues.push(`既定のスペース ${json.default} が spaces にありません。`);
+  }
+  return issues;
+}
+
+function text() {
+  const json = build();
+  return document.getElementById('minify').checked
+    ? JSON.stringify(json)
+    : JSON.stringify(json, null, 2);
+}
+
+function renderOutput() {
+  const json = build();
+  document.getElementById('out').textContent = text();
+
+  const list = document.getElementById('issues');
+  list.textContent = '';
+  const issues = validate(json);
+  issues.forEach((msg) => {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    list.append(li);
+  });
+  document.getElementById('valid').hidden = issues.length > 0;
+}
+
+function render() {
+  renderDefault();
+  renderSources();
+  renderSpaces();
+  renderOutput();
+}
+
+/* ---------- 読み込み ---------- */
+
+function load(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('JSONのかたちが違います');
+
+  const sources = Object.entries(raw.sources && typeof raw.sources === 'object' ? raw.sources : {})
+    .map(([id, s]) => ({
+      uid: uid(),
+      id,
+      label: String(s?.label ?? id),
+      list: String(s?.list ?? ''),
+      idea: String(s?.idea ?? ''),
+      db: DB_OPTIONS.includes(s?.db) ? s.db : 'video',
+      category: String(s?.category ?? ''),
+      auto: Boolean(s?.auto),
+    }));
+
+  const spaces = (Array.isArray(raw.spaces) ? raw.spaces : []).map((s) => ({
+    uid: uid(),
+    id: String(s?.id ?? ''),
+    label: String(s?.label ?? s?.id ?? ''),
+    mode: String(s?.mode ?? ''),
+    sources: (Array.isArray(s?.sources) ? s.sources : []).map(String),
+    auto: Boolean(s?.auto),
+  }));
+
+  state = {
+    version: Number(raw.version) || 1,
+    note: String(raw._note ?? ''),
+    default: String(raw.default ?? ''),
+    sources,
+    spaces,
+  };
+  document.getElementById('note').value = state.note;
+  render();
+}
+
+function status(message) {
+  const el = document.getElementById('status');
+  el.textContent = message;
+  if (message) setTimeout(() => { if (el.textContent === message) el.textContent = ''; }, 4000);
+}
+
+/* ---------- 画面のイベント ---------- */
+
+document.getElementById('note').addEventListener('input', (e) => {
+  state.note = e.target.value;
+  renderOutput();
+});
+document.getElementById('default-space').addEventListener('change', (e) => {
+  state.default = e.target.value;
+  renderOutput();
+});
+document.getElementById('minify').addEventListener('change', renderOutput);
+
+document.getElementById('add-source').addEventListener('click', () => {
+  state.sources.push(newSource());
+  render();
+});
+document.getElementById('add-space').addEventListener('click', () => {
+  state.spaces.push(newSpace());
+  render();
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(text());
+    status('コピーしました');
+  } catch {
+    status('コピーできませんでした。出力欄から手で選んでください');
+  }
+});
+
+document.getElementById('download').addEventListener('click', () => {
+  const blob = new Blob([text()], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'spaces.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('load-file').addEventListener('click', () => document.getElementById('file').click());
+document.getElementById('file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    load(JSON.parse(await file.text()));
+    status('読み込みました');
+  } catch (err) {
+    status('読み込めません: ' + String(err?.message ?? err));
+  }
+});
+
+document.getElementById('load-current').addEventListener('click', async () => {
+  try {
+    const res = await fetch(CURRENT_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    load(await res.json());
+    status('いまの spaces.json を読み込みました');
+  } catch (err) {
+    status('読み込めません: ' + String(err?.message ?? err));
+  }
+});
+
+document.getElementById('parse').addEventListener('click', () => {
+  const raw = document.getElementById('paste').value.trim();
+  if (!raw) return status('貼り付け欄が空です');
+  try {
+    load(JSON.parse(raw));
+    status('読み込みました');
+  } catch (err) {
+    status('読み込めません: ' + String(err?.message ?? err));
+  }
+});
+
+/* ---------- 初期表示 ---------- */
+
+load({
+  version: 1,
+  default: 'all',
+  sources: {
+    video: { label: '動画', list: 'index-video.json', idea: 'idea-video.json', db: 'video' },
+    web: { label: 'Web', list: 'index-web.json', idea: 'idea-web.json', db: 'web' },
+  },
+  spaces: [
+    { id: 'all', label: 'すべて', sources: ['video', 'web'] },
+    { id: 'video', label: '動画', sources: ['video'] },
+    { id: 'web', label: 'Web記事', sources: ['web'] },
+  ],
+});
+</script>
+</body>
+</html>

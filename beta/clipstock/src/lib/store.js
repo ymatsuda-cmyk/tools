@@ -91,6 +91,33 @@ function adoptByDb(items, targets) {
   })
 }
 
+/**
+ * GASの応答をいまのスペースに割り当てる。
+ * adoptByDb と違って分類も見るので、分類で絞るスペースでも使える。
+ */
+function adoptToSpace(items) {
+  const targets = sourcesOf()
+  return (items || []).flatMap((item) => {
+    const db = item.source || 'video'
+    const same = (s) => (s.db || 'video') === db
+    const hit = targets.find((s) => same(s) && s.category && s.category === (item.category || ''))
+      || targets.find((s) => same(s) && !s.category)
+    return hit ? [{ ...item, source: hit.id }] : []
+  })
+}
+
+/**
+ * Notion から直接読む。静的JSONは cron の書き出し待ちで遅れるので、
+ * 件数をその場で正しく知りたいときはこちらを使う。
+ */
+export async function listVideosFromNotion() {
+  const data = await gasListVideos()
+  const items = adoptToSpace(data.items)
+  items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+  registerPageSources(items)
+  return { ...data, items, source: 'notion' }
+}
+
 export async function listVideos() {
   try {
     const { items, generatedAt } = await loadParts((s) => s.list, LIST_LEGACY)

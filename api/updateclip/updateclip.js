@@ -14,7 +14,7 @@
  *   await api.run({ spaceId, modelKey, onProgress, shouldCancel })
  */
 
-import { listVideos } from '../../beta/clipstock/src/lib/store.js'
+import { listVideos, listVideosFromNotion } from '../../beta/clipstock/src/lib/store.js'
 import { fetchTranscript, saveGenerated } from '../../beta/clipstock/src/lib/gas.js'
 import { generateAll, stagesOf } from '../../beta/clipstock/src/lib/generate.js'
 import { initSpaces, selectSpace, spaceList, spaceMode } from '../../beta/clipstock/src/lib/spaces.js'
@@ -87,16 +87,31 @@ function isComplete(item, mode) {
 }
 
 /**
+ * 一覧の取得。件数は Notion を正とする。
+ * 静的JSONは cron の書き出し待ちで遅れるので、Notion に届かないときだけそちらに落とす。
+ */
+async function loadItems(fromNotion) {
+  if (fromNotion) {
+    try {
+      return await listVideosFromNotion()
+    } catch (err) {
+      console.warn('Notion から読めないため一覧JSONを使います:', err)
+    }
+  }
+  return listVideos()
+}
+
+/**
  * 生成の対象。
  * 未生成(完了)だけでなく、途中で失敗して一部だけ欠けているものも拾う。
  * 拾わないと、1段だけ落ちた動画が永久に取り残される。
  */
-export async function targets(spaceId) {
+export async function targets(spaceId, { fromNotion = true } = {}) {
   await ensureSpaces()
   const space = selectSpace(spaceId)
   const mode = spaceMode(space)
 
-  const { items, source } = await listVideos()
+  const { items, source } = await loadItems(fromNotion)
   const visible = excludeExcluded(items)
 
   const fresh = visible.filter((i) => i.status === STATUS_DONE)
