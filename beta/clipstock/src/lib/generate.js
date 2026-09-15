@@ -3,7 +3,7 @@ import { loadSettings, connectionOf } from './llm-settings.js'
 import { promptOf } from './prompts.js'
 import { serializeSections } from './sections.js'
 import { reconcileTags } from './tags.js'
-import { splitTranscript, resolveQuote, withTimecode, hasTimecodes } from './timecode.js'
+import { splitTranscript, resolveQuote, withTimecode, hasTimecodes, parseClock, formatTimecode } from './timecode.js'
 
 /**
  * 生成はタブと同じ単位で段に分けている。1回のJSONに全部詰めると、
@@ -20,10 +20,25 @@ export const STAGES = [
   { id: 'ideas', label: '活用アイデア' },
 ]
 
+/**
+ * music スペースの段。原文はYouTubeの概要欄なので、文字起こし前提の
+ * マインドマップ・応用・活用は作らない。保存先のカラムは使い回す
+ * (チャプター=サマリカラム / 概要=分野別カラム)。
+ */
+export const MUSIC_STAGES = [
+  { id: 'summary', label: 'チャプター' },
+  { id: 'fields', label: '概要' },
+]
+
+export function stagesOf(mode) {
+  return mode === 'music' ? MUSIC_STAGES : STAGES
+}
+
 /** 原文を見ない段。サマリ+分野別だけで足りるので軽い */
 const SUMMARY_ONLY_STAGES = ['apply', 'ideas']
 
-export function needsTranscript(stageId) {
+export function needsTranscript(stageId, mode) {
+  if (mode === 'music') return true
   return !SUMMARY_ONLY_STAGES.includes(stageId)
 }
 
@@ -261,6 +276,41 @@ function ideasToText(list) {
   )
 }
 
+// ---- music スペース ----
+
+/**
+ * チャプターを "[12:34] 曲名" の行にする。
+ * 時刻は概要欄に書かれているものを写すだけなので、読めない行は捨てる
+ * (モデルが作った時刻をリンクにしないため。タイムコードの方針は timecode.js 参照)。
+ */
+function chaptersToText(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((c) => {
+      const at = parseClock(typeof c === 'string' ? c : c?.time)
+      const title = String((typeof c === 'string' ? '' : c?.title) ?? '').trim()
+      if (at === null || !title) return ''
+      return `[${formatTimecode(at)}] ${title}`
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+async function generateMusicStage(stageId, connection, input, onProgress) {
+  if (stageId === 'summary') {
+    const instructions = fillPrompt('musicChapters', { NO_FENCE })
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(input, instructions), onProgress))
+    return { model: connection.model, detail: { summary: chaptersToText(parsed.chapters) } }
+  }
+
+  if (stageId === 'fields') {
+    const instructions = fillPrompt('musicOverview', { NO_FENCE })
+    const parsed = jsonOf(await ask(connection, SHARED_SYSTEM, withInstructions(input, instructions), onProgress))
+    return { model: connection.model, detail: { fields: String(parsed.overview ?? '').trim() } }
+  }
+
+  throw new Error('unknown music stage: ' + stageId)
+}
+
 /** 第3段のコンテキスト。原文全文ではなくサマリ+分野別で足りるので軽い */
 function applyContext(title, summaryText, fieldsText) {
   return [`動画タイトル: ${title}`, '', '# サマリ', summaryText, '', '# 分野別要約', fieldsText]
@@ -271,7 +321,7 @@ function applyContext(title, summaryText, fieldsText) {
 /**
  * 1段だけ生成する。
  * @param {string} stageId 'summary' | 'mindmap' | 'fields' | 'apply' | 'ideas'
- * @param {{title: string, transcript: string, summary?: string, fields?: string}} ctx
+ * @param {{title: string, transcript: string, summary?: string, fields?: string, mode?: string}} ctx
  * @param {(text: string) => void} [onProgress] ストリーミング中の生テキスト
  * @returns {Promise<{detail: object, model: string}>} detail は saveGenerated にそのまま渡せる形
  */
@@ -279,6 +329,10 @@ export async function generateStage(stageId, ctx, onProgress) {
   const connection = requireConnection()
   const transcript = String(ctx.transcript ?? '').slice(0, TRANSCRIPT_LIMIT)
   const transcriptInput = `動画タイトル: ${ctx.title}\n\n${transcript}`
+
+  if (ctx.mode === 'music') {
+    return generateMusicStage(stageId, connection, transcriptInput, onProgress)
+  }
 
   if (stageId === 'summary') {
     const knownTags = Array.isArray(ctx.knownTags) ? ctx.knownTags : []
@@ -351,7 +405,7 @@ export async function generateAll(ctx, { onStage, onStageStart, onProgress } = {
   let model = null
   let tagReport = null
 
-  for (const stage of STAGES) {
+  for (const stage of stagesOf(ctx.mode)) {
     onStageStart?.(stage)
     const res = await generateStage(
       stage.id,

@@ -311,6 +311,9 @@ def file_name(prefix, category, source):
 
 SOURCE_LABELS = {"video": "動画", "web": "Web"}
 
+# 分類ごとの見せ方。画面側が ?space=<分類> のタブ構成とAI生成の中身を切り替える
+SPACE_MODES = {"music": "music"}
+
 
 def base_spaces():
     return {
@@ -367,8 +370,13 @@ def update_spaces(out_dir, categories):
                     "category": category,
                     "auto": True,
                 }
-        if not any(s.get("id") == key for s in spaces):
-            spaces.append({"id": key, "label": category, "sources": ids, "auto": True})
+        space = next((s for s in spaces if s.get("id") == key), None)
+        if space is None:
+            space = {"id": key, "label": category, "sources": ids, "auto": True}
+            spaces.append(space)
+        # 見せ方はコード側の対応表が正とするので、自動項目は毎回揃え直す
+        if space.get("auto") and SPACE_MODES.get(category):
+            space["mode"] = SPACE_MODES[category]
 
     # 無くなった分類の自動項目を取り下げる
     doc["spaces"] = [s for s in spaces if not s.get("auto") or s.get("id") in keys]

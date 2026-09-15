@@ -74,6 +74,11 @@ STATUS_PROCESSING = "処理中"
 WHISPER_MODEL_DEFAULT = "mlx-community/whisper-large-v2-mlx"
 WHISPER_LANGUAGE_DEFAULT = "ja"
 
+# この分類は文字起こしではなくYouTubeの概要欄を本文にする。
+# ライブやアルバムの動画は歌詞を文字起こししても使い道が無く、
+# 知りたい情報(曲目と解説)は概要欄に集まっているため。
+DESCRIPTION_CATEGORIES = {"music"}
+
 CLIPSTOCK_BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
 CLIPSTOCK_OUT_DIR = SCRIPT_DIR.parents[2] / "data" / "clipstock"
 
@@ -167,6 +172,10 @@ def page_title(page):
 
 def page_status(page):
     return ((page.get("properties", {}).get("状態", {}) or {}).get("select") or {}).get("name") or ""
+
+
+def page_category(page):
+    return ((page.get("properties", {}).get("分類", {}) or {}).get("select") or {}).get("name") or ""
 
 
 def page_url_value(page):
@@ -360,6 +369,7 @@ def fetch_metadata(url):
         "title": info.get("title") or "",
         "thumbnail": info.get("thumbnail") or "",
         "duration": info.get("duration"),
+        "description": info.get("description") or "",
     }
 
 
@@ -681,30 +691,39 @@ def transcribe_page(page, *, is_retry, whisper_enabled, whisper_model, whisper_l
     else:
         print("        ⚠️ タイトルを取得できませんでした")
 
-    got = fetch_captions(video_id)
     engine_label = None
     transcript = None
-    if got:
-        transcript, engine_label = got
+    category = page_category(page)
 
-    if not transcript and whisper_enabled:
-        owner = whisper_lock_owner()
-        if owner or not acquire_whisper_lock():
-            print(f"  ⏭️  ほかでWhisperが実行中(PID {owner or '?'})。負荷が高くなるため中止します")
+    if category in DESCRIPTION_CATEGORIES:
+        description = (meta.get("description") or "").strip()
+        if not description:
+            print(f"  ❌ 概要欄が空でした（分類={category}）。スキップ")
             return False
-        print("    字幕なし → Whisperにフォールバック")
-        try:
-            got = transcribe_video_via_whisper(canonical_url, model=whisper_model,
-                                               language=whisper_language)
-        finally:
-            release_whisper_lock()
+        transcript, engine_label = description, "YouTube概要欄"
+    else:
+        got = fetch_captions(video_id)
         if got:
             transcript, engine_label = got
+
+        if not transcript and whisper_enabled:
+            owner = whisper_lock_owner()
+            if owner or not acquire_whisper_lock():
+                print(f"  ⏭️  ほかでWhisperが実行中(PID {owner or '?'})。負荷が高くなるため中止します")
+                return False
+            print("    字幕なし → Whisperにフォールバック")
+            try:
+                got = transcribe_video_via_whisper(canonical_url, model=whisper_model,
+                                                   language=whisper_language)
+            finally:
+                release_whisper_lock()
+            if got:
+                transcript, engine_label = got
 
     if not transcript:
         print("  ❌ 文字起こしを取得できませんでした。スキップ")
         return False
-    print(f"  ✅ 文字起こし取得 ({len(transcript)}文字 / {engine_label})")
+    print(f"  ✅ 本文を取得 ({len(transcript)}文字 / {engine_label})")
 
     if is_retry:
         print("    → 既存の本文を削除中...")

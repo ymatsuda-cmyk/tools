@@ -67,6 +67,7 @@ function normalize(raw) {
     .map((s) => ({
       id: String(s?.id ?? ''),
       label: String(s?.label ?? s?.id ?? ''),
+      mode: String(s?.mode ?? ''),
       sources: (Array.isArray(s?.sources) ? s.sources : []).filter((id) => sources[id]),
     }))
     .filter((s) => s.id && s.sources.length)
@@ -76,6 +77,14 @@ function normalize(raw) {
 
 export function activeSpace() {
   return active
+}
+
+/**
+ * そのスペースの見せ方。
+ * 既定('')は動画の要約向け。'music' は曲目リスト向けにタブと生成内容を差し替える。
+ */
+export function spaceMode(space = active) {
+  return space?.mode || ''
 }
 
 export function spaceList() {

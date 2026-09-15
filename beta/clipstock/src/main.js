@@ -6,7 +6,7 @@ import {
   renderIdeas,
   renderMindmapGallery,
   flattenIdeas,
-  TABS,
+  tabsOf,
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
 import { openVocabPanel } from './ui/vocab.js'
@@ -32,8 +32,8 @@ import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
 import { initPrompts } from './lib/prompts.js'
-import { initSpaces, activeSpace, spaceList, sourcesOf, spaceHref } from './lib/spaces.js'
-import { generateAll, generateStage, needsTranscript, STAGES } from './lib/generate.js'
+import { initSpaces, activeSpace, spaceList, sourcesOf, spaceHref, spaceMode } from './lib/spaces.js'
+import { generateAll, generateStage, needsTranscript, stagesOf } from './lib/generate.js'
 import { renderMindmap, markNodeLine, nodeMarkerOf } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers, MARKER_COLORS } from './lib/markers.js'
@@ -454,6 +454,7 @@ async function openDetail(key) {
     detail: null,
     tags: item.tags || [],
     activeTab: 'summary',
+    mode: spaceMode(),
     transcript: undefined, // undefined=未取得 / null=取得中 / string=取得済み
     mindmapColor: 1, // 枝をクリックしたときに塗る色。null なら消しゴム
     memoDraft: null,
@@ -1048,6 +1049,7 @@ async function generateContext(item) {
   return {
     title: item.title,
     transcript,
+    mode: detail.mode,
     summary: stripMarkers(detail.detail?.summary || ''),
     fields: stripMarkers(detail.detail?.fields || ''),
     // 既存のタグを渡して語彙を縛る。渡さないと動画ごとに表記が増えていく
@@ -1057,7 +1059,7 @@ async function generateContext(item) {
 
 async function runGenerateAll(item) {
   if (detail.busyStage) return
-  detail.busyStage = STAGES[0].id
+  detail.busyStage = stagesOf(detail.mode)[0].id
   paintBusy('原文を読み込んでいます', '')
   try {
     const ctx = await generateContext(item)
@@ -1083,12 +1085,12 @@ async function runGenerateAll(item) {
 
 async function runStage(item, stageId) {
   if (detail.busyStage) return
-  const stage = STAGES.find((s) => s.id === stageId)
+  const stage = stagesOf(detail.mode).find((s) => s.id === stageId)
   detail.busyStage = stageId
   paintBusy(`${stage?.label ?? stageId} を生成中`, '')
   try {
     const ctx = await generateContext(item)
-    if (needsTranscript(stageId) && !ctx.transcript) {
+    if (needsTranscript(stageId, detail.mode) && !ctx.transcript) {
       throw new Error('原文がありません。状態が「完了」になるまで待ってください')
     }
     const { detail: stageDetail, model, tagReport } = await generateStage(stageId, ctx, (text) =>
@@ -1116,18 +1118,28 @@ const FIELD_LABEL = {
   ideas: '活用アイデア',
 }
 
+// musicスペースは同じカラムを別の用途で使っているので、見出しと書き方の説明も差し替える
+const MUSIC_FIELD_LABEL = { summary: 'チャプター', fields: '概要' }
+const MUSIC_FIELD_HINT = {
+  summary: '1行1曲で「[12:34] 曲名」の形です。時刻は動画の再生位置になります',
+  fields: '見出しや箇条書きにせず、文章で書きます',
+}
+
 function editCurrentField(item) {
   const field = detail.activeTab
-  if (!FIELD_LABEL[field]) return
-  const hint =
-    field === 'mindmap'
+  const music = detail.mode === 'music'
+  const label = music ? MUSIC_FIELD_LABEL[field] : FIELD_LABEL[field]
+  if (!label) return
+  const hint = music
+    ? MUSIC_FIELD_HINT[field]
+    : field === 'mindmap'
       ? 'markmap用のMarkdownです。# が中心、## が大項目、- が枝になります'
       : field === 'summary'
         ? ''
         : '## で項目名、次の行に説明、- で箇条書きです'
 
   openEditor({
-    title: `${FIELD_LABEL[field]}を直す`,
+    title: `${label}を直す`,
     // マーカーのタグは見せない。保存時に、文言が一致した範囲だけ引き継ぐ
     value: plainTextOf(detail.detail?.[field] ?? ''),
     hint,
@@ -1828,7 +1840,7 @@ async function runBulkGenerate() {
       const { text: transcript } = await fetchTranscript(item.key)
       if (!transcript) throw new Error('原文が空です')
       await generateAll(
-        { title: item.title, transcript, summary: '', fields: '', knownTags: vocabulary },
+        { title: item.title, transcript, summary: '', fields: '', mode: spaceMode(), knownTags: vocabulary },
         {
           onStage: async (stageId, stageDetail, model) => {
             await saveGenerated(item.key, stageDetail, model, transcript.length)
@@ -1966,9 +1978,10 @@ document.addEventListener('keydown', (e) => {
   if (view === 'detail' && detail?.phase === 'ready' && !e.metaKey && !e.ctrlKey) {
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
-    const i = TABS.findIndex((t) => t.id === detail.activeTab)
-    if (e.key === 'ArrowRight' && i < TABS.length - 1) switchTab(TABS[i + 1].id)
-    if (e.key === 'ArrowLeft' && i > 0) switchTab(TABS[i - 1].id)
+    const tabs = tabsOf(detail.mode)
+    const i = tabs.findIndex((t) => t.id === detail.activeTab)
+    if (e.key === 'ArrowRight' && i < tabs.length - 1) switchTab(tabs[i + 1].id)
+    if (e.key === 'ArrowLeft' && i > 0) switchTab(tabs[i - 1].id)
   }
 })
 

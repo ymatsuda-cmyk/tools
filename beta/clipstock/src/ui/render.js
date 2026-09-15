@@ -1,5 +1,5 @@
 import { parseSections, isSectionHidden, visibleHeading, sectionRank } from '../lib/sections.js'
-import { splitLabel, splitTranscript, formatTimecode, youtubeUrlAt } from '../lib/timecode.js'
+import { splitLabel, splitTranscript, formatTimecode, youtubeUrlAt, parseTimecode, stripTimecode } from '../lib/timecode.js'
 import { renderMarkedHtml, plainTextOf, MARKER_COLORS } from '../lib/markers.js'
 import { addrAttrs } from '../lib/marker-target.js'
 import { STATUS_SUMMARIZED, STATUS_DONE, STATUS_NEW } from '../lib/filters.js'
@@ -316,9 +316,27 @@ function transcriptHtml(text, videoUrl) {
     .join('')}</div>`
 }
 
+/** チャプタータブ(music)。"[12:34] 曲名" の行を、時刻を押すとその曲がかかる一覧にする */
+function chaptersHtml(text, videoUrl) {
+  const rows = String(text ?? '')
+    .split('\n')
+    .map((line) => ({ at: parseTimecode(line), text: stripTimecode(line) }))
+    .filter((r) => r.text)
+  if (!rows.length) return '<p class="empty-section">まだありません</p>'
+  return `<ol class="chapters">${rows
+    .map(
+      (r, i) => `<li class="chapter-row">
+        <span class="chapter-num">${i + 1}</span>
+        ${timeChip(r.at, videoUrl)}
+        <span class="chapter-title">${escapeHtml(r.text)}</span>
+      </li>`
+    )
+    .join('')}</ol>`
+}
+
 // ============ 詳細 ============
 
-export const TABS = [
+const TABS = [
   { id: 'summary', label: 'サマリ' },
   { id: 'mindmap', label: 'マインドマップ' },
   { id: 'fields', label: '分野別' },
@@ -329,6 +347,21 @@ export const TABS = [
   { id: 'raw', label: '原文' },
 ]
 
+/**
+ * music スペースのタブ。原文がYouTubeの概要欄なので、文字起こしを前提にした
+ * マインドマップ・応用・活用・チャットは出さない。保存先のカラムは使い回す。
+ */
+const MUSIC_TABS = [
+  { id: 'summary', label: 'チャプター' },
+  { id: 'fields', label: '概要' },
+  { id: 'memo', label: 'メモ' },
+  { id: 'raw', label: '原文' },
+]
+
+export function tabsOf(mode) {
+  return mode === 'music' ? MUSIC_TABS : TABS
+}
+
 /** どのタブがAI生成物か。ここに載っているタブには「作り直す」ボタンを出す */
 const STAGE_OF_TAB = { summary: 'summary', mindmap: 'mindmap', fields: 'fields', apply: 'apply', ideas: 'ideas' }
 
@@ -336,6 +369,8 @@ export function detailHtml(item, state) {
   const d = state.detail || {}
   const tab = state.activeTab
   const canEdit = state.canEdit
+  const music = state.mode === 'music'
+  const tabs = tabsOf(state.mode)
 
   const editable = ['summary', 'mindmap', 'fields', 'apply', 'ideas'].includes(tab)
   const stage = STAGE_OF_TAB[tab]
@@ -370,7 +405,7 @@ export function detailHtml(item, state) {
       </div>
     </div>
     <nav class="tabs">
-      ${TABS.map((t) => `<button class="tab ${t.id === tab ? 'on' : ''}" data-tab="${t.id}">${t.label}${state.tabHasContent(t.id) ? '' : '<i class="tab-empty" aria-hidden="true"></i>'}</button>`).join('')}
+      ${tabs.map((t) => `<button class="tab ${t.id === tab ? 'on' : ''}" data-tab="${t.id}">${t.label}${state.tabHasContent(t.id) ? '' : '<i class="tab-empty" aria-hidden="true"></i>'}</button>`).join('')}
     </nav>
   `
 
@@ -386,7 +421,7 @@ export function detailHtml(item, state) {
         <pre class="gen-stream">${escapeHtml((state.busyText || '').slice(-1200))}</pre>
       </div>`
   } else {
-    panel = renderPanel(item, state, tab, d)
+    panel = renderPanel(item, state, tab, d, music)
   }
 
   const foot =
@@ -429,9 +464,10 @@ export function detailHtml(item, state) {
   `
 }
 
-function renderPanel(item, state, tab, d) {
+function renderPanel(item, state, tab, d, music = false) {
   switch (tab) {
     case 'summary':
+      if (music) return d.summary ? chaptersHtml(d.summary, item.url) : emptyPanel(item, 'チャプター', 'summary')
       return d.summary
         ? `<p class="prose"><span class="marker-target" ${addrAttrs('summary', 'whole')}>${renderMarkedHtml(
             d.summary,
@@ -441,6 +477,14 @@ function renderPanel(item, state, tab, d) {
     case 'mindmap':
       return '<div id="mindmap-host" class="mindmap-host"></div>'
     case 'fields':
+      if (music) {
+        return d.fields
+          ? `<p class="prose"><span class="marker-target" ${addrAttrs('fields', 'whole')}>${renderMarkedHtml(
+              d.fields,
+              escapeHtml
+            ).replace(/\n/g, '<br />')}</span></p>`
+          : emptyPanel(item, '概要', 'fields')
+      }
       return d.fields
         ? sectionsHtml(d.fields, { videoUrl: item.url, field: 'fields' })
         : emptyPanel(item, '分野別要約', 'fields')

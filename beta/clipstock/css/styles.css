@@ -910,6 +910,21 @@ mark { background: var(--highlight); color: inherit; }
 .tr-text { margin: 0; font-size: 12.5px; line-height: 1.8; }
 .tr-row:hover { background: var(--surface-1); border-radius: 4px; }
 
+/* チャプター(musicスペース)。時刻を押すとその曲から再生される */
+.chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-width: 70ch; }
+.chapter-row { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; border-radius: 4px; }
+.chapter-row:hover { background: var(--surface-1); }
+.chapter-row .tc { margin-left: 0; flex-shrink: 0; }
+.chapter-num {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.chapter-title { line-height: 1.7; }
+
 /* ============ マーカー ============ */
 
 /* マーカーは本文の文字列に埋め込まれているので、描画のたびに

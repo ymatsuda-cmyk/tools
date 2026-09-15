@@ -10,7 +10,7 @@
 const KEY = 'videos:prompts'
 const SETTING_URL = new URL('https://ymatsuda-cmyk.github.io/tools/data/clipstock/setting.json', import.meta.url)
 
-export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas']
+export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas', 'musicChapters', 'musicOverview']
 
 let defaults = {}
 let overrides = loadOverrides()
