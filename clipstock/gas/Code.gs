@@ -49,6 +49,7 @@ var PROP_CREATED  = '作成日時';       // created_time
 
 // ---- 状態の値 ----
 var STATUS_NEW        = '新規';     // 未処理。Mac mini 側バッチが拾う
+var STATUS_RETRY      = '再取得';   // 既存の文字起こしを置き換える対象
 var STATUS_RUNNING    = '処理中';
 var STATUS_DONE       = '完了';     // 文字起こし済み・要約待ち
 var STATUS_SUMMARIZED = '要約済み'; // AI生成完了
@@ -594,13 +595,13 @@ function saveTitle_(pageId, title, source) {
 
 /**
  * 状態を変更する。
- *  - 「新規」に戻す = 次回バッチで文字起こしをやり直させる
+ *  - 「再取得」に戻す = 次回バッチで文字起こしをやり直させる
  *  - 「除外」= 一覧から外す論理削除(Notionページ自体は消さない)
  * Notionのselectは未登録の選択肢名でもAPI側で自動追加されるため、
  * 事前にオプションを作っておく必要はない。
  */
 function setStatus_(pageId, status, source) {
-  var allowed = [STATUS_NEW, STATUS_RUNNING, STATUS_DONE, STATUS_SUMMARIZED, STATUS_EXCLUDED];
+  var allowed = [STATUS_NEW, STATUS_RETRY, STATUS_RUNNING, STATUS_DONE, STATUS_SUMMARIZED, STATUS_EXCLUDED];
   if (allowed.indexOf(status) === -1) throw new Error('unknown status: ' + status);
   var props = {};
   props[PROP_STATUS] = { select: { name: status } };
