@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ログビューア</title>
+<style>
+  :root{
+    --bg:#16202b;
+    --panel:#1d2a38;
+    --panel-2:#22303f;
+    --edge:#2b3c4e;
+    --text:#cbd8e4;
+    --dim:#7c93a8;
+    --faint:#54697c;
+    --error:#f2777a;
+    --warn:#e6b85c;
+    --info:#7fb3d5;
+    --debug:#6f8494;
+    --other:#93a7b8;
+    --accent:#8bd5ca;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+    --ui: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --fs: 12.5px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:var(--ui); font-size:13px;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button, select, input{font-family:inherit; font-size:12px; color:var(--text)}
+  button{
+    background:var(--panel-2); border:1px solid var(--edge); border-radius:4px;
+    padding:4px 9px; cursor:pointer; line-height:1.5;
+  }
+  button:hover{background:#2a3b4d}
+  button.on{background:#2d4a52; border-color:var(--accent); color:#d6f4ee}
+  input[type=text], input:not([type]), select{
+    background:#121a23; border:1px solid var(--edge); border-radius:4px;
+    padding:5px 8px; outline:none;
+  }
+  input::placeholder{color:var(--faint)}
+  input:focus-visible, button:focus-visible, select:focus-visible, li:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px;
+  }
+  label{display:inline-flex; align-items:center; gap:5px; color:var(--dim); cursor:pointer; white-space:nowrap}
+  input[type=checkbox]{accent-color:var(--accent); margin:0}
+
+  #app{display:flex; flex-direction:column; height:100%}
+
+  .bar{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px; background:var(--panel);
+    border-bottom:1px solid var(--edge); flex:0 0 auto;
+  }
+  .brand{font-weight:600; letter-spacing:.02em; margin-right:4px}
+  .spacer{flex:1}
+  .dot{
+    width:7px; height:7px; border-radius:50%; background:var(--faint);
+    box-shadow:0 0 0 0 rgba(139,213,202,.5);
+  }
+  .live .dot{background:var(--accent); animation:beat 2s ease-out infinite}
+  @keyframes beat{
+    0%{box-shadow:0 0 0 0 rgba(139,213,202,.45)}
+    70%{box-shadow:0 0 0 6px rgba(139,213,202,0)}
+    100%{box-shadow:0 0 0 0 rgba(139,213,202,0)}
+  }
+  @media (prefers-reduced-motion: reduce){ .live .dot{animation:none} }
+
+  .body{display:flex; flex:1; min-height:0}
+
+  aside{
+    width:272px; flex:0 0 272px; background:var(--panel);
+    border-right:1px solid var(--edge); display:flex; flex-direction:column; min-height:0;
+  }
+  .side-head{display:flex; gap:6px; padding:8px; border-bottom:1px solid var(--edge)}
+  .side-head input{flex:1; min-width:0}
+  .side-sub{display:flex; gap:12px; padding:6px 10px; border-bottom:1px solid var(--edge); font-size:11.5px}
+  #fileList{list-style:none; margin:0; padding:4px 0; overflow-y:auto; flex:1}
+  #fileList li{padding:6px 10px; cursor:pointer; border-left:2px solid transparent}
+  #fileList li:hover{background:var(--panel-2)}
+  #fileList li.open{border-left-color:var(--faint)}
+  #fileList li[aria-selected=true]{background:#24394a; border-left-color:var(--accent)}
+  .f-name{font-family:var(--mono); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .f-meta{font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:2px; display:flex; gap:8px}
+  .f-dir{color:var(--faint)}
+  .empty{padding:18px 12px; color:var(--faint); font-size:12px; line-height:1.7}
+  .drop{
+    margin:8px; padding:14px 10px; text-align:center; color:var(--faint);
+    border:1px dashed var(--edge); border-radius:6px; font-size:11.5px;
+  }
+  .drop.hot{border-color:var(--accent); color:var(--accent); background:#1b2f35}
+
+  main{flex:1; display:flex; flex-direction:column; min-width:0; position:relative}
+
+  /* ---- tabs ---- */
+  .tabs{
+    display:flex; align-items:stretch; flex:0 0 auto; min-height:34px;
+    background:#121a23; border-bottom:1px solid var(--edge);
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
+  }
+  .tabs::-webkit-scrollbar{height:4px}
+  .tabs::-webkit-scrollbar-thumb{background:var(--edge)}
+  .tab{
+    display:flex; align-items:center; gap:7px; padding:0 9px 0 12px;
+    border:0; border-right:1px solid var(--edge); border-bottom:2px solid transparent;
+    background:transparent; color:var(--dim); cursor:pointer;
+    font-family:var(--mono); font-size:11.5px; white-space:nowrap; border-radius:0;
+    max-width:230px;
+  }
+  .tab:hover{background:#1a2734}
+  .tab[aria-selected=true]{background:var(--bg); color:var(--text); border-bottom-color:var(--accent)}
+  .tab .t-name{overflow:hidden; text-overflow:ellipsis}
+  .tab .t-badge{
+    font-size:10px; padding:1px 5px; border-radius:8px;
+    background:var(--edge); color:var(--text);
+  }
+  .tab .t-badge.err{background:var(--error); color:#231114}
+  .tab .t-close{
+    width:16px; height:16px; line-height:14px; text-align:center;
+    border-radius:3px; color:var(--faint); font-size:13px; flex:0 0 auto;
+  }
+  .tab .t-close:hover{background:#3a4b5e; color:var(--text)}
+  .tab.stale .t-name{opacity:.6; text-decoration:underline dotted}
+  .tabs-hint{display:flex; align-items:center; padding:0 12px; color:var(--faint); font-size:11.5px}
+
+  .search{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:8px 12px; border-bottom:1px solid var(--edge); background:var(--panel);
+  }
+  #q{flex:1 1 220px; min-width:140px}
+  #ex{flex:0 1 160px; min-width:110px}
+  .chips{display:flex; gap:4px; margin-left:auto}
+  .chip{
+    font-family:var(--mono); font-size:10.5px; padding:3px 7px;
+    border:1px solid var(--edge); border-radius:3px; background:transparent;
+    color:var(--faint); cursor:pointer;
+  }
+  .chip[data-on=true]{color:var(--c); border-color:var(--c); background:color-mix(in srgb, var(--c) 12%, transparent)}
+  .chip b{font-weight:500; opacity:.65; margin-left:5px}
+
+  .notice{
+    display:none; align-items:center; gap:10px; padding:5px 12px;
+    background:#2a2f24; border-bottom:1px solid var(--edge); color:var(--warn); font-size:11.5px;
+  }
+  .notice.show{display:flex}
+
+  .viewport{flex:1; display:flex; min-height:0; position:relative}
+  .log{
+    flex:1; overflow:auto; font-family:var(--mono); font-size:var(--fs);
+    line-height:1.55; padding:6px 0 40vh; min-width:0;
+  }
+  .row{display:flex; white-space:pre; padding:0 10px 0 0}
+  .log.wrap .row{white-space:pre-wrap; word-break:break-word}
+  .row:hover{background:#1b2735}
+  .ln{
+    flex:0 0 auto; width:64px; text-align:right; padding-right:12px;
+    color:var(--faint); user-select:none;
+  }
+  .tx{flex:1; min-width:0}
+  .lv-error .tx{color:var(--error)}
+  .lv-warn  .tx{color:var(--warn)}
+  .lv-info  .tx{color:var(--info)}
+  .lv-debug .tx{color:var(--debug)}
+  .lv-other .tx{color:var(--other)}
+  .lv-error .ln{color:var(--error); opacity:.75}
+  .lv-warn  .ln{color:var(--warn); opacity:.7}
+  .row.pending .tx{opacity:.55}
+  mark{background:var(--accent); color:#10202a; border-radius:2px; padding:0 1px}
+
+  #map{
+    flex:0 0 14px; width:14px; background:#121a23;
+    border-left:1px solid var(--edge); cursor:pointer;
+  }
+
+  #toBottom{
+    position:absolute; right:32px; bottom:44px; display:none;
+    background:var(--accent); color:#10202a; border:0; font-weight:600;
+    padding:7px 13px; border-radius:20px; box-shadow:0 4px 14px rgba(0,0,0,.4);
+  }
+  #toBottom.show{display:block}
+
+  .status{
+    display:flex; align-items:center; gap:18px; flex:0 0 auto;
+    padding:6px 12px; background:var(--panel); border-top:1px solid var(--edge);
+    font-family:var(--mono); font-size:11px; color:var(--dim);
+  }
+  .status b{font-weight:500; color:var(--text)}
+  .status .k{color:var(--faint)}
+  .status .err{color:var(--error)}
+  .status .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+
+  @media (max-width: 760px){
+    aside{position:absolute; z-index:5; height:100%; box-shadow:8px 0 24px rgba(0,0,0,.4)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="bar">
+    <span class="brand">ログビューア</span>
+    <button id="pickDir">フォルダを開く</button>
+    <button id="pickFile">ファイルを開く</button>
+    <span class="spacer"></span>
+    <label id="followWrap" class="live"><input type="checkbox" id="follow" checked><span class="dot"></span>追尾</label>
+    <select id="interval" aria-label="更新間隔">
+      <option value="500">0.5秒</option>
+      <option value="1000" selected>1秒</option>
+      <option value="2000">2秒</option>
+      <option value="5000">5秒</option>
+    </select>
+    <label><input type="checkbox" id="wrap">折り返し</label>
+    <button id="fontMinus" aria-label="文字を小さく">小</button>
+    <button id="fontPlus" aria-label="文字を大きく">大</button>
+    <button id="save">表示中を保存</button>
+  </header>
+
+  <div class="body">
+    <aside id="sidebar">
+      <div class="side-head">
+        <input id="fileFilter" placeholder="ファイル名で絞り込み">
+        <button id="refresh" aria-label="再スキャン">再読込</button>
+      </div>
+      <div class="side-sub">
+        <label><input type="checkbox" id="showAll">全ファイル</label>
+        <span id="fileCount" style="color:var(--faint);font-family:var(--mono)"></span>
+      </div>
+      <ul id="fileList"></ul>
+      <div id="drop" class="drop">フォルダやファイルをここにドロップ</div>
+    </aside>
+
+    <main>
+      <div id="tabs" class="tabs" role="tablist"></div>
+
+      <div class="search">
+        <input id="q" placeholder="検索（⌘F）">
+        <button id="regexBtn" title="正規表現">.*</button>
+        <button id="caseBtn" title="大文字小文字を区別">Aa</button>
+        <label><input type="checkbox" id="onlyMatch" checked>一致行のみ</label>
+        <input id="ex" placeholder="除外する語">
+        <div id="levels" class="chips"></div>
+      </div>
+
+      <div id="notice" class="notice">
+        <span id="noticeText"></span>
+        <button id="loadAll">全体を読み込む</button>
+      </div>
+
+      <div class="viewport">
+        <div id="log" class="log" tabindex="0"></div>
+        <canvas id="map" title="クリックでジャンプ"></canvas>
+      </div>
+
+      <button id="toBottom">最新へ</button>
+
+      <div class="status">
+        <span><span class="k">行</span> <b id="stLines">0</b></span>
+        <span><span class="k">表示</span> <b id="stShown">0</b></span>
+        <span class="err" id="stErr"></span>
+        <span><span class="k">読込</span> <b id="stSize">0</b></span>
+        <span class="right"><span id="stMsg"></span><span class="k">更新</span> <b id="stTime">—</b></span>
+      </div>
+    </main>
+  </div>
+</div>
+
+<input type="file" id="fallbackDir" webkitdirectory multiple hidden>
+<input type="file" id="fallbackFile" multiple hidden>
+
+<script>
+(function(){
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const MAX_LINES = 200000;
+  const RENDER_CAP = 4000;
+  const TAIL_BYTES = 1048576;
+  const MAX_TABS = 12;
+
+  const LOGLIKE = /(\.log(\.[\w.-]+)?$)|\.(txt|out|err|ndjson|jsonl|json)$/i;
+  const SKIP_DIR = new Set(['node_modules','.git','Pods','build','dist','DerivedData','vendor','__pycache__','.venv','venv']);
+
+  const LEVELS = [
+    {key:'error', label:'ERROR', color:'var(--error)', re:/\b(FATAL|CRITICAL|SEVERE|ERROR|ERR)\b|Exception|Traceback|エラー|例外|致命/i},
+    {key:'warn',  label:'WARN',  color:'var(--warn)',  re:/\b(WARN|WARNING)\b|警告/i},
+    {key:'info',  label:'INFO',  color:'var(--info)',  re:/\b(INFO|NOTICE)\b|情報/i},
+    {key:'debug', label:'DEBUG', color:'var(--debug)', re:/\b(DEBUG|TRACE|VERBOSE)\b/i},
+    {key:'other', label:'その他', color:'var(--other)', re:null}
+  ];
+
+  const state = {
+    files: [],
+    dirHandle: null,
+    tabs: [],
+    activeKey: null,
+    follow: true,
+    pollMs: 1000,
+    regex: false,
+    caseSensitive: false,
+    levelOn: {error:true, warn:true, info:true, debug:true, other:true},
+    timer: null,
+    rescanAt: 0,
+    fs: 12.5
+  };
+
+  const active = () => state.tabs.find(t => t.key === state.activeKey) || null;
+
+  /* ---------- helpers ---------- */
+  const esc = s => s.replace(/[&<>]/g, c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
+  const num = n => n.toLocaleString('ja-JP');
+  function bytes(b){
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+  function clock(ms){
+    const d = new Date(ms), p = n => String(n).padStart(2,'0');
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+  function when(ms){
+    const d = new Date(ms), now = new Date(), p = n => String(n).padStart(2,'0');
+    return d.toDateString() === now.toDateString()
+      ? clock(ms)
+      : (d.getMonth()+1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function detectLevel(s){
+    for (const l of LEVELS) if (l.re && l.re.test(s)) return l.key;
+    return 'other';
+  }
+  function msg(text, isError){
+    const el = $('stMsg');
+    el.textContent = text || '';
+    el.style.color = isError ? 'var(--error)' : 'var(--dim)';
+    el.style.marginRight = text ? '10px' : '0';
+  }
+
+  /* ---------- file discovery ---------- */
+  async function pickDirectory(){
+    if (!window.showDirectoryPicker){ $('fallbackDir').click(); return; }
+    try {
+      const h = await window.showDirectoryPicker({ mode:'read' });
+      await openDirectory(h);
+    } catch(e){
+      if (e && e.name === 'AbortError') return;
+      msg('フォルダを開けません。ローカルサーバー経由（python3 -m http.server）で開き直してください', true);
+    }
+  }
+
+  async function openDirectory(handle){
+    state.dirHandle = handle;
+    await rescan();
+  }
+
+  async function rescan(){
+    if (!state.dirHandle) return;
+    try {
+      const acc = [];
+      await scan(state.dirHandle, '', 0, acc);
+      state.files = acc;
+      renderFileList();
+      state.rescanAt = Date.now();
+    } catch(e){
+      msg('フォルダを読めません: ' + e.message, true);
+    }
+  }
+
+  async function scan(dir, base, depth, acc){
+    if (depth > 4 || acc.length > 1500) return;
+    for await (const [name, h] of dir.entries()){
+      if (name.startsWith('.')) continue;
+      if (h.kind === 'directory'){
+        if (SKIP_DIR.has(name)) continue;
+        await scan(h, base + name + '/', depth + 1, acc);
+      } else {
+        if (!$('showAll').checked && !LOGLIKE.test(name)) continue;
+        let f;
+        try { f = await h.getFile(); } catch(_){ continue; }
+        acc.push({ handle:h, name, dir:base, size:f.size, mtime:f.lastModified, key: base + name });
+      }
+    }
+  }
+
+  async function pickFiles(){
+    if (!window.showOpenFilePicker){ $('fallbackFile').click(); return; }
+    try {
+      const handles = await window.showOpenFilePicker({ multiple:true });
+      let first = null;
+      for (const h of handles){ const e = await addHandle(h); if (e && !first) first = e; }
+      if (first) openTab(first);
+    } catch(e){ if (!e || e.name !== 'AbortError') msg(e.message, true); }
+  }
+
+  async function addHandle(h){
+    let f;
+    try { f = await h.getFile(); } catch(_){ return null; }
+    const key = h.name + ':' + f.lastModified;
+    const dup = state.files.find(x => x.key === key);
+    if (dup) return dup;
+    const entry = { handle:h, name:h.name, dir:'', size:f.size, mtime:f.lastModified, key };
+    state.files.push(entry);
+    renderFileList();
+    return entry;
+  }
+
+  function addPlainFiles(list){
+    let first = null;
+    for (const f of list){
+      const rel = f.webkitRelativePath || '';
+      const dir = rel ? rel.slice(0, rel.length - f.name.length) : '';
+      if (!$('showAll').checked && !LOGLIKE.test(f.name)) continue;
+      const entry = { file:f, name:f.name, dir, size:f.size, mtime:f.lastModified, key: dir + f.name + ':' + f.lastModified };
+      state.files.push(entry);
+      if (!first) first = entry;
+    }
+    renderFileList();
+    if (first){
+      msg('このブラウザでは追尾できません。Chromeなら自動更新できます');
+      openTab(first);
+    }
+  }
+
+  function renderFileList(){
+    const ul = $('fileList');
+    const term = $('fileFilter').value.trim().toLowerCase();
+    let list = state.files.slice();
+    if (term) list = list.filter(f => (f.dir + f.name).toLowerCase().includes(term));
+    list.sort((a,b) => b.mtime - a.mtime);
+    $('fileCount').textContent = list.length ? num(list.length) + ' 件' : '';
+
+    if (!list.length){
+      ul.innerHTML = '<li class="empty" style="cursor:default">' +
+        (state.files.length ? '条件に合うファイルがありません。' :
+         'まだファイルがありません。フォルダを開くか、ここにドロップしてください。') + '</li>';
+      return;
+    }
+    ul.innerHTML = list.map(f => {
+      const open = state.tabs.some(t => t.key === f.key);
+      return '<li role="option" tabindex="0" data-key="' + esc(f.key) + '"' +
+        (open ? ' class="open"' : '') +
+        (state.activeKey === f.key ? ' aria-selected="true"' : '') + '>' +
+        '<div class="f-name">' + (f.dir ? '<span class="f-dir">' + esc(f.dir) + '</span>' : '') + esc(f.name) + '</div>' +
+        '<div class="f-meta"><span>' + bytes(f.size) + '</span><span>' + when(f.mtime) + '</span></div>' +
+      '</li>';
+    }).join('');
+  }
+
+  /* ---------- tabs ---------- */
+  function renderTabs(){
+    const bar = $('tabs');
+    if (!state.tabs.length){
+      bar.innerHTML = '<span class="tabs-hint">ファイルを選ぶとタブが開きます。複数のログを並行して追尾できます。</span>';
+      return;
+    }
+    bar.innerHTML = state.tabs.map((t, i) => {
+      let badge = '';
+      if (t.key !== state.activeKey && t.unread > 0){
+        badge = '<span class="t-badge' + (t.hasErr ? ' err' : '') + '">+' + num(t.unread) + '</span>';
+      }
+      return '<button class="tab' + (t.live ? '' : ' stale') + '" role="tab" data-key="' + esc(t.key) + '"' +
+        ' aria-selected="' + (t.key === state.activeKey) + '"' +
+        ' title="' + esc((t.dir || '') + t.name) + (t.live ? '' : '（更新は追えません）') + '　⌥' + (i+1) + '">' +
+        '<span class="t-name">' + esc(t.name) + '</span>' + badge +
+        '<span class="t-close" data-close="' + esc(t.key) + '" aria-label="閉じる">×</span></button>';
+    }).join('');
+  }
+
+  function openTab(entry){
+    const exists = state.tabs.find(t => t.key === entry.key);
+    if (exists){ activateTab(entry.key); return; }
+    if (state.tabs.length >= MAX_TABS){
+      msg('タブは' + MAX_TABS + '個までです。どれか閉じてください', true);
+      return;
+    }
+    const tab = {
+      key: entry.key, name: entry.name, dir: entry.dir,
+      handle: entry.handle || null, file: entry.file || null,
+      live: !!entry.handle,
+      offset: 0, decoder: null, partial: '', lines: [], counter: 0,
+      counts: {error:0, warn:0, info:0, debug:0, other:0},
+      truncatedFrom: 0, read: 0, size: 0,
+      stick: true, scrollTop: 0, unread: 0, hasErr: false, updated: 0, loaded: false
+    };
+    state.tabs.push(tab);
+    state.activeKey = tab.key;
+    renderTabs();
+    renderFileList();
+    loadTab(tab, false);
+  }
+
+  function activateTab(key){
+    const cur = active();
+    if (cur) cur.scrollTop = $('log').scrollTop;
+    state.activeKey = key;
+    const t = active();
+    if (t){ t.unread = 0; t.hasErr = false; }
+    renderTabs();
+    renderFileList();
+    render();
+    const log = $('log');
+    if (t && t.stick) scrollToBottom(); else if (t) log.scrollTop = t.scrollTop;
+    updateNotice();
+    msg('');
+    if (t && t.updated) $('stTime').textContent = clock(t.updated);
+  }
+
+  function closeTab(key){
+    const i = state.tabs.findIndex(t => t.key === key);
+    if (i < 0) return;
+    state.tabs.splice(i, 1);
+    if (state.activeKey === key){
+      const next = state.tabs[Math.min(i, state.tabs.length - 1)];
+      state.activeKey = next ? next.key : null;
+    }
+    renderTabs();
+    renderFileList();
+    if (state.activeKey) activateTab(state.activeKey);
+    else { render(); updateNotice(); }
+  }
+
+  function updateNotice(){
+    const t = active();
+    const show = !!(t && t.truncatedFrom > 0);
+    $('notice').classList.toggle('show', show);
+    $('noticeText').textContent = show
+      ? '先頭を省略しています。末尾 ' + bytes(t.size - t.truncatedFrom) + ' のみ読み込みました（全体 ' + bytes(t.size) + '）'
+      : '';
+  }
+
+  /* ---------- reading ---------- */
+  async function fileOf(tab){
+    if (tab.handle){
+      if (tab.handle.queryPermission){
+        const p = await tab.handle.queryPermission({ mode:'read' });
+        if (p !== 'granted'){
+          const r = await tab.handle.requestPermission({ mode:'read' });
+          if (r !== 'granted') throw new Error('読み取りが許可されていません');
+        }
+      }
+      return await tab.handle.getFile();
+    }
+    return tab.file;
+  }
+
+  async function loadTab(tab, full){
+    let file;
+    try { file = await fileOf(tab); }
+    catch(e){ msg(e.message, true); return; }
+
+    let start = 0;
+    if (!full && file.size > TAIL_BYTES) start = file.size - TAIL_BYTES;
+
+    tab.offset = file.size;
+    tab.size = file.size;
+    tab.decoder = new TextDecoder('utf-8');
+    tab.partial = '';
+    tab.lines = [];
+    tab.counter = 0;
+    tab.counts = {error:0, warn:0, info:0, debug:0, other:0};
+    tab.truncatedFrom = start;
+    tab.read = file.size - start;
+    tab.unread = 0;
+    tab.hasErr = false;
+
+    try {
+      const buf = await file.slice(start).arrayBuffer();
+      let text = tab.decoder.decode(buf, { stream:true });
+      if (start > 0){
+        const i = text.indexOf('\n');
+        text = i >= 0 ? text.slice(i + 1) : text;
+      }
+      ingest(tab, text);
+    } catch(e){
+      msg('読み込みに失敗しました: ' + e.message, true);
+      return;
+    }
+
+    tab.loaded = true;
+    tab.updated = Date.now();
+    tab.stick = true;
+
+    if (tab.key === state.activeKey){
+      render();
+      scrollToBottom();
+      updateNotice();
+      msg('');
+      $('stTime').textContent = clock(tab.updated);
+    }
+    startPolling();
+  }
+
+  function ingest(tab, text){
+    const combined = tab.partial + text;
+    const parts = combined.split('\n');
+    tab.partial = parts.pop();
+    for (let i = 0; i < parts.length; i++){
+      const t = parts[i].replace(/\r$/, '');
+      const lv = detectLevel(t);
+      tab.counter++;
+      tab.counts[lv]++;
+      tab.lines.push({ n: tab.counter, t, lv });
+    }
+    if (tab.lines.length > MAX_LINES) tab.lines.splice(0, tab.lines.length - MAX_LINES);
+  }
+
+  /* ---------- polling ---------- */
+  function startPolling(){
+    stopPolling();
+    if (!state.follow) return;
+    if (!state.tabs.some(t => t.live)) return;
+    state.timer = setTimeout(tick, state.pollMs);
+  }
+  function stopPolling(){
+    if (state.timer){ clearTimeout(state.timer); state.timer = null; }
+  }
+
+  async function tick(){
+    state.timer = null;
+    for (const tab of state.tabs.slice()){
+      if (!tab.live || !tab.loaded) continue;
+      try {
+        const file = await tab.handle.getFile();
+        const entry = state.files.find(f => f.key === tab.key);
+        if (entry){ entry.size = file.size; entry.mtime = file.lastModified; }
+
+        if (file.size < tab.offset){
+          await loadTab(tab, false);
+          if (tab.key === state.activeKey) msg('ファイルが切り詰められました。読み直しました');
+          continue;
+        }
+        if (file.size === tab.offset) continue;
+
+        const buf = await file.slice(tab.offset).arrayBuffer();
+        const before = tab.counter, beforeErr = tab.counts.error;
+        ingest(tab, tab.decoder.decode(buf, { stream:true }));
+        tab.read += file.size - tab.offset;
+        tab.offset = file.size;
+        tab.size = file.size;
+        tab.updated = Date.now();
+
+        if (tab.key === state.activeKey){
+          render();
+          if (tab.stick) scrollToBottom();
+          $('stTime').textContent = clock(tab.updated);
+        } else {
+          tab.unread += tab.counter - before;
+          if (tab.counts.error > beforeErr) tab.hasErr = true;
+          renderTabs();
+        }
+      } catch(e){
+        if (tab.key === state.activeKey) msg('更新できません: ' + e.message, true);
+      }
+    }
+    if (state.dirHandle && Date.now() - state.rescanAt > 10000) await rescan();
+    if (state.follow && state.tabs.some(t => t.live)) state.timer = setTimeout(tick, state.pollMs);
+  }
+
+  /* ---------- filtering & rendering ---------- */
+  function buildRe(text){
+    if (!text) return null;
+    const src = state.regex ? text : text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    try { return new RegExp(src, state.caseSensitive ? 'g' : 'gi'); }
+    catch(_){ return null; }
+  }
+
+  function visibleLines(){
+    const tab = active();
+    if (!tab) return [];
+    const qre = buildRe($('q').value);
+    const exre = buildRe($('ex').value);
+    const only = $('onlyMatch').checked;
+    const out = [];
+    for (const ln of tab.lines){
+      if (!state.levelOn[ln.lv]) continue;
+      if (exre){ exre.lastIndex = 0; if (exre.test(ln.t)) continue; }
+      if (qre && only){ qre.lastIndex = 0; if (!qre.test(ln.t)) continue; }
+      out.push(ln);
+    }
+    if (tab.partial){
+      const lv = detectLevel(tab.partial);
+      if (state.levelOn[lv]) out.push({ n: tab.counter + 1, t: tab.partial, lv, pending:true });
+    }
+    return out;
+  }
+
+  function markup(text, re){
+    if (!re) return esc(text);
+    let out = '', last = 0, m, guard = 0;
+    re.lastIndex = 0;
+    while ((m = re.exec(text)) !== null && guard++ < 1000){
+      if (m[0] === ''){ re.lastIndex++; continue; }
+      out += esc(text.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+      last = m.index + m[0].length;
+    }
+    return out + esc(text.slice(last));
+  }
+
+  let lastVisible = [];
+  function render(){
+    const tab = active();
+    const rows = visibleLines();
+    lastVisible = rows;
+    const shown = rows.length > RENDER_CAP ? rows.slice(-RENDER_CAP) : rows;
+    const qre = buildRe($('q').value);
+    const log = $('log');
+
+    if (!tab){
+      log.innerHTML = '<div class="empty" style="padding:40px 24px;line-height:2">' +
+        '左のリストからログファイルを選ぶと、タブが開いてここに内容が出ます。<br>' +
+        '複数開けば、表示していないタブも裏で追記を拾い続けます。</div>';
+    } else if (!shown.length){
+      log.innerHTML = '<div class="empty" style="padding:40px 24px">' +
+        (tab.lines.length ? '条件に合う行がありません。検索語やレベルの絞り込みを外してみてください。' : 'このファイルは空です。') +
+        '</div>';
+    } else {
+      let html = '';
+      if (rows.length > shown.length){
+        html += '<div class="row"><span class="ln"></span><span class="tx" style="color:var(--faint)">' +
+          '（直近 ' + num(shown.length) + ' 行を表示中　全 ' + num(rows.length) + ' 行が条件に一致）</span></div>';
+      }
+      for (const r of shown){
+        html += '<div class="row lv-' + r.lv + (r.pending ? ' pending' : '') + '">' +
+          '<span class="ln">' + r.n + '</span><span class="tx">' + markup(r.t, qre) + '</span></div>';
+      }
+      log.innerHTML = html;
+    }
+
+    $('stLines').textContent = tab ? num(tab.counter) : '0';
+    $('stShown').textContent = num(rows.length);
+    $('stSize').textContent = tab ? bytes(tab.read) : '0';
+    const e = tab ? tab.counts.error : 0, w = tab ? tab.counts.warn : 0;
+    $('stErr').innerHTML = (e || w)
+      ? '<span class="k">ERROR</span> <b style="color:var(--error)">' + num(e) + '</b>　' +
+        '<span class="k">WARN</span> <b style="color:var(--warn)">' + num(w) + '</b>'
+      : '';
+    for (const l of LEVELS){
+      const b = document.querySelector('.chip[data-key=' + l.key + '] b');
+      if (b) b.textContent = tab && tab.counts[l.key] ? num(tab.counts[l.key]) : '';
+    }
+    drawMap(rows);
+  }
+
+  let renderQueued = false;
+  function queueRender(){
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; render(); });
+  }
+
+  function scrollToBottom(){
+    const log = $('log');
+    log.scrollTop = log.scrollHeight;
+    const t = active();
+    if (t) t.stick = true;
+    $('toBottom').classList.remove('show');
+  }
+
+  /* ---------- density strip ---------- */
+  function drawMap(rows){
+    const cv = $('map');
+    const h = cv.clientHeight, w = cv.clientWidth;
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== w * dpr || cv.height !== h * dpr){ cv.width = w * dpr; cv.height = h * dpr; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!rows.length) return;
+    const qre = buildRe($('q').value);
+    const step = Math.max(1, Math.ceil(rows.length / (h * 2)));
+    for (let i = 0; i < rows.length; i += step){
+      const r = rows[i];
+      let color = null;
+      if (r.lv === 'error') color = '#f2777a';
+      else if (r.lv === 'warn') color = '#e6b85c';
+      if (qre && !$('onlyMatch').checked){ qre.lastIndex = 0; if (qre.test(r.t)) color = '#8bd5ca'; }
+      if (!color) continue;
+      const y = Math.floor((i / rows.length) * h);
+      ctx.fillStyle = color;
+      ctx.fillRect(2, y, w - 4, 2);
+    }
+  }
+
+  $('map').addEventListener('click', e => {
+    const cv = $('map'), log = $('log');
+    const frac = (e.clientY - cv.getBoundingClientRect().top) / cv.clientHeight;
+    log.scrollTop = Math.max(0, frac * log.scrollHeight - log.clientHeight / 2);
+  });
+
+  /* ---------- level chips ---------- */
+  $('levels').innerHTML = LEVELS.map(l =>
+    '<button class="chip" data-key="' + l.key + '" data-on="true" style="--c:' + l.color + '">' +
+    l.label + '<b></b></button>').join('');
+  $('levels').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const k = chip.dataset.key;
+    state.levelOn[k] = !state.levelOn[k];
+    chip.dataset.on = String(state.levelOn[k]);
+    queueRender();
+  });
+
+  /* ---------- events ---------- */
+  $('pickDir').addEventListener('click', pickDirectory);
+  $('pickFile').addEventListener('click', pickFiles);
+  $('refresh').addEventListener('click', () => state.dirHandle ? rescan() : renderFileList());
+  $('showAll').addEventListener('change', () => state.dirHandle ? rescan() : renderFileList());
+  $('fileFilter').addEventListener('input', renderFileList);
+
+  $('fileList').addEventListener('click', e => {
+    const li = e.target.closest('li[data-key]');
+    if (!li) return;
+    const entry = state.files.find(f => f.key === li.dataset.key);
+    if (entry) openTab(entry);
+  });
+  $('fileList').addEventListener('keydown', e => {
+    const li = e.target.closest('li[data-key]');
+    if (!li) return;
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      const entry = state.files.find(f => f.key === li.dataset.key);
+      if (entry) openTab(entry);
+    }
+    if (e.key === 'ArrowDown' && li.nextElementSibling) li.nextElementSibling.focus();
+    if (e.key === 'ArrowUp' && li.previousElementSibling) li.previousElementSibling.focus();
+  });
+
+  $('tabs').addEventListener('click', e => {
+    const close = e.target.closest('[data-close]');
+    if (close){ e.stopPropagation(); closeTab(close.dataset.close); return; }
+    const tab = e.target.closest('.tab');
+    if (tab) activateTab(tab.dataset.key);
+  });
+  $('tabs').addEventListener('auxclick', e => {
+    if (e.button !== 1) return;
+    const tab = e.target.closest('.tab');
+    if (tab){ e.preventDefault(); closeTab(tab.dataset.key); }
+  });
+
+  $('follow').addEventListener('change', e => {
+    state.follow = e.target.checked;
+    $('followWrap').classList.toggle('live', state.follow);
+    if (state.follow){ scrollToBottom(); startPolling(); } else stopPolling();
+  });
+  $('interval').addEventListener('change', e => { state.pollMs = +e.target.value; startPolling(); });
+  $('wrap').addEventListener('change', e => $('log').classList.toggle('wrap', e.target.checked));
+  $('fontPlus').addEventListener('click', () => setFont(state.fs + 1));
+  $('fontMinus').addEventListener('click', () => setFont(state.fs - 1));
+  function setFont(v){
+    state.fs = Math.min(20, Math.max(9, v));
+    document.documentElement.style.setProperty('--fs', state.fs + 'px');
+  }
+
+  let inputTimer;
+  for (const id of ['q','ex']){
+    $(id).addEventListener('input', () => {
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(() => {
+        render();
+        const t = active();
+        if (t && t.stick) scrollToBottom();
+      }, 120);
+    });
+  }
+  $('onlyMatch').addEventListener('change', queueRender);
+  $('regexBtn').addEventListener('click', () => {
+    state.regex = !state.regex;
+    $('regexBtn').classList.toggle('on', state.regex);
+    queueRender();
+  });
+  $('caseBtn').addEventListener('click', () => {
+    state.caseSensitive = !state.caseSensitive;
+    $('caseBtn').classList.toggle('on', state.caseSensitive);
+    queueRender();
+  });
+  $('loadAll').addEventListener('click', () => {
+    const t = active();
+    if (t) loadTab(t, true);
+  });
+
+  $('log').addEventListener('scroll', () => {
+    const log = $('log');
+    const t = active();
+    if (!t) return;
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    t.stick = atBottom;
+    t.scrollTop = log.scrollTop;
+    $('toBottom').classList.toggle('show', !atBottom);
+  });
+  $('toBottom').addEventListener('click', scrollToBottom);
+
+  $('save').addEventListener('click', () => {
+    if (!lastVisible.length) return;
+    const t = active();
+    const text = lastVisible.map(r => r.t).join('\n');
+    const url = URL.createObjectURL(new Blob([text], { type:'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (t ? t.name : 'log') + '.filtered.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  document.addEventListener('keydown', e => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'f'){ e.preventDefault(); $('q').focus(); $('q').select(); return; }
+    if (e.key === 'Escape'){
+      const el = document.activeElement;
+      if (el === $('q') || el === $('ex')){ el.value = ''; el.blur(); render(); }
+      return;
+    }
+    if (mod && e.key === 'ArrowDown'){ e.preventDefault(); scrollToBottom(); return; }
+    if (e.altKey && !mod){
+      if (/^Digit[1-9]$/.test(e.code)){
+        const i = +e.code.slice(5) - 1;
+        if (state.tabs[i]){ e.preventDefault(); activateTab(state.tabs[i].key); }
+      } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight'){
+        const i = state.tabs.findIndex(t => t.key === state.activeKey);
+        if (i >= 0){
+          const n = (i + (e.code === 'ArrowRight' ? 1 : -1) + state.tabs.length) % state.tabs.length;
+          e.preventDefault();
+          activateTab(state.tabs[n].key);
+        }
+      } else if (e.code === 'KeyW'){
+        if (state.activeKey){ e.preventDefault(); closeTab(state.activeKey); }
+      }
+    }
+  });
+
+  /* ---------- drag & drop ---------- */
+  const drop = $('drop');
+  ['dragenter','dragover'].forEach(t => document.addEventListener(t, e => {
+    e.preventDefault(); drop.classList.add('hot');
+  }));
+  ['dragleave','drop'].forEach(t => document.addEventListener(t, e => {
+    if (t === 'dragleave' && e.relatedTarget) return;
+    drop.classList.remove('hot');
+  }));
+  document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const items = Array.from(e.dataTransfer.items || []);
+    const plain = [];
+    let firstEntry = null;
+    for (const it of items){
+      if (it.kind !== 'file') continue;
+      if (it.getAsFileSystemHandle){
+        const h = await it.getAsFileSystemHandle();
+        if (h.kind === 'directory'){ await openDirectory(h); continue; }
+        const entry = await addHandle(h);
+        if (entry && !firstEntry) firstEntry = entry;
+      } else {
+        const f = it.getAsFile();
+        if (f) plain.push(f);
+      }
+    }
+    if (plain.length) addPlainFiles(plain);
+    if (firstEntry) openTab(firstEntry);
+  });
+
+  $('fallbackDir').addEventListener('change', e => addPlainFiles(e.target.files));
+  $('fallbackFile').addEventListener('change', e => addPlainFiles(e.target.files));
+
+  window.addEventListener('resize', () => drawMap(lastVisible));
+
+  if (!window.showDirectoryPicker){
+    msg('このブラウザはフォルダの追尾に未対応です。Chromeを推奨します');
+  }
+  renderFileList();
+  renderTabs();
+  render();
+})();
+</script>
+</body>
+</html>
