@@ -326,7 +326,8 @@ function applyContext(title, summaryText, fieldsText) {
  * @returns {Promise<{detail: object, model: string}>} detail は saveGenerated にそのまま渡せる形
  */
 export async function generateStage(stageId, ctx, onProgress) {
-  const connection = requireConnection()
+  // ctx.connection は呼び出し側でモデルを選ばせるときだけ使う。無ければ画面で選んでいる接続
+  const connection = ctx.connection || requireConnection()
   const transcript = String(ctx.transcript ?? '').slice(0, TRANSCRIPT_LIMIT)
   const transcriptInput = `動画タイトル: ${ctx.title}\n\n${transcript}`
 

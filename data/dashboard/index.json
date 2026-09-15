@@ -72,6 +72,11 @@
         ]
       },
       {
+        "id": "clipgen",
+        "name": "clipstock 生成",
+        "type": "clipgen"
+      },
+      {
         "id": "calc",
         "name": "電卓",
         "type": "calc",

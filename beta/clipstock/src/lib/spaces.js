@@ -80,6 +80,17 @@ export function activeSpace() {
 }
 
 /**
+ * URLを介さずに表示対象を切り替える。
+ * ダッシュボードなど、?space= を持てない別ページから使う。
+ * initSpaces() のあとに呼ぶこと。
+ */
+export function selectSpace(id) {
+  const found = config.spaces.find((s) => s.id === id)
+  if (found) active = found
+  return active
+}
+
+/**
  * そのスペースの見せ方。
  * 既定('')は動画の要約向け。'music' は曲目リスト向けにタブと生成内容を差し替える。
  */

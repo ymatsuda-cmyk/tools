@@ -94,6 +94,16 @@
   }
   .mon-fix:hover{color:var(--text);}
 
+  .gen-picks{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .gen-picks select{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:6px 8px;outline:none;cursor:pointer;
+  }
+  .gen-picks select:focus{border-color:var(--border-strong);}
+  .gen-picks select:disabled{opacity:0.4;cursor:not-allowed;}
+  .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -471,6 +481,7 @@
         <option value="fxpos">ドル円の建値</option>
         <option value="rule">ルール（曜日で決まる予定）</option>
         <option value="calc">電卓</option>
+        <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
         <option value="manual">手動カウンタ</option>
         <option value="quota">APIクォータ</option>
@@ -503,6 +514,11 @@
     <div class="field" data-for="manual">
       <label>上限</label>
       <input type="number" id="mf-limit" value="100">
+    </div>
+    <div class="field" data-for="clipgen">
+      <label>総数</label>
+      <input type="number" id="mf-clipgen-total" placeholder="空欄なら一覧の全件数">
+      <div class="hint">「完了」がどれだけ溜まっているかを見るときの分母です</div>
     </div>
     <div class="field" data-for="manual">
       <label>単位</label>
@@ -1333,10 +1349,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1347,6 +1363,7 @@ const TYPE_LABELS = {
   fxpos  : 'ドル円建値',
   rule   : 'ルール',
   calc   : '電卓',
+  clipgen: 'clipstock生成',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -2052,9 +2069,284 @@ function wireCalcVars(card){
   });
 }
 
+/* ============================================================
+   clipstock のまとめて生成
+   スペース(パターン)と使うAIを選んで、未生成ぶんを順番に生成する。
+   生成そのものは api/updateclip が clipstock の実装を呼ぶ。
+   接続設定は clipstock と同じ localStorage を共有するので、ここでは持たない。
+   ============================================================ */
+
+const CLIPGEN_MODULE = new URL('../../api/updateclip/updateclip.js', location.href).href;
+
+/* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
+const clipgenState = {};
+
+const CLIPGEN_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  idle   : { color:'#5FA8A0', label:'待機中'   },
+  running: { color:'#E0B252', label:'生成中'   },
+  done   : { color:'#5FA8A0', label:'完了'     },
+  error  : { color:'#D9694F', label:'エラー'   }
+};
+
+let clipgenApi = null;
+
+async function clipgenModule(){
+  if(!clipgenApi) clipgenApi = await import(CLIPGEN_MODULE);
+  return clipgenApi;
+}
+
+function clipgenStateOf(m){
+  if(!clipgenState[m.id]){
+    clipgenState[m.id] = {
+      phase:'loading', spaces:[], models:[],
+      spaceId:m.space || '', modelKey:m.model || '',
+      index:0, total:0, title:'', stage:'', count:null, result:null, error:'',
+      cancel:false, paintedAt:0
+    };
+    loadClipgenOptions(m);
+  }
+  return clipgenState[m.id];
+}
+
+/** 選択肢をそろえる。1枚目のカードが読めば2枚目以降はモジュールのキャッシュに乗る */
+async function loadClipgenOptions(m){
+  const st = clipgenState[m.id];
+  try{
+    const api = await clipgenModule();
+    st.spaces = await api.spaces();
+    st.models = api.models();
+    if(!st.spaces.some(s => s.id === st.spaceId)) st.spaceId = st.spaces[0] ? st.spaces[0].id : '';
+    if(!st.models.some(x => x.key === st.modelKey)){
+      const active = st.models.find(x => x.active) || st.models[0];
+      st.modelKey = active ? active.key : '';
+    }
+    st.phase = 'idle';
+    paintClipgen(m.id);
+    countClipgen(m);
+  }catch(err){
+    st.phase = 'error';
+    st.error = err.message || String(err);
+    paintClipgen(m.id);
+  }
+}
+
+/** 対象の件数を数える。静的JSONを読むだけなのでNotionは叩かない */
+async function countClipgen(m){
+  const st = clipgenState[m.id];
+  if(!st.spaceId) return;
+  try{
+    const api = await clipgenModule();
+    const plan = await api.targets(st.spaceId);
+    st.count = {
+      fresh: plan.fresh.length,
+      partial: plan.partial.length,
+      total: plan.total,
+      counts: plan.counts
+    };
+    st.error = '';
+  }catch(err){
+    st.count = null;
+    st.error = err.message || String(err);
+  }
+  paintClipgen(m.id);
+}
+
+function clipgenCountText(st){
+  if(st.error && !st.count) return st.error;
+  if(!st.count) return '対象を確認中…';
+  const { fresh, partial } = st.count;
+  if(!fresh && !partial) return '生成する対象はありません';
+  const parts = [];
+  if(fresh) parts.push(`未生成 ${fresh}件`);
+  if(partial) parts.push(`欠け ${partial}件`);
+  return parts.join(' / ');
+}
+
+/** 分母。設定していなければ一覧の全件数を使う */
+function clipgenTotal(m, st){
+  const fixed = Number(m.total);
+  if(fixed > 0) return fixed;
+  return st.count ? st.count.total : 0;
+}
+
+/** 待機中のリング。まだAIに通していない「完了」が全体のどれだけ溜まっているか */
+function clipgenIdleRing(m, st){
+  if(!st.count) return '';
+  const done = st.count.counts?.['完了'] || 0;
+  const total = clipgenTotal(m, st);
+  const pct = total ? (done / total) * 100 : 0;
+  return `
+    <div class="mon-ring">
+      ${ringSVG(pct, metricColor(pct), `${done}/${total}`)}
+      <div class="sub">完了 / ${m.total ? '設定した総数' : '一覧の全件'}</div>
+    </div>`;
+}
+
+function clipgenBody(m, st){
+  if(st.phase === 'running'){
+    const pct = st.total ? (st.index / st.total) * 100 : 0;
+    return `
+      <div class="mon-ring">
+        ${ringSVG(pct, '#E0B252', `${st.index}/${st.total}`)}
+        <div class="sub">${esc(st.stage || '準備中')}</div>
+        <div class="gen-now">${esc(st.title || '')}</div>
+      </div>
+      <div class="mon-actions">
+        <button data-clipgen-cancel="${esc(m.id)}" ${st.cancel ? 'disabled' : ''}>
+          ${st.cancel ? '中止しています…' : '中止'}
+        </button>
+      </div>`;
+  }
+
+  const disabled = st.phase === 'loading' ? 'disabled' : '';
+  const picks = `
+    <div class="gen-picks">
+      <select data-clipgen-space="${esc(m.id)}" ${disabled} aria-label="パターン">
+        ${st.spaces.map(s => `<option value="${esc(s.id)}" ${s.id === st.spaceId ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+      </select>
+      <select data-clipgen-model="${esc(m.id)}" ${disabled} aria-label="使うAI">
+        ${st.models.map(x => `<option value="${esc(x.key)}" ${x.key === st.modelKey ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+      </select>
+    </div>`;
+
+  let note;
+  if(st.phase === 'loading'){
+    note = '<div class="mon-offline">読み込み中…</div>';
+  }else if(st.phase === 'error'){
+    note = `<div class="mon-err">${esc(st.error)}</div>`;
+  }else if(st.phase === 'done' && st.result){
+    const r = st.result;
+    const tail = r.cancelled ? '（中止）' : r.stopped === 'quota' ? '（利用上限で打ち切り）' : '';
+    note = `<div class="mon-note">${r.done}件生成${r.failed ? ` / ${r.failed}件失敗` : ''}${tail}</div>
+      ${r.failures.length ? `<div class="mon-err">${esc(r.failures[0])}</div>` : ''}
+      <div class="mon-note">${esc(clipgenCountText(st))}</div>`;
+  }else{
+    note = `<div class="mon-note">${esc(clipgenCountText(st))}</div>`;
+  }
+
+  const runnable = st.phase !== 'loading' && st.spaceId && st.modelKey
+    && st.count && (st.count.fresh || st.count.partial);
+
+  return `
+    ${picks}
+    ${clipgenIdleRing(m, st)}
+    ${note}
+    <div class="mon-actions">
+      <button class="use" data-clipgen-run="${esc(m.id)}" ${runnable ? '' : 'disabled'}>まとめて生成</button>
+    </div>`;
+}
+
+function renderClipgenCard(m){
+  const st = clipgenStateOf(m);
+  const meta = CLIPGEN_STATE_META[st.phase] || CLIPGEN_STATE_META.idle;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="clipgen-body">${clipgenBody(m, st)}</div>
+    </div>`;
+}
+
+/** カードの中身だけ差し替える。グリッド全体を描き直すと選択中のセレクトが閉じてしまう */
+function paintClipgen(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = clipgenState[id];
+  if(!m || !st) return;
+  const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"]`);
+  if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
+
+  const meta = CLIPGEN_STATE_META[st.phase] || CLIPGEN_STATE_META.idle;
+  card.querySelector('.mon-dot').style.background = meta.color;
+  card.querySelector('.mon-state').textContent = meta.label;
+  card.querySelector('.clipgen-body').innerHTML = clipgenBody(m, st);
+  wireClipgen(card);
+  st.paintedAt = Date.now();
+}
+
+function wireClipgen(card){
+  const id = card.dataset.monitor;
+  const st = clipgenState[id];
+  const m = allMonitors().find(x => x.id === id);
+  if(!st || !m) return;
+
+  card.querySelectorAll('[data-clipgen-space]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      st.spaceId = sel.value;
+      st.count = null;
+      st.result = null;
+      st.phase = 'idle';
+      paintClipgen(id);
+      countClipgen(m);
+    });
+  });
+
+  card.querySelectorAll('[data-clipgen-model]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{ st.modelKey = sel.value; });
+  });
+
+  card.querySelectorAll('[data-clipgen-run]').forEach(btn=>{
+    btn.addEventListener('click', ()=>runClipgen(m));
+  });
+
+  card.querySelectorAll('[data-clipgen-cancel]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      st.cancel = true;
+      paintClipgen(id);
+    });
+  });
+}
+
+/* ストリーミング中の更新は速すぎるので、描き直す間隔を空ける */
+const CLIPGEN_PAINT_MS = 300;
+
+async function runClipgen(m){
+  const st = clipgenState[m.id];
+  if(!st || st.phase === 'running') return;
+
+  const space = st.spaces.find(s => s.id === st.spaceId);
+  const model = st.models.find(x => x.key === st.modelKey);
+  const total = (st.count?.fresh || 0) + (st.count?.partial || 0);
+  if(!confirm(`${space ? space.label : st.spaceId} の${total}件を ${model ? model.label : 'AI'} で順番に生成します。\n時間がかかります。続けますか？`)) return;
+
+  Object.assign(st, { phase:'running', cancel:false, index:0, total, title:'', stage:'準備中', error:'', result:null });
+  paintClipgen(m.id);
+
+  try{
+    const api = await clipgenModule();
+    const result = await api.run({
+      spaceId: st.spaceId,
+      modelKey: st.modelKey,
+      shouldCancel: () => st.cancel,
+      onProgress: (p)=>{
+        st.index = p.index;
+        st.total = p.total;
+        st.title = p.title;
+        st.stage = p.stage;
+        if(Date.now() - st.paintedAt >= CLIPGEN_PAINT_MS) paintClipgen(m.id);
+      }
+    });
+    st.result = result;
+    st.phase = 'done';
+    st.index = result.done + result.failed;
+    toast(`${result.done}件を生成しました${result.failed ? `（${result.failed}件失敗）` : ''}`);
+  }catch(err){
+    st.phase = 'error';
+    st.error = err.message || String(err);
+    toast(st.error);
+  }
+  st.cancel = false;
+  paintClipgen(m.id);
+  countClipgen(m);
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
+  if(monitorType(m) === 'clipgen') return renderClipgenCard(m);
 
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -2315,6 +2607,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.mon-card').forEach(wireCalcVars);
 
+  grid.querySelectorAll('.clipgen-body').forEach(body=>wireClipgen(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-toggle]').forEach(sw=>{
     sw.addEventListener('change', ()=>{
       controlMonitor(sw.dataset.toggle, sw.checked ? 'start' : 'stop');
@@ -2508,6 +2802,7 @@ function openMonitorModal(type){
   F('mf-lead').value = '1';
   F('mf-leadlabel').value = '';
   F('mf-lines').value = '1';
+  F('mf-clipgen-total').value = '';
   F('err-monitor').style.display = 'none';
   syncMonitorForm();
   monitorOverlay.classList.add('show');
@@ -2557,6 +2852,10 @@ function buildMonitor(){
   if(type === 'calc'){
     m.lines = Math.max(1, Math.min(20, Number(F('mf-lines').value) || 1));
     m.rows = Array.from({ length:m.lines }, ()=>({ label:'', expr:'' }));
+  }
+  if(type === 'clipgen'){
+    const total = Number(F('mf-clipgen-total').value);
+    if(total > 0) m.total = total;
   }
   return m;
 }
