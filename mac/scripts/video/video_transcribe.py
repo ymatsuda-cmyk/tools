@@ -6,7 +6,8 @@
   --page-id <ID>        特定の1ページだけを処理
 
 処理の流れ:
-  1. Notionから対象ページを取得
+  1. Notionから対象ページを取得（すでに状態が「処理中」ならスキップし、
+     処理を始めるときに「処理中」へ書き換えて多重実行を防ぐ）
   2. URLプロパティから動画IDを解決
   3. 字幕API（youtube-transcript-api）で文字起こしを取得
      取れない場合は yt-dlp で音声を落とし、mlx-whisper で文字起こし（既定でON）
@@ -19,6 +20,7 @@
   NOTION_TOKEN     Notion Integration Token（必須）
   VIDEO_ENV_FILE   環境変数を読み込むファイルのパス（既定: ~/.video_notion_sync.env）
   VIDEO_DB_ID      対象データベースID（既定: 📚動画DB）
+  VIDEO_WHISPER_LOCK  Whisperの同時実行を防ぐロックファイル（既定: /tmp/video_transcribe_whisper.lock）
 
 Whisperフォールバックを使うには:
   pip install mlx-whisper
@@ -68,11 +70,16 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
 
 STATUS_EMPTY = "空欄"
+STATUS_PROCESSING = "処理中"
 WHISPER_MODEL_DEFAULT = "mlx-community/whisper-large-v2-mlx"
 WHISPER_LANGUAGE_DEFAULT = "ja"
 
 CLIPSTOCK_BUILDER = SCRIPT_DIR / "build_clipstock_json.py"
 CLIPSTOCK_OUT_DIR = SCRIPT_DIR.parents[2] / "data" / "clipstock"
+
+# Whisperはマシンの負荷が高いので、同時に2つ以上走らせないためのPIDロック
+WHISPER_LOCK_FILE = Path(os.environ.get(
+    "VIDEO_WHISPER_LOCK", str(Path(tempfile.gettempdir()) / "video_transcribe_whisper.lock")))
 
 # ---------------------------------------------------------------- Notion
 
@@ -156,6 +163,10 @@ def fetch_page(page_id):
 def page_title(page):
     items = page.get("properties", {}).get("動画タイトル", {}).get("title", [])
     return items[0].get("plain_text", "") if items else "(無題)"
+
+
+def page_status(page):
+    return ((page.get("properties", {}).get("状態", {}) or {}).get("select") or {}).get("name") or ""
 
 
 def page_url_value(page):
@@ -247,7 +258,7 @@ def append_transcript(page_id, source_label, transcript_text, engine_label):
 
 
 def update_page_props(page_id, *, title=None, url=None, thumbnail=None,
-                      char_count=None, status=None):
+                      char_count=None):
     props = {}
     if title:
         props["動画タイトル"] = {"title": [{"text": {"content": title[:2000]}}]}
@@ -257,14 +268,23 @@ def update_page_props(page_id, *, title=None, url=None, thumbnail=None,
         props["サムネイル"] = {"url": thumbnail}
     if char_count is not None:
         props["原文文字数"] = {"number": char_count}
-    if status:
-        props["状態"] = {"select": {"name": status}}
     if not props:
         return True
     resp = requests.patch(f"{NOTION_API}/pages/{page_id}",
                           headers=notion_headers(), json={"properties": props}, timeout=60)
     if resp.status_code != 200:
         print(f"    ⚠️ プロパティ更新失敗: {resp.status_code} {resp.text[:300]}")
+        return False
+    return True
+
+
+def set_status(page_id, status):
+    """状態を書き換える。status が空なら空欄に戻す。"""
+    value = {"name": status} if status else None
+    resp = requests.patch(f"{NOTION_API}/pages/{page_id}", headers=notion_headers(),
+                          json={"properties": {"状態": {"select": value}}}, timeout=60)
+    if resp.status_code != 200:
+        print(f"    ⚠️ 状態更新失敗: {resp.status_code} {resp.text[:300]}")
         return False
     return True
 
@@ -548,6 +568,44 @@ def transcribe_with_whisper(audio_path, model, language):
     return lines or None
 
 
+def whisper_lock_owner():
+    """Whisperを実行中のプロセスのPID。いなければ None（死んだロックは片付ける）。"""
+    try:
+        pid = int(WHISPER_LOCK_FILE.read_text().strip())
+    except (OSError, ValueError):
+        WHISPER_LOCK_FILE.unlink(missing_ok=True)
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        WHISPER_LOCK_FILE.unlink(missing_ok=True)
+        return None
+    except PermissionError:
+        pass  # 別ユーザのプロセス。生きている
+    return pid
+
+
+def acquire_whisper_lock():
+    """ロックを取る。他でWhisperが動いていれば False。"""
+    if whisper_lock_owner():
+        return False
+    try:
+        fd = os.open(str(WHISPER_LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w") as f:
+        f.write(str(os.getpid()))
+    return True
+
+
+def release_whisper_lock():
+    try:
+        if WHISPER_LOCK_FILE.read_text().strip() == str(os.getpid()):
+            WHISPER_LOCK_FILE.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
+
+
 def transcribe_video_via_whisper(canonical_url, *, model, language):
     """字幕が無い動画向け：音声DL→mlx-whisperで文字起こし。"""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -569,12 +627,37 @@ def transcribe_video_via_whisper(canonical_url, *, model, language):
 
 def process_page(page, *, set_status_name, is_retry, whisper_enabled,
                  whisper_model, whisper_language):
+    """1ページを処理する。処理中は状態を「処理中」にして他の実行との衝突を防ぐ。"""
+    page_id = page.get("id")
+    prev_status = page_status(page)
+
+    print(f"  対象: {page_title(page)[:60]}")
+    print(f"        page_id={page_id}")
+
+    if prev_status == STATUS_PROCESSING:
+        print(f"  ⏭️  すでに「{STATUS_PROCESSING}」のためスキップ（他の実行が処理中）")
+        return False
+    if not set_status(page_id, STATUS_PROCESSING):
+        print(f"  ❌ 状態を「{STATUS_PROCESSING}」にできなかったためスキップ")
+        return False
+
+    ok = False
+    try:
+        ok = transcribe_page(page, is_retry=is_retry, whisper_enabled=whisper_enabled,
+                             whisper_model=whisper_model, whisper_language=whisper_language)
+    finally:
+        # 失敗したときは元の状態に戻し、次回の実行で拾い直せるようにする
+        final_status = set_status_name if (ok and set_status_name) else prev_status
+        set_status(page_id, final_status)
+        if ok and set_status_name:
+            print(f"  ✅ 状態を「{set_status_name}」に更新")
+    return ok
+
+
+def transcribe_page(page, *, is_retry, whisper_enabled, whisper_model, whisper_language):
     title = page_title(page)
     page_id = page.get("id")
     raw_url = page_url_value(page)
-
-    print(f"  対象: {title[:60]}")
-    print(f"        page_id={page_id}")
 
     if not raw_url:
         print("  ❌ URLが空のためスキップ")
@@ -605,9 +688,16 @@ def process_page(page, *, set_status_name, is_retry, whisper_enabled,
         transcript, engine_label = got
 
     if not transcript and whisper_enabled:
+        owner = whisper_lock_owner()
+        if owner or not acquire_whisper_lock():
+            print(f"  ⏭️  ほかでWhisperが実行中(PID {owner or '?'})。負荷が高くなるため中止します")
+            return False
         print("    字幕なし → Whisperにフォールバック")
-        got = transcribe_video_via_whisper(canonical_url, model=whisper_model,
-                                           language=whisper_language)
+        try:
+            got = transcribe_video_via_whisper(canonical_url, model=whisper_model,
+                                               language=whisper_language)
+        finally:
+            release_whisper_lock()
         if got:
             transcript, engine_label = got
 
@@ -634,12 +724,9 @@ def process_page(page, *, set_status_name, is_retry, whisper_enabled,
         url=canonical_url if raw_url != canonical_url else None,
         thumbnail=meta.get("thumbnail") or None,
         char_count=len(transcript),
-        status=set_status_name,
     )
     if new_title:
         print(f"  ✅ 動画タイトルを更新: {new_title[:60]}")
-    if set_status_name:
-        print(f"  ✅ 状態を「{set_status_name}」に更新")
     return True
 
 
@@ -693,6 +780,12 @@ def main():
         print("⚠️ Python 3.9以下で実行されています。古いPython環境はLibreSSL絡みで"
               "yt-dlpが失敗しやすいので、python3.11以降で実行し直すことを推奨します。")
 
+    owner = whisper_lock_owner()
+    if owner and not args.no_whisper:
+        print(f"⏭️ 別のプロセス(PID {owner})がWhisperを実行中のため中止します。"
+              "字幕だけで進めたいときは --no-whisper を付けてください。")
+        return
+
     if args.page_id:
         page = fetch_page(args.page_id)
         targets = [page] if page else []
@@ -710,8 +803,7 @@ def main():
 
     print(f"\n対象: {len(targets)}件")
     for p in targets:
-        st = (p.get("properties", {}).get("状態", {}).get("select") or {}).get("name") or "(空欄)"
-        print(f"  - [{st}] {page_title(p)[:60]}")
+        print(f"  - [{page_status(p) or '(空欄)'}] {page_title(p)[:60]}")
 
     if args.dry_run:
         print("\n--dry-run のため処理は行いません。")
@@ -721,8 +813,7 @@ def main():
     ok_count = 0
     for i, page in enumerate(targets, 1):
         print(f"\n[{i}/{len(targets)}]")
-        st = (page.get("properties", {}).get("状態", {}).get("select") or {}).get("name") or ""
-        is_retry = is_retry_default or st == "再取得"
+        is_retry = is_retry_default or page_status(page) == "再取得"
         try:
             if process_page(page, set_status_name=set_status_name, is_retry=is_retry,
                             whisper_enabled=not args.no_whisper,
