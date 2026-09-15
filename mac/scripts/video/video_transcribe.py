@@ -2,8 +2,8 @@
 """Notionの動画DBを対象に、URL先の動画から文字起こしを行いページ本文へ書き込む。
 
 対象の指定方法:
-  --status 空欄 再取得   状態が空欄／再取得のページをまとめて処理（既定）
-  --page-id <ID>        特定の1ページだけを処理
+  --status 空欄 新規 再取得   状態が空欄／新規／再取得のページをまとめて処理（既定）
+  --page-id <ID>             特定の1ページだけを処理
 
 処理の流れ:
   1. Notionから対象ページを取得（すでに状態が「処理中」ならスキップし、
@@ -11,6 +11,7 @@
   2. URLプロパティから動画IDを解決
   3. 字幕API（youtube-transcript-api）で文字起こしを取得
      取れない場合は yt-dlp で音声を落とし、mlx-whisper で文字起こし（既定でON）
+     分類が「music」のページは文字起こしせず、YouTubeの概要欄を本文にする
   4. 既存の本文ブロックをアーカイブしてから新しい文字起こしを追記
   5. 動画タイトル・サムネイル・原文文字数・状態を更新
   6. 1件でも更新できたら build_clipstock_json.py を呼び、
@@ -70,6 +71,8 @@ NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 VIDEO_DB_ID = os.environ.get("VIDEO_DB_ID", "3630e7a535dc8154ac62d41f7611540f")
 
 STATUS_EMPTY = "空欄"
+STATUS_NEW = "新規"
+STATUS_RETRY = "再取得"
 STATUS_PROCESSING = "処理中"
 WHISPER_MODEL_DEFAULT = "mlx-community/whisper-large-v2-mlx"
 WHISPER_LANGUAGE_DEFAULT = "ja"
@@ -774,8 +777,8 @@ def rebuild_clipstock_index():
 def main():
     ap = argparse.ArgumentParser(description="Notion動画DBの文字起こし")
     ap.add_argument("--page-id", help="対象のNotionページID（--statusより優先）")
-    ap.add_argument("--status", nargs="+", default=[STATUS_EMPTY, "再取得"],
-                    help=f"対象とする状態（既定: {STATUS_EMPTY} 再取得）")
+    ap.add_argument("--status", nargs="+", default=[STATUS_EMPTY, STATUS_NEW, STATUS_RETRY],
+                    help=f"対象とする状態（既定: {STATUS_EMPTY} {STATUS_NEW} {STATUS_RETRY}）")
     ap.add_argument("--set-status", default="完了",
                     help="処理完了後に設定する状態（既定: 完了。空文字で更新しない）")
     ap.add_argument("--limit", type=int, help="処理する件数の上限")
@@ -832,7 +835,7 @@ def main():
     ok_count = 0
     for i, page in enumerate(targets, 1):
         print(f"\n[{i}/{len(targets)}]")
-        is_retry = is_retry_default or page_status(page) == "再取得"
+        is_retry = is_retry_default or page_status(page) == STATUS_RETRY
         try:
             if process_page(page, set_status_name=set_status_name, is_retry=is_retry,
                             whisper_enabled=not args.no_whisper,
