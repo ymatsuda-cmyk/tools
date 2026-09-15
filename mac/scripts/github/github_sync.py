@@ -17,7 +17,6 @@ def run(cmd):
     if result.returncode != 0:
         raise RuntimeError(
             f"\nCMD : {' '.join(cmd)}"
-            f"\nOUT : {result.stdout}"
             f"\nERR : {result.stderr}"
         )
 
@@ -185,20 +184,6 @@ def sync_config(config_path):
 
         print(f"rebase失敗: {e}")
         raise
-
-    # rebase後に差分が吸収される場合があるため、commit直前でも再確認する
-    diff_after_pull = subprocess.run([
-        "git",
-        "-C",
-        str(repo_root),
-        "diff",
-        "--cached",
-        "--quiet"
-    ])
-
-    if diff_after_pull.returncode == 0:
-        print("差分なし（pull後に同期済み）")
-        return
 
 
     #
