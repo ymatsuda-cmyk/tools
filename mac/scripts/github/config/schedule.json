@@ -1,0 +1,11 @@
+{
+  "id": "minutes-data",
+  "description": "スケジュールフォルダ",
+  "enabled": true,
+  "source_folder": "/Users/yuya/Library/CloudStorage/OneDrive-株式会社ライターム/data/schedule",
+  "repository_root": "/Users/yuya/tools",
+  "repo_subfolder": "data/schedule",
+  "branch": "main",
+  "commit_message": "auto: update schedule data",
+  "remote_name": "origin"
+}
