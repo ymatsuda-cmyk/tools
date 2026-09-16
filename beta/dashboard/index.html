@@ -466,11 +466,11 @@
   </div>
 </div>
 
-<!-- 監視対象の追加モーダル -->
+<!-- 監視対象の追加・編集モーダル -->
 <div class="overlay" id="monitorOverlay">
   <div class="modal">
-    <h2>監視対象を追加</h2>
-    <p class="sub">稼働状況タブに表示するカードを1件登録します</p>
+    <h2 id="monitorModalTitle">監視対象を追加</h2>
+    <p class="sub" id="monitorModalSub">稼働状況タブに表示するカードを1件登録します</p>
 
     <div class="field">
       <label>種類</label>
@@ -498,6 +498,12 @@
     <div class="field">
       <label>表示名</label>
       <input type="text" id="mf-name" placeholder="GPU サーバー">
+    </div>
+
+    <div class="field" data-for="api kaggle fx fxpos copilot manual quota">
+      <label>更新間隔（分）</label>
+      <input type="number" id="mf-interval" min="1" max="1440" placeholder="空欄なら既定">
+      <div class="hint">このカードだけ別の間隔で更新します。空欄なら設定の更新間隔に従います</div>
     </div>
 
     <div class="field" data-for="api kaggle fx">
@@ -686,7 +692,15 @@
           <input type="range" id="s-interval" min="1" max="30" step="1">
           <span class="val mono" id="v-interval"></span>
         </div>
-        <div class="hint">稼働状況タブを開いている間だけ自動更新します</div>
+        <div class="hint">稼働状況タブを開いている間だけ自動更新します。カードごとに変えるときは JSON に <code>"interval": 10</code>（分）を足します</div>
+      </div>
+      <div class="field">
+        <label>登録済みカードを編集</label>
+        <div class="range-row">
+          <select id="s-monitor-pick" style="flex:1;"></select>
+          <button class="icon-btn" id="btn-editmonitor" style="width:auto;white-space:nowrap;">フォームで開く</button>
+        </div>
+        <div class="hint">JSONの内容をそのまま入力欄に読み込みます。更新間隔などを直して保存できます</div>
       </div>
       <div class="field">
         <label>監視対象（JSON）</label>
@@ -1132,6 +1146,7 @@ function syncSettingsForm(){
   F('s-interval').value = config.monitorInterval || 3;
   F('v-interval').textContent = (config.monitorInterval || 3) + '分';
   F('s-monitors').value = JSON.stringify(config.monitors || [], null, 2);
+  syncMonitorPicker();
   F('err-monitors').style.display = 'none';
   F('s-gasurl').value = gasSettings.url || '';
   F('s-gassecret').value = gasSettings.secret || '';
@@ -1369,7 +1384,9 @@ const TYPE_LABELS = {
 
 let monitorTimer = null;
 let monitorCountdown = null;
+let monitorRunning = false;
 let nextFetchAt = 0;
+const monitorDueAt = {};      // カードごとの次に取りに行く時刻
 let currentView = 'links';
 let activeMonitor = 'all';    // 'all' か 'type:種別'
 
@@ -1440,6 +1457,20 @@ function monitorTypes(){
 
 function intervalMs(){
   return (config.monitorInterval || 3) * 60 * 1000;
+}
+
+/** カードごとの更新間隔。JSONに interval(分) があるものだけ既定から外れる */
+function intervalMsOf(m){
+  const mins = Number(m && m.interval);
+  return mins > 0 ? mins * 60 * 1000 : intervalMs();
+}
+
+/** 次に何かを取りに行く時刻。取得対象が無いときも、日付が変われば描き直したいので既定間隔で回す */
+function nextDueAt(){
+  const now = Date.now();
+  const targets = fetchTargets();
+  if(!targets.length) return now + intervalMs();
+  return Math.min(...targets.map(m => monitorDueAt[m.id] || now));
 }
 
 function ringSVG(pct, color, center){
@@ -2724,10 +2755,20 @@ async function recordManualUsage(id, delta, reset){
   }catch(err){ toast(err.message); }
 }
 
-async function fetchMonitors(){
-  const list = fetchTargets();
-  // 取得の要らないカード（ゴミ出し）だけのときも、日付が変われば描き直す
-  if(list.length === 0){ renderMonitors(); return; }
+/**
+ * 状況を取りに行く。force=false のときは、自分の周期が来たカードだけを取る
+ * （カードごとに interval を変えられるようにするため）
+ */
+async function fetchMonitors(force = true){
+  const targets = fetchTargets();
+  const now = Date.now();
+  const list = force ? targets : targets.filter(m => (monitorDueAt[m.id] || 0) <= now);
+  if(list.length === 0){
+    // 取得の要らないカード（ゴミ出し）だけのときも、日付が変われば描き直す
+    if(targets.length === 0) renderMonitors();
+    scheduleNextFetch();
+    return;
+  }
   try{
     const res = await callGas({ action:'monitorStatus', monitors:list });
     (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
@@ -2736,8 +2777,19 @@ async function fetchMonitors(){
       monitorSnapshots[m.id] = { id:m.id, state:'error', error:err.message };
     });
   }
-  nextFetchAt = Date.now() + intervalMs();
+  const done = Date.now();
+  list.forEach(m=>{ monitorDueAt[m.id] = done + intervalMsOf(m); });
+  scheduleNextFetch();
   renderMonitors();
+}
+
+/** 一番早く期限が来るカードに合わせて次の取得を予約する */
+function scheduleNextFetch(){
+  clearTimeout(monitorTimer);
+  monitorTimer = null;
+  nextFetchAt = nextDueAt();
+  if(!monitorRunning) return;
+  monitorTimer = setTimeout(()=>fetchMonitors(false), Math.max(1000, nextFetchAt - Date.now()));
 }
 
 async function controlMonitor(id, action){
@@ -2782,13 +2834,14 @@ function updateClock(){
 
 function startMonitorLoop(){
   stopMonitorLoop();
+  monitorRunning = true;
   fetchMonitors();
-  monitorTimer = setInterval(fetchMonitors, intervalMs());
   monitorCountdown = setInterval(updateClock, 1000);
 }
 
 function stopMonitorLoop(){
-  if(monitorTimer) clearInterval(monitorTimer);
+  monitorRunning = false;
+  if(monitorTimer) clearTimeout(monitorTimer);
   if(monitorCountdown) clearInterval(monitorCountdown);
   monitorTimer = null; monitorCountdown = null;
 }
@@ -2845,16 +2898,42 @@ function syncMonitorForm(){
   });
 }
 
-function openMonitorModal(type){
-  F('mf-type').value = type || 'api';
-  F('mf-id').value = '';
-  F('mf-name').value = '';
-  F('mf-endpoint').value = '';
-  F('mf-price').value = '';
-  F('mf-lead').value = '1';
-  F('mf-leadlabel').value = '';
-  F('mf-lines').value = '1';
-  F('mf-clipgen-total').value = '';
+/** JSONの1件をそのまま入力欄へ。欠けている項目は新規追加と同じ既定値で埋める */
+function fillMonitorForm(m){
+  F('mf-type').value = monitorType(m);
+  F('mf-id').value = m.id || '';
+  F('mf-name').value = m.name || '';
+  F('mf-interval').value = m.interval > 0 ? m.interval : '';
+  F('mf-endpoint').value = m.endpoint || '';
+  F('mf-monthlylimit').value = m.monthlyLimit || 300;
+  F('mf-limit').value = m.limit || 100;
+  F('mf-unit').value = m.unit || '';
+  F('mf-cycle').value = m.cycle || 'daily';
+  F('mf-windowhours').value = m.windowHours || 5;
+  F('mf-service').value = m.service || '';
+  F('mf-model').value = m.model || '';
+  F('mf-dailylimit').value = m.dailyLimit || 1000;
+  F('mf-side').value = m.side || 'buy';
+  F('mf-price').value = m.price || '';
+  F('mf-amount').value = m.amount || 1000000;
+  F('mf-lead').value = m.lead == null ? 1 : m.lead;
+  F('mf-leadlabel').value = m.leadLabel || '';
+  F('mf-lines').value = m.lines || (Array.isArray(m.rows) ? m.rows.length : 1);
+  F('mf-clipgen-total').value = m.total || '';
+}
+
+/** 編集中のID。新規追加のときは null */
+let editingMonitorId = null;
+
+function openMonitorModal(type, id){
+  const base = id ? allMonitors().find(m => m.id === id) : null;
+  editingMonitorId = base ? base.id : null;
+  fillMonitorForm(base || { type: type || 'api' });
+  F('monitorModalTitle').textContent = base ? '監視対象を編集' : '監視対象を追加';
+  F('monitorModalSub').textContent = base
+    ? 'JSONの内容を読み込みました。直して保存するとJSONに書き戻します'
+    : '稼働状況タブに表示するカードを1件登録します';
+  F('saveMonitor').textContent = base ? '保存' : '追加';
   F('err-monitor').style.display = 'none';
   syncMonitorForm();
   monitorOverlay.classList.add('show');
@@ -2862,13 +2941,20 @@ function openMonitorModal(type){
 }
 
 function buildMonitor(){
+  const base = editingMonitorId ? allMonitors().find(m => m.id === editingMonitorId) : null;
   const type = F('mf-type').value;
   const id = F('mf-id').value.trim();
   if(!id) throw new Error('IDを入力してください');
-  if(allMonitors().some(m => m.id === id)) throw new Error('同じIDがすでに登録されています');
+  if(allMonitors().some(m => m.id === id && m.id !== editingMonitorId)) throw new Error('同じIDがすでに登録されています');
 
-  const m = { id, name: F('mf-name').value.trim() || id };
-  if(type !== 'api') m.type = type;
+  // 画面に出していない項目（rules や rows の中身など）は編集時も残す
+  const m = Object.assign({}, base, { id, name: F('mf-name').value.trim() || id });
+  if(type !== 'api') m.type = type; else delete m.type;
+
+  // 空欄なら既定の更新間隔に任せるので、JSONには書かない
+  const interval = Number(F('mf-interval').value);
+  if(interval > 0) m.interval = Math.min(1440, Math.round(interval));
+  else delete m.interval;
 
   if(['api','kaggle','fx'].includes(type)){
     const endpoint = F('mf-endpoint').value.trim();
@@ -2881,6 +2967,7 @@ function buildMonitor(){
     m.unit = F('mf-unit').value.trim() || '回';
     m.cycle = F('mf-cycle').value;
     if(m.cycle === 'rolling') m.windowHours = Number(F('mf-windowhours').value) || 5;
+    else delete m.windowHours;
   }
   if(type === 'quota'){
     m.service = F('mf-service').value.trim();
@@ -2899,34 +2986,67 @@ function buildMonitor(){
     m.lead = Number(F('mf-lead').value) || 0;
     const leadLabel = F('mf-leadlabel').value.trim();
     if(leadLabel) m.leadLabel = leadLabel;
-    m.rules = SAMPLE_RULES;
+    else delete m.leadLabel;
+    if(!Array.isArray(m.rules)) m.rules = SAMPLE_RULES;
   }
   if(type === 'calc'){
     m.lines = Math.max(1, Math.min(20, Number(F('mf-lines').value) || 1));
-    m.rows = Array.from({ length:m.lines }, ()=>({ label:'', expr:'' }));
+    const rows = Array.isArray(m.rows) ? m.rows.slice(0, m.lines) : [];
+    while(rows.length < m.lines) rows.push({ label:'', expr:'' });
+    m.rows = rows;
   }
   if(type === 'clipgen'){
     const total = Number(F('mf-clipgen-total').value);
     if(total > 0) m.total = total;
+    else delete m.total;
   }
   return m;
 }
 
+/** 設定の監視タブにある「登録済みカードを編集」の一覧 */
+function syncMonitorPicker(){
+  const sel = F('s-monitor-pick');
+  const list = allMonitors();
+  sel.innerHTML = list.length
+    ? list.map(m => `<option value="${esc(m.id)}">${esc(m.name || m.id)}（${TYPE_LABELS[monitorType(m)] || monitorType(m)}）</option>`).join('')
+    : '<option value="">登録がありません</option>';
+  F('btn-editmonitor').disabled = list.length === 0;
+}
+
+F('btn-editmonitor').onclick = ()=>{
+  const id = F('s-monitor-pick').value;
+  if(!id) return;
+  settingsOverlay.classList.remove('show');
+  openMonitorModal(null, id);
+};
+
 F('mf-type').addEventListener('change', syncMonitorForm);
 document.getElementById('openMonitorAdd').onclick = ()=>openMonitorModal('api');
 document.getElementById('openInfoAdd').onclick = ()=>openMonitorModal('fxpos');
-document.getElementById('cancelMonitor').onclick = ()=>monitorOverlay.classList.remove('show');
+document.getElementById('cancelMonitor').onclick = ()=>{
+  editingMonitorId = null;
+  monitorOverlay.classList.remove('show');
+};
 
 document.getElementById('saveMonitor').onclick = async ()=>{
   try{
     const m = buildMonitor();
-    config.monitors = allMonitors().concat([m]);
+    const editing = editingMonitorId;
+    config.monitors = editing
+      ? allMonitors().map(x => x.id === editing ? m : x)
+      : allMonitors().concat([m]);
+    if(editing && editing !== m.id){
+      delete monitorSnapshots[editing];
+      delete monitorDueAt[editing];
+    }
     await persistLocal();
     F('s-monitors').value = JSON.stringify(config.monitors, null, 2);
+    syncMonitorPicker();
     monitorOverlay.classList.remove('show');
+    editingMonitorId = null;
     renderMonitors();
     startMonitorLoop();
-    toast('「' + m.name + '」を追加しました');
+    toast('「' + m.name + '」を' + (editing ? '更新' : '追加') + 'しました');
   }catch(err){
     F('err-monitor').textContent = err.message;
     F('err-monitor').style.display = 'block';
@@ -2945,6 +3065,7 @@ document.getElementById('btn-applymonitors').onclick = async ()=>{  try{
     config.monitors = parsed;
     F('err-monitors').style.display = 'none';
     await persistLocal();
+    syncMonitorPicker();
     if(monitors().length === 0) activeMonitor = 'all';
     syncUrl();
     monitorSnapshots = {};
