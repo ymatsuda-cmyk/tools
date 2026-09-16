@@ -1,6 +1,6 @@
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
-import { promptOf } from './prompts.js'
+import { promptOf, ensurePrompts } from './prompts.js'
 import { serializeSections } from './sections.js'
 import { reconcileTags } from './tags.js'
 import { splitTranscript, resolveQuote, withTimecode, hasTimecodes, parseClock, formatTimecode } from './timecode.js'
@@ -326,6 +326,8 @@ function applyContext(title, summaryText, fieldsText) {
  * @returns {Promise<{detail: object, model: string}>} detail は saveGenerated にそのまま渡せる形
  */
 export async function generateStage(stageId, ctx, onProgress) {
+  // 文面は setting.json 側にある。読み込み中・読み込み失敗のまま叩かないよう、ここで揃える
+  await ensurePrompts()
   // ctx.connection は呼び出し側でモデルを選ばせるときだけ使う。無ければ画面で選んでいる接続
   const connection = ctx.connection || requireConnection()
   const transcript = String(ctx.transcript ?? '').slice(0, TRANSCRIPT_LIMIT)

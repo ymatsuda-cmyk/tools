@@ -13,6 +13,7 @@ const SETTING_URL = new URL('https://ymatsuda-cmyk.github.io/tools/data/clipstoc
 export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas']
 
 let defaults = {}
+let loading = null
 let overrides = loadOverrides()
 
 function loadOverrides() {
@@ -31,8 +32,13 @@ function persist() {
   }
 }
 
-/** setting.json を読む。失敗しても画面は動かす(生成しようとしたときにだけ落ちる) */
-export async function initPrompts() {
+/** setting.json を読む。失敗しても画面は動かす(生成しようとしたときに取り直す) */
+export function initPrompts() {
+  if (!loading) loading = load()
+  return loading
+}
+
+async function load() {
   try {
     const res = await fetch(SETTING_URL, { cache: 'no-cache' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -40,7 +46,14 @@ export async function initPrompts() {
     defaults = json?.prompts || {}
   } catch (err) {
     console.error('setting.json を読み込めませんでした:', err)
+    loading = null // 失敗は覚えない。次の生成で読み直せるようにする
   }
+}
+
+/** 生成の直前に呼ぶ。読み込み中なら待ち、前回失敗していれば取り直す */
+export async function ensurePrompts() {
+  if (Object.keys(defaults).length) return
+  await initPrompts()
 }
 
 export function promptLabel(id) {
