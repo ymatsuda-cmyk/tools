@@ -104,6 +104,34 @@
   .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
+  .sch-main{display:flex;flex-direction:column;gap:2px;text-align:center;margin-bottom:10px;}
+  .sch-main b{font-size:16px;font-weight:600;line-height:1.35;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-main .when{font-size:11px;color:var(--text-secondary);}
+  .sch-main.sch-none{font-size:13px;font-weight:600;color:var(--text-muted);padding:10px 0;}
+  .sch-list{display:flex;flex-direction:column;gap:7px;
+    border-top:1px solid var(--border);padding-top:10px;}
+  .sch-row{display:flex;align-items:flex-start;gap:7px;}
+  .sch-row.past{opacity:0.4;}
+  .sch-row.now .sch-title{color:var(--accent);font-weight:600;}
+  .sch-bar{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:16px;}
+  .sch-time{flex-shrink:0;width:36px;font-size:11px;color:var(--text-muted);
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;line-height:1.5;}
+  .sch-text{min-width:0;flex:1;}
+  .sch-title{display:block;font-size:12px;line-height:1.4;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-sub{display:block;font-size:10px;color:var(--text-muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-accounts{display:flex;flex-direction:column;gap:6px;
+    border-top:1px solid var(--border);padding-top:10px;margin-top:12px;}
+  .sch-acc{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted);}
+  .sch-acc .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .sch-acc .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-acc button{background:none;border:none;color:var(--text-muted);font-size:10px;
+    text-decoration:underline;cursor:pointer;padding:2px 3px;flex-shrink:0;}
+  .sch-acc button:hover{color:var(--text);}
+  .sch-acc button.use{color:var(--accent);}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -480,6 +508,7 @@
         <option value="fx">ドル円 かんたん投資</option>
         <option value="fxpos">ドル円の建値</option>
         <option value="rule">ルール（曜日で決まる予定）</option>
+        <option value="schedule">今日の予定（Outlookなど）</option>
         <option value="calc">電卓</option>
         <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
@@ -588,6 +617,25 @@
       <label>式の行数</label>
       <input type="number" id="mf-lines" value="1" min="1" max="20">
       <div class="hint">行ごとに名前と式を持ちます。名前を付けると、他の行の式から変数として使えます</div>
+    </div>
+
+    <div class="field" data-for="schedule">
+      <label>一覧に出す件数</label>
+      <input type="number" id="mf-sch-max" value="5" min="1" max="20">
+    </div>
+    <div class="field" data-for="schedule">
+      <label>終わった予定</label>
+      <select id="mf-sch-hidepast">
+        <option value="show">薄くして残す</option>
+        <option value="hide">隠す</option>
+      </select>
+    </div>
+    <div class="field" data-for="schedule">
+      <label>アカウント</label>
+      <textarea id="mf-sch-accounts" spellcheck="false" style="min-height:150px;"></textarea>
+      <div class="hint">何件でも並べられます。clientId は Azure のアプリ登録で発行するIDです。
+        用意のしかたは <span class="mono">api/schedule/README.md</span> を見てください</div>
+      <div class="hint" id="hint-sch-redirect">リダイレクトURI: 読み込み中…</div>
     </div>
 
     <div class="modal-actions">
@@ -1364,10 +1412,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc', 'clipgen'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1379,6 +1427,7 @@ const TYPE_LABELS = {
   rule   : 'ルール',
   calc   : '電卓',
   clipgen: 'clipstock生成',
+  schedule: '今日の予定',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1426,7 +1475,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -1598,6 +1647,12 @@ const SAMPLE_RULES = [
   { label:'可燃ごみ', color:'#D9694F', days:[2, 5] },
   { label:'資源ごみ', color:'#5FA8A0', days:[3] },
   { label:'不燃ごみ', color:'#8A857C', days:[4], weeks:[2] }
+];
+
+/* 今日の予定カードの雛形。clientId を入れればそのまま使える */
+const SAMPLE_SCHEDULE_ACCOUNTS = [
+  { id:'work', label:'仕事', provider:'outlook', clientId:'', tenant:'common', color:'#5FA8A0' },
+  { id:'home', label:'個人', provider:'outlook', clientId:'', tenant:'common', color:'#8F7BD6' }
 ];
 
 const WEEKDAY_JA = ['日','月','火','水','木','金','土'];
@@ -2426,10 +2481,216 @@ async function runClipgen(m){
   countClipgen(m);
 }
 
+/* ---------- 今日の予定 ---------- */
+
+const SCHEDULE_MODULE = new URL('../../api/schedule/schedule.api.js', location.href).href;
+
+/* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
+const scheduleState = {};
+
+const SCHEDULE_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中'   },
+  ok     : { color:'#5FA8A0', label:'今日'         },
+  signin : { color:'#E0B252', label:'未サインイン' },
+  error  : { color:'#D9694F', label:'エラー'       }
+};
+
+let scheduleApi = null;
+
+async function scheduleModule(){
+  if(!scheduleApi) scheduleApi = await import(SCHEDULE_MODULE);
+  return scheduleApi;
+}
+
+function todayKey(){
+  return new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
+}
+
+/** カードの更新間隔が過ぎたとき、日付が変わったときに取り直す */
+function scheduleStateOf(m){
+  let st = scheduleState[m.id];
+  if(!st){
+    st = scheduleState[m.id] = {
+      phase:'loading', accounts:[], result:null, error:'',
+      loading:false, loadedAt:0, dayKey:''
+    };
+    loadSchedule(m);
+  }else if(!st.loading && (st.dayKey !== todayKey() || Date.now() - st.loadedAt >= intervalMsOf(m))){
+    loadSchedule(m);
+  }
+  return st;
+}
+
+async function loadSchedule(m){
+  const st = scheduleState[m.id];
+  if(!st || st.loading) return;
+  st.loading = true;
+  st.dayKey = todayKey();
+  try{
+    const api = await scheduleModule();
+    st.accounts = api.normalizeAccounts(m.accounts || []);
+    st.result = st.accounts.length ? await api.today(st.accounts) : null;
+    st.error = '';
+    st.phase = st.result && st.result.signedIn ? 'ok' : 'signin';
+  }catch(err){
+    st.error = err.message || String(err);
+    st.phase = 'error';
+  }
+  st.loading = false;
+  st.loadedAt = Date.now();
+  paintSchedule(m.id);
+}
+
+/** 「あと25分」「あと2時間10分」 */
+function untilText(when, now){
+  const min = Math.round((when - now) / 60000);
+  if(min <= 0) return 'まもなく';
+  if(min < 60) return `あと${min}分`;
+  const h = Math.floor(min / 60);
+  const rest = min % 60;
+  return `あと${h}時間${rest ? rest + '分' : ''}`;
+}
+
+function scheduleEvents(m, st, now){
+  const all = (st.result ? st.result.events : []).filter(e => !e.cancelled && !e.declined);
+  if(!m.hidePast) return all;
+  return all.filter(e => e.allDay || !e.end || e.end > now);
+}
+
+function scheduleMain(m, list, now){
+  const api = scheduleApi;
+  const current = list.find(e => api.ongoing(e, now));
+  if(current){
+    return `<div class="sch-main">
+        <span class="when">いま ${esc(api.formatTime(current.start))} – ${esc(api.formatTime(current.end))}</span>
+        <b>${esc(current.title)}</b>
+      </div>`;
+  }
+  const next = api.nextEvent(list, now);
+  if(next){
+    return `<div class="sch-main">
+        <span class="when">次 ${esc(api.formatTime(next.start))}（${esc(untilText(next.start, now))}）</span>
+        <b>${esc(next.title)}</b>
+      </div>`;
+  }
+  return `<div class="sch-main sch-none">${list.length ? 'この先の予定はありません' : '今日の予定はありません'}</div>`;
+}
+
+function scheduleList(m, list, now){
+  if(!list.length) return '';
+  const api = scheduleApi;
+  const max = Math.max(1, Math.min(20, Number(m.max) || 5));
+  const rows = list.slice(0, max).map(e=>{
+    const past = !e.allDay && e.end && e.end <= now;
+    const cls = 'sch-row' + (past ? ' past' : '') + (api.ongoing(e, now) ? ' now' : '');
+    const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
+    return `<div class="${cls}">
+        <span class="sch-bar" style="background:${esc(e.color)}"></span>
+        <span class="sch-time">${esc(e.allDay ? '終日' : api.formatTime(e.start))}</span>
+        <span class="sch-text">
+          <span class="sch-title">${esc(e.title)}</span>
+          ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
+        </span>
+      </div>`;
+  }).join('');
+  const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
+  return `<div class="sch-list">${rows}</div>${more}`;
+}
+
+/** アカウントごとのサインイン状態と、その場でサインインするボタン */
+function scheduleAccountRows(m, st){
+  const list = (st.result && st.result.accounts) || st.accounts;
+  if(!list.length) return '';
+  return `<div class="sch-accounts">
+      ${list.map(a=>`
+        <div class="sch-acc">
+          <span class="dot" style="background:${esc(a.color)}"></span>
+          <span class="who" title="${esc(a.username || a.label)}">${esc(a.label)}${a.signedIn && a.username ? ' / ' + esc(a.username) : ''}</span>
+          ${a.signedIn
+            ? `<button data-schedule-out="${esc(m.id)}" data-account="${esc(a.id)}">サインアウト</button>`
+            : `<button class="use" data-schedule-in="${esc(m.id)}" data-account="${esc(a.id)}">サインイン</button>`}
+        </div>
+        ${a.error ? `<div class="mon-err">${esc(a.label)}: ${esc(a.error)}</div>` : ''}`).join('')}
+    </div>`;
+}
+
+function scheduleBody(m, st){
+  if(!scheduleApi || (st.loading && !st.result)) return `<div class="mon-offline">読み込み中…</div>`;
+  if(!st.accounts.length){
+    return `<div class="mon-offline">アカウントが未設定です</div>
+      <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
+  }
+  if(st.phase === 'error' && !st.result){
+    return `<div class="mon-err">${esc(st.error)}</div>${scheduleAccountRows(m, st)}`;
+  }
+
+  const now = new Date();
+  const list = scheduleEvents(m, st, now);
+  return scheduleMain(m, list, now) + scheduleList(m, list, now) + scheduleAccountRows(m, st);
+}
+
+function renderScheduleCard(m){
+  const st = scheduleStateOf(m);
+  const meta = SCHEDULE_STATE_META[st.phase] || SCHEDULE_STATE_META.loading;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="schedule-body">${scheduleBody(m, st)}</div>
+    </div>`;
+}
+
+/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの入力が飛ぶ */
+function paintSchedule(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = scheduleState[id];
+  if(!m || !st) return;
+  const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .schedule-body`);
+  if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
+
+  const meta = SCHEDULE_STATE_META[st.phase] || SCHEDULE_STATE_META.loading;
+  const box = card.closest('.mon-card');
+  box.querySelector('.mon-dot').style.background = meta.color;
+  box.querySelector('.mon-state').textContent = meta.label;
+  card.innerHTML = scheduleBody(m, st);
+  wireSchedule(box);
+}
+
+function wireSchedule(card){
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  if(!m) return;
+  card.querySelectorAll('[data-schedule-in]').forEach(btn=>{
+    btn.addEventListener('click', ()=>scheduleAuth(m, btn.dataset.account, 'in'));
+  });
+  card.querySelectorAll('[data-schedule-out]').forEach(btn=>{
+    btn.addEventListener('click', ()=>scheduleAuth(m, btn.dataset.account, 'out'));
+  });
+}
+
+async function scheduleAuth(m, accountId, action){
+  const st = scheduleState[m.id];
+  const account = st && st.accounts.find(a => a.id === accountId);
+  if(!account) return;
+  try{
+    const api = await scheduleModule();
+    if(action === 'in') await api.signIn(account);
+    else await api.signOut(account);
+    toast(`${account.label} を${action === 'in' ? 'サインイン' : 'サインアウト'}しました`);
+  }catch(err){
+    toast(err.message || String(err));
+  }
+  st.loadedAt = 0;
+  await loadSchedule(m);
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
   if(monitorType(m) === 'clipgen') return renderClipgenCard(m);
+  if(monitorType(m) === 'schedule') return renderScheduleCard(m);
 
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -2692,6 +2953,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.clipgen-body').forEach(body=>wireClipgen(body.closest('.mon-card')));
 
+  grid.querySelectorAll('.schedule-body').forEach(body=>wireSchedule(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-toggle]').forEach(sw=>{
     sw.addEventListener('change', ()=>{
       controlMonitor(sw.dataset.toggle, sw.checked ? 'start' : 'stop');
@@ -2896,6 +3159,18 @@ function syncMonitorForm(){
   monitorOverlay.querySelectorAll('[data-for]').forEach(el=>{
     el.hidden = !el.dataset.for.split(' ').includes(type);
   });
+  if(type === 'schedule') showScheduleRedirect();
+}
+
+/** Azureに登録するURIはこのページの場所で決まるので、その場で見せる */
+async function showScheduleRedirect(){
+  const el = F('hint-sch-redirect');
+  try{
+    const api = await scheduleModule();
+    el.innerHTML = 'リダイレクトURI: <span class="mono">' + esc(await api.redirectUri('outlook')) + '</span>';
+  }catch(err){
+    el.textContent = 'リダイレクトURIを読めません: ' + (err.message || err);
+  }
 }
 
 /** JSONの1件をそのまま入力欄へ。欠けている項目は新規追加と同じ既定値で埋める */
@@ -2920,6 +3195,10 @@ function fillMonitorForm(m){
   F('mf-leadlabel').value = m.leadLabel || '';
   F('mf-lines').value = m.lines || (Array.isArray(m.rows) ? m.rows.length : 1);
   F('mf-clipgen-total').value = m.total || '';
+  F('mf-sch-max').value = m.max || 5;
+  F('mf-sch-hidepast').value = m.hidePast ? 'hide' : 'show';
+  F('mf-sch-accounts').value = JSON.stringify(
+    Array.isArray(m.accounts) && m.accounts.length ? m.accounts : SAMPLE_SCHEDULE_ACCOUNTS, null, 2);
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -2999,6 +3278,21 @@ function buildMonitor(){
     const total = Number(F('mf-clipgen-total').value);
     if(total > 0) m.total = total;
     else delete m.total;
+  }
+  if(type === 'schedule'){
+    m.max = Math.max(1, Math.min(20, Number(F('mf-sch-max').value) || 5));
+    if(F('mf-sch-hidepast').value === 'hide') m.hidePast = true;
+    else delete m.hidePast;
+
+    let accounts;
+    try{ accounts = JSON.parse(F('mf-sch-accounts').value); }
+    catch{ throw new Error('アカウントのJSONを読み取れません'); }
+    if(!Array.isArray(accounts) || !accounts.length) throw new Error('アカウントを1件以上、配列で書いてください');
+    accounts.forEach(a=>{
+      if(!a || !a.id) throw new Error('各アカウントに id が必要です');
+      if((a.provider || 'outlook') === 'outlook' && !a.clientId) throw new Error(`${a.id}: clientId を入力してください`);
+    });
+    m.accounts = accounts;
   }
   return m;
 }

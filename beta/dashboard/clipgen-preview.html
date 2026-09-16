@@ -95,6 +95,34 @@
   }
   .mon-fix:hover{color:var(--text);}
 
+  .sch-main{display:flex;flex-direction:column;gap:2px;text-align:center;margin-bottom:10px;}
+  .sch-main b{font-size:16px;font-weight:600;line-height:1.35;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-main .when{font-size:11px;color:var(--text-secondary);}
+  .sch-main.sch-none{font-size:13px;font-weight:600;color:var(--text-muted);padding:10px 0;}
+  .sch-list{display:flex;flex-direction:column;gap:7px;
+    border-top:1px solid var(--border);padding-top:10px;}
+  .sch-row{display:flex;align-items:flex-start;gap:7px;}
+  .sch-row.past{opacity:0.4;}
+  .sch-row.now .sch-title{color:var(--accent);font-weight:600;}
+  .sch-bar{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:16px;}
+  .sch-time{flex-shrink:0;width:36px;font-size:11px;color:var(--text-muted);
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;line-height:1.5;}
+  .sch-text{min-width:0;flex:1;}
+  .sch-title{display:block;font-size:12px;line-height:1.4;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-sub{display:block;font-size:10px;color:var(--text-muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-accounts{display:flex;flex-direction:column;gap:6px;
+    border-top:1px solid var(--border);padding-top:10px;margin-top:12px;}
+  .sch-acc{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted);}
+  .sch-acc .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .sch-acc .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sch-acc button{background:none;border:none;color:var(--text-muted);font-size:10px;
+    text-decoration:underline;cursor:pointer;padding:2px 3px;flex-shrink:0;}
+  .sch-acc button:hover{color:var(--text);}
+  .sch-acc button.use{color:var(--accent);}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -288,6 +316,28 @@
         <p class="caption">JSONには出ません。実物ではGASが取った為替レートが入ります。</p>
         <div class="fields">
           <label>いまのレート<input type="number" id="d-rate" value="152.30" step="0.01"></label>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="schedule">
+        <h2>プレビュー用の予定</h2>
+        <p class="caption">JSONには出ません。実物では Outlook から取った今日の予定が入ります。<br>
+           <span class="mono">account</span> は何番目のアカウントか（1から）。</p>
+        <div class="fields">
+          <div class="row2">
+            <label>今の時刻<input type="time" id="d-now" value="10:20"></label>
+            <label>サインイン
+              <select id="d-signin">
+                <option value="all" selected>ぜんぶ済み</option>
+                <option value="first">1つめだけ</option>
+                <option value="none">まだ</option>
+                <option value="error">エラー</option>
+              </select>
+            </label>
+          </div>
+          <label>予定
+            <textarea class="json" id="d-events" spellcheck="false" style="min-height:150px;"></textarea>
+          </label>
         </div>
       </div>
     </div>
@@ -912,6 +962,188 @@ function dummy(){
   };
 }
 
+/* ---------- 今日の予定 ---------- */
+
+const SCHEDULE_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中'   },
+  ok     : { color:'#5FA8A0', label:'今日'         },
+  signin : { color:'#E0B252', label:'未サインイン' },
+  error  : { color:'#D9694F', label:'エラー'       }
+};
+
+/* api/schedule が色を指定しなかったアカウントに配る色 */
+const SCHEDULE_PALETTE = ['#5FA8A0', '#8F7BD6', '#E0B252', '#D9694F', '#6F9FD8', '#B58AC4'];
+
+function schAccounts(m){
+  return (Array.isArray(m.accounts) ? m.accounts : []).map((a, i)=>{
+    const id = (a && a.id) || `account-${i + 1}`;
+    return { ...a, id, label:(a && a.label) || id, color:(a && a.color) || SCHEDULE_PALETTE[i % SCHEDULE_PALETTE.length] };
+  });
+}
+
+function schTime(d){
+  return d ? d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', hour12:false }) : '';
+}
+
+function schOngoing(e, now){
+  if(!e || e.allDay || !e.start) return false;
+  const end = e.end || new Date(e.start.getTime() + 30 * 60 * 1000);
+  return e.start <= now && now < end;
+}
+
+function schNext(list, now){
+  return list.find(e => !e.allDay && e.start && e.start > now) || null;
+}
+
+function untilText(when, now){
+  const min = Math.round((when - now) / 60000);
+  if(min <= 0) return 'まもなく';
+  if(min < 60) return `あと${min}分`;
+  const h = Math.floor(min / 60);
+  const rest = min % 60;
+  return `あと${h}時間${rest ? rest + '分' : ''}`;
+}
+
+function schMain(list, now){
+  const current = list.find(e => schOngoing(e, now));
+  if(current){
+    return `<div class="sch-main">
+        <span class="when">いま ${esc(schTime(current.start))} – ${esc(schTime(current.end))}</span>
+        <b>${esc(current.title)}</b>
+      </div>`;
+  }
+  const next = schNext(list, now);
+  if(next){
+    return `<div class="sch-main">
+        <span class="when">次 ${esc(schTime(next.start))}（${esc(untilText(next.start, now))}）</span>
+        <b>${esc(next.title)}</b>
+      </div>`;
+  }
+  return `<div class="sch-main sch-none">${list.length ? 'この先の予定はありません' : '今日の予定はありません'}</div>`;
+}
+
+function schList(m, list, now){
+  if(!list.length) return '';
+  const max = Math.max(1, Math.min(20, Number(m.max) || 5));
+  const rows = list.slice(0, max).map(e=>{
+    const past = !e.allDay && e.end && e.end <= now;
+    const cls = 'sch-row' + (past ? ' past' : '') + (schOngoing(e, now) ? ' now' : '');
+    const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
+    return `<div class="${cls}">
+        <span class="sch-bar" style="background:${esc(e.color)}"></span>
+        <span class="sch-time">${esc(e.allDay ? '終日' : schTime(e.start))}</span>
+        <span class="sch-text">
+          <span class="sch-title">${esc(e.title)}</span>
+          ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
+        </span>
+      </div>`;
+  }).join('');
+  const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
+  return `<div class="sch-list">${rows}</div>${more}`;
+}
+
+function schAccountRows(m, st){
+  if(!st.accounts.length) return '';
+  return `<div class="sch-accounts">
+      ${st.accounts.map(a=>`
+        <div class="sch-acc">
+          <span class="dot" style="background:${esc(a.color)}"></span>
+          <span class="who">${esc(a.label)}${a.signedIn && a.username ? ' / ' + esc(a.username) : ''}</span>
+          ${a.signedIn
+            ? `<button>サインアウト</button>`
+            : `<button class="use">サインイン</button>`}
+        </div>
+        ${a.error ? `<div class="mon-err">${esc(a.label)}: ${esc(a.error)}</div>` : ''}`).join('')}
+    </div>`;
+}
+
+function schBody(m, st){
+  if(!st.accounts.length){
+    return `<div class="mon-offline">アカウントが未設定です</div>
+      <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
+  }
+  if(st.error) return `<div class="mon-err">${esc(st.error)}</div>${schAccountRows(m, st)}`;
+
+  const list = m.hidePast ? st.events.filter(e => e.allDay || !e.end || e.end > st.now) : st.events;
+  return schMain(list, st.now) + schList(m, list, st.now) + schAccountRows(m, st);
+}
+
+function renderScheduleCard(m, st){
+  const meta = SCHEDULE_STATE_META[st.phase] || SCHEDULE_STATE_META.loading;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="schedule-body">${schBody(m, st)}</div>
+    </div>`;
+}
+
+const SAMPLE_EVENTS = [
+  { allDay:true, title:'健康診断の予約', account:2 },
+  { time:'09:30-10:00', title:'朝会', account:1, location:'Teams' },
+  { time:'10:00-11:00', title:'要件のすり合わせ', account:1, location:'会議室A' },
+  { time:'13:00-14:30', title:'レビュー', account:1 },
+  { time:'19:00-20:00', title:'歯医者', account:2, location:'駅前' }
+];
+
+/** その日の hh:mm */
+function todayAt(text){
+  const [h, m] = String(text || '').split(':');
+  const d = new Date();
+  d.setHours(Number(h) || 0, Number(m) || 0, 0, 0);
+  return d;
+}
+
+/** JSONには出ない、プレビュー用の予定 */
+function dummySchedule(m){
+  const accounts = schAccounts(m);
+  const now = todayAt(F('d-now').value || '10:20');
+  const mode = F('d-signin').value;
+
+  const state = accounts.map((a, i)=>({
+    ...a,
+    signedIn: mode === 'all' || (mode === 'first' && i === 0),
+    username: `${a.id}@example.com`,
+    error: mode === 'error' && i === 0 ? 'サインインし直してください' : ''
+  }));
+
+  let rows = [];
+  let error = '';
+  try{
+    rows = JSON.parse(F('d-events').value || '[]');
+    if(!Array.isArray(rows)) throw new Error('配列で書いてください');
+  }catch(err){
+    error = '予定を読み取れません: ' + err.message;
+  }
+
+  const events = rows.map((r, i)=>{
+    const acc = state[Math.max(1, Number(r.account) || 1) - 1] || state[0];
+    const [from, to] = String(r.time || '').split('-');
+    return {
+      key: 'dummy-' + i,
+      title: r.title || '(件名なし)',
+      start: r.allDay ? todayAt('00:00') : todayAt(from),
+      end: r.allDay ? null : todayAt(to || from),
+      allDay: !!r.allDay,
+      location: r.location || '',
+      accountId: acc ? acc.id : '',
+      accountLabel: acc ? acc.label : '',
+      color: acc ? acc.color : SCHEDULE_PALETTE[0]
+    };
+  })
+    .filter(e => state.some(a => a.id === e.accountId && a.signedIn))
+    .sort((a, b) => a.allDay !== b.allDay ? (a.allDay ? -1 : 1) : a.start - b.start);
+
+  const signedIn = state.some(a => a.signedIn);
+  return {
+    phase: error ? 'error' : signedIn ? 'ok' : 'signin',
+    error, now, events, accounts: state
+  };
+}
+
 function paint(){
   const m = currentMonitor();
   if(activeTab === 'clipgen'){
@@ -922,6 +1154,8 @@ function paint(){
     F('live').innerHTML = renderRuleCard(m, ruleBaseDate());
   }else if(activeTab === 'fxpos'){
     F('live').innerHTML = renderFxPosCard(m, Number(F('d-rate').value) || 0);
+  }else if(activeTab === 'schedule'){
+    F('live').innerHTML = renderScheduleCard(m, dummySchedule(m));
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -941,6 +1175,7 @@ function paint(){
 const TABS = [
   { id:'clipgen', label:'clipstock生成' },
   { id:'rule',    label:'ルール' },
+  { id:'schedule', label:'今日の予定' },
   { id:'api',     label:'汎用API / Kaggle' },
   { id:'copilot', label:'Copilot' },
   { id:'manual',  label:'手動カウンタ' },
@@ -958,6 +1193,10 @@ const SAMPLE_RULES = [
 const TEMPLATES = {
   clipgen: { id:'clipgen', name:'clipstock 生成', type:'clipgen', group:'AI', total:30, showSpace:false },
   rule   : { id:'gomi', name:'ゴミ出し', type:'rule', lead:1, leadLabel:'今夜出す', rules:SAMPLE_RULES },
+  schedule: { id:'today', name:'今日の予定', type:'schedule', max:5, accounts:[
+    { id:'work', label:'仕事', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#5FA8A0' },
+    { id:'home', label:'個人', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#8F7BD6' }
+  ] },
   api    : { id:'gpu-server', name:'GPU サーバー', endpoint:'https://example.com/api/resource' },
   copilot: { id:'copilot', name:'GitHub Copilot', type:'copilot', monthlyLimit:300 },
   manual : { id:'claude', name:'Claude', type:'manual', limit:100, unit:'回', cycle:'daily' },
@@ -1044,7 +1283,8 @@ function wireDrag(){
 
 ['id','name','group','total','threshold','space','model',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
- 'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate']
+ 'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
+ 'd-now','d-signin','d-events']
   .forEach(id => F(id).addEventListener('input', paint));
 
 [F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
@@ -1081,6 +1321,7 @@ F('copy').addEventListener('click', async ()=>{
 });
 
 F('d-today').value = new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
+F('d-events').value = JSON.stringify(SAMPLE_EVENTS, null, 2);
 switchTab('clipgen');
 paint();
 </script>

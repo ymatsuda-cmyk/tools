@@ -198,6 +198,34 @@ clipstock の「完了ぶんをまとめて生成」を、clipstock を開かず
 | `space` | 最初に選んでおくパターン（省略可。省略時は spaces.json の既定） |
 | `model` | 最初に選んでおくAI（省略可。省略時は clipstock で選択中のもの） |
 | `showSpace` | `false` でパターンのコンボボックスを隠す。`space` の値で固定される |
+
+### 今日の予定（`type: "schedule"`）
+
+Outlook の今日の予定を出すカードです。Microsoft アカウントは何個でも並べられます。
+
+```json
+{
+  "id": "today", "name": "今日の予定", "type": "schedule", "max": 5,
+  "accounts": [
+    { "id": "work", "label": "仕事", "provider": "outlook", "clientId": "…", "tenant": "common", "color": "#5FA8A0" },
+    { "id": "home", "label": "個人", "provider": "outlook", "clientId": "…", "tenant": "common", "color": "#8F7BD6" }
+  ]
+}
+```
+
+| キー | 内容 |
+|---|---|
+| `max` | 一覧に出す件数。既定 5 |
+| `hidePast` | `true` で終わった予定を消す。既定は薄くして残す |
+| `accounts` | アカウントの一覧。`id` と `clientId` が要る |
+
+GAS は通りません。ブラウザから直接 Microsoft にサインインします。
+カード下部の「サインイン」を押すとポップアップが開きます。
+
+アプリ登録（Azure）のしかたと、アカウントを2つ使うときの考え方は
+`api/schedule/README.md` を見てください。登録するリダイレクトURIは、
+設定 →監視 →種類「今日の予定」の入力欄に表示されます。
+
 | `showModel` | `false` で使うAIのコンボボックスを隠す。`model` の値で固定される |
 | `showRun` | `false` で「まとめて生成」ボタンを隠す。件数を見るだけのカードになる（実行中の「中止」は残る） |
 | `includePartial` | `false` にすると、項目が欠けているものを対象から外す（既定は対象にする） |
