@@ -15,7 +15,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0'
 const SCOPES = ['User.Read', 'Calendars.Read']
 
 /* サインインが終わったポップアップが戻ってくる先。Azureにこれを登録する */
-const REDIRECT_URI = new URL('./auth-redirect.html', import.meta.url).href
+const REDIRECT_URI = new URL('../auth-redirect.html', import.meta.url).href
 
 /** どのMicrosoftアカウントに繋いだかの控え。トークンはMSALが別に持つ */
 const LINK_KEY = 'schedule.outlook.links'
