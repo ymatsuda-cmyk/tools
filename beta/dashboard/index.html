@@ -3290,7 +3290,11 @@ function buildMonitor(){
     if(!Array.isArray(accounts) || !accounts.length) throw new Error('アカウントを1件以上、配列で書いてください');
     accounts.forEach(a=>{
       if(!a || !a.id) throw new Error('各アカウントに id が必要です');
-      if((a.provider || 'outlook') === 'outlook' && !a.clientId) throw new Error(`${a.id}: clientId を入力してください`);
+      if((a.provider || 'outlook') !== 'outlook') return;
+      if(!a.clientId) throw new Error(`${a.id}: clientId を入力してください`);
+      if(/^[0-]+$/.test(String(a.clientId).trim())){
+        throw new Error(`${a.id}: clientId が見本のままです。Azure のアプリ登録で発行したIDに置き換えてください`);
+      }
     });
     m.accounts = accounts;
   }

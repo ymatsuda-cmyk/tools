@@ -81,6 +81,10 @@ const instances = new Map()
 
 function instanceFor(account) {
   if (!account.clientId) throw new Error('clientId が設定されていません')
+  // 見本のIDのままだとMicrosoft側で AADSTS700038 になり、原因が分かりにくい
+  if (/^[0-]+$/.test(String(account.clientId).trim())) {
+    throw new Error('clientId が見本のままです。Azure のアプリ登録で発行したIDに置き換えてください')
+  }
   const key = account.clientId + '|' + authorityOf(account)
   if (!instances.has(key)) instances.set(key, createInstance(account))
   return instances.get(key)
