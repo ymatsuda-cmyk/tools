@@ -1,17 +1,18 @@
 # 予定取得API
 
-今日の予定を取ってくる共通の入口です。取得元は差し替えでき、いまは Outlook
-（Microsoft Graph）だけが入っています。アカウントは何個でも並べられます。
+今日の予定を取ってくる共通の入口です。取得元は差し替えられ、Outlook（Microsoft Graph）と、
+サインインなしで使えるJSON決め打ちの2つが入っています。アカウントは何個でも並べられます。
 
 ```
 api/schedule/
 ├── schedule.api.js        呼び出す側が使う入口
 ├── auth-redirect.html     サインインのポップアップが戻ってくる先
 └── providers/
-    └── outlook.js         Microsoft Graph
+    ├── outlook.js         Microsoft Graph
+    └── json.js            サインイン不要。固定の予定や共有JSON
 ```
 
-ブラウザから直接 Microsoft にサインインします。GAS もサーバーも要りません。
+Outlook はブラウザから直接 Microsoft にサインインします。JSON はサインインもサーバーも要りません。
 
 ---
 
@@ -22,10 +23,12 @@ const schedule = await import('/api/schedule/schedule.api.js')
 
 const accounts = schedule.normalizeAccounts([
   { id: 'work', label: '仕事', provider: 'outlook', clientId: '…', tenant: 'organizations' },
-  { id: 'home', label: '個人', provider: 'outlook', clientId: '…', tenant: 'consumers' }
+  { id: 'home', label: '個人', provider: 'outlook', clientId: '…', tenant: 'consumers' },
+  { id: 'plan', label: '予定表', provider: 'json',
+    events: [{ title: '健康診断', allDay: true, start: '2026-09-20' }] }
 ])
 
-await schedule.signIn(accounts[0])        // ポップアップが開く
+await schedule.signIn(accounts[0])        // ポップアップが開く（jsonは不要）
 const result = await schedule.today(accounts)
 ```
 
@@ -118,9 +121,48 @@ API のアクセス許可 → Microsoft Graph → **委任されたアクセス�
 
 ---
 
+## JSON で決め打ちする（`provider: "json"`）
+
+サインインが要りません。承認待ちの間や、Outlook に無い予定（旅行の日程など）を
+足したいときに使います。書き方は2通りです。
+
+### 1. アカウントの中に直接書く
+
+```json
+{ "id": "plan", "label": "予定表", "provider": "json",
+  "events": [
+    { "title": "健康診断", "allDay": true, "start": "2026-09-20" },
+    { "title": "歯医者", "start": "2026-09-16T19:00:00+09:00", "end": "2026-09-16T20:00:00+09:00", "location": "駅前" }
+  ]
+}
+```
+
+### 2. 外部のJSONファイルから取る
+
+```json
+{ "id": "plan", "label": "予定表", "provider": "json",
+  "url": "https://example.com/events.json" }
+```
+
+`url` を書くと、更新のたびにそこへ取りに行きます（`events` より優先）。
+同一オリジンでなければ、その先で CORS を許可する必要があります。
+
+### 1件の書き方
+
+| キー | 必須 | 内容 |
+|---|---|---|
+| `title` | 任意 | 省略すると「(件名なし)」 |
+| `start` | ほぼ必須 | 終日なら `"2026-09-20"`、時刻ありなら `"2026-09-16T19:00:00+09:00"` |
+| `end` | 任意 | 省略すると `start` と同じ（終日は無し） |
+| `allDay` | 任意 | `true` で終日扱い |
+| `location` | 任意 | 表示に出る |
+| `id` | 任意 | 省略すると配列内の順番から自動で振る |
+
+---
+
 ## 取得元を足す
 
-1. `providers/新しい名前.js` を作り、`outlook.js` と同じものを公開する
+1. `providers/新しい名前.js` を作り、`outlook.js` か `json.js` と同じものを公開する
    - `id` `label` `FIELDS` `redirectUri()` `status(account)` `signIn(account)`
      `signOut(account)` `events(account, {from, to})`
 2. `events()` は予定の配列を返す。1件の形は

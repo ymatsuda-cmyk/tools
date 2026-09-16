@@ -634,6 +634,8 @@
       <label>アカウント</label>
       <textarea id="mf-sch-accounts" spellcheck="false" style="min-height:150px;"></textarea>
       <div class="hint">何件でも並べられます。clientId は Azure のアプリ登録で発行するIDです。
+        <span class="mono">"provider": "json"</span> にすると、サインインなしで
+        <span class="mono">events</span>（直書き）や <span class="mono">url</span>（外部JSON）から予定を出せます。
         用意のしかたは <span class="mono">api/schedule/README.md</span> を見てください</div>
       <div class="hint" id="hint-sch-redirect">リダイレクトURI: 読み込み中…</div>
     </div>
@@ -3162,12 +3164,12 @@ function syncMonitorForm(){
   if(type === 'schedule') showScheduleRedirect();
 }
 
-/** Azureに登録するURIはこのページの場所で決まるので、その場で見せる */
+/** Azureに登録するURIはこのページの場所で決まるので、その場で見せる（jsonの取得元には不要） */
 async function showScheduleRedirect(){
   const el = F('hint-sch-redirect');
   try{
     const api = await scheduleModule();
-    el.innerHTML = 'リダイレクトURI: <span class="mono">' + esc(await api.redirectUri('outlook')) + '</span>';
+    el.innerHTML = 'OutlookのリダイレクトURI: <span class="mono">' + esc(await api.redirectUri('outlook')) + '</span>';
   }catch(err){
     el.textContent = 'リダイレクトURIを読めません: ' + (err.message || err);
   }

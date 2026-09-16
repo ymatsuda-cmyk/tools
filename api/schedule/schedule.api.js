@@ -12,14 +12,16 @@
  *   const schedule = await import('/api/schedule/schedule.api.js')
  *   const accounts = schedule.normalizeAccounts([
  *     { id:'work', label:'仕事', provider:'outlook', clientId:'...' },
- *     { id:'home', label:'個人', provider:'outlook', clientId:'...', tenant:'consumers' }
+ *     { id:'home', label:'個人', provider:'outlook', clientId:'...', tenant:'consumers' },
+ *     { id:'plan', label:'予定表', provider:'json', events:[{ title:'健康診断', allDay:true, start:'2026-09-20' }] }
  *   ])
  *   await schedule.signIn(accounts[0])          // ポップアップでサインイン
  *   const { events, accounts: state } = await schedule.today(accounts)
  */
 
 const LOADERS = {
-  outlook: () => import('./providers/outlook.js')
+  outlook: () => import('./providers/outlook.js'),
+  json: () => import('./providers/json.js')
 }
 
 /** アカウントに色を指定しなかったときの並び順 */
