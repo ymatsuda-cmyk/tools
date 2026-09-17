@@ -325,6 +325,7 @@
     text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   }
   .card-meta{font-size:11px;color:var(--text-muted);}
+  .card-updated{font-size:10px;color:var(--text-muted);margin-top:3px;}
 
   .empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty .big{font-size:15px;color:var(--text-secondary);}
@@ -1022,6 +1023,14 @@ function renderChips(){
   });
 }
 
+function formatUpdatedAt(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `更新日時: ${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function thumbHTML(r){
   const isVideo = r.preview && /\.mp4($|\?)/i.test(r.preview);
   const cat = (!isVideo && !r.thumb) ? categoryOf(r) : null;
@@ -1065,6 +1074,7 @@ function render(){
       <div class="card-body">
         <div class="card-title">${r.title}</div>
         <div class="card-meta mono">${r.category || '未分類'}</div>
+        <div class="card-updated mono">${formatUpdatedAt(r.updatedAt)}</div>
       </div>
     </div>`).join('');
 
@@ -1198,7 +1208,8 @@ document.getElementById('saveItem').onclick = async ()=>{
     cardSize: F('f-cardsize').value,
     thumb: F('f-thumb').value.trim() || null,
     preview: F('f-preview').value.trim() || null,
-    type: detectType(url)
+    type: detectType(url),
+    updatedAt: new Date().toISOString()
   };
   if(editingId){
     const i = resources.findIndex(r=>r.id===editingId);
