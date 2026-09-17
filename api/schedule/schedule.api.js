@@ -17,6 +17,7 @@
  *   ])
  *   await schedule.signIn(accounts[0])          // ポップアップでサインイン
  *   const { events, accounts: state } = await schedule.today(accounts)
+ *   const { days } = await schedule.week(accounts)   // 明日から1週間を日ごとに仕分け
  */
 
 const LOADERS = {
@@ -110,6 +111,33 @@ export async function today(accounts, options = {}) {
   const from = new Date(base.getFullYear(), base.getMonth(), base.getDate())
   const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1)
   return range(accounts, { from, to })
+}
+
+/**
+ * 明日から1週間ばんを日ごとに仕分けする。today() と重ならないよう、明日から始める
+ * options.days で日数を変えられる（既定 7）
+ */
+export async function week(accounts, options = {}) {
+  const base = options.date ? new Date(options.date) : new Date()
+  const from = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1)
+  const days = Math.max(1, Number(options.days) || 7)
+  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days)
+  const result = await range(accounts, { from, to })
+  return { ...result, days: groupByDay(result.events, from, days) }
+}
+
+/** from を起点に days 日ぶん、日付ごとに予定を仕分ける */
+function groupByDay(events, from, days) {
+  const list = []
+  for (let i = 0; i < days; i++) {
+    const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i)
+    const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+    const dayEvents = events.filter((e) =>
+      e.allDay ? dayKey(e.start) === dayKey(date) : e.start < next && (e.end || e.start) > date
+    )
+    list.push({ dayKey: dayKey(date), date, events: dayEvents })
+  }
+  return list
 }
 
 /**

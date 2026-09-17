@@ -95,6 +95,12 @@
   }
   .mon-fix:hover{color:var(--text);}
 
+  .sch-switch{display:flex;gap:6px;margin-bottom:10px;}
+  .sch-switch button{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:6px 8px;cursor:pointer;}
+  .sch-switch button:hover{border-color:var(--border-strong);color:var(--text);}
+  .sch-switch button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+
   .sch-main{display:flex;flex-direction:column;gap:2px;text-align:center;margin-bottom:10px;}
   .sch-main b{font-size:16px;font-weight:600;line-height:1.35;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -122,6 +128,13 @@
     text-decoration:underline;cursor:pointer;padding:2px 3px;flex-shrink:0;}
   .sch-acc button:hover{color:var(--text);}
   .sch-acc button.use{color:var(--accent);}
+
+  .sch-week{display:flex;flex-direction:column;gap:10px;}
+  .sch-day{border-top:1px solid var(--border);padding-top:10px;}
+  .sch-day:first-child{border-top:none;padding-top:0;}
+  .sch-day-head{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;}
+  .sch-day .sch-list{border-top:none;padding-top:0;}
+  .sch-day-empty{font-size:11px;color:var(--text-muted);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -321,8 +334,10 @@
 
       <div class="panel" data-tab="schedule">
         <h2>プレビュー用の予定</h2>
-        <p class="caption">JSONには出ません。実物では Outlook から取った今日の予定が入ります。<br>
-           <span class="mono">account</span> は何番目のアカウントか（1から）。</p>
+        <p class="caption">JSONには出ません。実物では Outlook から取った予定が入ります。<br>
+           <span class="mono">account</span> は何番目のアカウントか（1から）。
+           <span class="mono">day</span> は今日から何日後か（省略で0＝今日）。カード内の「週間」ボタンで、
+           明日から1週間ぶんの見え方を確認できます。</p>
         <div class="fields">
           <div class="row2">
             <label>今の時刻<input type="time" id="d-now" value="10:20"></label>
@@ -974,6 +989,9 @@ const SCHEDULE_STATE_META = {
 /* api/schedule が色を指定しなかったアカウントに配る色 */
 const SCHEDULE_PALETTE = ['#5FA8A0', '#8F7BD6', '#E0B252', '#D9694F', '#6F9FD8', '#B58AC4'];
 
+/* プレビューはカードが1枚だけなので、切り替え状態もここに直接持つ */
+let scheduleView = 'today';
+
 function schAccounts(m){
   return (Array.isArray(m.accounts) ? m.accounts : []).map((a, i)=>{
     const id = (a && a.id) || `account-${i + 1}`;
@@ -1025,21 +1043,71 @@ function schMain(list, now){
 function schList(m, list, now){
   if(!list.length) return '';
   const max = Math.max(1, Math.min(20, Number(m.max) || 5));
-  const rows = list.slice(0, max).map(e=>{
-    const past = !e.allDay && e.end && e.end <= now;
-    const cls = 'sch-row' + (past ? ' past' : '') + (schOngoing(e, now) ? ' now' : '');
-    const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
-    return `<div class="${cls}">
-        <span class="sch-bar" style="background:${esc(e.color)}"></span>
-        <span class="sch-time">${esc(e.allDay ? '終日' : schTime(e.start))}</span>
-        <span class="sch-text">
-          <span class="sch-title">${esc(e.title)}</span>
-          ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
-        </span>
-      </div>`;
-  }).join('');
+  const rows = list.slice(0, max).map(e => schRow(e, now)).join('');
   const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
   return `<div class="sch-list">${rows}</div>${more}`;
+}
+
+/** 1件ぶんの行。今日の一覧・週間の一覧の両方から使う */
+function schRow(e, now){
+  const past = !e.allDay && e.end && e.end <= now;
+  const cls = 'sch-row' + (past ? ' past' : '') + (schOngoing(e, now) ? ' now' : '');
+  const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
+  return `<div class="${cls}">
+      <span class="sch-bar" style="background:${esc(e.color)}"></span>
+      <span class="sch-time">${esc(e.allDay ? '終日' : schTime(e.start))}</span>
+      <span class="sch-text">
+        <span class="sch-title">${esc(e.title)}</span>
+        ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
+      </span>
+    </div>`;
+}
+
+/** from を起点に days 日ぶん、日付ごとに予定を仕分ける */
+function schGroupByDay(events, from, days){
+  const list = [];
+  for(let i = 0; i < days; i++){
+    const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+    const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    const dayEvents = events.filter(e => e.allDay
+      ? sameDay(e.start, date)
+      : e.start < next && (e.end || e.start) > date);
+    list.push({ date, events: dayEvents });
+  }
+  return list;
+}
+
+function sameDay(a, b){
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** 「9/18(木)」のような日付見出し */
+function schDayLabel(date){
+  const WEEKDAY_JA = ['日','月','火','水','木','金','土'];
+  return `${date.getMonth() + 1}/${date.getDate()}(${WEEKDAY_JA[date.getDay()]})`;
+}
+
+function schWeekBody(m, st){
+  const from = new Date(st.now.getFullYear(), st.now.getMonth(), st.now.getDate() + 1);
+  const days = schGroupByDay(st.events, from, 7);
+  return `<div class="sch-week">${days.map(d=>{
+      const body = d.events.length
+        ? `<div class="sch-list">${d.events.map(e => schRow(e, st.now)).join('')}</div>`
+        : `<div class="sch-day-empty">予定なし</div>`;
+      return `<div class="sch-day">
+          <div class="sch-day-head">${esc(schDayLabel(d.date))}</div>
+          ${body}
+        </div>`;
+    }).join('')}</div>`;
+}
+
+/** 今日／週間を切り替えるボタン */
+function schSwitch(){
+  const items = [{ key:'today', label:'今日' }, { key:'week', label:'週間' }];
+  return `<div class="sch-switch">
+      ${items.map(it=>`<button class="${scheduleView === it.key ? 'on' : ''}"
+          data-sch-view="${it.key}">${it.label}</button>`).join('')}
+    </div>`;
 }
 
 function schAccountRows(m, st){
@@ -1058,14 +1126,27 @@ function schAccountRows(m, st){
 }
 
 function schBody(m, st){
+  const switcher = schSwitch();
   if(!st.accounts.length){
-    return `<div class="mon-offline">アカウントが未設定です</div>
+    return switcher + `<div class="mon-offline">アカウントが未設定です</div>
       <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
   }
-  if(st.error) return `<div class="mon-err">${esc(st.error)}</div>${schAccountRows(m, st)}`;
+  if(st.error) return switcher + `<div class="mon-err">${esc(st.error)}</div>${schAccountRows(m, st)}`;
+
+  if(scheduleView === 'week') return switcher + schWeekBody(m, st) + schAccountRows(m, st);
 
   const list = m.hidePast ? st.events.filter(e => e.allDay || !e.end || e.end > st.now) : st.events;
-  return schMain(list, st.now) + schList(m, list, st.now) + schAccountRows(m, st);
+  return switcher + schMain(list, st.now) + schList(m, list, st.now) + schAccountRows(m, st);
+}
+
+/** 今日／週間ボタンの結線 */
+function wireSchedulePreview(){
+  F('live').querySelectorAll('[data-sch-view]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      scheduleView = btn.dataset.schView;
+      paint();
+    });
+  });
 }
 
 function renderScheduleCard(m, st){
@@ -1086,13 +1167,18 @@ const SAMPLE_EVENTS = [
   { time:'09:30-10:00', title:'朝会', account:1, location:'Teams' },
   { time:'10:00-11:00', title:'要件のすり合わせ', account:1, location:'会議室A' },
   { time:'13:00-14:30', title:'レビュー', account:1 },
-  { time:'19:00-20:00', title:'歯医者', account:2, location:'駅前' }
+  { time:'19:00-20:00', title:'歯医者', account:2, location:'駅前' },
+  { day:1, time:'10:00-11:00', title:'週次定例', account:1, location:'Teams' },
+  { day:2, allDay:true, title:'出張（大阪）', account:1 },
+  { day:3, time:'15:00-16:00', title:'1on1', account:2 },
+  { day:6, time:'09:00-12:00', title:'研修', account:1, location:'本社' }
 ];
 
-/** その日の hh:mm */
-function todayAt(text){
+/** 今日から dayOffset 日後の hh:mm */
+function todayAt(text, dayOffset){
   const [h, m] = String(text || '').split(':');
   const d = new Date();
+  d.setDate(d.getDate() + (Number(dayOffset) || 0));
   d.setHours(Number(h) || 0, Number(m) || 0, 0, 0);
   return d;
 }
@@ -1122,11 +1208,12 @@ function dummySchedule(m){
   const events = rows.map((r, i)=>{
     const acc = state[Math.max(1, Number(r.account) || 1) - 1] || state[0];
     const [from, to] = String(r.time || '').split('-');
+    const day = Number(r.day) || 0;
     return {
       key: 'dummy-' + i,
       title: r.title || '(件名なし)',
-      start: r.allDay ? todayAt('00:00') : todayAt(from),
-      end: r.allDay ? null : todayAt(to || from),
+      start: r.allDay ? todayAt('00:00', day) : todayAt(from, day),
+      end: r.allDay ? null : todayAt(to || from, day),
       allDay: !!r.allDay,
       location: r.location || '',
       accountId: acc ? acc.id : '',
@@ -1156,6 +1243,7 @@ function paint(){
     F('live').innerHTML = renderFxPosCard(m, Number(F('d-rate').value) || 0);
   }else if(activeTab === 'schedule'){
     F('live').innerHTML = renderScheduleCard(m, dummySchedule(m));
+    wireSchedulePreview();
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -1307,6 +1395,7 @@ F('apply').addEventListener('click', ()=>{
 F('reset').addEventListener('click', ()=>{
   if(activeTab === 'clipgen') applyMonitor(clone(TEMPLATES.clipgen));
   else drafts[activeTab] = clone(TEMPLATES[activeTab]);
+  if(activeTab === 'schedule') scheduleView = 'today';
   paint();
   say('見本に戻しました');
 });

@@ -104,6 +104,12 @@
   .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
+  .sch-switch{display:flex;gap:6px;margin-bottom:10px;}
+  .sch-switch button{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text-secondary);font-size:11px;padding:6px 8px;cursor:pointer;}
+  .sch-switch button:hover{border-color:var(--border-strong);color:var(--text);}
+  .sch-switch button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+
   .sch-main{display:flex;flex-direction:column;gap:2px;text-align:center;margin-bottom:10px;}
   .sch-main b{font-size:16px;font-weight:600;line-height:1.35;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -131,6 +137,13 @@
     text-decoration:underline;cursor:pointer;padding:2px 3px;flex-shrink:0;}
   .sch-acc button:hover{color:var(--text);}
   .sch-acc button.use{color:var(--accent);}
+
+  .sch-week{display:flex;flex-direction:column;gap:10px;}
+  .sch-day{border-top:1px solid var(--border);padding-top:10px;}
+  .sch-day:first-child{border-top:none;padding-top:0;}
+  .sch-day-head{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;}
+  .sch-day .sch-list{border-top:none;padding-top:0;}
+  .sch-day-empty{font-size:11px;color:var(--text-muted);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -629,6 +642,14 @@
         <option value="show">薄くして残す</option>
         <option value="hide">隠す</option>
       </select>
+    </div>
+    <div class="field" data-for="schedule">
+      <label>最初に開く表示</label>
+      <select id="mf-sch-defaultview">
+        <option value="today">今日</option>
+        <option value="week">週間（明日から1週間）</option>
+      </select>
+      <div class="hint">カード内のボタンでいつでも切り替えられます。ここは開いたときの初期状態だけです</div>
     </div>
     <div class="field" data-for="schedule">
       <label>アカウント</label>
@@ -2492,7 +2513,7 @@ const scheduleState = {};
 
 const SCHEDULE_STATE_META = {
   loading: { color:'#66625A', label:'読み込み中'   },
-  ok     : { color:'#5FA8A0', label:'今日'         },
+  ok     : { color:'#5FA8A0', label:'予定あり'     },
   signin : { color:'#E0B252', label:'未サインイン' },
   error  : { color:'#D9694F', label:'エラー'       }
 };
@@ -2508,38 +2529,64 @@ function todayKey(){
   return new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
 }
 
+function emptyScheduleCache(){
+  return { phase:'loading', result:null, error:'', loading:false, loadedAt:0, dayKey:'' };
+}
+
 /** カードの更新間隔が過ぎたとき、日付が変わったときに取り直す */
 function scheduleStateOf(m){
   let st = scheduleState[m.id];
   if(!st){
     st = scheduleState[m.id] = {
-      phase:'loading', accounts:[], result:null, error:'',
-      loading:false, loadedAt:0, dayKey:''
+      view: m.defaultView === 'week' ? 'week' : 'today',
+      accounts:[],
+      cache: { today: emptyScheduleCache(), week: emptyScheduleCache() }
     };
-    loadSchedule(m);
-  }else if(!st.loading && (st.dayKey !== todayKey() || Date.now() - st.loadedAt >= intervalMsOf(m))){
-    loadSchedule(m);
+  }
+  const cur = st.cache[st.view];
+  if(!cur.loading && (cur.dayKey !== todayKey() || Date.now() - cur.loadedAt >= intervalMsOf(m))){
+    loadSchedule(m, st.view);
   }
   return st;
 }
 
-async function loadSchedule(m){
+/** view を切り替える。データが古ければその場で取りに行く */
+function switchScheduleView(id, view){
+  const st = scheduleState[id];
+  const m = allMonitors().find(x => x.id === id);
+  if(!st || !m || st.view === view) return;
+  st.view = view;
+  const cur = st.cache[view];
+  if(!cur.loading && (cur.dayKey !== todayKey() || Date.now() - cur.loadedAt >= intervalMsOf(m))){
+    loadSchedule(m, view);
+  }
+  paintSchedule(id);
+}
+
+async function loadSchedule(m, view){
   const st = scheduleState[m.id];
-  if(!st || st.loading) return;
-  st.loading = true;
-  st.dayKey = todayKey();
+  const cur = st && st.cache[view];
+  if(!st || !cur || cur.loading) return;
+  cur.loading = true;
+  cur.dayKey = todayKey();
   try{
     const api = await scheduleModule();
     st.accounts = api.normalizeAccounts(m.accounts || []);
-    st.result = st.accounts.length ? await api.today(st.accounts) : null;
-    st.error = '';
-    st.phase = st.result && st.result.signedIn ? 'ok' : 'signin';
+    if(!st.accounts.length){
+      cur.result = null;
+      cur.error = '';
+      cur.phase = 'signin';
+    }else{
+      cur.result = view === 'week' ? await api.week(st.accounts) : await api.today(st.accounts);
+      cur.error = '';
+      cur.phase = cur.result.signedIn ? 'ok' : 'signin';
+    }
   }catch(err){
-    st.error = err.message || String(err);
-    st.phase = 'error';
+    cur.error = err.message || String(err);
+    cur.phase = 'error';
   }
-  st.loading = false;
-  st.loadedAt = Date.now();
+  cur.loading = false;
+  cur.loadedAt = Date.now();
   paintSchedule(m.id);
 }
 
@@ -2553,8 +2600,8 @@ function untilText(when, now){
   return `あと${h}時間${rest ? rest + '分' : ''}`;
 }
 
-function scheduleEvents(m, st, now){
-  const all = (st.result ? st.result.events : []).filter(e => !e.cancelled && !e.declined);
+function scheduleEvents(m, cur, now){
+  const all = (cur.result ? cur.result.events : []).filter(e => !e.cancelled && !e.declined);
   if(!m.hidePast) return all;
   return all.filter(e => e.allDay || !e.end || e.end > now);
 }
@@ -2578,30 +2625,63 @@ function scheduleMain(m, list, now){
   return `<div class="sch-main sch-none">${list.length ? 'この先の予定はありません' : '今日の予定はありません'}</div>`;
 }
 
+/** 1件ぶんの行。今日の一覧・週間の一覧の両方から使う */
+function scheduleRow(e, now){
+  const api = scheduleApi;
+  const past = !e.allDay && e.end && e.end <= now;
+  const cls = 'sch-row' + (past ? ' past' : '') + (api.ongoing(e, now) ? ' now' : '');
+  const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
+  return `<div class="${cls}">
+      <span class="sch-bar" style="background:${esc(e.color)}"></span>
+      <span class="sch-time">${esc(e.allDay ? '終日' : api.formatTime(e.start))}</span>
+      <span class="sch-text">
+        <span class="sch-title">${esc(e.title)}</span>
+        ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
+      </span>
+    </div>`;
+}
+
 function scheduleList(m, list, now){
   if(!list.length) return '';
-  const api = scheduleApi;
   const max = Math.max(1, Math.min(20, Number(m.max) || 5));
-  const rows = list.slice(0, max).map(e=>{
-    const past = !e.allDay && e.end && e.end <= now;
-    const cls = 'sch-row' + (past ? ' past' : '') + (api.ongoing(e, now) ? ' now' : '');
-    const sub = [e.accountLabel, e.location].filter(Boolean).join(' · ');
-    return `<div class="${cls}">
-        <span class="sch-bar" style="background:${esc(e.color)}"></span>
-        <span class="sch-time">${esc(e.allDay ? '終日' : api.formatTime(e.start))}</span>
-        <span class="sch-text">
-          <span class="sch-title">${esc(e.title)}</span>
-          ${sub ? `<span class="sch-sub">${esc(sub)}</span>` : ''}
-        </span>
-      </div>`;
-  }).join('');
+  const rows = list.slice(0, max).map(e => scheduleRow(e, now)).join('');
   const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
   return `<div class="sch-list">${rows}</div>${more}`;
 }
 
+/** 「9/18(木)」のような日付見出し */
+function scheduleDayLabel(date){
+  const d = new Date(date);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_JA[d.getDay()]})`;
+}
+
+function scheduleWeekBody(m, cur, now){
+  const days = (cur.result && cur.result.days) || [];
+  if(!days.length) return `<div class="mon-offline">予定を確認できません</div>`;
+  return `<div class="sch-week">${days.map(d=>{
+      const list = (d.events || []).filter(e => !e.cancelled && !e.declined);
+      const body = list.length
+        ? `<div class="sch-list">${list.map(e => scheduleRow(e, now)).join('')}</div>`
+        : `<div class="sch-day-empty">予定なし</div>`;
+      return `<div class="sch-day">
+          <div class="sch-day-head">${esc(scheduleDayLabel(d.date))}</div>
+          ${body}
+        </div>`;
+    }).join('')}</div>`;
+}
+
+/** 今日／週間を切り替えるボタン */
+function scheduleSwitch(m, st){
+  const items = [{ key:'today', label:'今日' }, { key:'week', label:'週間' }];
+  return `<div class="sch-switch">
+      ${items.map(it=>`<button class="${st.view === it.key ? 'on' : ''}"
+          data-schedule-view="${esc(m.id)}" data-view="${it.key}">${it.label}</button>`).join('')}
+    </div>`;
+}
+
 /** アカウントごとのサインイン状態と、その場でサインインするボタン */
-function scheduleAccountRows(m, st){
-  const list = (st.result && st.result.accounts) || st.accounts;
+function scheduleAccountRows(m, st, cur){
+  const list = (cur.result && cur.result.accounts) || st.accounts;
   if(!list.length) return '';
   return `<div class="sch-accounts">
       ${list.map(a=>`
@@ -2617,23 +2697,28 @@ function scheduleAccountRows(m, st){
 }
 
 function scheduleBody(m, st){
-  if(!scheduleApi || (st.loading && !st.result)) return `<div class="mon-offline">読み込み中…</div>`;
+  const cur = st.cache[st.view];
+  const switcher = scheduleSwitch(m, st);
+  if(!scheduleApi || (cur.loading && !cur.result)) return switcher + `<div class="mon-offline">読み込み中…</div>`;
   if(!st.accounts.length){
-    return `<div class="mon-offline">アカウントが未設定です</div>
+    return switcher + `<div class="mon-offline">アカウントが未設定です</div>
       <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
   }
-  if(st.phase === 'error' && !st.result){
-    return `<div class="mon-err">${esc(st.error)}</div>${scheduleAccountRows(m, st)}`;
+  if(cur.phase === 'error' && !cur.result){
+    return switcher + `<div class="mon-err">${esc(cur.error)}</div>${scheduleAccountRows(m, st, cur)}`;
   }
 
   const now = new Date();
-  const list = scheduleEvents(m, st, now);
-  return scheduleMain(m, list, now) + scheduleList(m, list, now) + scheduleAccountRows(m, st);
+  if(st.view === 'week') return switcher + scheduleWeekBody(m, cur, now) + scheduleAccountRows(m, st, cur);
+
+  const list = scheduleEvents(m, cur, now);
+  return switcher + scheduleMain(m, list, now) + scheduleList(m, list, now) + scheduleAccountRows(m, st, cur);
 }
 
 function renderScheduleCard(m){
   const st = scheduleStateOf(m);
-  const meta = SCHEDULE_STATE_META[st.phase] || SCHEDULE_STATE_META.loading;
+  const cur = st.cache[st.view];
+  const meta = SCHEDULE_STATE_META[cur.phase] || SCHEDULE_STATE_META.loading;
   return `
     <div class="mon-card" data-monitor="${esc(m.id)}">
       <div class="mon-head">
@@ -2653,7 +2738,7 @@ function paintSchedule(id){
   const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .schedule-body`);
   if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
 
-  const meta = SCHEDULE_STATE_META[st.phase] || SCHEDULE_STATE_META.loading;
+  const meta = SCHEDULE_STATE_META[st.cache[st.view].phase] || SCHEDULE_STATE_META.loading;
   const box = card.closest('.mon-card');
   box.querySelector('.mon-dot').style.background = meta.color;
   box.querySelector('.mon-state').textContent = meta.label;
@@ -2664,6 +2749,9 @@ function paintSchedule(id){
 function wireSchedule(card){
   const m = allMonitors().find(x => x.id === card.dataset.monitor);
   if(!m) return;
+  card.querySelectorAll('[data-schedule-view]').forEach(btn=>{
+    btn.addEventListener('click', ()=>switchScheduleView(m.id, btn.dataset.view));
+  });
   card.querySelectorAll('[data-schedule-in]').forEach(btn=>{
     btn.addEventListener('click', ()=>scheduleAuth(m, btn.dataset.account, 'in'));
   });
@@ -2684,8 +2772,9 @@ async function scheduleAuth(m, accountId, action){
   }catch(err){
     toast(err.message || String(err));
   }
-  st.loadedAt = 0;
-  await loadSchedule(m);
+  st.cache.today.loadedAt = 0;
+  st.cache.week.loadedAt = 0;
+  await loadSchedule(m, st.view);
 }
 
 function renderMonitorCard(m, snap){
@@ -3199,6 +3288,7 @@ function fillMonitorForm(m){
   F('mf-clipgen-total').value = m.total || '';
   F('mf-sch-max').value = m.max || 5;
   F('mf-sch-hidepast').value = m.hidePast ? 'hide' : 'show';
+  F('mf-sch-defaultview').value = m.defaultView === 'week' ? 'week' : 'today';
   F('mf-sch-accounts').value = JSON.stringify(
     Array.isArray(m.accounts) && m.accounts.length ? m.accounts : SAMPLE_SCHEDULE_ACCOUNTS, null, 2);
 }
@@ -3285,6 +3375,8 @@ function buildMonitor(){
     m.max = Math.max(1, Math.min(20, Number(F('mf-sch-max').value) || 5));
     if(F('mf-sch-hidepast').value === 'hide') m.hidePast = true;
     else delete m.hidePast;
+    if(F('mf-sch-defaultview').value === 'week') m.defaultView = 'week';
+    else delete m.defaultView;
 
     let accounts;
     try{ accounts = JSON.parse(F('mf-sch-accounts').value); }
