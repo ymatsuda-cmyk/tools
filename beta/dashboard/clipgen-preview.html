@@ -141,6 +141,7 @@
   .mail-body .sch-row:hover{background:var(--surface-2);}
   .mail-body .sch-row.unread .sch-title{font-weight:700;color:var(--text);}
   .mail-body .sch-row.starred{background:rgba(224,178,82,0.10);}
+  .mail-time-col{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;}
   .mail-actions{display:flex;gap:1px;flex-shrink:0;margin-left:auto;}
   .mail-star, .mail-del{background:none;border:none;cursor:pointer;font-size:13px;line-height:1;
     padding:4px;color:var(--text-muted);border-radius:5px;}
@@ -1310,13 +1311,15 @@ function mailRow(e){
   const cls = 'sch-row' + (e.isRead ? '' : ' unread') + (e.starred ? ' starred' : '');
   return `<div class="${cls}">
       <span class="sch-bar" style="background:${esc(e.color)}"></span>
-      <span class="sch-time">${esc(mailRowTime(e.receivedAt))}</span>
+      <span class="mail-time-col">
+        <span class="sch-time">${esc(mailRowTime(e.receivedAt))}</span>
+        <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
+      </span>
       <span class="sch-text">
-        <span class="sch-title">${esc(e.subject)}</span>
+        <span class="sch-title" title="${esc(e.subject)}">${esc(e.subject)}</span>
         ${e.from ? `<span class="sch-sub">${esc(e.from)}</span>` : ''}
       </span>
       <span class="mail-actions">
-        <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
         <button class="mail-del" data-mail-del="${esc(e.key)}" title="非表示にする">✕</button>
       </span>
     </div>`;
