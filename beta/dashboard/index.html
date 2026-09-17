@@ -59,7 +59,10 @@
   .monitor-bar .mono{font-size:11px;color:var(--text-muted);}
   .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
   .monitor-empty{padding:50px 20px;text-align:center;color:var(--text-muted);font-size:13px;}
-  .mon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .mon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;
+    cursor:grab;transition:opacity .15s ease;}
+  .mon-card.dragging{opacity:0.4;cursor:grabbing;}
+  .monitor-grid.reordering .mon-card:not(.dragging){transition:transform .15s ease;}
   .mon-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
   .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1705,7 +1708,7 @@ function renderRuleCard(m){
   const rules = Array.isArray(m.rules) ? m.rules : [];
   if(!rules.length){
     return `
-      <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
         <div class="mon-head">
           <span class="mon-dot" style="background:#66625A"></span>
           <span class="mon-name">${esc(m.name || m.id)}</span>
@@ -1737,7 +1740,7 @@ function renderRuleCard(m){
     : `<div class="rule-main rule-none">${esc(m.noneLabel || 'なし')}</div>`;
 
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}">
+    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
       <div class="mon-head">
         <span class="mon-dot" style="background:${esc(dot)}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
@@ -2002,7 +2005,7 @@ function renderCalcCard(m){
   const scope = calcScope(m);
 
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}">
+    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
       <div class="mon-head">
         <span class="mon-dot" style="background:#5FA8A0"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
@@ -2401,7 +2404,7 @@ function renderClipgenCard(m){
   const st = clipgenStateOf(m);
   const meta = CLIPGEN_STATE_META[st.phase] || CLIPGEN_STATE_META.idle;
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}">
+    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
@@ -2720,7 +2723,7 @@ function renderScheduleCard(m){
   const cur = st.cache[st.view];
   const meta = SCHEDULE_STATE_META[cur.phase] || SCHEDULE_STATE_META.loading;
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}">
+    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
@@ -2843,7 +2846,7 @@ function renderMonitorCard(m, snap){
   }
 
   return `
-    <div class="mon-card" data-monitor="${m.id}">
+    <div class="mon-card" data-monitor="${m.id}" draggable="true">
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(snap && snap.name ? snap.name : m.name || m.id)}</span>
@@ -3081,6 +3084,64 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
     });
   });
 }
+
+/* ---------- 稼働状況・情報タブのカード並び替え（ドラッグ＆ドロップ） ---------- */
+let draggingMonitorCard = null;
+
+/** grid内の並び順を config.monitors 全体へ反映する（絞り込み中は表示分だけ入れ替える） */
+function commitMonitorOrderFromDom(gridEl){
+  const ids = [...gridEl.querySelectorAll('.mon-card')].map(c => c.dataset.monitor);
+  const list = allMonitors();
+  const shown = new Set(ids);
+  const byId = new Map(list.map(m => [m.id, m]));
+  const slots = [];
+  list.forEach((m, i) => { if(shown.has(m.id)) slots.push(i); });
+  slots.forEach((pos, k) => { list[pos] = byId.get(ids[k]); });
+  config.monitors = list;
+}
+
+function setupMonitorDnD(gridId){
+  const gridEl = document.getElementById(gridId);
+  if(!gridEl) return;
+
+  gridEl.addEventListener('dragstart', e=>{
+    const card = e.target.closest('.mon-card');
+    if(!card) return;
+    draggingMonitorCard = card;
+    gridEl.classList.add('reordering');
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.monitor);
+  });
+
+  gridEl.addEventListener('dragover', e=>{
+    if(!draggingMonitorCard) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const over = e.target.closest('.mon-card');
+    if(!over || over === draggingMonitorCard) return;
+    const rect = over.getBoundingClientRect();
+    const after = (e.clientX - rect.left) > rect.width / 2;
+    gridEl.insertBefore(draggingMonitorCard, after ? over.nextSibling : over);
+  });
+
+  gridEl.addEventListener('drop', e=>{ e.preventDefault(); });
+
+  gridEl.addEventListener('dragend', async ()=>{
+    if(!draggingMonitorCard) return;
+    draggingMonitorCard.classList.remove('dragging');
+    draggingMonitorCard = null;
+    gridEl.classList.remove('reordering');
+    commitMonitorOrderFromDom(gridEl);
+    await persistLocal();
+    F('s-monitors').value = JSON.stringify(config.monitors, null, 2);
+    syncMonitorPicker();
+    toast('並び順を変更しました');
+  });
+}
+
+setupMonitorDnD('monitorGrid');
+setupMonitorDnD('infoGrid');
 
 /** 取得値と入力値の差をGASに保存し、以降の表示に反映する */
 async function adjustMonitor(id, text){
