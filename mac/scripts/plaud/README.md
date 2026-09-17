@@ -45,9 +45,15 @@ PLAUD_WS_ID=ws_clQPe6Vll0
 
 PLAUD_TOKEN_2=yyyyy
 # PLAUD_WS_ID_2=ws_xxxxxxxx   ← 未設定なら workspaceId なしで既定ワークスペースを見る
+# PLAUD_REFRESH_TOKEN_2=zzzzz ← 設定するとworkspaceToken(約10日で失効)を毎回自動更新する
 ```
 
 `_3` `_4` `_5` と最大5アカウントまで。`PLAUD_DOMAIN_n` はリージョンが違う場合のみ指定。
+
+`PLAUD_REFRESH_TOKEN_n` はブラウザの DevTools → Application → Local Storage →
+`pld_xxx:workspaceList` の値に含まれる `refreshToken` をコピーして設定します。
+設定しておくと `PLAUD_TOKEN_n`(workspaceToken)が期限切れになっても自動で再取得し、
+ローテーションされた新しい refresh_token は `.env` に自動で書き戻されます。
 ログ上の名前は `account1` `account2` と自動で付きます。
 Notion側の重複判定は `https://web.plaud.ai/file/{id}` で行うため、アカウントが増えても
 二重登録にはなりません。

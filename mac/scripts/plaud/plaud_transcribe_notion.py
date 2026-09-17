@@ -13,13 +13,31 @@ def load_env():
                 os.environ.setdefault(k.strip(), v.strip())
 load_env()
 
+def update_env_var(key, value):
+    """~/.plaud_notion_sync.env の該当キーを書き換える（無ければ追記）。ローテーションするrefresh_tokenの永続化用。"""
+    os.environ[key] = value
+    lines = ENV_FILE.read_text().splitlines() if ENV_FILE.exists() else []
+    found = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k = stripped.split("=", 1)[0].strip()
+            if k == key:
+                lines[i] = f"{key}={value}"
+                found = True
+                break
+    if not found:
+        lines.append(f"{key}={value}")
+    ENV_FILE.write_text("\n".join(lines) + "\n")
+
 DEFAULT_PLAUD_DOMAIN = "https://api-apne1.plaud.ai"
 DEFAULT_PLAUD_WS_ID  = "ws_clQPe6Vll0"
 PLAUD_MAX_ACCOUNTS   = 5
 
 def load_plaud_accounts():
     """PLAUD_TOKEN, PLAUD_TOKEN_2 … を順に読み、複数アカウント分の設定を返す。
-    2つ目以降で PLAUD_WS_ID_n が未設定なら workspaceId を付けずに既定ワークスペースを見る。"""
+    2つ目以降で PLAUD_WS_ID_n が未設定なら workspaceId を付けずに既定ワークスペースを見る。
+    PLAUD_REFRESH_TOKEN_n を設定しておくと、workspaceToken期限切れ(10日程度)を自動更新できる。"""
     accounts = []
     for idx in range(1, PLAUD_MAX_ACCOUNTS + 1):
         sfx = "" if idx == 1 else f"_{idx}"
@@ -28,7 +46,9 @@ def load_plaud_accounts():
             continue
         accounts.append({
             "name": f"account{idx}",
+            "env_suffix": sfx,
             "token": token,
+            "refresh_token": os.environ.get(f"PLAUD_REFRESH_TOKEN{sfx}", "").strip().strip('"').strip("'"),
             "domain": (os.environ.get(f"PLAUD_DOMAIN{sfx}", "").strip() or DEFAULT_PLAUD_DOMAIN).rstrip("/"),
             "workspace": os.environ.get(
                 f"PLAUD_WS_ID{sfx}", DEFAULT_PLAUD_WS_ID if idx == 1 else "").strip(),
@@ -197,7 +217,45 @@ def _fetch_file_page(account, url):
     resp = plaud_get(account, url)
     return resp, (resp.json() if resp.status_code == 200 else None)
 
+def refresh_workspace_token(account):
+    """refresh_token を使って workspaceToken(account["token"]) を再発行する。
+    成功すると account["token"] / account["refresh_token"] を更新し、rotateしたrefresh_tokenは
+    .env にも書き戻して次回実行以降も使えるようにする。"""
+    refresh_token = account.get("refresh_token")
+    if not refresh_token or not account.get("workspace"):
+        return False
+    url = f"{account['domain']}/user-app/auth/workspace/refresh/{account['workspace']}"
+    bearer_prefix = "Bearer" if not refresh_token.lower().startswith("bearer ") else ""
+    headers = {"Authorization": f"{bearer_prefix} {refresh_token}".strip()}
+    try:
+        resp = requests.post(url, json={}, headers=headers, timeout=30)
+    except requests.RequestException:
+        return False
+    if resp.status_code != 200:
+        return False
+    try:
+        body = resp.json()
+    except ValueError:
+        return False
+    if body.get("status") != 0:
+        return False
+    data = body.get("data") or {}
+    new_token = data.get("workspace_token") or data.get("access_token")
+    if not new_token:
+        return False
+    account["token"] = new_token if new_token.lower().startswith("bearer ") else f"Bearer {new_token}"
+    account["_bearer_toggled"] = True  # 形式は判明済みなのでplaud_get側の自動反転は不要
+    new_refresh = data.get("refresh_token")
+    if new_refresh and new_refresh != refresh_token:
+        account["refresh_token"] = new_refresh
+        update_env_var(f"PLAUD_REFRESH_TOKEN{account['env_suffix']}", new_refresh)
+    return True
+
 def get_plaud_files_for_account(account):
+    if account.get("refresh_token"):
+        # workspaceTokenは約10日で失効するため、リクエスト前に必ず更新しておく
+        if not refresh_workspace_token(account):
+            print(f"    ⚠️ [{account['name']}] workspaceTokenの自動更新に失敗しました（refresh_tokenが失効している可能性）")
     all_files = []
     page = 1
     while True:
@@ -235,14 +293,18 @@ def get_plaud_files_for_account(account):
     return all_files
 
 def report_empty_listing(account, data):
-    """200だが0件。トークン切れとworkspaceId未指定のどちらかを判別できる情報を出す。"""
+    """200だが0件。トークン切れ・workspaceトークン期限切れ・workspaceId未指定のいずれかを判別できる情報を出す。"""
     code = data.get("code") or data.get("status")
     msg = data.get("msg") or data.get("message") or ""
     print(f"    ℹ️ [{account['name']}] total={data.get('data_file_total')} "
           f"code={code} msg={msg} keys={list(data)[:6]}")
     if code == -3900 or "auth" in str(msg).lower():
         print(f"       トークンが無効または期限切れです。PLAUD_TOKEN_n を取り直してください")
-    if not account["workspace"]:
+    elif code == -419 or "expired" in str(msg).lower():
+        print(f"       workspaceのログインセッションが期限切れです（PLAUD_WS_ID_n の設定は問題ありません）。"
+              f"web.plaud.ai にそのアカウントで再ログインし、DevToolsのNetworkで file/simple/web の"
+              f"Authorization ヘッダーを控えて PLAUD_TOKEN_n を更新してください")
+    elif not account["workspace"]:
         print(f"       workspaceId 未指定です。web.plaud.ai にそのアカウントでログインし、"
               f"DevToolsのNetworkで file/simple/web の workspaceId を控えて"
               f"PLAUD_WS_ID_n に設定してください")
