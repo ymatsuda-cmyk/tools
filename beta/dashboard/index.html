@@ -96,6 +96,7 @@
   .switch.busy .track{cursor:wait;opacity:0.5;}
   .switch.disabled .track{cursor:not-allowed;opacity:0.35;}
   .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
+  .mon-err-bottom{border-top:1px solid var(--border);padding-top:8px;margin-top:10px;}
   .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
   .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
   .mon-fix{
@@ -2813,22 +2814,21 @@ function renderMonitorCard(m, snap){
   const on = state === 'running' || state === 'starting';
   const locked = !snap || snap.error || state === 'unknown';
 
+  // エラー中は前回うまく取れた内容を出し続け、エラーはカード下部にだけ出す
+  const source = (snap && !snap.error) ? snap : monitorLastGood[m.id];
+  const errorNote = (snap && snap.error)
+    ? `<div class="mon-err mon-err-bottom">${esc(snap.error)}</div>` : '';
+
   let body;
-  if(!snap){
-    body = `<div class="mon-offline">取得中…</div>`;
-  }else if(snap.error){
-    body = `<div class="mon-offline">応答がありません</div><div class="mon-err">${esc(snap.error)}</div>`;
-  }else if(snap.fx){
-    body = fxBody(snap.fx);
-  }else if(snap.fxpos){
-    body = fxPosBody(snap.fxpos);
+  if(source && source.fx){
+    body = fxBody(source.fx);
+  }else if(source && source.fxpos){
+    body = fxPosBody(source.fxpos);
   }else if(m.type === 'fx'){
     body = `<div class="mon-offline">データを取得できません</div>
       <div class="mon-err">ダッシュボード用GASを最新の Code.gs に更新し、再デプロイしてください</div>`;
-  }else if(!snap.remaining){
-    body = `<div class="mon-offline">${meta.label}</div>`;
-  }else{
-    const r = snap.remaining;
+  }else if(source && source.remaining){
+    const r = source.remaining;
     const max = Number(r.max) || 0;
     const val = Math.max(0, Number(r.value) || 0);
     const pct = max === 0 ? 0 : (val / max) * 100;
@@ -2837,10 +2837,16 @@ function renderMonitorCard(m, snap){
       <div class="mon-ring">
         ${ringSVG(pct, remainColor(pct), round1(val) + unit)}
         <div class="sub mono">${max ? '残り / 上限 ' + round1(max) + unit : '残り'}</div>
-        ${snap.note ? `<div class="mon-note">${esc(snap.note)}</div>` : ''}
+        ${source.note ? `<div class="mon-note">${esc(source.note)}</div>` : ''}
         ${m.type === 'manual' ? '' :
           `<button class="mon-fix" data-fix="${m.id}" data-unit="${esc(unit)}" data-value="${round1(val)}">残りを修正</button>`}
       </div>`;
+  }else if(source){
+    body = `<div class="mon-offline">${meta.label}</div>`;
+  }else if(snap && snap.error){
+    body = `<div class="mon-offline">まだ内容を取得できていません</div>`;
+  }else{
+    body = `<div class="mon-offline">取得中…</div>`;
   }
 
   const cls = 'switch' + (busy ? ' busy' : '') + (locked ? ' disabled' : '');
@@ -2876,6 +2882,7 @@ function renderMonitorCard(m, snap){
       </div>
       ${body}
       ${footer}
+      ${errorNote}
     </div>`;
 }
 
@@ -2900,6 +2907,14 @@ function round1(n){
 }
 
 let monitorSnapshots = {};
+/* エラーで上書きされる前の、最後にうまく取れた内容。エラー中もカードの中身を保てるようにする */
+const monitorLastGood = {};
+
+/** 取得結果を反映する。エラーが無ければ monitorLastGood にも積む */
+function setSnapshot(id, snap){
+  monitorSnapshots[id] = snap;
+  if(snap && !snap.error) monitorLastGood[id] = snap;
+}
 
 function renderMonitorChips(){
   const el = document.getElementById('monitorChips');
@@ -3184,7 +3199,7 @@ async function adjustMonitor(id, text){
   }
   try{
     const res = await callGas({ action:'monitorAdjust', monitor:m, value:Number(text), reset });
-    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    if(res.snapshot) setSnapshot(id, res.snapshot);
     renderMonitors();
   }catch(err){ toast(err.message); }
 }
@@ -3195,7 +3210,7 @@ async function recordManualUsage(id, delta, reset){
   if(!m) return;
   try{
     const res = await callGas({ action:'monitorUsage', monitor:m, delta, reset });
-    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    if(res.snapshot) setSnapshot(id, res.snapshot);
     renderMonitors();
   }catch(err){ toast(err.message); }
 }
@@ -3216,10 +3231,10 @@ async function fetchMonitors(force = true){
   }
   try{
     const res = await callGas({ action:'monitorStatus', monitors:list });
-    (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
+    (res.results || []).forEach(r=>{ setSnapshot(r.id, r); });
   }catch(err){
     list.forEach(m=>{
-      monitorSnapshots[m.id] = { id:m.id, state:'error', error:err.message };
+      setSnapshot(m.id, { id:m.id, state:'error', error:err.message });
     });
   }
   const done = Date.now();
@@ -3265,9 +3280,9 @@ function refreshMonitorCard(id){
 async function refreshSingleMonitor(m){
   try{
     const res = await callGas({ action:'monitorStatus', monitors:[m] });
-    (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
+    (res.results || []).forEach(r=>{ setSnapshot(r.id, r); });
   }catch(err){
-    monitorSnapshots[m.id] = { id:m.id, state:'error', error:err.message };
+    setSnapshot(m.id, { id:m.id, state:'error', error:err.message });
   }
   monitorDueAt[m.id] = Date.now() + intervalMsOf(m);
   renderMonitors();
@@ -3283,18 +3298,18 @@ async function controlMonitor(id, action){
   }
 
   monitorSnapshots[id] = Object.assign({}, monitorSnapshots[id], {
-    state: action === 'start' ? 'starting' : 'stopping'
+    state: action === 'start' ? 'starting' : 'stopping', error: ''
   });
   renderMonitors();
 
   try{
     const res = await callGas({ action:'monitorControl', monitor:m, command:action });
-    if(res.snapshot) monitorSnapshots[id] = res.snapshot;
+    if(res.snapshot) setSnapshot(id, res.snapshot);
     toast(`${label}を要求しました`);
   }catch(err){
-    monitorSnapshots[id] = Object.assign({}, monitorSnapshots[id], {
+    setSnapshot(id, Object.assign({}, monitorSnapshots[id], {
       state:'error', error: err.message
-    });
+    }));
     toast(err.message);
   }
   renderMonitors();
@@ -3556,6 +3571,7 @@ document.getElementById('saveMonitor').onclick = async ()=>{
       : allMonitors().concat([m]);
     if(editing && editing !== m.id){
       delete monitorSnapshots[editing];
+      delete monitorLastGood[editing];
       delete monitorDueAt[editing];
     }
     await persistLocal();
