@@ -67,6 +67,13 @@
   .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mon-state{font-size:10px;color:var(--text-muted);}
+  .mon-refresh{flex-shrink:0;width:20px;height:20px;padding:0;margin-left:2px;
+    background:none;border:none;color:var(--text-muted);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;border-radius:6px;}
+  .mon-refresh:hover{color:var(--text);background:var(--surface-2);}
+  .mon-refresh svg{width:13px;height:13px;}
+  .mon-refresh.spin svg{animation:mon-spin .7s linear infinite;transform-origin:center;}
+  @keyframes mon-spin{to{transform:rotate(360deg);}}
   .mon-ring{text-align:center;margin-bottom:12px;}
   .mon-ring svg{width:96px;height:96px;display:block;margin:0 auto;}
   .mon-ring .sub{font-size:11px;color:var(--text-secondary);margin-top:5px;}
@@ -1704,6 +1711,15 @@ function ruleDateLabel(d){
   return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_JA[d.getDay()]})`;
 }
 
+/** カード右上に置く、そのカードだけを更新するボタン */
+function monRefreshBtn(id){
+  return `<button class="mon-refresh" data-refresh="${esc(id)}" draggable="false" title="このカードだけ更新" aria-label="このカードだけ更新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>
+      </svg>
+    </button>`;
+}
+
 function renderRuleCard(m){
   const rules = Array.isArray(m.rules) ? m.rules : [];
   if(!rules.length){
@@ -1712,6 +1728,7 @@ function renderRuleCard(m){
         <div class="mon-head">
           <span class="mon-dot" style="background:#66625A"></span>
           <span class="mon-name">${esc(m.name || m.id)}</span>
+          ${monRefreshBtn(m.id)}
         </div>
         <div class="mon-offline">ルールが未設定です</div>
         <div class="mon-note">設定 →監視 のJSONで rules を登録してください</div>
@@ -1745,6 +1762,7 @@ function renderRuleCard(m){
         <span class="mon-dot" style="background:${esc(dot)}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${esc(hit.length ? (m.leadLabel || '次の予定') : 'なし')}</span>
+        ${monRefreshBtn(m.id)}
       </div>
       ${main}
       <div class="rule-when">${ruleDateLabel(target)}</div>
@@ -2009,6 +2027,7 @@ function renderCalcCard(m){
       <div class="mon-head">
         <span class="mon-dot" style="background:#5FA8A0"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
+        ${monRefreshBtn(m.id)}
       </div>
       <div class="calc-rows">
         ${rows.map((r, i) => `
@@ -2409,6 +2428,7 @@ function renderClipgenCard(m){
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monRefreshBtn(m.id)}
       </div>
       <div class="clipgen-body">${clipgenBody(m, st)}</div>
     </div>`;
@@ -2728,6 +2748,7 @@ function renderScheduleCard(m){
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monRefreshBtn(m.id)}
       </div>
       <div class="schedule-body">${scheduleBody(m, st)}</div>
     </div>`;
@@ -2851,6 +2872,7 @@ function renderMonitorCard(m, snap){
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(snap && snap.name ? snap.name : m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monRefreshBtn(m.id)}
       </div>
       ${body}
       ${footer}
@@ -3049,6 +3071,14 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.schedule-body').forEach(body=>wireSchedule(body.closest('.mon-card')));
 
+  grid.querySelectorAll('[data-refresh]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      btn.classList.add('spin');
+      refreshMonitorCard(btn.dataset.refresh);
+    });
+  });
+
   grid.querySelectorAll('[data-toggle]').forEach(sw=>{
     sw.addEventListener('change', ()=>{
       controlMonitor(sw.dataset.toggle, sw.checked ? 'start' : 'stop');
@@ -3205,6 +3235,42 @@ function scheduleNextFetch(){
   nextFetchAt = nextDueAt();
   if(!monitorRunning) return;
   monitorTimer = setTimeout(()=>fetchMonitors(false), Math.max(1000, nextFetchAt - Date.now()));
+}
+
+/** カード右上のボタンから、そのカード1件だけを更新する */
+function refreshMonitorCard(id){
+  const m = allMonitors().find(x => x.id === id);
+  if(!m) return;
+  const type = monitorType(m);
+  if(type === 'clipgen'){
+    const st = clipgenStateOf(m);
+    st.phase = 'loading';
+    paintClipgen(id);
+    loadClipgenOptions(m);
+  }else if(type === 'schedule'){
+    const st = scheduleState[id];
+    if(!st) return;
+    st.cache.today.loadedAt = 0;
+    st.cache.week.loadedAt = 0;
+    loadSchedule(m, st.view);
+  }else if(LOCAL_TYPES.includes(type)){
+    // rule/calc は取得先が無く、常に最新を計算しているのでその場で描き直すだけ
+    renderMonitors();
+  }else{
+    refreshSingleMonitor(m);
+  }
+}
+
+/** 汎用API系のカード1件だけを、待ち時間を無視してGASに取りに行く */
+async function refreshSingleMonitor(m){
+  try{
+    const res = await callGas({ action:'monitorStatus', monitors:[m] });
+    (res.results || []).forEach(r=>{ monitorSnapshots[r.id] = r; });
+  }catch(err){
+    monitorSnapshots[m.id] = { id:m.id, state:'error', error:err.message };
+  }
+  monitorDueAt[m.id] = Date.now() + intervalMsOf(m);
+  renderMonitors();
 }
 
 async function controlMonitor(id, action){
