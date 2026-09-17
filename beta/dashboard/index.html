@@ -156,6 +156,18 @@
   .sch-day .sch-list{border-top:none;padding-top:0;}
   .sch-day-empty{font-size:11px;color:var(--text-muted);}
 
+  /* メールは schedule の行・日別見出しをそのまま流用し、状態の見た目だけ足す */
+  .mail-body .sch-row{padding:4px;border-radius:8px;}
+  .mail-body .sch-row:hover{background:var(--surface-2);}
+  .mail-body .sch-row.unread .sch-title{font-weight:700;color:var(--text);}
+  .mail-body .sch-row.starred{background:rgba(224,178,82,0.10);}
+  .mail-actions{display:flex;gap:1px;flex-shrink:0;margin-left:auto;}
+  .mail-star, .mail-del{background:none;border:none;cursor:pointer;font-size:13px;line-height:1;
+    padding:4px;color:var(--text-muted);border-radius:5px;}
+  .mail-star:hover, .mail-del:hover{color:var(--text);background:var(--surface);}
+  .mail-star.on{color:#E0B252;}
+  .mail-empty{font-size:11px;color:var(--text-muted);padding:10px 0;text-align:center;}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -534,6 +546,7 @@
         <option value="fxpos">ドル円の建値</option>
         <option value="rule">ルール（曜日で決まる予定）</option>
         <option value="schedule">今日の予定（Outlookなど）</option>
+        <option value="mail">メール受信（Outlookなど）</option>
         <option value="calc">電卓</option>
         <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
@@ -671,6 +684,26 @@
         <span class="mono">events</span>（直書き）や <span class="mono">url</span>（外部JSON）から予定を出せます。
         用意のしかたは <span class="mono">api/schedule/README.md</span> を見てください</div>
       <div class="hint" id="hint-sch-redirect">リダイレクトURI: 読み込み中…</div>
+    </div>
+
+    <div class="field" data-for="mail">
+      <label>一覧に出す件数</label>
+      <input type="number" id="mf-mail-max" value="10" min="1" max="50">
+    </div>
+    <div class="field" data-for="mail">
+      <label>何日前まで有効か</label>
+      <input type="number" id="mf-mail-maxage" value="7" min="1" max="90">
+      <div class="hint">受信日時がこれより古いメールはカードに出しません。アカウントごとに
+        JSONの <span class="mono">maxAgeDays</span> で上書きもできます</div>
+    </div>
+    <div class="field" data-for="mail">
+      <label>アカウント</label>
+      <textarea id="mf-mail-accounts" spellcheck="false" style="min-height:150px;"></textarea>
+      <div class="hint">何件でも並べられます。受信トレイ（トップフォルダ）のメールだけを対象にします。
+        <span class="mono">"provider": "json"</span> にすると、サインインなしで
+        <span class="mono">mails</span>（直書き）や <span class="mono">url</span>（外部JSON）からメールを出せます。
+        用意のしかたは <span class="mono">api/mail/README.md</span> を見てください</div>
+      <div class="hint" id="hint-mail-redirect">リダイレクトURI: 読み込み中…</div>
     </div>
 
     <div class="modal-actions">
@@ -1457,10 +1490,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1473,6 +1506,7 @@ const TYPE_LABELS = {
   calc   : '電卓',
   clipgen: 'clipstock生成',
   schedule: '今日の予定',
+  mail   : 'メール受信',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1520,7 +1554,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule', 'mail'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -1696,6 +1730,12 @@ const SAMPLE_RULES = [
 
 /* 今日の予定カードの雛形。clientId を入れればそのまま使える */
 const SAMPLE_SCHEDULE_ACCOUNTS = [
+  { id:'work', label:'仕事', provider:'outlook', clientId:'', tenant:'common', color:'#5FA8A0' },
+  { id:'home', label:'個人', provider:'outlook', clientId:'', tenant:'common', color:'#8F7BD6' }
+];
+
+/* メール受信カードの雛形。clientId を入れればそのまま使える */
+const SAMPLE_MAIL_ACCOUNTS = [
   { id:'work', label:'仕事', provider:'outlook', clientId:'', tenant:'common', color:'#5FA8A0' },
   { id:'home', label:'個人', provider:'outlook', clientId:'', tenant:'common', color:'#8F7BD6' }
 ];
@@ -2813,11 +2853,293 @@ async function scheduleAuth(m, accountId, action){
   await loadSchedule(m, st.view);
 }
 
+/* ---------- メール受信 ---------- */
+
+const MAIL_MODULE = new URL('../../api/mail/mail.api.js', location.href).href;
+
+/* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
+const mailState = {};
+
+const MAIL_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  ok     : { color:'#5FA8A0', label:'受信あり'   },
+  none   : { color:'#5FA8A0', label:'新着なし'   },
+  signin : { color:'#E0B252', label:'未サインイン' },
+  error  : { color:'#D9694F', label:'エラー'     }
+};
+
+let mailApi = null;
+
+async function mailModule(){
+  if(!mailApi) mailApi = await import(MAIL_MODULE);
+  return mailApi;
+}
+
+const MAIL_LOCAL_KEY = 'dashMailLocal';
+
+/** 削除(非表示)・優先(★)は端末のブラウザだけに覚えさせる。メール自体は変更しない */
+function mailLocalAll(){
+  try{ return JSON.parse(localStorage.getItem(MAIL_LOCAL_KEY)) || {}; }
+  catch{ return {}; }
+}
+
+function mailLocalOf(id){
+  return mailLocalAll()[id] || { hidden:[], starred:[] };
+}
+
+function mailLocalSave(all){
+  localStorage.setItem(MAIL_LOCAL_KEY, JSON.stringify(all));
+}
+
+function isMailHidden(id, key){
+  return mailLocalOf(id).hidden.includes(key);
+}
+
+function isMailStarred(id, key){
+  return mailLocalOf(id).starred.includes(key);
+}
+
+function hideMail(id, key){
+  const all = mailLocalAll();
+  const local = all[id] || (all[id] = { hidden:[], starred:[] });
+  if(!local.hidden.includes(key)) local.hidden.push(key);
+  mailLocalSave(all);
+}
+
+function toggleMailStar(id, key){
+  const all = mailLocalAll();
+  const local = all[id] || (all[id] = { hidden:[], starred:[] });
+  const i = local.starred.indexOf(key);
+  if(i === -1) local.starred.push(key); else local.starred.splice(i, 1);
+  mailLocalSave(all);
+}
+
+function emptyMailCache(){
+  return { phase:'loading', result:null, error:'', loading:false, loadedAt:0 };
+}
+
+/** カードの更新間隔が過ぎたときに取り直す */
+function mailStateOf(m){
+  let st = mailState[m.id];
+  if(!st) st = mailState[m.id] = { view:'inbox', accounts:[], cache: emptyMailCache() };
+  const cur = st.cache;
+  if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadMail(m);
+  return st;
+}
+
+/** view を切り替える。データは取り直さず、その場でフィルタし直すだけ */
+function switchMailView(id, view){
+  const st = mailState[id];
+  if(!st || st.view === view) return;
+  st.view = view;
+  paintMail(id);
+}
+
+async function loadMail(m){
+  const st = mailState[m.id];
+  const cur = st && st.cache;
+  if(!st || !cur || cur.loading) return;
+  cur.loading = true;
+  try{
+    const api = await mailModule();
+    st.accounts = api.normalizeAccounts(m.accounts || []);
+    if(!st.accounts.length){
+      cur.result = null;
+      cur.error = '';
+      cur.phase = 'signin';
+    }else{
+      cur.result = await api.recent(st.accounts, { maxAgeDays: m.maxAgeDays || 7 });
+      cur.error = '';
+      cur.phase = !cur.result.signedIn ? 'signin' : (cur.result.mails.length ? 'ok' : 'none');
+    }
+  }catch(err){
+    cur.error = err.message || String(err);
+    cur.phase = 'error';
+  }
+  cur.loading = false;
+  cur.loadedAt = Date.now();
+  paintMail(m.id);
+}
+
+/** 非表示にした分を除いた一覧。新着順（同じ日の中では★を先に出す） */
+function mailVisibleList(m, cur){
+  const all = cur.result ? cur.result.mails : [];
+  return all
+    .filter(e => !isMailHidden(m.id, e.key))
+    .map(e => ({ ...e, starred: isMailStarred(m.id, e.key) }))
+    .sort((a, b) => b.receivedAt - a.receivedAt);
+}
+
+/** 受信日ごとにまとめる。渡す一覧は新着順に並んでいる前提 */
+function mailGroupByDay(list){
+  const groups = [];
+  list.forEach(e=>{
+    const key = e.receivedAt.toLocaleDateString('sv-SE');
+    let g = groups[groups.length - 1];
+    if(!g || g.key !== key){ g = { key, date: e.receivedAt, items: [] }; groups.push(g); }
+    g.items.push(e);
+  });
+  // 日をまたいで★を先頭に出すと日付順が崩れるので、同じ日の中だけで★を並べ替える
+  groups.forEach(g => g.items.sort((a, b) => Number(b.starred) - Number(a.starred)));
+  return groups;
+}
+
+function mailRowTime(d){
+  return d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', hour12:false });
+}
+
+/** 1行ぶん。1行目に時分と件名、2行目に差出人。schedule の行と同じ見た目を流用する */
+function mailRow(e){
+  const cls = 'sch-row' + (e.isRead ? '' : ' unread') + (e.starred ? ' starred' : '');
+  return `<div class="${cls}">
+      <span class="sch-bar" style="background:${esc(e.color)}"></span>
+      <span class="sch-time">${esc(mailRowTime(e.receivedAt))}</span>
+      <span class="sch-text">
+        <span class="sch-title">${esc(e.subject)}</span>
+        ${e.from ? `<span class="sch-sub">${esc(e.from)}</span>` : ''}
+      </span>
+      <span class="mail-actions">
+        <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
+        <button class="mail-del" data-mail-del="${esc(e.key)}" title="非表示にする">✕</button>
+      </span>
+    </div>`;
+}
+
+/** 受信トレイ／優先を切り替えるボタン */
+function mailSwitch(m, st){
+  const items = [{ key:'inbox', label:'受信トレイ' }, { key:'priority', label:'優先' }];
+  return `<div class="sch-switch">
+      ${items.map(it=>`<button class="${st.view === it.key ? 'on' : ''}"
+          data-mail-view="${esc(m.id)}" data-view="${it.key}">${it.label}</button>`).join('')}
+    </div>`;
+}
+
+/** アカウントごとのサインイン状態と、その場でサインインするボタン。schedule と共通のスタイルを使う */
+function mailAccountRows(m, st, cur){
+  const list = (cur.result && cur.result.accounts) || st.accounts;
+  if(!list.length) return '';
+  return `<div class="sch-accounts">
+      ${list.map(a=>`
+        <div class="sch-acc">
+          <span class="dot" style="background:${esc(a.color)}"></span>
+          <span class="who" title="${esc(a.username || a.label)}">${esc(a.label)}${a.signedIn && a.username ? ' / ' + esc(a.username) : ''}</span>
+          ${a.signedIn
+            ? `<button data-mail-out="${esc(m.id)}" data-account="${esc(a.id)}">サインアウト</button>`
+            : `<button class="use" data-mail-in="${esc(m.id)}" data-account="${esc(a.id)}">サインイン</button>`}
+        </div>
+        ${a.error ? `<div class="mon-err">${esc(a.label)}: ${esc(a.error)}</div>` : ''}`).join('')}
+    </div>`;
+}
+
+function mailBody(m, st){
+  const cur = st.cache;
+  const switcher = mailSwitch(m, st);
+  if(!mailApi || (cur.loading && !cur.result)) return switcher + `<div class="mon-offline">読み込み中…</div>`;
+  if(!st.accounts.length){
+    return switcher + `<div class="mon-offline">アカウントが未設定です</div>
+      <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
+  }
+  if(cur.phase === 'error' && !cur.result){
+    return switcher + `<div class="mon-err">${esc(cur.error)}</div>${mailAccountRows(m, st, cur)}`;
+  }
+  let list = mailVisibleList(m, cur);
+  if(st.view === 'priority') list = list.filter(e => e.starred);
+  const max = Math.max(1, Math.min(50, Number(m.max) || 10));
+  const shown = list.slice(0, max);
+  const body = shown.length
+    ? `<div class="sch-week">${mailGroupByDay(shown).map(g => `
+        <div class="sch-day">
+          <div class="sch-day-head">${esc(scheduleDayLabel(g.date))}</div>
+          <div class="sch-list">${g.items.map(mailRow).join('')}</div>
+        </div>`).join('')}</div>`
+    : `<div class="mail-empty">${st.view === 'priority' ? '優先メールはありません' : '新着メールはありません'}</div>`;
+  const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
+  return switcher + body + more + mailAccountRows(m, st, cur);
+}
+
+function renderMailCard(m){
+  const st = mailStateOf(m);
+  const cur = st.cache;
+  const meta = MAIL_STATE_META[cur.phase] || MAIL_STATE_META.loading;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+        ${monRefreshBtn(m.id)}
+      </div>
+      <div class="mail-body">${mailBody(m, st)}</div>
+    </div>`;
+}
+
+/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの入力が飛ぶ */
+function paintMail(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = mailState[id];
+  if(!m || !st) return;
+  const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .mail-body`);
+  if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
+
+  const meta = MAIL_STATE_META[st.cache.phase] || MAIL_STATE_META.loading;
+  const box = card.closest('.mon-card');
+  box.querySelector('.mon-dot').style.background = meta.color;
+  box.querySelector('.mon-state').textContent = meta.label;
+  card.innerHTML = mailBody(m, st);
+  wireMail(box);
+}
+
+function wireMail(card){
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  if(!m) return;
+  card.querySelectorAll('[data-mail-star]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      toggleMailStar(m.id, btn.dataset.mailStar);
+      paintMail(m.id);
+    });
+  });
+  card.querySelectorAll('[data-mail-del]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      hideMail(m.id, btn.dataset.mailDel);
+      paintMail(m.id);
+    });
+  });
+  card.querySelectorAll('[data-mail-view]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); switchMailView(m.id, btn.dataset.view); });
+  });
+  card.querySelectorAll('[data-mail-in]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); mailAuth(m, btn.dataset.account, 'in'); });
+  });
+  card.querySelectorAll('[data-mail-out]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); mailAuth(m, btn.dataset.account, 'out'); });
+  });
+}
+
+async function mailAuth(m, accountId, action){
+  const st = mailState[m.id];
+  const account = st && st.accounts.find(a => a.id === accountId);
+  if(!account) return;
+  try{
+    const api = await mailModule();
+    if(action === 'in') await api.signIn(account);
+    else await api.signOut(account);
+    toast(`${account.label} を${action === 'in' ? 'サインイン' : 'サインアウト'}しました`);
+  }catch(err){
+    toast(err.message || String(err));
+  }
+  st.cache.loadedAt = 0;
+  await loadMail(m);
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
   if(monitorType(m) === 'clipgen') return renderClipgenCard(m);
   if(monitorType(m) === 'schedule') return renderScheduleCard(m);
+  if(monitorType(m) === 'mail') return renderMailCard(m);
+
 
   const state = snap && snap.state ? snap.state : 'unknown';
   const meta = STATE_META[state] || STATE_META.unknown;
@@ -3097,6 +3419,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.schedule-body').forEach(body=>wireSchedule(body.closest('.mon-card')));
 
+  grid.querySelectorAll('.mail-body').forEach(body=>wireMail(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-refresh]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -3279,6 +3603,11 @@ function refreshMonitorCard(id){
     st.cache.today.loadedAt = 0;
     st.cache.week.loadedAt = 0;
     loadSchedule(m, st.view);
+  }else if(type === 'mail'){
+    const st = mailState[id];
+    if(!st) return;
+    st.cache.loadedAt = 0;
+    loadMail(m);
   }else if(LOCAL_TYPES.includes(type)){
     // rule/calc は取得先が無く、常に最新を計算しているのでその場で描き直すだけ
     renderMonitors();
@@ -3404,6 +3733,7 @@ function syncMonitorForm(){
     el.hidden = !el.dataset.for.split(' ').includes(type);
   });
   if(type === 'schedule') showScheduleRedirect();
+  if(type === 'mail') showMailRedirect();
 }
 
 /** Azureに登録するURIはこのページの場所で決まるので、その場で見せる（jsonの取得元には不要） */
@@ -3411,6 +3741,16 @@ async function showScheduleRedirect(){
   const el = F('hint-sch-redirect');
   try{
     const api = await scheduleModule();
+    el.innerHTML = 'OutlookのリダイレクトURI: <span class="mono">' + esc(await api.redirectUri('outlook')) + '</span>';
+  }catch(err){
+    el.textContent = 'リダイレクトURIを読めません: ' + (err.message || err);
+  }
+}
+
+async function showMailRedirect(){
+  const el = F('hint-mail-redirect');
+  try{
+    const api = await mailModule();
     el.innerHTML = 'OutlookのリダイレクトURI: <span class="mono">' + esc(await api.redirectUri('outlook')) + '</span>';
   }catch(err){
     el.textContent = 'リダイレクトURIを読めません: ' + (err.message || err);
@@ -3444,6 +3784,10 @@ function fillMonitorForm(m){
   F('mf-sch-defaultview').value = m.defaultView === 'week' ? 'week' : 'today';
   F('mf-sch-accounts').value = JSON.stringify(
     Array.isArray(m.accounts) && m.accounts.length ? m.accounts : SAMPLE_SCHEDULE_ACCOUNTS, null, 2);
+  F('mf-mail-max').value = m.max || 10;
+  F('mf-mail-maxage').value = m.maxAgeDays || 7;
+  F('mf-mail-accounts').value = JSON.stringify(
+    Array.isArray(m.accounts) && m.accounts.length ? m.accounts : SAMPLE_MAIL_ACCOUNTS, null, 2);
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -3533,6 +3877,25 @@ function buildMonitor(){
 
     let accounts;
     try{ accounts = JSON.parse(F('mf-sch-accounts').value); }
+    catch{ throw new Error('アカウントのJSONを読み取れません'); }
+    if(!Array.isArray(accounts) || !accounts.length) throw new Error('アカウントを1件以上、配列で書いてください');
+    accounts.forEach(a=>{
+      if(!a || !a.id) throw new Error('各アカウントに id が必要です');
+      if((a.provider || 'outlook') !== 'outlook') return;
+      if(!a.clientId) throw new Error(`${a.id}: clientId を入力してください`);
+      if(/^[0-]+$/.test(String(a.clientId).trim())){
+        throw new Error(`${a.id}: clientId が見本のままです。Azure のアプリ登録で発行したIDに置き換えてください`);
+      }
+    });
+    m.accounts = accounts;
+  }
+  if(type === 'mail'){
+    m.max = Math.max(1, Math.min(50, Number(F('mf-mail-max').value) || 10));
+    const maxAgeDays = Number(F('mf-mail-maxage').value);
+    m.maxAgeDays = maxAgeDays > 0 ? Math.min(90, Math.round(maxAgeDays)) : 7;
+
+    let accounts;
+    try{ accounts = JSON.parse(F('mf-mail-accounts').value); }
     catch{ throw new Error('アカウントのJSONを読み取れません'); }
     if(!Array.isArray(accounts) || !accounts.length) throw new Error('アカウントを1件以上、配列で書いてください');
     accounts.forEach(a=>{

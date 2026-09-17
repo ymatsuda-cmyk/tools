@@ -136,6 +136,18 @@
   .sch-day .sch-list{border-top:none;padding-top:0;}
   .sch-day-empty{font-size:11px;color:var(--text-muted);}
 
+  /* メールは schedule の行・日別見出しをそのまま流用し、状態の見た目だけ足す */
+  .mail-body .sch-row{padding:4px;border-radius:8px;}
+  .mail-body .sch-row:hover{background:var(--surface-2);}
+  .mail-body .sch-row.unread .sch-title{font-weight:700;color:var(--text);}
+  .mail-body .sch-row.starred{background:rgba(224,178,82,0.10);}
+  .mail-actions{display:flex;gap:1px;flex-shrink:0;margin-left:auto;}
+  .mail-star, .mail-del{background:none;border:none;cursor:pointer;font-size:13px;line-height:1;
+    padding:4px;color:var(--text-muted);border-radius:5px;}
+  .mail-star:hover, .mail-del:hover{color:var(--text);background:var(--surface);}
+  .mail-star.on{color:#E0B252;}
+  .mail-empty{font-size:11px;color:var(--text-muted);padding:10px 0;text-align:center;}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -352,6 +364,27 @@
           </div>
           <label>予定
             <textarea class="json" id="d-events" spellcheck="false" style="min-height:150px;"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="mail">
+        <h2>プレビュー用のメール</h2>
+        <p class="caption">JSONには出ません。実物では Outlook から取った受信メールが入ります。<br>
+           <span class="mono">account</span> は何番目のアカウントか（1から）。
+           <span class="mono">hoursAgo</span> は何時間前に受信したか。カード内の★／✕で
+           優先・非表示の見え方も確認できます（この見本では保存されません）。</p>
+        <div class="fields">
+          <label>サインイン
+            <select id="d-mail-signin">
+              <option value="all" selected>ぜんぶ済み</option>
+              <option value="first">1つめだけ</option>
+              <option value="none">まだ</option>
+              <option value="error">エラー</option>
+            </select>
+          </label>
+          <label>メール
+            <textarea class="json" id="d-mails" spellcheck="false" style="min-height:150px;"></textarea>
           </label>
         </div>
       </div>
@@ -1231,6 +1264,205 @@ function dummySchedule(m){
   };
 }
 
+/* ---------- メール受信 ---------- */
+
+const MAIL_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  ok     : { color:'#5FA8A0', label:'受信あり'   },
+  none   : { color:'#5FA8A0', label:'新着なし'   },
+  signin : { color:'#E0B252', label:'未サインイン' },
+  error  : { color:'#D9694F', label:'エラー'       }
+};
+
+/* JSONには出さないプレビュー専用の★／非表示。タブ切り替えや「見本に戻す」でリセットする */
+let mailLocalPreview = { starred:new Set(), hidden:new Set() };
+
+/* プレビューはカードが1枚だけなので、切り替え状態もここに直接持つ */
+let mailView = 'inbox';
+
+function mailAccounts(m){
+  return (Array.isArray(m.accounts) ? m.accounts : []).map((a, i)=>{
+    const id = (a && a.id) || `account-${i + 1}`;
+    return { ...a, id, label:(a && a.label) || id, color:(a && a.color) || SCHEDULE_PALETTE[i % SCHEDULE_PALETTE.length] };
+  });
+}
+
+function mailRowTime(d){
+  return d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', hour12:false });
+}
+
+/** 受信日ごとにまとめる。渡す一覧は新着順に並んでいる前提 */
+function mailGroupByDay(list){
+  const groups = [];
+  list.forEach(e=>{
+    const key = e.receivedAt.toLocaleDateString('sv-SE');
+    let g = groups[groups.length - 1];
+    if(!g || g.key !== key){ g = { key, date: e.receivedAt, items: [] }; groups.push(g); }
+    g.items.push(e);
+  });
+  // 日をまたいで★を先頭に出すと日付順が崩れるので、同じ日の中だけで★を並べ替える
+  groups.forEach(g => g.items.sort((a, b) => Number(b.starred) - Number(a.starred)));
+  return groups;
+}
+
+/** 1行ぶん。1行目に時分と件名、2行目に差出人。schedule の行と同じ見た目を流用する */
+function mailRow(e){
+  const cls = 'sch-row' + (e.isRead ? '' : ' unread') + (e.starred ? ' starred' : '');
+  return `<div class="${cls}">
+      <span class="sch-bar" style="background:${esc(e.color)}"></span>
+      <span class="sch-time">${esc(mailRowTime(e.receivedAt))}</span>
+      <span class="sch-text">
+        <span class="sch-title">${esc(e.subject)}</span>
+        ${e.from ? `<span class="sch-sub">${esc(e.from)}</span>` : ''}
+      </span>
+      <span class="mail-actions">
+        <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
+        <button class="mail-del" data-mail-del="${esc(e.key)}" title="非表示にする">✕</button>
+      </span>
+    </div>`;
+}
+
+/** 受信トレイ／優先を切り替えるボタン */
+function mailSwitch(){
+  const items = [{ key:'inbox', label:'受信トレイ' }, { key:'priority', label:'優先' }];
+  return `<div class="sch-switch">
+      ${items.map(it=>`<button class="${mailView === it.key ? 'on' : ''}"
+          data-mail-view="${it.key}">${it.label}</button>`).join('')}
+    </div>`;
+}
+
+function mailAccountRows(st){
+  if(!st.accounts.length) return '';
+  return `<div class="sch-accounts">
+      ${st.accounts.map(a=>`
+        <div class="sch-acc">
+          <span class="dot" style="background:${esc(a.color)}"></span>
+          <span class="who">${esc(a.label)}${a.signedIn && a.username ? ' / ' + esc(a.username) : ''}</span>
+          ${a.signedIn
+            ? `<button>サインアウト</button>`
+            : `<button class="use">サインイン</button>`}
+        </div>
+        ${a.error ? `<div class="mon-err">${esc(a.label)}: ${esc(a.error)}</div>` : ''}`).join('')}
+    </div>`;
+}
+
+function mailBody(m, st){
+  const switcher = mailSwitch();
+  if(!st.accounts.length){
+    return switcher + `<div class="mon-offline">アカウントが未設定です</div>
+      <div class="mon-note">設定 →監視 でカードの accounts を書いてください</div>`;
+  }
+  if(st.error) return switcher + `<div class="mon-err">${esc(st.error)}</div>${mailAccountRows(st)}`;
+
+  let list = st.mails
+    .filter(e => !mailLocalPreview.hidden.has(e.key))
+    .map(e => ({ ...e, starred: mailLocalPreview.starred.has(e.key) }))
+    .sort((a, b) => b.receivedAt - a.receivedAt);
+  if(mailView === 'priority') list = list.filter(e => e.starred);
+  const max = Math.max(1, Math.min(50, Number(m.max) || 10));
+  const shown = list.slice(0, max);
+  const body = shown.length
+    ? `<div class="sch-week">${mailGroupByDay(shown).map(g => `
+        <div class="sch-day">
+          <div class="sch-day-head">${esc(schDayLabel(g.date))}</div>
+          <div class="sch-list">${g.items.map(mailRow).join('')}</div>
+        </div>`).join('')}</div>`
+    : `<div class="mail-empty">${mailView === 'priority' ? '優先メールはありません' : '新着メールはありません'}</div>`;
+  const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
+  return switcher + body + more + mailAccountRows(st);
+}
+
+/** ☆/✕・受信トレイ／優先の結線。見本のでは保存せず、見ている間だけ覚えておく */
+function wireMailPreview(){
+  F('live').querySelectorAll('[data-mail-star]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.mailStar;
+      mailLocalPreview.starred.has(key) ? mailLocalPreview.starred.delete(key) : mailLocalPreview.starred.add(key);
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-mail-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      mailLocalPreview.hidden.add(btn.dataset.mailDel);
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-mail-view]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      mailView = btn.dataset.mailView;
+      paint();
+    });
+  });
+}
+
+function renderMailCard(m, st){
+  const meta = MAIL_STATE_META[st.phase] || MAIL_STATE_META.loading;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="mail-body">${mailBody(m, st)}</div>
+    </div>`;
+}
+
+const SAMPLE_MAILS = [
+  { subject:'来週の定例について', from:'田中さん', account:1, hoursAgo:1, unread:true },
+  { subject:'見積書の送付', from:'取引先A', account:1, hoursAgo:5 },
+  { subject:'請求書発行のお知らせ', from:'経理部', account:2, hoursAgo:20, unread:true },
+  { subject:'ニュースレター', from:'info@example.com', account:2, hoursAgo:40 }
+];
+
+/** JSONには出ない、プレビュー用のメール */
+function dummyMail(m){
+  const accounts = mailAccounts(m);
+  const mode = F('d-mail-signin').value;
+
+  const state = accounts.map((a, i)=>({
+    ...a,
+    signedIn: mode === 'all' || (mode === 'first' && i === 0),
+    username: `${a.id}@example.com`,
+    error: mode === 'error' && i === 0 ? 'サインインし直してください' : ''
+  }));
+
+  let rows = [];
+  let error = '';
+  try{
+    rows = JSON.parse(F('d-mails').value || '[]');
+    if(!Array.isArray(rows)) throw new Error('配列で書いてください');
+  }catch(err){
+    error = 'メールを読み取れません: ' + err.message;
+  }
+
+  const maxAgeDays = Math.max(1, Number(m.maxAgeDays) || 7);
+  const since = Date.now() - maxAgeDays * 24 * 3600 * 1000;
+
+  const mails = rows.map((r, i)=>{
+    const acc = state[Math.max(1, Number(r.account) || 1) - 1] || state[0];
+    return {
+      key: 'dummy-' + i,
+      subject: r.subject || '(件名なし)',
+      from: r.from || '',
+      receivedAt: new Date(Date.now() - (Number(r.hoursAgo) || 0) * 3600 * 1000),
+      isRead: !r.unread,
+      accountId: acc ? acc.id : '',
+      accountLabel: acc ? acc.label : '',
+      color: acc ? acc.color : SCHEDULE_PALETTE[0]
+    };
+  })
+    .filter(e => state.some(a => a.id === e.accountId && a.signedIn))
+    .filter(e => e.receivedAt.getTime() >= since)
+    .sort((a, b) => b.receivedAt - a.receivedAt);
+
+  const signedIn = state.some(a => a.signedIn);
+  return {
+    phase: error ? 'error' : signedIn ? (mails.length ? 'ok' : 'none') : 'signin',
+    error, mails, accounts: state
+  };
+}
+
 function paint(){
   const m = currentMonitor();
   if(activeTab === 'clipgen'){
@@ -1244,6 +1476,9 @@ function paint(){
   }else if(activeTab === 'schedule'){
     F('live').innerHTML = renderScheduleCard(m, dummySchedule(m));
     wireSchedulePreview();
+  }else if(activeTab === 'mail'){
+    F('live').innerHTML = renderMailCard(m, dummyMail(m));
+    wireMailPreview();
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -1264,6 +1499,7 @@ const TABS = [
   { id:'clipgen', label:'clipstock生成' },
   { id:'rule',    label:'ルール' },
   { id:'schedule', label:'今日の予定' },
+  { id:'mail',    label:'メール受信' },
   { id:'api',     label:'汎用API / Kaggle' },
   { id:'copilot', label:'Copilot' },
   { id:'manual',  label:'手動カウンタ' },
@@ -1282,6 +1518,10 @@ const TEMPLATES = {
   clipgen: { id:'clipgen', name:'clipstock 生成', type:'clipgen', group:'AI', total:30, showSpace:false },
   rule   : { id:'gomi', name:'ゴミ出し', type:'rule', lead:1, leadLabel:'今夜出す', rules:SAMPLE_RULES },
   schedule: { id:'today', name:'今日の予定', type:'schedule', max:5, accounts:[
+    { id:'work', label:'仕事', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#5FA8A0' },
+    { id:'home', label:'個人', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#8F7BD6' }
+  ] },
+  mail   : { id:'inbox', name:'メール受信', type:'mail', max:10, maxAgeDays:7, accounts:[
     { id:'work', label:'仕事', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#5FA8A0' },
     { id:'home', label:'個人', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#8F7BD6' }
   ] },
@@ -1372,7 +1612,7 @@ function wireDrag(){
 ['id','name','group','total','threshold','space','model',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
  'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
- 'd-now','d-signin','d-events']
+ 'd-now','d-signin','d-events','d-mail-signin','d-mails']
   .forEach(id => F(id).addEventListener('input', paint));
 
 [F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
@@ -1396,6 +1636,7 @@ F('reset').addEventListener('click', ()=>{
   if(activeTab === 'clipgen') applyMonitor(clone(TEMPLATES.clipgen));
   else drafts[activeTab] = clone(TEMPLATES[activeTab]);
   if(activeTab === 'schedule') scheduleView = 'today';
+  if(activeTab === 'mail'){ mailLocalPreview = { starred:new Set(), hidden:new Set() }; mailView = 'inbox'; }
   paint();
   say('見本に戻しました');
 });
@@ -1411,6 +1652,7 @@ F('copy').addEventListener('click', async ()=>{
 
 F('d-today').value = new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
 F('d-events').value = JSON.stringify(SAMPLE_EVENTS, null, 2);
+F('d-mails').value = JSON.stringify(SAMPLE_MAILS, null, 2);
 switchTab('clipgen');
 paint();
 </script>
