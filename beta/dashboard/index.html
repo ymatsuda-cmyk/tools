@@ -24,6 +24,7 @@
     --thumb-h:110px;
     --grid-gap:14px;
     --card-radius:14px;
+    --card-border-w:1px;
     --fade:0.35s;
   }
   *{box-sizing:border-box;}
@@ -59,10 +60,13 @@
   .monitor-bar .mono{font-size:11px;color:var(--text-muted);}
   .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
   .monitor-empty{padding:50px 20px;text-align:center;color:var(--text-muted);font-size:13px;}
-  .mon-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;
+  .mon-card{background:var(--surface);border:var(--card-border-w) solid var(--border);border-radius:var(--card-radius);padding:16px;
     cursor:grab;transition:opacity .15s ease;}
   .mon-card.dragging{opacity:0.4;cursor:grabbing;}
   .monitor-grid.reordering .mon-card:not(.dragging){transition:transform .15s ease;}
+  .mon-card[data-size="wide"]{grid-column:span 2;}
+  .mon-card[data-size="tall"]{min-height:calc(100% + var(--thumb-h));}
+  .mon-card[data-size="large"]{grid-column:span 2;min-height:calc(100% + var(--thumb-h));}
   .mon-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
   .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -97,6 +101,7 @@
   .switch.disabled .track{cursor:not-allowed;opacity:0.35;}
   .mon-err{font-size:11px;color:var(--danger);margin-top:8px;}
   .mon-err-bottom{border-top:1px solid var(--border);padding-top:8px;margin-top:10px;}
+  .mon-updated{font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px;margin-top:10px;}
   .mon-offline{text-align:center;padding:14px 0;color:var(--text-muted);font-size:12px;}
   .mon-note{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;}
   .mon-fix{
@@ -254,7 +259,7 @@
     grid-auto-rows:auto;
   }
   .card{
-    background:var(--surface);border:1px solid var(--border);border-radius:var(--card-radius);
+    background:var(--surface);border:var(--card-border-w) solid var(--border);border-radius:var(--card-radius);
     overflow:hidden;cursor:pointer;position:relative;
     transition:border-color .2s ease,transform .18s ease,box-shadow .2s ease;
   }
@@ -267,8 +272,9 @@
   .card.dragging{opacity:0.4;transform:none;box-shadow:none;cursor:grabbing;}
   .grid.reordering .card:hover{transform:none;box-shadow:none;}
   .card[data-size="wide"]{grid-column:span 2;}
+  .card[data-size="tall"] .thumb{height:calc(var(--thumb-h) * 2);}
   .card[data-size="large"]{grid-column:span 2;}
-  .card[data-size="large"] .thumb{height:calc(var(--thumb-h) * 1.7);}
+  .card[data-size="large"] .thumb{height:calc(var(--thumb-h) * 2);}
   .card[data-size="wide"] .thumb{height:var(--thumb-h);}
 
   .thumb{
@@ -335,7 +341,7 @@
   .card-body{padding:10px 11px 12px;}
   .card-title{
     font-size:13px;font-weight:600;line-height:1.4;margin:0 0 3px;overflow:hidden;
-    text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    text-overflow:ellipsis;display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   }
   .card-meta{font-size:11px;color:var(--text-muted);}
   .card-updated{font-size:10px;color:var(--text-muted);margin-top:3px;}
@@ -504,7 +510,8 @@
       <select id="f-cardsize">
         <option value="normal">標準</option>
         <option value="wide">横2列分</option>
-        <option value="large">横2列分・背高</option>
+        <option value="tall">縦2倍</option>
+        <option value="large">縦2倍・横2列分</option>
       </select>
     </div>
     <div class="field">
@@ -566,6 +573,16 @@
     <div class="field">
       <label>表示名</label>
       <input type="text" id="mf-name" placeholder="GPU サーバー">
+    </div>
+
+    <div class="field">
+      <label>カードの大きさ</label>
+      <select id="mf-cardsize">
+        <option value="normal">標準</option>
+        <option value="wide">横2列分</option>
+        <option value="tall">縦2倍</option>
+        <option value="large">縦2倍・横2列分</option>
+      </select>
     </div>
 
     <div class="field" data-for="api kaggle fx fxpos copilot manual quota">
@@ -760,6 +777,13 @@
         </div>
       </div>
       <div class="field">
+        <label>枠線の幅</label>
+        <div class="range-row">
+          <input type="range" id="s-borderw" min="0" max="6" step="1">
+          <span class="val mono" id="v-borderw"></span>
+        </div>
+      </div>
+      <div class="field">
         <label>クロスフェードの速さ</label>
         <div class="range-row">
           <input type="range" id="s-fade" min="0" max="1200" step="50">
@@ -845,6 +869,38 @@
   </div>
 </div>
 
+<!-- カード設定モーダル -->
+<div class="overlay" id="cardConfigOverlay">
+  <div class="modal">
+    <h2 id="cardConfigTitle">カード設定</h2>
+    <p class="sub">カード単位の表示設定とJSONの書き出し・反映</p>
+    <div class="field">
+      <label>カードの大きさ</label>
+      <select id="cf-size">
+        <option value="normal">標準</option>
+        <option value="wide">横2列分</option>
+        <option value="tall">縦2倍</option>
+        <option value="large">縦2倍・横2列分</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>カードJSON</label>
+      <textarea id="cf-json" spellcheck="false"></textarea>
+      <div class="err" id="err-cardjson">JSONの形式が正しくありません</div>
+      <div class="hint">この1枚だけを書き出し、貼り付けた内容を反映できます</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-cardform">フォームで編集</button>
+      <button class="btn btn-secondary" id="btn-cardcopy">JSONコピー</button>
+      <button class="btn btn-secondary" id="btn-cardexport">書き出し</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelCardConfig">閉じる</button>
+      <button class="btn btn-primary" id="applyCardConfig">反映</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -926,6 +982,7 @@ const DEFAULT_CONFIG = {
   thumbH:110,
   gap:14,
   radius:14,
+  borderW:1,
   fade:350,
   indexFile:'index.json'
 };
@@ -984,6 +1041,7 @@ function applyConfig(){
   r.setProperty('--thumb-h', config.thumbH + 'px');
   r.setProperty('--grid-gap', config.gap + 'px');
   r.setProperty('--card-radius', config.radius + 'px');
+  r.setProperty('--card-border-w', (config.borderW == null ? DEFAULT_CONFIG.borderW : config.borderW) + 'px');
   r.setProperty('--fade', (config.fade/1000) + 's');
   document.getElementById('pageTitle').textContent = config.title;
   document.title = config.title;
@@ -1083,6 +1141,7 @@ function thumbHTML(r){
       <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
       <div class="card-actions">
         <button class="mini-btn edit" data-edit="${r.id}" title="編集">✎</button>
+        <button class="mini-btn" data-card-config="resource:${r.id}" title="カード設定">⚙</button>
         <button class="mini-btn del" data-del="${r.id}" title="削除">✕</button>
       </div>
     </div>`;
@@ -1136,6 +1195,9 @@ function render(){
   });
   grid.querySelectorAll('[data-edit]').forEach(b=>{
     b.addEventListener('click', e=>{ e.stopPropagation(); openItemModal(b.dataset.edit); });
+  });
+  grid.querySelectorAll('[data-card-config]').forEach(b=>{
+    b.addEventListener('click', e=>{ e.stopPropagation(); openCardConfig(b.dataset.cardConfig); });
   });
 }
 
@@ -1265,7 +1327,8 @@ function syncSettingsForm(){
   F('s-indexfile').value = sanitizeIndexFile(config.indexFile);
   F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + sanitizeIndexFile(config.indexFile);
   const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
-                 ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']];
+                 ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],
+                 ['s-borderw','v-borderw','borderW','px'],['s-fade','v-fade','fade','ms']];
   pairs.forEach(([input,label,key,unit])=>{
     F(input).value = config[key];
     F(label).textContent = config[key] + unit;
@@ -1299,7 +1362,8 @@ F('s-indexfile').addEventListener('input', async e=>{
 });
 
 [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
- ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],['s-fade','v-fade','fade','ms']]
+ ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],
+ ['s-borderw','v-borderw','borderW','px'],['s-fade','v-fade','fade','ms']]
 .forEach(([input,label,key,unit])=>{
   F(input).addEventListener('input', async e=>{
     config[key] = Number(e.target.value);
@@ -1332,6 +1396,111 @@ document.getElementById('btn-applyjson').onclick = async ()=>{
 function currentJSON(){
   return JSON.stringify({ config, resources }, null, 2);
 }
+
+let cardConfigTarget = null;
+
+function cardSizeValue(value){
+  return ['normal','wide','tall','large'].includes(value) ? value : 'normal';
+}
+
+function cardConfigItem(){
+  if(!cardConfigTarget) return null;
+  const [kind, id] = cardConfigTarget.split(':');
+  const list = kind === 'monitor' ? allMonitors() : resources;
+  const item = list.find(x => x.id === id);
+  return item ? { kind, id, item } : null;
+}
+
+function syncCardConfigJson(){
+  const current = cardConfigItem();
+  if(!current) return;
+  const next = { ...current.item, cardSize: F('cf-size').value };
+  if(next.cardSize === 'normal') delete next.cardSize;
+  F('cf-json').value = JSON.stringify(next, null, 2);
+}
+
+function openCardConfig(target){
+  cardConfigTarget = target;
+  const current = cardConfigItem();
+  if(!current) return;
+  F('cardConfigTitle').textContent = (current.item.name || current.item.title || current.item.id) + ' のカード設定';
+  F('cf-size').value = cardSizeValue(current.item.cardSize || 'normal');
+  F('cf-json').value = JSON.stringify(current.item, null, 2);
+  F('err-cardjson').style.display = 'none';
+  F('cardConfigOverlay').classList.add('show');
+}
+
+async function applyCardConfig(){
+  const current = cardConfigItem();
+  if(!current) return;
+  try{
+    const parsed = JSON.parse(F('cf-json').value);
+    if(!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('オブジェクトで指定してください');
+    parsed.id = parsed.id || current.id;
+    parsed.cardSize = cardSizeValue(parsed.cardSize || F('cf-size').value);
+    if(parsed.cardSize === 'normal') delete parsed.cardSize;
+
+    if(current.kind === 'monitor'){
+      if(!parsed.endpoint && !ENDPOINTLESS_TYPES.includes(parsed.type)){
+        throw new Error('endpoint が必要です（または endpoint 不要の type を指定してください）');
+      }
+      config.monitors = allMonitors().map(x => x.id === current.id ? parsed : x);
+      if(parsed.id !== current.id){
+        delete monitorSnapshots[current.id];
+        delete monitorLastGood[current.id];
+        delete monitorDueAt[current.id];
+      }
+      F('s-monitors').value = JSON.stringify(config.monitors, null, 2);
+      syncMonitorPicker();
+      renderMonitors();
+      if(currentView !== 'links') startMonitorLoop();
+    }else{
+      parsed.type = parsed.type || detectType(parsed.url || '');
+      resources = resources.map(x => x.id === current.id ? parsed : x);
+      render();
+    }
+
+    await persistLocal();
+    F('s-json').value = currentJSON();
+    F('err-cardjson').style.display = 'none';
+    cardConfigTarget = current.kind + ':' + parsed.id;
+    toast('カード設定を反映しました');
+  }catch(err){
+    F('err-cardjson').textContent = 'JSONの形式が正しくありません: ' + err.message;
+    F('err-cardjson').style.display = 'block';
+  }
+}
+
+F('cf-size').addEventListener('change', syncCardConfigJson);
+F('cancelCardConfig').onclick = ()=>F('cardConfigOverlay').classList.remove('show');
+F('applyCardConfig').onclick = applyCardConfig;
+F('btn-cardform').onclick = ()=>{
+  const current = cardConfigItem();
+  if(!current) return;
+  F('cardConfigOverlay').classList.remove('show');
+  if(current.kind === 'monitor') openMonitorModal(null, current.id);
+  else openItemModal(current.id);
+};
+F('btn-cardcopy').onclick = async ()=>{
+  try{
+    await navigator.clipboard.writeText(F('cf-json').value);
+    toast('カードJSONをコピーしました');
+  }catch(e){
+    F('cf-json').select();
+    toast('カードJSONを選択しました');
+  }
+};
+F('btn-cardexport').onclick = ()=>{
+  const current = cardConfigItem();
+  const name = current ? safeName((current.item.name || current.item.title || current.id) + '.json') : 'card.json';
+  const blob = new Blob([F('cf-json').value], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(name + ' を書き出しました');
+};
 
 document.getElementById('btn-export').onclick = ()=>{
   const file = sanitizeIndexFile(config.indexFile);
@@ -1773,18 +1942,50 @@ function monRefreshBtn(id){
     </button>`;
 }
 
+function monConfigBtn(id){
+  return `<button class="mon-refresh" data-card-config="monitor:${esc(id)}" draggable="false" title="カード設定" aria-label="カード設定">⚙</button>`;
+}
+
+function monCardAttrs(m){
+  return `class="mon-card" data-monitor="${esc(m.id)}" data-size="${esc(m.cardSize || 'normal')}" draggable="true"`;
+}
+
+function loadedAtOf(m){
+  const type = monitorType(m);
+  if(type === 'clipgen') return clipgenState[m.id] && clipgenState[m.id].paintedAt;
+  if(type === 'schedule'){
+    const st = scheduleState[m.id];
+    return st && st.cache && st.cache[st.view] && st.cache[st.view].loadedAt;
+  }
+  if(type === 'mail') return mailState[m.id] && mailState[m.id].cache && mailState[m.id].cache.loadedAt;
+  return null;
+}
+
+function monitorUpdatedText(m, snap){
+  const source = snap && !snap.error ? snap : monitorLastGood[m.id];
+  const iso = source && (source.updatedAt || source.checkedAt || source.timestamp || source.time || source._fetchedAt) || loadedAtOf(m) || m.updatedAt;
+  return formatUpdatedAt(iso).replace('更新日時', '最終更新');
+}
+
+function monitorUpdatedHtml(m, snap){
+  const text = monitorUpdatedText(m, snap);
+  return text ? `<div class="mon-updated mono">${esc(text)}</div>` : '';
+}
+
 function renderRuleCard(m){
   const rules = Array.isArray(m.rules) ? m.rules : [];
   if(!rules.length){
     return `
-      <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+      <div ${monCardAttrs(m)}>
         <div class="mon-head">
           <span class="mon-dot" style="background:#66625A"></span>
           <span class="mon-name">${esc(m.name || m.id)}</span>
+          ${monConfigBtn(m.id)}
           ${monRefreshBtn(m.id)}
         </div>
         <div class="mon-offline">ルールが未設定です</div>
         <div class="mon-note">設定 →監視 のJSONで rules を登録してください</div>
+        ${monitorUpdatedHtml(m)}
       </div>`;
   }
 
@@ -1810,11 +2011,12 @@ function renderRuleCard(m){
     : `<div class="rule-main rule-none">${esc(m.noneLabel || 'なし')}</div>`;
 
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:${esc(dot)}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${esc(hit.length ? (m.leadLabel || '次の予定') : 'なし')}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       ${main}
@@ -1828,6 +2030,7 @@ function renderRuleCard(m){
           <span class="d">${ruleDateLabel(u.date)}</span>
           <span class="n">${u.on.map(r => esc(r.label)).join('・')}</span>
         </div>`).join('')}</div>` : ''}
+      ${monitorUpdatedHtml(m)}
     </div>`;
 }
 
@@ -2076,10 +2279,11 @@ function renderCalcCard(m){
   const scope = calcScope(m);
 
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:#5FA8A0"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       <div class="calc-rows">
@@ -2096,6 +2300,7 @@ function renderCalcCard(m){
           </div>`).join('')}
       </div>
       ${calcVarsHtml(scope.names)}
+      ${monitorUpdatedHtml(m)}
     </div>`;
 }
 
@@ -2476,14 +2681,16 @@ function renderClipgenCard(m){
   const st = clipgenStateOf(m);
   const meta = CLIPGEN_STATE_META[st.phase] || CLIPGEN_STATE_META.idle;
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       <div class="clipgen-body">${clipgenBody(m, st)}</div>
+      ${monitorUpdatedHtml(m)}
     </div>`;
 }
 
@@ -2796,14 +3003,16 @@ function renderScheduleCard(m){
   const cur = st.cache[st.view];
   const meta = SCHEDULE_STATE_META[cur.phase] || SCHEDULE_STATE_META.loading;
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       <div class="schedule-body">${scheduleBody(m, st)}</div>
+      ${monitorUpdatedHtml(m)}
     </div>`;
 }
 
@@ -3065,14 +3274,16 @@ function renderMailCard(m){
   const cur = st.cache;
   const meta = MAIL_STATE_META[cur.phase] || MAIL_STATE_META.loading;
   return `
-    <div class="mon-card" data-monitor="${esc(m.id)}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       <div class="mail-body">${mailBody(m, st)}</div>
+      ${monitorUpdatedHtml(m)}
     </div>`;
 }
 
@@ -3209,16 +3420,18 @@ function renderMonitorCard(m, snap){
   }
 
   return `
-    <div class="mon-card" data-monitor="${m.id}" draggable="true">
+    <div ${monCardAttrs(m)}>
       <div class="mon-head">
         <span class="mon-dot" style="background:${meta.color}"></span>
         <span class="mon-name">${esc(snap && snap.name ? snap.name : m.name || m.id)}</span>
         <span class="mon-state">${meta.label}</span>
+        ${monConfigBtn(m.id)}
         ${monRefreshBtn(m.id)}
       </div>
       ${body}
       ${footer}
       ${errorNote}
+      ${monitorUpdatedHtml(m, snap)}
     </div>`;
 }
 
@@ -3248,8 +3461,9 @@ const monitorLastGood = {};
 
 /** 取得結果を反映する。エラーが無ければ monitorLastGood にも積む */
 function setSnapshot(id, snap){
-  monitorSnapshots[id] = snap;
-  if(snap && !snap.error) monitorLastGood[id] = snap;
+  const next = Object.assign({}, snap, { _fetchedAt: new Date().toISOString() });
+  monitorSnapshots[id] = next;
+  if(next && !next.error) monitorLastGood[id] = next;
 }
 
 function renderMonitorChips(){
@@ -3429,6 +3643,13 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
       e.stopPropagation();
       btn.classList.add('spin');
       refreshMonitorCard(btn.dataset.refresh);
+    });
+  });
+
+  grid.querySelectorAll('[data-card-config]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      openCardConfig(btn.dataset.cardConfig);
     });
   });
 
@@ -3765,6 +3986,7 @@ function fillMonitorForm(m){
   F('mf-type').value = monitorType(m);
   F('mf-id').value = m.id || '';
   F('mf-name').value = m.name || '';
+  F('mf-cardsize').value = cardSizeValue(m.cardSize || 'normal');
   F('mf-interval').value = m.interval > 0 ? m.interval : '';
   F('mf-endpoint').value = m.endpoint || '';
   F('mf-monthlylimit').value = m.monthlyLimit || 300;
@@ -3821,6 +4043,9 @@ function buildMonitor(){
   // 画面に出していない項目（rules や rows の中身など）は編集時も残す
   const m = Object.assign({}, base, { id, name: F('mf-name').value.trim() || id });
   if(type !== 'api') m.type = type; else delete m.type;
+  m.cardSize = cardSizeValue(F('mf-cardsize').value);
+  if(m.cardSize === 'normal') delete m.cardSize;
+  m.updatedAt = new Date().toISOString();
 
   // 空欄なら既定の更新間隔に任せるので、JSONには書かない
   const interval = Number(F('mf-interval').value);
