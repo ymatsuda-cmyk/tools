@@ -193,6 +193,10 @@ def detect_repetition(text, min_len=8, threshold=6):
     return m.group(1) if m else None
 
 # ── PLAUD ────────────────────────────────────────────────────
+def _fetch_file_page(account, url):
+    resp = plaud_get(account, url)
+    return resp, (resp.json() if resp.status_code == 200 else None)
+
 def get_plaud_files_for_account(account):
     all_files = []
     page = 1
@@ -200,13 +204,25 @@ def get_plaud_files_for_account(account):
         url = f"{account['domain']}/file/simple/web?pageSize=50&pageNum={page}"
         if account["workspace"]:
             url += f"&workspaceId={account['workspace']}"
-        resp = plaud_get(account, url)
-        if resp.status_code != 200:
+        resp, data = _fetch_file_page(account, url)
+        if data is None:
             print(f"    ⚠️ [{account['name']}] 一覧取得失敗: {resp.status_code} {resp.text[:200]}")
             break
-        data = resp.json()
         files = data.get("data_file_list", [])
         total = data.get("data_file_total", 0)
+        # 200だが0件の場合、401/403にならず素通りする「Bearer有無の不一致」があり得るので
+        # 一度だけ反転して再試行する（成功しなければ元のトークンに戻す）
+        if not files and page == 1 and not account.get("_bearer_toggled"):
+            prev_token = account["token"]
+            account["token"] = _toggle_bearer(prev_token)
+            resp2, data2 = _fetch_file_page(account, url)
+            files2 = data2.get("data_file_list", []) if data2 else []
+            if files2:
+                print(f"    ℹ️ [{account['name']}] Authorizationの Bearer 有無を自動調整しました")
+                account["_bearer_toggled"] = True
+                data, files, total = data2, files2, data2.get("data_file_total", 0)
+            else:
+                account["token"] = prev_token
         if not files:
             if page == 1:
                 report_empty_listing(account, data)
