@@ -158,17 +158,18 @@
   .min-title-input{flex:1;min-width:0;font-size:12px;font-weight:600;background:var(--surface-2);
     border:1px solid var(--accent);border-radius:6px;color:var(--text);padding:1px 5px;font-family:inherit;}
   .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
-  .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
+  .min-meta-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:3px;}
+  .min-meta{font-size:10px;color:var(--text-secondary);}
   .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
   .min-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
   .min-chip{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);
     border-radius:10px;padding:2px 7px;font-size:10px;color:var(--text-secondary);}
   /* role の活性/非活性トグル。バーの色だけで状態が分かるようにする */
-  .min-roles{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+  .min-roles{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;}
   .min-role{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);
     border-radius:10px;padding:2px 8px 2px 6px;font-size:10px;color:var(--text-muted);cursor:pointer;transition:all .15s ease;}
-  .min-role:hover:not(:disabled){border-color:var(--border-strong);}
-  .min-role:disabled{cursor:not-allowed;opacity:0.5;}
+  .min-role:hover{border-color:var(--border-strong);}
+  .min-role.locked{cursor:help;}
   .min-role .bar{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--text-muted);}
   .min-role.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
   .min-role.on .bar{background:var(--accent);}
@@ -1520,9 +1521,9 @@ function minutesRoleToggles(m, item, editable){
   const perms = item.permissions || [];
   return roles.map(role => {
     const on = perms.includes(role);
-    const cls = 'min-role' + (on ? ' on' : '');
+    const cls = 'min-role' + (on ? ' on' : '') + (editable ? '' : ' locked');
     return `<button class="${cls}" data-min-role="${esc(item.key)}:${esc(role)}"
-        ${editable ? '' : 'disabled'} title="${editable ? (on ? 'クリックで外す' : 'クリックで割り当てる') : 'GAS URL / トークンを設定すると編集できます'}">
+        title="${editable ? (on ? 'クリックで外す' : 'クリックで割り当てる') : 'GAS URL / トークンを設定すると編集できます'}">
         <span class="bar"></span>${esc(role)}
       </button>`;
   }).join('');
@@ -1547,9 +1548,11 @@ function minutesRow(m, item, editable){
         ${titleHtml}
         <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
       </div>
-      <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
+      <div class="min-meta-row">
+        <span class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</span>
+        <div class="min-roles">${minutesRoleToggles(m, item, editable)}</div>
+      </div>
       <div class="min-chips">${minutesExtraChips(m, item)}</div>
-      <div class="min-roles">${minutesRoleToggles(m, item, editable)}</div>
     </div>`;
 }
 
@@ -1582,6 +1585,10 @@ function renderMinutesCard(m, st){
 function wireMinutesPreview(){
   F('live').querySelectorAll('[data-min-role]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
+      if(!F('d-minutes-editable').checked){
+        say('GAS URL/トークンが設定済みのチェックを入れると編集できます', true);
+        return;
+      }
       const i = btn.dataset.minRole.indexOf(':');
       const key = btn.dataset.minRole.slice(0, i);
       const role = btn.dataset.minRole.slice(i + 1);
@@ -1595,6 +1602,10 @@ function wireMinutesPreview(){
 
   F('live').querySelectorAll('[data-min-title]').forEach(el=>{
     el.addEventListener('click', ()=>{
+      if(!F('d-minutes-editable').checked){
+        say('GAS URL/トークンが設定済みのチェックを入れると編集できます', true);
+        return;
+      }
       minutesEditingTitle.add(el.dataset.minTitle);
       paint();
       const input = F('live').querySelector(`[data-min-title-input="${CSS.escape(el.dataset.minTitle)}"]`);
