@@ -27,6 +27,20 @@
     --card-border-w:1px;
     --fade:0.35s;
   }
+  /* 背景が白いパターン。設定 →表示 で切り替える */
+  html[data-theme="light"]{
+    --bg:#F5F4F0;
+    --surface:#FFFFFF;
+    --surface-2:#F0EEE8;
+    --border:#E1DDD3;
+    --border-strong:#CBC6B8;
+    --text:#211E19;
+    --text-secondary:#5C564A;
+    --text-muted:#8C8676;
+    --accent:#3E8F86;
+    --accent-soft:rgba(62,143,134,0.14);
+    --danger:#C1503A;
+  }
   *{box-sizing:border-box;}
   body{
     margin:0;background:var(--bg);color:var(--text);
@@ -805,6 +819,13 @@
         <input type="text" id="s-title">
       </div>
       <div class="field">
+        <label>配色</label>
+        <select id="s-theme">
+          <option value="dark">ダーク（既定）</option>
+          <option value="light">ライト（背景が白）</option>
+        </select>
+      </div>
+      <div class="field">
         <label>カード最小幅</label>
         <div class="range-row">
           <input type="range" id="s-cardmin" min="120" max="320" step="10">
@@ -1034,6 +1055,7 @@ function categoryOf(r){
 }
 const DEFAULT_CONFIG = {
   title:'マイリソース',
+  theme:'dark',
   cardMin:180,
   thumbH:110,
   gap:14,
@@ -1093,6 +1115,7 @@ function detectType(url){
 
 function applyConfig(){
   const r = document.documentElement.style;
+  document.documentElement.dataset.theme = config.theme === 'light' ? 'light' : 'dark';
   r.setProperty('--card-min', config.cardMin + 'px');
   r.setProperty('--thumb-h', config.thumbH + 'px');
   r.setProperty('--grid-gap', config.gap + 'px');
@@ -1380,6 +1403,7 @@ const settingsOverlay = document.getElementById('settingsOverlay');
 
 function syncSettingsForm(){
   F('s-title').value = config.title;
+  F('s-theme').value = config.theme === 'light' ? 'light' : 'dark';
   F('s-indexfile').value = sanitizeIndexFile(config.indexFile);
   F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + sanitizeIndexFile(config.indexFile);
   const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
@@ -1411,6 +1435,7 @@ document.getElementById('settingsTabs').addEventListener('click', e=>{
 });
 
 F('s-title').addEventListener('input', async e=>{ config.title = e.target.value || 'マイリソース'; applyConfig(); await persistLocal(); });
+F('s-theme').addEventListener('change', async e=>{ config.theme = e.target.value === 'light' ? 'light' : 'dark'; applyConfig(); await persistLocal(); });
 F('s-indexfile').addEventListener('input', async e=>{
   config.indexFile = sanitizeIndexFile(e.target.value);
   F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + config.indexFile;
