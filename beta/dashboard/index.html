@@ -183,7 +183,10 @@
   .minutes-body .min-row:last-child{border-bottom:none;}
   .minutes-body .min-row:hover{background:var(--surface-2);}
   .min-head{display:flex;align-items:baseline;gap:8px;}
-  .min-title{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .min-title{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text;}
+  .min-title.saving{opacity:0.6;}
+  .min-title-input{flex:1;min-width:0;font-size:12px;font-weight:600;background:var(--surface-2);
+    border:1px solid var(--accent);border-radius:6px;color:var(--text);padding:1px 5px;font-family:inherit;}
   .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
   .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
   .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
@@ -3451,7 +3454,7 @@ function emptyMinutesCache(){
 /** カードの更新間隔が過ぎたときに取り直す */
 function minutesStateOf(m){
   let st = minutesState[m.id];
-  if(!st) st = minutesState[m.id] = { pending:new Set(), cache: emptyMinutesCache() };
+  if(!st) st = minutesState[m.id] = { pending:new Set(), editingTitle:new Set(), cache: emptyMinutesCache() };
   const cur = st.cache;
   if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadMinutes(m);
   return st;
@@ -3459,7 +3462,7 @@ function minutesStateOf(m){
 
 /** 議事録DBの直近10件。並び順はAPI側（date降順）に任せる */
 async function loadMinutes(m){
-  const st = minutesState[m.id] || (minutesState[m.id] = { pending:new Set(), cache: emptyMinutesCache() });
+  const st = minutesState[m.id] || (minutesState[m.id] = { pending:new Set(), editingTitle:new Set(), cache: emptyMinutesCache() });
   const cur = st.cache;
   cur.loading = true;
   try{
@@ -3519,6 +3522,38 @@ function minutesDateLabel(iso){
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
+/**
+ * タイトルを即座に書き換え、GASへの反映は裏で行う。
+ * 失敗したら見た目を元に戻してトーストで知らせる
+ */
+function minutesSaveTitle(m, item, title){
+  if(!m.gasUrl || !m.token){
+    toast('このカードにGAS URLとトークンを設定するとタイトルを編集できます');
+    return;
+  }
+  const st = minutesState[m.id];
+  const pendingKey = 'title:' + item.notionPageId;
+  if(st.pending.has(pendingKey)) return;
+
+  const before = item.title;
+  item.title = title;
+  st.pending.add(pendingKey);
+  paintMinutes(m.id);
+
+  minutesModule()
+    .then(api => api.saveTitle({ gasUrl:m.gasUrl, token:m.token }, item.notionPageId, title))
+    .then(()=> toast('タイトルを更新しました'))
+    .catch(err=>{
+      // 裏での反映に失敗したので見た目を元に戻す
+      item.title = before;
+      toast(err.message || String(err));
+    })
+    .finally(()=>{
+      st.pending.delete(pendingKey);
+      paintMinutes(m.id);
+    });
+}
+
 /** rolesに書かれた権限をトグルボタンとして並べる。バーの色が丸ごと状態を表す（灰=非活性／緑=活性／黄=反映中） */
 function minutesRoleToggles(m, item, pending){
   const roles = Array.isArray(m.roles) ? m.roles : [];
@@ -3544,16 +3579,24 @@ function minutesExtraChips(m, item){
   return extra.map(p => `<span class="min-chip">${esc(p)}</span>`).join('');
 }
 
-function minutesRow(m, item, pending){
+function minutesRow(m, item, st){
+  const editable = !!(m.gasUrl && m.token);
+  const editing = st.editingTitle.has(item.notionPageId);
+  const savingTitle = st.pending.has('title:' + item.notionPageId);
+  const titleHtml = editing
+    ? `<input type="text" class="min-title-input" data-min-title-input="${esc(item.notionPageId)}" value="${esc(item.title)}">`
+    : `<span class="min-title${savingTitle ? ' saving' : ''}" data-min-title="${esc(item.notionPageId)}"
+        title="${editable ? 'クリックでタイトルを編集' : esc(item.title)}">${esc(item.title)}</span>`;
+
   return `<div class="min-row">
       <div class="min-head">
         <span class="sch-bar" style="background:${MINUTES_STATUS_COLOR[item.status] || '#66625A'}"></span>
-        <span class="min-title" title="${esc(item.title)}">${esc(item.title)}</span>
+        ${titleHtml}
         <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
       </div>
       <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
       <div class="min-chips">${minutesExtraChips(m, item)}</div>
-      <div class="min-roles">${minutesRoleToggles(m, item, pending)}</div>
+      <div class="min-roles">${minutesRoleToggles(m, item, st.pending)}</div>
     </div>`;
 }
 
@@ -3567,7 +3610,7 @@ function minutesBody(m, st){
   const shown = list.slice(0, max);
   if(!shown.length) return `<div class="mail-empty">議事録はありません</div>`;
 
-  const rows = shown.map(item => minutesRow(m, item, st.pending)).join('');
+  const rows = shown.map(item => minutesRow(m, item, st)).join('');
   const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
   return `<div class="sch-list">${rows}</div>${more}`;
 }
@@ -3620,6 +3663,37 @@ function wireMinutes(card){
       const role = btn.dataset.minRole.slice(i + 1);
       const item = (st.cache.result || []).find(x => x.notionPageId === pageId);
       if(item) minutesToggleRole(m, item, role);
+    });
+  });
+
+  card.querySelectorAll('[data-min-title]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(!m.gasUrl || !m.token){
+        toast('このカードにGAS URLとトークンを設定するとタイトルを編集できます');
+        return;
+      }
+      st.editingTitle.add(el.dataset.minTitle);
+      paintMinutes(m.id);
+      const input = card.querySelector(`[data-min-title-input="${CSS.escape(el.dataset.minTitle)}"]`);
+      if(input){ input.focus(); input.select(); }
+    });
+  });
+
+  card.querySelectorAll('[data-min-title-input]').forEach(input=>{
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+      else if(e.key === 'Escape'){ e.preventDefault(); input.dataset.cancel = '1'; input.blur(); }
+    });
+    input.addEventListener('blur', ()=>{
+      const id = input.dataset.minTitleInput;
+      st.editingTitle.delete(id);
+      if(input.dataset.cancel !== '1'){
+        const item = (st.cache.result || []).find(x => x.notionPageId === id);
+        const title = input.value.trim();
+        if(item && title && title !== item.title) minutesSaveTitle(m, item, title);
+      }
+      paintMinutes(m.id);
     });
   });
 }

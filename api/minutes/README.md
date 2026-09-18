@@ -35,6 +35,7 @@ await minutes.savePermissions(
 |---|---|
 | `recent({ limit, indexUrl })` | 新着順に並べた一覧を取る（既定 直近10件）。認証不要 |
 | `savePermissions(config, pageIds, permissions, mode)` | 権限をまとめて更新する。`config` に `gasUrl` と `token` が必要 |
+| `saveTitle(config, pageId, title)` | ミーティング名（タイトル）を更新する。`config` に `gasUrl` と `token` が必要 |
 
 ### `recent()` が返すもの
 

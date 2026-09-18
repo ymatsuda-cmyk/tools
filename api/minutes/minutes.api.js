@@ -71,3 +71,8 @@ async function callGas(config, action, params = {}) {
 export function savePermissions(config, pageIds, permissions, mode = 'add') {
   return callGas(config, 'savePermissions', { pageIds, permissions, mode })
 }
+
+/** ミーティング名(タイトル)を更新する */
+export function saveTitle(config, pageId, title) {
+  return callGas(config, 'saveTitle', { pageId, title })
+}
