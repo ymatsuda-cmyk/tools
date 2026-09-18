@@ -149,6 +149,26 @@
   .mail-star.on{color:#E0B252;}
   .mail-empty{font-size:11px;color:var(--text-muted);padding:10px 0;text-align:center;}
 
+  /* 議事録は権限(multi_select)の割り当て・更新をカードから直接できる */
+  .minutes-body .min-row{padding:6px 4px;border-bottom:1px solid var(--border);}
+  .minutes-body .min-row:last-child{border-bottom:none;}
+  .minutes-body .min-row:hover{background:var(--surface-2);}
+  .min-head{display:flex;align-items:baseline;gap:8px;}
+  .min-title{font-size:12px;font-weight:600;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
+  .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
+  .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
+  .min-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+  .min-chip{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:2px 7px;font-size:10px;color:var(--text-secondary);}
+  .min-chip button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0;line-height:1;}
+  .min-chip button:hover{color:var(--danger);}
+  .min-editor{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .min-editor select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:11px;padding:4px 6px;}
+  .min-editor button{background:var(--accent-soft);color:var(--accent);border:none;border-radius:8px;font-size:11px;padding:4px 10px;cursor:pointer;}
+  .min-editor button:disabled{opacity:0.4;cursor:not-allowed;}
+  .min-note-inline{font-size:10px;color:var(--text-muted);}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -386,6 +406,20 @@
           </label>
           <label>メール
             <textarea class="json" id="d-mails" spellcheck="false" style="min-height:150px;"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="minutes">
+        <h2>プレビュー用の議事録</h2>
+        <p class="caption">JSONには出ません。実物では Notion の一覧が入ります。<br>
+           件名をクリックすると権限の割り当て欄が開きます（この見本では保存されません）。</p>
+        <div class="fields">
+          <label class="check">
+            <input type="checkbox" id="d-minutes-editable" checked> GAS URL/トークンが設定済み（権限を編集できる）
+          </label>
+          <label>議事録
+            <textarea class="json" id="d-minutes-items" spellcheck="false" style="min-height:150px;"></textarea>
           </label>
         </div>
       </div>
@@ -1418,6 +1452,153 @@ const SAMPLE_MAILS = [
   { subject:'ニュースレター', from:'info@example.com', account:2, hoursAgo:40 }
 ];
 
+/* ---------- 議事録 ---------- */
+
+const MINUTES_STATE_META = {
+  ok   : { color:'#5FA8A0', label:'取得済み' },
+  none : { color:'#5FA8A0', label:'0件'      },
+  error: { color:'#D9694F', label:'エラー'   }
+};
+
+const MINUTES_STATUS_COLOR = {
+  '文字起こし': '#8A857C',
+  '要約'      : '#5FA8A0',
+  '削除'      : '#D9694F'
+};
+
+const SAMPLE_MINUTES = [
+  { title:'定例会議', date:'2026-09-17T07:01:00.000Z', duration:'1時間 13分 21秒', status:'要約', permissions:['jba'] },
+  { title:'育成面談（中嶋）', date:'2026-09-16T07:09:00.000Z', duration:'27分 30秒', status:'文字起こし', permissions:[] },
+  { title:'経営会議', date:'2026-09-16T04:30:00.000Z', duration:'37分 32秒', status:'要約', permissions:[] }
+];
+
+/* 件名クリックで開く権限編集欄の開閉状態。タブ切り替えや「見本に戻す」でリセットする */
+let minutesExpanded = new Set();
+
+/* 権限の割り当て（この見本では保存せず、見ている間だけ覚えておく）。キーはitem.key（並べ替えても崩れない） */
+let minutesLocalPreview = {};
+
+function minutesDateLabel(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+/** JSONには出ない、プレビュー用の議事録。permissions は minutesLocalPreview の上書きを優先する */
+function dummyMinutes(){
+  let rows = [];
+  let error = '';
+  try{
+    rows = JSON.parse(F('d-minutes-items').value || '[]');
+    if(!Array.isArray(rows)) throw new Error('配列で書いてください');
+  }catch(err){
+    error = '議事録を読み取れません: ' + err.message;
+  }
+
+  const items = rows.map((r, i)=>({
+    key: 'dummy-' + i,
+    title: r.title || '(タイトルなし)',
+    date: r.date || new Date().toISOString(),
+    duration: r.duration || '',
+    status: r.status || '要約',
+    permissions: minutesLocalPreview['dummy-' + i] || r.permissions || []
+  })).sort((a, b) => new Date(b.date) - new Date(a.date));
+  return { phase: error ? 'error' : items.length ? 'ok' : 'none', error, items };
+}
+
+/** 権限チップ＋（編集できるなら）割り当て編集欄。件名クリックで開閉する */
+function minutesRow(m, item, expanded, editable){
+  const perms = item.permissions || [];
+  const chips = perms.map(p => `
+      <span class="min-chip">${esc(p)}
+        <button data-min-remove="${esc(item.key)}:${esc(p)}" title="この権限を外す">✕</button>
+      </span>`).join('') || `<span class="min-note-inline">権限は未設定です</span>`;
+
+  const roles = Array.isArray(m.roles) ? m.roles : [];
+  const addable = roles.filter(r => !perms.includes(r));
+  const editor = expanded
+    ? `<div class="min-editor">
+        ${editable
+          ? (addable.length
+              ? `<select data-min-role="${esc(item.key)}">${addable.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}</select>
+                 <button data-min-add="${esc(item.key)}">追加</button>`
+              : `<span class="min-note-inline">追加できる権限がありません</span>`)
+          : `<span class="min-note-inline">設定 →このカードの GAS URL / トークンを入力すると編集できます</span>`}
+      </div>`
+    : '';
+
+  return `<div class="min-row">
+      <div class="min-head">
+        <span class="sch-bar" style="background:${MINUTES_STATUS_COLOR[item.status] || '#66625A'}"></span>
+        <span class="min-title" data-min-toggle="${esc(item.key)}" title="${esc(item.title)}">${esc(item.title)}</span>
+        <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
+      </div>
+      <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
+      <div class="min-chips">${chips}</div>
+      ${editor}
+    </div>`;
+}
+
+function minutesBody(m, st){
+  if(st.phase === 'error') return `<div class="mon-err">${esc(st.error)}</div>`;
+  const max = Math.max(1, Math.min(10, Number(m.max) || 5));
+  const shown = st.items.slice(0, max);
+  if(!shown.length) return `<div class="mail-empty">議事録はありません</div>`;
+
+  const editable = F('d-minutes-editable').checked;
+  const rows = shown.map(item => minutesRow(m, item, minutesExpanded.has(item.key), editable)).join('');
+  const more = st.items.length > max ? `<div class="mon-note">ほか${st.items.length - max}件</div>` : '';
+  return `<div class="sch-list">${rows}</div>${more}`;
+}
+
+function renderMinutesCard(m, st){
+  const meta = MINUTES_STATE_META[st.phase] || MINUTES_STATE_META.none;
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+      </div>
+      <div class="minutes-body">${minutesBody(m, st)}</div>
+    </div>`;
+}
+
+/** 件名の開閉・権限の追加/削除の結線。見本のでは保存せず、見ている間だけ覚えておく */
+function wireMinutesPreview(){
+  F('live').querySelectorAll('[data-min-toggle]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const key = el.dataset.minToggle;
+      minutesExpanded.has(key) ? minutesExpanded.delete(key) : minutesExpanded.add(key);
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-min-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i = btn.dataset.minRemove.indexOf(':');
+      const key = btn.dataset.minRemove.slice(0, i);
+      const role = btn.dataset.minRemove.slice(i + 1);
+      const item = dummyMinutes().items.find(x => x.key === key);
+      const perms = new Set(item ? item.permissions : []);
+      perms.delete(role);
+      minutesLocalPreview[key] = [...perms];
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-min-add]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.minAdd;
+      const sel = F('live').querySelector(`[data-min-role="${CSS.escape(key)}"]`);
+      if(!sel || !sel.value) return;
+      const item = dummyMinutes().items.find(x => x.key === key);
+      const perms = new Set(item ? item.permissions : []);
+      perms.add(sel.value);
+      minutesLocalPreview[key] = [...perms];
+      paint();
+    });
+  });
+}
+
 /** JSONには出ない、プレビュー用のメール */
 function dummyMail(m){
   const accounts = mailAccounts(m);
@@ -1482,6 +1663,9 @@ function paint(){
   }else if(activeTab === 'mail'){
     F('live').innerHTML = renderMailCard(m, dummyMail(m));
     wireMailPreview();
+  }else if(activeTab === 'minutes'){
+    F('live').innerHTML = renderMinutesCard(m, dummyMinutes());
+    wireMinutesPreview();
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -1503,6 +1687,7 @@ const TABS = [
   { id:'rule',    label:'ルール' },
   { id:'schedule', label:'今日の予定' },
   { id:'mail',    label:'メール受信' },
+  { id:'minutes', label:'議事録' },
   { id:'api',     label:'汎用API / Kaggle' },
   { id:'copilot', label:'Copilot' },
   { id:'manual',  label:'手動カウンタ' },
@@ -1528,6 +1713,7 @@ const TEMPLATES = {
     { id:'work', label:'仕事', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#5FA8A0' },
     { id:'home', label:'個人', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#8F7BD6' }
   ] },
+  minutes: { id:'gijiroku', name:'議事録', type:'minutes', max:5, roles:['jba', 'kijun', 'keiei'] },
   api    : { id:'gpu-server', name:'GPU サーバー', endpoint:'https://example.com/api/resource' },
   copilot: { id:'copilot', name:'GitHub Copilot', type:'copilot', monthlyLimit:300 },
   manual : { id:'claude', name:'Claude', type:'manual', limit:100, unit:'回', cycle:'daily' },
@@ -1615,7 +1801,7 @@ function wireDrag(){
 ['id','name','group','total','threshold','space','model',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
  'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
- 'd-now','d-signin','d-events','d-mail-signin','d-mails']
+ 'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items']
   .forEach(id => F(id).addEventListener('input', paint));
 
 [F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
@@ -1640,6 +1826,7 @@ F('reset').addEventListener('click', ()=>{
   else drafts[activeTab] = clone(TEMPLATES[activeTab]);
   if(activeTab === 'schedule') scheduleView = 'today';
   if(activeTab === 'mail'){ mailLocalPreview = { starred:new Set(), hidden:new Set() }; mailView = 'inbox'; }
+  if(activeTab === 'minutes'){ minutesLocalPreview = {}; minutesExpanded = new Set(); }
   paint();
   say('見本に戻しました');
 });
@@ -1656,6 +1843,7 @@ F('copy').addEventListener('click', async ()=>{
 F('d-today').value = new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
 F('d-events').value = JSON.stringify(SAMPLE_EVENTS, null, 2);
 F('d-mails').value = JSON.stringify(SAMPLE_MAILS, null, 2);
+F('d-minutes-items').value = JSON.stringify(SAMPLE_MINUTES, null, 2);
 switchTab('clipgen');
 paint();
 </script>

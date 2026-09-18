@@ -178,6 +178,26 @@
     background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:2px 0 6px;}
   .mail-preview a{color:var(--accent);}
 
+  /* 議事録は権限(multi_select)の割り当て・更新をカードから直接できる */
+  .minutes-body .min-row{padding:6px 4px;border-bottom:1px solid var(--border);}
+  .minutes-body .min-row:last-child{border-bottom:none;}
+  .minutes-body .min-row:hover{background:var(--surface-2);}
+  .min-head{display:flex;align-items:baseline;gap:8px;}
+  .min-title{font-size:12px;font-weight:600;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
+  .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
+  .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
+  .min-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+  .min-chip{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:2px 7px;font-size:10px;color:var(--text-secondary);}
+  .min-chip button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0;line-height:1;}
+  .min-chip button:hover{color:var(--danger);}
+  .min-editor{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .min-editor select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:11px;padding:4px 6px;}
+  .min-editor button{background:var(--accent-soft);color:var(--accent);border:none;border-radius:8px;font-size:11px;padding:4px 10px;cursor:pointer;}
+  .min-editor button:disabled{opacity:0.4;cursor:not-allowed;}
+  .min-note-inline{font-size:10px;color:var(--text-muted);}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -559,6 +579,7 @@
         <option value="rule">ルール（曜日で決まる予定）</option>
         <option value="schedule">今日の予定（Outlookなど）</option>
         <option value="mail">メール受信（Outlookなど）</option>
+        <option value="minutes">議事録（Notion）</option>
         <option value="calc">電卓</option>
         <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
@@ -726,6 +747,27 @@
         <span class="mono">mails</span>（直書き）や <span class="mono">url</span>（外部JSON）からメールを出せます。
         用意のしかたは <span class="mono">api/mail/README.md</span> を見てください</div>
       <div class="hint" id="hint-mail-redirect">リダイレクトURI: 読み込み中…</div>
+    </div>
+
+    <div class="field" data-for="minutes">
+      <label>一覧に出す件数</label>
+      <input type="number" id="mf-min-max" value="5" min="1" max="10">
+      <div class="hint">直近10件のうち、カードに出す件数です（一覧が10件を超えても取得は最新10件まで）</div>
+    </div>
+    <div class="field" data-for="minutes">
+      <label>GASのURL</label>
+      <input type="text" id="mf-min-gasurl" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="hint">権限の割り当て・更新に使います。空欄なら一覧表示のみで編集はできません。<span class="mono">minutes/gas/Code.gs</span> をデプロイしたURLです</div>
+    </div>
+    <div class="field" data-for="minutes">
+      <label>共有トークン</label>
+      <input type="text" id="mf-min-token" placeholder="ACCESS_TOKEN">
+      <div class="hint">GASのスクリプトプロパティ <span class="mono">ACCESS_TOKEN</span> と同じ値を入力してください</div>
+    </div>
+    <div class="field" data-for="minutes">
+      <label>割り当てる権限（カンマ区切り）</label>
+      <input type="text" id="mf-min-roles" placeholder="jba, kijun, keiei">
+      <div class="hint">追加ボタンの選択肢に出す権限名です。Notionの「権限」列(multi_select)に付ける名前をそのまま書いてください</div>
     </div>
 
     <div class="modal-actions">
@@ -1664,10 +1706,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1681,6 +1723,7 @@ const TYPE_LABELS = {
   clipgen: 'clipstock生成',
   schedule: '今日の予定',
   mail   : 'メール受信',
+  minutes: '議事録',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -1962,6 +2005,7 @@ function loadedAtOf(m){
     return st && st.cache && st.cache[st.view] && st.cache[st.view].loadedAt;
   }
   if(type === 'mail') return mailState[m.id] && mailState[m.id].cache && mailState[m.id].cache.loadedAt;
+  if(type === 'minutes') return minutesState[m.id] && minutesState[m.id].cache && minutesState[m.id].cache.loadedAt;
   return null;
 }
 
@@ -3367,12 +3411,223 @@ async function mailAuth(m, accountId, action){
   await loadMail(m);
 }
 
+/* ---------- 議事録 ---------- */
+
+const MINUTES_MODULE = new URL('../../api/minutes/minutes.api.js', location.href).href;
+
+/* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
+const minutesState = {};
+
+const MINUTES_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  ok     : { color:'#5FA8A0', label:'取得済み'   },
+  none   : { color:'#5FA8A0', label:'0件'        },
+  error  : { color:'#D9694F', label:'エラー'     }
+};
+
+const MINUTES_STATUS_COLOR = {
+  '文字起こし': '#8A857C',
+  '要約'      : '#5FA8A0',
+  '削除'      : '#D9694F'
+};
+
+let minutesApi = null;
+
+async function minutesModule(){
+  if(!minutesApi) minutesApi = await import(MINUTES_MODULE);
+  return minutesApi;
+}
+
+function emptyMinutesCache(){
+  return { phase:'loading', result:null, error:'', loading:false, loadedAt:0 };
+}
+
+/** カードの更新間隔が過ぎたときに取り直す */
+function minutesStateOf(m){
+  let st = minutesState[m.id];
+  if(!st) st = minutesState[m.id] = { expanded:new Set(), cache: emptyMinutesCache() };
+  const cur = st.cache;
+  if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadMinutes(m);
+  return st;
+}
+
+/** 議事録DBの直近10件。並び順はAPI側（date降順）に任せる */
+async function loadMinutes(m){
+  const st = minutesState[m.id] || (minutesState[m.id] = { expanded:new Set(), cache: emptyMinutesCache() });
+  const cur = st.cache;
+  cur.loading = true;
+  try{
+    const api = await minutesModule();
+    const { items } = await api.recent({ limit:10, indexUrl:m.indexUrl });
+    cur.result = items;
+    cur.phase = items.length ? 'ok' : 'none';
+    cur.error = '';
+  }catch(err){
+    cur.error = err.message || String(err);
+    if(!cur.result) cur.phase = 'error';
+  }
+  cur.loading = false;
+  cur.loadedAt = Date.now();
+  paintMinutes(m.id);
+}
+
+/** GASの savePermissions を呼ぶ。設定にGAS URL/トークンが無いカードは読み取り専用にする */
+async function minutesSavePermission(m, item, role, mode){
+  if(!m.gasUrl || !m.token){
+    toast('このカードにGAS URLとトークンを設定すると権限を編集できます');
+    return;
+  }
+  try{
+    const api = await minutesModule();
+    await api.savePermissions({ gasUrl:m.gasUrl, token:m.token }, [item.notionPageId], [role], mode);
+
+    const perms = new Set(item.permissions || []);
+    if(mode === 'remove') perms.delete(role); else perms.add(role);
+    item.permissions = [...perms];
+    toast(`「${item.title}」の権限を更新しました`);
+  }catch(err){
+    toast(err.message || String(err));
+  }
+  paintMinutes(m.id);
+}
+
+
+function minutesDateLabel(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+/** 権限チップ＋（設定済みなら）割り当て編集欄。件名クリックで開閉する */
+function minutesRow(m, item, expanded){
+  const id = item.notionPageId;
+  const perms = item.permissions || [];
+  const chips = perms.map(p => `
+      <span class="min-chip">${esc(p)}
+        <button data-min-remove="${esc(id)}:${esc(p)}" title="この権限を外す">✕</button>
+      </span>`).join('') || `<span class="min-note-inline">権限は未設定です</span>`;
+
+  const roles = Array.isArray(m.roles) ? m.roles : [];
+  const addable = roles.filter(r => !perms.includes(r));
+  const editable = !!(m.gasUrl && m.token);
+  const editor = expanded
+    ? `<div class="min-editor">
+        ${editable
+          ? (addable.length
+              ? `<select data-min-role="${esc(id)}">${addable.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}</select>
+                 <button data-min-add="${esc(id)}">追加</button>`
+              : `<span class="min-note-inline">追加できる権限がありません</span>`)
+          : `<span class="min-note-inline">設定 →このカードの GAS URL / トークンを入力すると編集できます</span>`}
+      </div>`
+    : '';
+
+  return `<div class="min-row">
+      <div class="min-head">
+        <span class="sch-bar" style="background:${MINUTES_STATUS_COLOR[item.status] || '#66625A'}"></span>
+        <span class="min-title" data-min-toggle="${esc(id)}" title="${esc(item.title)}">${esc(item.title)}</span>
+        <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
+      </div>
+      <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
+      <div class="min-chips">${chips}</div>
+      ${editor}
+    </div>`;
+}
+
+function minutesBody(m, st){
+  const cur = st.cache;
+  if(cur.loading && !cur.result) return `<div class="mon-offline">読み込み中…</div>`;
+  if(cur.error && !cur.result) return `<div class="mon-err">${esc(cur.error)}</div>`;
+
+  const list = cur.result || [];
+  const max = Math.max(1, Math.min(10, Number(m.max) || 5));
+  const shown = list.slice(0, max);
+  if(!shown.length) return `<div class="mail-empty">議事録はありません</div>`;
+
+  const rows = shown.map(item => minutesRow(m, item, st.expanded.has(item.notionPageId))).join('');
+  const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
+  return `<div class="sch-list">${rows}</div>${more}`;
+}
+
+function renderMinutesCard(m){
+  const st = minutesStateOf(m);
+  const cur = st.cache;
+  const meta = MINUTES_STATE_META[cur.phase] || MINUTES_STATE_META.loading;
+  return `
+    <div ${monCardAttrs(m)}>
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${meta.label}</span>
+        ${monConfigBtn(m.id)}
+        ${monRefreshBtn(m.id)}
+      </div>
+      <div class="minutes-body">${minutesBody(m, st)}</div>
+      ${monitorUpdatedHtml(m)}
+    </div>`;
+}
+
+/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの開閉状態が飛ぶ */
+function paintMinutes(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = minutesState[id];
+  if(!m || !st) return;
+  const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .minutes-body`);
+  if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
+
+  const meta = MINUTES_STATE_META[st.cache.phase] || MINUTES_STATE_META.loading;
+  const box = card.closest('.mon-card');
+  box.querySelector('.mon-dot').style.background = meta.color;
+  box.querySelector('.mon-state').textContent = meta.label;
+  card.innerHTML = minutesBody(m, st);
+  wireMinutes(box);
+}
+
+function wireMinutes(card){
+  const m = allMonitors().find(x => x.id === card.dataset.monitor);
+  if(!m) return;
+  const st = minutesState[m.id];
+  if(!st) return;
+
+  card.querySelectorAll('[data-min-toggle]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const id = el.dataset.minToggle;
+      if(st.expanded.has(id)) st.expanded.delete(id); else st.expanded.add(id);
+      paintMinutes(m.id);
+    });
+  });
+  card.querySelectorAll('[data-min-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const [pageId, role] = splitMinutesIdRole(btn.dataset.minRemove);
+      const item = (st.cache.result || []).find(x => x.notionPageId === pageId);
+      if(item) minutesSavePermission(m, item, role, 'remove');
+    });
+  });
+  card.querySelectorAll('[data-min-add]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const pageId = btn.dataset.minAdd;
+      const sel = card.querySelector(`[data-min-role="${CSS.escape(pageId)}"]`);
+      const item = (st.cache.result || []).find(x => x.notionPageId === pageId);
+      if(item && sel && sel.value) minutesSavePermission(m, item, sel.value, 'add');
+    });
+  });
+}
+
+/** "notionPageId:role" を分ける。pageId に : は含まれないので最初の : だけで十分 */
+function splitMinutesIdRole(raw){
+  const i = raw.indexOf(':');
+  return [raw.slice(0, i), raw.slice(i + 1)];
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
   if(monitorType(m) === 'clipgen') return renderClipgenCard(m);
   if(monitorType(m) === 'schedule') return renderScheduleCard(m);
   if(monitorType(m) === 'mail') return renderMailCard(m);
+  if(monitorType(m) === 'minutes') return renderMinutesCard(m);
 
 
   const state = snap && snap.state ? snap.state : 'unknown';
@@ -3658,6 +3913,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.mail-body').forEach(body=>wireMail(body.closest('.mon-card')));
 
+  grid.querySelectorAll('.minutes-body').forEach(body=>wireMinutes(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-refresh]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -3852,6 +4109,11 @@ function refreshMonitorCard(id){
     if(!st) return;
     st.cache.loadedAt = 0;
     loadMail(m);
+  }else if(type === 'minutes'){
+    const st = minutesState[id];
+    if(!st) return;
+    st.cache.loadedAt = 0;
+    loadMinutes(m);
   }else if(LOCAL_TYPES.includes(type)){
     // rule/calc は取得先が無く、常に最新を計算しているのでその場で描き直すだけ
     renderMonitors();
@@ -4033,6 +4295,10 @@ function fillMonitorForm(m){
   F('mf-mail-maxage').value = m.maxAgeDays || 7;
   F('mf-mail-accounts').value = JSON.stringify(
     Array.isArray(m.accounts) && m.accounts.length ? m.accounts : SAMPLE_MAIL_ACCOUNTS, null, 2);
+  F('mf-min-max').value = m.max || 5;
+  F('mf-min-gasurl').value = m.gasUrl || '';
+  F('mf-min-token').value = m.token || '';
+  F('mf-min-roles').value = (Array.isArray(m.roles) ? m.roles : []).join(', ');
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -4155,6 +4421,14 @@ function buildMonitor(){
       }
     });
     m.accounts = accounts;
+  }
+  if(type === 'minutes'){
+    m.max = Math.max(1, Math.min(10, Number(F('mf-min-max').value) || 5));
+    const gasUrl = F('mf-min-gasurl').value.trim();
+    const token = F('mf-min-token').value.trim();
+    if(gasUrl) m.gasUrl = gasUrl; else delete m.gasUrl;
+    if(token) m.token = token; else delete m.token;
+    m.roles = F('mf-min-roles').value.split(',').map(s => s.trim()).filter(Boolean);
   }
   return m;
 }
