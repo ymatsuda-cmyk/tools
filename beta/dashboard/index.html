@@ -183,19 +183,25 @@
   .minutes-body .min-row:last-child{border-bottom:none;}
   .minutes-body .min-row:hover{background:var(--surface-2);}
   .min-head{display:flex;align-items:baseline;gap:8px;}
-  .min-title{font-size:12px;font-weight:600;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .min-title{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
   .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
   .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
   .min-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
   .min-chip{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);
     border-radius:10px;padding:2px 7px;font-size:10px;color:var(--text-secondary);}
-  .min-chip button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0;line-height:1;}
-  .min-chip button:hover{color:var(--danger);}
-  .min-editor{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-  .min-editor select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:11px;padding:4px 6px;}
-  .min-editor button{background:var(--accent-soft);color:var(--accent);border:none;border-radius:8px;font-size:11px;padding:4px 10px;cursor:pointer;}
-  .min-editor button:disabled{opacity:0.4;cursor:not-allowed;}
+  /* role の活性/非活性トグル。バーの色だけで状態が分かるようにする */
+  .min-roles{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+  .min-role{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:2px 8px 2px 6px;font-size:10px;color:var(--text-muted);cursor:pointer;transition:all .15s ease;}
+  .min-role:hover:not(:disabled){border-color:var(--border-strong);}
+  .min-role:disabled{cursor:not-allowed;opacity:0.5;}
+  .min-role .bar{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--text-muted);}
+  .min-role.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+  .min-role.on .bar{background:var(--accent);}
+  .min-role.pending{opacity:0.6;}
+  .min-role.pending .bar{background:#E0B252;animation:min-role-pulse 1s ease-in-out infinite;}
+  @keyframes min-role-pulse{50%{opacity:0.3;}}
   .min-note-inline{font-size:10px;color:var(--text-muted);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
@@ -1771,7 +1777,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule', 'mail'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule', 'mail', 'minutes'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -3445,7 +3451,7 @@ function emptyMinutesCache(){
 /** カードの更新間隔が過ぎたときに取り直す */
 function minutesStateOf(m){
   let st = minutesState[m.id];
-  if(!st) st = minutesState[m.id] = { expanded:new Set(), cache: emptyMinutesCache() };
+  if(!st) st = minutesState[m.id] = { pending:new Set(), cache: emptyMinutesCache() };
   const cur = st.cache;
   if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadMinutes(m);
   return st;
@@ -3453,7 +3459,7 @@ function minutesStateOf(m){
 
 /** 議事録DBの直近10件。並び順はAPI側（date降順）に任せる */
 async function loadMinutes(m){
-  const st = minutesState[m.id] || (minutesState[m.id] = { expanded:new Set(), cache: emptyMinutesCache() });
+  const st = minutesState[m.id] || (minutesState[m.id] = { pending:new Set(), cache: emptyMinutesCache() });
   const cur = st.cache;
   cur.loading = true;
   try{
@@ -3471,26 +3477,41 @@ async function loadMinutes(m){
   paintMinutes(m.id);
 }
 
-/** GASの savePermissions を呼ぶ。設定にGAS URL/トークンが無いカードは読み取り専用にする */
-async function minutesSavePermission(m, item, role, mode){
+/**
+ * roleのトグルをクリックした瞬間に見た目を切り替え、GASへの反映は裏で行う。
+ * 失敗したら見た目を元に戻してトーストで知らせる
+ */
+function minutesToggleRole(m, item, role){
   if(!m.gasUrl || !m.token){
     toast('このカードにGAS URLとトークンを設定すると権限を編集できます');
     return;
   }
-  try{
-    const api = await minutesModule();
-    await api.savePermissions({ gasUrl:m.gasUrl, token:m.token }, [item.notionPageId], [role], mode);
+  const st = minutesState[m.id];
+  const pendingKey = item.notionPageId + ':' + role;
+  if(st.pending.has(pendingKey)) return;   // 反映待ちの間は連打させない
 
-    const perms = new Set(item.permissions || []);
-    if(mode === 'remove') perms.delete(role); else perms.add(role);
-    item.permissions = [...perms];
-    toast(`「${item.title}」の権限を更新しました`);
-  }catch(err){
-    toast(err.message || String(err));
-  }
+  const perms = new Set(item.permissions || []);
+  const wasOn = perms.has(role);
+  wasOn ? perms.delete(role) : perms.add(role);
+  item.permissions = [...perms];
+  st.pending.add(pendingKey);
   paintMinutes(m.id);
-}
 
+  const mode = wasOn ? 'remove' : 'add';
+  minutesModule()
+    .then(api => api.savePermissions({ gasUrl:m.gasUrl, token:m.token }, [item.notionPageId], [role], mode))
+    .catch(err=>{
+      // 裏での反映に失敗したので見た目を元に戻す
+      const back = new Set(item.permissions || []);
+      wasOn ? back.add(role) : back.delete(role);
+      item.permissions = [...back];
+      toast(err.message || String(err));
+    })
+    .finally(()=>{
+      st.pending.delete(pendingKey);
+      paintMinutes(m.id);
+    });
+}
 
 function minutesDateLabel(iso){
   const d = new Date(iso);
@@ -3498,38 +3519,41 @@ function minutesDateLabel(iso){
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
-/** 権限チップ＋（設定済みなら）割り当て編集欄。件名クリックで開閉する */
-function minutesRow(m, item, expanded){
-  const id = item.notionPageId;
-  const perms = item.permissions || [];
-  const chips = perms.map(p => `
-      <span class="min-chip">${esc(p)}
-        <button data-min-remove="${esc(id)}:${esc(p)}" title="この権限を外す">✕</button>
-      </span>`).join('') || `<span class="min-note-inline">権限は未設定です</span>`;
-
+/** rolesに書かれた権限をトグルボタンとして並べる。バーの色が丸ごと状態を表す（灰=非活性／緑=活性／黄=反映中） */
+function minutesRoleToggles(m, item, pending){
   const roles = Array.isArray(m.roles) ? m.roles : [];
-  const addable = roles.filter(r => !perms.includes(r));
-  const editable = !!(m.gasUrl && m.token);
-  const editor = expanded
-    ? `<div class="min-editor">
-        ${editable
-          ? (addable.length
-              ? `<select data-min-role="${esc(id)}">${addable.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}</select>
-                 <button data-min-add="${esc(id)}">追加</button>`
-              : `<span class="min-note-inline">追加できる権限がありません</span>`)
-          : `<span class="min-note-inline">設定 →このカードの GAS URL / トークンを入力すると編集できます</span>`}
-      </div>`
-    : '';
+  if(!roles.length) return `<span class="min-note-inline">設定 →このカードの roles に権限名を書いてください</span>`;
 
+  const editable = !!(m.gasUrl && m.token);
+  const perms = item.permissions || [];
+  return roles.map(role => {
+    const on = perms.includes(role);
+    const isPending = pending.has(item.notionPageId + ':' + role);
+    const cls = 'min-role' + (on ? ' on' : '') + (isPending ? ' pending' : '');
+    return `<button class="${cls}" data-min-role="${esc(item.notionPageId)}:${esc(role)}"
+        ${editable ? '' : 'disabled'} title="${editable ? (on ? 'クリックで外す' : 'クリックで割り当てる') : 'GAS URL / トークンを設定すると編集できます'}">
+        <span class="bar"></span>${esc(role)}
+      </button>`;
+  }).join('');
+}
+
+/** rolesに無い権限（過去に手で付けたものなど）は読み取り専用のチップとして出す */
+function minutesExtraChips(m, item){
+  const roles = Array.isArray(m.roles) ? m.roles : [];
+  const extra = (item.permissions || []).filter(p => !roles.includes(p));
+  return extra.map(p => `<span class="min-chip">${esc(p)}</span>`).join('');
+}
+
+function minutesRow(m, item, pending){
   return `<div class="min-row">
       <div class="min-head">
         <span class="sch-bar" style="background:${MINUTES_STATUS_COLOR[item.status] || '#66625A'}"></span>
-        <span class="min-title" data-min-toggle="${esc(id)}" title="${esc(item.title)}">${esc(item.title)}</span>
+        <span class="min-title" title="${esc(item.title)}">${esc(item.title)}</span>
         <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
       </div>
       <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
-      <div class="min-chips">${chips}</div>
-      ${editor}
+      <div class="min-chips">${minutesExtraChips(m, item)}</div>
+      <div class="min-roles">${minutesRoleToggles(m, item, pending)}</div>
     </div>`;
 }
 
@@ -3543,7 +3567,7 @@ function minutesBody(m, st){
   const shown = list.slice(0, max);
   if(!shown.length) return `<div class="mail-empty">議事録はありません</div>`;
 
-  const rows = shown.map(item => minutesRow(m, item, st.expanded.has(item.notionPageId))).join('');
+  const rows = shown.map(item => minutesRow(m, item, st.pending)).join('');
   const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
   return `<div class="sch-list">${rows}</div>${more}`;
 }
@@ -3566,7 +3590,7 @@ function renderMinutesCard(m){
     </div>`;
 }
 
-/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの開閉状態が飛ぶ */
+/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの状態が飛ぶ */
 function paintMinutes(id){
   const m = allMonitors().find(x => x.id === id);
   const st = minutesState[id];
@@ -3588,37 +3612,16 @@ function wireMinutes(card){
   const st = minutesState[m.id];
   if(!st) return;
 
-  card.querySelectorAll('[data-min-toggle]').forEach(el=>{
-    el.addEventListener('click', e=>{
-      e.stopPropagation();
-      const id = el.dataset.minToggle;
-      if(st.expanded.has(id)) st.expanded.delete(id); else st.expanded.add(id);
-      paintMinutes(m.id);
-    });
-  });
-  card.querySelectorAll('[data-min-remove]').forEach(btn=>{
+  card.querySelectorAll('[data-min-role]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
-      const [pageId, role] = splitMinutesIdRole(btn.dataset.minRemove);
+      const i = btn.dataset.minRole.indexOf(':');
+      const pageId = btn.dataset.minRole.slice(0, i);
+      const role = btn.dataset.minRole.slice(i + 1);
       const item = (st.cache.result || []).find(x => x.notionPageId === pageId);
-      if(item) minutesSavePermission(m, item, role, 'remove');
+      if(item) minutesToggleRole(m, item, role);
     });
   });
-  card.querySelectorAll('[data-min-add]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      e.stopPropagation();
-      const pageId = btn.dataset.minAdd;
-      const sel = card.querySelector(`[data-min-role="${CSS.escape(pageId)}"]`);
-      const item = (st.cache.result || []).find(x => x.notionPageId === pageId);
-      if(item && sel && sel.value) minutesSavePermission(m, item, sel.value, 'add');
-    });
-  });
-}
-
-/** "notionPageId:role" を分ける。pageId に : は含まれないので最初の : だけで十分 */
-function splitMinutesIdRole(raw){
-  const i = raw.indexOf(':');
-  return [raw.slice(0, i), raw.slice(i + 1)];
 }
 
 function renderMonitorCard(m, snap){

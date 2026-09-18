@@ -154,19 +154,22 @@
   .minutes-body .min-row:last-child{border-bottom:none;}
   .minutes-body .min-row:hover{background:var(--surface-2);}
   .min-head{display:flex;align-items:baseline;gap:8px;}
-  .min-title{font-size:12px;font-weight:600;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .min-title{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .min-date{font-size:10px;color:var(--text-muted);flex-shrink:0;}
   .min-meta{font-size:10px;color:var(--text-secondary);margin-top:2px;}
   .min-status{padding:1px 6px;border-radius:8px;background:var(--surface-2);}
   .min-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
   .min-chip{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);
     border-radius:10px;padding:2px 7px;font-size:10px;color:var(--text-secondary);}
-  .min-chip button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0;line-height:1;}
-  .min-chip button:hover{color:var(--danger);}
-  .min-editor{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-  .min-editor select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:11px;padding:4px 6px;}
-  .min-editor button{background:var(--accent-soft);color:var(--accent);border:none;border-radius:8px;font-size:11px;padding:4px 10px;cursor:pointer;}
-  .min-editor button:disabled{opacity:0.4;cursor:not-allowed;}
+  /* role の活性/非活性トグル。バーの色だけで状態が分かるようにする */
+  .min-roles{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+  .min-role{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:2px 8px 2px 6px;font-size:10px;color:var(--text-muted);cursor:pointer;transition:all .15s ease;}
+  .min-role:hover:not(:disabled){border-color:var(--border-strong);}
+  .min-role:disabled{cursor:not-allowed;opacity:0.5;}
+  .min-role .bar{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--text-muted);}
+  .min-role.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+  .min-role.on .bar{background:var(--accent);}
   .min-note-inline{font-size:10px;color:var(--text-muted);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
@@ -1472,9 +1475,6 @@ const SAMPLE_MINUTES = [
   { title:'経営会議', date:'2026-09-16T04:30:00.000Z', duration:'37分 32秒', status:'要約', permissions:[] }
 ];
 
-/* 件名クリックで開く権限編集欄の開閉状態。タブ切り替えや「見本に戻す」でリセットする */
-let minutesExpanded = new Set();
-
 /* 権限の割り当て（この見本では保存せず、見ている間だけ覚えておく）。キーはitem.key（並べ替えても崩れない） */
 let minutesLocalPreview = {};
 
@@ -1506,36 +1506,39 @@ function dummyMinutes(){
   return { phase: error ? 'error' : items.length ? 'ok' : 'none', error, items };
 }
 
-/** 権限チップ＋（編集できるなら）割り当て編集欄。件名クリックで開閉する */
-function minutesRow(m, item, expanded, editable){
-  const perms = item.permissions || [];
-  const chips = perms.map(p => `
-      <span class="min-chip">${esc(p)}
-        <button data-min-remove="${esc(item.key)}:${esc(p)}" title="この権限を外す">✕</button>
-      </span>`).join('') || `<span class="min-note-inline">権限は未設定です</span>`;
-
+/** rolesに書かれた権限をトグルボタンとして並べる。バーの色だけで状態が分かる */
+function minutesRoleToggles(m, item, editable){
   const roles = Array.isArray(m.roles) ? m.roles : [];
-  const addable = roles.filter(r => !perms.includes(r));
-  const editor = expanded
-    ? `<div class="min-editor">
-        ${editable
-          ? (addable.length
-              ? `<select data-min-role="${esc(item.key)}">${addable.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}</select>
-                 <button data-min-add="${esc(item.key)}">追加</button>`
-              : `<span class="min-note-inline">追加できる権限がありません</span>`)
-          : `<span class="min-note-inline">設定 →このカードの GAS URL / トークンを入力すると編集できます</span>`}
-      </div>`
-    : '';
+  if(!roles.length) return `<span class="min-note-inline">設定 →このカードの roles に権限名を書いてください</span>`;
 
+  const perms = item.permissions || [];
+  return roles.map(role => {
+    const on = perms.includes(role);
+    const cls = 'min-role' + (on ? ' on' : '');
+    return `<button class="${cls}" data-min-role="${esc(item.key)}:${esc(role)}"
+        ${editable ? '' : 'disabled'} title="${editable ? (on ? 'クリックで外す' : 'クリックで割り当てる') : 'GAS URL / トークンを設定すると編集できます'}">
+        <span class="bar"></span>${esc(role)}
+      </button>`;
+  }).join('');
+}
+
+/** rolesに無い権限（過去に手で付けたものなど）は読み取り専用のチップとして出す */
+function minutesExtraChips(m, item){
+  const roles = Array.isArray(m.roles) ? m.roles : [];
+  const extra = (item.permissions || []).filter(p => !roles.includes(p));
+  return extra.map(p => `<span class="min-chip">${esc(p)}</span>`).join('');
+}
+
+function minutesRow(m, item, editable){
   return `<div class="min-row">
       <div class="min-head">
         <span class="sch-bar" style="background:${MINUTES_STATUS_COLOR[item.status] || '#66625A'}"></span>
-        <span class="min-title" data-min-toggle="${esc(item.key)}" title="${esc(item.title)}">${esc(item.title)}</span>
+        <span class="min-title" title="${esc(item.title)}">${esc(item.title)}</span>
         <span class="min-date mono">${esc(minutesDateLabel(item.date))}</span>
       </div>
       <div class="min-meta"><span class="min-status">${esc(item.status || '')}</span>${item.duration ? ' ・ ' + esc(item.duration) : ''}</div>
-      <div class="min-chips">${chips}</div>
-      ${editor}
+      <div class="min-chips">${minutesExtraChips(m, item)}</div>
+      <div class="min-roles">${minutesRoleToggles(m, item, editable)}</div>
     </div>`;
 }
 
@@ -1546,7 +1549,7 @@ function minutesBody(m, st){
   if(!shown.length) return `<div class="mail-empty">議事録はありません</div>`;
 
   const editable = F('d-minutes-editable').checked;
-  const rows = shown.map(item => minutesRow(m, item, minutesExpanded.has(item.key), editable)).join('');
+  const rows = shown.map(item => minutesRow(m, item, editable)).join('');
   const more = st.items.length > max ? `<div class="mon-note">ほか${st.items.length - max}件</div>` : '';
   return `<div class="sch-list">${rows}</div>${more}`;
 }
@@ -1564,35 +1567,16 @@ function renderMinutesCard(m, st){
     </div>`;
 }
 
-/** 件名の開閉・権限の追加/削除の結線。見本のでは保存せず、見ている間だけ覚えておく */
+/** roleトグルの結線。見本のでは保存せず、見ている間だけ覚えておく */
 function wireMinutesPreview(){
-  F('live').querySelectorAll('[data-min-toggle]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const key = el.dataset.minToggle;
-      minutesExpanded.has(key) ? minutesExpanded.delete(key) : minutesExpanded.add(key);
-      paint();
-    });
-  });
-  F('live').querySelectorAll('[data-min-remove]').forEach(btn=>{
+  F('live').querySelectorAll('[data-min-role]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const i = btn.dataset.minRemove.indexOf(':');
-      const key = btn.dataset.minRemove.slice(0, i);
-      const role = btn.dataset.minRemove.slice(i + 1);
+      const i = btn.dataset.minRole.indexOf(':');
+      const key = btn.dataset.minRole.slice(0, i);
+      const role = btn.dataset.minRole.slice(i + 1);
       const item = dummyMinutes().items.find(x => x.key === key);
       const perms = new Set(item ? item.permissions : []);
-      perms.delete(role);
-      minutesLocalPreview[key] = [...perms];
-      paint();
-    });
-  });
-  F('live').querySelectorAll('[data-min-add]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const key = btn.dataset.minAdd;
-      const sel = F('live').querySelector(`[data-min-role="${CSS.escape(key)}"]`);
-      if(!sel || !sel.value) return;
-      const item = dummyMinutes().items.find(x => x.key === key);
-      const perms = new Set(item ? item.permissions : []);
-      perms.add(sel.value);
+      perms.has(role) ? perms.delete(role) : perms.add(role);
       minutesLocalPreview[key] = [...perms];
       paint();
     });
@@ -1826,7 +1810,7 @@ F('reset').addEventListener('click', ()=>{
   else drafts[activeTab] = clone(TEMPLATES[activeTab]);
   if(activeTab === 'schedule') scheduleView = 'today';
   if(activeTab === 'mail'){ mailLocalPreview = { starred:new Set(), hidden:new Set() }; mailView = 'inbox'; }
-  if(activeTab === 'minutes'){ minutesLocalPreview = {}; minutesExpanded = new Set(); }
+  if(activeTab === 'minutes'){ minutesLocalPreview = {}; }
   paint();
   say('見本に戻しました');
 });
