@@ -173,6 +173,10 @@
   .mail-star:hover, .mail-del:hover{color:var(--text);background:var(--surface);}
   .mail-star.on{color:#E0B252;}
   .mail-empty{font-size:11px;color:var(--text-muted);padding:10px 0;text-align:center;}
+  .sch-title{cursor:pointer;}
+  .mail-preview{font-size:11px;color:var(--text-secondary);white-space:pre-wrap;
+    background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:2px 0 6px;}
+  .mail-preview a{color:var(--accent);}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -3131,7 +3135,7 @@ function emptyMailCache(){
 /** カードの更新間隔が過ぎたときに取り直す */
 function mailStateOf(m){
   let st = mailState[m.id];
-  if(!st) st = mailState[m.id] = { view:'inbox', accounts:[], cache: emptyMailCache() };
+  if(!st) st = mailState[m.id] = { view:'inbox', accounts:[], expanded:new Set(), cache: emptyMailCache() };
   const cur = st.cache;
   if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadMail(m);
   return st;
@@ -3198,9 +3202,15 @@ function mailRowTime(d){
   return d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', hour12:false });
 }
 
-/** 1行ぶん。1行目に時分と件名、2行目に差出人。schedule の行と同じ見た目を流用する */
-function mailRow(e){
+/** 1行ぶん。1行目に時分と件名、2行目に差出人。schedule の行と同じ見た目を流用する。
+ * 件名をクリックすると、下に本文の抜粋（preview）を開閉表示する */
+function mailRow(e, expanded){
   const cls = 'sch-row' + (e.isRead ? '' : ' unread') + (e.starred ? ' starred' : '');
+  const preview = expanded
+    ? `<div class="mail-preview">${e.preview ? esc(e.preview) : '本文のプレビューはありません'}${
+        e.url ? `<br><a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">元のメールを開く</a>` : ''
+      }</div>`
+    : '';
   return `<div class="${cls}">
       <span class="sch-bar" style="background:${esc(e.color)}"></span>
       <span class="mail-time-col">
@@ -3208,8 +3218,9 @@ function mailRow(e){
         <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
       </span>
       <span class="sch-text">
-        <span class="sch-title" title="${esc(e.subject)}">${esc(e.subject)}</span>
+        <span class="sch-title" data-mail-toggle="${esc(e.key)}" title="${esc(e.subject)}">${esc(e.subject)}</span>
         ${e.from ? `<span class="sch-sub">${esc(e.from)}</span>` : ''}
+        ${preview}
       </span>
       <span class="mail-actions">
         <button class="mail-del" data-mail-del="${esc(e.key)}" title="非表示にする">✕</button>
@@ -3262,7 +3273,7 @@ function mailBody(m, st){
     ? `<div class="sch-week">${mailGroupByDay(shown).map(g => `
         <div class="sch-day">
           <div class="sch-day-head">${esc(scheduleDayLabel(g.date))}</div>
-          <div class="sch-list">${g.items.map(mailRow).join('')}</div>
+          <div class="sch-list">${g.items.map(e => mailRow(e, st.expanded.has(e.key))).join('')}</div>
         </div>`).join('')}</div>`
     : `<div class="mail-empty">${st.view === 'priority' ? '優先メールはありません' : '新着メールはありません'}</div>`;
   const more = list.length > max ? `<div class="mon-note">ほか${list.length - max}件</div>` : '';
@@ -3317,6 +3328,15 @@ function wireMail(card){
     btn.addEventListener('click', e=>{
       e.stopPropagation();
       hideMail(m.id, btn.dataset.mailDel);
+      paintMail(m.id);
+    });
+  });
+  card.querySelectorAll('[data-mail-toggle]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const st = mailState[m.id];
+      const key = el.dataset.mailToggle;
+      if(st.expanded.has(key)) st.expanded.delete(key); else st.expanded.add(key);
       paintMail(m.id);
     });
   });
