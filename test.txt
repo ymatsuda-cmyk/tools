@@ -1,0 +1,46 @@
+# リポジトリ概要 (tools)
+
+個人用の業務効率化ツール群をまとめたモノレポ。GitHub Pages で配信する
+静的Webアプリ(HTML/CSS/素のJS)を中心に、Google Apps Script(GAS)を
+バックエンド代わりに使う構成が多い。ビルドツールやパッケージマネージャは
+基本的に使わず、ブラウザでそのまま動く作りを志向している。
+
+## 主なディレクトリ
+
+- addin/ … Excelアドイン等の関連ファイル(bug-tracker, kanban, weekly, eigyo, finance など複数の社内ツール)
+- api/ … GAS等のAPI実装(mail, mindmap, minutes, schedule, updateclip)
+- beta/ … 開発中/試験的な機能(btswitch, clipstock, dashboard, logview, player)
+- chat/ … Kaggle上のOllama(gemma)をOpenAI互換API経由で使うチャットアプリ。
+  Dexie(IndexedDB)で履歴保存、SSEストリーミング、ファイル添付(PDF/docx/xlsx)対応。
+  ビルド不要、GitHub Pagesでそのまま配信可能。
+- clipstock/ … 動画・Web記事のナレッジベースアプリ。
+  Mac miniのcronでYouTube動画のメタ情報・文字起こしを取得しNotionに保存、
+  ブラウザ+GASでAI要約・マインドマップ生成・タグ整理・アイデア横断表示などを行う。
+- data/ … 各アプリが読み込む一覧JSON等の静的データ(clipstock, dashboard, mail, minutes, news-brief, schedule)
+- fx-invest/ … FX/投資関連のGASアプリ
+- LLM/ … LLM関連の実験コード(beta, GAS, kaggle)
+- loan-manage/ … ローン管理アプリ
+- mac/ … Mac側で動くPythonスクリプト(cron等でNotion連携・JSON生成・git push)
+- mindmap/ … マインドマップ表示用ビューア
+- minutes/ … 議事録アプリ。ブラウザ→GAS→Notionの3層構成。
+  AIによる要約・マインドマップ生成、手動編集モードなどを持つ。
+- news-brief/ … ニュースまとめアプリ
+- old/ … 旧バージョン・過去資産の保管
+- report/ … 日次のバグ/週次スケジュール/朝会レポート等のMarkdown・HTMLファイル群
+
+## 共通する設計方針
+
+- ブラウザ(静的JS/HTML) → GAS → Notion(またはNotion API)という3層構成が
+  複数アプリ(minutes, clipstock)で共通して使われている。
+  GASを挟むのはNotion APIにCORSヘッダーが無く、ブラウザから直接叩けないため。
+- AI接続設定(baseUrl/APIキー/モデル名)はlocalStorageのキーを複数アプリ間で
+  共有し、1箇所で設定すれば他アプリでも使い回せるようになっている。
+- Notion側の一覧取得を高速化するため、Mac mini側のPythonスクリプトで
+  定期的にJSONを生成し、リポジトリのdata/配下にpushしてアプリはそれを読む
+  (JSONが読めない場合はNotionから直接取得するフォールバックあり)。
+- ビルド不要・ES Modules + importmapでCDNからライブラリを読み込む構成を採用し、
+  GitHub Pagesにそのままデプロイできるようにしている。
+
+## リモートリポジトリ
+
+- origin: https://github.com/ymatsuda-cmyk/tools.git
