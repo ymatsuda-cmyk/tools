@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer6 - tools</title>
+<style>
+  /* シンプルなサンプルページ */
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#16202b;
+    color:#cbd8e4;
+    font-family:-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    padding:2rem;
+    box-sizing:border-box;
+  }
+  #app{
+    max-width:640px;
+    text-align:center;
+  }
+  h1{
+    font-size:2rem;
+    margin-bottom:1rem;
+  }
+  p{
+    line-height:1.8;
+    font-size:1rem;
+  }
+  /* /api（mindmap）利用結果の表示欄 */
+  #apiResult{
+    margin-top:1.5rem;
+    padding:1rem;
+    background:#1e2c3a;
+    border-radius:8px;
+    text-align:left;
+    font-size:0.9rem;
+    white-space:pre-wrap;
+    word-break:break-all;
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+    <h1>サンプルページ</h1>
+    <div id="apiResult">/api（mindmap）を読み込んでいます…</div>
+  </div>
+
+  <!-- 既存の /api/mindmap モジュール(window.MindMap)を読み込む -->
+  <script src="../api/mindmap/mindmap.api.js"></script>
+  <script>
+    // /api（mindmap）を利用したサンプル呼び出し
+    // MindMap.mount() で仮想の描画先を用意し、サンプルのツリーを描画して件数を表示する
+    (function () {
+      var resultEl = document.getElementById('apiResult');
+      try {
+        // 描画先が無いと動かないため、画面外に非表示のコンテナを用意する
+        var hidden = document.createElement('div');
+        hidden.style.position = 'absolute';
+        hidden.style.left = '-9999px';
+        hidden.style.width = '400px';
+        hidden.style.height = '300px';
+        document.body.appendChild(hidden);
+
+        MindMap.mount(hidden);
+
+        // サンプルの顧客ツリーを描画する
+        var sampleTree = {
+          text: '顧客一覧',
+          children: [
+            { text: '顧客A' },
+            { text: '顧客B' }
+          ]
+        };
+        MindMap.render(sampleTree);
+
+        resultEl.textContent =
+          '/api/mindmap/mindmap.api.js を利用した解析結果:\n' +
+          'ノード数: ' + MindMap.count() + '\n' +
+          MindMap.toJSON();
+      } catch (err) {
+        // /api の読み込みや実行に失敗した場合はエラー内容を表示する
+        resultEl.textContent = '/api（mindmap）の呼び出しに失敗しました: ' + err.message;
+      }
+    })();
+  </script>
+</body>
+</html>
