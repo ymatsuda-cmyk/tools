@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer8 - tools</title>
+<style>
+  /* シンプルな顧客ページ8 */
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:#16202b;
+    color:#cbd8e4;
+    font-family:-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    padding:2rem;
+    box-sizing:border-box;
+  }
+  h1{
+    font-size:2rem;
+    margin-bottom:1.5rem;
+    text-align:center;
+  }
+  .section{
+    width:100%;
+    max-width:800px;
+    margin-bottom:1.5rem;
+  }
+  .section h2{
+    font-size:1.1rem;
+    margin-bottom:0.5rem;
+  }
+  /* /api（mail）の一覧表示 */
+  #mailList{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  #mailList li{
+    background:#1e2c3a;
+    border-radius:8px;
+    padding:0.75rem 1rem;
+    margin-bottom:0.5rem;
+    font-size:0.9rem;
+  }
+  #mailList li b{
+    color:#eef4fa;
+  }
+  /* /api（mindmap2）の描画領域 */
+  #mindmapHost{
+    width:100%;
+    height:320px;
+    background:#1e2c3a;
+    border-radius:8px;
+  }
+  #mailStatus, #apiStatus{
+    font-size:0.9rem;
+    color:#9fb3c8;
+  }
+</style>
+</head>
+<body>
+  <h1>顧客ページ8</h1>
+
+  <div class="section">
+    <h2>/api（mail）で取得したお知らせ</h2>
+    <p id="mailStatus">/api（mail）を読み込んでいます…</p>
+    <ul id="mailList"></ul>
+  </div>
+
+  <div class="section">
+    <h2>/api（mindmap2）で描画した顧客情報</h2>
+    <div id="mindmapHost"></div>
+    <p id="apiStatus">/api（mindmap2）を読み込んでいます…</p>
+  </div>
+
+  <script type="module">
+    // 既存の /api モジュール(mail, mindmap2)を実際に呼び出して画面を作る
+    import * as mail from '../api/mail/mail.api.js'
+    import { renderMindmap } from '../api/mindmap2/mindmap2.js'
+
+    const mailStatusEl = document.getElementById('mailStatus')
+    const mailListEl = document.getElementById('mailList')
+    const apiStatusEl = document.getElementById('apiStatus')
+    const hostEl = document.getElementById('mindmapHost')
+
+    /* --- /api（mail）: サインイン不要のjsonプロバイダで実際に取得処理を動かす --- */
+    async function loadMail() {
+      try {
+        // 外部通信やサインインを伴わない json プロバイダに、固定のお知らせデータを持たせる
+        const accounts = mail.normalizeAccounts([
+          {
+            id: 'customer8',
+            label: '顧客窓口',
+            provider: 'json',
+            maxAgeDays: 3650,
+            mails: [
+              { subject: '契約更新のご案内', from: 'support@example.com', receivedAt: '2026-09-18T09:00:00+09:00' },
+              { subject: 'ご請求書送付のお知らせ', from: 'billing@example.com', receivedAt: '2026-09-15T09:00:00+09:00', isRead: false },
+            ],
+          },
+        ])
+
+        const { mails } = await mail.recent(accounts, { maxAgeDays: 3650 })
+        mailListEl.innerHTML = mails
+          .map((m) => `<li><b>${m.subject}</b> - ${m.from}（${mail.formatTime(m.receivedAt)}）</li>`)
+          .join('')
+        mailStatusEl.textContent = `/api（mail）を実行し、${mails.length}件のお知らせを取得しました`
+      } catch (err) {
+        // 取得に失敗した場合はエラー内容を表示する
+        mailStatusEl.textContent = '/api（mail）の呼び出しに失敗しました: ' + err.message
+      }
+    }
+
+    /* --- /api（mindmap2）: 顧客情報のツリーを実際に描画する --- */
+    async function loadMindmap() {
+      const sampleMarkdown = [
+        '# 顧客ページ8',
+        '## 顧客A',
+        '- 担当: 山田',
+        '- 契約: 継続中',
+        '## 顧客B',
+        '- 担当: 佐藤',
+        '- 契約: 新規',
+      ].join('\n')
+
+      try {
+        await renderMindmap(hostEl, sampleMarkdown)
+        apiStatusEl.textContent = '/api（mindmap2）を実行し、マインドマップを描画しました'
+      } catch (err) {
+        // 読み込みや描画に失敗した場合はエラー内容を表示する
+        apiStatusEl.textContent = '/api（mindmap2）の実行に失敗しました: ' + err.message
+      }
+    }
+
+    loadMail()
+    loadMindmap()
+  </script>
+</body>
+</html>
