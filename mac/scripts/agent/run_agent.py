@@ -11,7 +11,7 @@ Phase2: GitHub IssueをVS Code + Clineへ投入し、実装完了を検知して
 """
 
 from __future__ import annotations
-
+import traceback
 import argparse
 import base64
 import json
@@ -405,12 +405,22 @@ def notify_teams(
 def copy_to_clipboard(text: str) -> bool:
     try:
         import pyperclip
+        import traceback
+
+        log(f"pyperclip={pyperclip.__file__}")
 
         pyperclip.copy(text)
+
         log("クリップボードへコピーしました。")
         return True
+
     except Exception as error:
-        log(f"クリップボードコピー失敗: {error}")
+        import traceback
+
+        log(f"クリップボードコピー失敗: {type(error).__name__}")
+        log(str(error))
+        log(traceback.format_exc())
+
         return False
 
 
@@ -871,20 +881,43 @@ def handle_cline_question(issue_number: int) -> bool:
 
 def wait_for_implementation(issue_number: int) -> str:
     log("実装完了を待機します。")
+
     started_at = time.time()
     previous = snapshot_changes()
     stable_since: float | None = None
 
     while True:
-        if time.time() - started_at > IMPLEMENTATION_TIMEOUT_SECONDS:
-            log("実装待機がタイムアウトしました。")
-            break
+        elapsed = time.time() - started_at
+
+        if elapsed > IMPLEMENTATION_TIMEOUT_SECONDS:
+            # タイムアウト直前の最新状態を必ず再取得する
+            current = snapshot_changes()
+
+            if current:
+                log(
+                    "実装待機がタイムアウトしましたが、"
+                    "Git変更が存在するため最新状態を採用します。"
+                )
+                return current
+
+            log("実装待機がタイムアウトしました。変更は検出されませんでした。")
+            return ""
 
         question_file, _, _, _, _ = question_paths()
+
         if question_file.exists():
             if handle_cline_question(issue_number):
+                # Teams回答待ち時間を実装タイムアウトに含めない
+                started_at = time.time()
+
+                # 回答後の現在状態を基準に監視を再開する
                 previous = snapshot_changes()
                 stable_since = None
+
+                log(
+                    "Teams回答後の実装監視を再開しました。"
+                    "実装タイムアウトをリセットします。"
+                )
                 continue
 
         time.sleep(POLL_INTERVAL_SECONDS)
@@ -901,27 +934,50 @@ def wait_for_implementation(issue_number: int) -> str:
 
         if stable_since is None:
             stable_since = time.time()
-            log(f"変更停止。{STABLE_DURATION_SECONDS}秒後に完了判定します。")
+            log(
+                f"変更停止。"
+                f"{STABLE_DURATION_SECONDS}秒後に完了判定します。"
+            )
             continue
 
         if time.time() - stable_since >= STABLE_DURATION_SECONDS:
+            # 完了判定時にも最新状態を再取得する
+            final_snapshot = snapshot_changes()
+
+            if final_snapshot != current:
+                log("完了判定直前に追加変更を検知しました。監視を継続します。")
+                previous = final_snapshot
+                stable_since = None
+                continue
+
             log("実装完了を検知しました。")
-            break
-
-    return previous
-
-
+            return final_snapshot
+        
 
 def list_changed_files() -> list[str]:
-    files = []
+    files: list[str] = []
+
     for line in snapshot_changes().splitlines():
-        path = line[3:].strip().strip('"')
-        if path == ".agent-question.json":
+        if len(line) < 4:
             continue
+
+        path = (
+            line[3:]
+            .strip()
+            .strip('"')
+            .replace("\\", "/")
+        )
+
+        if path in {
+            ".agent-question.json",
+            ".agent-summary.json",
+        }:
+            continue
+
         if path:
             files.append(path)
-    return files
 
+    return files
 
 def expand_changed_files(changed_files: list[str]) -> list[str]:
     expanded: set[str] = set()
@@ -1399,4 +1455,9 @@ def build_preview_url(
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(traceback.format_exc())
+        raise
+    

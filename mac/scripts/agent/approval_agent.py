@@ -1,3 +1,11 @@
+import sys
+import pyperclip
+
+print("===================================")
+print("Python:", sys.executable)
+print("pyperclip file =", pyperclip.__file__)
+print("Version:", sys.version)
+print("===================================")
 import base64
 import json
 import pathlib
@@ -70,7 +78,7 @@ while True:
 
                 subprocess.Popen(
                     [
-                        "python",
+                        "sys.executable",
                         "finish_agent.py",
                         str(issue_number),
                         "--approve"
@@ -117,7 +125,7 @@ while True:
 
                 subprocess.Popen(
                     [
-                        "python",
+                        sys.executable,
                         "run_agent.py",
                         str(issue_number),
                         "--no-vscode"
