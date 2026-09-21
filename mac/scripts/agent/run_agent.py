@@ -341,6 +341,7 @@ URL: {issue['url']}
 必須JSON形式:
 {{
   "issueNumber": {issue['number']},
+    "summaryText": "Teams承認画面に表示する実装完了報告の全文",
   "implementation": [
     "実装した内容1",
     "実装した内容2"
@@ -1142,6 +1143,11 @@ def read_cline_summary(issue_number: int) -> str:
             f"現在Issue=#{issue_number}, サマリーIssue=#{source_issue}"
         )
         return ""
+
+    summary_text = data.get("summaryText")
+    if isinstance(summary_text, str) and summary_text.strip():
+        log("Clineの最終サマリーをsummaryTextへ反映します。")
+        return summary_text.strip()
 
     def normalize_items(value) -> list[str]:
         if isinstance(value, list):
