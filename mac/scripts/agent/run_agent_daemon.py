@@ -293,15 +293,15 @@ def process_issue(
             cwd=str(run_agent_path.parent),
             check=False,
         )
-    
+
         update_state(
-            issue_number,
+            state_path,
             {
                 "runAgentExitCode": result.returncode,
-                "stdout": result.stdout[-5000:],
-                "stderr": result.stderr[-5000:],
+                "stdout": (result.stdout or "")[-5000:],
+                "stderr": (result.stderr or "")[-5000:],
             },
-        )            
+        )
     except OSError as error:
         update_state(
             state_path,
