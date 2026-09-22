@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTML編集アプリ</title>
+<style>
+:root{
+  --bg-app:#12151a; --bg-panel:#15181d; --bg-canvas:#1b1f24;
+  --border:#262b32; --border-soft:#1c2128;
+  --text:#e7ebee; --text-dim:#a7afb8; --text-mute:#838d97; --text-faint:#5c6570;
+  --accent:#6fa8cc; --accent-soft:rgba(111,168,204,.16);
+  --warn:#e0806f; --protect:#b3402f; --sel:#2f7fd1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg-app); color:var(--text);
+  font-family:-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  font-size:13px; display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+button{font-family:inherit; cursor:pointer}
+input{font-family:inherit}
+
+/* header */
+header{flex:0 0 52px; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bg-panel); border-bottom:1px solid var(--border)}
+.filename{font-size:13px; color:var(--text); white-space:nowrap; max-width:320px; overflow:hidden; text-overflow:ellipsis}
+.dot{width:6px; height:6px; border-radius:50%; flex:0 0 auto}
+.dot.dirty{background:var(--warn)} .dot.clean{background:#3a4550}
+.hint{font-size:11px; color:var(--text-mute)}
+.iconbtn{width:30px; height:30px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; border-radius:6px; color:var(--text-dim)}
+.iconbtn:hover:not(:disabled){background:var(--border)}
+.iconbtn:disabled{opacity:.35; cursor:default}
+.seg{display:flex; align-items:center; background:var(--bg-canvas); border:1px solid var(--border); border-radius:8px; padding:2px}
+.seg button{font-size:12px; padding:6px 14px; border-radius:6px; border:none; background:transparent; color:var(--text-mute)}
+.seg button.on{background:#2a3540; color:var(--text)}
+.spacer{flex:1 1 auto}
+.btn{font-size:12px; padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-dim); display:flex; align-items:center; gap:6px}
+.btn:hover:not(:disabled){background:var(--border)}
+.btn:disabled{opacity:.4; cursor:default}
+.btn-primary{border:none; background:var(--accent); color:#0d1114; font-weight:700}
+.btn-primary:disabled{opacity:.4}
+
+/* body layout */
+.body{flex:1 1 auto; display:flex; min-height:0}
+nav.outline{flex:0 0 230px; background:var(--bg-panel); border-right:1px solid var(--border); padding:14px 10px; overflow-y:auto}
+nav.outline h3{font-size:11px; color:var(--text-faint); letter-spacing:.08em; margin:2px 8px 10px; font-weight:400}
+.nav-item{display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; padding:8px 10px; border-radius:6px; border:none; background:transparent; color:var(--text-dim); font-size:12.5px; text-align:left; margin-bottom:1px}
+.nav-item:hover{background:var(--border-soft)}
+.nav-item.active{background:#20303c; color:#dcebf3; font-weight:600}
+.chip{font-family:ui-monospace,"Roboto Mono",monospace; font-size:9px; color:var(--warn); background:rgba(224,128,111,.14); padding:2px 5px; border-radius:4px; flex:0 0 auto}
+
+.center{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; background:var(--bg-canvas)}
+.toolbar{flex:0 0 40px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-dim)}
+.zoom{display:flex; align-items:center; gap:6px}
+.zoom button{width:22px; height:22px; border-radius:5px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font-size:13px; line-height:1}
+.zoom span{font-size:11px; color:var(--text-mute); width:34px; text-align:center}
+
+.stage{flex:1 1 auto; position:relative; overflow:auto}
+.stage iframe{position:absolute; top:0; left:0; width:100%; height:100%; border:none; background:#fff}
+.codewrap{position:absolute; inset:0; display:flex; flex-direction:column}
+.codewrap textarea{flex:1 1 auto; width:100%; resize:none; border:none; background:#0e1013; color:#d6dbe0; font-family:ui-monospace,"Roboto Mono",monospace; font-size:12.5px; line-height:1.6; padding:16px; outline:none}
+.codebar{flex:0 0 auto; display:flex; justify-content:flex-end; gap:8px; padding:8px 12px; background:var(--bg-panel); border-top:1px solid var(--border)}
+
+.empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
+.empty-inner{text-align:center; color:var(--text-mute)}
+.empty-inner p{margin:0 0 16px; font-size:13px}
+.drop{border:1.5px dashed var(--border); border-radius:10px; padding:36px 48px; color:var(--text-faint)}
+.drop.over{border-color:var(--accent); color:var(--accent)}
+
+/* right panel */
+aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--border); display:flex; flex-direction:column; min-height:0}
+.tabs{flex:0 0 auto; display:flex; padding:0 12px; border-bottom:1px solid var(--border)}
+.tabs button{flex:1; text-align:center; padding:11px 0; font-size:12px; color:var(--text-mute); background:transparent; border:none; border-bottom:2px solid transparent}
+.tabs button.on{color:var(--text); font-weight:600; border-bottom-color:var(--accent)}
+.scope-row{padding:10px 14px; font-size:11px; color:var(--text-faint); border-bottom:1px solid var(--border-soft); display:flex; align-items:center; gap:6px}
+.scope-row select{font-size:11px; background:var(--bg-canvas); color:var(--text-dim); border:1px solid var(--border); border-radius:5px; padding:2px 6px}
+
+.chat{flex:1 1 auto; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:9px}
+.msg{max-width:90%; font-size:12.5px; line-height:1.6; padding:8px 11px; border-radius:10px}
+.msg.user{align-self:flex-end; background:var(--accent-soft); color:#dcebf3; border-radius:10px 10px 2px 10px}
+.msg.assistant{align-self:flex-start; background:var(--bg-canvas); border:1px solid var(--border); color:#d3d9de; border-radius:10px 10px 10px 2px}
+.msg.error{align-self:flex-start; background:rgba(224,128,111,.1); border:1px solid rgba(224,128,111,.4); color:#e8b3a6}
+.msg .undo-link{display:block; margin-top:6px; font-size:11px; color:#7fa8c4; background:none; border:none; padding:0; text-decoration:underline}
+
+.composer{flex:0 0 auto; padding:10px 12px; border-top:1px solid var(--border); display:flex; gap:7px; align-items:center}
+.composer input[type=text]{flex:1; min-width:0; font-size:12.5px; background:var(--bg-canvas); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text)}
+.composer .send{width:32px; height:32px; border-radius:8px; border:none; background:var(--accent); color:#0d1114; display:flex; align-items:center; justify-content:center; flex:0 0 auto}
+.composer .send:disabled{opacity:.4}
+
+.apikey{padding:8px 14px 0; font-size:11px; color:var(--text-faint)}
+.apikey input{width:100%; font-size:11.5px; background:var(--bg-canvas); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text-dim); margin-top:5px}
+.apikey .note{margin-top:6px; line-height:1.5; color:var(--text-faint)}
+
+.history{flex:0 0 auto; max-height:160px; overflow-y:auto; padding:8px 14px 14px; border-top:1px solid var(--border-soft)}
+.history h4{font-size:10.5px; color:var(--text-faint); letter-spacing:.06em; margin:2px 0 8px; font-weight:400}
+.hitem{display:flex; align-items:center; gap:7px; width:100%; background:none; border:none; padding:3px 0; font-size:11px; color:var(--text-mute); text-align:left}
+.hitem:hover{color:var(--text-dim)}
+.hitem.cur{color:var(--text)}
+.hitem .b{width:5px; height:5px; border-radius:50%; background:var(--text-faint); flex:0 0 auto}
+.hitem.cur .b{background:var(--accent)}
+
+.props-empty{padding:20px 16px; font-size:12px; color:var(--text-faint); line-height:1.7}
+
+.visually-hidden{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a8894" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+  <span class="filename" id="filename">開いているファイルはありません</span>
+  <span class="dot clean" id="dirtyDot"></span>
+  <span class="hint" id="dirtyHint"></span>
+
+  <div style="flex:0 0 auto"></div>
+  <button class="iconbtn" id="btnUndo" disabled aria-label="元に戻す" title="元に戻す">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7"/></svg>
+  </button>
+  <button class="iconbtn" id="btnRedo" disabled aria-label="やり直す" title="やり直す">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7"/></svg>
+  </button>
+
+  <div class="seg" id="viewSeg">
+    <button class="on" data-mode="preview">プレビュー</button>
+    <button data-mode="code">コード</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <button class="btn" id="btnOpen">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h5l2 2h11v10H3z"/></svg>
+    開く
+  </button>
+  <button class="btn btn-primary" id="btnSave" disabled>保存</button>
+  <input type="file" id="fileInput" accept=".html,.htm,text/html" class="visually-hidden">
+</header>
+
+<div class="body">
+
+  <nav class="outline" id="outline" style="display:none">
+    <h3>章構成</h3>
+    <div id="outlineList"></div>
+  </nav>
+
+  <div class="center">
+    <div class="toolbar" id="toolbar" style="display:none">
+      <div id="breadcrumb">ドキュメント全体</div>
+      <div class="zoom">
+        <button aria-label="縮小" id="zoomOut">−</button>
+        <span id="zoomLabel">100%</span>
+        <button aria-label="拡大" id="zoomIn">+</button>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="empty" id="emptyState">
+        <div class="empty-inner">
+          <div class="drop" id="dropZone">
+            <p>HTMLファイルをここにドラッグ、または</p>
+            <button class="btn btn-primary" id="btnOpen2">ファイルを開く</button>
+          </div>
+        </div>
+      </div>
+      <iframe id="preview" style="display:none" title="プレビュー"></iframe>
+      <div class="codewrap" id="codewrap" style="display:none">
+        <label for="codeArea" class="visually-hidden">HTMLソース</label>
+        <textarea id="codeArea" spellcheck="false"></textarea>
+        <div class="codebar">
+          <button class="btn" id="btnApplyCode">プレビューに反映</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside id="aside" style="display:none">
+    <div class="tabs">
+      <button class="tab" data-tab="props">プロパティ</button>
+      <button class="tab on" data-tab="ai">AIで編集</button>
+    </div>
+
+    <div id="panelProps" style="display:none">
+      <div class="props-empty">ブロックごとのプロパティ編集は今後追加予定です。まずはプレビュー上でクリックして直接編集するか、AIタブから指示してください。</div>
+    </div>
+
+    <div id="panelAI" style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0">
+      <div class="scope-row">
+        対象範囲：
+        <select id="scopeSelect">
+          <option value="doc">ドキュメント全体</option>
+        </select>
+      </div>
+      <div class="chat" id="chat"></div>
+      <div class="apikey" id="apikeyWrap">
+        <label for="apiKeyInput" style="font-size:11px; color:var(--text-faint)">Anthropic APIキー</label>
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        <div class="note">ご自身のAPIキーが必要です。キーはこのブラウザ内にのみ保存され、送信先は指示のたびに呼び出すAnthropicのAPIのみです。ブラウザやネットワーク環境によっては直接呼び出しがブロックされる場合があります。</div>
+      </div>
+      <div class="composer">
+        <label for="aiInput" class="visually-hidden">AIへの編集指示</label>
+        <input type="text" id="aiInput" placeholder="指示を入力…（例：表に列を追加して）" disabled>
+        <button class="send" id="aiSend" aria-label="送信" disabled>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="history">
+        <h4>変更履歴</h4>
+        <div id="historyList"></div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- state ----
+  var currentFileName = null;
+  var fileHandle = null;
+  var history = [];      // full HTML strings (with doctype)
+  var historyLog = [];   // {time,label} parallel to history
+  var historyIndex = -1;
+  var viewMode = "preview"; // "preview" | "code"
+  var activeSectionId = null;
+  var zoomPct = 100;
+  var pushTimer = null;
+
+  var el = {
+    filename: document.getElementById("filename"),
+    dirtyDot: document.getElementById("dirtyDot"),
+    dirtyHint: document.getElementById("dirtyHint"),
+    btnUndo: document.getElementById("btnUndo"),
+    btnRedo: document.getElementById("btnRedo"),
+    viewSeg: document.getElementById("viewSeg"),
+    btnOpen: document.getElementById("btnOpen"),
+    btnOpen2: document.getElementById("btnOpen2"),
+    btnSave: document.getElementById("btnSave"),
+    fileInput: document.getElementById("fileInput"),
+    outline: document.getElementById("outline"),
+    outlineList: document.getElementById("outlineList"),
+    toolbar: document.getElementById("toolbar"),
+    breadcrumb: document.getElementById("breadcrumb"),
+    zoomIn: document.getElementById("zoomIn"),
+    zoomOut: document.getElementById("zoomOut"),
+    zoomLabel: document.getElementById("zoomLabel"),
+    stage: document.getElementById("stage"),
+    emptyState: document.getElementById("emptyState"),
+    dropZone: document.getElementById("dropZone"),
+    preview: document.getElementById("preview"),
+    codewrap: document.getElementById("codewrap"),
+    codeArea: document.getElementById("codeArea"),
+    btnApplyCode: document.getElementById("btnApplyCode"),
+    aside: document.getElementById("aside"),
+    tabs: document.querySelectorAll(".tabs .tab"),
+    panelProps: document.getElementById("panelProps"),
+    panelAI: document.getElementById("panelAI"),
+    scopeSelect: document.getElementById("scopeSelect"),
+    chat: document.getElementById("chat"),
+    apiKeyInput: document.getElementById("apiKeyInput"),
+    aiInput: document.getElementById("aiInput"),
+    aiSend: document.getElementById("aiSend"),
+    historyList: document.getElementById("historyList")
+  };
+
+  el.apiKeyInput.value = localStorage.getItem("aiedit_api_key") || "";
+  el.apiKeyInput.addEventListener("change", function(){
+    localStorage.setItem("aiedit_api_key", el.apiKeyInput.value);
+  });
+
+  // ---- file open ----
+  async function openFile(){
+    if (window.showOpenFilePicker) {
+      try {
+        var handles = await window.showOpenFilePicker({
+          types: [{ description: "HTML", accept: { "text/html": [".html", ".htm"] } }]
+        });
+        fileHandle = handles[0];
+        var file = await fileHandle.getFile();
+        loadHTMLText(await file.text(), file.name);
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+        // fall through to plain input
+      }
+    }
+    el.fileInput.click();
+  }
+  el.btnOpen.addEventListener("click", openFile);
+  el.btnOpen2.addEventListener("click", openFile);
+  el.fileInput.addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    fileHandle = null;
+    var reader = new FileReader();
+    reader.onload = function(){ loadHTMLText(reader.result, file.name); };
+    reader.readAsText(file);
+  });
+
+  ["dragover","dragenter"].forEach(function(ev){
+    window.addEventListener(ev, function(e){ e.preventDefault(); el.dropZone.classList.add("over"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    window.addEventListener(ev, function(e){ el.dropZone.classList.remove("over"); });
+  });
+  window.addEventListener("drop", function(e){
+    e.preventDefault();
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    fileHandle = null;
+    var reader = new FileReader();
+    reader.onload = function(){ loadHTMLText(reader.result, f.name); };
+    reader.readAsText(f);
+  });
+
+  function loadHTMLText(text, filename){
+    currentFileName = filename;
+    history = [text];
+    historyLog = [{ time: now(), label: "初期読み込み" }];
+    historyIndex = 0;
+    el.filename.textContent = filename;
+    el.emptyState.style.display = "none";
+    el.outline.style.display = "block";
+    el.toolbar.style.display = "flex";
+    el.aside.style.display = "flex";
+    el.btnSave.disabled = false;
+    el.aiInput.disabled = false;
+    el.aiSend.disabled = false;
+    setViewMode("preview");
+    renderPreview(text);
+    updateHistoryButtons();
+    renderHistoryList();
+    setDirty(false);
+  }
+
+  function now(){
+    var d = new Date();
+    function p(n){ return (n<10?"0":"")+n; }
+    return p(d.getHours())+":"+p(d.getMinutes());
+  }
+
+  // ---- preview rendering ----
+  el.preview.addEventListener("load", onPreviewLoad);
+
+  function renderPreview(html){
+    el.preview.srcdoc = html;
+  }
+
+  function onPreviewLoad(){
+    var doc = el.preview.contentDocument;
+    if (!doc || !doc.body) return;
+
+    var style = doc.createElement("style");
+    style.textContent =
+      "[contenteditable=\"false\"]{outline:1.5px dashed #b3402f !important; outline-offset:2px; cursor:default !important;}" +
+      "body[contenteditable] *:hover{outline:1px dashed #2f7fd1; outline-offset:1px;}";
+    doc.head.appendChild(style);
+
+    var protect = doc.body.querySelectorAll("input,select,textarea,button");
+    protect.forEach(function(elm){
+      elm.setAttribute("contenteditable", "false");
+      elm.title = "フォーム/操作要素のため直接編集できません";
+    });
+
+    doc.designMode = "on";
+    doc.body.setAttribute("contenteditable", "true");
+    doc.body.addEventListener("input", scheduleHistoryPush);
+    doc.body.addEventListener("click", function(e){
+      var sec = e.target.closest ? e.target.closest("section[id]") : null;
+      if (sec) setActiveSection(sec.id);
+    });
+
+    buildOutline(doc);
+    if (viewMode === "code") {
+      // keep code view in sync if we were mid-switch
+    }
+  }
+
+  function scheduleHistoryPush(){
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function(){
+      pushHistory(getFullHTMLFromPreview(), "本文を編集（手動）");
+    }, 1200);
+  }
+
+  function getFullHTMLFromPreview(){
+    var doc = el.preview.contentDocument;
+    return "<!doctype html>\n" + doc.documentElement.outerHTML;
+  }
+
+  // ---- outline ----
+  function buildOutline(doc){
+    var sections = doc.querySelectorAll("section[id]");
+    el.outlineList.innerHTML = "";
+    el.scopeSelect.innerHTML = '<option value="doc">ドキュメント全体</option>';
+    if (sections.length === 0) return;
+    sections.forEach(function(sec, i){
+      var heading = sec.querySelector("h1,h2,h3");
+      var label = heading ? heading.textContent.trim() : ("セクション " + (i + 1));
+      var hasProtected = sec.querySelector("input,select,textarea,button") !== null;
+
+      var btn = document.createElement("button");
+      btn.className = "nav-item";
+      btn.dataset.id = sec.id;
+      btn.innerHTML = "<span>" + escapeHTML(label) + "</span>" + (hasProtected ? '<span class="chip">保護</span>' : "");
+      btn.addEventListener("click", function(){ scrollToSection(sec.id); });
+      el.outlineList.appendChild(btn);
+
+      var opt = document.createElement("option");
+      opt.value = sec.id;
+      opt.textContent = label;
+      el.scopeSelect.appendChild(opt);
+    });
+  }
+
+  function escapeHTML(s){
+    return s.replace(/[&<>"']/g, function(c){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  function scrollToSection(id){
+    setActiveSection(id);
+    var doc = el.preview.contentDocument;
+    var target = doc && doc.getElementById(id);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.scopeSelect.value = id;
+  }
+
+  function setActiveSection(id){
+    activeSectionId = id;
+    var items = el.outlineList.querySelectorAll(".nav-item");
+    items.forEach(function(btn){ btn.classList.toggle("active", btn.dataset.id === id); });
+    var label = "ドキュメント全体";
+    var opt = el.scopeSelect.querySelector('option[value="' + cssEsc(id) + '"]');
+    if (opt) label = opt.textContent;
+    el.breadcrumb.textContent = label;
+    if (el.scopeSelect.value !== "doc" || activeSectionId) {
+      // leave scope select as-is unless user changes it; breadcrumb always follows click
+    }
+  }
+  function cssEsc(s){ return String(s).replace(/"/g, '\\"'); }
+
+  // ---- view mode (preview / code) ----
+  el.viewSeg.addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-mode]");
+    if (!btn) return;
+    setViewMode(btn.dataset.mode);
+  });
+
+  function setViewMode(mode){
+    viewMode = mode;
+    el.viewSeg.querySelectorAll("button").forEach(function(b){
+      b.classList.toggle("on", b.dataset.mode === mode);
+    });
+    if (mode === "code") {
+      el.codeArea.value = getFullHTMLFromPreview();
+      el.preview.style.display = "none";
+      el.codewrap.style.display = "flex";
+    } else {
+      applyCodeIfChanged();
+      el.codewrap.style.display = "none";
+      el.preview.style.display = "block";
+    }
+  }
+
+  function applyCodeIfChanged(){
+    var text = el.codeArea.value;
+    if (text && text !== getFullHTMLFromPreview()) {
+      renderPreview(text);
+      pushHistory(text, "コードを反映");
+    }
+  }
+  el.btnApplyCode.addEventListener("click", applyCodeIfChanged);
+
+  // ---- zoom (visual scale of the preview) ----
+  el.zoomIn.addEventListener("click", function(){ setZoom(zoomPct + 10); });
+  el.zoomOut.addEventListener("click", function(){ setZoom(zoomPct - 10); });
+  function setZoom(pct){
+    zoomPct = Math.max(50, Math.min(150, pct));
+    el.zoomLabel.textContent = zoomPct + "%";
+    el.preview.style.transform = "scale(" + (zoomPct/100) + ")";
+    el.preview.style.transformOrigin = "top left";
+    el.preview.style.width = (10000/zoomPct) + "%";
+    el.preview.style.height = (10000/zoomPct) + "%";
+  }
+
+  // ---- history / undo-redo ----
+  function pushHistory(text, label){
+    if (historyIndex >= 0 && text === history[historyIndex]) return;
+    history = history.slice(0, historyIndex + 1);
+    historyLog = historyLog.slice(0, historyIndex + 1);
+    history.push(text);
+    historyLog.push({ time: now(), label: label });
+    if (history.length > 50) { history.shift(); historyLog.shift(); } else { historyIndex++; }
+    if (historyIndex >= history.length) historyIndex = history.length - 1;
+    updateHistoryButtons();
+    renderHistoryList();
+    setDirty(historyIndex > 0);
+  }
+
+  function goToHistory(i){
+    if (i < 0 || i >= history.length) return;
+    historyIndex = i;
+    var text = history[historyIndex];
+    if (viewMode === "code") { el.codeArea.value = text; }
+    renderPreview(text);
+    updateHistoryButtons();
+    renderHistoryList();
+    setDirty(historyIndex > 0);
+  }
+
+  el.btnUndo.addEventListener("click", function(){ goToHistory(historyIndex - 1); });
+  el.btnRedo.addEventListener("click", function(){ goToHistory(historyIndex + 1); });
+
+  function updateHistoryButtons(){
+    el.btnUndo.disabled = historyIndex <= 0;
+    el.btnRedo.disabled = historyIndex >= history.length - 1;
+  }
+
+  function renderHistoryList(){
+    el.historyList.innerHTML = "";
+    for (var i = historyLog.length - 1; i >= 0; i--) {
+      (function(i){
+        var row = document.createElement("button");
+        row.className = "hitem" + (i === historyIndex ? " cur" : "");
+        row.innerHTML = '<span class="b"></span>' + historyLog[i].time + "　" + escapeHTML(historyLog[i].label);
+        row.addEventListener("click", function(){ goToHistory(i); });
+        el.historyList.appendChild(row);
+      })(i);
+    }
+  }
+
+  function setDirty(isDirty){
+    el.dirtyDot.className = "dot " + (isDirty ? "dirty" : "clean");
+    el.dirtyHint.textContent = isDirty ? "未保存の変更があります" : "";
+  }
+
+  // ---- save ----
+  el.btnSave.addEventListener("click", async function(){
+    if (viewMode === "code") applyCodeIfChanged();
+    var text = getFullHTMLFromPreview();
+    if (fileHandle) {
+      try {
+        var writable = await fileHandle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        setDirty(false);
+        return;
+      } catch (e) {
+        // fall through to download
+      }
+    }
+    downloadHTML(text, currentFileName || "edited.html");
+    setDirty(false);
+  });
+
+  function downloadHTML(text, filename){
+    var blob = new Blob([text], { type: "text/html" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // ---- right panel tabs ----
+  document.querySelectorAll(".tabs .tab").forEach(function(tab){
+    tab.addEventListener("click", function(){
+      document.querySelectorAll(".tabs .tab").forEach(function(t){ t.classList.remove("on"); });
+      tab.classList.add("on");
+      var isAI = tab.dataset.tab === "ai";
+      el.panelAI.style.display = isAI ? "flex" : "none";
+      el.panelProps.style.display = isAI ? "none" : "block";
+    });
+  });
+
+  // ---- AI assistant ----
+  function addMsg(role, html){
+    var div = document.createElement("div");
+    div.className = "msg " + role;
+    div.innerHTML = html;
+    el.chat.appendChild(div);
+    el.chat.scrollTop = el.chat.scrollHeight;
+    return div;
+  }
+
+  el.aiSend.addEventListener("click", sendAI);
+  el.aiInput.addEventListener("keydown", function(e){
+    if (e.key === "Enter") sendAI();
+  });
+
+  async function sendAI(){
+    var instruction = el.aiInput.value.trim();
+    if (!instruction) return;
+    var apiKey = el.apiKeyInput.value.trim();
+    addMsg("user", escapeHTML(instruction));
+    el.aiInput.value = "";
+
+    if (!apiKey) {
+      addMsg("error", "APIキーが未設定です。上のAPIキー欄に入力してください。");
+      return;
+    }
+
+    var scope = el.scopeSelect.value;
+    var doc = el.preview.contentDocument;
+    var targetEl = scope !== "doc" ? doc.getElementById(scope) : null;
+    var fragment = targetEl ? targetEl.outerHTML : ("<!doctype html>\n" + doc.documentElement.outerHTML);
+
+    var prompt =
+      "あなたはHTML編集アシスタントです。以下のHTMLの一部を、指示にしたがって書き換えてください。" +
+      "出力は書き換え後のHTMLそのものだけを返し、説明文や```のようなコードフェンスは一切含めないでください。\n\n" +
+      "---対象HTML---\n" + fragment + "\n\n---指示---\n" + instruction;
+
+    var thinking = addMsg("assistant", "考えています…");
+
+    try {
+      var res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!res.ok) {
+        var errText = await res.text();
+        throw new Error("APIエラー (" + res.status + ") " + errText.slice(0, 200));
+      }
+      var data = await res.json();
+      var textOut = (data.content || [])
+        .filter(function(b){ return b.type === "text"; })
+        .map(function(b){ return b.text; })
+        .join("\n")
+        .trim();
+      textOut = textOut.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+
+      if (!textOut) throw new Error("応答からHTMLを取得できませんでした。");
+
+      if (targetEl) {
+        var newEl = doc.createElement("div");
+        newEl.innerHTML = textOut;
+        if (newEl.firstElementChild) {
+          targetEl.replaceWith(newEl.firstElementChild);
+        } else {
+          targetEl.outerHTML = textOut;
+        }
+        pushHistory(getFullHTMLFromPreview(), "AI編集");
+        buildOutline(el.preview.contentDocument);
+      } else {
+        renderPreview(textOut);
+        pushHistory(textOut, "AI編集（全体）");
+      }
+
+      thinking.remove();
+      var ok = addMsg("assistant", "書き換えました。プレビューでご確認ください。");
+      var undoBtn = document.createElement("button");
+      undoBtn.className = "undo-link";
+      undoBtn.textContent = "この変更を取り消す";
+      undoBtn.addEventListener("click", function(){ goToHistory(historyIndex - 1); });
+      ok.appendChild(undoBtn);
+
+    } catch (err) {
+      thinking.remove();
+      addMsg("error", "エラー: " + escapeHTML(err.message || String(err)) +
+        "（ブラウザのCORS制限や、ネットワーク環境によって直接呼び出しがブロックされている可能性があります）");
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
