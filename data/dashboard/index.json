@@ -1,20 +1,17 @@
 {
   "config": {
     "title": "ダッシュボード",
-    "cardMin": 140,
+    "theme": "light",
+    "cardMin": 160,
     "thumbH": 170,
     "gap": 14,
     "radius": 14,
+    "borderW": 1,
     "fade": 350,
     "indexFile": "index.json",
+    "tabs": [],
     "indexPath": "index.json",
-    "monitorInterval": 3,
-    "tabs": [
-      {
-        "id": "custom",
-        "label": "カスタマイズ"
-      }
-    ],
+    "monitorInterval": 5,
     "monitors": [
       {
         "id": "kaggle-gemma",
@@ -29,17 +26,190 @@
         "endpoint": "https://script.google.com/macros/s/AKfycbxZcx2lumJFU_Eu-CMzY-btxGkOaknS--7F6S_Qo8iMnChrg7KA04z-Q-ZgsuXgc2-Q/exec"
       },
       {
+        "id": "clipgen1",
+        "name": "文字起こし中",
+        "type": "clipgen",
+        "group": "AI",
+        "total": 50,
+        "space": "all",
+        "chart": "bar",
+        "showRun": false,
+        "showSpace": false,
+        "includePartial": false,
+        "statuses": [
+          "処理中",
+          "完了",
+          "要約済み",
+          "除外"
+        ],
+        "statusMatch": "notIn"
+      },
+      {
+        "id": "clipgen2",
+        "name": "AI生成待ち",
+        "type": "clipgen",
+        "group": "AI",
+        "total": 30,
+        "space": "all",
+        "statuses": [
+          "処理中",
+          "完了"
+        ],
+        "updatedAt": "2026-09-23T07:16:29.496Z",
+        "chart": "bar"
+      },
+      {
+        "id": "today",
+        "name": "予定",
+        "type": "schedule",
+        "max": 10,
+        "accounts": [
+          {
+            "id": "home",
+            "label": "日本ビジネスアシスト",
+            "provider": "outlook",
+            "clientId": "533a210b-a27d-4734-bd4c-30c245930e1e",
+            "tenant": "common",
+            "color": "#4FD1C5"
+          },
+          {
+            "id": "plan",
+            "label": "ライターム",
+            "provider": "json",
+            "url": "https://ymatsuda-cmyk.github.io/tools/data/schedule/schedule_rtm.json",
+            "color": "#F5B94C"
+          }
+        ],
+        "cardSize": "wide"
+      },
+      {
+        "id": "inbox",
+        "name": "メール",
+        "type": "mail",
+        "max": 10,
+        "maxAgeDays": 7,
+        "accounts": [
+          {
+            "id": "work",
+            "label": "日本ビジネスアシスト",
+            "provider": "outlook",
+            "clientId": "533a210b-a27d-4734-bd4c-30c245930e1e",
+            "tenant": "common",
+            "color": "#4FD1C5"
+          },
+          {
+            "id": "work2",
+            "label": "ライターム",
+            "provider": "json",
+            "url": "https://ymatsuda-cmyk.github.io/tools/data/mail/mail_rtm.json",
+            "color": "#F5B94C"
+          }
+        ],
+        "cardSize": "wide"
+      },
+      {
         "id": "kaggle-qwen38",
         "name": "qwen3.8 27b",
         "type": "kaggle",
         "endpoint": "https://script.google.com/macros/s/AKfycbz08SCS4i23ENcrXiqEBhU7apJh6PkcKvIs9IOqUZVQfjaMXc7rfRwd2GyqK4aMQhM/exec"
       },
       {
-        "id": "copilot",
-        "name": "GitHub Copilot",
-        "group": "AI",
-        "type": "copilot",
-        "monthlyLimit": 300
+        "id": "gijiroku",
+        "name": "議事録",
+        "type": "minutes",
+        "max": 5,
+        "roles": [
+          "jba",
+          "kijun"
+        ],
+        "cardSize": "wide",
+        "updatedAt": "2026-09-18T09:23:33.583Z",
+        "gasUrl": "https://script.google.com/macros/s/AKfycbzBXdHnc4tUu2FaovalgGolrYnjWKPNNRrFA7kwZiygLY_pf5vxPzDQtA4ETOrnB6xc/exec",
+        "token": "Abcdefghijklmn"
+      },
+      {
+        "id": "trash1",
+        "name": "代々木",
+        "type": "rule",
+        "lead": 1,
+        "rules": [
+          {
+            "label": "可燃ごみ",
+            "color": "#D9694F",
+            "days": [
+              2,
+              5
+            ]
+          },
+          {
+            "label": "資源ごみ",
+            "color": "#4F7FD9",
+            "days": [
+              3
+            ]
+          },
+          {
+            "label": "不燃ごみ",
+            "color": "#8A857C",
+            "days": [
+              4
+            ],
+            "weeks": [
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "id": "trash2",
+        "name": "柏市",
+        "type": "rule",
+        "lead": 1,
+        "rules": [
+          {
+            "label": "可燃ごみ",
+            "color": "#D9694F",
+            "days": [
+              1,
+              4
+            ]
+          },
+          {
+            "label": "容器プラ",
+            "color": "#4F7FD9",
+            "days": [
+              3
+            ]
+          },
+          {
+            "label": "不燃ごみ",
+            "color": "#8A857C",
+            "days": [
+              1
+            ],
+            "weeks": [
+              1,
+              3
+            ]
+          },
+          {
+            "label": "資源ごみ",
+            "color": "#5FA8A0",
+            "days": [
+              3
+            ],
+            "weeks": [
+              1,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "id": "fx",
+        "name": "ドル円",
+        "type": "fx",
+        "endpoint": "https://script.google.com/macros/s/AKfycbxH4pglsocIbAU8xLsYZRxXr3HdZgD1PxaUAiONJgezAUQcAe9p_bsB4XMp0cpfYVruMg/exec"
       },
       {
         "id": "usd-150",
@@ -50,47 +220,31 @@
         "amount": 1000000
       },
       {
-        "id": "fx",
-        "name": "ドル円",
-        "type": "fx",
-        "endpoint": "https://script.google.com/macros/s/AKfycbxH4pglsocIbAU8xLsYZRxXr3HdZgD1PxaUAiONJgezAUQcAe9p_bsB4XMp0cpfYVruMg/exec"
-      },
-      {
-        "id": "あ",
-        "name": "ああ",
-        "type": "manual",
-        "limit": 100,
-        "unit": "回",
-        "cycle": "daily"
-      },
-      {
-        "id": "trash",
-        "name": "ゴミ出し",
-        "type": "rule",
-        "lead": 1,
-        "leadLabel": "今夜出す",
-        "noneLabel": "出すものなし",
-        "rules": [
-          { "label": "可燃ごみ", "color": "#D9694F", "days": [1, 4] },
-          { "label": "容器プラ", "color": "#4F7FD9", "days": [3] },
-          { "label": "不燃ごみ", "color": "#8A857C", "days": [1], "weeks": [1, 3] },
-          { "label": "資源ごみ", "color": "#5FA8A0", "days": [3], "weeks": [1, 3] }
-        ]
-      },
-      {
-        "id": "clipgen",
-        "name": "clipstock 生成",
-        "type": "clipgen"
-      },
-      {
         "id": "calc",
-        "name": "電卓",
+        "name": "売上状況",
         "type": "calc",
-        "lines": 3,
+        "lines": 5,
         "rows": [
-          { "label": "単価", "expr": "1200" },
-          { "label": "個数", "expr": "3" },
-          { "label": "税込", "expr": "単価*個数*1.1" }
+          {
+            "label": "単価",
+            "expr": "5145*170"
+          },
+          {
+            "label": "個数",
+            "expr": "3"
+          },
+          {
+            "label": "税込",
+            "expr": "個数+単価*個数*1.1"
+          },
+          {
+            "label": "aaaa",
+            "expr": "税込*個数"
+          },
+          {
+            "label": "cccc",
+            "expr": ""
+          }
         ]
       }
     ]
@@ -106,7 +260,8 @@
       "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/minutes.jpeg",
       "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/minutes.mp4",
       "type": "site",
-      "category_icon": null
+      "category_icon": null,
+      "updatedAt": "2026-09-23T14:55:13.687Z"
     },
     {
       "id": "r1788345489159",
@@ -118,7 +273,8 @@
       "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/stepcount.jpeg",
       "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/stepcount.mp4",
       "type": "excel",
-      "category_icon": null
+      "category_icon": null,
+      "updatedAt": "2026-09-23T14:55:20.477Z"
     },
     {
       "id": "r1788399742990",
@@ -130,7 +286,8 @@
       "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/clipstock.jpeg",
       "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/clipstock.mp4",
       "type": "site",
-      "category_icon": "db"
+      "category_icon": "db",
+      "updatedAt": "2026-09-23T14:55:30.625Z"
     },
     {
       "id": "r1789220151513",
@@ -142,7 +299,8 @@
       "cardSize": "normal",
       "thumb": null,
       "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/chat.mp4",
-      "type": "site"
+      "type": "site",
+      "updatedAt": "2026-09-23T14:55:35.077Z"
     },
     {
       "id": "r1788345036894",
@@ -154,19 +312,20 @@
       "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/kanban.jpeg",
       "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/kanban.mp4",
       "type": "excel",
-      "category_icon": null
+      "category_icon": null,
+      "updatedAt": "2026-09-23T14:55:41.299Z"
     },
     {
-      "id": "r1788346024009",
-      "title": "Google Apps Script",
-      "url": "https://script.google.com/home",
-      "category": "コード",
+      "id": "r1789231189723",
+      "title": "研修",
+      "url": "https://ymatsuda-cmyk.github.io/tools/beta/contentsstock/",
+      "category": "ログ",
+      "category_icon": null,
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://pala-ghe.com/wp/wp-content/uploads/2021/11/gas-1.png",
+      "thumb": null,
       "preview": null,
-      "type": "site",
-      "category_icon": "code"
+      "type": "site"
     },
     {
       "id": "r1789131743286",
@@ -177,18 +336,6 @@
       "runType": "web",
       "cardSize": "normal",
       "thumb": "https://cdn.textstudio.com/output/graphic/preview/large/0/6/9/9/9960_a863ac94.webp",
-      "preview": null,
-      "type": "site"
-    },
-    {
-      "id": "r1789222460036",
-      "title": "Notion（動画）",
-      "url": "https://app.notion.com/p/3630e7a535dc8154ac62d41f7611540f?v=3630e7a535dc810b9291000c7d4303a5&source=copy_link",
-      "category": "ＤＢ",
-      "category_icon": null,
-      "runType": "web",
-      "cardSize": "normal",
-      "thumb": "https://assets.st-note.com/production/uploads/images/217412971/rectangle_large_type_2_a9082a209b09a1fd25d90cd1cef4a55a.png?width=1200",
       "preview": null,
       "type": "site"
     },
@@ -205,6 +352,30 @@
       "category_icon": null
     },
     {
+      "id": "r1789222460036",
+      "title": "Notion（動画）",
+      "url": "https://app.notion.com/p/3630e7a535dc8154ac62d41f7611540f?v=3630e7a535dc810b9291000c7d4303a5&source=copy_link",
+      "category": "ＤＢ",
+      "category_icon": null,
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://assets.st-note.com/production/uploads/images/217412971/rectangle_large_type_2_a9082a209b09a1fd25d90cd1cef4a55a.png?width=1200",
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1788346024009",
+      "title": "Google Apps Script",
+      "url": "https://script.google.com/home",
+      "category": "コード",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://pala-ghe.com/wp/wp-content/uploads/2021/11/gas-1.png",
+      "preview": null,
+      "type": "site",
+      "category_icon": "code"
+    },
+    {
       "id": "r1789143837780",
       "title": "Google AI Studio",
       "url": "https://aistudio.google.com/prompts/new_chat?project=gen-lang-client-0273484198",
@@ -214,7 +385,8 @@
       "cardSize": "normal",
       "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/AIStudio.jpeg",
       "preview": null,
-      "type": "site"
+      "type": "site",
+      "updatedAt": "2026-09-23T14:55:51.489Z"
     },
     {
       "id": "r1789217058974",
@@ -251,6 +423,19 @@
       "thumb": "https://storage.googleapis.com/gweb-uniblog-publish-prod/original_images/logo3.png",
       "preview": null,
       "type": "site"
+    },
+    {
+      "id": "r1789643297779",
+      "title": "Microsoft  Azure",
+      "url": "https://portal.azure.com/#home",
+      "category": "コード",
+      "category_icon": null,
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://fiverr-res.cloudinary.com/images/t_main1,q_auto,f_auto,q_auto,f_auto/gigs/291846808/original/1920f4649555ff9a2f9893f85b16e612a6729302/do-azure-autoscale-virtual-machine-azure-bastion-load-balancer-dns-waf-etc.png",
+      "preview": null,
+      "type": "site",
+      "updatedAt": "2026-09-17T11:08:35.453Z"
     },
     {
       "id": "r1789222579664",
@@ -337,6 +522,18 @@
       "type": "site"
     },
     {
+      "id": "r1789225062820",
+      "title": "Notion（コンテンツ）",
+      "url": "https://app.notion.com/p/d600e7a535dc83caadf381afe7abea03?v=08d0e7a535dc83d392a4089b8a73826c&source=copy_link",
+      "category": "ＤＢ",
+      "category_icon": null,
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://assets.st-note.com/production/uploads/images/217412971/rectangle_large_type_2_a9082a209b09a1fd25d90cd1cef4a55a.png?width=1200",
+      "preview": null,
+      "type": "site"
+    },
+    {
       "id": "r1789120111669",
       "title": "EDINET",
       "url": "https://disclosure2.edinet-fsa.go.jp/WEEK0010.aspx",
@@ -345,18 +542,6 @@
       "runType": "web",
       "cardSize": "normal",
       "thumb": "https://www.ovhcloud.com/sites/default/files/styles/desktop_full_width/public/2020-06/EDINET-case-study-header-web.jpg",
-      "preview": null,
-      "type": "site"
-    },
-    {
-      "id": "r1789220933753",
-      "title": "Plaud web",
-      "url": "https://web.plaud.ai/file-list?categoryId=allFiles",
-      "category": "ＤＢ",
-      "category_icon": "ai",
-      "runType": "web",
-      "cardSize": "normal",
-      "thumb": "https://cdn.shopify.com/s/files/1/0618/0755/8812/files/custom-summary-templates-img06-648-540x.jpg?v=1735802266",
       "preview": null,
       "type": "site"
     },
@@ -373,26 +558,14 @@
       "type": "site"
     },
     {
-      "id": "r1789225062820",
-      "title": "Notion（コンテンツ）",
-      "url": "https://app.notion.com/p/d600e7a535dc83caadf381afe7abea03?v=08d0e7a535dc83d392a4089b8a73826c&source=copy_link",
+      "id": "r1789220933753",
+      "title": "Plaud web",
+      "url": "https://web.plaud.ai/file-list?categoryId=allFiles",
       "category": "ＤＢ",
-      "category_icon": null,
+      "category_icon": "ai",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://assets.st-note.com/production/uploads/images/217412971/rectangle_large_type_2_a9082a209b09a1fd25d90cd1cef4a55a.png?width=1200",
-      "preview": null,
-      "type": "site"
-    },
-    {
-      "id": "r1789231189723",
-      "title": "コンテンツ",
-      "url": "https://ymatsuda-cmyk.github.io/tools/beta/contentsstock/",
-      "category": "ログ",
-      "category_icon": null,
-      "runType": "web",
-      "cardSize": "normal",
-      "thumb": null,
+      "thumb": "https://cdn.shopify.com/s/files/1/0618/0755/8812/files/custom-summary-templates-img06-648-540x.jpg?v=1735802266",
       "preview": null,
       "type": "site"
     },
@@ -407,6 +580,44 @@
       "thumb": null,
       "preview": null,
       "type": "site"
+    },
+    {
+      "id": "r1789384180223",
+      "title": "音楽",
+      "url": "https://ymatsuda-cmyk.github.io/tools/beta/player/",
+      "category": "",
+      "category_icon": null,
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site"
+    },
+    {
+      "id": "r1789643896830",
+      "title": "Power Automate",
+      "url": "https://make.powerautomate.com/",
+      "category": "コード",
+      "category_icon": null,
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": "https://cdn.techjockey.com/web/assets/images/techjockey/products/16041_microsoftpowerautomatelogo.jpg",
+      "preview": null,
+      "type": "site",
+      "updatedAt": "2026-09-17T11:18:55.949Z"
+    },
+    {
+      "id": "r1790049090937",
+      "title": "html編集",
+      "url": "https://ymatsuda-cmyk.github.io/tools/utility/html-editor.html",
+      "category": "その他",
+      "category_icon": "doc",
+      "runType": "web",
+      "cardSize": "normal",
+      "thumb": null,
+      "preview": null,
+      "type": "site",
+      "updatedAt": "2026-09-22T03:52:08.316Z"
     }
   ]
 }
