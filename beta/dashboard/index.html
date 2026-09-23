@@ -2747,8 +2747,8 @@ function clipgenBars(m, st){
   if(!rows.length) return '';
 
   const max = Math.max(1, ...rows.map(r => r.value));
-  const hit = st.count ? clipgenMatched(m, st.count.counts) : 0;
-  const head = `${clipgenRingLabel(m)}（${st.count ? st.count.label : ''} ${hit}件）`;
+  const sum = rows.reduce((acc, r) => acc + r.value, 0);
+  const head = `${clipgenRingLabel(m)}（合計 ${sum}件）`;
   return `
     <div class="gen-bars">
       <div class="sub">${esc(head)}</div>
