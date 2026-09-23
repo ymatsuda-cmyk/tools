@@ -563,29 +563,30 @@ function clipgenIdleRing(m, st){
     </div>`;
 }
 
-/** 棒グラフの中身。分類ごとに1本ずつ並べる */
+/** 棒グラフの中身。パターンごとに1本ずつ並べる(総覧の「すべて」は個別を全部含むので外す) */
 function clipgenBarRows(m, st){
-  const groups = (st.count && st.count.groups) || [];
-  return groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }));
+  if(!st.all) return [];
+  return st.all.spaces
+    .filter(s => s.id !== st.all.defaultSpaceId)
+    .map(s => ({ label:s.label, value:clipgenMatched(m, s.counts), total:s.total }));
 }
 
-/** 棒の長さは一番多いもの基準、色はその分類の中での溜まり具合で決める */
+/** 棒の長さは一番多いもの基準、色はそのパターンの中での溜まり具合で決める */
 function clipgenBars(m, st){
-  if(!st.count) return '';
-  const label = clipgenRingLabel(m);
-  const shown = clipgenBarRows(m, st).filter(r => r.value > 0);
-  if(!shown.length){
-    return `<div class="gen-bars"><div class="sub">${esc(label)}</div><div class="mon-note">0件</div></div>`;
-  }
-  const max = Math.max(...shown.map(r => r.value));
-  const sum = shown.reduce((acc, r) => acc + r.value, 0);
+  if(!st.all) return '';
+  const rows = clipgenBarRows(m, st);
+  if(!rows.length) return `<div class="gen-bars"><div class="sub">${esc(clipgenRingLabel(m))}</div><div class="mon-note">0件</div></div>`;
+
+  const max = Math.max(1, ...rows.map(r => r.value));
+  const hit = st.count ? clipgenMatched(m, st.count.counts) : 0;
+  const head = `${clipgenRingLabel(m)}（${st.count ? st.count.label : ''} ${hit}件）`;
   return `
     <div class="gen-bars">
-      <div class="sub">${esc(label)}(合計 ${sum}件)</div>
-      ${shown.map(r => `
+      <div class="sub">${esc(head)}</div>
+      ${rows.map(r => `
         <div class="gen-bar">
           <span class="gen-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
-          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${Math.max(3, (r.value / max) * 100)}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
+          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${r.value ? Math.max(3, (r.value / max) * 100) : 0}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
           <span class="gen-bar-value">${r.value}</span>
         </div>`).join('')}
     </div>`;
@@ -936,10 +937,12 @@ function renderRuleCard(m, baseDate){
    ============================================================ */
 
 const SPACES = [
-  { id:'all',   label:'すべて', categories:['未分類', 'other', 'music', 'golf'] },
-  { id:'video', label:'動画',   categories:['未分類', 'other', 'music', 'golf'] },
-  { id:'web',   label:'Web記事', categories:['未分類', 'other', 'golf'] },
-  { id:'music', label:'music', categories:['music'] }
+  { id:'all',   label:'すべて', weight:1 },
+  { id:'video', label:'動画',   weight:0.8 },
+  { id:'web',   label:'Web記事', weight:0.2 },
+  { id:'other', label:'other',  weight:0 },
+  { id:'music', label:'music',  weight:0.18 },
+  { id:'golf',  label:'golf',   weight:0 }
 ];
 
 const MODELS = [
@@ -950,20 +953,18 @@ const MODELS = [
 /* clipstock の状態。実物では Notion の「状態」プロパティの値 */
 const STATUSES = ['新規', '再取得', '処理中', '完了', '要約済み', '除外'];
 
-/** 分類別の棒グラフを確かめられるよう、ダミー件数を分類に振り分ける */
-function sampleGroups(spaceId, counts){
-  const categories = (SPACES.find(s => s.id === spaceId) || {}).categories;
-  if(!categories) return [];
-  const weights = [0.4, 0.3, 0.2, 0.1];
-  return categories.map((label, i) => {
+/** パターン別の棒グラフを確かめられるよう、ダミー件数をパターンに振り分ける */
+function sampleSpaces(counts){
+  return SPACES.map(s=>{
     const share = {};
     let total = 0;
     Object.entries(counts).forEach(([status, n])=>{
-      const v = Math.round(n * (weights[i] || 0.1));
+      const v = Math.round(n * s.weight);
       share[status] = v;
       total += v;
     });
-    return { category:label, label, counts:share, total, fresh:share['完了'] || 0, partial:0 };
+    return { id:s.id, label:s.label, mode:s.id === 'music' ? 'music' : '',
+      total, counts:share, fresh:share['完了'] || 0, partial:0 };
   });
 }
 
@@ -971,21 +972,21 @@ function sampleGroups(spaceId, counts){
 function sampleState(m, { phase, counts, partial }){
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const spaceId = m.space || SPACES[0].id;
+  const all = { updatedAt:new Date().toISOString(), defaultSpaceId:'all', spaces:sampleSpaces(counts) };
   const st = {
     phase,
     spaces: SPACES,
     models: MODELS,
     spaceId,
     modelKey: m.model || MODELS[0].key,
-    count: {
-      fresh: counts['完了'] || 0, partial, total, counts,
-      groups: sampleGroups(spaceId, counts), source:'counts'
-    },
+    all,
+    count: { ...all.spaces.find(s => s.id === spaceId), total, counts, partial },
     index: 0, total: 0, title:'', stage:'', error:'', result:null, cancel:false
   };
 
   if(phase === 'loading'){
     st.count = null;
+    st.all = null;
     st.spaces = [];
     st.models = [];
   }
@@ -1001,6 +1002,7 @@ function sampleState(m, { phase, counts, partial }){
   if(phase === 'error'){
     st.error = 'clipstock の接続設定が未入力です。clipstock の設定でGASのURLと共有トークンを入れてください';
     st.count = null;
+    st.all = null;
   }
   return st;
 }

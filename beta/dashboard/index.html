@@ -673,9 +673,9 @@
       <label>件数の見せ方</label>
       <select id="mf-clipgen-chart">
         <option value="ring">リング</option>
-        <option value="bar">棒グラフ（分類別）</option>
+        <option value="bar">棒グラフ（パターン別）</option>
       </select>
-      <div class="hint">棒グラフは分類ごとに1本ずつ並べます。分類が空のものは「未分類」にまとめます</div>
+      <div class="hint">棒グラフはパターン（動画・Web記事・other・music・golf…）ごとに1本ずつ並べます。総覧の「すべて」は外れます</div>
     </div>
     <div class="field" data-for="manual">
       <label>単位</label>
@@ -2593,7 +2593,7 @@ function clipgenStateOf(m){
     clipgenState[m.id] = {
       phase:'loading', spaces:[], models:[],
       spaceId:m.space || '', modelKey:m.model || '',
-      index:0, total:0, title:'', stage:'', count:null, result:null, error:'',
+      index:0, total:0, title:'', stage:'', all:null, count:null, result:null, error:'',
       cancel:false, paintedAt:0
     };
     loadClipgenOptions(m);
@@ -2623,26 +2623,26 @@ async function loadClipgenOptions(m, refresh){
   }
 }
 
+/** 取得済みの集計から、いま選んでいるパターンぶんを取り出す */
+function applyClipgenCount(st){
+  const list = (st.all && st.all.spaces) || [];
+  st.count = list.find(s => s.id === st.spaceId) || null;
+}
+
 /**
- * 対象の件数を数える。GASが集計済みの件数だけを読むのでNotionの全件走査は起きない。
+ * 件数を取る。すべてのパターンぶんを1回でまとめて受け取るので、
+ * パターンを切り替えても取り直しは起きない。
  * refresh=true(カードの更新ボタン)のときだけ GAS 側で集計を作り直す。
  */
 async function countClipgen(m, refresh){
   const st = clipgenState[m.id];
-  if(!st.spaceId) return;
   try{
     const api = await clipgenModule();
-    const plan = await api.counts(st.spaceId, { refresh: Boolean(refresh) });
-    st.count = {
-      fresh: plan.fresh,
-      partial: plan.partial,
-      total: plan.total,
-      counts: plan.counts,
-      groups: plan.groups,
-      source: plan.source
-    };
+    st.all = await api.countsAll({ refresh: Boolean(refresh) });
+    applyClipgenCount(st);
     st.error = '';
   }catch(err){
+    st.all = null;
     st.count = null;
     st.error = err.message || String(err);
   }
@@ -2727,29 +2727,30 @@ function clipgenIdleRing(m, st){
     </div>`;
 }
 
-/** 棒グラフの中身。分類ごとに1本ずつ並べる */
+/** 棒グラフの中身。パターンごとに1本ずつ並べる(総覧の「すべて」は個別を全部含むので外す) */
 function clipgenBarRows(m, st){
-  const groups = (st.count && st.count.groups) || [];
-  return groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }));
+  if(!st.all) return [];
+  return st.all.spaces
+    .filter(s => s.id !== st.all.defaultSpaceId)
+    .map(s => ({ label:s.label, value:clipgenMatched(m, s.counts), total:s.total }));
 }
 
-/** 棒の長さは一番多いもの基準、色はその分類の中での溜まり具合で決める */
+/** 棒の長さは一番多いもの基準、色はそのパターンの中での溜まり具合で決める */
 function clipgenBars(m, st){
-  if(!st.count) return '';
-  const label = clipgenRingLabel(m);
-  const shown = clipgenBarRows(m, st).filter(r => r.value > 0);
-  if(!shown.length){
-    return `<div class="gen-bars"><div class="sub">${esc(label)}</div><div class="mon-note">0件</div></div>`;
-  }
-  const max = Math.max(...shown.map(r => r.value));
-  const sum = shown.reduce((acc, r) => acc + r.value, 0);
+  if(!st.all) return '';
+  const rows = clipgenBarRows(m, st);
+  if(!rows.length) return `<div class="gen-bars"><div class="sub">${esc(clipgenRingLabel(m))}</div><div class="mon-note">0件</div></div>`;
+
+  const max = Math.max(1, ...rows.map(r => r.value));
+  const hit = st.count ? clipgenMatched(m, st.count.counts) : 0;
+  const head = `${clipgenRingLabel(m)}（${st.count ? st.count.label : ''} ${hit}件）`;
   return `
     <div class="gen-bars">
-      <div class="sub">${esc(label)}(合計 ${sum}件)</div>
-      ${shown.map(r => `
+      <div class="sub">${esc(head)}</div>
+      ${rows.map(r => `
         <div class="gen-bar">
           <span class="gen-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
-          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${Math.max(3, (r.value / max) * 100)}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
+          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${r.value ? Math.max(3, (r.value / max) * 100) : 0}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
           <span class="gen-bar-value">${r.value}</span>
         </div>`).join('')}
     </div>`;
@@ -2869,11 +2870,11 @@ function wireClipgen(card){
   card.querySelectorAll('[data-clipgen-space]').forEach(sel=>{
     sel.addEventListener('change', ()=>{
       st.spaceId = sel.value;
-      st.count = null;
       st.result = null;
       st.phase = 'idle';
+      // 取得済みの集計から選び直すだけ。GASには問い合わせない
+      applyClipgenCount(st);
       paintClipgen(id);
-      countClipgen(m);
     });
   });
 

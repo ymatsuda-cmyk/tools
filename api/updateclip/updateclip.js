@@ -17,7 +17,7 @@
 import { listVideos, listVideosFromNotion } from '../../beta/clipstock/src/lib/store.js'
 import { fetchTranscript, saveGenerated, statusCounts } from '../../beta/clipstock/src/lib/gas.js'
 import { generateAll, stagesOf } from '../../beta/clipstock/src/lib/generate.js'
-import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../beta/clipstock/src/lib/spaces.js'
+import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf, defaultSpaceId } from '../../beta/clipstock/src/lib/spaces.js'
 import { loadSettings, connectionOf } from '../../beta/clipstock/src/lib/llm-settings.js'
 import { loadConfig, isConfigured } from '../../beta/clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../beta/clipstock/src/lib/filters.js'
@@ -138,9 +138,9 @@ export async function targets(spaceId, { fromNotion = true } = {}) {
 }
 
 /**
- * そのスペースが読む集計のかたまりを選ぶ。
+ * そのパターンが読む集計のかたまりを選ぶ。
  * 分類で絞る取り込み元はその分類ぶんだけ、分類なしの取り込み元は受け皿なので、
- * 同じスペースの他の取り込み元が取る分類を除いた残り全部を見る(store.js の割り当てと同じ規則)。
+ * 同じパターンの他の取り込み元が取る分類を除いた残り全部を見る(store.js の割り当てと同じ規則)。
  */
 function bucketsOf(space, counts) {
   const sources = sourcesOf(space)
@@ -154,70 +154,52 @@ function bucketsOf(space, counts) {
 
   return sources.flatMap((s) => {
     const byCategory = counts[s.db || 'video'] || {}
-    if (s.category) {
-      return byCategory[s.category] ? [{ category: s.category, bucket: byCategory[s.category] }] : []
-    }
+    if (s.category) return byCategory[s.category] ? [byCategory[s.category]] : []
     const taken = claimed.get(s.db || 'video') || new Set()
     return Object.entries(byCategory)
       .filter(([category]) => !taken.has(category))
-      .map(([category, bucket]) => ({ category, bucket }))
+      .map(([, bucket]) => bucket)
   })
 }
 
-/** 分類ごとにまとめる。同じ分類が動画DBとweb記事DBの両方にあれば足し合わせる */
-function groupsOf(picked, mode) {
-  const byCategory = new Map()
-  picked.forEach(({ category, bucket }) => {
-    const key = category || ''
-    if (!byCategory.has(key)) {
-      byCategory.set(key, { category: key, label: key || '未分類', total: 0, counts: {}, fresh: 0, partial: 0 })
-    }
-    const group = byCategory.get(key)
-    group.total += bucket.total || 0
-    group.partial += (bucket.partial && bucket.partial[mode]) || 0
-    Object.entries(bucket.status || {}).forEach(([status, n]) => {
-      group.counts[status] = (group.counts[status] || 0) + n
-    })
-    group.fresh = group.counts[STATUS_DONE] || 0
-  })
-  return [...byCategory.values()].sort((a, b) => b.total - a.total)
-}
-
-/**
- * 件数だけを取る軽い入口。targets() と違って一覧そのものは取らないので、
- * 「何件たまっているか」を出すだけのダッシュボードのカードはこちらを使う。
- * fresh / partial は配列ではなく件数を返す。groups は分類別の内訳。
- */
-export async function counts(spaceId, { refresh = false } = {}) {
-  await ensureSpaces()
-  const space = selectSpace(spaceId)
+/** パターン1つぶんの件数 */
+function summarize(space, counts) {
   const mode = spaceMode(space)
-
-  const data = await statusCounts(refresh)
-  const groups = groupsOf(bucketsOf(space, data.counts || {}), mode)
-
   const byStatus = {}
   let total = 0
   let partial = 0
-  groups.forEach((g) => {
-    total += g.total
-    partial += g.partial
-    Object.entries(g.counts).forEach(([status, n]) => {
+
+  bucketsOf(space, counts).forEach((bucket) => {
+    total += bucket.total || 0
+    partial += (bucket.partial && bucket.partial[mode]) || 0
+    Object.entries(bucket.status || {}).forEach(([status, n]) => {
       byStatus[status] = (byStatus[status] || 0) + n
     })
   })
 
   return {
-    spaceId: space.id,
-    spaceLabel: space.label,
+    id: space.id,
+    label: space.label,
     mode,
-    source: 'counts',
     total,
     counts: byStatus,
-    groups,
     fresh: byStatus[STATUS_DONE] || 0,
     partial,
+  }
+}
+
+/**
+ * 件数だけを取る軽い入口。targets() と違って一覧そのものは取らない。
+ * すべてのパターンぶんを1回でまとめて返すので、パターンを切り替えても取り直しは要らない。
+ */
+export async function countsAll({ refresh = false } = {}) {
+  await ensureSpaces()
+  const data = await statusCounts(refresh)
+  const counts = data.counts || {}
+  return {
     updatedAt: data.updatedAt || null,
+    defaultSpaceId: defaultSpaceId(),
+    spaces: spaceList().map((space) => summarize(space, counts)),
   }
 }
 

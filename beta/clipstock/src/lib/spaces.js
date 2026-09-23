@@ -102,6 +102,11 @@ export function spaceList() {
   return config.spaces
 }
 
+/** 総覧のパターン。個別のパターンを全部含むので、内訳を出すときは外す */
+export function defaultSpaceId() {
+  return config.default
+}
+
 /** そのスペースが読む取り込み元。{id, label, list, idea, db} の配列 */
 export function sourcesOf(space = active) {
   return (space?.sources || []).map((id) => ({ id, ...config.sources[id] }))
