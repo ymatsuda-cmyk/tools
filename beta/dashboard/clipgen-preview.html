@@ -300,7 +300,7 @@
           <label>件数の見せ方(chart)
             <select id="chart">
               <option value="ring" selected>リング</option>
-              <option value="bar">棒グラフ</option>
+              <option value="bar">棒グラフ（分類別）</option>
             </select>
           </label>
           <div class="sep"></div>
@@ -563,32 +563,17 @@ function clipgenIdleRing(m, st){
     </div>`;
 }
 
-/**
- * 棒グラフの中身。分類をまたぐパターン(すべて・動画・Web記事)なら分類別、
- * 分類で絞るパターンは棒が1本になってしまうので状態別に並べる。
- */
-function clipgenBarData(m, st){
+/** 棒グラフの中身。分類ごとに1本ずつ並べる */
+function clipgenBarRows(m, st){
   const groups = (st.count && st.count.groups) || [];
-  if(groups.length > 1){
-    return {
-      label: clipgenRingLabel(m),
-      rows: groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }))
-    };
-  }
-  const counts = (st.count && st.count.counts) || {};
-  const total = clipgenTotal(m, st);
-  return {
-    label: '状態ごと',
-    rows: Object.keys(counts).sort((a, b) => counts[b] - counts[a])
-      .map(status => ({ label:status, value:counts[status], total }))
-  };
+  return groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }));
 }
 
-/** 棒の長さは一番多いもの基準、色はその中での溜まり具合で決める */
+/** 棒の長さは一番多いもの基準、色はその分類の中での溜まり具合で決める */
 function clipgenBars(m, st){
   if(!st.count) return '';
-  const { label, rows } = clipgenBarData(m, st);
-  const shown = rows.filter(r => r.value > 0);
+  const label = clipgenRingLabel(m);
+  const shown = clipgenBarRows(m, st).filter(r => r.value > 0);
   if(!shown.length){
     return `<div class="gen-bars"><div class="sub">${esc(label)}</div><div class="mon-note">0件</div></div>`;
   }
@@ -954,7 +939,7 @@ const SPACES = [
   { id:'all',   label:'すべて', categories:['未分類', 'other', 'music', 'golf'] },
   { id:'video', label:'動画',   categories:['未分類', 'other', 'music', 'golf'] },
   { id:'web',   label:'Web記事', categories:['未分類', 'other', 'golf'] },
-  { id:'music', label:'music'  }
+  { id:'music', label:'music', categories:['music'] }
 ];
 
 const MODELS = [
