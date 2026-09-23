@@ -8,6 +8,12 @@
     "fade": 350,
     "indexPath": "index.json",
     "monitorInterval": 3,
+    "tabs": [
+      {
+        "id": "custom",
+        "label": "カスタマイズ"
+      }
+    ],
     "monitors": [
       {
         "id": "gpu-server",

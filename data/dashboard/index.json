@@ -9,6 +9,12 @@
     "indexFile": "index.json",
     "indexPath": "index.json",
     "monitorInterval": 3,
+    "tabs": [
+      {
+        "id": "custom",
+        "label": "カスタマイズ"
+      }
+    ],
     "monitors": [
       {
         "id": "kaggle-gemma",
