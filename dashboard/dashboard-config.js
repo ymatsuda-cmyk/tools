@@ -23,9 +23,14 @@
     return tabs.some(tab => tab.id === requested) ? requested : fallback;
   }
 
+  function tabOptions(defaultTab, tabs){
+    const labels = { links:'リンク', monitor:'稼働状況', info:'情報' };
+    return [{ id:defaultTab, label:labels[defaultTab] || defaultTab }].concat(tabs);
+  }
+
   function isVisible(card){
     return !card || card.hidden !== true;
   }
 
-  return { customTabs, cardTab, isVisible };
+  return { customTabs, cardTab, tabOptions, isVisible };
 });

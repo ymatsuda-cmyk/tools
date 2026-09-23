@@ -282,7 +282,7 @@ other・music・golf…）ごとに1本ずつ並べます。0件のパターン�
 項目が欠けているものを拾います。1件ごと・1段ごとに Notion へ保存するので、
 途中で中止しても、そこまでの結果は残ります。
 
-生成処理の実体は [`api/updateclip/updateclip.js`](../../api/updateclip/updateclip.js) で、
+生成処理の実体は [`api/updateclip/updateclip.js`](../api/updateclip/updateclip.js) で、
 clipstock の実装をそのまま呼びます。GASのURL・共有トークン・AIの接続先は
 **clipstock の設定をそのまま使う**ので、ダッシュボード側での設定は要りません。
 まだ clipstock を設定していない場合は、先に clipstock の歯車から接続を入れてください。

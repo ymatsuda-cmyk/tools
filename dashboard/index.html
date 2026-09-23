@@ -1001,6 +1001,10 @@
       </select>
     </div>
     <div class="field">
+      <label>表示するタブ</label>
+      <select id="cf-tab"></select>
+    </div>
+    <div class="field">
       <label>カードJSON</label>
       <textarea id="cf-json" spellcheck="false"></textarea>
       <div class="err" id="err-cardjson">JSONの形式が正しくありません</div>
@@ -1592,11 +1596,24 @@ function cardConfigItem(){
   return item ? { kind, id, item } : null;
 }
 
+function defaultCardTab(current){
+  return current.kind === 'monitor' ? defaultMonitorTab(current.item) : 'links';
+}
+
+function syncCardTabOptions(current){
+  const defaultTab = defaultCardTab(current);
+  const options = DashboardConfig.tabOptions(defaultTab, configuredTabs());
+  F('cf-tab').innerHTML = options.map(tab=>`<option value="${esc(tab.id)}">${esc(tab.label)}</option>`).join('');
+  F('cf-tab').value = DashboardConfig.cardTab(current.item, defaultTab, configuredTabs());
+}
+
 function syncCardConfigJson(){
   const current = cardConfigItem();
   if(!current) return;
   const next = { ...current.item, cardSize: F('cf-size').value };
   if(next.cardSize === 'normal') delete next.cardSize;
+  if(F('cf-tab').value === defaultCardTab(current)) delete next.tab;
+  else next.tab = F('cf-tab').value;
   F('cf-json').value = JSON.stringify(next, null, 2);
 }
 
@@ -1606,6 +1623,7 @@ function openCardConfig(target){
   if(!current) return;
   F('cardConfigTitle').textContent = (current.item.name || current.item.title || current.item.id) + ' のカード設定';
   F('cf-size').value = cardSizeValue(current.item.cardSize || 'normal');
+  syncCardTabOptions(current);
   F('cf-json').value = JSON.stringify(current.item, null, 2);
   F('err-cardjson').style.display = 'none';
   F('cardConfigOverlay').classList.add('show');
@@ -1653,6 +1671,7 @@ async function applyCardConfig(){
 }
 
 F('cf-size').addEventListener('change', syncCardConfigJson);
+F('cf-tab').addEventListener('change', syncCardConfigJson);
 F('cancelCardConfig').onclick = ()=>F('cardConfigOverlay').classList.remove('show');
 F('applyCardConfig').onclick = applyCardConfig;
 F('btn-cardform').onclick = ()=>{
