@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>顧客一覧 | customer9</title>
+<style>
+  :root {
+    --ink: #1c1917;
+    --ink2: #57534e;
+    --ink3: #a8a29e;
+    --bg: #fafaf9;
+    --bg2: #f5f4f1;
+    --white: #ffffff;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.14);
+    --teal: #0f766e;
+    --teal-l: #ccfbf1;
+    --red: #b91c1c;
+    --red-l: #fee2e2;
+    --r: 12px;
+    --r-sm: 8px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  }
+
+  main {
+    width: min(960px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 40px 0 80px;
+  }
+
+  header.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .sub {
+    margin-top: 4px;
+    color: var(--ink2);
+    font-size: 0.9rem;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  input[type="text"], input[type="search"] {
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--border2);
+    border-radius: var(--r-sm);
+    background: var(--white);
+    font: inherit;
+    color: var(--ink);
+  }
+
+  #search {
+    flex: 1 1 240px;
+    min-width: 180px;
+  }
+
+  button {
+    height: 40px;
+    padding: 0 18px;
+    border: 1px solid var(--border2);
+    border-radius: var(--r-sm);
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  button.primary {
+    border-color: var(--teal);
+    background: var(--teal);
+    color: #ffffff;
+  }
+
+  button:hover { filter: brightness(0.97); }
+
+  .panel {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    background: var(--white);
+    box-shadow: var(--shadow);
+  }
+
+  .settings {
+    display: none;
+    grid-template-columns: 140px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+
+  .settings.open { display: grid; }
+
+  .settings label {
+    font-size: 0.85rem;
+    color: var(--ink2);
+  }
+
+  .settings select {
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--border2);
+    border-radius: var(--r-sm);
+    background: var(--white);
+    font: inherit;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.82rem;
+    color: var(--ink2);
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.92rem;
+    vertical-align: top;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--bg2); }
+
+  .code {
+    font-family: "DM Mono", Consolas, monospace;
+    color: var(--ink2);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: var(--teal-l);
+    color: var(--teal);
+  }
+
+  .state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--ink2);
+  }
+
+  .state.error {
+    color: var(--red);
+    background: var(--red-l);
+  }
+
+  footer.hint {
+    margin-top: 16px;
+    color: var(--ink3);
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 640px) {
+    .settings { grid-template-columns: 1fr; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tbody tr {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 4px 0;
+      border-bottom: none;
+    }
+    tbody td::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 0.72rem;
+      color: var(--ink3);
+    }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>顧客一覧</h1>
+        <p class="sub">登録されている顧客をまとめて確認できます</p>
+      </div>
+      <button id="btn-settings" type="button">API設定</button>
+    </header>
+
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="名前・コードで検索">
+      <button id="btn-refresh" class="primary" type="button">更新</button>
+    </div>
+
+    <div class="panel">
+      <div id="settings" class="settings">
+        <label for="s-provider">取得元</label>
+        <select id="s-provider">
+          <option value="json">JSON（確認用サンプル）</option>
+          <option value="gas">GAS Web App</option>
+        </select>
+        <button id="s-save" type="button">保存</button>
+
+        <label for="s-url">URL</label>
+        <input id="s-url" type="text" placeholder="https://script.google.com/macros/s/xxx/exec">
+        <span></span>
+      </div>
+
+      <div id="state" class="state">読み込み中…</div>
+
+      <table id="table" hidden>
+        <thead>
+          <tr>
+            <th>コード</th>
+            <th>名前</th>
+            <th>メール</th>
+            <th>電話番号</th>
+            <th>状態</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <footer class="hint">
+      取得元は「API設定」から切り替えられます。GAS Web Appの準備手順は
+      <code>api/customer9/README.md</code> を参照してください。
+    </footer>
+  </main>
+
+  <script type="module">
+    const STORAGE_KEY = 'customer9.config'
+
+    const els = {
+      state: document.getElementById('state'),
+      table: document.getElementById('table'),
+      rows: document.getElementById('rows'),
+      search: document.getElementById('search'),
+      btnRefresh: document.getElementById('btn-refresh'),
+      btnSettings: document.getElementById('btn-settings'),
+      settings: document.getElementById('settings'),
+      sProvider: document.getElementById('s-provider'),
+      sUrl: document.getElementById('s-url'),
+      sSave: document.getElementById('s-save')
+    }
+
+    let customers = []
+
+    function loadConfig() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+      } catch {
+        return {}
+      }
+    }
+
+    function saveConfig(config) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+    }
+
+    function renderRows(list) {
+      els.rows.innerHTML = list.map(c => `
+        <tr>
+          <td data-label="コード" class="code">${escapeHtml(c.code)}</td>
+          <td data-label="名前">${escapeHtml(c.name)}</td>
+          <td data-label="メール">${escapeHtml(c.email)}</td>
+          <td data-label="電話番号">${escapeHtml(c.phone)}</td>
+          <td data-label="状態">${c.status ? `<span class="badge">${escapeHtml(c.status)}</span>` : ''}</td>
+        </tr>
+      `).join('')
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]))
+    }
+
+    function applyFilter() {
+      const q = els.search.value.trim().toLowerCase()
+      const filtered = q
+        ? customers.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q))
+        : customers
+
+      els.table.hidden = filtered.length === 0
+      els.state.hidden = filtered.length !== 0
+
+      if (filtered.length === 0) {
+        els.state.className = 'state'
+        els.state.textContent = customers.length === 0 ? 'データがありません' : '該当する顧客が見つかりません'
+      } else {
+        renderRows(filtered)
+      }
+    }
+
+    async function load() {
+      els.state.className = 'state'
+      els.state.textContent = '読み込み中…'
+      els.state.hidden = false
+      els.table.hidden = true
+
+      try {
+        const api = await import('/api/customer9/customer9.api.js')
+        const config = api.normalizeConfig(loadConfig())
+        const result = await api.list(config)
+        customers = result.customers
+        applyFilter()
+      } catch (err) {
+        els.state.className = 'state error'
+        els.state.textContent = `顧客一覧を取得できませんでした: ${err.message || err}`
+        els.state.hidden = false
+        els.table.hidden = true
+      }
+    }
+
+    function openSettingsPanel() {
+      const config = loadConfig()
+      els.sProvider.value = config.provider || 'json'
+      els.sUrl.value = config.url || ''
+      els.settings.classList.toggle('open')
+    }
+
+    els.btnSettings.addEventListener('click', openSettingsPanel)
+    els.btnRefresh.addEventListener('click', load)
+    els.search.addEventListener('input', applyFilter)
+    els.sSave.addEventListener('click', () => {
+      saveConfig({ provider: els.sProvider.value, url: els.sUrl.value.trim() })
+      els.settings.classList.remove('open')
+      load()
+    })
+
+    load()
+  </script>
+</body>
+</html>
