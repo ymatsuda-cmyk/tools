@@ -16,11 +16,29 @@ your-repo/
 `assets/thumbs/` と `assets/previews/` は空だと Git に登録されないので、
 `.gitkeep` という空ファイルを置いておいてください。
 
-リポジトリ直下ではなくサブディレクトリ（例 `beta/dashboard/`）に置く場合は、
+リポジトリ直下ではなくサブディレクトリ（例 `dashboard/`）に置く場合は、
 スクリプトプロパティ `GITHUB_BASE_PATH` にそのディレクトリを指定します。
-GAS はコミット先をすべてそのディレクトリ配下（`beta/dashboard/index.json`、
-`beta/dashboard/assets/...`）に切り替えます。ダッシュボード側の設定や
+GAS はコミット先をすべてそのディレクトリ配下（`dashboard/index.json`、
+`dashboard/assets/...`）に切り替えます。ダッシュボード側の設定や
 `index.json` 内のパスは、これまで通り `index.html` からの相対パスのままで構いません。
+
+## タブとカード表示の設定
+
+`index.json` の `config.tabs` に任意のタブを追加できます。`id` は半角英数字、`_`、`-`を使い、
+`links`、`monitor`、`info` 以外を指定してください。
+
+```json
+{
+  "config": {
+    "tabs": [{ "id": "custom", "label": "カスタム" }]
+  }
+}
+```
+
+リンクカード（`resources`）または稼働状況・情報カード（`config.monitors`）に
+`"tab": "custom"` を追加すると、そのカードをカスタムタブへ移動できます。
+`"hidden": true` を追加するとカードを非表示にできます。非表示にしたカードは、
+画面右上の「設定」→「表示」→「非表示カード」から表示に戻せます。
 
 ---
 
@@ -78,7 +96,7 @@ Settings → Developer settings → Personal access tokens → **Fine-grained to
 | `GITHUB_OWNER` | GitHubのユーザー名 |
 | `GITHUB_REPO` | リポジトリ名 |
 | `GITHUB_BRANCH` | `main`（省略可） |
-| `GITHUB_BASE_PATH` | リポジトリ配下のディレクトリ 例 `beta/dashboard`（省略時はリポジトリ直下） |
+| `GITHUB_BASE_PATH` | リポジトリ配下のディレクトリ 例 `dashboard`（省略時はリポジトリ直下） |
 | `NOTION_TOKEN` | 手順1のトークン |
 | `NOTION_DATABASE_ID` | 手順1のデータベースID |
 | `SHARED_SECRET` | 自分で決めた任意の文字列 |

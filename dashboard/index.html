@@ -65,8 +65,9 @@
   }
   .add-btn:hover{background:rgba(95,168,160,0.26);}
 
-  .main-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;margin-bottom:14px;width:fit-content;}
-  .main-tabs button{background:transparent;border:none;color:var(--text-muted);font-size:13px;padding:7px 16px;border-radius:7px;cursor:pointer;}
+  .main-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;margin-bottom:14px;width:fit-content;max-width:100%;overflow-x:auto;}
+  .main-tabs button{flex:0 0 auto;background:transparent;border:none;color:var(--text-muted);font-size:13px;padding:7px 16px;border-radius:7px;cursor:pointer;}
+  .main-tabs .add-tab{font-size:18px;line-height:1;padding:6px 10px;}
   .main-tabs button.active{background:var(--surface-2);color:var(--text);}
   .view[hidden]{display:none;}
 
@@ -469,6 +470,7 @@
     <button data-view="links" class="active">リンク</button>
     <button data-view="monitor">稼働状況</button>
     <button data-view="info">情報</button>
+    <button type="button" class="add-tab" id="addMainTab" title="タブを追加" aria-label="タブを追加">＋</button>
   </div>
 
   <div class="status-line mono" id="statusLine">読み込み中…</div>
@@ -513,6 +515,23 @@
     <div class="monitor-grid" id="infoGrid"></div>
     <div class="monitor-empty" id="infoEmpty">
       情報カードが登録されていません。上の「＋ 追加」からドル円・ルール・電卓のカードを登録できます。
+    </div>
+  </div>
+  <div id="customViews"></div>
+</div>
+
+<!-- タブ追加モーダル -->
+<div class="overlay" id="tabOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h2>タブを追加</h2>
+    <div class="field">
+      <label>タブ名</label>
+      <input type="text" id="newTabLabel" maxlength="40" placeholder="例: カスタマイズ">
+      <div class="err" id="err-tab-label">タブ名を入力してください</div>
+    </div>
+    <div class="modal-actions">
+      <button class="icon-btn" id="cancelAddTab">キャンセル</button>
+      <button class="add-btn" id="saveAddTab">追加</button>
     </div>
   </div>
 </div>
@@ -884,6 +903,10 @@
           <span class="val mono" id="v-fade"></span>
         </div>
       </div>
+      <div class="field">
+        <label>非表示カード</label>
+        <div id="hiddenCards" class="hint">非表示のカードはありません</div>
+      </div>
     </div>
 
     <div class="tab-panel" data-panel="data">
@@ -997,6 +1020,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="dashboard-config.js"></script>
 <script>
 const RUN_LABEL = { web:'Web', download:'DL', local:'Local' };
 
@@ -1079,7 +1103,8 @@ const DEFAULT_CONFIG = {
   radius:14,
   borderW:1,
   fade:350,
-  indexFile:'index.json'
+  indexFile:'index.json',
+  tabs:[]
 };
 
 /* データの置き場所は固定。設定で変えられるのはファイル名だけ */
@@ -1144,6 +1169,36 @@ function applyConfig(){
   document.querySelectorAll('#sizeGroup button').forEach(b=>{
     b.classList.toggle('active', Number(b.dataset.size) === config.cardMin);
   });
+  renderTabStructure();
+}
+
+function configuredTabs(){
+  return DashboardConfig.customTabs(config.tabs);
+}
+
+function renderTabStructure(){
+  const tabs = configuredTabs();
+  const mainTabs = document.getElementById('mainTabs');
+  mainTabs.querySelectorAll('[data-custom-tab]').forEach(el=>el.remove());
+  tabs.forEach(tab=>{
+    const button = document.createElement('button');
+    button.dataset.view = tab.id;
+    button.dataset.customTab = 'true';
+    button.textContent = tab.label;
+    button.classList.toggle('active', currentView === tab.id);
+    mainTabs.insertBefore(button, document.getElementById('addMainTab'));
+  });
+
+  const customViews = document.getElementById('customViews');
+  customViews.innerHTML = tabs.map(tab=>`
+    <div class="view" data-view="${esc(tab.id)}" hidden>
+      <div class="grid custom-resource-grid" data-custom-resources="${esc(tab.id)}"></div>
+      <div class="monitor-grid" id="customMonitorGrid-${esc(tab.id)}"></div>
+      <div class="monitor-empty" id="customEmpty-${esc(tab.id)}">このタブに表示するカードはありません。</div>
+    </div>`).join('');
+  if(!['links','monitor','info',...tabs.map(tab=>tab.id)].includes(currentView)) currentView = 'links';
+  document.querySelectorAll('.view').forEach(view=>{ view.hidden = view.dataset.view !== currentView; });
+  document.querySelectorAll('#mainTabs button').forEach(button=>button.classList.toggle('active', button.dataset.view === currentView));
 }
 
 async function persistLocal(){
@@ -1188,7 +1243,7 @@ async function init(){
 /** URLの ?view= を反映して初期表示を決める */
 function applyInitialView(){
   const view = initialParams.view;
-  if(view !== 'monitor' && view !== 'info') return;
+  if(!['monitor','info',...configuredTabs().map(tab=>tab.id)].includes(view)) return;
   const btn = document.querySelector(`#mainTabs button[data-view="${view}"]`);
   if(btn) btn.click();
 }
@@ -1247,14 +1302,17 @@ function render(){
   renderChips();
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const list = resources.filter(r=>{
+    const okView = DashboardConfig.cardTab(r, 'links', configuredTabs()) === 'links';
+    const visible = DashboardConfig.isVisible(r);
     const okCat = activeCategory==='すべて' || r.category===activeCategory;
     const okQ = !q || (r.title||'').toLowerCase().includes(q);
-    return okCat && okQ;
+    return visible && okView && okCat && okQ;
   });
 
   const grid = document.getElementById('grid');
   if(list.length===0){
     grid.innerHTML = `<div class="empty"><div class="big">まだリンクがありません</div><p>右上の「追加」から、アプリ・資料・動画を登録できます</p></div>`;
+    renderCustomTabs();
     return;
   }
   grid.innerHTML = list.map(r=>`
@@ -1295,6 +1353,7 @@ function render(){
   grid.querySelectorAll('[data-card-config]').forEach(b=>{
     b.addEventListener('click', e=>{ e.stopPropagation(); openCardConfig(b.dataset.cardConfig); });
   });
+  renderCustomTabs();
 }
 
 document.getElementById('searchInput').addEventListener('input', render);
@@ -1439,7 +1498,31 @@ function syncSettingsForm(){
   F('s-gassecret').value = gasSettings.secret || '';
   F('s-json').value = JSON.stringify({ config, resources }, null, 2);
   F('err-json').style.display = 'none';
+  renderHiddenCards();
 }
+
+function renderHiddenCards(){
+  const hidden = resources.map(item=>({ kind:'resource', item }))
+    .concat(allMonitors().map(item=>({ kind:'monitor', item })))
+    .filter(entry=>!DashboardConfig.isVisible(entry.item));
+  const host = F('hiddenCards');
+  if(hidden.length === 0){ host.textContent = '非表示のカードはありません'; return; }
+  host.innerHTML = hidden.map(entry=>{
+    const label = entry.item.title || entry.item.name || entry.item.id;
+    return `<button class="icon-btn" data-restore-card="${esc(entry.kind + ':' + entry.item.id)}" style="margin:0 6px 6px 0;">${esc(label)}を表示</button>`;
+  }).join('');
+}
+
+F('hiddenCards').addEventListener('click', async e=>{
+  const button = e.target.closest('[data-restore-card]');
+  if(!button) return;
+  const [kind, id] = button.dataset.restoreCard.split(':');
+  if(kind === 'resource') resources = resources.map(item=>item.id === id ? { ...item, hidden:false } : item);
+  else config.monitors = allMonitors().map(item=>item.id === id ? { ...item, hidden:false } : item);
+  await persistLocal();
+  render(); renderMonitors(); syncSettingsForm();
+  toast('カードを表示に戻しました');
+});
 
 document.getElementById('openSettings').onclick = ()=>{ syncSettingsForm(); settingsOverlay.classList.add('show'); };
 document.getElementById('closeSettings').onclick = ()=>settingsOverlay.classList.remove('show');
@@ -1817,6 +1900,14 @@ function allMonitors(){
   return Array.isArray(config.monitors) ? config.monitors : [];
 }
 
+function defaultMonitorTab(m){
+  return isInfoMonitor(m) ? 'info' : 'monitor';
+}
+
+function monitorTab(m){
+  return DashboardConfig.cardTab(m, defaultMonitorTab(m), configuredTabs());
+}
+
 /** type 未指定は共通仕様のAPIとして扱う */
 function monitorType(m){
   return m.type || 'api';
@@ -1831,7 +1922,7 @@ function isInfoMonitor(m){
 
 /** 稼働状況タブの対象。チップの選択で絞り込む */
 function monitors(){
-  const list = allMonitors().filter(m => !isInfoMonitor(m));
+  const list = allMonitors().filter(m => DashboardConfig.isVisible(m) && monitorTab(m) === 'monitor');
   if(!activeMonitor.startsWith('type:')) return list;
   const t = activeMonitor.slice(5);
   return list.filter(m => monitorType(m) === t);
@@ -1839,17 +1930,17 @@ function monitors(){
 
 /** 情報タブの対象 */
 function infoMonitors(){
-  return allMonitors().filter(isInfoMonitor);
+  return allMonitors().filter(m => DashboardConfig.isVisible(m) && monitorTab(m) === 'info');
 }
 
 /** 取得対象。両方のタブぶんをまとめて取りに行く */
 function fetchTargets(){
-  return monitors().concat(infoMonitors()).filter(m => !LOCAL_TYPES.includes(monitorType(m)));
+  return allMonitors().filter(m => DashboardConfig.isVisible(m) && !LOCAL_TYPES.includes(monitorType(m)));
 }
 
 /** 登録済みの種別一覧（情報タブのものは除く） */
 function monitorTypes(){
-  return [...new Set(allMonitors().filter(m => !isInfoMonitor(m)).map(monitorType))];
+  return [...new Set(allMonitors().filter(m => DashboardConfig.isVisible(m) && monitorTab(m) === 'monitor').map(monitorType))];
 }
 
 function intervalMs(){
@@ -2566,7 +2657,7 @@ function wireCalcVars(card){
    ============================================================ */
 
 /* 更新したのに古いものを掋むことがあるので、読み込みのたびにURLを変える */
-const CLIPGEN_MODULE = new URL('../../api/updateclip/updateclip.js', location.href).href
+const CLIPGEN_MODULE = new URL('../api/updateclip/updateclip.js', location.href).href
   + '?t=' + Date.now();
 
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
@@ -2945,7 +3036,7 @@ async function runClipgen(m){
 
 /* ---------- 今日の予定 ---------- */
 
-const SCHEDULE_MODULE = new URL('../../api/schedule/schedule.api.js', location.href).href;
+const SCHEDULE_MODULE = new URL('../api/schedule/schedule.api.js', location.href).href;
 
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
 const scheduleState = {};
@@ -3221,7 +3312,7 @@ async function scheduleAuth(m, accountId, action){
 
 /* ---------- メール受信 ---------- */
 
-const MAIL_MODULE = new URL('../../api/mail/mail.api.js', location.href).href;
+const MAIL_MODULE = new URL('../api/mail/mail.api.js', location.href).href;
 
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
 const mailState = {};
@@ -3521,7 +3612,7 @@ async function mailAuth(m, accountId, action){
 
 /* ---------- 議事録 ---------- */
 
-const MINUTES_MODULE = new URL('../../api/minutes/minutes.api.js', location.href).href;
+const MINUTES_MODULE = new URL('../api/minutes/minutes.api.js', location.href).href;
 
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
 const minutesState = {};
@@ -3955,6 +4046,36 @@ function renderMonitors(){
       : 'この条件に一致する監視対象がありません。');
   paintMonitorGrid('infoGrid', 'infoEmpty', infoMonitors(),
     '情報カードが登録されていません。上の「＋ 追加」からドル円・ルール・電卓のカードを登録できます。');
+  configuredTabs().forEach(tab=>{
+    const view = document.querySelector(`[data-view="${CSS.escape(tab.id)}"]`);
+    if(!view) return;
+    const list = allMonitors().filter(m=>DashboardConfig.isVisible(m) && monitorTab(m) === tab.id);
+    const resourceCount = resources.filter(r=>DashboardConfig.isVisible(r) && DashboardConfig.cardTab(r, 'links', configuredTabs()) === tab.id).length;
+    paintMonitorGrid('customMonitorGrid-' + tab.id, 'customEmpty-' + tab.id, list,
+      resourceCount > 0 ? '' : 'このタブに表示するカードはありません。');
+  });
+}
+
+function renderCustomTabs(){
+  configuredTabs().forEach(tab=>{
+    const grid = document.querySelector(`[data-custom-resources="${CSS.escape(tab.id)}"]`);
+    if(!grid) return;
+    const list = resources.filter(r=>DashboardConfig.isVisible(r) && DashboardConfig.cardTab(r, 'links', configuredTabs()) === tab.id);
+    grid.innerHTML = list.map(r=>`
+      <div class="card" data-id="${esc(r.id)}" data-url="${esc(r.url)}" data-size="${esc(r.cardSize||'normal')}">
+        ${thumbHTML(r)}
+        <div class="card-body"><div class="card-title">${esc(r.title)}</div><div class="card-meta mono">${esc(r.category || '未分類')}</div><div class="card-updated mono">${formatUpdatedAt(r.updatedAt)}</div></div>
+      </div>`).join('');
+    grid.querySelectorAll('.card').forEach(card=>card.addEventListener('click', e=>{
+      if(!e.target.closest('.card-actions')) window.open(card.dataset.url, '_blank');
+    }));
+    grid.querySelectorAll('[data-edit]').forEach(button=>button.addEventListener('click', e=>{ e.stopPropagation(); openItemModal(button.dataset.edit); }));
+    grid.querySelectorAll('[data-card-config]').forEach(button=>button.addEventListener('click', e=>{ e.stopPropagation(); openCardConfig(button.dataset.cardConfig); }));
+    grid.querySelectorAll('[data-del]').forEach(button=>button.addEventListener('click', async e=>{
+      e.stopPropagation(); resources = resources.filter(r=>r.id !== button.dataset.del); await persistLocal(); render();
+    }));
+  });
+  renderMonitors();
 }
 
 function paintMonitorGrid(gridId, emptyId, list, emptyText){
@@ -4379,7 +4500,7 @@ document.addEventListener('click', e=>{
 
 document.getElementById('mainTabs').addEventListener('click', e=>{
   const btn = e.target.closest('button');
-  if(!btn) return;
+  if(!btn || !btn.dataset.view) return;
   currentView = btn.dataset.view;
   document.querySelectorAll('#mainTabs button').forEach(b=>b.classList.toggle('active', b===btn));
   document.querySelectorAll('.view').forEach(v=>{ v.hidden = v.dataset.view !== currentView; });
@@ -4391,6 +4512,29 @@ document.getElementById('mainTabs').addEventListener('click', e=>{
     renderMonitors();
     startMonitorLoop();
   }
+});
+
+const tabOverlay = document.getElementById('tabOverlay');
+
+document.getElementById('addMainTab').addEventListener('click', ()=>{
+  F('newTabLabel').value = '';
+  F('err-tab-label').style.display = 'none';
+  tabOverlay.classList.add('show');
+  F('newTabLabel').focus();
+});
+
+document.getElementById('cancelAddTab').addEventListener('click', ()=>tabOverlay.classList.remove('show'));
+
+document.getElementById('saveAddTab').addEventListener('click', async ()=>{
+  const label = F('newTabLabel').value.trim();
+  if(!label){ F('err-tab-label').style.display = 'block'; return; }
+  const tab = { id:'tab-' + Date.now(), label };
+  config.tabs = configuredTabs().concat(tab);
+  await persistLocal();
+  tabOverlay.classList.remove('show');
+  renderTabStructure();
+  renderCustomTabs();
+  document.querySelector(`#mainTabs button[data-view="${tab.id}"]`)?.click();
 });
 
 window.addEventListener('popstate', ()=>{
