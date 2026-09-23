@@ -9,6 +9,12 @@
     "indexFile": "index.json",
     "indexPath": "index.json",
     "monitorInterval": 3,
+    "tabs": [
+      {
+        "id": "custom",
+        "label": "カスタマイズ"
+      }
+    ],
     "monitors": [
       {
         "id": "kaggle-gemma",
@@ -97,8 +103,8 @@
       "category": "ログ",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/minutes.jpeg",
-      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/minutes.mp4",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/minutes.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/minutes.mp4",
       "type": "site",
       "category_icon": null
     },
@@ -109,8 +115,8 @@
       "category": "社内",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/stepcount.jpeg",
-      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/stepcount.mp4",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/stepcount.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/stepcount.mp4",
       "type": "excel",
       "category_icon": null
     },
@@ -121,8 +127,8 @@
       "category": "ログ",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/clipstock.jpeg",
-      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/clipstock.mp4",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/clipstock.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/clipstock.mp4",
       "type": "site",
       "category_icon": "db"
     },
@@ -135,7 +141,7 @@
       "runType": "web",
       "cardSize": "normal",
       "thumb": null,
-      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/chat.mp4",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/chat.mp4",
       "type": "site"
     },
     {
@@ -145,8 +151,8 @@
       "category": "社内",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/kanban.jpeg",
-      "preview": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/previews/kanban.mp4",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/kanban.jpeg",
+      "preview": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/previews/kanban.mp4",
       "type": "excel",
       "category_icon": null
     },
@@ -206,7 +212,7 @@
       "category_icon": "code",
       "runType": "web",
       "cardSize": "normal",
-      "thumb": "https://ymatsuda-cmyk.github.io/tools/beta/dashboard/assets/thumbs/AIStudio.jpeg",
+      "thumb": "https://ymatsuda-cmyk.github.io/tools/dashboard/assets/thumbs/AIStudio.jpeg",
       "preview": null,
       "type": "site"
     },

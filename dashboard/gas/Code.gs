@@ -11,7 +11,7 @@
  *  GITHUB_OWNER      … GitHubのユーザー名 or Organization名
  *  GITHUB_REPO       … リポジトリ名
  *  GITHUB_BRANCH     … 省略時 main
- *  GITHUB_BASE_PATH  … リポジトリ配下のディレクトリ（例 beta/dashboard）。省略時はリポジトリ直下
+ *  GITHUB_BASE_PATH  … リポジトリ配下のディレクトリ（例 dashboard）。省略時はリポジトリ直下
  *  NOTION_TOKEN      … Notion internal integration token（ntn_ で始まる）
  *  NOTION_DATABASE_ID… リンク管理用データベースのID
  *  SHARED_SECRET     … ダッシュボードから呼ぶときの共有パスワード（任意の文字列）
@@ -37,8 +37,8 @@ function basePath() {
 
 /**
  * ダッシュボードから見た相対パスを、リポジトリ内の実際のパスに変換する。
- * 例: GITHUB_BASE_PATH='beta/dashboard' のとき
- *     'assets/thumbs/bot.png' → 'beta/dashboard/assets/thumbs/bot.png'
+ * 例: GITHUB_BASE_PATH='dashboard' のとき
+ *     'assets/thumbs/bot.png' → 'dashboard/assets/thumbs/bot.png'
  */
 function repoPath(path) {
   const clean = String(path).replace(/^\/+/, '');
