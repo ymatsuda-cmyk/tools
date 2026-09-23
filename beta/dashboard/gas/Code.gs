@@ -15,6 +15,8 @@
  *  NOTION_TOKEN      … Notion internal integration token（ntn_ で始まる）
  *  NOTION_DATABASE_ID… リンク管理用データベースのID
  *  SHARED_SECRET     … ダッシュボードから呼ぶときの共有パスワード（任意の文字列）
+ *  KAGGLE_SNAPSHOT   … Kaggleの状態をためる場所（自動で書かれる。手で入れる必要はない）
+ *                      初回に setupKaggleSnapshotTrigger() を一度実行して定期取得を張ること
  */
 
 const PROP = PropertiesService.getScriptProperties();
@@ -595,7 +597,73 @@ function sendKaggleControl(monitor, command) {
   if (!data.success) {
     throw new Error(data.message || data.error || '操作に失敗しました');
   }
-  return fetchKaggleStatus(monitor);
+  // 起動/停止の直後はカードに即出したいので、ためてある値も入れ替える
+  return saveKaggleSnapshot(fetchKaggleStatus(monitor));
+}
+
+/* ------------------------------------------------------------
+   取得した状態をためておく
+
+   コントローラーへの問い合わせは往復が重く、カードの更新のたびに
+   叩くと表示が待たされる。定期トリガーで取り直した結果をスクリプト
+   プロパティに置き、カードはそれを読むだけにする。
+   ------------------------------------------------------------ */
+
+var KAGGLE_SNAPSHOT_PROP = 'KAGGLE_SNAPSHOT';   // { 監視ID: 状態 }
+var KAGGLE_TARGET_PROP   = 'KAGGLE_TARGETS';    // { 監視ID: {endpoint, name} }
+
+function readJsonProp_(key) {
+  var raw = PROP.getProperty(key);
+  if (!raw) return {};
+  try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+}
+
+/** カードから問い合わせのあった宛先を覚える。定期取得はこれを回る */
+function rememberKaggleTarget(monitor) {
+  var targets = readJsonProp_(KAGGLE_TARGET_PROP);
+  var cur = targets[monitor.id];
+  var name = monitor.name || monitor.id;
+  if (cur && cur.endpoint === monitor.endpoint && cur.name === name) return;
+  targets[monitor.id] = { endpoint: monitor.endpoint, name: name };
+  PROP.setProperty(KAGGLE_TARGET_PROP, JSON.stringify(targets));
+}
+
+function saveKaggleSnapshot(snap) {
+  var all = readJsonProp_(KAGGLE_SNAPSHOT_PROP);
+  all[snap.id] = snap;
+  PROP.setProperty(KAGGLE_SNAPSHOT_PROP, JSON.stringify(all));
+  return snap;
+}
+
+/** 定期トリガーから呼ぶ。覚えている宛先を順に取り直す */
+function refreshKaggleSnapshots() {
+  var targets = readJsonProp_(KAGGLE_TARGET_PROP);
+  var all = readJsonProp_(KAGGLE_SNAPSHOT_PROP);
+  Object.keys(targets).forEach(function (id) {
+    var t = targets[id];
+    all[id] = fetchKaggleStatus({ id: id, name: t.name, endpoint: t.endpoint });
+  });
+  PROP.setProperty(KAGGLE_SNAPSHOT_PROP, JSON.stringify(all));
+  return all;
+}
+
+/** カードが読む値。ためたものが無いときと refresh のときだけ取りに行く */
+function getKaggleStatus(monitor, refresh) {
+  rememberKaggleTarget(monitor);
+  if (!refresh) {
+    var saved = readJsonProp_(KAGGLE_SNAPSHOT_PROP)[monitor.id];
+    if (saved) return saved;
+  }
+  return saveKaggleSnapshot(fetchKaggleStatus(monitor));
+}
+
+/** 初回に1度だけ手で実行する。5分ごとに状態を取り直すトリガーを張る */
+function setupKaggleSnapshotTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (trigger) {
+    if (trigger.getHandlerFunction() === 'refreshKaggleSnapshots') ScriptApp.deleteTrigger(trigger);
+  });
+  ScriptApp.newTrigger('refreshKaggleSnapshots').timeBased().everyMinutes(5).create();
+  return { created: true };
 }
 
 /* ============================================================
@@ -782,16 +850,17 @@ function monitorHeaders(monitor) {
 
 /**
  * 1件分の稼働状況を取得する。手動調整を反映した値を返す。
+ * refresh=true のときだけ、ためてある値を使わずに取り直す。
  */
-function fetchMonitorStatus(monitor) {
-  return applyAdjust(fetchMonitorRaw(monitor), monitor);
+function fetchMonitorStatus(monitor, refresh) {
+  return applyAdjust(fetchMonitorRaw(monitor, refresh), monitor);
 }
 
 /**
  * 取得元が返したままの値。
  * 失敗しても例外を投げず、error を含むオブジェクトを返す。
  */
-function fetchMonitorRaw(monitor) {
+function fetchMonitorRaw(monitor, refresh) {
   try {
     // endpoint を持たない種別を先に処理する
     if (monitor.type === 'quota')   return getQuotaStatus(monitor);
@@ -802,7 +871,7 @@ function fetchMonitorRaw(monitor) {
     if (!monitor.endpoint) throw new Error('endpoint が未設定です');
 
     if (monitor.type === 'kaggle') {
-      return fetchKaggleStatus(monitor);
+      return getKaggleStatus(monitor, refresh);
     }
     if (monitor.type === 'fx') {
       return fetchFxStatus(monitor);
@@ -947,7 +1016,8 @@ function doPost(e) {
 
     if (req.action === 'monitorStatus') {
       const list = req.monitors || [];
-      const results = list.map(function (m) { return fetchMonitorStatus(m); });
+      const refresh = req.refresh === true;
+      const results = list.map(function (m) { return fetchMonitorStatus(m, refresh); });
       return jsonOut({ ok: true, results: results });
     }
 

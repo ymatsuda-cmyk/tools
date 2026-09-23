@@ -4236,9 +4236,10 @@ async function recordManualUsage(id, delta, reset){
 
 /**
  * 状況を取りに行く。force=false のときは、自分の周期が来たカードだけを取る
- * （カードごとに interval を変えられるようにするため）
+ * （カードごとに interval を変えられるようにするため）。
+ * refresh=true は「今すぐ更新」だけ。GASがためている値を使わずに取り直させる
  */
-async function fetchMonitors(force = true){
+async function fetchMonitors(force = true, refresh = false){
   const targets = fetchTargets();
   const now = Date.now();
   tickClipgenCounts(force);
@@ -4250,7 +4251,7 @@ async function fetchMonitors(force = true){
     return;
   }
   try{
-    const res = await callGas({ action:'monitorStatus', monitors:list });
+    const res = await callGas({ action:'monitorStatus', monitors:list, refresh });
     (res.results || []).forEach(r=>{ setSnapshot(r.id, r); });
   }catch(err){
     list.forEach(m=>{
@@ -4309,7 +4310,7 @@ function refreshMonitorCard(id){
 /** 汎用API系のカード1件だけを、待ち時間を無視してGASに取りに行く */
 async function refreshSingleMonitor(m){
   try{
-    const res = await callGas({ action:'monitorStatus', monitors:[m] });
+    const res = await callGas({ action:'monitorStatus', monitors:[m], refresh:true });
     (res.results || []).forEach(r=>{ setSnapshot(r.id, r); });
   }catch(err){
     setSnapshot(m.id, { id:m.id, state:'error', error:err.message });
@@ -4399,12 +4400,12 @@ window.addEventListener('popstate', ()=>{
 
 document.getElementById('btn-refresh-monitor').onclick = ()=>{
   toast('更新しています…');
-  fetchMonitors();
+  fetchMonitors(true, true);
 };
 
 document.getElementById('btn-refresh-info').onclick = ()=>{
   toast('更新しています…');
-  fetchMonitors();
+  fetchMonitors(true, true);
 };
 
 // タブを離れている間は止めて、戻ったら再開する
