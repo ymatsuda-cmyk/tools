@@ -154,18 +154,39 @@ function bucketsOf(space, counts) {
 
   return sources.flatMap((s) => {
     const byCategory = counts[s.db || 'video'] || {}
-    if (s.category) return byCategory[s.category] ? [byCategory[s.category]] : []
+    if (s.category) {
+      return byCategory[s.category] ? [{ category: s.category, bucket: byCategory[s.category] }] : []
+    }
     const taken = claimed.get(s.db || 'video') || new Set()
     return Object.entries(byCategory)
       .filter(([category]) => !taken.has(category))
-      .map(([, bucket]) => bucket)
+      .map(([category, bucket]) => ({ category, bucket }))
   })
+}
+
+/** 分類ごとにまとめる。同じ分類が動画DBとweb記事DBの両方にあれば足し合わせる */
+function groupsOf(picked, mode) {
+  const byCategory = new Map()
+  picked.forEach(({ category, bucket }) => {
+    const key = category || ''
+    if (!byCategory.has(key)) {
+      byCategory.set(key, { category: key, label: key || '未分類', total: 0, counts: {}, fresh: 0, partial: 0 })
+    }
+    const group = byCategory.get(key)
+    group.total += bucket.total || 0
+    group.partial += (bucket.partial && bucket.partial[mode]) || 0
+    Object.entries(bucket.status || {}).forEach(([status, n]) => {
+      group.counts[status] = (group.counts[status] || 0) + n
+    })
+    group.fresh = group.counts[STATUS_DONE] || 0
+  })
+  return [...byCategory.values()].sort((a, b) => b.total - a.total)
 }
 
 /**
  * 件数だけを取る軽い入口。targets() と違って一覧そのものは取らないので、
  * 「何件たまっているか」を出すだけのダッシュボードのカードはこちらを使う。
- * fresh / partial は配列ではなく件数を返す。
+ * fresh / partial は配列ではなく件数を返す。groups は分類別の内訳。
  */
 export async function counts(spaceId, { refresh = false } = {}) {
   await ensureSpaces()
@@ -173,15 +194,15 @@ export async function counts(spaceId, { refresh = false } = {}) {
   const mode = spaceMode(space)
 
   const data = await statusCounts(refresh)
-  const buckets = bucketsOf(space, data.counts || {})
+  const groups = groupsOf(bucketsOf(space, data.counts || {}), mode)
 
   const byStatus = {}
   let total = 0
   let partial = 0
-  buckets.forEach((b) => {
-    total += b.total || 0
-    partial += (b.partial && b.partial[mode]) || 0
-    Object.entries(b.status || {}).forEach(([status, n]) => {
+  groups.forEach((g) => {
+    total += g.total
+    partial += g.partial
+    Object.entries(g.counts).forEach(([status, n]) => {
       byStatus[status] = (byStatus[status] || 0) + n
     })
   })
@@ -193,6 +214,7 @@ export async function counts(spaceId, { refresh = false } = {}) {
     source: 'counts',
     total,
     counts: byStatus,
+    groups,
     fresh: byStatus[STATUS_DONE] || 0,
     partial,
     updatedAt: data.updatedAt || null,

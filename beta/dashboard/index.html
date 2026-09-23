@@ -134,6 +134,15 @@
   .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
+  .gen-bars{margin-bottom:12px;}
+  .gen-bars .sub{font-size:11px;color:var(--text-secondary);text-align:center;margin-bottom:8px;}
+  .gen-bar{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+  .gen-bar-label{flex:0 0 62px;font-size:10px;color:var(--text-secondary);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gen-bar-track{flex:1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;}
+  .gen-bar-fill{display:block;height:100%;border-radius:4px;}
+  .gen-bar-value{flex:0 0 26px;text-align:right;font-size:10px;color:var(--text-muted);}
+
   .sch-switch{display:flex;gap:6px;margin-bottom:10px;}
   .sch-switch button{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
     color:var(--text-secondary);font-size:11px;padding:6px 8px;cursor:pointer;}
@@ -659,6 +668,14 @@
       <label>総数</label>
       <input type="number" id="mf-clipgen-total" placeholder="空欄なら一覧の全件数">
       <div class="hint">「完了」がどれだけ溜まっているかを見るときの分母です</div>
+    </div>
+    <div class="field" data-for="clipgen">
+      <label>件数の見せ方</label>
+      <select id="mf-clipgen-chart">
+        <option value="ring">リング</option>
+        <option value="bar">棒グラフ</option>
+      </select>
+      <div class="hint">棒グラフは、分類をまたぐパターン（すべて・動画・Web記事）なら分類別、分類で絞るパターンなら状態別に並べます</div>
     </div>
     <div class="field" data-for="manual">
       <label>単位</label>
@@ -2709,6 +2726,49 @@ function clipgenIdleRing(m, st){
     </div>`;
 }
 
+/**
+ * 棒グラフの中身。分類をまたぐパターン(すべて・動画・Web記事)なら分類別、
+ * 分類で絞るパターンは棒が1本になってしまうので状態別に並べる。
+ */
+function clipgenBarData(m, st){
+  const groups = (st.count && st.count.groups) || [];
+  if(groups.length > 1){
+    return {
+      label: clipgenRingLabel(m),
+      rows: groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }))
+    };
+  }
+  const counts = (st.count && st.count.counts) || {};
+  const total = clipgenTotal(m, st);
+  return {
+    label: '状態ごと',
+    rows: Object.keys(counts).sort((a, b) => counts[b] - counts[a])
+      .map(status => ({ label:status, value:counts[status], total }))
+  };
+}
+
+/** 棒の長さは一番多いもの基準、色はその中での溜まり具合で決める */
+function clipgenBars(m, st){
+  if(!st.count) return '';
+  const { label, rows } = clipgenBarData(m, st);
+  const shown = rows.filter(r => r.value > 0);
+  if(!shown.length){
+    return `<div class="gen-bars"><div class="sub">${esc(label)}</div><div class="mon-note">0件</div></div>`;
+  }
+  const max = Math.max(...shown.map(r => r.value));
+  const sum = shown.reduce((acc, r) => acc + r.value, 0);
+  return `
+    <div class="gen-bars">
+      <div class="sub">${esc(label)}(合計 ${sum}件)</div>
+      ${shown.map(r => `
+        <div class="gen-bar">
+          <span class="gen-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
+          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${Math.max(3, (r.value / max) * 100)}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
+          <span class="gen-bar-value">${r.value}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
 /** パターンと使うAIのセレクト。設定で片方ずつ隠せる。隠したぶんは既定値が使われる */
 function clipgenPicks(m, st){
   const disabled = st.phase === 'loading' ? 'disabled' : '';
@@ -2770,7 +2830,7 @@ function clipgenBody(m, st){
 
   const parts = {
     picks: clipgenPicks(m, st),
-    ring: clipgenIdleRing(m, st),
+    ring: m.chart === 'bar' ? clipgenBars(m, st) : clipgenIdleRing(m, st),
     note,
     // 中止は隠さない。隠すと動き出したものを止められなくなる
     actions: m.showRun === false ? '' : `
@@ -4418,6 +4478,7 @@ function fillMonitorForm(m){
   F('mf-leadlabel').value = m.leadLabel || '';
   F('mf-lines').value = m.lines || (Array.isArray(m.rows) ? m.rows.length : 1);
   F('mf-clipgen-total').value = m.total || '';
+  F('mf-clipgen-chart').value = m.chart === 'bar' ? 'bar' : 'ring';
   F('mf-sch-max').value = m.max || 5;
   F('mf-sch-hidepast').value = m.hidePast ? 'hide' : 'show';
   F('mf-sch-defaultview').value = m.defaultView === 'week' ? 'week' : 'today';
@@ -4513,6 +4574,8 @@ function buildMonitor(){
     const total = Number(F('mf-clipgen-total').value);
     if(total > 0) m.total = total;
     else delete m.total;
+    if(F('mf-clipgen-chart').value === 'bar') m.chart = 'bar';
+    else delete m.chart;
   }
   if(type === 'schedule'){
     m.max = Math.max(1, Math.min(20, Number(F('mf-sch-max').value) || 5));

@@ -217,6 +217,15 @@
   .gen-now{font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
+  .gen-bars{margin-bottom:12px;}
+  .gen-bars .sub{font-size:11px;color:var(--text-secondary);text-align:center;margin-bottom:8px;}
+  .gen-bar{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+  .gen-bar-label{flex:0 0 62px;font-size:10px;color:var(--text-secondary);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gen-bar-track{flex:1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;}
+  .gen-bar-fill{display:block;height:100%;border-radius:4px;}
+  .gen-bar-value{flex:0 0 26px;text-align:right;font-size:10px;color:var(--text-muted);}
+
   /* 並べ替え用の持ち手。実物のカードには出ない */
   .part{position:relative;border:1px dashed transparent;border-radius:10px;}
   .edit .part{cursor:grab;padding:8px 6px 2px;margin:0 -6px 4px;}
@@ -288,6 +297,12 @@
           <label>既定のAI(model)
             <select id="model"></select>
           </label>
+          <label>件数の見せ方(chart)
+            <select id="chart">
+              <option value="ring" selected>リング</option>
+              <option value="bar">棒グラフ</option>
+            </select>
+          </label>
           <div class="sep"></div>
           <label class="check"><input type="checkbox" id="showSpace"> 分類のコンボボックスを出す</label>
           <label class="check"><input type="checkbox" id="showModel" checked> AIのコンボボックスを出す</label>
@@ -298,7 +313,7 @@
 
       <div class="panel" data-tab="clipgen">
         <h2>数える状態</h2>
-        <p class="caption">リングに出す件数の条件です。複数選べます。</p>
+        <p class="caption">リング・棒グラフに出す件数の条件です。複数選べます。</p>
         <div class="fields">
           <label>条件
             <select id="statusMatch">
@@ -492,7 +507,7 @@ const CLIPGEN_STATE_META = {
 };
 
 const CLIPGEN_PARTS = ['picks', 'ring', 'note', 'actions'];
-const PART_NAMES = { picks:'コンボボックス', ring:'リング', note:'件数メモ', actions:'ボタン' };
+const PART_NAMES = { picks:'コンボボックス', ring:'件数グラフ', note:'件数メモ', actions:'ボタン' };
 
 const CLIPGEN_DEFAULT_STATUSES = ['完了'];
 
@@ -545,6 +560,49 @@ function clipgenIdleRing(m, st){
     <div class="mon-ring">
       ${ringSVG(pct, metricColor(pct), `${hit}`)}
       <div class="sub">${esc(clipgenRingLabel(m))}(${m.total ? '設定した総数' : '一覧の全件'} ${total}件)</div>
+    </div>`;
+}
+
+/**
+ * 棒グラフの中身。分類をまたぐパターン(すべて・動画・Web記事)なら分類別、
+ * 分類で絞るパターンは棒が1本になってしまうので状態別に並べる。
+ */
+function clipgenBarData(m, st){
+  const groups = (st.count && st.count.groups) || [];
+  if(groups.length > 1){
+    return {
+      label: clipgenRingLabel(m),
+      rows: groups.map(g => ({ label:g.label, value:clipgenMatched(m, g.counts), total:g.total }))
+    };
+  }
+  const counts = (st.count && st.count.counts) || {};
+  const total = clipgenTotal(m, st);
+  return {
+    label: '状態ごと',
+    rows: Object.keys(counts).sort((a, b) => counts[b] - counts[a])
+      .map(status => ({ label:status, value:counts[status], total }))
+  };
+}
+
+/** 棒の長さは一番多いもの基準、色はその中での溜まり具合で決める */
+function clipgenBars(m, st){
+  if(!st.count) return '';
+  const { label, rows } = clipgenBarData(m, st);
+  const shown = rows.filter(r => r.value > 0);
+  if(!shown.length){
+    return `<div class="gen-bars"><div class="sub">${esc(label)}</div><div class="mon-note">0件</div></div>`;
+  }
+  const max = Math.max(...shown.map(r => r.value));
+  const sum = shown.reduce((acc, r) => acc + r.value, 0);
+  return `
+    <div class="gen-bars">
+      <div class="sub">${esc(label)}(合計 ${sum}件)</div>
+      ${shown.map(r => `
+        <div class="gen-bar">
+          <span class="gen-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
+          <span class="gen-bar-track"><span class="gen-bar-fill" style="width:${Math.max(3, (r.value / max) * 100)}%;background:${metricColor(r.total ? (r.value / r.total) * 100 : 0)}"></span></span>
+          <span class="gen-bar-value">${r.value}</span>
+        </div>`).join('')}
     </div>`;
 }
 
@@ -608,7 +666,7 @@ function clipgenParts(m, st){
 
   return {
     picks: clipgenPicks(m, st),
-    ring: clipgenIdleRing(m, st),
+    ring: m.chart === 'bar' ? clipgenBars(m, st) : clipgenIdleRing(m, st),
     note,
     // 中止は隠さない。隠すと動き出したものを止められなくなる
     actions: m.showRun === false ? '' : `
@@ -893,9 +951,9 @@ function renderRuleCard(m, baseDate){
    ============================================================ */
 
 const SPACES = [
-  { id:'all',   label:'すべて' },
-  { id:'video', label:'動画'   },
-  { id:'web',   label:'Web記事' },
+  { id:'all',   label:'すべて', categories:['未分類', 'other', 'music', 'golf'] },
+  { id:'video', label:'動画',   categories:['未分類', 'other', 'music', 'golf'] },
+  { id:'web',   label:'Web記事', categories:['未分類', 'other', 'golf'] },
   { id:'music', label:'music'  }
 ];
 
@@ -907,16 +965,37 @@ const MODELS = [
 /* clipstock の状態。実物では Notion の「状態」プロパティの値 */
 const STATUSES = ['新規', '再取得', '処理中', '完了', '要約済み', '除外'];
 
+/** 分類別の棒グラフを確かめられるよう、ダミー件数を分類に振り分ける */
+function sampleGroups(spaceId, counts){
+  const categories = (SPACES.find(s => s.id === spaceId) || {}).categories;
+  if(!categories) return [];
+  const weights = [0.4, 0.3, 0.2, 0.1];
+  return categories.map((label, i) => {
+    const share = {};
+    let total = 0;
+    Object.entries(counts).forEach(([status, n])=>{
+      const v = Math.round(n * (weights[i] || 0.1));
+      share[status] = v;
+      total += v;
+    });
+    return { category:label, label, counts:share, total, fresh:share['完了'] || 0, partial:0 };
+  });
+}
+
 /** 設定と、見え方を確かめるためのダミー件数から作る状態 */
 function sampleState(m, { phase, counts, partial }){
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const spaceId = m.space || SPACES[0].id;
   const st = {
     phase,
     spaces: SPACES,
     models: MODELS,
-    spaceId: m.space || SPACES[0].id,
+    spaceId,
     modelKey: m.model || MODELS[0].key,
-    count: { fresh: counts['完了'] || 0, partial, total, counts, source:'notion' },
+    count: {
+      fresh: counts['完了'] || 0, partial, total, counts,
+      groups: sampleGroups(spaceId, counts), source:'counts'
+    },
     index: 0, total: 0, title:'', stage:'', error:'', result:null, cancel:false
   };
 
@@ -988,6 +1067,7 @@ function monitor(){
 
   if(F('space').value) m.space = F('space').value;
   if(F('model').value) m.model = F('model').value;
+  if(F('chart').value === 'bar') m.chart = 'bar';
 
   if(!F('showSpace').checked) m.showSpace = false;
   if(!F('showModel').checked) m.showModel = false;
@@ -1016,6 +1096,7 @@ function applyMonitor(m){
   F('threshold').value = Math.max(1, Number(m.threshold) || 1);
   if(SPACES.some(s => s.id === m.space)) F('space').value = m.space;
   F('model').value = MODELS.some(x => x.key === m.model) ? m.model : '';
+  F('chart').value = m.chart === 'bar' ? 'bar' : 'ring';
 
   F('showSpace').checked = m.showSpace !== false;
   F('showModel').checked = m.showModel !== false;
@@ -1829,7 +1910,7 @@ function wireDrag(){
 
 /* ---------- 入力 ---------- */
 
-['id','name','group','total','threshold','space','model',
+['id','name','group','total','threshold','space','model','chart',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
  'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
  'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items']
