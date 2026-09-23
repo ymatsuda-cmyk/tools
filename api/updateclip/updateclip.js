@@ -17,7 +17,7 @@
 import { listVideos, listVideosFromNotion } from '../../beta/clipstock/src/lib/store.js'
 import { fetchTranscript, saveGenerated, statusCounts } from '../../beta/clipstock/src/lib/gas.js'
 import { generateAll, stagesOf } from '../../beta/clipstock/src/lib/generate.js'
-import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf, defaultSpaceId } from '../../beta/clipstock/src/lib/spaces.js'
+import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../beta/clipstock/src/lib/spaces.js'
 import { loadSettings, connectionOf } from '../../beta/clipstock/src/lib/llm-settings.js'
 import { loadConfig, isConfigured } from '../../beta/clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../beta/clipstock/src/lib/filters.js'
@@ -162,8 +162,28 @@ function bucketsOf(space, counts) {
   })
 }
 
+/**
+ * 他のパターンを丸ごと含んでしまうパターン(実質「すべて」)。
+ * 内訳を並べると二重に数えることになるので、印を付けて呼び出し側で外せるようにする。
+ */
+function coveringSpaceIds(spaces) {
+  const sets = spaces.map((s) => ({ id: s.id, sources: new Set(s.sources || []) }))
+  return new Set(
+    sets
+      .filter((s) =>
+        sets.some(
+          (t) =>
+            t.id !== s.id &&
+            t.sources.size < s.sources.size &&
+            [...t.sources].every((id) => s.sources.has(id))
+        )
+      )
+      .map((s) => s.id)
+  )
+}
+
 /** パターン1つぶんの件数 */
-function summarize(space, counts) {
+function summarize(space, counts, covering) {
   const mode = spaceMode(space)
   const byStatus = {}
   let total = 0
@@ -181,6 +201,7 @@ function summarize(space, counts) {
     id: space.id,
     label: space.label,
     mode,
+    covering,
     total,
     counts: byStatus,
     fresh: byStatus[STATUS_DONE] || 0,
@@ -196,10 +217,11 @@ export async function countsAll({ refresh = false } = {}) {
   await ensureSpaces()
   const data = await statusCounts(refresh)
   const counts = data.counts || {}
+  const spaces = spaceList()
+  const covering = coveringSpaceIds(spaces)
   return {
     updatedAt: data.updatedAt || null,
-    defaultSpaceId: defaultSpaceId(),
-    spaces: spaceList().map((space) => summarize(space, counts)),
+    spaces: spaces.map((space) => summarize(space, counts, covering.has(space.id))),
   }
 }
 

@@ -565,17 +565,16 @@ function clipgenIdleRing(m, st){
 
 /** 棒グラフの中身。パターンごとに1本ずつ並べる(総覧の「すべて」は個別を全部含むので外す) */
 function clipgenBarRows(m, st){
-  if(!st.all) return [];
+  if(!st.all || !Array.isArray(st.all.spaces)) return [];
   return st.all.spaces
-    .filter(s => s.id !== st.all.defaultSpaceId)
+    .filter(s => !s.covering)
     .map(s => ({ label:s.label, value:clipgenMatched(m, s.counts), total:s.total }));
 }
 
 /** 棒の長さは一番多いもの基準、色はそのパターンの中での溜まり具合で決める */
 function clipgenBars(m, st){
-  if(!st.all) return '';
   const rows = clipgenBarRows(m, st);
-  if(!rows.length) return `<div class="gen-bars"><div class="sub">${esc(clipgenRingLabel(m))}</div><div class="mon-note">0件</div></div>`;
+  if(!rows.length) return '';
 
   const max = Math.max(1, ...rows.map(r => r.value));
   const hit = st.count ? clipgenMatched(m, st.count.counts) : 0;
@@ -963,7 +962,7 @@ function sampleSpaces(counts){
       share[status] = v;
       total += v;
     });
-    return { id:s.id, label:s.label, mode:s.id === 'music' ? 'music' : '',
+    return { id:s.id, label:s.label, mode:s.id === 'music' ? 'music' : '', covering:s.id === 'all',
       total, counts:share, fresh:share['完了'] || 0, partial:0 };
   });
 }
@@ -972,7 +971,7 @@ function sampleSpaces(counts){
 function sampleState(m, { phase, counts, partial }){
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const spaceId = m.space || SPACES[0].id;
-  const all = { updatedAt:new Date().toISOString(), defaultSpaceId:'all', spaces:sampleSpaces(counts) };
+  const all = { updatedAt:new Date().toISOString(), spaces:sampleSpaces(counts) };
   const st = {
     phase,
     spaces: SPACES,

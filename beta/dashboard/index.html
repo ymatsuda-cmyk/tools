@@ -2565,7 +2565,9 @@ function wireCalcVars(card){
    接続設定は clipstock と同じ localStorage を共有するので、ここでは持たない。
    ============================================================ */
 
-const CLIPGEN_MODULE = new URL('../../api/updateclip/updateclip.js', location.href).href;
+/* 更新したのに古いものを掋むことがあるので、読み込みのたびにURLを変える */
+const CLIPGEN_MODULE = new URL('../../api/updateclip/updateclip.js', location.href).href
+  + '?t=' + Date.now();
 
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
 const clipgenState = {};
@@ -2636,8 +2638,12 @@ function applyClipgenCount(st){
  */
 async function countClipgen(m, refresh){
   const st = clipgenState[m.id];
+  if(!st) return;
   try{
     const api = await clipgenModule();
+    if(typeof api.countsAll !== 'function'){
+      throw new Error('api/updateclip が古いままです。Ctrl+Shift+R で読み込み直してください');
+    }
     st.all = await api.countsAll({ refresh: Boolean(refresh) });
     applyClipgenCount(st);
     st.error = '';
@@ -2729,17 +2735,16 @@ function clipgenIdleRing(m, st){
 
 /** 棒グラフの中身。パターンごとに1本ずつ並べる(総覧の「すべて」は個別を全部含むので外す) */
 function clipgenBarRows(m, st){
-  if(!st.all) return [];
+  if(!st.all || !Array.isArray(st.all.spaces)) return [];
   return st.all.spaces
-    .filter(s => s.id !== st.all.defaultSpaceId)
+    .filter(s => !s.covering)
     .map(s => ({ label:s.label, value:clipgenMatched(m, s.counts), total:s.total }));
 }
 
 /** 棒の長さは一番多いもの基準、色はそのパターンの中での溜まり具合で決める */
 function clipgenBars(m, st){
-  if(!st.all) return '';
   const rows = clipgenBarRows(m, st);
-  if(!rows.length) return `<div class="gen-bars"><div class="sub">${esc(clipgenRingLabel(m))}</div><div class="mon-note">0件</div></div>`;
+  if(!rows.length) return '';
 
   const max = Math.max(1, ...rows.map(r => r.value));
   const hit = st.count ? clipgenMatched(m, st.count.counts) : 0;
