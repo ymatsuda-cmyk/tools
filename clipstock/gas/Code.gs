@@ -352,11 +352,10 @@ function sortByCreatedDesc_(items) {
   });
 }
 
-/** 一覧の1件。web記事は状態が空欄のものを取り込まない(下書きが混ざるため) */
+/** 一覧の1件。状態が空欄でもvideoと同様に「新規」として取り込む */
 function toListItem_(page, source) {
   var p = page.properties;
   var status = selectOf_(p, PROP_STATUS);
-  if (source === 'web' && !status) return null;
 
   return {
     key: page.id,
@@ -395,7 +394,6 @@ function listIdeas_() {
     var ideas = richTextOf_(p, PROP_IDEAS);
     if (!apply && !ideas) return;
     var status = selectOf_(p, PROP_STATUS);
-    if (source === 'web' && !status) return;
     items.push({
       key: page.id,
       source: source,
@@ -403,7 +401,7 @@ function listIdeas_() {
       url: urlOf_(p, PROP_URL),
       thumb: urlOf_(p, PROP_THUMB),
       tags: multiSelectOf_(p, PROP_TAGS),
-      status: status,
+      status: status || STATUS_NEW,
       apply: apply,
       ideas: ideas,
     });

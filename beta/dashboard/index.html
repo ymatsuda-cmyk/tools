@@ -2553,6 +2553,9 @@ const CLIPGEN_MODULE = new URL('../../api/updateclip/updateclip.js', location.hr
 /* カードごとの状態。定期更新で描き直されても消えないよう、DOMの外に置く */
 const clipgenState = {};
 
+/* 件数を数え直す次の時刻。他のカードと同じ周期で回す */
+const clipgenDueAt = {};
+
 const CLIPGEN_STATE_META = {
   loading: { color:'#66625A', label:'読み込み中' },
   idle   : { color:'#5FA8A0', label:'待機中'   },
@@ -2582,7 +2585,7 @@ function clipgenStateOf(m){
 }
 
 /** 選択肢をそろえる。1枚目のカードが読めば2枚目以降はモジュールのキャッシュに乗る */
-async function loadClipgenOptions(m){
+async function loadClipgenOptions(m, refresh){
   const st = clipgenState[m.id];
   try{
     const api = await clipgenModule();
@@ -2595,7 +2598,7 @@ async function loadClipgenOptions(m){
     }
     st.phase = 'idle';
     paintClipgen(m.id);
-    countClipgen(m);
+    countClipgen(m, refresh);
   }catch(err){
     st.phase = 'error';
     st.error = err.message || String(err);
@@ -2603,16 +2606,19 @@ async function loadClipgenOptions(m){
   }
 }
 
-/** 対象の件数を数える。静的JSONを読むだけなのでNotionは叩かない */
-async function countClipgen(m){
+/**
+ * 対象の件数を数える。GASが集計済みの件数だけを読むのでNotionの全件走査は起きない。
+ * refresh=true(カードの更新ボタン)のときだけ GAS 側で集計を作り直す。
+ */
+async function countClipgen(m, refresh){
   const st = clipgenState[m.id];
   if(!st.spaceId) return;
   try{
     const api = await clipgenModule();
-    const plan = await api.targets(st.spaceId);
+    const plan = await api.counts(st.spaceId, { refresh: Boolean(refresh) });
     st.count = {
-      fresh: plan.fresh.length,
-      partial: plan.partial.length,
+      fresh: plan.fresh,
+      partial: plan.partial,
       total: plan.total,
       counts: plan.counts,
       source: plan.source
@@ -2622,7 +2628,22 @@ async function countClipgen(m){
     st.count = null;
     st.error = err.message || String(err);
   }
+  clipgenDueAt[m.id] = Date.now() + intervalMsOf(m);
   paintClipgen(m.id);
+}
+
+/**
+ * 周期が来た件数カードを数え直す。GASの集計を読むだけなので、
+ * 他のカードと同じ間隔で回しても Notion には負担がかからない。
+ */
+function tickClipgenCounts(force){
+  const now = Date.now();
+  allMonitors().filter(m => monitorType(m) === 'clipgen').forEach(m=>{
+    const st = clipgenState[m.id];
+    if(!st || st.phase === 'loading' || st.phase === 'running') return;
+    if(!force && (clipgenDueAt[m.id] || 0) > now) return;
+    countClipgen(m);
+  });
 }
 
 /* カードの中身。設定の layout でこの並びを入れ替えられる */
@@ -4168,6 +4189,7 @@ async function recordManualUsage(id, delta, reset){
 async function fetchMonitors(force = true){
   const targets = fetchTargets();
   const now = Date.now();
+  tickClipgenCounts(force);
   const list = force ? targets : targets.filter(m => (monitorDueAt[m.id] || 0) <= now);
   if(list.length === 0){
     // 取得の要らないカード（ゴミ出し）だけのときも、日付が変われば描き直す
@@ -4207,7 +4229,7 @@ function refreshMonitorCard(id){
     const st = clipgenStateOf(m);
     st.phase = 'loading';
     paintClipgen(id);
-    loadClipgenOptions(m);
+    loadClipgenOptions(m, true);
   }else if(type === 'schedule'){
     const st = scheduleState[id];
     if(!st) return;

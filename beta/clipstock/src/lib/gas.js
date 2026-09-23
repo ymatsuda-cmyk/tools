@@ -109,6 +109,15 @@ export function listIdeas() {
   return callGas('listIdeas')
 }
 
+/**
+ * 取り込み元×分類ごとの、状態別件数だけを取る。
+ * GAS がプロパティに持っている集計を読むだけなので、Notion の全件走査は起きない。
+ * refresh=true のときだけ GAS 側で集計を作り直す(遅いので手動更新のときだけ)。
+ */
+export function statusCounts(refresh = false) {
+  return callGas('statusCounts', { refresh })
+}
+
 /** @returns {Promise<{text: string, updatedAt: string}>} */
 export function fetchTranscript(pageId) {
   return callGas('fetchTranscript', { pageId })

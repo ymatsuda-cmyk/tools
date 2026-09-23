@@ -15,9 +15,9 @@
  */
 
 import { listVideos, listVideosFromNotion } from '../../beta/clipstock/src/lib/store.js'
-import { fetchTranscript, saveGenerated } from '../../beta/clipstock/src/lib/gas.js'
+import { fetchTranscript, saveGenerated, statusCounts } from '../../beta/clipstock/src/lib/gas.js'
 import { generateAll, stagesOf } from '../../beta/clipstock/src/lib/generate.js'
-import { initSpaces, selectSpace, spaceList, spaceMode } from '../../beta/clipstock/src/lib/spaces.js'
+import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../beta/clipstock/src/lib/spaces.js'
 import { loadSettings, connectionOf } from '../../beta/clipstock/src/lib/llm-settings.js'
 import { loadConfig, isConfigured } from '../../beta/clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../beta/clipstock/src/lib/filters.js'
@@ -134,6 +134,68 @@ export async function targets(spaceId, { fromNotion = true } = {}) {
     counts,
     fresh,
     partial,
+  }
+}
+
+/**
+ * そのスペースが読む集計のかたまりを選ぶ。
+ * 分類で絞る取り込み元はその分類ぶんだけ、分類なしの取り込み元は受け皿なので、
+ * 同じスペースの他の取り込み元が取る分類を除いた残り全部を見る(store.js の割り当てと同じ規則)。
+ */
+function bucketsOf(space, counts) {
+  const sources = sourcesOf(space)
+  const claimed = new Map()
+  sources.forEach((s) => {
+    if (!s.category) return
+    const db = s.db || 'video'
+    if (!claimed.has(db)) claimed.set(db, new Set())
+    claimed.get(db).add(s.category)
+  })
+
+  return sources.flatMap((s) => {
+    const byCategory = counts[s.db || 'video'] || {}
+    if (s.category) return byCategory[s.category] ? [byCategory[s.category]] : []
+    const taken = claimed.get(s.db || 'video') || new Set()
+    return Object.entries(byCategory)
+      .filter(([category]) => !taken.has(category))
+      .map(([, bucket]) => bucket)
+  })
+}
+
+/**
+ * 件数だけを取る軽い入口。targets() と違って一覧そのものは取らないので、
+ * 「何件たまっているか」を出すだけのダッシュボードのカードはこちらを使う。
+ * fresh / partial は配列ではなく件数を返す。
+ */
+export async function counts(spaceId, { refresh = false } = {}) {
+  await ensureSpaces()
+  const space = selectSpace(spaceId)
+  const mode = spaceMode(space)
+
+  const data = await statusCounts(refresh)
+  const buckets = bucketsOf(space, data.counts || {})
+
+  const byStatus = {}
+  let total = 0
+  let partial = 0
+  buckets.forEach((b) => {
+    total += b.total || 0
+    partial += (b.partial && b.partial[mode]) || 0
+    Object.entries(b.status || {}).forEach(([status, n]) => {
+      byStatus[status] = (byStatus[status] || 0) + n
+    })
+  })
+
+  return {
+    spaceId: space.id,
+    spaceLabel: space.label,
+    mode,
+    source: 'counts',
+    total,
+    counts: byStatus,
+    fresh: byStatus[STATUS_DONE] || 0,
+    partial,
+    updatedAt: data.updatedAt || null,
   }
 }
 
