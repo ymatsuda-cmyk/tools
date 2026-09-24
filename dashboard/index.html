@@ -255,9 +255,10 @@
   .agent-issue-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
   .agent-issue-no{font-size:12px;color:var(--text-muted);flex-shrink:0;}
   .agent-issue-title{font-size:13px;flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agent-issue-note{font-size:12px;color:var(--text-secondary);padding-left:13px;}
+  .agent-warn{color:var(--danger);font-weight:600;}
   .agent-issue-meta{display:flex;align-items:center;gap:10px;padding-left:13px;}
-  .agent-issue-elapsed{font-size:11px;color:var(--text-secondary);flex-grow:1;}
-  .agent-issue-elapsed.warn{color:var(--danger);font-weight:600;}
+  .agent-issue-elapsed{font-size:11px;color:var(--text-muted);flex-grow:1;}
   .agent-issue-links{font-size:11px;display:flex;gap:8px;flex-shrink:0;}
   .agent-issue-links a{white-space:nowrap;}
   .agent-more{width:100%;box-sizing:border-box;border:none;border-top:1px solid var(--border);background:none;
@@ -3969,8 +3970,11 @@ function wireMinutes(card){
 
 /* ============================================================
    Issue状態ダッシュボード
-   utility/agent.html と同じ data/agent/dashboard.json を
-   api/agent/agent.api.js 経由で読み、フェーズごとにアコーディオンで出す
+   utility/agent.html（agent-dashboard-version: 4）と同じ data/agent/dashboard.json を
+   api/agent/agent.api.js 経由で読み、担当（人/Cline/自動連携/システム）＋終了の
+   5行をアコーディオンで出す。分類ロジック(classify)は agent.api.js 側にあり、
+   ここでは呼ぶだけ。agent.html と表示がずれないよう、行の色・ラベルは
+   agent.api.js の ACTORS をそのまま使う
    ============================================================ */
 
 const AGENT_MODULE = new URL('../api/agent/agent.api.js', location.href).href;
@@ -3983,16 +3987,8 @@ const AGENT_STATE_META = {
   error  : { color:'#D9694F', label:'エラー'     }
 };
 
-/* Issue単体の状態ドットの色。utility/agent.html の STATUS_COLORS(枠線色)に合わせる */
-const AGENT_STATUS_COLOR = {
-  created:'#66625A', queued:'#66625A', rework:'#E0B252',
-  implementing:'#5FA8A0', waiting_decision:'#E0B252', preview_deploying:'#5FA8A0',
-  waiting_approval:'#E0B252', approved:'#5FA8A0',
-  completed:'#7CC47C', rejected:'#66625A', failed:'#D9694F'
-};
-
-/* utility/agent.html の STUCK_THRESHOLD_SECONDS と同じ値。同期は agent.api.js 側が正 */
-const AGENT_STUCK_THRESHOLD = { waiting_approval: 2 * 3600, waiting_decision: 1 * 3600 };
+/* 「終了」行だけは担当が無いので、agent.api.js の ACTORS とは別に用意する */
+const AGENT_DONE_ROW = { key:'done', label:'終了' };
 
 const agentState = {};
 let agentApi = null;
@@ -4003,7 +3999,7 @@ async function agentModule(){
 }
 
 function emptyAgentCache(){
-  return { phase:'loading', issues:[], phases:[], error:'', loading:false, loadedAt:0 };
+  return { phase:'loading', issues:[], generatedAt:null, error:'', loading:false, loadedAt:0 };
 }
 
 /** カードの更新間隔が過ぎたときに取り直す */
@@ -4021,9 +4017,9 @@ async function loadAgent(m){
   cur.loading = true;
   try{
     const api = await agentModule();
-    const { issues, phases } = await api.recent({ dataUrl: m.dataUrl });
+    const { issues, generatedAt } = await api.recent({ dataUrl: m.dataUrl });
     cur.issues = issues;
-    cur.phases = phases;
+    cur.generatedAt = generatedAt;
     cur.phase = issues.length ? 'ok' : 'none';
     cur.error = '';
   }catch(err){
@@ -4035,109 +4031,109 @@ async function loadAgent(m){
   paintAgent(m.id);
 }
 
-/** 「N秒前」「N分前」…utility/agent.html の formatElapsed と同じ計算 */
-function agentElapsed(iso){
-  if(!iso) return { label:'', seconds:null };
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return { label:'', seconds:null };
-  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if(seconds < 60) return { label: seconds + '秒前', seconds };
-  const minutes = Math.floor(seconds / 60);
-  if(minutes < 60) return { label: minutes + '分前', seconds };
-  const hours = Math.floor(minutes / 60);
-  if(hours < 24) return { label: hours + '時間' + (minutes % 60) + '分前', seconds };
-  const days = Math.floor(hours / 24);
-  return { label: days + '日前', seconds };
+/** 担当ごとのグルーピングは「いま」からの経過時間で変わるので、描画のたびに計算し直す */
+function agentGroups(cur){
+  if(!agentApi || !cur.issues.length) return { human:[], cline:[], pa:[], system:[], done:[] };
+  return agentApi.groupByActor(cur.issues);
 }
 
-function agentIsStuck(item){
-  const threshold = AGENT_STUCK_THRESHOLD[item.status];
-  if(threshold == null || !item.updatedAt) return false;
-  return (Date.now() - new Date(item.updatedAt).getTime()) / 1000 >= threshold;
-}
-
-/** フェーズ行の色。終了フェーズは失敗が1件でもあれば赤にする */
-function agentPhaseColor(phase){
-  if(!phase.items.length) return '#66625A';
-  if(phase.key === 'done') return phase.items.some(i => i.status === 'failed') ? '#D9694F' : '#7CC47C';
-  if(phase.key === 'implementing') return '#5FA8A0';
-  if(phase.key === 'approval') return '#E0B252';
-  return '#66625A';
-}
-
-function agentPhaseSub(phase){
-  if(!phase.items.length) return { text:'なし', warn:false };
-  if(phase.key === 'done'){
-    const done = phase.items.filter(i => i.status === 'completed').length;
-    const rejected = phase.items.filter(i => i.status === 'rejected').length;
-    const failed = phase.items.filter(i => i.status === 'failed').length;
-    return { text: `完了 ${done} ・却下 ${rejected} ・失敗 ${failed}`, warn: failed > 0 };
+function agentRowColor(row, items){
+  if(row.key === 'done'){
+    if(!items.length) return '#66625A';
+    const hasOrphan = items.some(({ issue }) => !agentApi.TERMINAL.includes(issue.status));
+    return hasOrphan ? '#D9694F' : '#7CC47C';
   }
-  const first = phase.items[0];
-  const e = agentElapsed(first.updatedAt);
-  return { text: `#${first.number} ${first.title}${e.label ? ' ・' + e.label : ''}`, warn:false };
+  return items.length ? row.color[1] : '#66625A';
 }
 
-function agentIssueRow(item){
-  const color = AGENT_STATUS_COLOR[item.status] || '#66625A';
-  const e = agentElapsed(item.updatedAt);
-  const stuck = agentIsStuck(item);
+function agentRowSub(row, items){
+  if(!items.length) return { text:'なし', warn:false };
+  if(row.key === 'done'){
+    const completed = items.filter(({ issue }) => issue.status === 'completed').length;
+    const rejected = items.filter(({ issue }) => issue.status === 'rejected').length;
+    const orphan = items.length - completed - rejected;
+    return { text: `完了 ${completed} ・却下 ${rejected} ・退避 ${orphan}`, warn: orphan > 0 };
+  }
+  const first = items[0];
+  const e = agentApi.formatElapsed(agentApi.secondsSince(first.issue.updatedAt));
+  return { text: `#${first.issue.number} ${first.issue.title}${e ? ' ・' + e : ''}`, warn: !!first.result.warn };
+}
+
+function agentDoneIssueColor(issue){
+  if(issue.status === 'completed') return '#4A8A3F';
+  if(issue.status === 'rejected') return '#66625A';
+  return '#D9694F';   // 退避済み（非terminalのまま終了扱いになったもの）
+}
+
+function agentIssueRow(row, item){
+  const { issue, result } = item;
+  const e = agentApi.formatElapsed(agentApi.secondsSince(issue.updatedAt));
+  const color = row.key === 'done' ? agentDoneIssueColor(issue) : (row.color[1]);
+  const noteText = row.key === 'done' ? agentApi.doneLabel(issue) : result.note;
+  const warnText = row.key === 'done'
+    ? (issue.pendingNotifications && issue.pendingNotifications.count
+        ? '未送信通知' + issue.pendingNotifications.count + '件' : '')
+    : (result.warn || '');
   const links = [];
-  if(item.issueUrl) links.push(`<a href="${esc(item.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
-  if(item.pullRequestUrl) links.push(`<a href="${esc(item.pullRequestUrl)}" target="_blank" rel="noopener">PR</a>`);
-  if(item.previewUrl) links.push(`<a href="${esc(item.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
+  if(issue.issueUrl) links.push(`<a href="${esc(issue.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
+  if(issue.prUrl) links.push(`<a href="${esc(issue.prUrl)}" target="_blank" rel="noopener">PR</a>`);
+  if(issue.previewUrl) links.push(`<a href="${esc(issue.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
   return `
     <div class="agent-issue">
       <div class="agent-issue-head">
         <span class="agent-issue-dot" style="background:${color}"></span>
-        <span class="agent-issue-no">#${esc(item.number)}</span>
-        <span class="agent-issue-title">${esc(item.title)}</span>
+        <span class="agent-issue-no">#${esc(issue.number)}</span>
+        <span class="agent-issue-title">${esc(issue.title)}</span>
       </div>
+      <div class="agent-issue-note">${esc(noteText)}${warnText ? ` <span class="agent-warn">${esc(warnText)}</span>` : ''}</div>
       <div class="agent-issue-meta">
-        <span class="agent-issue-elapsed${stuck ? ' warn' : ''}">${esc(item.status)}${e.label ? ' ・' + e.label : ''}${stuck ? ' ・放置' : ''}</span>
+        <span class="agent-issue-elapsed">${esc(e)}${e && issue.status ? ' ・' : ''}${esc(issue.status || '')}</span>
         ${links.length ? `<span class="agent-issue-links">${links.join('')}</span>` : ''}
       </div>
     </div>`;
 }
 
-function agentIssuesHtml(m, phase, st){
-  if(!phase.items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
+function agentIssuesHtml(m, row, items, st){
+  if(!items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
   const max = Math.max(1, Math.min(20, Number(m.max) || 5));
-  const showAll = st.expandedFull.has(phase.key);
-  const shown = showAll ? phase.items : phase.items.slice(0, max);
-  const rows = shown.map(agentIssueRow).join('');
-  const more = (!showAll && phase.items.length > max)
-    ? `<button type="button" class="agent-more" data-agent-more="${esc(m.id)}:${esc(phase.key)}">残り${phase.items.length - max}件を表示</button>`
+  const showAll = st.expandedFull.has(row.key);
+  const shown = showAll ? items : items.slice(0, max);
+  const rows = shown.map(item => agentIssueRow(row, item)).join('');
+  const more = (!showAll && items.length > max)
+    ? `<button type="button" class="agent-more" data-agent-more="${esc(m.id)}:${esc(row.key)}">残り${items.length - max}件を表示</button>`
     : '';
   return `<div class="agent-issues">${rows}${more}</div>`;
 }
 
-function agentPhaseRow(m, phase, st){
-  const isOpen = st.expanded.has(phase.key);
-  const color = agentPhaseColor(phase);
-  const sub = agentPhaseSub(phase);
-  const count = phase.items.length;
+function agentRowHtml(m, row, items, st){
+  const isOpen = st.expanded.has(row.key);
+  const color = agentRowColor(row, items);
+  const sub = agentRowSub(row, items);
+  const count = items.length;
   return `
     <button type="button" class="agent-phase${isOpen ? ' open' : ''}" aria-expanded="${isOpen}"
-      data-agent-phase="${esc(m.id)}:${esc(phase.key)}">
+      data-agent-phase="${esc(m.id)}:${esc(row.key)}">
       <span class="agent-bar" style="background:${color}"></span>
       <span class="agent-count${count ? ' has' : ''}">${count}</span>
       <span class="agent-info">
-        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(phase.label)}</span>
+        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(row.label)}</span>
         <span class="agent-sub${sub.warn ? ' warn' : ''}">${esc(sub.text)}</span>
       </span>
       <svg class="agent-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
       </svg>
     </button>
-    ${isOpen ? agentIssuesHtml(m, phase, st) : ''}`;
+    ${isOpen ? agentIssuesHtml(m, row, items, st) : ''}`;
 }
 
 function agentBodyContent(m, st){
   const cur = st.cache;
   if(cur.error && !cur.issues.length) return `<div class="mon-err">${esc(cur.error)}</div>`;
-  if(!cur.phases.length) return `<div class="agent-empty">読み込み中…</div>`;
-  return cur.phases.map(phase => agentPhaseRow(m, phase, st)).join('');
+  if(!agentApi) return `<div class="agent-empty">読み込み中…</div>`;
+
+  const groups = agentGroups(cur);
+  const rows = [...agentApi.ACTORS, AGENT_DONE_ROW];
+  return rows.map(row => agentRowHtml(m, row, groups[row.key] || [], st)).join('');
 }
 
 function renderAgentCard(m){

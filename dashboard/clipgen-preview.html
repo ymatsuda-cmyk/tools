@@ -1746,6 +1746,9 @@ function wireMinutesPreview(){
 }
 
 /* ---------- Issue状態ダッシュボード ---------- */
+/* utility/agent.html（agent-dashboard-version: 4）・api/agent/agent.api.js と同じロジック。
+   通信せず完全にオフラインの見本なので import はせず、ここに複製してある。
+   分類（担当への振り分け）を直すときは api/agent/agent.api.js 側も合わせて直すこと */
 
 const AGENT_STATE_META = {
   ok   : { color:'#5FA8A0', label:'取得済み' },
@@ -1753,63 +1756,102 @@ const AGENT_STATE_META = {
   error: { color:'#D9694F', label:'エラー'   }
 };
 
-/* utility/agent.html の PHASES と同じ並び・グルーピング */
-const AGENT_PHASES = [
-  ['waiting',      '待機中',   ['created', 'queued', 'rework']],
-  ['implementing', '実装中',   ['implementing', 'waiting_decision', 'preview_deploying']],
-  ['approval',     '承認待ち', ['waiting_approval', 'approved']],
-  ['done',         '終了',     ['completed', 'rejected', 'failed']]
+/* agent.api.js の ACTORS と同じ並び・色 */
+const AGENT_ACTORS = [
+  { key:'human',  label:'人の対応待ち',   color:['#FAEEDA', '#BA7517', '#633806'] },
+  { key:'cline',  label:'Cline作業中',    color:['#E6F1FB', '#378ADD', '#0C447C'] },
+  { key:'pa',     label:'自動連携待ち',   color:['#EEEDFE', '#7F77DD', '#3C3489'] },
+  { key:'system', label:'システム処理中', color:['#F1EFE8', '#888780', '#444441'] }
 ];
+const AGENT_DONE_ROW = { key:'done', label:'終了' };
 
-/* utility/agent.html の STUCK_THRESHOLD_SECONDS と同じ値 */
-const AGENT_STUCK_THRESHOLD = { waiting_approval: 2 * 3600, waiting_decision: 1 * 3600 };
+const AGENT_PA_STALE_SECONDS = 180;
+const AGENT_TERMINAL = ['completed', 'rejected'];
 
-/* Issue単体の状態ドットの色。index.html / utility/agent.html の STATUS_COLORS(枠線色)に合わせる */
-const AGENT_STATUS_COLOR = {
-  created:'#66625A', queued:'#66625A', rework:'#E0B252',
-  implementing:'#5FA8A0', waiting_decision:'#E0B252', preview_deploying:'#5FA8A0',
-  waiting_approval:'#E0B252', approved:'#5FA8A0',
-  completed:'#7CC47C', rejected:'#66625A', failed:'#D9694F'
+/* agent.api.js の STATUS_MAP と同じ */
+const AGENT_STATUS_MAP = {
+  created:           ['system', '着手待ち（空き枠待ち）', 1800, '停滞'],
+  queued:            ['system', '着手準備中',             1800, '停滞'],
+  rework:            ['system', '再実装の着手待ち',       1800, '停滞'],
+  preview_deploying: ['system', '検証サイトへ公開中',     1800, '停滞'],
+  approved:          ['system', 'マージ処理中',           1800, '停滞'],
+  implementing:      ['cline',  'Clineが実装中',          3600, '長時間・停止の可能性'],
+  waiting_decision:  ['human',  'Teamsで質問の回答待ち',  3600, '放置'],
+  waiting_approval:  ['human',  'Teamsで承認待ち',        7200, '放置'],
+  failed:            ['human',  '停止・要対応',           null, '']
 };
 
 const SAMPLE_AGENT_ISSUES = [
-  { number:74, title:'issue', status:'implementing', hoursAgo:16, issueUrl:'https://github.com/example/tools/issues/74' },
-  { number:63, title:'issue', status:'implementing', hoursAgo:50, issueUrl:'https://github.com/example/tools/issues/63' },
-  { number:64, title:'issue', status:'implementing', hoursAgo:49, issueUrl:'https://github.com/example/tools/issues/64' },
-  { number:70, title:'(タイトルなし)', status:'failed', hoursAgo:17 },
-  { number:77, title:'issue', status:'completed', hoursAgo:0.5,
+  { number:74, title:'issue', status:'implementing', hoursAgo:18, archived:false },
+  { number:58, title:'dashboardの場所を移動', status:'waiting_approval', hoursAgo:52, archived:true, pendingNotifications:{ count:10, hoursAgo:53 } },
+  { number:77, title:'issue', status:'completed', hoursAgo:2.6, archived:true,
     issueUrl:'https://github.com/example/tools/issues/77', pullRequestUrl:'https://github.com/example/tools/pull/77' },
-  { number:75, title:'issue', status:'completed', hoursAgo:15,
+  { number:75, title:'issue', status:'completed', hoursAgo:17, archived:true,
     issueUrl:'https://github.com/example/tools/issues/75', pullRequestUrl:'https://github.com/example/tools/pull/75' },
-  { number:8,  title:'却下されたIssue', status:'rejected', hoursAgo:48 }
+  { number:72, title:'issue', status:'rejected', hoursAgo:18.5, archived:true },
+  { number:67, title:'issue', status:'failed', hoursAgo:26, archived:true },
+  { number:64, title:'issue', status:'implementing', hoursAgo:27, archived:true }
 ];
 
 /* この見本の中だけで覚えておく展開状態（保存はしない） */
 let agentExpanded = new Set();
 let agentExpandedFull = new Set();
 
-/** 「N秒前」「N分前」…utility/agent.html の formatElapsed と同じ計算 */
-function agentElapsed(iso){
-  if(!iso) return { label:'', seconds:null };
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return { label:'', seconds:null };
-  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if(seconds < 60) return { label: seconds + '秒前', seconds };
+/** 「N秒前」「N分前」…agent.api.js の formatElapsed と同じ計算 */
+function agentFormatElapsed(seconds){
+  if(seconds == null) return '';
+  if(seconds < 60) return seconds + '秒前';
   const minutes = Math.floor(seconds / 60);
-  if(minutes < 60) return { label: minutes + '分前', seconds };
+  if(minutes < 60) return minutes + '分前';
   const hours = Math.floor(minutes / 60);
-  if(hours < 24) return { label: hours + '時間' + (minutes % 60) + '分前', seconds };
-  const days = Math.floor(hours / 24);
-  return { label: days + '日前', seconds };
+  if(hours < 24) return hours + '時間' + (minutes % 60) + '分前';
+  return Math.floor(hours / 24) + '日前';
 }
 
-function agentIsStuck(item){
-  const threshold = AGENT_STUCK_THRESHOLD[item.status];
-  if(threshold == null || !item.updatedAt) return false;
-  return (Date.now() - new Date(item.updatedAt).getTime()) / 1000 >= threshold;
+function agentSecondsSince(iso){
+  if(!iso) return null;
+  const t = new Date(iso).getTime();
+  if(isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 1000));
 }
 
-/** JSONには出ない、プレビュー用のIssue一覧。hoursAgo から updatedAt を組み立てる */
+/** 1件を担当(actor)に振り分ける。agent.api.js の classify() と同じロジック */
+function agentClassify(issue){
+  const status = (issue.status || '').toLowerCase();
+  const pending = issue.pendingNotifications || {};
+  const pendingAge = agentSecondsSince(pending.oldestAt);
+
+  if(issue.archived || AGENT_TERMINAL.includes(status)) return { actor:'done' };
+
+  if(pending.count > 0 && pendingAge != null && pendingAge >= AGENT_PA_STALE_SECONDS){
+    return {
+      actor:'pa',
+      note: `Teams通知 ${pending.count}件が未送信`,
+      warn: agentFormatElapsed(pendingAge).replace('前', '') + ' 滞留'
+    };
+  }
+
+  const entry = AGENT_STATUS_MAP[status] || ['system', issue.statusLabel || status, null, ''];
+  const age = agentSecondsSince(issue.updatedAt);
+  let note = entry[1];
+  if(status === 'failed' && issue.error) note += '：' + issue.error;
+  const warn = entry[2] != null && age != null && age >= entry[2] ? entry[3] : '';
+  return { actor: entry[0], note, warn };
+}
+
+/** 終了に振り分けられた1件のラベル。agent.api.js の doneLabel() と同じ */
+function agentDoneLabel(issue){
+  const orphan = !AGENT_TERMINAL.includes(issue.status);
+  return orphan ? `退避済み（${issue.statusLabel || issue.status}のまま）` : (issue.statusLabel || issue.status);
+}
+
+function agentDoneIssueColor(issue){
+  if(issue.status === 'completed') return '#4A8A3F';
+  if(issue.status === 'rejected') return '#66625A';
+  return '#D9694F';
+}
+
+/** JSONには出ない、プレビュー用のIssue一覧。hoursAgo から updatedAt / pendingNotifications.oldestAt を組み立てる */
 function dummyAgentIssues(){
   let rows = [];
   let error = '';
@@ -1820,100 +1862,114 @@ function dummyAgentIssues(){
     error = 'Issue一覧を読み取れません: ' + err.message;
   }
 
-  const issues = rows.map((r, i)=>({
-    number: r.number != null ? r.number : i + 1,
-    title: r.title || '(タイトルなし)',
-    status: String(r.status || '').toLowerCase(),
-    updatedAt: new Date(Date.now() - (Number(r.hoursAgo) || 0) * 3600 * 1000).toISOString(),
-    issueUrl: r.issueUrl || null,
-    pullRequestUrl: r.pullRequestUrl || null,
-    previewUrl: r.previewUrl || null
-  })).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const issues = rows.map((r, i)=>{
+    const pending = r.pendingNotifications;
+    return {
+      number: r.number != null ? r.number : i + 1,
+      title: r.title || '(タイトルなし)',
+      status: String(r.status || '').toLowerCase(),
+      statusLabel: r.statusLabel || r.status || '',
+      error: r.error || '',
+      updatedAt: new Date(Date.now() - (Number(r.hoursAgo) || 0) * 3600 * 1000).toISOString(),
+      issueUrl: r.issueUrl || null,
+      prUrl: r.pullRequestUrl || null,
+      previewUrl: r.previewUrl || null,
+      archived: !!r.archived,
+      pendingNotifications: pending
+        ? { count: pending.count || 0, oldestAt: new Date(Date.now() - (Number(pending.hoursAgo) || 0) * 3600 * 1000).toISOString() }
+        : { count: 0, oldestAt: null }
+    };
+  }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
-  const phases = AGENT_PHASES.map(([key, label, statuses]) => ({
-    key, label,
-    items: issues.filter(i => statuses.includes(i.status))
-  }));
-  const known = new Set(AGENT_PHASES.flatMap(([, , statuses]) => statuses));
-  const orphans = issues.filter(i => !known.has(i.status));
-  if(orphans.length) phases[phases.length - 1].items.push(...orphans);
+  const groups = { human:[], cline:[], pa:[], system:[], done:[] };
+  issues.forEach(issue => {
+    const result = agentClassify(issue);
+    groups[result.actor].push({ issue, result });
+  });
 
-  return { phase: error ? 'error' : issues.length ? 'ok' : 'none', error, issues, phases };
+  return { phase: error ? 'error' : issues.length ? 'ok' : 'none', error, issues, groups };
 }
 
-function agentPhaseColor(phase){
-  if(!phase.items.length) return '#66625A';
-  if(phase.key === 'done') return phase.items.some(i => i.status === 'failed') ? '#D9694F' : '#7CC47C';
-  if(phase.key === 'implementing') return '#5FA8A0';
-  if(phase.key === 'approval') return '#E0B252';
-  return '#66625A';
-}
-
-function agentPhaseSub(phase){
-  if(!phase.items.length) return { text:'なし', warn:false };
-  if(phase.key === 'done'){
-    const done = phase.items.filter(i => i.status === 'completed').length;
-    const rejected = phase.items.filter(i => i.status === 'rejected').length;
-    const failed = phase.items.filter(i => i.status === 'failed').length;
-    return { text: `完了 ${done} ・却下 ${rejected} ・失敗 ${failed}`, warn: failed > 0 };
+function agentRowColor(row, items){
+  if(row.key === 'done'){
+    if(!items.length) return '#66625A';
+    const hasOrphan = items.some(({ issue }) => !AGENT_TERMINAL.includes(issue.status));
+    return hasOrphan ? '#D9694F' : '#7CC47C';
   }
-  const first = phase.items[0];
-  const e = agentElapsed(first.updatedAt);
-  return { text: `#${first.number} ${first.title}${e.label ? ' ・' + e.label : ''}`, warn:false };
+  return items.length ? row.color[1] : '#66625A';
 }
 
-function agentIssueRow(item){
-  const color = AGENT_STATUS_COLOR[item.status] || '#66625A';
-  const e = agentElapsed(item.updatedAt);
-  const stuck = agentIsStuck(item);
+function agentRowSub(row, items){
+  if(!items.length) return { text:'なし', warn:false };
+  if(row.key === 'done'){
+    const completed = items.filter(({ issue }) => issue.status === 'completed').length;
+    const rejected = items.filter(({ issue }) => issue.status === 'rejected').length;
+    const orphan = items.length - completed - rejected;
+    return { text: `完了 ${completed} ・却下 ${rejected} ・退避 ${orphan}`, warn: orphan > 0 };
+  }
+  const first = items[0];
+  const e = agentFormatElapsed(agentSecondsSince(first.issue.updatedAt));
+  return { text: `#${first.issue.number} ${first.issue.title}${e ? ' ・' + e : ''}`, warn: !!first.result.warn };
+}
+
+function agentIssueRow(row, item){
+  const { issue, result } = item;
+  const e = agentFormatElapsed(agentSecondsSince(issue.updatedAt));
+  const color = row.key === 'done' ? agentDoneIssueColor(issue) : row.color[1];
+  const noteText = row.key === 'done' ? agentDoneLabel(issue) : result.note;
+  const warnText = row.key === 'done'
+    ? (issue.pendingNotifications && issue.pendingNotifications.count
+        ? '未送信通知' + issue.pendingNotifications.count + '件' : '')
+    : (result.warn || '');
   const links = [];
-  if(item.issueUrl) links.push(`<a href="${esc(item.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
-  if(item.pullRequestUrl) links.push(`<a href="${esc(item.pullRequestUrl)}" target="_blank" rel="noopener">PR</a>`);
-  if(item.previewUrl) links.push(`<a href="${esc(item.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
+  if(issue.issueUrl) links.push(`<a href="${esc(issue.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
+  if(issue.prUrl) links.push(`<a href="${esc(issue.prUrl)}" target="_blank" rel="noopener">PR</a>`);
+  if(issue.previewUrl) links.push(`<a href="${esc(issue.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
   return `
     <div class="agent-issue">
       <div class="agent-issue-head">
         <span class="agent-issue-dot" style="background:${color}"></span>
-        <span class="agent-issue-no">#${esc(item.number)}</span>
-        <span class="agent-issue-title">${esc(item.title)}</span>
+        <span class="agent-issue-no">#${esc(issue.number)}</span>
+        <span class="agent-issue-title">${esc(issue.title)}</span>
       </div>
+      <div class="agent-issue-note">${esc(noteText)}${warnText ? ` <span class="agent-warn">${esc(warnText)}</span>` : ''}</div>
       <div class="agent-issue-meta">
-        <span class="agent-issue-elapsed${stuck ? ' warn' : ''}">${esc(item.status)}${e.label ? ' ・' + e.label : ''}${stuck ? ' ・放置' : ''}</span>
+        <span class="agent-issue-elapsed">${esc(e)}${e && issue.status ? ' ・' : ''}${esc(issue.status || '')}</span>
         ${links.length ? `<span class="agent-issue-links">${links.join('')}</span>` : ''}
       </div>
     </div>`;
 }
 
-function agentIssuesHtml(m, phase){
-  if(!phase.items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
+function agentIssuesHtml(m, row, items){
+  if(!items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
   const max = Math.max(1, Math.min(20, Number(m.max) || 5));
-  const showAll = agentExpandedFull.has(phase.key);
-  const shown = showAll ? phase.items : phase.items.slice(0, max);
-  const rows = shown.map(agentIssueRow).join('');
-  const more = (!showAll && phase.items.length > max)
-    ? `<button type="button" class="agent-more" data-agent-more="${esc(phase.key)}">残り${phase.items.length - max}件を表示</button>`
+  const showAll = agentExpandedFull.has(row.key);
+  const shown = showAll ? items : items.slice(0, max);
+  const rows = shown.map(item => agentIssueRow(row, item)).join('');
+  const more = (!showAll && items.length > max)
+    ? `<button type="button" class="agent-more" data-agent-more="${esc(row.key)}">残り${items.length - max}件を表示</button>`
     : '';
   return `<div class="agent-issues">${rows}${more}</div>`;
 }
 
-function agentPhaseRow(m, phase){
-  const isOpen = agentExpanded.has(phase.key);
-  const color = agentPhaseColor(phase);
-  const sub = agentPhaseSub(phase);
-  const count = phase.items.length;
+function agentRowHtml(m, row, items){
+  const isOpen = agentExpanded.has(row.key);
+  const color = agentRowColor(row, items);
+  const sub = agentRowSub(row, items);
+  const count = items.length;
   return `
-    <button type="button" class="agent-phase${isOpen ? ' open' : ''}" aria-expanded="${isOpen}" data-agent-phase="${esc(phase.key)}">
+    <button type="button" class="agent-phase${isOpen ? ' open' : ''}" aria-expanded="${isOpen}" data-agent-phase="${esc(row.key)}">
       <span class="agent-bar" style="background:${color}"></span>
       <span class="agent-count${count ? ' has' : ''}">${count}</span>
       <span class="agent-info">
-        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(phase.label)}</span>
+        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(row.label)}</span>
         <span class="agent-sub${sub.warn ? ' warn' : ''}">${esc(sub.text)}</span>
       </span>
       <svg class="agent-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
       </svg>
     </button>
-    ${isOpen ? agentIssuesHtml(m, phase) : ''}`;
+    ${isOpen ? agentIssuesHtml(m, row, items) : ''}`;
 }
 
 function renderAgentCard(m, st){
@@ -1921,7 +1977,7 @@ function renderAgentCard(m, st){
   const url = m.dashboardUrl || 'https://ymatsuda-cmyk.github.io/tools-beta/utility/agent.html';
   const body = st.phase === 'error'
     ? `<div class="mon-err">${esc(st.error)}</div>`
-    : st.phases.map(phase => agentPhaseRow(m, phase)).join('');
+    : [...AGENT_ACTORS, AGENT_DONE_ROW].map(row => agentRowHtml(m, row, st.groups[row.key] || [])).join('');
   return `
     <div class="mon-card" data-monitor="${esc(m.id)}">
       <div class="mon-head">
