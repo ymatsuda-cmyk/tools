@@ -282,6 +282,11 @@ mark { background: var(--highlight); color: inherit; }
 }
 .card-edit:hover { background: var(--accent-bg); color: var(--text-primary); }
 .card-delete:hover { background: var(--accent-bg); color: var(--danger-text); }
+/* お気に入り。この端末だけの印なので canEdit に関わらず常に出す */
+.card-fav.on { color: var(--warn-text); }
+.card-fav:hover { background: var(--accent-bg); color: var(--warn-text); }
+.btn-fav.on { color: var(--warn-text); }
+.btn-fav.on:hover { color: var(--warn-text); }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .badge {

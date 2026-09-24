@@ -84,11 +84,16 @@ function progressHtml(item) {
 
 export function renderLibrary(container, items, state, handlers) {
   if (!items.length) {
+    const empty = state.emptyState || {
+      icon: 'ti-movie',
+      text: '該当する動画がありません',
+      hint: 'Notionの動画DBにURLを追加すると、次のバッチで文字起こしまで進みます',
+    }
     container.innerHTML = `
       <div class="empty-state">
-        <i class="ti ti-movie" aria-hidden="true"></i>
-        <p>該当する動画がありません</p>
-        <p class="empty-hint">Notionの動画DBにURLを追加すると、次のバッチで文字起こしまで進みます</p>
+        <i class="ti ${empty.icon}" aria-hidden="true"></i>
+        <p>${empty.text}</p>
+        <p class="empty-hint">${empty.hint}</p>
       </div>`
     return
   }
@@ -96,8 +101,9 @@ export function renderLibrary(container, items, state, handlers) {
   container.innerHTML = `
     <div class="grid">
       ${items
-        .map(
-          (item) => `
+        .map((item) => {
+          const fav = state.favorite(item.key)
+          return `
         <article class="card ${state.seen(item.key) ? '' : 'unseen'}" data-key="${escapeHtml(item.key)}" tabindex="0">
           ${thumbHtml(item)}
           <div class="card-body">
@@ -108,13 +114,14 @@ export function renderLibrary(container, items, state, handlers) {
               <span class="badge s-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
               ${progressHtml(item)}
               <span class="card-date">${fmtDate(item.createdAt)}</span>
+              <button class="card-edit card-fav ${fav ? 'on' : ''}" data-key="${escapeHtml(item.key)}" aria-label="${fav ? 'お気に入りから外す' : 'お気に入りに追加'}" aria-pressed="${fav}"><i class="ti ti-star" aria-hidden="true"></i></button>
               ${state.canEdit ? `<button class="card-edit" data-key="${escapeHtml(item.key)}" aria-label="この動画の情報を編集"><i class="ti ti-pencil" aria-hidden="true"></i></button>` : ''}
               ${state.canEdit ? `<button class="card-edit card-delete" data-key="${escapeHtml(item.key)}" aria-label="この動画を削除"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}
             </div>
             ${state.showTags && item.tags?.length ? `<div class="card-tags">${item.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </div>
         </article>`
-        )
+        })
         .join('')}
     </div>
   `
@@ -130,7 +137,14 @@ export function renderLibrary(container, items, state, handlers) {
     })
   })
 
-  container.querySelectorAll('.card-edit').forEach((btn) => {
+  container.querySelectorAll('.card-fav').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation() // カードのクリック(詳細を開く)と競合させない
+      handlers.onToggleFavorite(btn.dataset.key)
+    })
+  })
+
+  container.querySelectorAll('.card-edit:not(.card-fav)').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation() // カードのクリック(詳細を開く)と競合させない
       if (btn.classList.contains('card-delete')) handlers.onDelete(btn.dataset.key)
@@ -387,6 +401,7 @@ export function detailHtml(item, state) {
           ${d.model ? `<span class="model-badge">${escapeHtml(d.model)}</span>` : ''}
         </div>
       </div>
+      <button class="btn-ghost btn-fav ${state.favorite ? 'on' : ''}" aria-label="${state.favorite ? 'お気に入りから外す' : 'お気に入りに追加'}" aria-pressed="${Boolean(state.favorite)}"><i class="ti ti-star" aria-hidden="true"></i></button>
       ${item.url ? `<a class="btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" aria-label="${item.source === 'web' ? '元記事を開く' : 'YouTubeで開く'}"><i class="ti ti-external-link" aria-hidden="true"></i></a>` : ''}
       ${canEdit ? '<button class="btn-ghost btn-more" aria-label="その他の操作"><i class="ti ti-dots" aria-hidden="true"></i></button>' : ''}
     </div>

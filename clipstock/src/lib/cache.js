@@ -63,3 +63,38 @@ export function seenAt(pageId) {
 export function isSeen(pageId) {
   return Boolean(loadSeenMap()[pageId])
 }
+
+// --- お気に入り ---
+// 端末ごとの個人的な印付け。既読と同じ理由でNotionには書き戻さない。
+
+const FAVORITE_KEY = 'videos:favorites'
+
+function loadFavoriteMap() {
+  try {
+    return JSON.parse(localStorage.getItem(FAVORITE_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+function saveFavoriteMap(map) {
+  try {
+    localStorage.setItem(FAVORITE_KEY, JSON.stringify(map))
+  } catch {
+    // 容量超過などは黙って諦める。お気に入りが無くても動く
+  }
+}
+
+export function isFavorite(pageId) {
+  return Boolean(loadFavoriteMap()[pageId])
+}
+
+/** @returns {boolean} 切り替え後の状態 */
+export function toggleFavorite(pageId) {
+  const map = loadFavoriteMap()
+  const next = !map[pageId]
+  if (next) map[pageId] = new Date().toISOString()
+  else delete map[pageId]
+  saveFavoriteMap(map)
+  return next
+}

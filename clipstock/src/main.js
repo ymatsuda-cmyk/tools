@@ -48,7 +48,7 @@ import {
   setSectionRank,
   setSectionRankByHeading,
 } from './lib/sections.js'
-import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen } from './lib/cache.js'
+import { getDetailCache, setDetailCache, clearDetailCache, isCacheFresh, markSeen, isSeen, isFavorite, toggleFavorite } from './lib/cache.js'
 import {
   excludeExcluded,
   filterByStatus,
@@ -88,7 +88,7 @@ const syncEl = $('sync-status')
 let items = []
 // 表示中の一覧がいつ時点のものか。設定画面でJSONを見せるときに使う
 let listMeta = { generatedAt: null }
-let view = 'library' // 'library' | 'detail' | 'ideas' | 'mindmaps' | 'crosschat'
+let view = 'library' // 'library' | 'favorites' | 'detail' | 'ideas' | 'mindmaps' | 'crosschat'
 let selectedKey = null
 let searchQuery = ''
 let showTags = true
@@ -200,12 +200,46 @@ function refresh() {
     return
   }
 
+  if (view === 'favorites') {
+    renderLibrary(
+      stageEl,
+      currentItems().filter((i) => isFavorite(i.key)),
+      {
+        searchQuery,
+        showTags,
+        seen: isSeen,
+        favorite: isFavorite,
+        canEdit: canEdit(loadConfig()),
+        emptyState: {
+          icon: 'ti-star',
+          text: 'お気に入りはまだありません',
+          hint: 'カードの星アイコンを押すと、ここに集まります(この端末だけの印です)',
+        },
+      },
+      { onOpen: openDetail, onEdit: openCardEditor, onDelete: deleteCard, onToggleFavorite: onToggleFavoriteCard }
+    )
+    return
+  }
+
   renderLibrary(
     stageEl,
     currentItems(),
-    { searchQuery, showTags, seen: isSeen, canEdit: canEdit(loadConfig()) },
-    { onOpen: openDetail, onEdit: openCardEditor, onDelete: deleteCard }
+    { searchQuery, showTags, seen: isSeen, favorite: isFavorite, canEdit: canEdit(loadConfig()) },
+    { onOpen: openDetail, onEdit: openCardEditor, onDelete: deleteCard, onToggleFavorite: onToggleFavoriteCard }
   )
+}
+
+/** カード上の星ボタン。押した瞬間にその場で見た目を変え、一覧全体は作り直さない */
+function onToggleFavoriteCard(key) {
+  const fav = toggleFavorite(key)
+  const btn = stageEl.querySelector(`.card-fav[data-key="${CSS.escape(key)}"]`)
+  if (btn) {
+    btn.classList.toggle('on', fav)
+    btn.setAttribute('aria-pressed', String(fav))
+    btn.setAttribute('aria-label', fav ? 'お気に入りから外す' : 'お気に入りに追加')
+  }
+  // お気に入りタブで外したときは、その場でカードごと消す
+  if (view === 'favorites' && !fav) refresh()
 }
 
 /** 設定モーダルに渡す、いま画面に出ている一覧JSON(index-video.json / index-web.json と同じ形) */
@@ -505,7 +539,7 @@ function paintDetail() {
     setView('library')
     return
   }
-  stageEl.innerHTML = detailHtml(item, { ...detail, tabHasContent })
+  stageEl.innerHTML = detailHtml(item, { ...detail, tabHasContent, favorite: isFavorite(item.key) })
   wireDetail(item)
 }
 
@@ -516,6 +550,13 @@ function switchTab(id) {
 
 function wireDetail(item) {
   stageEl.querySelector('.btn-back')?.addEventListener('click', () => setView('library'))
+  stageEl.querySelector('.btn-fav')?.addEventListener('click', (e) => {
+    const fav = toggleFavorite(item.key)
+    const btn = e.currentTarget
+    btn.classList.toggle('on', fav)
+    btn.setAttribute('aria-pressed', String(fav))
+    btn.setAttribute('aria-label', fav ? 'お気に入りから外す' : 'お気に入りに追加')
+  })
   stageEl.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)))
   stageEl.querySelector('.btn-retry')?.addEventListener('click', () => openDetail(item.key))
   stageEl.querySelector('.btn-generate-all')?.addEventListener('click', () => runGenerateAll(item))
