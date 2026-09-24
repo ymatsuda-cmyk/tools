@@ -7,10 +7,12 @@
  * (既定に戻せば上書きは消える)。
  */
 
-const KEY = 'videos:prompts'
-const SETTING_URL = new URL('https://ymatsuda-cmyk.github.io/tools/data/clipstock/setting.json', import.meta.url)
+import { baseUrl } from './spaces.js'
 
-export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas']
+const KEY = 'videos:prompts'
+const SETTING_FILE = 'setting.json'
+
+export const PROMPT_IDS = ['summary', 'mindmap', 'fields', 'apply', 'ideas', 'musicChapters', 'musicOverview']
 
 let defaults = {}
 let loading = null
@@ -40,7 +42,7 @@ export function initPrompts() {
 
 async function load() {
   try {
-    const res = await fetch(SETTING_URL, { cache: 'no-cache' })
+    const res = await fetch(new URL(SETTING_FILE, baseUrl()), { cache: 'no-cache' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const json = await res.json()
     defaults = json?.prompts || {}

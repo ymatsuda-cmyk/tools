@@ -18,6 +18,8 @@
  *  - code             権限コードと権限の対応 JSON 例: {"dfkjnga":"xYz","abc":"team"}
  *  - VIDEO_DB_ID      動画DBのID(省略時は下の DEFAULT_DB_ID を使う)
  *  - WEB_DB_ID        web記事DBのID(省略時は DEFAULT_WEB_DB_ID。空文字にするとwebを読まない)
+ *  - STATUS_COUNTS    状態ごとの件数の集計(自動で書かれる。手で入れる必要はない)
+ *                     初回に setupStatusCountsTrigger() を一度実行して定期更新を張ること
  *
  * デプロイ:
  *  - 種類: ウェブアプリ / 実行するユーザー: 自分 / アクセス: 全員
@@ -45,6 +47,7 @@ var PROP_MODEL    = '要約モデル';     // rich_text  (要追加)
 var PROP_GENERATED = '要約日時';      // date       (要追加)
 var PROP_RAW_COUNT = '原文文字数';    // number     (要追加)
 var PROP_PUBLIC   = '公開';           // checkbox   マインドマップ一覧に並べるか (要追加)
+var PROP_CATEGORY = '分類';           // select     空ならまとめて1つ、入っていれば一覧JSONを分ける
 var PROP_CREATED  = '作成日時';       // created_time
 
 // ---- 状態の値 ----
@@ -102,6 +105,9 @@ function doPost(e) {
       case 'saveTitle':
         result = saveTitle_(body.pageId, body.title, body.source);
         break;
+      case 'saveCategory':
+        result = saveCategory_(body.pageId, body.category, body.source);
+        break;
       case 'setStatus':
         result = setStatus_(body.pageId, body.status, body.source);
         break;
@@ -119,6 +125,9 @@ function doPost(e) {
         break;
       case 'takeRebuildRequest':
         result = takeRebuildRequest_();
+        break;
+      case 'statusCounts':
+        result = statusCounts_(body.refresh);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -361,6 +370,7 @@ function toListItem_(page, source) {
     key: page.id,
     source: source,
     title: titleAnyOf_(p) || '(タイトル未取得)',
+    category: selectOf_(p, PROP_CATEGORY),
     url: urlOf_(p, PROP_URL),
     thumb: urlOf_(p, PROP_THUMB),
     status: status || STATUS_NEW,
@@ -370,7 +380,7 @@ function toListItem_(page, source) {
     summary: richTextOf_(p, PROP_SUMMARY),
     model: richTextOf_(p, PROP_MODEL) || null,
     generatedAt: dateOf_(p, PROP_GENERATED),
-    rawCount: numberOf_(p, PROP_RAW_COUNT),
+    rawCouAnt: numberOf_(p, PROP_RAW_COUNT),
     isPublic: checkboxOf_(p, PROP_PUBLIC),
     has: {
       mindmap: Boolean(richTextOf_(p, PROP_MINDMAP)),
@@ -483,7 +493,7 @@ function saveGenerated_(pageId, detail, model, rawCount, source) {
   props[PROP_STATUS] = { select: { name: STATUS_SUMMARIZED } };
   if (typeof rawCount === 'number' && rawCount > 0) props[PROP_RAW_COUNT] = { number: rawCount };
 
-  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
+  patchSynced_(pageId, { properties: props }, source);
   return { saved: true };
 }
 
@@ -592,6 +602,19 @@ function saveTitle_(pageId, title, source) {
 }
 
 /**
+ * 分類を保存する。空文字なら外す。
+ * 一覧JSONの分かれ方が変わるが、反映は次のcronでJSONを作り直してからになる。
+ * Notionのselectは未登録の選択肢名でもAPI側で自動追加される。
+ */
+function saveCategory_(pageId, category, source) {
+  var name = String(category || '').trim();
+  var props = {};
+  props[PROP_CATEGORY] = { select: name ? { name: name.slice(0, 100) } : null };
+  patchSynced_(pageId, { properties: props }, source);
+  return { saved: true, category: name };
+}
+
+/**
  * 状態を変更する。
  *  - 「再取得」に戻す = 次回バッチで文字起こしをやり直させる
  *  - 「除外」= 一覧から外す論理削除(Notionページ自体は消さない)
@@ -603,7 +626,7 @@ function setStatus_(pageId, status, source) {
   if (allowed.indexOf(status) === -1) throw new Error('unknown status: ' + status);
   var props = {};
   props[PROP_STATUS] = { select: { name: status } };
-  notionPageFetch_('pages/' + pageId, 'patch', { properties: props }, source);
+  patchSynced_(pageId, { properties: props }, source);
   return { saved: true, status: status };
 }
 
@@ -629,7 +652,7 @@ function setPublic_(pageId, isPublic, source) {
  */
 function deleteVideo_(pageId, source) {
   if (!pageId) throw new Error('pageId は必須です');
-  notionPageFetch_('pages/' + pageId, 'patch', { archived: true }, source);
+  patchSynced_(pageId, { archived: true }, source);
   return { deleted: true, pageId: pageId };
 }
 
@@ -691,4 +714,151 @@ function parseRebuild_(raw) {
   } catch (e) {
     return {};
   }
+}
+
+// ============ 状態ごとの件数 ============
+
+/**
+ * 件数を出すためだけに毎回Notionを全件走査すると、件数が増えるほどカードの表示が遅くなる。
+ * 集計結果だけをスクリプトプロパティに置き、カードはそれを読むだけにする。
+ *
+ * 更新は2通り:
+ *  - 定期トリガー(setupStatusCountsTrigger)で作り直す。Mac側バッチのように
+ *    GASを通らない状態変更を拾うため。
+ *  - このGASを通る書き込み(状態・分類・生成・削除)では、その場で1件ぶんの差分を当てる。
+ *    次のトリガーを待たずに画面へ出すため。
+ *
+ * 形: { updatedAt, counts: { <video|web>: { <分類>: { total, status:{}, partial:{} } } } }
+ * 「除外」は一覧に出さない論理削除なので、どの数にも入れない。
+ */
+var STATUS_COUNTS_PROP = 'STATUS_COUNTS';
+
+/** 段の構成。フロントの generate.js の STAGES / MUSIC_STAGES と対で持つ */
+var STAGE_MODES = {
+  '': ['summary', 'mindmap', 'fields', 'apply', 'ideas'],
+  music: ['summary', 'fields'],
+};
+
+function emptyBucket_() {
+  return { total: 0, status: {}, partial: { '': 0, music: 0 } };
+}
+
+function bucketOf_(counts, source, category) {
+  if (!counts[source]) counts[source] = {};
+  if (!counts[source][category]) counts[source][category] = emptyBucket_();
+  return counts[source][category];
+}
+
+/** その段がすでに埋まっているか。サマリだけは有無フラグではなく本文を見る */
+function stageFilled_(item, stageId) {
+  return stageId === 'summary' ? Boolean(item.summary) : Boolean(item.has[stageId]);
+}
+
+/** 1件ぶんを集計に足す(delta=1)／引く(delta=-1) */
+function applyToCounts_(counts, item, delta) {
+  if (!item || item.status === STATUS_EXCLUDED) return;
+  var bucket = bucketOf_(counts, item.source, item.category || '');
+  bucket.total += delta;
+  bucket.status[item.status] = (bucket.status[item.status] || 0) + delta;
+  if (item.status !== STATUS_SUMMARIZED) return;
+
+  // 生成が途中で落ちて段が欠けているもの。スペースの mode で段の数が変わる
+  Object.keys(STAGE_MODES).forEach(function (mode) {
+    var missing = STAGE_MODES[mode].some(function (stageId) {
+      return !stageFilled_(item, stageId);
+    });
+    if (missing) bucket.partial[mode] += delta;
+  });
+}
+
+/** ページがどちらのDBのものか。フロントから渡る source より確実 */
+function sourceOfPage_(page) {
+  var parent = (page && page.parent) || {};
+  var id = String(parent.database_id || '').replace(/-/g, '');
+  var web = String(webDbId_() || '').replace(/-/g, '');
+  return id && web && id === web ? 'web' : 'video';
+}
+
+function buildStatusCounts_() {
+  var counts = {};
+  eachSourcePage_(function (page, source) {
+    applyToCounts_(counts, toListItem_(page, source), 1);
+  });
+  return { updatedAt: new Date().toISOString(), counts: counts };
+}
+
+/** 定期トリガーから呼ぶ。Notionを走査して集計を作り直す */
+function refreshStatusCounts() {
+  var data = buildStatusCounts_();
+  PropertiesService.getScriptProperties().setProperty(STATUS_COUNTS_PROP, JSON.stringify(data));
+  return data;
+}
+
+/** カードが読む入口。refresh=true のときだけ作り直す(手動更新ボタン用) */
+function statusCounts_(refresh) {
+  if (!refresh) {
+    var raw = PropertiesService.getScriptProperties().getProperty(STATUS_COUNTS_PROP);
+    if (raw) {
+      try {
+        var data = JSON.parse(raw);
+        if (data && data.counts) return data;
+      } catch (e) {
+        // 壊れていれば作り直す
+      }
+    }
+  }
+  return refreshStatusCounts();
+}
+
+/**
+ * 更新した1件ぶんだけ集計を直す。
+ * 集計がまだ無ければ何もしない(初回の statusCounts_ で全件から作られる)。
+ */
+function adjustStatusCounts_(before, after) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty(STATUS_COUNTS_PROP);
+  if (!raw) return;
+
+  var data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    return;
+  }
+  if (!data || !data.counts) return;
+
+  if (before) applyToCounts_(data.counts, toListItem_(before, sourceOfPage_(before)), -1);
+  if (after) applyToCounts_(data.counts, toListItem_(after, sourceOfPage_(after)), 1);
+  data.updatedAt = new Date().toISOString();
+  props.setProperty(STATUS_COUNTS_PROP, JSON.stringify(data));
+}
+
+/**
+ * ページを更新し、集計に差分を当てる。
+ * 変更前の状態を知るために更新前に1度読む(集計をやり直すより安い)。
+ * 集計が失敗しても更新そのものは成功として返す。ずれは次のトリガーで直る。
+ */
+function patchSynced_(pageId, payload, source) {
+  var before = null;
+  try {
+    before = notionPageFetch_('pages/' + pageId, 'get', null, source);
+  } catch (e) {
+    // 読めなくても更新は通す
+  }
+  var after = notionPageFetch_('pages/' + pageId, 'patch', payload, source);
+  try {
+    adjustStatusCounts_(before, payload.archived ? null : after);
+  } catch (e) {
+    // 集計のずれで書き込みを失敗扱いにしない
+  }
+  return after;
+}
+
+/** 初回に1度だけ手で実行する。10分ごとに集計を作り直すトリガーを張る */
+function setupStatusCountsTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (trigger) {
+    if (trigger.getHandlerFunction() === 'refreshStatusCounts') ScriptApp.deleteTrigger(trigger);
+  });
+  ScriptApp.newTrigger('refreshStatusCounts').timeBased().everyMinutes(10).create();
+  return { created: true };
 }

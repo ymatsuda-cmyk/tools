@@ -11,11 +11,11 @@
  * '<' で始まる値は旧形式としてiframeにそのまま流し込む(API側で処理)。
  */
 
-import { renderMindmap as renderMap, splitPrefix, nodeLineIndexes } from '../../../../api/mindmap2/mindmap2.js'
+import { renderMindmap as renderMap, splitPrefix, nodeLineIndexes } from '../../../api/mindmap2/mindmap2.js'
 import { parseTimecode, youtubeUrlAt, splitLabel, withTimecode } from './timecode.js'
 import { MARKER_COLORS } from './markers.js'
 
-export { isLegacyHtml } from '../../../../api/mindmap2/mindmap2.js'
+export { isLegacyHtml } from '../../../api/mindmap2/mindmap2.js'
 
 /**
  * マインドマップ内の "[12:34]" をMarkdownリンクに変える。

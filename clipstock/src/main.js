@@ -6,7 +6,7 @@ import {
   renderIdeas,
   renderMindmapGallery,
   flattenIdeas,
-  TABS,
+  tabsOf,
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
 import { openVocabPanel } from './ui/vocab.js'
@@ -19,6 +19,7 @@ import {
   saveMemo,
   saveTags,
   saveTitle,
+  saveCategory,
   setStatus,
   setPublic,
   updateRawCount,
@@ -31,7 +32,8 @@ import { listVideos, listIdeas } from './lib/store.js'
 import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
 import { initPrompts } from './lib/prompts.js'
-import { generateAll, generateStage, needsTranscript, STAGES } from './lib/generate.js'
+import { initSpaces, activeSpace, spaceList, sourcesOf, spaceHref, spaceMode } from './lib/spaces.js'
+import { generateAll, generateStage, needsTranscript, stagesOf } from './lib/generate.js'
 import { renderMindmap, markNodeLine, nodeMarkerOf } from './lib/mindmap.js'
 import { hasTimecodes } from './lib/timecode.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers, MARKER_COLORS } from './lib/markers.js'
@@ -54,12 +56,11 @@ import {
   filterBySearch,
   filterBySource,
   sourceCounts,
-  SOURCE_ORDER,
   buildTagOptions,
   statusCounts,
   STATUS_ORDER,
   STATUS_DONE,
-  STATUS_NEW,
+  STATUS_RETRY,
   STATUS_SUMMARIZED,
   STATUS_EXCLUDED,
 } from './lib/filters.js'
@@ -251,6 +252,8 @@ function openCardEditor(key) {
   let tags = [...(item.tags || [])]
   const known = knownTagsOf(items)
   const statuses = [...new Set([...STATUS_ORDER, STATUS_EXCLUDED, item.status].filter(Boolean))]
+  // いま使われている分類。表記ゆれで別グループにならないよう、まず選ばせる
+  const categories = [...new Set(items.map((i) => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
   const root = $('modal-root')
   root.innerHTML = `
     <div class="overlay">
@@ -259,6 +262,13 @@ function openCardEditor(key) {
         <div class="modal-body">
           <label class="field-label">タイトル</label>
           <input id="ce-title" class="input" value="${escapeHtml(item.title || '')}" />
+
+          <label class="field-label">分類</label>
+          <input id="ce-category" class="input" list="ce-category-list" placeholder="空欄なら分類なし" value="${escapeHtml(item.category || '')}" />
+          <datalist id="ce-category-list">
+            ${categories.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}
+          </datalist>
+          <div class="foot-note">一覧JSONの分かれ先が変わります。反映は次回の作り直しのあとです</div>
 
           <label class="field-label">状態</label>
           <select id="ce-status" class="input">
@@ -329,6 +339,7 @@ function openCardEditor(key) {
   $('ce-save').addEventListener('click', async () => {
     const title = $('ce-title').value.trim()
     const status = $('ce-status').value
+    const category = $('ce-category').value.trim()
     // マーカーは画面に出していないので、文言が一致する範囲だけ引き継ぐ
     const summary = reconcileMarkers(item.summary || '', $('ce-summary').value)
     if (!title) {
@@ -356,6 +367,10 @@ function openCardEditor(key) {
       if (status !== item.status) {
         await setStatus(key, status)
         item.status = status
+      }
+      if (category !== (item.category || '')) {
+        await saveCategory(key, category)
+        item.category = category
       }
       // 詳細のキャッシュは古くなる。開いたときに取り直させる
       clearDetailCache(key)
@@ -389,7 +404,7 @@ function paintStatusChips() {
 /** 取り込み元の絞り込み。件数は「除外」を外した全件から数える(自分自身の絞りは効かせない) */
 function paintSourceChips() {
   const counts = sourceCounts(excludeExcluded(items))
-  const shown = SOURCE_ORDER.filter((s) => counts.get(s.id))
+  const shown = sourcesOf().filter((s) => counts.get(s.id))
   const el = $('source-filter')
   // 片方しか無いなら絞る意味が無い
   if (shown.length < 2) {
@@ -439,6 +454,7 @@ async function openDetail(key) {
     detail: null,
     tags: item.tags || [],
     activeTab: 'summary',
+    mode: spaceMode(),
     transcript: undefined, // undefined=未取得 / null=取得中 / string=取得済み
     mindmapColor: 1, // 枝をクリックしたときに塗る色。null なら消しゴム
     memoDraft: null,
@@ -1033,6 +1049,7 @@ async function generateContext(item) {
   return {
     title: item.title,
     transcript,
+    mode: detail.mode,
     summary: stripMarkers(detail.detail?.summary || ''),
     fields: stripMarkers(detail.detail?.fields || ''),
     // 既存のタグを渡して語彙を縛る。渡さないと動画ごとに表記が増えていく
@@ -1042,7 +1059,7 @@ async function generateContext(item) {
 
 async function runGenerateAll(item) {
   if (detail.busyStage) return
-  detail.busyStage = STAGES[0].id
+  detail.busyStage = stagesOf(detail.mode)[0].id
   paintBusy('原文を読み込んでいます', '')
   try {
     const ctx = await generateContext(item)
@@ -1068,12 +1085,12 @@ async function runGenerateAll(item) {
 
 async function runStage(item, stageId) {
   if (detail.busyStage) return
-  const stage = STAGES.find((s) => s.id === stageId)
+  const stage = stagesOf(detail.mode).find((s) => s.id === stageId)
   detail.busyStage = stageId
   paintBusy(`${stage?.label ?? stageId} を生成中`, '')
   try {
     const ctx = await generateContext(item)
-    if (needsTranscript(stageId) && !ctx.transcript) {
+    if (needsTranscript(stageId, detail.mode) && !ctx.transcript) {
       throw new Error('原文がありません。状態が「完了」になるまで待ってください')
     }
     const { detail: stageDetail, model, tagReport } = await generateStage(stageId, ctx, (text) =>
@@ -1101,18 +1118,28 @@ const FIELD_LABEL = {
   ideas: '活用アイデア',
 }
 
+// musicスペースは同じカラムを別の用途で使っているので、見出しと書き方の説明も差し替える
+const MUSIC_FIELD_LABEL = { summary: 'チャプター', fields: '概要' }
+const MUSIC_FIELD_HINT = {
+  summary: '1行1曲で「[12:34] 曲名」の形です。時刻は動画の再生位置になります',
+  fields: '見出しや箇条書きにせず、文章で書きます',
+}
+
 function editCurrentField(item) {
   const field = detail.activeTab
-  if (!FIELD_LABEL[field]) return
-  const hint =
-    field === 'mindmap'
+  const music = detail.mode === 'music'
+  const label = music ? MUSIC_FIELD_LABEL[field] : FIELD_LABEL[field]
+  if (!label) return
+  const hint = music
+    ? MUSIC_FIELD_HINT[field]
+    : field === 'mindmap'
       ? 'markmap用のMarkdownです。# が中心、## が大項目、- が枝になります'
       : field === 'summary'
         ? ''
         : '## で項目名、次の行に説明、- で箇条書きです'
 
   openEditor({
-    title: `${FIELD_LABEL[field]}を直す`,
+    title: `${label}を直す`,
     // マーカーのタグは見せない。保存時に、文言が一致した範囲だけ引き継ぐ
     value: plainTextOf(detail.detail?.[field] ?? ''),
     hint,
@@ -1226,10 +1253,10 @@ function openMoreMenu(anchor, item) {
         })
       }
       if (act === 'retry') {
-        if (!confirm('状態を「新規」に戻します。次回のバッチで文字起こしをやり直します。')) return
+        if (!confirm('状態を「再取得」に戻します。次回のバッチで文字起こしをやり直します。')) return
         try {
-          await setStatus(item.key, STATUS_NEW)
-          item.status = STATUS_NEW
+          await setStatus(item.key, STATUS_RETRY)
+          item.status = STATUS_RETRY
           paintDetail()
         } catch (err) {
           alert('変更できませんでした: ' + (err.message || err))
@@ -1813,7 +1840,7 @@ async function runBulkGenerate() {
       const { text: transcript } = await fetchTranscript(item.key)
       if (!transcript) throw new Error('原文が空です')
       await generateAll(
-        { title: item.title, transcript, summary: '', fields: '', knownTags: vocabulary },
+        { title: item.title, transcript, summary: '', fields: '', mode: spaceMode(), knownTags: vocabulary },
         {
           onStage: async (stageId, stageDetail, model) => {
             await saveGenerated(item.key, stageDetail, model, transcript.length)
@@ -1951,13 +1978,32 @@ document.addEventListener('keydown', (e) => {
   if (view === 'detail' && detail?.phase === 'ready' && !e.metaKey && !e.ctrlKey) {
     const target = e.target
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
-    const i = TABS.findIndex((t) => t.id === detail.activeTab)
-    if (e.key === 'ArrowRight' && i < TABS.length - 1) switchTab(TABS[i + 1].id)
-    if (e.key === 'ArrowLeft' && i > 0) switchTab(TABS[i - 1].id)
+    const tabs = tabsOf(detail.mode)
+    const i = tabs.findIndex((t) => t.id === detail.activeTab)
+    if (e.key === 'ArrowRight' && i < tabs.length - 1) switchTab(tabs[i + 1].id)
+    if (e.key === 'ArrowLeft' && i > 0) switchTab(tabs[i - 1].id)
   }
 })
 
 $('toggle-tags').classList.toggle('on', showTags)
 // プロンプトは生成を押すときまでに揃っていればよいので、一覧の読み込みは待たせない
 initPrompts()
-loadList()
+// どのJSONを読むかがスペースで決まるので、一覧より先に解決させる
+initSpaces().then(() => {
+  paintSpaceSwitch()
+  loadList()
+})
+
+/** 表示対象の切り替え。選択はURLに入るのでリンクとして配れる */
+function paintSpaceSwitch() {
+  const spaces = spaceList()
+  const el = $('space-switch')
+  if (spaces.length < 2) {
+    el.innerHTML = ''
+    return
+  }
+  const now = activeSpace()
+  el.innerHTML = spaces
+    .map((s) => `<a class="space-tab ${s.id === now?.id ? 'on' : ''}" href="${escapeHtml(spaceHref(s.id))}">${escapeHtml(s.label)}</a>`)
+    .join('')
+}
