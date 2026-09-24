@@ -232,6 +232,40 @@
   @keyframes min-role-pulse{50%{opacity:0.3;}}
   .min-note-inline{font-size:10px;color:var(--text-muted);}
 
+  /* Issue状態ダッシュボード：フェーズごとの行をクリックでアコーディオン展開 */
+  .agent-body{border-bottom:1px solid var(--border);}
+  .agent-phase{width:100%;box-sizing:border-box;border:none;border-top:1px solid var(--border);
+    background:none;padding:9px 0;margin:0;display:flex;align-items:center;gap:11px;
+    cursor:pointer;text-align:left;font:inherit;color:inherit;}
+  .agent-phase:first-child{border-top:none;}
+  .agent-phase.open{background:var(--surface-2);padding-left:8px;padding-right:8px;}
+  .agent-bar{width:4px;height:32px;border-radius:2px;flex-shrink:0;}
+  .agent-count{width:26px;flex-shrink:0;font-size:14px;text-align:right;color:var(--text-muted);}
+  .agent-count.has{color:var(--text);font-weight:600;}
+  .agent-info{flex-grow:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .agent-label{font-size:13px;color:var(--text-secondary);}
+  .agent-label.has{font-weight:600;}
+  .agent-sub{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agent-sub.warn{color:var(--danger);}
+  .agent-chev{width:13px;height:13px;flex-shrink:0;stroke:var(--text-muted);}
+  .agent-phase.open .agent-chev{stroke:var(--text);}
+  .agent-issues{background:var(--surface-2);padding:0 8px 8px 8px;display:flex;flex-direction:column;}
+  .agent-issue{padding:7px 0 7px 41px;display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--border);}
+  .agent-issue-head{display:flex;align-items:center;gap:7px;min-width:0;}
+  .agent-issue-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .agent-issue-no{font-size:12px;color:var(--text-muted);flex-shrink:0;}
+  .agent-issue-title{font-size:13px;flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agent-issue-meta{display:flex;align-items:center;gap:10px;padding-left:13px;}
+  .agent-issue-elapsed{font-size:11px;color:var(--text-secondary);flex-grow:1;}
+  .agent-issue-elapsed.warn{color:var(--danger);font-weight:600;}
+  .agent-issue-links{font-size:11px;display:flex;gap:8px;flex-shrink:0;}
+  .agent-issue-links a{white-space:nowrap;}
+  .agent-more{width:100%;box-sizing:border-box;border:none;border-top:1px solid var(--border);background:none;
+    padding:9px 0 3px 41px;margin:0;text-align:left;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;}
+  .agent-empty{font-size:11px;color:var(--text-muted);padding:8px 0 8px 41px;}
+  .agent-open{text-align:center;padding-top:2px;}
+  .agent-open a{font-size:12px;}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -632,6 +666,7 @@
         <option value="schedule">今日の予定（Outlookなど）</option>
         <option value="mail">メール受信（Outlookなど）</option>
         <option value="minutes">議事録（Notion）</option>
+        <option value="agent">Issue状態ダッシュボード</option>
         <option value="calc">電卓</option>
         <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
@@ -828,6 +863,22 @@
       <label>割り当てる権限（カンマ区切り）</label>
       <input type="text" id="mf-min-roles" placeholder="jba, kijun, keiei">
       <div class="hint">追加ボタンの選択肢に出す権限名です。Notionの「権限」列(multi_select)に付ける名前をそのまま書いてください</div>
+    </div>
+
+    <div class="field" data-for="agent">
+      <label>データJSONのURL</label>
+      <input type="text" id="mf-agent-dataurl" placeholder="https://ymatsuda-cmyk.github.io/tools-beta/data/agent/dashboard.json">
+      <div class="hint">空欄なら既定のURL（tools-beta の <span class="mono">data/agent/dashboard.json</span>）から取得します</div>
+    </div>
+    <div class="field" data-for="agent">
+      <label>展開時に一度に出す件数</label>
+      <input type="number" id="mf-agent-max" value="5" min="1" max="20">
+      <div class="hint">フェーズを開いたときに並べる件数です。超えた分は「残りN件を表示」から出せます</div>
+    </div>
+    <div class="field" data-for="agent">
+      <label>「ダッシュボードを開く」の行き先</label>
+      <input type="text" id="mf-agent-url" placeholder="https://ymatsuda-cmyk.github.io/tools-beta/utility/agent.html">
+      <div class="hint">空欄なら既定のURL（utility/agent.html）を使います</div>
     </div>
 
     <div class="modal-actions">
@@ -1860,10 +1911,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -1878,6 +1929,7 @@ const TYPE_LABELS = {
   schedule: '今日の予定',
   mail   : 'メール受信',
   minutes: '議事録',
+  agent  : 'Issue状態',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -2168,6 +2220,7 @@ function loadedAtOf(m){
   }
   if(type === 'mail') return mailState[m.id] && mailState[m.id].cache && mailState[m.id].cache.loadedAt;
   if(type === 'minutes') return minutesState[m.id] && minutesState[m.id].cache && minutesState[m.id].cache.loadedAt;
+  if(type === 'agent') return agentState[m.id] && agentState[m.id].cache && agentState[m.id].cache.loadedAt;
   return null;
 }
 
@@ -3914,6 +3967,240 @@ function wireMinutes(card){
   });
 }
 
+/* ============================================================
+   Issue状態ダッシュボード
+   utility/agent.html と同じ data/agent/dashboard.json を
+   api/agent/agent.api.js 経由で読み、フェーズごとにアコーディオンで出す
+   ============================================================ */
+
+const AGENT_MODULE = new URL('../api/agent/agent.api.js', location.href).href;
+const AGENT_DEFAULT_URL = 'https://ymatsuda-cmyk.github.io/tools-beta/utility/agent.html';
+
+const AGENT_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  ok     : { color:'#5FA8A0', label:'取得済み'   },
+  none   : { color:'#5FA8A0', label:'0件'        },
+  error  : { color:'#D9694F', label:'エラー'     }
+};
+
+/* Issue単体の状態ドットの色。utility/agent.html の STATUS_COLORS(枠線色)に合わせる */
+const AGENT_STATUS_COLOR = {
+  created:'#66625A', queued:'#66625A', rework:'#E0B252',
+  implementing:'#5FA8A0', waiting_decision:'#E0B252', preview_deploying:'#5FA8A0',
+  waiting_approval:'#E0B252', approved:'#5FA8A0',
+  completed:'#7CC47C', rejected:'#66625A', failed:'#D9694F'
+};
+
+/* utility/agent.html の STUCK_THRESHOLD_SECONDS と同じ値。同期は agent.api.js 側が正 */
+const AGENT_STUCK_THRESHOLD = { waiting_approval: 2 * 3600, waiting_decision: 1 * 3600 };
+
+const agentState = {};
+let agentApi = null;
+
+async function agentModule(){
+  if(!agentApi) agentApi = await import(AGENT_MODULE);
+  return agentApi;
+}
+
+function emptyAgentCache(){
+  return { phase:'loading', issues:[], phases:[], error:'', loading:false, loadedAt:0 };
+}
+
+/** カードの更新間隔が過ぎたときに取り直す */
+function agentStateOf(m){
+  let st = agentState[m.id];
+  if(!st) st = agentState[m.id] = { expanded:new Set(), expandedFull:new Set(), cache: emptyAgentCache() };
+  const cur = st.cache;
+  if(!cur.loading && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadAgent(m);
+  return st;
+}
+
+async function loadAgent(m){
+  const st = agentState[m.id] || (agentState[m.id] = { expanded:new Set(), expandedFull:new Set(), cache: emptyAgentCache() });
+  const cur = st.cache;
+  cur.loading = true;
+  try{
+    const api = await agentModule();
+    const { issues, phases } = await api.recent({ dataUrl: m.dataUrl });
+    cur.issues = issues;
+    cur.phases = phases;
+    cur.phase = issues.length ? 'ok' : 'none';
+    cur.error = '';
+  }catch(err){
+    cur.error = err.message || String(err);
+    if(!cur.issues.length) cur.phase = 'error';
+  }
+  cur.loading = false;
+  cur.loadedAt = Date.now();
+  paintAgent(m.id);
+}
+
+/** 「N秒前」「N分前」…utility/agent.html の formatElapsed と同じ計算 */
+function agentElapsed(iso){
+  if(!iso) return { label:'', seconds:null };
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return { label:'', seconds:null };
+  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if(seconds < 60) return { label: seconds + '秒前', seconds };
+  const minutes = Math.floor(seconds / 60);
+  if(minutes < 60) return { label: minutes + '分前', seconds };
+  const hours = Math.floor(minutes / 60);
+  if(hours < 24) return { label: hours + '時間' + (minutes % 60) + '分前', seconds };
+  const days = Math.floor(hours / 24);
+  return { label: days + '日前', seconds };
+}
+
+function agentIsStuck(item){
+  const threshold = AGENT_STUCK_THRESHOLD[item.status];
+  if(threshold == null || !item.updatedAt) return false;
+  return (Date.now() - new Date(item.updatedAt).getTime()) / 1000 >= threshold;
+}
+
+/** フェーズ行の色。終了フェーズは失敗が1件でもあれば赤にする */
+function agentPhaseColor(phase){
+  if(!phase.items.length) return '#66625A';
+  if(phase.key === 'done') return phase.items.some(i => i.status === 'failed') ? '#D9694F' : '#7CC47C';
+  if(phase.key === 'implementing') return '#5FA8A0';
+  if(phase.key === 'approval') return '#E0B252';
+  return '#66625A';
+}
+
+function agentPhaseSub(phase){
+  if(!phase.items.length) return { text:'なし', warn:false };
+  if(phase.key === 'done'){
+    const done = phase.items.filter(i => i.status === 'completed').length;
+    const rejected = phase.items.filter(i => i.status === 'rejected').length;
+    const failed = phase.items.filter(i => i.status === 'failed').length;
+    return { text: `完了 ${done} ・却下 ${rejected} ・失敗 ${failed}`, warn: failed > 0 };
+  }
+  const first = phase.items[0];
+  const e = agentElapsed(first.updatedAt);
+  return { text: `#${first.number} ${first.title}${e.label ? ' ・' + e.label : ''}`, warn:false };
+}
+
+function agentIssueRow(item){
+  const color = AGENT_STATUS_COLOR[item.status] || '#66625A';
+  const e = agentElapsed(item.updatedAt);
+  const stuck = agentIsStuck(item);
+  const links = [];
+  if(item.issueUrl) links.push(`<a href="${esc(item.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
+  if(item.pullRequestUrl) links.push(`<a href="${esc(item.pullRequestUrl)}" target="_blank" rel="noopener">PR</a>`);
+  if(item.previewUrl) links.push(`<a href="${esc(item.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
+  return `
+    <div class="agent-issue">
+      <div class="agent-issue-head">
+        <span class="agent-issue-dot" style="background:${color}"></span>
+        <span class="agent-issue-no">#${esc(item.number)}</span>
+        <span class="agent-issue-title">${esc(item.title)}</span>
+      </div>
+      <div class="agent-issue-meta">
+        <span class="agent-issue-elapsed${stuck ? ' warn' : ''}">${esc(item.status)}${e.label ? ' ・' + e.label : ''}${stuck ? ' ・放置' : ''}</span>
+        ${links.length ? `<span class="agent-issue-links">${links.join('')}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function agentIssuesHtml(m, phase, st){
+  if(!phase.items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
+  const max = Math.max(1, Math.min(20, Number(m.max) || 5));
+  const showAll = st.expandedFull.has(phase.key);
+  const shown = showAll ? phase.items : phase.items.slice(0, max);
+  const rows = shown.map(agentIssueRow).join('');
+  const more = (!showAll && phase.items.length > max)
+    ? `<button type="button" class="agent-more" data-agent-more="${esc(m.id)}:${esc(phase.key)}">残り${phase.items.length - max}件を表示</button>`
+    : '';
+  return `<div class="agent-issues">${rows}${more}</div>`;
+}
+
+function agentPhaseRow(m, phase, st){
+  const isOpen = st.expanded.has(phase.key);
+  const color = agentPhaseColor(phase);
+  const sub = agentPhaseSub(phase);
+  const count = phase.items.length;
+  return `
+    <button type="button" class="agent-phase${isOpen ? ' open' : ''}" aria-expanded="${isOpen}"
+      data-agent-phase="${esc(m.id)}:${esc(phase.key)}">
+      <span class="agent-bar" style="background:${color}"></span>
+      <span class="agent-count${count ? ' has' : ''}">${count}</span>
+      <span class="agent-info">
+        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(phase.label)}</span>
+        <span class="agent-sub${sub.warn ? ' warn' : ''}">${esc(sub.text)}</span>
+      </span>
+      <svg class="agent-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
+      </svg>
+    </button>
+    ${isOpen ? agentIssuesHtml(m, phase, st) : ''}`;
+}
+
+function agentBodyContent(m, st){
+  const cur = st.cache;
+  if(cur.error && !cur.issues.length) return `<div class="mon-err">${esc(cur.error)}</div>`;
+  if(!cur.phases.length) return `<div class="agent-empty">読み込み中…</div>`;
+  return cur.phases.map(phase => agentPhaseRow(m, phase, st)).join('');
+}
+
+function renderAgentCard(m){
+  const st = agentStateOf(m);
+  const cur = st.cache;
+  const meta = AGENT_STATE_META[cur.phase] || AGENT_STATE_META.loading;
+  const url = m.dashboardUrl || AGENT_DEFAULT_URL;
+  return `
+    <div ${monCardAttrs(m)}>
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${cur.issues.length ? cur.issues.length + '件' : meta.label}</span>
+        ${monConfigBtn(m.id)}
+        ${monRefreshBtn(m.id)}
+      </div>
+      <div class="agent-body">${agentBodyContent(m, st)}</div>
+      <div class="agent-open"><a href="${esc(url)}" target="_blank" rel="noopener">ダッシュボードを開く</a></div>
+      ${monitorUpdatedHtml(m)}
+    </div>`;
+}
+
+/** カードの中身だけ差し替える。グリッド全体を描き直すと他のカードの状態が飛ぶ */
+function paintAgent(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = agentState[id];
+  if(!m || !st) return;
+  const card = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .agent-body`);
+  if(!card) return;   // 別タブを見ている。次に描かれるときに最新が出る
+
+  const meta = AGENT_STATE_META[st.cache.phase] || AGENT_STATE_META.loading;
+  const box = card.closest('.mon-card');
+  box.querySelector('.mon-dot').style.background = meta.color;
+  box.querySelector('.mon-state').textContent = st.cache.issues.length ? st.cache.issues.length + '件' : meta.label;
+  card.innerHTML = agentBodyContent(m, st);
+  wireAgent(box);
+}
+
+function wireAgent(card){
+  const id = card.dataset.monitor;
+  const st = agentState[id];
+  if(!st) return;
+
+  card.querySelectorAll('[data-agent-phase]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const key = btn.dataset.agentPhase.split(':')[1];
+      if(st.expanded.has(key)) st.expanded.delete(key);
+      else st.expanded.add(key);
+      paintAgent(id);
+    });
+  });
+
+  card.querySelectorAll('[data-agent-more]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const key = btn.dataset.agentMore.split(':')[1];
+      st.expandedFull.add(key);
+      paintAgent(id);
+    });
+  });
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
@@ -3921,6 +4208,7 @@ function renderMonitorCard(m, snap){
   if(monitorType(m) === 'schedule') return renderScheduleCard(m);
   if(monitorType(m) === 'mail') return renderMailCard(m);
   if(monitorType(m) === 'minutes') return renderMinutesCard(m);
+  if(monitorType(m) === 'agent') return renderAgentCard(m);
 
 
   const state = snap && snap.state ? snap.state : 'unknown';
@@ -4238,6 +4526,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.minutes-body').forEach(body=>wireMinutes(body.closest('.mon-card')));
 
+  grid.querySelectorAll('.agent-body').forEach(body=>wireAgent(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-refresh]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -4439,6 +4729,11 @@ function refreshMonitorCard(id){
     if(!st) return;
     st.cache.loadedAt = 0;
     loadMinutes(m);
+  }else if(type === 'agent'){
+    const st = agentState[id];
+    if(!st) return;
+    st.cache.loadedAt = 0;
+    loadAgent(m);
   }else if(LOCAL_TYPES.includes(type)){
     // rule/calc は取得先が無く、常に最新を計算しているのでその場で描き直すだけ
     renderMonitors();
@@ -4648,6 +4943,9 @@ function fillMonitorForm(m){
   F('mf-min-gasurl').value = m.gasUrl || '';
   F('mf-min-token').value = m.token || '';
   F('mf-min-roles').value = (Array.isArray(m.roles) ? m.roles : []).join(', ');
+  F('mf-agent-dataurl').value = m.dataUrl || '';
+  F('mf-agent-max').value = m.max || 5;
+  F('mf-agent-url').value = m.dashboardUrl || '';
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -4780,6 +5078,13 @@ function buildMonitor(){
     if(gasUrl) m.gasUrl = gasUrl; else delete m.gasUrl;
     if(token) m.token = token; else delete m.token;
     m.roles = F('mf-min-roles').value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if(type === 'agent'){
+    const dataUrl = F('mf-agent-dataurl').value.trim();
+    if(dataUrl) m.dataUrl = dataUrl; else delete m.dataUrl;
+    m.max = Math.max(1, Math.min(20, Number(F('mf-agent-max').value) || 5));
+    const dashboardUrl = F('mf-agent-url').value.trim();
+    if(dashboardUrl) m.dashboardUrl = dashboardUrl; else delete m.dashboardUrl;
   }
   return m;
 }

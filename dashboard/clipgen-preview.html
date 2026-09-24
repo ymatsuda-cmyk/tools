@@ -175,6 +175,40 @@
   .min-role.on .bar{background:var(--accent);}
   .min-note-inline{font-size:10px;color:var(--text-muted);}
 
+  /* Issue状態ダッシュボード：index.html と同じ見た目 */
+  .agent-body{border-bottom:1px solid var(--border);}
+  .agent-phase{width:100%;box-sizing:border-box;border:none;border-top:1px solid var(--border);
+    background:none;padding:9px 0;margin:0;display:flex;align-items:center;gap:11px;
+    cursor:pointer;text-align:left;font:inherit;color:inherit;}
+  .agent-phase:first-child{border-top:none;}
+  .agent-phase.open{background:var(--surface-2);padding-left:8px;padding-right:8px;}
+  .agent-bar{width:4px;height:32px;border-radius:2px;flex-shrink:0;}
+  .agent-count{width:26px;flex-shrink:0;font-size:14px;text-align:right;color:var(--text-muted);}
+  .agent-count.has{color:var(--text);font-weight:600;}
+  .agent-info{flex-grow:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .agent-label{font-size:13px;color:var(--text-secondary);}
+  .agent-label.has{font-weight:600;}
+  .agent-sub{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agent-sub.warn{color:var(--danger);}
+  .agent-chev{width:13px;height:13px;flex-shrink:0;stroke:var(--text-muted);}
+  .agent-phase.open .agent-chev{stroke:var(--text);}
+  .agent-issues{background:var(--surface-2);padding:0 8px 8px 8px;display:flex;flex-direction:column;}
+  .agent-issue{padding:7px 0 7px 41px;display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--border);}
+  .agent-issue-head{display:flex;align-items:center;gap:7px;min-width:0;}
+  .agent-issue-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .agent-issue-no{font-size:12px;color:var(--text-muted);flex-shrink:0;}
+  .agent-issue-title{font-size:13px;flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .agent-issue-meta{display:flex;align-items:center;gap:10px;padding-left:13px;}
+  .agent-issue-elapsed{font-size:11px;color:var(--text-secondary);flex-grow:1;}
+  .agent-issue-elapsed.warn{color:var(--danger);font-weight:600;}
+  .agent-issue-links{font-size:11px;display:flex;gap:8px;flex-shrink:0;}
+  .agent-issue-links a{white-space:nowrap;}
+  .agent-more{width:100%;box-sizing:border-box;border:none;border-top:1px solid var(--border);background:none;
+    padding:9px 0 3px 41px;margin:0;text-align:left;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;}
+  .agent-empty{font-size:11px;color:var(--text-muted);padding:8px 0 8px 41px;}
+  .agent-open{text-align:center;padding-top:2px;}
+  .agent-open a{font-size:12px;}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -441,6 +475,20 @@
           </label>
           <label>議事録
             <textarea class="json" id="d-minutes-items" spellcheck="false" style="min-height:150px;"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="agent">
+        <h2>プレビュー用のIssue</h2>
+        <p class="caption">JSONには出ません。実物では tools-beta の <span class="mono">dashboard.json</span> が入ります。<br>
+           <span class="mono">hoursAgo</span> は何時間前に更新されたか。フェーズの行をクリックすると
+           この見本でも展開します。<span class="mono">status</span> は
+           <span class="mono">created / queued / rework / implementing / waiting_decision /
+           preview_deploying / waiting_approval / approved / completed / rejected / failed</span> のいずれかです。</p>
+        <div class="fields">
+          <label>Issue一覧
+            <textarea class="json" id="d-agent-issues" spellcheck="false" style="min-height:150px;"></textarea>
           </label>
         </div>
       </div>
@@ -1697,6 +1745,214 @@ function wireMinutesPreview(){
   });
 }
 
+/* ---------- Issue状態ダッシュボード ---------- */
+
+const AGENT_STATE_META = {
+  ok   : { color:'#5FA8A0', label:'取得済み' },
+  none : { color:'#5FA8A0', label:'0件'      },
+  error: { color:'#D9694F', label:'エラー'   }
+};
+
+/* utility/agent.html の PHASES と同じ並び・グルーピング */
+const AGENT_PHASES = [
+  ['waiting',      '待機中',   ['created', 'queued', 'rework']],
+  ['implementing', '実装中',   ['implementing', 'waiting_decision', 'preview_deploying']],
+  ['approval',     '承認待ち', ['waiting_approval', 'approved']],
+  ['done',         '終了',     ['completed', 'rejected', 'failed']]
+];
+
+/* utility/agent.html の STUCK_THRESHOLD_SECONDS と同じ値 */
+const AGENT_STUCK_THRESHOLD = { waiting_approval: 2 * 3600, waiting_decision: 1 * 3600 };
+
+/* Issue単体の状態ドットの色。index.html / utility/agent.html の STATUS_COLORS(枠線色)に合わせる */
+const AGENT_STATUS_COLOR = {
+  created:'#66625A', queued:'#66625A', rework:'#E0B252',
+  implementing:'#5FA8A0', waiting_decision:'#E0B252', preview_deploying:'#5FA8A0',
+  waiting_approval:'#E0B252', approved:'#5FA8A0',
+  completed:'#7CC47C', rejected:'#66625A', failed:'#D9694F'
+};
+
+const SAMPLE_AGENT_ISSUES = [
+  { number:74, title:'issue', status:'implementing', hoursAgo:16, issueUrl:'https://github.com/example/tools/issues/74' },
+  { number:63, title:'issue', status:'implementing', hoursAgo:50, issueUrl:'https://github.com/example/tools/issues/63' },
+  { number:64, title:'issue', status:'implementing', hoursAgo:49, issueUrl:'https://github.com/example/tools/issues/64' },
+  { number:70, title:'(タイトルなし)', status:'failed', hoursAgo:17 },
+  { number:77, title:'issue', status:'completed', hoursAgo:0.5,
+    issueUrl:'https://github.com/example/tools/issues/77', pullRequestUrl:'https://github.com/example/tools/pull/77' },
+  { number:75, title:'issue', status:'completed', hoursAgo:15,
+    issueUrl:'https://github.com/example/tools/issues/75', pullRequestUrl:'https://github.com/example/tools/pull/75' },
+  { number:8,  title:'却下されたIssue', status:'rejected', hoursAgo:48 }
+];
+
+/* この見本の中だけで覚えておく展開状態（保存はしない） */
+let agentExpanded = new Set();
+let agentExpandedFull = new Set();
+
+/** 「N秒前」「N分前」…utility/agent.html の formatElapsed と同じ計算 */
+function agentElapsed(iso){
+  if(!iso) return { label:'', seconds:null };
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return { label:'', seconds:null };
+  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if(seconds < 60) return { label: seconds + '秒前', seconds };
+  const minutes = Math.floor(seconds / 60);
+  if(minutes < 60) return { label: minutes + '分前', seconds };
+  const hours = Math.floor(minutes / 60);
+  if(hours < 24) return { label: hours + '時間' + (minutes % 60) + '分前', seconds };
+  const days = Math.floor(hours / 24);
+  return { label: days + '日前', seconds };
+}
+
+function agentIsStuck(item){
+  const threshold = AGENT_STUCK_THRESHOLD[item.status];
+  if(threshold == null || !item.updatedAt) return false;
+  return (Date.now() - new Date(item.updatedAt).getTime()) / 1000 >= threshold;
+}
+
+/** JSONには出ない、プレビュー用のIssue一覧。hoursAgo から updatedAt を組み立てる */
+function dummyAgentIssues(){
+  let rows = [];
+  let error = '';
+  try{
+    rows = JSON.parse(F('d-agent-issues').value || '[]');
+    if(!Array.isArray(rows)) throw new Error('配列で書いてください');
+  }catch(err){
+    error = 'Issue一覧を読み取れません: ' + err.message;
+  }
+
+  const issues = rows.map((r, i)=>({
+    number: r.number != null ? r.number : i + 1,
+    title: r.title || '(タイトルなし)',
+    status: String(r.status || '').toLowerCase(),
+    updatedAt: new Date(Date.now() - (Number(r.hoursAgo) || 0) * 3600 * 1000).toISOString(),
+    issueUrl: r.issueUrl || null,
+    pullRequestUrl: r.pullRequestUrl || null,
+    previewUrl: r.previewUrl || null
+  })).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  const phases = AGENT_PHASES.map(([key, label, statuses]) => ({
+    key, label,
+    items: issues.filter(i => statuses.includes(i.status))
+  }));
+  const known = new Set(AGENT_PHASES.flatMap(([, , statuses]) => statuses));
+  const orphans = issues.filter(i => !known.has(i.status));
+  if(orphans.length) phases[phases.length - 1].items.push(...orphans);
+
+  return { phase: error ? 'error' : issues.length ? 'ok' : 'none', error, issues, phases };
+}
+
+function agentPhaseColor(phase){
+  if(!phase.items.length) return '#66625A';
+  if(phase.key === 'done') return phase.items.some(i => i.status === 'failed') ? '#D9694F' : '#7CC47C';
+  if(phase.key === 'implementing') return '#5FA8A0';
+  if(phase.key === 'approval') return '#E0B252';
+  return '#66625A';
+}
+
+function agentPhaseSub(phase){
+  if(!phase.items.length) return { text:'なし', warn:false };
+  if(phase.key === 'done'){
+    const done = phase.items.filter(i => i.status === 'completed').length;
+    const rejected = phase.items.filter(i => i.status === 'rejected').length;
+    const failed = phase.items.filter(i => i.status === 'failed').length;
+    return { text: `完了 ${done} ・却下 ${rejected} ・失敗 ${failed}`, warn: failed > 0 };
+  }
+  const first = phase.items[0];
+  const e = agentElapsed(first.updatedAt);
+  return { text: `#${first.number} ${first.title}${e.label ? ' ・' + e.label : ''}`, warn:false };
+}
+
+function agentIssueRow(item){
+  const color = AGENT_STATUS_COLOR[item.status] || '#66625A';
+  const e = agentElapsed(item.updatedAt);
+  const stuck = agentIsStuck(item);
+  const links = [];
+  if(item.issueUrl) links.push(`<a href="${esc(item.issueUrl)}" target="_blank" rel="noopener">Issue</a>`);
+  if(item.pullRequestUrl) links.push(`<a href="${esc(item.pullRequestUrl)}" target="_blank" rel="noopener">PR</a>`);
+  if(item.previewUrl) links.push(`<a href="${esc(item.previewUrl)}" target="_blank" rel="noopener">プレビュー</a>`);
+  return `
+    <div class="agent-issue">
+      <div class="agent-issue-head">
+        <span class="agent-issue-dot" style="background:${color}"></span>
+        <span class="agent-issue-no">#${esc(item.number)}</span>
+        <span class="agent-issue-title">${esc(item.title)}</span>
+      </div>
+      <div class="agent-issue-meta">
+        <span class="agent-issue-elapsed${stuck ? ' warn' : ''}">${esc(item.status)}${e.label ? ' ・' + e.label : ''}${stuck ? ' ・放置' : ''}</span>
+        ${links.length ? `<span class="agent-issue-links">${links.join('')}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function agentIssuesHtml(m, phase){
+  if(!phase.items.length) return `<div class="agent-issues"><div class="agent-empty">なし</div></div>`;
+  const max = Math.max(1, Math.min(20, Number(m.max) || 5));
+  const showAll = agentExpandedFull.has(phase.key);
+  const shown = showAll ? phase.items : phase.items.slice(0, max);
+  const rows = shown.map(agentIssueRow).join('');
+  const more = (!showAll && phase.items.length > max)
+    ? `<button type="button" class="agent-more" data-agent-more="${esc(phase.key)}">残り${phase.items.length - max}件を表示</button>`
+    : '';
+  return `<div class="agent-issues">${rows}${more}</div>`;
+}
+
+function agentPhaseRow(m, phase){
+  const isOpen = agentExpanded.has(phase.key);
+  const color = agentPhaseColor(phase);
+  const sub = agentPhaseSub(phase);
+  const count = phase.items.length;
+  return `
+    <button type="button" class="agent-phase${isOpen ? ' open' : ''}" aria-expanded="${isOpen}" data-agent-phase="${esc(phase.key)}">
+      <span class="agent-bar" style="background:${color}"></span>
+      <span class="agent-count${count ? ' has' : ''}">${count}</span>
+      <span class="agent-info">
+        <span class="agent-label${count ? ' has' : ''}"${count ? ` style="color:${color}"` : ''}>${esc(phase.label)}</span>
+        <span class="agent-sub${sub.warn ? ' warn' : ''}">${esc(sub.text)}</span>
+      </span>
+      <svg class="agent-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
+      </svg>
+    </button>
+    ${isOpen ? agentIssuesHtml(m, phase) : ''}`;
+}
+
+function renderAgentCard(m, st){
+  const meta = AGENT_STATE_META[st.phase] || AGENT_STATE_META.none;
+  const url = m.dashboardUrl || 'https://ymatsuda-cmyk.github.io/tools-beta/utility/agent.html';
+  const body = st.phase === 'error'
+    ? `<div class="mon-err">${esc(st.error)}</div>`
+    : st.phases.map(phase => agentPhaseRow(m, phase)).join('');
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${st.issues.length ? st.issues.length + '件' : meta.label}</span>
+      </div>
+      <div class="agent-body">${body}</div>
+      <div class="agent-open"><a href="${esc(url)}" target="_blank" rel="noopener">ダッシュボードを開く</a></div>
+    </div>`;
+}
+
+/** フェーズの開閉・「残りを表示」の結線。見本のでは保存せず、見ている間だけ覚えておく */
+function wireAgentPreview(){
+  F('live').querySelectorAll('[data-agent-phase]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.agentPhase;
+      if(agentExpanded.has(key)) agentExpanded.delete(key);
+      else agentExpanded.add(key);
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-agent-more]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      agentExpandedFull.add(btn.dataset.agentMore);
+      paint();
+    });
+  });
+}
+
 /** JSONには出ない、プレビュー用のメール */
 function dummyMail(m){
   const accounts = mailAccounts(m);
@@ -1764,6 +2020,9 @@ function paint(){
   }else if(activeTab === 'minutes'){
     F('live').innerHTML = renderMinutesCard(m, dummyMinutes());
     wireMinutesPreview();
+  }else if(activeTab === 'agent'){
+    F('live').innerHTML = renderAgentCard(m, dummyAgentIssues());
+    wireAgentPreview();
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -1786,6 +2045,7 @@ const TABS = [
   { id:'schedule', label:'今日の予定' },
   { id:'mail',    label:'メール受信' },
   { id:'minutes', label:'議事録' },
+  { id:'agent',   label:'Issue状態' },
   { id:'api',     label:'汎用API / Kaggle' },
   { id:'copilot', label:'Copilot' },
   { id:'manual',  label:'手動カウンタ' },
@@ -1812,6 +2072,7 @@ const TEMPLATES = {
     { id:'home', label:'個人', provider:'outlook', clientId:'00000000-0000-0000-0000-000000000000', tenant:'common', color:'#8F7BD6' }
   ] },
   minutes: { id:'gijiroku', name:'議事録', type:'minutes', max:5, roles:['jba', 'kijun', 'keiei'] },
+  agent  : { id:'issues', name:'Issue状態', type:'agent', max:5 },
   api    : { id:'gpu-server', name:'GPU サーバー', endpoint:'https://example.com/api/resource' },
   copilot: { id:'copilot', name:'GitHub Copilot', type:'copilot', monthlyLimit:300 },
   manual : { id:'claude', name:'Claude', type:'manual', limit:100, unit:'回', cycle:'daily' },
@@ -1899,7 +2160,7 @@ function wireDrag(){
 ['id','name','group','total','threshold','space','model','chart',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
  'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
- 'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items']
+ 'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items','d-agent-issues']
   .forEach(id => F(id).addEventListener('input', paint));
 
 [F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
@@ -1925,6 +2186,7 @@ F('reset').addEventListener('click', ()=>{
   if(activeTab === 'schedule') scheduleView = 'today';
   if(activeTab === 'mail'){ mailLocalPreview = { starred:new Set(), hidden:new Set() }; mailView = 'inbox'; }
   if(activeTab === 'minutes'){ minutesLocalPreview = {}; minutesTitleOverride = {}; minutesEditingTitle = new Set(); }
+  if(activeTab === 'agent'){ agentExpanded = new Set(); agentExpandedFull = new Set(); }
   paint();
   say('見本に戻しました');
 });
@@ -1942,6 +2204,7 @@ F('d-today').value = new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD
 F('d-events').value = JSON.stringify(SAMPLE_EVENTS, null, 2);
 F('d-mails').value = JSON.stringify(SAMPLE_MAILS, null, 2);
 F('d-minutes-items').value = JSON.stringify(SAMPLE_MINUTES, null, 2);
+F('d-agent-issues').value = JSON.stringify(SAMPLE_AGENT_ISSUES, null, 2);
 switchTab('clipgen');
 paint();
 </script>
