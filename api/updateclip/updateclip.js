@@ -14,14 +14,14 @@
  *   await api.run({ spaceId, modelKey, onProgress, shouldCancel })
  */
 
-import { listVideos, listVideosFromNotion } from '../../beta/clipstock/src/lib/store.js'
-import { fetchTranscript, saveGenerated, statusCounts } from '../../beta/clipstock/src/lib/gas.js'
-import { generateAll, stagesOf } from '../../beta/clipstock/src/lib/generate.js'
-import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../beta/clipstock/src/lib/spaces.js'
-import { loadSettings, connectionOf } from '../../beta/clipstock/src/lib/llm-settings.js'
-import { loadConfig, isConfigured } from '../../beta/clipstock/src/lib/videos-config.js'
-import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../beta/clipstock/src/lib/filters.js'
-import { knownTagsOf } from '../../beta/clipstock/src/lib/tags.js'
+import { listVideos, listVideosFromNotion } from '../../clipstock/src/lib/store.js'
+import { fetchTranscript, saveGenerated, statusCounts } from '../../clipstock/src/lib/gas.js'
+import { generateAll, stagesOf } from '../../clipstock/src/lib/generate.js'
+import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../clipstock/src/lib/spaces.js'
+import { loadSettings, connectionOf } from '../../clipstock/src/lib/llm-settings.js'
+import { loadConfig, isConfigured } from '../../clipstock/src/lib/videos-config.js'
+import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../clipstock/src/lib/filters.js'
+import { knownTagsOf } from '../../clipstock/src/lib/tags.js'
 
 /** モデルは接続をまたいで同名がありうるので、接続IDと組にして一意にする */
 const MODEL_SEPARATOR = '::'

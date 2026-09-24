@@ -24,6 +24,11 @@ export function parseTimecode(text) {
   return h * 3600 + Number(m[2]) * 60 + Number(m[3])
 }
 
+/** 括弧なしの "12:34" / "1:02:03" を秒にする(概要欄のチャプター表記を読むため) */
+export function parseClock(text) {
+  return parseTimecode(`[${String(text ?? '').trim()}]`)
+}
+
 /** 秒を "12:34" / "1:02:03" にする */
 export function formatTimecode(seconds) {
   const s = Math.max(0, Math.floor(Number(seconds) || 0))

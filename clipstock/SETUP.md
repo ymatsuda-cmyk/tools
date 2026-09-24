@@ -188,6 +188,60 @@ cron の例(1時間おき。文字起こしのバッチのあとに回すと噛�
 25 * * * * ~/tools/mac/scripts/push/git_push_all.sh >> ~/git_push.log 2>&1
 ```
 
+### 表示対象をURLで切り替える
+
+「どの一覧JSONを読むか」と「どのNotionDBへ書き戻すか」は対になっているので、
+`data/clipstock/spaces.json` にまとめて書き、その組み合わせに名前を付けます。
+これをスペースと呼び、URLの `?space=<id>` で選びます。
+
+```json
+{
+  "default": "all",
+  "sources": {
+    "video": { "label": "動画", "list": "index-video.json", "idea": "idea-video.json", "db": "video" },
+    "web":   { "label": "Web",  "list": "index-web.json",   "idea": "idea-web.json",   "db": "web" }
+  },
+  "spaces": [
+    { "id": "all",   "label": "すべて",  "sources": ["video", "web"] },
+    { "id": "video", "label": "動画",    "sources": ["video"] },
+    { "id": "web",   "label": "Web記事", "sources": ["web"] }
+  ]
+}
+```
+
+- `sources` … 取り込み元1つぶん。`list` / `idea` は `data/clipstock/` からの相対名、
+  `db` は書き戻し先を選ぶキーで `gas/Code.gs` の `source` と一致させる
+- `spaces` … 取り込み元の組み合わせ。画面上部のタブになる
+
+```
+index.html            → default のスペース(すべて)
+index.html?space=web  → web記事だけ
+```
+
+### 「分類」カラムで分ける
+
+Notion の `分類` カラムが**空のページ**が `index-video.json` / `index-web.json` に入ります。
+分類が入っているページはそこには入らず、分類ごとのファイルに書き出されます。
+
+```
+分類が空      → index-video.json     / index-web.json
+分類が「経営」→ index-経営-video.json / index-経営-web.json
+              idea-経営-video.json  / idea-経営-web.json
+```
+
+分類が増えると `build_clipstock_json.py` が `spaces.json` に取り込み元とスペースを
+`"auto": true` 付きで足します。ラベルや並び順を手で直したいときは `auto` を外してください。
+以降そのスペースは自動更新の対象から外れます。分類が使われなくなると `auto` の項目だけ
+取り下げられます(書き出し済みのJSONファイルは残るので、要らなければ手で消す)。
+
+分類ごとのスペースは JSON が前提です。GAS 側は `分類` を見ないので、JSONが読めないときの
+Notion 直読みへのフォールバックは「分類なし」のスペースでだけ働きます。
+
+取り込み元を増やすときはコードではなく `spaces.json` に足します。
+選択を localStorage ではなくURLに置いているのは、画面をリンクやブックマークで
+配れるようにするためです。`spaces.json` が読めないときは、分割前と同じ
+動画 / web の2つを使います。
+
 `--out` に指定した場所と `mac/scripts/push/git_push_config.json` の
 `clipstock-data` の `source_folder` を必ず一致させてください。ここがずれると、
 古いJSONを配信し続けても誰も気づけません。

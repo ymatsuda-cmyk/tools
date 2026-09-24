@@ -1,7 +1,8 @@
 import { loadConfig } from './videos-config.js'
+import { dbOf } from './spaces.js'
 
 /**
- * ページIDごとの取り込み元。
+ * ページIDごとの書き戻し先。
  * web記事DBは動画DBと別のNotion(統合も別のことがある)なので、
  * 書き戻すときにどちらのトークンを使うかをGAS側へ伝える必要がある。
  */
@@ -10,7 +11,7 @@ const pageSources = new Map()
 /** 一覧を読み込んだら呼ぶ。以降そのページへの操作に source が付く */
 export function registerPageSources(items) {
   ;(items || []).forEach((item) => {
-    if (item && item.key) pageSources.set(item.key, item.source === 'web' ? 'web' : 'video')
+    if (item && item.key) pageSources.set(item.key, dbOf(item.source || 'video'))
   })
 }
 
@@ -108,6 +109,15 @@ export function listIdeas() {
   return callGas('listIdeas')
 }
 
+/**
+ * 取り込み元×分類ごとの、状態別件数だけを取る。
+ * GAS がプロパティに持っている集計を読むだけなので、Notion の全件走査は起きない。
+ * refresh=true のときだけ GAS 側で集計を作り直す(遅いので手動更新のときだけ)。
+ */
+export function statusCounts(refresh = false) {
+  return callGas('statusCounts', { refresh })
+}
+
 /** @returns {Promise<{text: string, updatedAt: string}>} */
 export function fetchTranscript(pageId) {
   return callGas('fetchTranscript', { pageId })
@@ -148,7 +158,12 @@ export function saveTitle(pageId, title) {
   return callGas('saveTitle', { pageId, title })
 }
 
-/** 状態変更。'新規' に戻すと次回バッチで文字起こしをやり直す。'除外' は論理削除 */
+/** 分類。空文字で外せる。一覧JSONの分かれ先が変わるので作り直しを依頼する */
+export function saveCategory(pageId, category) {
+  return callGas('saveCategory', { pageId, category })
+}
+
+/** 状態変更。'再取得' に戻すと次回バッチで文字起こしをやり直す。'除外' は論理削除 */
 export function setStatus(pageId, status) {
   return callGas('setStatus', { pageId, status })
 }
@@ -179,6 +194,7 @@ const REBUILD_ACTIONS = new Set([
   'saveField',
   'saveTags',
   'saveTitle',
+  'saveCategory',
   'setStatus',
   'setPublic',
   'updateRawCount',
