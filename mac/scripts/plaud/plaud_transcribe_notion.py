@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import importlib.util, json, os, re, requests, shlex, shutil, subprocess, sys, tempfile
+import importlib.util, json, os, re, requests, shlex, shutil, subprocess, sys, tempfile, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -109,6 +109,10 @@ MINUTES_INDEX_PATH = Path(os.environ.get(
 ))
 GIT_AUTO_PUSH = False
 #GIT_AUTO_PUSH = os.environ.get("MINUTES_GIT_PUSH", "0") == "1"
+
+# launchd/cronの多重起動で同じPLAUDファイルを二重登録するのを防ぐ（drive_inbox.pyと同じ方式）
+LOCK_FILE = Path("/tmp/plaud_transcribe_notion.lock")
+LOCK_MAX_AGE_SEC = int(os.environ.get("PLAUD_LOCK_MAX_AGE_SEC", "21600"))  # 6時間。長い会議の文字起こしを考慮
 
 def plaud_headers(account):
     return {
@@ -676,6 +680,10 @@ def _multi_select_tags(props, name):
     items = props.get(name, {}).get("multi_select", [])
     return [it.get("name", "") for it in items if it.get("name")]
 
+def _number(props, name):
+    val = props.get(name, {}).get("number")
+    return val if isinstance(val, (int, float)) else 0
+
 def to_iso_z(s):
     if not s: return ""
     try:
@@ -687,10 +695,12 @@ def to_iso_z(s):
 
 def page_to_entry(page):
     props = page.get("properties", {})
-    url_val = _rich_text(props, "URL")
-    key = plaud_id_from_url(url_val)
-    if not key: return None            # PLAUD由来でないページは除外
     if page.get("archived") or page.get("in_trash"): return None
+    url_val = _rich_text(props, "URL")
+    notion_page_id = page.get("id", "")
+    # PLAUD由来ならPLAUDのfileIdをkeyに、Drive Inbox経由などURLが無いページはNotionページIDをkeyにする
+    key = plaud_id_from_url(url_val) or notion_page_id
+    if not key: return None
     title_items = props.get("ミーティング名", {}).get("title", [])
     return {
         "key": key,
@@ -700,7 +710,8 @@ def page_to_entry(page):
         "status": (props.get("状態", {}).get("select") or {}).get("name", ""),
         "tags": _multi_select_tags(props, "カテゴリー"),
         "permissions": _multi_select_tags(props, "権限"),
-        "notionPageId": page.get("id", ""),
+        "rawContextCount": _number(props, "原文文字数"),
+        "notionPageId": notion_page_id,
         "updatedAt": None,
     }
 
@@ -718,7 +729,7 @@ def write_minutes_index(pages):
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     for e in entries:
         old = previous.get(e["key"])
-        unchanged = old and all(old.get(k) == e[k] for k in ("title", "date", "duration", "status", "tags", "permissions", "notionPageId"))
+        unchanged = old and all(old.get(k) == e[k] for k in ("title", "date", "duration", "status", "tags", "permissions", "rawContextCount", "notionPageId"))
         e["updatedAt"] = (old.get("updatedAt") or now_iso) if unchanged else now_iso
 
     entries.sort(key=lambda e: e["date"], reverse=True)
@@ -764,7 +775,7 @@ def build_index(pages=None):
     if GIT_AUTO_PUSH:
         push_minutes_index()
 
-def main():
+def _run():
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
     print(f"\n{'='*60}\nPLAUD→文字起こし→Notion開始: {now}\n{'='*60}")
     if not PLAUD_ACCOUNTS or not NOTION_TOKEN:
@@ -803,6 +814,12 @@ def main():
         origin = f" <{account['name']}>" if account else ""
         print(f"\n  [{i}/{len(new_files)}] {name}{origin}")
 
+        # 長時間の文字起こし中に別プロセスが同じファイルを拾わないよう、
+        # ダウンロード直前に一度だけ再チェックする（多重起動時の保険。根本対策はロックファイル）。
+        recheck_pages = fetch_notion_pages()
+        if file_id in get_registered_ids(recheck_pages):
+            print(f"  ⏭️ 他プロセスが既に登録済みのためスキップ"); continue
+
         temp_url = get_download_url(file_id, account)
         if not temp_url:
             print(f"  ❌ URL取得失敗。スキップ"); continue
@@ -831,6 +848,21 @@ def main():
     build_index(latest_notion_pages)
 
     print(f"\n{'='*60}\n✅ 全処理完了: {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S JST')}\n{'='*60}\n")
+
+def main():
+    # launchd/cronの実行が重なると同じPLAUDファイルを二重処理するので排他をかける（drive_inbox.pyと同じ方式）
+    if LOCK_FILE.exists():
+        age = time.time() - LOCK_FILE.stat().st_mtime
+        if age < LOCK_MAX_AGE_SEC:
+            print(f"❌ 前回の実行が継続中の可能性があります（ロック経過: {int(age)}秒）。終了します。")
+            print(f"   誤検知の場合は {LOCK_FILE} を削除してから再実行してください。")
+            return
+        print(f"⚠️ 古いロック（{int(age)}秒経過）を破棄します: {LOCK_FILE}")
+    LOCK_FILE.write_text(str(os.getpid()))
+    try:
+        _run()
+    finally:
+        LOCK_FILE.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     main()
