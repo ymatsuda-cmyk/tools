@@ -1,234 +1,397 @@
-# 予定取得API
+# リソースダッシュボード セットアップ手順
 
-今日の予定を取ってくる共通の入口です。取得元は差し替えられ、Outlook（Microsoft Graph）、
-サインインなしで使えるJSON決め打ち、外部が書き込んだJSONBinを読むだけの3つが
-入っています。アカウントは何個でも並べられます。
+Notion で管理し、GAS 経由で GitHub Pages に反映する構成です。
+
+## リポジトリ構成
 
 ```
-api/schedule/
-├── schedule.api.js        呼び出す側が使う入口
-├── auth-redirect.html     サインインのポップアップが戻ってくる先
-└── providers/
-    ├── outlook.js         Microsoft Graph
-    ├── json.js            サインイン不要。固定の予定や共有JSON
-    └── jsonbin.js         サインイン不要。JSONBinを読むだけ（書き込みは外部で行う）
+your-repo/
+├── index.html          ダッシュボード本体
+├── index.json          リンクデータ（GASが自動更新）
+└── assets/
+    ├── thumbs/         サムネイル画像
+    └── previews/       ホバー時のmp4・画像
 ```
 
-Outlook はブラウザから直接 Microsoft にサインインします。JSON・JSONBinはどちらもサインインも
-サーバーも要りません（JSONBinは読み込み専用で、書き込みは外部で行います）。
+`assets/thumbs/` と `assets/previews/` は空だと Git に登録されないので、
+`.gitkeep` という空ファイルを置いておいてください。
 
----
+リポジトリ直下ではなくサブディレクトリ（例 `dashboard/`）に置く場合は、
+スクリプトプロパティ `GITHUB_BASE_PATH` にそのディレクトリを指定します。
+GAS はコミット先をすべてそのディレクトリ配下（`dashboard/index.json`、
+`dashboard/assets/...`）に切り替えます。ダッシュボード側の設定や
+`index.json` 内のパスは、これまで通り `index.html` からの相対パスのままで構いません。
 
-## 使い方
+## タブとカード表示の設定
 
-```javascript
-const schedule = await import('/api/schedule/schedule.api.js')
+`index.json` の `config.tabs` に任意のタブを追加できます。`id` は半角英数字、`_`、`-`を使い、
+`links`、`monitor`、`info` 以外を指定してください。
 
-const accounts = schedule.normalizeAccounts([
-  { id: 'work', label: '仕事', provider: 'outlook', clientId: '…', tenant: 'organizations' },
-  { id: 'home', label: '個人', provider: 'outlook', clientId: '…', tenant: 'consumers' },
-  { id: 'plan', label: '予定表', provider: 'json',
-    events: [{ title: '健康診断', allDay: true, start: '2026-09-20' }] }
-])
-
-await schedule.signIn(accounts[0])        // ポップアップが開く（jsonは不要）
-const result = await schedule.today(accounts)
-```
-
-### 関数
-
-| 関数 | 内容 |
-|---|---|
-| `normalizeAccounts(list)` | 設定の書き漏らし（provider・label・色）を埋める |
-| `today(accounts)` | 今日 0:00〜翌 0:00 の予定 |
-| `range(accounts, {from, to})` | 期間を指定して取る |
-| `status(accounts)` | サインイン状態だけを見る |
-| `signIn(account)` / `signOut(account)` | ポップアップでサインイン・サインアウト |
-| `providers()` | 選べる取得元と、設定に必要な項目 |
-| `redirectUri()` | Azure に登録するURI |
-| `formatTime` / `nextEvent` / `ongoing` | 表示のための小物 |
-
-### `today()` が返すもの
-
-```javascript
+```json
 {
-  from, to, dayKey: '2026-09-16',
-  signedIn: true,
-  events: [{
-    key, id, accountId, accountLabel, color, provider,
-    title, start: Date, end: Date, allDay, cancelled, free, declined,
-    location, organizer, onlineUrl, url
-  }],
-  accounts: [{ id, label, color, signedIn, username, count, error, needsSignIn }],
-  errors: [{ id, message }]
+  "config": {
+    "tabs": [{ "id": "custom", "label": "カスタム" }]
+  }
 }
 ```
 
-予定は開始が早い順に並びます（終日は先頭）。アカウントが1つ落ちても、
-残りの予定はそのまま返ります。理由は `accounts[].error` に入ります。
+リンクカード（`resources`）または稼働状況・情報カード（`config.monitors`）に
+`"tab": "custom"` を追加すると、そのカードをカスタムタブへ移動できます。
+`"hidden": true` を追加するとカードを非表示にできます。非表示にしたカードは、
+画面右上の「設定」→「表示」→「非表示カード」から表示に戻せます。
 
 ---
 
-## Outlook の準備
+## 1. Notion データベースを作る
 
-### 1. アプリを登録する
+新しいデータベースを作成し、以下のプロパティを用意します。
+**プロパティ名は完全に一致させてください**（GAS側がこの名前で読み取ります）。
 
-[Azure Portal](https://portal.azure.com) → Microsoft Entra ID → アプリの登録 → 新規登録
+| プロパティ名 | 種類 | 内容 |
+|---|---|---|
+| 名前 | タイトル | カードに表示される名前 |
+| URL | URL | クリック時に開くリンク先 |
+| カテゴリ | セレクト | AI / 資料 / アプリ など自由 |
+| 実行方法 | セレクト | `Webアプリ` `ダウンロード` `ローカル実行` |
+| カードサイズ | セレクト | `標準` `横2列分` `横2列分・背高` |
+| サムネイル | テキスト | `assets/thumbs/bot.png` のようなパス |
+| プレビュー | テキスト | `assets/previews/bot.mp4` のようなパス |
+| 公開 | チェックボックス | オフの行はダッシュボードに出ない |
+| 並び順 | 数値 | 小さい順に並ぶ。空欄は末尾 |
 
-| 項目 | 値 |
-|---|---|
-| 名前 | 何でもよい（例 `dashboard-schedule`） |
-| サポートされているアカウントの種類 | 職場と個人の両方を使うなら **任意の組織 + 個人の Microsoft アカウント** |
-| リダイレクト URI | プラットフォームは **シングルページ アプリケーション (SPA)**、URI は下記 |
+サムネイルとプレビューは**ファイル添付ではなくテキスト**にしてください。
+Notion の添付ファイルURLは約1時間で失効するため、Webページには使えません。
 
-リダイレクト URI は、このAPIを置いた場所の `auth-redirect.html` です。
+### インテグレーションを接続する
 
-```
-https://ユーザー名.github.io/リポジトリ名/api/schedule/auth-redirect.html
-```
-
-`redirectUri()` を呼べば、いま必要なURLがそのまま返ります。
-ローカルで試すときは、その時のURL（`http://localhost:5500/...`）も追加してください。
-
-> **SPA を選んでください。** 「Web」で登録するとクライアントシークレットを求められ、
-> ブラウザだけでは動きません。
-
-### 2. アクセス許可
-
-API のアクセス許可 → Microsoft Graph → **委任されたアクセス許可**
-
-- `User.Read`
-- `Calendars.Read`
-
-どちらも個人が同意できる範囲なので、管理者の同意は要りません
-（職場のテナントで同意を制限している場合は管理者に依頼してください）。
-
-### 3. アカウントを2つ使う
-
-**アプリ登録は1つで足ります。** `clientId` を同じにしたまま、`id` と `label` だけ
-変えて2件並べ、それぞれでサインインしてください。サインイン時にアカウントの
-選択画面が出るので、別々のアカウントを選びます。
-
-職場のテナントが外部アプリを制限している場合だけ、そのテナント側でもう1つ
-アプリを登録し、`clientId` と `tenant` を分けてください。
-
-| `tenant` | 対象 |
-|---|---|
-| `common` | 職場/学校と個人の両方（既定） |
-| `organizations` | 職場/学校のみ |
-| `consumers` | 個人（outlook.com / hotmail.com）のみ |
-| テナントID | そのテナントのみ |
-
-サインインの状態はブラウザに保存されます（MSAL の localStorage）。
-端末やブラウザを変えたときは、もう一度サインインしてください。
+1. https://www.notion.so/my-integrations で新しいインテグレーションを作成
+2. 表示された Internal Integration Token（`ntn_` で始まる）を控える
+3. 作成したデータベースを開き、右上「…」→「接続」からそのインテグレーションを追加
+4. データベースのURLから ID を控える
+   `notion.so/xxxxxxxx?v=yyyy` の `xxxxxxxx` の部分（32文字）
 
 ---
 
-## JSON で決め打ちする（`provider: "json"`）
+## 2. GitHub のトークンを用意する
 
-サインインが要りません。承認待ちの間や、Outlook に無い予定（旅行の日程など）を
-足したいときに使います。書き方は2通りです。
+Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
 
-### 1. アカウントの中に直接書く
+- Repository access: 対象のリポジトリのみを選択
+- Permissions → Repository permissions → **Contents: Read and write**
+- 有効期限は運用に合わせて設定（期限切れになると同期が止まります）
+
+生成されたトークンは一度しか表示されないので、その場で控えてください。
+
+---
+
+## 3. GAS を設定する
+
+1. https://script.google.com で新規プロジェクトを作成
+2. `Code.gs` の中身を貼り付け
+3. 左メニューの「プロジェクトの設定」→「スクリプト プロパティ」で以下を登録
+
+| プロパティ | 値 |
+|---|---|
+| `GITHUB_TOKEN` | 手順2のトークン |
+| `GITHUB_OWNER` | GitHubのユーザー名 |
+| `GITHUB_REPO` | リポジトリ名 |
+| `GITHUB_BRANCH` | `main`（省略可） |
+| `GITHUB_BASE_PATH` | リポジトリ配下のディレクトリ 例 `dashboard`（省略時はリポジトリ直下） |
+| `NOTION_TOKEN` | 手順1のトークン |
+| `NOTION_DATABASE_ID` | 手順1のデータベースID |
+| `SHARED_SECRET` | 自分で決めた任意の文字列 |
+
+トークンをコード内に直接書かないでください。スクリプトプロパティに置けば、
+GASを共有してもトークンは見えません。
+
+### 接続確認
+
+エディタ上部の関数選択から `testGitHubConnection` を実行してログを確認します。
+`200` が返れば GitHub 側はOK。続けて `testNotionConnection` を実行し、
+Notionの行が JSON に変換されて出力されることを確認します。
+
+### ウェブアプリとしてデプロイ
+
+右上「デプロイ」→「新しいデプロイ」→ 種類は **ウェブアプリ**
+
+- 実行するユーザー: **自分**
+- アクセスできるユーザー: **全員**
+
+発行された `https://script.google.com/macros/s/.../exec` を控えます。
+「全員」にしますが、`SHARED_SECRET` を知らないと書き込みはできません。
+
+> コードを修正したときは「デプロイを管理」→ 鉛筆アイコン →
+> バージョンを「新バージョン」にして更新してください。新規デプロイにすると URL が変わります。
+
+---
+
+## 4. ダッシュボードと繋ぐ
+
+1. `index.html` を GitHub Pages で開く
+2. 右上「設定」→「連携」タブ
+3. GAS の URL と、`SHARED_SECRET` と同じ文字列を入力
+
+これで以下が使えるようになります。
+
+- **画像 / mp4 のアップロード**: 追加・編集画面でファイルを選び「アップロード」
+  → `assets/` 配下にコミットされ、パスが自動入力されます
+- **index.json を GitHub に保存**: 画面で編集した内容を直接コミット
+- **Notion から同期する**: Notionの内容で index.json を作り直す
+
+---
+
+## 5. 定期同期（任意）
+
+GASエディタの左メニュー「トリガー」→「トリガーを追加」
+
+- 実行する関数: `syncFromNotion`
+- イベントのソース: 時間主導型
+- 間隔: 1時間おき など
+
+これで Notion に追加するだけで、放っておいてもサイトに反映されます。
+
+---
+
+## 運用上の注意
+
+- **反映のラグ**: GitHub Pages のビルドに30秒〜1分かかります
+- **mp4 のサイズ**: リポジトリは1GB以下が推奨。3〜5秒・720p程度に圧縮してください
+- **同じファイル名の差し替え**: 履歴が積み上がるため、頻繁な差し替えはリポジトリを重くします
+- **GASの実行時間**: 1回6分の上限があります。大量ファイルは分けて処理してください
+- **編集の優先順位**: ダッシュボードはブラウザ内の編集内容を優先表示します。
+  公開状態に戻すには 設定 →データ →「index.json を再読み込み」を押してください
+
+---
+
+## 6. 稼働状況タブ
+
+サーバーなどの稼働状況をリングゲージで表示し、起動・停止を行えます。
+
+各サービスは共通仕様のAPIを1つ用意します。詳細は `docs/service-api.md` を参照してください。
+
+1. サービス側にAPIを実装する（GETで状況を返し、POSTで起動/停止）
+2. GASのスクリプトプロパティに `MONITOR_TOKEN_{監視ID大文字}` でトークンを登録
+3. ダッシュボードの 設定 →監視 に、監視対象をJSONで登録
 
 ```json
-{ "id": "plan", "label": "予定表", "provider": "json",
-  "events": [
-    { "title": "健康診断", "allDay": true, "start": "2026-09-20" },
-    { "title": "歯医者", "start": "2026-09-16T19:00:00+09:00", "end": "2026-09-16T20:00:00+09:00", "location": "駅前" }
+[
+  { "id": "gpu-server", "name": "GPU サーバー", "endpoint": "https://your-service.example.com/api/resource" }
+]
+```
+
+更新間隔は既定で3分です。稼働状況タブを開いている間だけ自動更新し、
+他のタブに移ったりブラウザを裏に回すと自動で止まります。
+
+ブラウザからサービスAPIを直接叩かずGASを経由するため、
+サービス側でCORSを設定する必要はなく、トークンも公開されません。
+
+### URLパラメータでの絞り込み
+
+稼働状況タブは、URLパラメータで表示するサーバーを切り替えられます。
+
+| パラメータ | 例 | 動作 |
+|---|---|---|
+| `server` | `?server=gpu-server` | そのIDのサーバーだけ表示 |
+| `group` | `?group=本番` | そのグループだけ表示 |
+| `view` | `?view=monitor` | 稼働状況タブを開いた状態で起動 |
+
+```
+https://ユーザー名.github.io/リポジトリ名/?view=monitor&group=本番
+```
+
+画面上のチップで切り替えるとURLも自動で書き換わるので、
+その状態をブックマークすればいつでも同じ画面を開けます。
+
+### clipstock まとめて生成（`type: "clipgen"`）
+
+clipstock の「完了ぶんをまとめて生成」を、clipstock を開かずにここから流すカードです。
+
+```json
+{ "id": "clipgen", "name": "clipstock 生成", "type": "clipgen" }
+```
+
+| キー | 内容 |
+|---|---|
+| `total` | リングの分母。省略すると一覧の全件数を使う |
+| `space` | 最初に選んでおくパターン（省略可。省略時は spaces.json の既定） |
+| `model` | 最初に選んでおくAI（省略可。省略時は clipstock で選択中のもの） |
+| `showSpace` | `false` でパターンのコンボボックスを隠す。`space` の値で固定される |
+
+### 今日の予定（`type: "schedule"`）
+
+Outlook の今日の予定を出すカードです。Microsoft アカウントは何個でも並べられます。
+
+```json
+{
+  "id": "today", "name": "今日の予定", "type": "schedule", "max": 5,
+  "accounts": [
+    { "id": "work", "label": "仕事", "provider": "outlook", "clientId": "…", "tenant": "common", "color": "#5FA8A0" },
+    { "id": "home", "label": "個人", "provider": "outlook", "clientId": "…", "tenant": "common", "color": "#8F7BD6" }
   ]
 }
 ```
 
-### 2. 外部のJSONファイルから取る
-
-```json
-{ "id": "plan", "label": "予定表", "provider": "json",
-  "url": "https://example.com/events.json" }
-```
-
-URL先のJSONは、次のどの形でも構いません。
-
-| 形 | 例 |
+| キー | 内容 |
 |---|---|
-| 配列 | `[ { "title": "…", "start": "…" }, … ]` |
-| 包んだオブジェクト | `{ "events": [ {...} ] }`（`items`/`data`/`value`/`values` でも可） |
-| 予定1件そのもの | `{ "title": "…", "start": "…" }` |
-| NDJSON（1行1件） | `{...}` を改行区切りで並べたもの。GASなどが1件ずつ追記していく運用向け |
+| `max` | 一覧に出す件数。既定 5 |
+| `hidePast` | `true` で終わった予定を消す。既定は薄くして残す |
+| `defaultView` | `"week"` でカードを開いたときに週間表示から始める。既定は今日 |
+| `accounts` | アカウントの一覧。`id` と `clientId` が要る |
 
-それ以外の形（配列を持たないオブジェクトなど）だと
-「予定のJSONを読み取れません」というエラーになります。
+カード内に「今日／週間」の切り替えボタンがあり、いつでも押し替えられます。
+週間は**明日から1週間ぶん**を日付ごとにまとめて表示します（今日の予定は含みません）。
 
-`start` / `end` に**タイムゾーンの表記が無い**場合（`2026-09-16T04:30:00.0000000` のような
-Outlookの生の応答そのもの）は **UTC として扱います**。日本時間で書きたいときは
-`+09:00` を付けてください（`2026-09-16T13:30:00+09:00`）。
+GAS は通りません。ブラウザから直接 Microsoft にサインインします。
+カード下部の「サインイン」を押すとポップアップが開きます。
 
-`title` の代わりに `subject`、`allDay` の代わりに `isAllDay`、`start`/`end` が
-`{ "dateTime": "…" }` の形（Graph APIの生の応答そのもの）でも読めます。
+アプリ登録（Azure）のしかたと、アカウントを2つ使うときの考え方は
+`api/schedule/README.md` を見てください。登録するリダイレクトURIは、
+設定 →監視 →種類「今日の予定」の入力欄に表示されます。
 
-### 1件の書き方
+| `showModel` | `false` で使うAIのコンボボックスを隠す。`model` の値で固定される |
+| `showRun` | `false` で「まとめて生成」ボタンを隠す。件数を見るだけのカードになる（実行中の「中止」は残る） |
+| `includePartial` | `false` にすると、項目が欠けているものを対象から外す（既定は対象にする） |
+| `threshold` | 何件たまったら「まとめて生成」を押せるようにするか（既定 1） |
+| `statuses` | リングで数える状態の配列。省略すると `["完了"]` |
+| `statusMatch` | `"in"`（既定）で `statuses` に一致するものを数え、`"notIn"` で一致しないものを数える |
+| `chart` | 件数の見せ方。`"ring"`（既定）か `"bar"`（パターン別の棒グラフ） |
+| `layout` | カードの中身の並び。`["picks","ring","note","actions"]` から使うものを並べる |
 
-| キー | 必須 | 内容 |
-|---|---|---|
-| `title`（`subject` でも可） | 任意 | 省略すると「(件名なし)」 |
-| `start` | ほぼ必須 | 終日なら `"2026-09-20"`、時刻ありなら `"2026-09-16T19:00:00+09:00"` |
-| `end` | 任意 | 省略すると `start` と同じ（終日は無し） |
-| `allDay`（`isAllDay` でも可） | 任意 | `true` で終日扱い |
-| `location` | 任意 | 表示に出る |
-| `id` | 任意 | 省略すると配列内の順番から自動で振る |
+カード上のセレクトで**パターン（スペース）**と**使うAI**を選び、「まとめて生成」を押します。
+`showSpace` / `showModel` を `false` にすればセレクトは出ず、`space` / `model` に書いた値で固定されます。
+
+待機中のリングは、`statuses` に挙げた状態（既定は `完了`＝文字起こしは済んだがAI生成がまだ）のものが
+`total` に対して何件たまっているかを出します。状態は複数挙げられ、`statusMatch` を `"notIn"` にすると
+**挙げた状態以外**を数えます。中央には件数だけを出し、溜まるほど黄色→赤に変わります。
+実行中はリングが進捗に切り替わり、生成中の段・動画タイトルが出ます。
+
+`chart` を `"bar"` にすると、リングの代わりに**パターン別の棒グラフ**が出ます。数える条件
+（`statuses` / `statusMatch`）はリングと同じで、それを spaces.json のパターン（動画・Web記事・
+other・music・golf…）ごとに1本ずつ並べます。0件のパターンも名前だけ残ります。
+個別を全部含む総覧のパターン（`すべて`）は二重になるので棒にはしません。見出しには
+並べた棒の合計を出します。
+
+棒の長さは一番多いものを基準にし、色はそのパターンの中での溜まり具合（黄色→赤）で変わります。
+
+件数は全パターンぶんを1回で受け取るので、カード上でパターンを切り替えても通信は起きません。
+
+設定値と見た目の対応は [`clipgen-preview.html`](clipgen-preview.html) で確かめられます。
+カードの中身をドラッグして並べ替えると、そのまま貼り付けられる設定JSONがその場で出ます。
+
+対象は clipstock と同じ条件です。状態が `完了` のものに加えて、`要約済み` でも
+項目が欠けているものを拾います。1件ごと・1段ごとに Notion へ保存するので、
+途中で中止しても、そこまでの結果は残ります。
+
+生成処理の実体は [`api/updateclip/updateclip.js`](../api/updateclip/updateclip.js) で、
+clipstock の実装をそのまま呼びます。GASのURL・共有トークン・AIの接続先は
+**clipstock の設定をそのまま使う**ので、ダッシュボード側での設定は要りません。
+まだ clipstock を設定していない場合は、先に clipstock の歯車から接続を入れてください。
+
+対象の件数は GAS が集計したものを読みます。GAS は10分ごと（`setupStatusCountsTrigger`）に
+Notion を数えてスクリプトプロパティに置き、状態・分類・生成・削除でこの GAS を通ったときは
+その場で1件ぶんを足し引きします。カードは集計を読むだけなので、件数が増えても表示は速いままです。
+
+Notion 側で直接状態を変えたときや Mac 側のバッチが動かしたときは、次の集計（最長10分）で
+反映されます。すぐ知りたいときはカード右上の更新ボタンを押してください。そのときだけ
+GAS が Notion を数え直します。
 
 ---
 
-## JSONBinから受け取る（`provider: "jsonbin"`）
+## 7. 情報タブ
 
-`json`と同じくサインインが要りません。違いは、予定をダッシュボード側には持たせず、
-**外部（GAS・手動など）が [jsonbin.io](https://jsonbin.io/) のBinに書き込んだものを読むだけ**
-という点です。読み込み専用で、ダッシュボードからの書き込みはしません。
+稼働状況とは性質が違う「見るだけ」のカードを置く場所です。ドル円と、ルールがあります。
 
-### アカウントの書き方
+### ルール（`type: "rule"`）
+
+曜日や第n週で決まっている繰り返しの予定を出すカードです。ゴミ出しがその一例です。
+
+GASには問い合わせず、ブラウザ内の日付だけで組み立てます。設定も通信も要りません。
+
+`lead` は**何日前に知りたいか**です。ゴミ出しは前の晩に出すので `1`（翌日ぶんを主役にする）。
+当日に知りたいものは `0` にします。予定は 設定 →監視 のJSONで登録します。
 
 ```json
-{ "id": "plan", "label": "予定表", "provider": "jsonbin",
-  "binId": "6512abcd1f2e3a4b5c6d7e8f",
-  "apiKey": "$2a$10$ここにX-Master-KeyかAccess Keyを入れる" }
+{
+  "id": "trash",
+  "name": "ゴミ出し",
+  "type": "rule",
+  "lead": 1,
+  "leadLabel": "今夜出す",
+  "noneLabel": "出すものなし",
+  "rules": [
+    { "label": "可燃ごみ", "color": "#D9694F", "days": [2, 5] },
+    { "label": "資源ごみ", "color": "#5FA8A0", "days": [3] },
+    { "label": "不燃ごみ", "color": "#8A857C", "days": [4], "weeks": [2] }
+  ]
+}
 ```
 
-| キー | 必須 | 内容 |
-|---|---|---|
-| `binId` | 必須 | jsonbin.io のBin ID |
-| `apiKey` | 必須 | 読み込みに使うキー（`X-Master-Key`。Access Keyで読み込み専用に絞ってもよい） |
+| キー | 内容 |
+|---|---|
+| `lead` | 何日前に出すか。既定は1（翌日ぶん） |
+| `leadLabel` | カード右上の見出し。例 `今夜出す` |
+| `noneLabel` | 対象日に予定が無いときの表示。例 `出すものなし` |
+| `rules[].days` | 曜日。**0が日曜**、1が月曜…6が土曜 |
+| `rules[].weeks` | その第n週だけにする。上の例は第2木曜。毎週なら省略 |
+| `rules[].color` | 見出しと一覧の点の色。省略可 |
 
-Bin1つにつき予定表1つの対応で、アカウントごとに別々のBin/キーを指定できます。
+カードは対象日の予定を大きく出し、その下にそれ以降の予定を3件並べます。
+`lead` が1以上のとき、今日ぶんの予定があれば「今日は◯◯」を添えます。
 
-### 外部からの書き込み方（例）
+### 電卓（`type: "calc"`）
 
-GASなど、ブラウザの外からBinの内容を丸ごと上書きします。
+式を持てるカードです。JSONに並べれば何個でも置けます。
+
+```json
+{
+  "id": "calc",
+  "name": "電卓",
+  "type": "calc",
+  "lines": 3,
+  "rows": [
+    { "label": "単価", "expr": "1200" },
+    { "label": "個数", "expr": "3" },
+    { "label": "税込", "expr": "単価*個数*1.1" }
+  ]
+}
+```
+
+| キー | 内容 |
+|---|---|
+| `lines` | 式の行数。既定は1。1〜20 |
+| `rows[].label` | その行の名前。付けると**変数**になります |
+| `rows[].expr` | 式。カード上で書き換えると自動で保存されます |
+
+#### 変数
+
+行に名前を付けると、他の行の式からその名前で参照できます。式の中では**チップ**として出ます。
 
 ```
-PUT https://api.jsonbin.io/v3/b/{binId}
-Content-Type: application/json
-X-Master-Key: {apiKey}
-
-[
-  { "title": "健康診断", "allDay": true, "start": "2026-09-20" },
-  { "title": "歯医者", "start": "2026-09-16T19:00:00+09:00", "end": "2026-09-16T20:00:00+09:00", "location": "駅前" }
-]
+単価             1200
+                1,200
+個数                3
+                    3
+税込   [単価]*[個数]*1.1
+                3,960
 ```
 
-中身の形は「JSON で決め打ちする」の**配列・包んだオブジェクト・予定1件そのもの**の
-3通りが使えます（NDJSONはJSONBinの性質上想定していません。1件の書き方は上の表と同じです）。
-まだ何も書き込んでいない（Binが空/存在しない）ときは、予定なしとして扱います。
+- 変数を入れるのは**カード下のボタンだけ**です。式の欄に直接打てるのは
+  数字と演算子（`0-9 . + - * / % ( )` と空白）だけで、名前は打ち込めません
+- チップは**つかんで動かせます**。同じ行の中でも、他の行の式へでも放り込めます
+- 消すときはチップを**クリックして選び、Del（または BackSpace）**を押します
+- 定義の無い名前のチップは赤く出ます。JSONに書いた古い名前などが該当します
 
----
+行の並び順は関係なく、下の行を上の行から参照しても構いません。
+参照が輪になっている場合は「◯◯が循環しています」と出て止まります。
 
-## 取得元を足す
+名前を書き換えて欄を離れると、**その名前を使っている式も一緒に直ります**。
+`単価` → `値段` にすれば `単価*個数` は `値段*個数` になります。
+`単価合計` のように名前を含んでいるだけの語は巻き込みません。
 
-1. `providers/新しい名前.js` を作り、`outlook.js` か `json.js` と同じものを公開する
-   - `id` `label` `FIELDS` `redirectUri()` `status(account)` `signIn(account)`
-     `signOut(account)` `events(account, {from, to})`
-2. `events()` は予定の配列を返す。1件の形は
-   `{ id, title, start: Date, end: Date, allDay, cancelled, location, organizer, onlineUrl, url }`
-3. `schedule.api.js` の `LOADERS` に1行足す
+#### 入力
 
-アカウント名・色・並べ替え・エラーのまとめは `schedule.api.js` 側でやるので、
-取得元はその取得元固有の事情だけを持てば済みます。
+- 結果は入力しながら出ます。`=` はありません
+- 使える記号は `+ − × ÷ ( )` と後置の `%`（`10%` は 0.1、`1200*10%` は 120）
+- 式の評価に `eval` は使っていません。四則演算・括弧・変数だけを読む簡易パーサです
+- 書き換えた内容はブラウザに保存されます。公開する `index.json` に残すときは
+  設定 →データ →「index.json を GitHub に保存」を押してください
