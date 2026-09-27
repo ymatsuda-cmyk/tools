@@ -841,6 +841,9 @@
       <div class="hint">何件でも並べられます。受信トレイ（トップフォルダ）のメールだけを対象にします。
         <span class="mono">"provider": "json"</span> にすると、サインインなしで
         <span class="mono">mails</span>（直書き）や <span class="mono">url</span>（外部JSON）からメールを出せます。
+        <span class="mono">"provider": "jsonbin"</span> にすると、外部（GAS・手動など）が
+        <span class="mono">binId</span> のJSONBinに書き込んだメールを読み込めます（読み込み専用、
+        <span class="mono">binId</span>/<span class="mono">apiKey</span> をアカウントごとに設定）。
         用意のしかたは <span class="mono">api/mail/README.md</span> を見てください</div>
       <div class="hint" id="hint-mail-redirect">リダイレクトURI: 読み込み中…</div>
     </div>

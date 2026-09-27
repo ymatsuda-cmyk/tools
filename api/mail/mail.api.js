@@ -18,7 +18,8 @@
 
 const LOADERS = {
   outlook: () => import('./providers/outlook.js'),
-  json: () => import('./providers/json.js')
+  json: () => import('./providers/json.js'),
+  jsonbin: () => import('./providers/jsonbin.js')
 }
 
 /** アカウントに色を指定しなかったときの並び順 */

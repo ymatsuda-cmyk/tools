@@ -1,7 +1,8 @@
 # 受信メール取得API
 
 受信トレイ（トップフォルダ）のメールを取ってくる共通の入口です。取得元は差し替えられ、
-Outlook（Microsoft Graph）と、サインインなしで使えるJSON決め打ちの2つが入っています。
+Outlook（Microsoft Graph）、サインインなしで使えるJSON決め打ち、外部が書き込んだ
+JSONBinを読むだけの3つが入っています。
 アカウントは何個でも並べられます。サブフォルダは見ません。
 
 ```
@@ -10,10 +11,12 @@ api/mail/
 ├── auth-redirect.html     サインインのポップアップが戻ってくる先
 └── providers/
     ├── outlook.js         Microsoft Graph（受信トレイのみ）
-    └── json.js            サインイン不要。固定のメールや共有JSON
+    ├── json.js            サインイン不要。固定のメールや共有JSON
+    └── jsonbin.js         サインイン不要。JSONBinを読むだけ（書き込みは外部で行う）
 ```
 
-Outlook はブラウザから直接 Microsoft にサインインします。JSON はサインインもサーバーも要りません。
+Outlook はブラウザから直接 Microsoft にサインインします。JSON・JSONBinはどちらもサインインも
+サーバーも要りません（JSONBinは読み込み専用で、書き込みは外部で行います）。
 
 ---
 
@@ -158,6 +161,49 @@ URL先のJSONは、次のどの形でも構いません。
 | `preview`（`bodyPreview` でも可） | 任意 | 使わないが将来のために受け取る |
 | `url`（`webLink` でも可） | 任意 | クリック先（未使用） |
 | `id` | 任意 | 省略すると配列内の順番から自動で振る |
+
+---
+
+## JSONBinから受け取る（`provider: "jsonbin"`）
+
+`json`と同じくサインインが要りません。違いは、メール本文をダッシュボード側には持たせず、
+**外部（GAS・手動など）が [jsonbin.io](https://jsonbin.io/) のBinに書き込んだものを読むだけ**
+という点です。読み込み専用で、ダッシュボードからの書き込みはしません。
+
+### アカウントの書き方
+
+```json
+{ "id": "share", "label": "共有箱", "provider": "jsonbin", "maxAgeDays": 3,
+  "binId": "6512abcd1f2e3a4b5c6d7e8f",
+  "apiKey": "$2a$10$ここにX-Master-KeyかAccess Keyを入れる" }
+```
+
+| キー | 必須 | 内容 |
+|---|---|---|
+| `binId` | 必須 | jsonbin.io のBin ID |
+| `apiKey` | 必須 | 読み込みに使うキー（`X-Master-Key`。Access Keyで読み込み専用に絞ってもよい） |
+| `maxAgeDays` | 任意 | このアカウントだけ有効期間を上書きする |
+
+Bin1つにつきメールボックス1つの対応で、アカウントごとに別々のBin/キーを指定できます。
+
+### 外部からの書き込み方（例）
+
+GASなど、ブラウザの外からBinの内容を丸ごと上書きします。
+
+```
+PUT https://api.jsonbin.io/v3/b/{binId}
+Content-Type: application/json
+X-Master-Key: {apiKey}
+
+[
+  { "subject": "お知らせ", "from": "info@example.com", "receivedAt": "2026-09-16T10:00:00+09:00" },
+  { "subject": "請求書",   "from": "billing@example.com", "receivedAt": "2026-09-15T09:00:00+09:00", "isRead": false }
+]
+```
+
+中身の形は「JSON で決め打ちする」の**配列・包んだオブジェクト・メール1件そのもの**の
+3通りが使えます（NDJSONはJSONBinの性質上想定していません。1件の書き方は上の表と同じです）。
+まだ何も書き込んでいない（Binが空/存在しない）ときは、カードは「新着なし」として扱います。
 
 ---
 
