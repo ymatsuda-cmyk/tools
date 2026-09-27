@@ -963,16 +963,32 @@
 
     <div class="tab-panel" data-panel="data">
       <div class="field">
-        <label>読み込むファイル名</label>
-        <input type="text" id="s-indexfile" placeholder="index.json">
-        <div class="hint" id="hint-indexfile">https://ymatsuda-cmyk.github.io/tools/data/dashboard/ 配下のファイル名を指定します（.json のみ）</div>
+        <label>保存先</label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+          <input type="checkbox" id="s-jsonbin-enabled" style="width:auto;">
+          JSONBinを使用する（オフの場合はこのブラウザのローカル保存を使用します）
+        </label>
       </div>
       <div class="field">
-        <label>公開データの反映</label>
+        <label>JSONBin Bin ID</label>
+        <input type="text" id="s-jsonbin-binid" placeholder="例: 6512abcd1f2e3a4b5c6d7e8f">
+      </div>
+      <div class="field">
+        <label>JSONBin X-Master-Key（またはAccess Key）</label>
+        <input type="password" id="s-jsonbin-apikey" placeholder="$2a$10$...">
+        <div class="hint" id="hint-jsonbin">jsonbin.io のBin詳細ページで発行したキーを入力します。このブラウザにのみ保存されます</div>
+      </div>
+      <div class="field">
+        <label>書き出しファイル名</label>
+        <input type="text" id="s-indexfile" placeholder="index.json">
+        <div class="hint" id="hint-indexfile">「index.json を書き出す」で保存する際のファイル名です（.json のみ。読み込みには使用しません）</div>
+      </div>
+      <div class="field">
+        <label>データの書き出し・再読み込み</label>
         <button class="icon-btn" id="btn-export" style="width:100%;margin-bottom:8px;">index.json を書き出す</button>
         <button class="icon-btn" id="btn-copyjson" style="width:100%;margin-bottom:8px;">JSONをコピー</button>
         <button class="icon-btn" id="btn-reload" style="width:100%;">読み込み直す（編集を破棄）</button>
-        <div class="hint">書き出したファイルを data/dashboard/ に置いて push すると、全員に反映されます</div>
+        <div class="hint">JSONBin使用時は「読み込み直す」でJSONBin側の最新内容を取得します。data/dashboard/index.json からの自動読み込みは行いません</div>
       </div>
     </div>
 
@@ -1163,17 +1179,10 @@ const DEFAULT_CONFIG = {
   tabs:[]
 };
 
-/* データの置き場所は固定。設定で変えられるのはファイル名だけ */
-const DATA_BASE = 'https://ymatsuda-cmyk.github.io/tools/data/dashboard/';
-
-/** パス指定を弾き、.json のファイル名だけを通す */
+/** パス指定を弾き、.json のファイル名だけを通す（「index.json を書き出す」の保存ファイル名にのみ使用） */
 function sanitizeIndexFile(name){
   const clean = String(name || '').trim().replace(/^.*[\\/]/, '');
   return /^[\w.-]+\.json$/i.test(clean) ? clean : 'index.json';
-}
-
-function indexUrl(){
-  return DATA_BASE + sanitizeIndexFile(config.indexFile) + '?t=' + Date.now();
 }
 
 let config = { ...DEFAULT_CONFIG };
@@ -1197,6 +1206,75 @@ const store = {
     try{ localStorage.setItem(key, value); }catch(e){}
   }
 };
+
+/* ---------- JSONBin連携（有効時は読み込み・保存の両方をJSONBinに向ける） ---------- */
+let jsonbinSettings = { enabled:false, binId:'', apiKey:'' };
+
+async function loadJsonbinSettings(){
+  const raw = await store.get('jsonbinSettings');
+  if(raw){
+    try{ jsonbinSettings = { ...jsonbinSettings, ...JSON.parse(raw) }; }catch(e){}
+  }
+}
+
+async function saveJsonbinSettings(){
+  await store.set('jsonbinSettings', JSON.stringify(jsonbinSettings));
+}
+
+/** JSONBinを使う条件が揃っているか（有効化 + Bin ID + キーが入力済み） */
+function jsonbinReady(){
+  return !!(jsonbinSettings.enabled && jsonbinSettings.binId && jsonbinSettings.apiKey);
+}
+
+/** JSONBinから最新のレコードを取得。Binがまだ空の場合はnullを返す */
+async function jsonbinLoad(){
+  const res = await fetch('https://api.jsonbin.io/v3/b/' + encodeURIComponent(jsonbinSettings.binId) + '/latest', {
+    headers:{ 'X-Master-Key': jsonbinSettings.apiKey, 'X-Bin-Meta':'false' },
+    cache:'no-store'
+  });
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error('JSONBinの読み込みに失敗しました（' + res.status + '）');
+  return await res.json();
+}
+
+/** JSONBinへ現在の内容を上書き保存 */
+async function jsonbinSave(data){
+  const res = await fetch('https://api.jsonbin.io/v3/b/' + encodeURIComponent(jsonbinSettings.binId), {
+    method:'PUT',
+    headers:{ 'Content-Type':'application/json', 'X-Master-Key': jsonbinSettings.apiKey },
+    body: JSON.stringify(data)
+  });
+  if(!res.ok) throw new Error('JSONBinへの保存に失敗しました（' + res.status + '）');
+}
+
+/**
+ * 現在の設定に応じて config/resources を読み込む。
+ * JSONBin有効時はJSONBinから、そうでなければ従来通りこのブラウザのローカル保存(store)から読み込む。
+ * data/dashboard/index.json からの読み込みは行わない。
+ */
+async function loadState(){
+  if(jsonbinReady()){
+    try{
+      const data = await jsonbinLoad();
+      if(data){
+        return { config:{ ...DEFAULT_CONFIG, ...(data.config || {}) }, resources: data.resources || [], status:'JSONBinから読み込みました' };
+      }
+      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'JSONBinにデータがありません。追加した内容は自動的に保存されます' };
+    }catch(e){
+      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'JSONBinの読み込みに失敗しました: ' + e.message };
+    }
+  }
+  const local = await store.get('dashboardState');
+  if(local){
+    try{
+      const parsed = JSON.parse(local);
+      return { config:{ ...DEFAULT_CONFIG, ...(parsed.config || {}) }, resources: parsed.resources || [], status:'ローカルの編集内容を表示中' };
+    }catch(e){
+      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'保存データの読み込みに失敗しました' };
+    }
+  }
+  return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'データがありません。追加した内容はこの端末に保存されます' };
+}
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1258,39 +1336,23 @@ function renderTabStructure(){
 }
 
 async function persistLocal(){
+  if(jsonbinReady()){
+    try{
+      await jsonbinSave({ config, resources });
+    }catch(e){
+      toast(e.message);
+    }
+    return;
+  }
   await store.set('dashboardState', JSON.stringify({ config, resources }));
 }
 
-/* ---------- 初期読み込み: 公開データ → ローカル編集を優先 ---------- */
+/* ---------- 初期読み込み: JSONBin有効時はJSONBin、そうでなければローカル保存 ---------- */
 async function init(){
-  const local = await store.get('dashboardState');
-  if(local){
-    try{
-      const parsed = JSON.parse(local);
-      config = { ...DEFAULT_CONFIG, ...(parsed.config || {}) };
-      resources = parsed.resources || [];
-    }catch(e){
-      resources = [];
-    }
-  }
-
-  let published = null;
-  try{
-    const res = await fetch(indexUrl(), { cache:'no-store' });
-    if(res.ok) published = await res.json();
-  }catch(e){ /* ファイルが無い場合は無視 */ }
-
-  const file = sanitizeIndexFile(config.indexFile);
-  if(local){
-    setStatus(published ? 'ローカルの編集内容を表示中（未公開の変更があります）' : 'ローカルの編集内容を表示中');
-  }else if(published){
-    // ファイル名はこの端末の設定なので、公開データの config では上書きしない
-    config = { ...DEFAULT_CONFIG, ...(published.config || {}), indexFile:file };
-    resources = published.resources || [];
-    setStatus(file + ' を読み込みました');
-  }else{
-    setStatus(file + ' が見つかりません。追加した内容は書き出して公開できます');
-  }
+  const state = await loadState();
+  config = state.config;
+  resources = state.resources;
+  setStatus(state.status);
   applyConfig();
   render();
   applyInitialView();
@@ -1536,8 +1598,11 @@ const settingsOverlay = document.getElementById('settingsOverlay');
 function syncSettingsForm(){
   F('s-title').value = config.title;
   F('s-theme').value = config.theme === 'light' ? 'light' : 'dark';
+  F('s-jsonbin-enabled').checked = !!jsonbinSettings.enabled;
+  F('s-jsonbin-binid').value = jsonbinSettings.binId || '';
+  F('s-jsonbin-apikey').value = jsonbinSettings.apiKey || '';
   F('s-indexfile').value = sanitizeIndexFile(config.indexFile);
-  F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + sanitizeIndexFile(config.indexFile);
+  F('hint-indexfile').textContent = '書き出しファイル名: ' + sanitizeIndexFile(config.indexFile);
   const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
                  ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],
                  ['s-borderw','v-borderw','borderW','px'],['s-fade','v-fade','fade','ms']];
@@ -1594,8 +1659,27 @@ F('s-title').addEventListener('input', async e=>{ config.title = e.target.value 
 F('s-theme').addEventListener('change', async e=>{ config.theme = e.target.value === 'light' ? 'light' : 'dark'; applyConfig(); await persistLocal(); });
 F('s-indexfile').addEventListener('input', async e=>{
   config.indexFile = sanitizeIndexFile(e.target.value);
-  F('hint-indexfile').textContent = '読み込み先: ' + DATA_BASE + config.indexFile;
+  F('hint-indexfile').textContent = '書き出しファイル名: ' + config.indexFile;
   await persistLocal();
+});
+
+F('s-jsonbin-enabled').addEventListener('change', async e=>{
+  jsonbinSettings.enabled = e.target.checked;
+  await saveJsonbinSettings();
+  const state = await loadState();
+  config = state.config;
+  resources = state.resources;
+  applyConfig(); render(); syncSettingsForm();
+  setStatus(state.status);
+  toast(jsonbinSettings.enabled ? 'JSONBinを使用します' : 'ローカル保存を使用します');
+});
+F('s-jsonbin-binid').addEventListener('input', async e=>{
+  jsonbinSettings.binId = e.target.value.trim();
+  await saveJsonbinSettings();
+});
+F('s-jsonbin-apikey').addEventListener('input', async e=>{
+  jsonbinSettings.apiKey = e.target.value.trim();
+  await saveJsonbinSettings();
 });
 
 [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
@@ -1776,20 +1860,12 @@ document.getElementById('btn-copyjson').onclick = async ()=>{
 };
 
 document.getElementById('btn-reload').onclick = async ()=>{
-  const file = sanitizeIndexFile(config.indexFile);
-  try{
-    const res = await fetch(indexUrl(), { cache:'no-store' });
-    if(!res.ok) throw new Error('読み込めませんでした');
-    const data = await res.json();
-    config = { ...DEFAULT_CONFIG, ...(data.config || {}), indexFile:file };
-    resources = data.resources || [];
-    await persistLocal();
-    applyConfig(); render(); syncSettingsForm();
-    setStatus(file + ' を再読み込みしました');
-    toast(file + ' を反映しました');
-  }catch(e){
-    toast(file + ' を読み込めませんでした');
-  }
+  const state = await loadState();
+  config = state.config;
+  resources = state.resources;
+  applyConfig(); render(); syncSettingsForm();
+  setStatus(state.status);
+  toast('再読み込みしました');
 };
 
 /* ---------- GAS連携 ---------- */
@@ -5169,7 +5245,7 @@ F('s-interval').addEventListener('input', async e=>{
 });
 
 initialParams = readUrlParams();
-loadGasSettings().then(init);
+Promise.all([loadGasSettings(), loadJsonbinSettings()]).then(init);
 </script>
 </body>
 </html>
