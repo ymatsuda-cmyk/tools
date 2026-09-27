@@ -1,8 +1,0 @@
-{
-  "id": "mail-share",
-  "description": "共有箱メール(dashboardのjsonbinメール取得元向け)のJSONBin登録",
-  "enabled": true,
-  "source_file": "/Users/yuya/scripts/data/mail/share.json",
-  "bin_id": "6512abcd1f2e3a4b5c6d7e8f",
-  "api_key": "$2a$10$ここにX-Master-KeyかAccess Keyを入れる"
-}
