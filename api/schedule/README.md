@@ -1,7 +1,8 @@
 # 予定取得API
 
-今日の予定を取ってくる共通の入口です。取得元は差し替えられ、Outlook（Microsoft Graph）と、
-サインインなしで使えるJSON決め打ちの2つが入っています。アカウントは何個でも並べられます。
+今日の予定を取ってくる共通の入口です。取得元は差し替えられ、Outlook（Microsoft Graph）、
+サインインなしで使えるJSON決め打ち、外部が書き込んだJSONBinを読むだけの3つが
+入っています。アカウントは何個でも並べられます。
 
 ```
 api/schedule/
@@ -9,10 +10,12 @@ api/schedule/
 ├── auth-redirect.html     サインインのポップアップが戻ってくる先
 └── providers/
     ├── outlook.js         Microsoft Graph
-    └── json.js            サインイン不要。固定の予定や共有JSON
+    ├── json.js            サインイン不要。固定の予定や共有JSON
+    └── jsonbin.js         サインイン不要。JSONBinを読むだけ（書き込みは外部で行う）
 ```
 
-Outlook はブラウザから直接 Microsoft にサインインします。JSON はサインインもサーバーも要りません。
+Outlook はブラウザから直接 Microsoft にサインインします。JSON・JSONBinはどちらもサインインも
+サーバーも要りません（JSONBinは読み込み専用で、書き込みは外部で行います）。
 
 ---
 
@@ -173,6 +176,48 @@ Outlookの生の応答そのもの）は **UTC として扱います**。日本�
 | `allDay`（`isAllDay` でも可） | 任意 | `true` で終日扱い |
 | `location` | 任意 | 表示に出る |
 | `id` | 任意 | 省略すると配列内の順番から自動で振る |
+
+---
+
+## JSONBinから受け取る（`provider: "jsonbin"`）
+
+`json`と同じくサインインが要りません。違いは、予定をダッシュボード側には持たせず、
+**外部（GAS・手動など）が [jsonbin.io](https://jsonbin.io/) のBinに書き込んだものを読むだけ**
+という点です。読み込み専用で、ダッシュボードからの書き込みはしません。
+
+### アカウントの書き方
+
+```json
+{ "id": "plan", "label": "予定表", "provider": "jsonbin",
+  "binId": "6512abcd1f2e3a4b5c6d7e8f",
+  "apiKey": "$2a$10$ここにX-Master-KeyかAccess Keyを入れる" }
+```
+
+| キー | 必須 | 内容 |
+|---|---|---|
+| `binId` | 必須 | jsonbin.io のBin ID |
+| `apiKey` | 必須 | 読み込みに使うキー（`X-Master-Key`。Access Keyで読み込み専用に絞ってもよい） |
+
+Bin1つにつき予定表1つの対応で、アカウントごとに別々のBin/キーを指定できます。
+
+### 外部からの書き込み方（例）
+
+GASなど、ブラウザの外からBinの内容を丸ごと上書きします。
+
+```
+PUT https://api.jsonbin.io/v3/b/{binId}
+Content-Type: application/json
+X-Master-Key: {apiKey}
+
+[
+  { "title": "健康診断", "allDay": true, "start": "2026-09-20" },
+  { "title": "歯医者", "start": "2026-09-16T19:00:00+09:00", "end": "2026-09-16T20:00:00+09:00", "location": "駅前" }
+]
+```
+
+中身の形は「JSON で決め打ちする」の**配列・包んだオブジェクト・予定1件そのもの**の
+3通りが使えます（NDJSONはJSONBinの性質上想定していません。1件の書き方は上の表と同じです）。
+まだ何も書き込んでいない（Binが空/存在しない）ときは、予定なしとして扱います。
 
 ---
 

@@ -818,6 +818,9 @@
       <div class="hint">何件でも並べられます。clientId は Azure のアプリ登録で発行するIDです。
         <span class="mono">"provider": "json"</span> にすると、サインインなしで
         <span class="mono">events</span>（直書き）や <span class="mono">url</span>（外部JSON）から予定を出せます。
+        <span class="mono">"provider": "jsonbin"</span> にすると、外部（GAS・手動など）が
+        <span class="mono">binId</span> のJSONBinに書き込んだ予定を読み込めます（読み込み専用、
+        <span class="mono">binId</span>/<span class="mono">apiKey</span> をアカウントごとに設定）。
         用意のしかたは <span class="mono">api/schedule/README.md</span> を見てください</div>
       <div class="hint" id="hint-sch-redirect">リダイレクトURI: 読み込み中…</div>
     </div>
