@@ -1,5 +1,26 @@
 # Change Log
 
+## 1.9.0 - 2026-09-27
+
+### Title
+
+Sync settings across devices with JSONBin
+
+### Changes
+
+- Added an optional JSONBin(jsonbin.io) sync for the settings modal, off by default. Checking "JSONBinを使う" plus a Bin ID and API key(X-Master-Key) makes the whole settings object(GAS URL, shared token, code, and the list-JSON location) available from any browser/device, instead of being stuck in this one browser's localStorage.
+- The Bin ID/API key themselves always stay local(they're the key needed to reach the cloud copy in the first place), so they're never overwritten by what comes back from JSONBin.
+- Saving still writes to localStorage first no matter what, so a failed cloud write never loses the local save; the save button shows "保存中(クラウド同期)..." while it pushes, and reports the error inline (keeping the modal open to retry) if the push fails.
+- Added "クラウドから取得" to pull an existing Bin's contents into the form (without saving yet) and "空のBinを作る" to create a fresh Bin from the current settings and fill in its ID — reuses the same field-mapping code as the existing "JSONで一括設定" import.
+- On app startup, before resolving which list JSON to load, the app now tries to refresh the local settings from JSONBin (if enabled) so a second device picks up the latest 一覧JSONの場所 etc. without needing to open the settings modal first. Falls back silently to the local settings if the fetch fails or JSONBin isn't enabled.
+
+### Affected Files
+
+- `clipstock/src/lib/jsonbin.js` (new)
+- `clipstock/src/lib/videos-config.js`
+- `clipstock/src/ui/settings.js`
+- `clipstock/src/main.js`
+
 ## 1.8.0 - 2026-09-12
 
 ### Title

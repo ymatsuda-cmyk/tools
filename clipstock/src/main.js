@@ -29,7 +29,7 @@ import {
   requestRebuildNow,
 } from './lib/gas.js'
 import { listVideos, listIdeas } from './lib/store.js'
-import { loadConfig, isConfigured, canEdit } from './lib/videos-config.js'
+import { loadConfig, isConfigured, canEdit, syncConfigFromJsonbin } from './lib/videos-config.js'
 import { loadSettings, saveSettings, activeModelName, allModels, connectionOf } from './lib/llm-settings.js'
 import { initPrompts } from './lib/prompts.js'
 import { initSpaces, activeSpace, spaceList, sourcesOf, spaceHref, spaceMode } from './lib/spaces.js'
@@ -2029,10 +2029,14 @@ document.addEventListener('keydown', (e) => {
 $('toggle-tags').classList.toggle('on', showTags)
 // プロンプトは生成を押すときまでに揃っていればよいので、一覧の読み込みは待たせない
 initPrompts()
-// どのJSONを読むかがスペースで決まるので、一覧より先に解決させる
-initSpaces().then(() => {
-  paintSpaceSwitch()
-  loadList()
+// JSONBinを使う設定なら、一覧より先にクラウド側の設定(一覧JSONの場所など)を取り込む。
+// 使っていない/取得できないときはローカルの設定のまま進む
+syncConfigFromJsonbin().finally(() => {
+  // どのJSONを読むかがスペースで決まるので、一覧より先に解決させる
+  initSpaces().then(() => {
+    paintSpaceSwitch()
+    loadList()
+  })
 })
 
 /** 表示対象の切り替え。選択はURLに入るのでリンクとして配れる */

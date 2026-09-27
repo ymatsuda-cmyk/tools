@@ -1,8 +1,9 @@
 import { escapeHtml } from './render.js'
-import { loadConfig, saveConfig } from '../lib/videos-config.js'
+import { loadConfig, saveConfig, jsonbinReady, pushConfigToJsonbin } from '../lib/videos-config.js'
 import { loadSettings, saveSettings, newConnection } from '../lib/llm-settings.js'
 import { verifyCode } from '../lib/gas.js'
 import { PROMPT_IDS, promptLabel, promptOf, defaultPromptOf, savePrompt } from '../lib/prompts.js'
+import { fetchBin, createBin } from '../lib/jsonbin.js'
 
 function roleLabel(role) {
   if (!role) return '<span class="muted">未確認</span>'
@@ -48,6 +49,24 @@ export function openSettings(onSaved, list) {
         <label class="field-label">一覧JSONの場所</label>
         <input id="cfg-data" class="input" value="${escapeHtml(config.dataUrl)}" placeholder="空欄で data/clipstock/ を使う" />
         <div class="foot-note">一覧とアイデアはここのJSONから読みます。読めなければNotionから直接取得します</div>
+
+        <details class="json-block" id="cfg-jsonbin-block">
+          <summary>設定の保存先(JSONBin)</summary>
+          <div class="foot-note">この設定(GAS URL・共有トークン・コード・一覧JSONの場所)はふだんこの端末のブラウザにだけ保存されます。JSONBin(jsonbin.io)のBinを用意すると、他の端末やブラウザでも同じ設定を使えます</div>
+          <label class="row">
+            <input type="checkbox" id="cfg-jsonbin-use" ${config.useJsonbin ? 'checked' : ''} />
+            <span>JSONBinを使う(設定をクラウドにも保存する)</span>
+          </label>
+          <label class="field-label">Bin ID</label>
+          <input id="cfg-jsonbin-id" class="input" value="${escapeHtml(config.jsonbinBinId)}" placeholder="jsonbin.ioで作成したBinのID" />
+          <label class="field-label">APIキー(X-Master-Key)</label>
+          <input id="cfg-jsonbin-key" class="input" type="password" value="${escapeHtml(config.jsonbinApiKey)}" placeholder="jsonbin.ioのアカウントで発行したキー" />
+          <div class="row">
+            <button id="cfg-jsonbin-pull" class="btn">クラウドから取得</button>
+            <button id="cfg-jsonbin-create" class="btn">空のBinを作る</button>
+          </div>
+          <div id="cfg-jsonbin-msg" class="foot-note">保存を押すと、チェックが入っていればクラウド側にも書き込みます</div>
+        </details>
 
         <label class="field-label">コード</label>
         <div class="row">
@@ -301,14 +320,12 @@ export function openSettings(onSaved, list) {
     )
   })
 
-  $('cfg-json-import').addEventListener('click', () => {
-    let parsed
-    try {
-      parsed = JSON.parse($('cfg-json').value)
-    } catch (err) {
-      alert('JSONの形式が不正です: ' + (err.message || err))
-      return
-    }
+  /**
+   * JSONで受け取った設定をフォームへ反映する。
+   * 手貼りのJSON一括設定と、JSONBinからの取得の両方から使う。
+   * ここで反映しても保存を押すまでは確定しない。
+   */
+  function applyParsedConfig(parsed) {
     if (parsed.gasUrl !== undefined) $('cfg-gas').value = parsed.gasUrl
     if (parsed.accessToken !== undefined) $('cfg-token').value = parsed.accessToken
     if (parsed.code !== undefined) $('cfg-code').value = parsed.code
@@ -324,6 +341,58 @@ export function openSettings(onSaved, list) {
       paintConns()
     }
     if (parsed.code) $('cfg-verify').click()
+  }
+
+  $('cfg-json-import').addEventListener('click', () => {
+    let parsed
+    try {
+      parsed = JSON.parse($('cfg-json').value)
+    } catch (err) {
+      alert('JSONの形式が不正です: ' + (err.message || err))
+      return
+    }
+    applyParsedConfig(parsed)
+  })
+
+  $('cfg-jsonbin-pull').addEventListener('click', async () => {
+    const binId = $('cfg-jsonbin-id').value.trim()
+    const apiKey = $('cfg-jsonbin-key').value.trim()
+    const msg = $('cfg-jsonbin-msg')
+    if (!binId || !apiKey) {
+      msg.innerHTML = '<span class="error-text">Bin IDとAPIキーを入力してください</span>'
+      return
+    }
+    msg.textContent = '取得中...'
+    try {
+      const remote = await fetchBin(binId, apiKey)
+      applyParsedConfig(remote)
+      msg.innerHTML = '<span class="ok-text">クラウドの設定を反映しました(保存を押すまでは確定しません)</span>'
+    } catch (err) {
+      msg.innerHTML = `<span class="error-text">取得に失敗しました: ${escapeHtml(String(err.message || err))}</span>`
+    }
+  })
+
+  $('cfg-jsonbin-create').addEventListener('click', async () => {
+    const apiKey = $('cfg-jsonbin-key').value.trim()
+    const msg = $('cfg-jsonbin-msg')
+    if (!apiKey) {
+      msg.innerHTML = '<span class="error-text">先にAPIキーを入力してください</span>'
+      return
+    }
+    msg.textContent = '作成中...'
+    try {
+      const snapshot = {
+        gasUrl: $('cfg-gas').value.trim(),
+        accessToken: $('cfg-token').value.trim(),
+        code: $('cfg-code').value.trim(),
+        dataUrl: $('cfg-data').value.trim(),
+      }
+      const id = await createBin(apiKey, snapshot, { name: 'clipstock-config' })
+      $('cfg-jsonbin-id').value = id
+      msg.innerHTML = `<span class="ok-text">Binを作成しました(ID: ${escapeHtml(id)})。保存を押して確定してください</span>`
+    } catch (err) {
+      msg.innerHTML = `<span class="error-text">作成に失敗しました: ${escapeHtml(String(err.message || err))}</span>`
+    }
   })
 
   $('cfg-verify').addEventListener('click', async () => {
@@ -343,17 +412,40 @@ export function openSettings(onSaved, list) {
     }
   })
 
-  $('cfg-save').addEventListener('click', () => {
-    saveConfig({
+  $('cfg-save').addEventListener('click', async () => {
+    const newConfig = {
       ...config,
       gasUrl: $('cfg-gas').value.trim(),
       accessToken: $('cfg-token').value.trim(),
       code: $('cfg-code').value.trim(),
       dataUrl: $('cfg-data').value.trim(),
       role: verifiedRole,
-    })
+      useJsonbin: $('cfg-jsonbin-use').checked,
+      jsonbinBinId: $('cfg-jsonbin-id').value.trim(),
+      jsonbinApiKey: $('cfg-jsonbin-key').value.trim(),
+    }
+    // この端末への保存は先に済ませる。クラウドへの書き込みが失敗しても消えないように
+    saveConfig(newConfig)
     saveSettings({ ...settings, connections: draft, activeConnectionId: activeId, activeModel })
     PROMPT_IDS.forEach((id) => savePrompt(id, promptDraft[id]))
+
+    if (jsonbinReady(newConfig)) {
+      const saveBtn = $('cfg-save')
+      const msg = $('cfg-jsonbin-msg')
+      saveBtn.disabled = true
+      saveBtn.textContent = '保存中(クラウド同期)...'
+      try {
+        await pushConfigToJsonbin(newConfig)
+      } catch (err) {
+        saveBtn.disabled = false
+        saveBtn.textContent = '保存'
+        if (msg) {
+          msg.innerHTML = `<span class="error-text">クラウドへの保存に失敗しました: ${escapeHtml(String(err.message || err))}(この端末には保存済みです)</span>`
+        }
+        return // モーダルは開いたままにして、再試行できるようにする
+      }
+    }
+
     root.innerHTML = ''
     onSaved?.()
   })
