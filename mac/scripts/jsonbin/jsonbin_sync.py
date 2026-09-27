@@ -8,12 +8,21 @@ from pathlib import Path
 
 API_BASE = "https://api.jsonbin.io/v3/b"
 
-# 【重要】jsonbin.io の手前にいる Cloudflare は、Pythonのデフォルト
-# User-Agent("Python-urllib/3.x")を見ただけでbot扱いし、JSONBin自体の
-# 認証チェックより前に 403 "error code: 1010" で弾く。
-# X-Master-Key が正しくてもこのエラーになるので、必ずUser-Agentを
-# ブラウザっぽいものに差し替えること（kaggle/quota_client.py の GAS 呼び出しと同じ理由）。
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) jsonbin-sync/1.0"
+# 【重要】jsonbin.io の手前にいる Cloudflare は、Pythonの素のリクエスト
+# (User-Agent: Python-urllib/3.x など)をbot扱いし、JSONBin自体の認証
+# チェックより前に 403 "error code: 1010" で弾く。X-Master-Key が正しくても
+# このエラーになる。User-Agentだけでは足りない場合があるため、実在の
+# ブラウザに近いヘッダー一式を送る（Accept-Encodingは、gzip/br展開の
+# 実装が要るため意図的に外している＝圧縮なしの応答を要求する）。
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
+}
 
 
 def call(method, url, headers, body=None):
@@ -28,7 +37,7 @@ def call(method, url, headers, body=None):
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"User-Agent": UA, **headers},
+        headers={**BROWSER_HEADERS, **headers},
         method=method
     )
 
