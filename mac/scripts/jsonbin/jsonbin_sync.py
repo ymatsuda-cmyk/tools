@@ -8,6 +8,13 @@ from pathlib import Path
 
 API_BASE = "https://api.jsonbin.io/v3/b"
 
+# 【重要】jsonbin.io の手前にいる Cloudflare は、Pythonのデフォルト
+# User-Agent("Python-urllib/3.x")を見ただけでbot扱いし、JSONBin自体の
+# 認証チェックより前に 403 "error code: 1010" で弾く。
+# X-Master-Key が正しくてもこのエラーになるので、必ずUser-Agentを
+# ブラウザっぽいものに差し替えること（kaggle/quota_client.py の GAS 呼び出しと同じ理由）。
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) jsonbin-sync/1.0"
+
 
 def call(method, url, headers, body=None):
     """JSONBinを叩く。失敗してもここでは投げず、ステータスとボディをそのまま返す。"""
@@ -21,7 +28,7 @@ def call(method, url, headers, body=None):
     req = urllib.request.Request(
         url,
         data=data,
-        headers=headers,
+        headers={"User-Agent": UA, **headers},
         method=method
     )
 
@@ -91,6 +98,26 @@ def sync_config(config_path):
     if not config.get("enabled", True):
         print("無効設定のためスキップ")
         return
+
+    #
+    # 必須キーの確認
+    #
+    # github_sync.py の設定(source_folder / repository_root など)を
+    # そのまま流用してしまうケースが多いため、先にまとめて確認する
+    #
+    required_keys = ["id", "source_file", "bin_id", "api_key"]
+
+    missing = [k for k in required_keys if k not in config]
+
+    if missing:
+        raise KeyError(
+            f"設定ファイルに次のキーがありません: {', '.join(missing)}\n"
+            f"  ({config_path})\n"
+            "  jsonbin_sync.py に必要なキーは "
+            "id / source_file / bin_id / api_key です。\n"
+            "  github_sync.py 用の source_folder / repository_root 等とは"
+            "キー名が違うのでご注意ください。"
+        )
 
     source_file = Path(config["source_file"])
 
