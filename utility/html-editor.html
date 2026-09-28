@@ -102,6 +102,40 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
 
 .props-empty{padding:20px 16px; font-size:12px; color:var(--text-faint); line-height:1.7}
 
+/* format bar */
+.formatbar{flex:0 0 44px; display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--border); background:var(--bg-panel); overflow-x:auto}
+.formatbar .grp{display:flex; align-items:center; gap:2px; flex:0 0 auto}
+.formatbar .div{width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto}
+.fbtn{min-width:30px; height:28px; padding:0 8px; display:flex; align-items:center; justify-content:center; gap:5px; background:transparent; border:1px solid transparent; border-radius:6px; color:var(--text-dim); font-size:12px; white-space:nowrap}
+.fbtn:hover{background:var(--border-soft)}
+.fbtn.mode-on{background:var(--accent); color:#0d1114}
+.swatch{width:15px; height:15px; border-radius:3px; border:1px solid rgba(255,255,255,.25); flex:0 0 auto}
+
+.popover-wrap{position:relative}
+.popover{position:absolute; top:34px; left:0; z-index:20; background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:10px; box-shadow:0 10px 24px rgba(0,0,0,.4); display:none}
+.popover.open{display:block}
+.swrow{display:flex; gap:6px; margin-bottom:8px}
+.swrow:last-child{margin-bottom:0}
+.sizebtns{display:flex; flex-direction:column; gap:2px; min-width:120px}
+.sizebtns button{text-align:left; padding:6px 8px; border-radius:5px; border:none; background:transparent; color:var(--text-dim); font-size:12px}
+.sizebtns button:hover{background:var(--border-soft)}
+.colorcustom{display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:var(--text-faint)}
+.colorcustom input[type=color]{width:26px; height:22px; border:none; background:none; padding:0}
+.nonebtn{font-size:11px; color:var(--text-mute); background:transparent; border:1px dashed var(--border); border-radius:5px; padding:4px 8px; margin-top:6px; width:100%}
+
+/* comments tab */
+.hint-row{padding:8px 14px; font-size:11px; color:var(--text-faint); border-bottom:1px solid var(--border-soft)}
+.clist{flex:1 1 auto; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:10px}
+.cthread{border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg-canvas)}
+.cthread .anchor{font-size:11px; color:var(--text-faint); font-style:italic; margin-bottom:6px; cursor:pointer}
+.cthread .anchor:hover{color:var(--accent)}
+.cmsg{font-size:12px; color:var(--text-dim); background:var(--bg-panel); border-radius:6px; padding:6px 8px; margin-bottom:5px}
+.cmsg .t{font-size:10px; color:var(--text-faint); margin-right:6px}
+.creply{display:flex; gap:6px; margin-top:6px}
+.creply input{flex:1; font-size:11.5px; background:var(--bg-panel); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text)}
+.creply button{font-size:11px; padding:0 10px; border-radius:6px; border:none; background:var(--accent); color:#0d1114}
+.cdelete{margin-top:6px; font-size:10.5px; color:var(--text-faint); background:none; border:none; text-decoration:underline; padding:0; display:block}
+
 .visually-hidden{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
 </style>
 </head>
@@ -152,6 +186,60 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
         <button aria-label="拡大" id="zoomIn">+</button>
       </div>
     </div>
+    <div class="formatbar" id="formatbar" style="display:none">
+      <div class="grp">
+        <button class="fbtn" id="btnBold" title="太字"><b>B</b></button>
+        <button class="fbtn" id="btnItalic" title="斜体"><i>I</i></button>
+        <button class="fbtn" id="btnUnderline" title="下線"><u>U</u></button>
+      </div>
+      <div class="div"></div>
+      <div class="grp popover-wrap">
+        <button class="fbtn" id="btnColor" title="文字色">文字色 <span class="swatch" id="colorPreview" style="background:#e7ebee"></span></button>
+        <div class="popover" id="colorPopover">
+          <div class="swrow" data-kind="color">
+            <button class="swatch" data-color="#e7ebee" style="background:#e7ebee"></button>
+            <button class="swatch" data-color="#2f7fd1" style="background:#2f7fd1"></button>
+            <button class="swatch" data-color="#e0806f" style="background:#e0806f"></button>
+            <button class="swatch" data-color="#3fae6a" style="background:#3fae6a"></button>
+            <button class="swatch" data-color="#c99a3f" style="background:#c99a3f"></button>
+            <button class="swatch" data-color="#16202b" style="background:#16202b"></button>
+          </div>
+          <div class="colorcustom"><input type="color" id="colorCustom" value="#e7ebee"><span>カスタム</span></div>
+        </div>
+      </div>
+      <div class="grp popover-wrap">
+        <button class="fbtn" id="btnMarker" title="マーカー">マーカー <span class="swatch" id="markerPreview" style="background:#fff59d"></span></button>
+        <div class="popover" id="markerPopover">
+          <div class="swrow" data-kind="marker">
+            <button class="swatch" data-color="#fff59d" style="background:#fff59d"></button>
+            <button class="swatch" data-color="#ffccbc" style="background:#ffccbc"></button>
+            <button class="swatch" data-color="#c8e6c9" style="background:#c8e6c9"></button>
+            <button class="swatch" data-color="#bbdefb" style="background:#bbdefb"></button>
+            <button class="swatch" data-color="#e1bee7" style="background:#e1bee7"></button>
+          </div>
+          <button class="nonebtn" id="markerNone">マーカーなし</button>
+        </div>
+      </div>
+      <div class="grp popover-wrap">
+        <button class="fbtn" id="btnSize" title="サイズ">サイズ</button>
+        <div class="popover" id="sizePopover">
+          <div class="sizebtns">
+            <button data-size="12px">12 px</button>
+            <button data-size="14px">14 px（標準）</button>
+            <button data-size="16px">16 px</button>
+            <button data-size="18px">18 px</button>
+            <button data-size="20px">20 px</button>
+            <button data-size="24px">24 px</button>
+            <button data-size="28px">28 px</button>
+            <button data-size="32px">32 px</button>
+          </div>
+        </div>
+      </div>
+      <button class="fbtn" id="btnClearFormat" title="書式をクリア">クリア</button>
+      <div class="div"></div>
+      <button class="fbtn" id="btnBorder" title="枠を追加/解除">枠</button>
+      <button class="fbtn" id="btnComment" title="コメントを追加">コメント</button>
+    </div>
     <div class="stage" id="stage">
       <div class="empty" id="emptyState">
         <div class="empty-inner">
@@ -175,11 +263,17 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
   <aside id="aside" style="display:none">
     <div class="tabs">
       <button class="tab" data-tab="props">プロパティ</button>
+      <button class="tab" data-tab="comments">コメント</button>
       <button class="tab on" data-tab="ai">AIで編集</button>
     </div>
 
     <div id="panelProps" style="display:none">
       <div class="props-empty">ブロックごとのプロパティ編集は今後追加予定です。まずはプレビュー上でクリックして直接編集するか、AIタブから指示してください。</div>
+    </div>
+
+    <div id="panelComments" style="display:none; flex-direction:column; flex:1 1 auto; min-height:0">
+      <div class="hint-row">テキストを選択してツールバーの「コメント」を押すと、その箇所にコメントを付けられます。</div>
+      <div class="clist" id="clist"></div>
     </div>
 
     <div id="panelAI" style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0">
@@ -191,9 +285,26 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
       </div>
       <div class="chat" id="chat"></div>
       <div class="apikey" id="apikeyWrap">
-        <label for="apiKeyInput" style="font-size:11px; color:var(--text-faint)">Anthropic APIキー</label>
+        <label for="providerSelect" style="font-size:11px; color:var(--text-faint)">AIプロバイダ</label>
+        <select id="providerSelect" style="width:100%; font-size:11.5px; background:var(--bg-canvas); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text-dim); margin-top:5px">
+          <option value="anthropic">Anthropic（Claude）</option>
+          <option value="openai">OpenAI（GPT）</option>
+          <option value="google">Google（Gemini）</option>
+          <option value="custom">カスタム（OpenAI互換API）</option>
+        </select>
+        <label for="apiKeyInput" style="font-size:11px; color:var(--text-faint); display:block; margin-top:8px">APIキー</label>
         <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
-        <div class="note">ご自身のAPIキーが必要です。キーはこのブラウザ内にのみ保存され、送信先は指示のたびに呼び出すAnthropicのAPIのみです。ブラウザやネットワーク環境によっては直接呼び出しがブロックされる場合があります。</div>
+        <label for="modelInput" style="font-size:11px; color:var(--text-faint); display:block; margin-top:8px">モデル名（任意）</label>
+        <input type="text" id="modelInput" placeholder="claude-sonnet-5">
+        <div id="baseUrlRow" style="display:none">
+          <label for="baseUrlInput" style="font-size:11px; color:var(--text-faint); display:block; margin-top:8px">エンドポイントURL</label>
+          <input type="text" id="baseUrlInput" placeholder="https://example.com/v1/chat/completions">
+          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-faint); margin-top:8px; cursor:pointer">
+            <input type="checkbox" id="gasModeCheckbox">
+            GAS互換モード（text/plainで送信・ヘッダーなし）
+          </label>
+        </div>
+        <div class="note">ご自身のAPIキーが必要です（カスタムでは不要な場合もあります）。キーはこのブラウザ内にのみ保存され、指示のたびに選択中のプロバイダへ直接送信されます。ブラウザやネットワーク環境によっては直接呼び出しがブロックされる場合があります。</div>
       </div>
       <div class="composer">
         <label for="aiInput" class="visually-hidden">AIへの編集指示</label>
@@ -225,6 +336,8 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
   var activeSectionId = null;
   var zoomPct = 100;
   var pushTimer = null;
+  var borderMode = false;
+  var comments = []; // {id, anchor, messages:[{time,text}]}
 
   var el = {
     filename: document.getElementById("filename"),
@@ -258,15 +371,356 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     scopeSelect: document.getElementById("scopeSelect"),
     chat: document.getElementById("chat"),
     apiKeyInput: document.getElementById("apiKeyInput"),
+    providerSelect: document.getElementById("providerSelect"),
+    modelInput: document.getElementById("modelInput"),
+    baseUrlInput: document.getElementById("baseUrlInput"),
+    baseUrlRow: document.getElementById("baseUrlRow"),
+    gasModeCheckbox: document.getElementById("gasModeCheckbox"),
     aiInput: document.getElementById("aiInput"),
     aiSend: document.getElementById("aiSend"),
-    historyList: document.getElementById("historyList")
+    historyList: document.getElementById("historyList"),
+    formatbar: document.getElementById("formatbar"),
+    clist: document.getElementById("clist"),
+    panelComments: document.getElementById("panelComments")
   };
 
-  el.apiKeyInput.value = localStorage.getItem("aiedit_api_key") || "";
-  el.apiKeyInput.addEventListener("change", function(){
-    localStorage.setItem("aiedit_api_key", el.apiKeyInput.value);
+  function loadProviderFields(p){
+    var raw = localStorage.getItem("aiedit_cfg_" + p);
+    var cfg = {};
+    if (raw) { try { cfg = JSON.parse(raw); } catch (e) {} }
+    else if (p === "anthropic") {
+      var legacy = localStorage.getItem("aiedit_api_key");
+      if (legacy) cfg.apiKey = legacy;
+    }
+    el.apiKeyInput.value = cfg.apiKey || "";
+    el.modelInput.value = cfg.model || "";
+    el.baseUrlInput.value = cfg.baseUrl || "";
+    el.gasModeCheckbox.checked = !!cfg.gasMode;
+    el.baseUrlRow.style.display = p === "custom" ? "block" : "none";
+    el.apiKeyInput.placeholder = p === "anthropic" ? "sk-ant-..." : p === "openai" ? "sk-..." : p === "google" ? "AIza..." : "（不要な場合は空欄）";
+    el.modelInput.placeholder = p === "anthropic" ? "claude-sonnet-5" : p === "openai" ? "例: gpt-4o-mini" : p === "google" ? "例: gemini-2.0-flash" : "サーバー側で使えるモデル名";
+  }
+  function saveCurrentProviderFields(){
+    var p = el.providerSelect.value;
+    localStorage.setItem("aiedit_cfg_" + p, JSON.stringify({
+      apiKey: el.apiKeyInput.value, model: el.modelInput.value, baseUrl: el.baseUrlInput.value,
+      gasMode: el.gasModeCheckbox.checked
+    }));
+    localStorage.setItem("aiedit_provider", p);
+  }
+  el.providerSelect.addEventListener("change", function(){
+    loadProviderFields(el.providerSelect.value);
+    localStorage.setItem("aiedit_provider", el.providerSelect.value);
   });
+  [el.apiKeyInput, el.modelInput, el.baseUrlInput, el.gasModeCheckbox].forEach(function(inp){
+    inp.addEventListener("change", saveCurrentProviderFields);
+  });
+  (function initProvider(){
+    var p = localStorage.getItem("aiedit_provider") || "anthropic";
+    el.providerSelect.value = p;
+    loadProviderFields(p);
+  })();
+
+  // ---- selection formatting ----
+  function wrapSelection(styleObj){
+    var doc = el.preview.contentDocument;
+    if (!doc) return false;
+    var sel = doc.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.getRangeAt(0).collapsed) return false;
+    var range = sel.getRangeAt(0);
+    var span = doc.createElement("span");
+    Object.keys(styleObj).forEach(function(k){ span.style[k] = styleObj[k]; });
+    try {
+      range.surroundContents(span);
+    } catch (e) {
+      var frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+    sel.removeAllRanges();
+    var newRange = doc.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+    return true;
+  }
+
+  function afterFormatChange(label){
+    pushHistory(getFullHTMLFromPreview(), label);
+  }
+
+  function closeAllPopovers(){
+    document.querySelectorAll(".popover.open").forEach(function(p){ p.classList.remove("open"); });
+  }
+  document.addEventListener("click", function(e){
+    if (!e.target.closest(".popover-wrap")) closeAllPopovers();
+  });
+
+  el.btnBold = document.getElementById("btnBold");
+  el.btnItalic = document.getElementById("btnItalic");
+  el.btnUnderline = document.getElementById("btnUnderline");
+  el.btnClearFormat = document.getElementById("btnClearFormat");
+  el.btnBorder = document.getElementById("btnBorder");
+  el.btnComment = document.getElementById("btnComment");
+
+  el.btnBold.addEventListener("click", function(){
+    var doc = el.preview.contentDocument; if (!doc) return;
+    doc.execCommand("bold"); afterFormatChange("太字を切替");
+  });
+  el.btnItalic.addEventListener("click", function(){
+    var doc = el.preview.contentDocument; if (!doc) return;
+    doc.execCommand("italic"); afterFormatChange("斜体を切替");
+  });
+  el.btnUnderline.addEventListener("click", function(){
+    var doc = el.preview.contentDocument; if (!doc) return;
+    doc.execCommand("underline"); afterFormatChange("下線を切替");
+  });
+  el.btnClearFormat.addEventListener("click", function(){
+    var doc = el.preview.contentDocument; if (!doc) return;
+    doc.execCommand("removeFormat"); afterFormatChange("書式をクリア");
+  });
+
+  function wirePopover(btnId, popoverId){
+    var btn = document.getElementById(btnId);
+    var pop = document.getElementById(popoverId);
+    if (!btn || !pop) return;
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var isOpen = pop.classList.contains("open");
+      closeAllPopovers();
+      if (!isOpen) pop.classList.add("open");
+    });
+  }
+  wirePopover("btnColor", "colorPopover");
+  wirePopover("btnMarker", "markerPopover");
+  wirePopover("btnSize", "sizePopover");
+
+  var colorPopover = document.getElementById("colorPopover");
+  colorPopover.querySelectorAll('.swrow[data-kind="color"] .swatch').forEach(function(sw){
+    sw.addEventListener("click", function(){
+      var c = sw.dataset.color;
+      if (wrapSelection({ color: c })) {
+        document.getElementById("colorPreview").style.background = c;
+        afterFormatChange("文字色を変更");
+      }
+      closeAllPopovers();
+    });
+  });
+  document.getElementById("colorCustom").addEventListener("input", function(){
+    var c = this.value;
+    if (wrapSelection({ color: c })) {
+      document.getElementById("colorPreview").style.background = c;
+      afterFormatChange("文字色を変更");
+    }
+  });
+
+  var markerPopover = document.getElementById("markerPopover");
+  markerPopover.querySelectorAll('.swrow[data-kind="marker"] .swatch').forEach(function(sw){
+    sw.addEventListener("click", function(){
+      var c = sw.dataset.color;
+      if (wrapSelection({ backgroundColor: c })) {
+        document.getElementById("markerPreview").style.background = c;
+        afterFormatChange("マーカーを追加");
+      }
+      closeAllPopovers();
+    });
+  });
+  document.getElementById("markerNone").addEventListener("click", function(){
+    if (wrapSelection({ backgroundColor: "transparent" })) afterFormatChange("マーカーを解除");
+    closeAllPopovers();
+  });
+
+  document.getElementById("sizePopover").querySelectorAll("button[data-size]").forEach(function(b){
+    b.addEventListener("click", function(){
+      if (wrapSelection({ fontSize: b.dataset.size })) afterFormatChange("文字サイズを変更");
+      closeAllPopovers();
+    });
+  });
+
+  // ---- frame / border tool ----
+  function setBorderMode(on){
+    borderMode = on;
+    el.btnBorder.classList.toggle("mode-on", on);
+    el.btnBorder.textContent = on ? "対象をクリック…" : "枠";
+  }
+  el.btnBorder.addEventListener("click", function(){ setBorderMode(!borderMode); });
+
+  function toggleFrame(target){
+    if (target.hasAttribute("data-framed")) {
+      target.removeAttribute("data-framed");
+      target.style.border = ""; target.style.borderRadius = ""; target.style.padding = "";
+    } else {
+      target.setAttribute("data-framed", "1");
+      target.style.border = "2px solid #2f7fd1";
+      target.style.borderRadius = "6px";
+      if (!target.style.padding) target.style.padding = "10px";
+    }
+    afterFormatChange("枠を切替");
+  }
+
+  // ---- comments ----
+  el.btnComment.addEventListener("click", function(){
+    var doc = el.preview.contentDocument;
+    var sel = doc && doc.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.getRangeAt(0).collapsed) {
+      alert("先にプレビュー上でコメントを付けたい文字を選択してください。");
+      return;
+    }
+    var id = "c" + Date.now();
+    var range = sel.getRangeAt(0);
+    var span = doc.createElement("span");
+    span.className = "ai-comment-anchor";
+    span.dataset.commentId = id;
+    try { range.surroundContents(span); }
+    catch (e) { var frag = range.extractContents(); span.appendChild(frag); range.insertNode(span); }
+    comments.push({ id: id, anchor: span.textContent.slice(0, 40), messages: [] });
+    afterFormatChange("コメントを追加");
+    activateCommentTab(id, true);
+  });
+
+  function activateCommentTab(id, focusInput){
+    document.querySelectorAll(".tabs .tab").forEach(function(t){ t.classList.toggle("on", t.dataset.tab === "comments"); });
+    el.panelAI.style.display = "none";
+    el.panelProps.style.display = "none";
+    el.panelComments.style.display = "flex";
+    renderComments();
+    var thread = el.clist.querySelector('[data-thread="' + id + '"]');
+    if (thread) {
+      thread.scrollIntoView({ block: "nearest" });
+      if (focusInput) {
+        var input = thread.querySelector(".creply input");
+        if (input) input.focus();
+      }
+    }
+  }
+
+  function renderComments(){
+    el.clist.innerHTML = "";
+    comments.forEach(function(c){
+      var card = document.createElement("div");
+      card.className = "cthread";
+      card.dataset.thread = c.id;
+
+      var anchorEl = document.createElement("div");
+      anchorEl.className = "anchor";
+      anchorEl.textContent = "「" + c.anchor + (c.anchor.length >= 40 ? "…" : "") + "」";
+      anchorEl.addEventListener("click", function(){
+        var doc = el.preview.contentDocument;
+        var span = doc && doc.querySelector('.ai-comment-anchor[data-comment-id="' + c.id + '"]');
+        if (span) span.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      card.appendChild(anchorEl);
+
+      c.messages.forEach(function(m){
+        var mEl = document.createElement("div");
+        mEl.className = "cmsg";
+        mEl.innerHTML = '<span class="t">' + m.time + "</span>" + escapeHTML(m.text);
+        card.appendChild(mEl);
+      });
+
+      var replyRow = document.createElement("div");
+      replyRow.className = "creply";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "コメントを追記…";
+      var send = document.createElement("button");
+      send.textContent = "追記";
+      send.addEventListener("click", function(){
+        var text = input.value.trim();
+        if (!text) return;
+        c.messages.push({ time: now(), text: text });
+        input.value = "";
+        renderComments();
+        afterFormatChange("コメントを追記");
+      });
+      input.addEventListener("keydown", function(e){ if (e.key === "Enter") send.click(); });
+      replyRow.appendChild(input); replyRow.appendChild(send);
+      card.appendChild(replyRow);
+
+      var del = document.createElement("button");
+      del.className = "cdelete";
+      del.textContent = "このコメントを削除して文章に戻す";
+      del.addEventListener("click", function(){
+        var doc = el.preview.contentDocument;
+        var span = doc && doc.querySelector('.ai-comment-anchor[data-comment-id="' + c.id + '"]');
+        if (span) {
+          while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+          span.remove();
+        }
+        comments = comments.filter(function(x){ return x.id !== c.id; });
+        renderComments();
+        afterFormatChange("コメントを削除");
+      });
+      card.appendChild(del);
+
+      el.clist.appendChild(card);
+    });
+  }
+
+  // ---- table drag-resize ----
+  function enhanceTables(doc){
+    doc.querySelectorAll("table").forEach(function(table){
+      if (table.dataset.enhanced) return;
+      table.dataset.enhanced = "1";
+      table.style.tableLayout = "fixed";
+      if (!table.style.width) {
+        var w = table.getBoundingClientRect().width;
+        if (w) table.style.width = w + "px";
+      }
+      var rows = table.rows;
+      if (!rows || rows.length === 0) return;
+      Array.prototype.forEach.call(rows[0].cells, function(cell, colIndex){
+        cell.style.position = "relative";
+        var handle = doc.createElement("span");
+        handle.className = "col-resizer";
+        handle.setAttribute("contenteditable", "false");
+        handle.addEventListener("mousedown", function(ev){
+          ev.preventDefault(); ev.stopPropagation();
+          var startX = ev.clientX;
+          var startWidth = cell.getBoundingClientRect().width;
+          function onMove(mv){
+            var newWidth = Math.max(30, startWidth + (mv.clientX - startX));
+            Array.prototype.forEach.call(table.rows, function(row){
+              var c = row.cells[colIndex];
+              if (c) c.style.width = newWidth + "px";
+            });
+          }
+          function onUp(){
+            doc.removeEventListener("mousemove", onMove);
+            doc.removeEventListener("mouseup", onUp);
+            afterFormatChange("表の列幅を調整");
+          }
+          doc.addEventListener("mousemove", onMove);
+          doc.addEventListener("mouseup", onUp);
+        });
+        cell.appendChild(handle);
+      });
+      Array.prototype.forEach.call(rows, function(row){
+        var cell = row.cells[0];
+        if (!cell) return;
+        cell.style.position = "relative";
+        var handle = doc.createElement("span");
+        handle.className = "row-resizer";
+        handle.setAttribute("contenteditable", "false");
+        handle.addEventListener("mousedown", function(ev){
+          ev.preventDefault(); ev.stopPropagation();
+          var startY = ev.clientY;
+          var startHeight = row.getBoundingClientRect().height;
+          function onMove(mv){
+            var newHeight = Math.max(18, startHeight + (mv.clientY - startY));
+            Array.prototype.forEach.call(row.cells, function(c){ c.style.height = newHeight + "px"; });
+          }
+          function onUp(){
+            doc.removeEventListener("mousemove", onMove);
+            doc.removeEventListener("mouseup", onUp);
+            afterFormatChange("表の行の高さを調整");
+          }
+          doc.addEventListener("mousemove", onMove);
+          doc.addEventListener("mouseup", onUp);
+        });
+        cell.appendChild(handle);
+      });
+    });
+  }
 
   // ---- file open ----
   async function openFile(){
@@ -353,7 +807,13 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     var style = doc.createElement("style");
     style.textContent =
       "[contenteditable=\"false\"]{outline:1.5px dashed #b3402f !important; outline-offset:2px; cursor:default !important;}" +
-      "body[contenteditable] *:hover{outline:1px dashed #2f7fd1; outline-offset:1px;}";
+      "body[contenteditable] *:hover{outline:1px dashed #2f7fd1; outline-offset:1px;}" +
+      ".ai-comment-anchor{background:rgba(255,196,0,.22); border-bottom:1.5px dashed #b98900; cursor:pointer;}" +
+      ".col-resizer{position:absolute; top:0; right:-3px; width:6px; height:100%; cursor:col-resize; z-index:5; background:transparent;}" +
+      ".col-resizer:hover{background:rgba(47,127,209,.35);}" +
+      ".row-resizer{position:absolute; left:0; bottom:-3px; width:100%; height:6px; cursor:row-resize; z-index:5; background:transparent;}" +
+      ".row-resizer:hover{background:rgba(47,127,209,.35);}" +
+      "[data-framed]{outline:2px solid #2f7fd1; outline-offset:2px;}";
     doc.head.appendChild(style);
 
     var protect = doc.body.querySelectorAll("input,select,textarea,button");
@@ -366,14 +826,21 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     doc.body.setAttribute("contenteditable", "true");
     doc.body.addEventListener("input", scheduleHistoryPush);
     doc.body.addEventListener("click", function(e){
+      if (borderMode) {
+        e.preventDefault();
+        var target = e.target.closest ? e.target.closest("p,div,section,img,table,figure,blockquote,h1,h2,h3,h4,li,td,th,ul,ol") : null;
+        if (target) toggleFrame(target);
+        setBorderMode(false);
+        return;
+      }
+      var anchor = e.target.closest ? e.target.closest(".ai-comment-anchor") : null;
+      if (anchor) activateCommentTab(anchor.dataset.commentId);
       var sec = e.target.closest ? e.target.closest("section[id]") : null;
       if (sec) setActiveSection(sec.id);
     });
 
     buildOutline(doc);
-    if (viewMode === "code") {
-      // keep code view in sync if we were mid-switch
-    }
+    enhanceTables(doc);
   }
 
   function scheduleHistoryPush(){
@@ -457,10 +924,12 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
       el.codeArea.value = getFullHTMLFromPreview();
       el.preview.style.display = "none";
       el.codewrap.style.display = "flex";
+      el.formatbar.style.display = "none";
     } else {
       applyCodeIfChanged();
       el.codewrap.style.display = "none";
       el.preview.style.display = "block";
+      el.formatbar.style.display = "flex";
     }
   }
 
@@ -569,9 +1038,11 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     tab.addEventListener("click", function(){
       document.querySelectorAll(".tabs .tab").forEach(function(t){ t.classList.remove("on"); });
       tab.classList.add("on");
-      var isAI = tab.dataset.tab === "ai";
-      el.panelAI.style.display = isAI ? "flex" : "none";
-      el.panelProps.style.display = isAI ? "none" : "block";
+      var which = tab.dataset.tab;
+      el.panelAI.style.display = which === "ai" ? "flex" : "none";
+      el.panelProps.style.display = which === "props" ? "block" : "none";
+      el.panelComments.style.display = which === "comments" ? "flex" : "none";
+      if (which === "comments") renderComments();
     });
   });
 
@@ -585,6 +1056,94 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     return div;
   }
 
+  async function describeError(res){
+    var t = "";
+    try { t = await res.text(); } catch (e) {}
+    return "APIエラー (" + res.status + ") " + t.slice(0, 200);
+  }
+
+  async function callAnthropic(cfg, prompt){
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": cfg.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: cfg.model || "claude-sonnet-5",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    if (!res.ok) throw new Error(await describeError(res));
+    var data = await res.json();
+    return (data.content || []).filter(function(b){ return b.type === "text"; }).map(function(b){ return b.text; }).join("\n");
+  }
+
+  async function callOpenAI(cfg, prompt){
+    var res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "Authorization": "Bearer " + cfg.apiKey },
+      body: JSON.stringify({
+        model: cfg.model || "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 4000
+      })
+    });
+    if (!res.ok) throw new Error(await describeError(res));
+    var data = await res.json();
+    var choice = data.choices && data.choices[0];
+    return choice && choice.message ? choice.message.content : "";
+  }
+
+  async function callGemini(cfg, prompt){
+    var model = cfg.model || "gemini-2.0-flash";
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(cfg.apiKey);
+    var res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    if (!res.ok) throw new Error(await describeError(res));
+    var data = await res.json();
+    var cand = data.candidates && data.candidates[0];
+    var parts = (cand && cand.content && cand.content.parts) || [];
+    return parts.map(function(p){ return p.text || ""; }).join("\n");
+  }
+
+  function extractCustomText(data){
+    if (typeof data === "string") return data;
+    if (data.choices && data.choices[0] && data.choices[0].message) return data.choices[0].message.content || "";
+    if (Array.isArray(data.content)) return data.content.filter(function(b){ return b.type === "text"; }).map(function(b){ return b.text; }).join("\n");
+    if (data.candidates && data.candidates[0]) {
+      var parts = (data.candidates[0].content && data.candidates[0].content.parts) || [];
+      return parts.map(function(p){ return p.text || ""; }).join("\n");
+    }
+    if (typeof data.text === "string") return data.text;
+    return "";
+  }
+
+  async function callCustom(cfg, prompt){
+    if (!cfg.baseUrl) throw new Error("エンドポイントURLが未設定です。");
+    var payload = { model: cfg.model || "", messages: [{ role: "user", content: prompt }], max_tokens: 4000 };
+    var headers = {};
+    if (cfg.gasMode) {
+      // GASのWebアプリはプリフライト(OPTIONS)やカスタムヘッダーに対応していないため、
+      // text/plainで送りAPIキーは本文に含める(ヘッダーは付けない)
+      headers["content-type"] = "text/plain;charset=utf-8";
+      if (cfg.apiKey) payload.apiKey = cfg.apiKey;
+    } else {
+      headers["content-type"] = "application/json";
+      if (cfg.apiKey) headers["Authorization"] = "Bearer " + cfg.apiKey;
+    }
+    var res = await fetch(cfg.baseUrl, { method: "POST", headers: headers, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(await describeError(res));
+    var data = await res.json();
+    return extractCustomText(data);
+  }
+
   el.aiSend.addEventListener("click", sendAI);
   el.aiInput.addEventListener("keydown", function(e){
     if (e.key === "Enter") sendAI();
@@ -593,12 +1152,22 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
   async function sendAI(){
     var instruction = el.aiInput.value.trim();
     if (!instruction) return;
-    var apiKey = el.apiKeyInput.value.trim();
+    var provider = el.providerSelect.value;
+    var cfg = {
+      apiKey: el.apiKeyInput.value.trim(),
+      model: el.modelInput.value.trim(),
+      baseUrl: el.baseUrlInput.value.trim(),
+      gasMode: el.gasModeCheckbox.checked
+    };
     addMsg("user", escapeHTML(instruction));
     el.aiInput.value = "";
 
-    if (!apiKey) {
+    if (!cfg.apiKey && provider !== "custom") {
       addMsg("error", "APIキーが未設定です。上のAPIキー欄に入力してください。");
+      return;
+    }
+    if (provider === "custom" && !cfg.baseUrl) {
+      addMsg("error", "エンドポイントURLが未設定です。上の欄に入力してください。");
       return;
     }
 
@@ -615,32 +1184,13 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     var thinking = addMsg("assistant", "考えています…");
 
     try {
-      var res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true"
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
+      var textOut;
+      if (provider === "anthropic") textOut = await callAnthropic(cfg, prompt);
+      else if (provider === "openai") textOut = await callOpenAI(cfg, prompt);
+      else if (provider === "google") textOut = await callGemini(cfg, prompt);
+      else textOut = await callCustom(cfg, prompt);
 
-      if (!res.ok) {
-        var errText = await res.text();
-        throw new Error("APIエラー (" + res.status + ") " + errText.slice(0, 200));
-      }
-      var data = await res.json();
-      var textOut = (data.content || [])
-        .filter(function(b){ return b.type === "text"; })
-        .map(function(b){ return b.text; })
-        .join("\n")
-        .trim();
-      textOut = textOut.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+      textOut = (textOut || "").trim().replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
 
       if (!textOut) throw new Error("応答からHTMLを取得できませんでした。");
 
@@ -654,6 +1204,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
         }
         pushHistory(getFullHTMLFromPreview(), "AI編集");
         buildOutline(el.preview.contentDocument);
+        enhanceTables(el.preview.contentDocument);
       } else {
         renderPreview(textOut);
         pushHistory(textOut, "AI編集（全体）");
