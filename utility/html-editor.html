@@ -310,7 +310,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
       <button class="fbtn" id="btnLink" title="リンクを挿入/解除">リンク</button>
       <input type="file" id="imageFileInput" accept="image/*" class="visually-hidden">
       <div class="div"></div>
-      <button class="fbtn" id="btnDrawPen" title="ペンで書き込む（Apple Pencil対応）">ペン</button>
+      <button class="fbtn" id="btnDrawPen" title="ペンで書き込む（Apple Pencil対応・色は文字色から選択）">ペン <span class="swatch" id="penColorPreview" style="background:#1f2d3a"></span></button>
       <button class="fbtn" id="btnDrawHighlight" title="マーカーで書き込む（Apple Pencil対応）">マーカー描画</button>
       <button class="fbtn" id="btnDrawEraser" title="消しゴム（触れた線を削除）">消しゴム</button>
       <button class="fbtn" id="btnDrawClear" title="手書きをすべて削除">全消去</button>
@@ -442,6 +442,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
   var pushTimer = null;
   var comments = []; // {id, anchor, messages:[{time,text}]}
   var drawMode = null; // null | "pen" | "highlight" | "eraser"
+  var penColor = "#1f2d3a"; // synced with the 文字色 (text color) picker
 
   var el = {
     filename: document.getElementById("filename"),
@@ -514,7 +515,8 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     btnDrawHighlight: document.getElementById("btnDrawHighlight"),
     btnDrawEraser: document.getElementById("btnDrawEraser"),
     btnDrawClear: document.getElementById("btnDrawClear"),
-    btnExportPdf: document.getElementById("btnExportPdf")
+    btnExportPdf: document.getElementById("btnExportPdf"),
+    penColorPreview: document.getElementById("penColorPreview")
   };
 
   function loadProviderFields(p){
@@ -643,23 +645,25 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
   wirePopover("btnMarker", "markerPopover");
   wirePopover("btnSize", "sizePopover");
 
+  function setTextAndPenColor(c){
+    penColor = c;
+    document.getElementById("colorPreview").style.background = c;
+    if (el.penColorPreview) el.penColorPreview.style.background = c;
+  }
+
   var colorPopover = document.getElementById("colorPopover");
   colorPopover.querySelectorAll('.swrow[data-kind="color"] .swatch').forEach(function(sw){
     sw.addEventListener("click", function(){
       var c = sw.dataset.color;
-      if (wrapSelection({ color: c })) {
-        document.getElementById("colorPreview").style.background = c;
-        afterFormatChange("文字色を変更");
-      }
+      setTextAndPenColor(c);
+      if (wrapSelection({ color: c })) afterFormatChange("文字色を変更");
       closeAllPopovers();
     });
   });
   document.getElementById("colorCustom").addEventListener("input", function(){
     var c = this.value;
-    if (wrapSelection({ color: c })) {
-      document.getElementById("colorPreview").style.background = c;
-      afterFormatChange("文字色を変更");
-    }
+    setTextAndPenColor(c);
+    if (wrapSelection({ color: c })) afterFormatChange("文字色を変更");
   });
 
   var markerPopover = document.getElementById("markerPopover");
@@ -774,7 +778,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
         path.setAttribute("stroke", "rgba(255,224,102,.55)");
         path.setAttribute("stroke-width", "16");
       } else {
-        path.setAttribute("stroke", "#1f2d3a");
+        path.setAttribute("stroke", penColor);
         path.setAttribute("stroke-width", "2.5");
       }
       path.setAttribute("d", "M " + p.x + " " + p.y);
@@ -1480,6 +1484,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
       ".ai-table-tools button{font-family:ui-monospace,monospace; font-size:10px; padding:2px 6px; border-radius:4px; border:none; background:transparent; color:#a7afb8; cursor:pointer;}" +
       ".ai-table-tools button:hover{background:#262b32;}" +
       ".ai-img-handle{opacity:.7;} .ai-img-wrap:hover .ai-img-handle{opacity:1;}" +
+      "#ai-ink-layer{outline:none !important;}" +
       "@media print{ .col-resizer,.row-resizer,.ai-table-tools,.ai-img-handle{display:none !important;} " +
       ".ai-comment-anchor{background:transparent !important; border-bottom:none !important;} " +
       "body,[contenteditable]{outline:none !important;} }";
