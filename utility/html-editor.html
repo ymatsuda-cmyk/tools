@@ -118,7 +118,7 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
 .swatch{width:15px; height:15px; border-radius:3px; border:1px solid rgba(255,255,255,.25); flex:0 0 auto}
 
 .popover-wrap{position:relative}
-.popover{position:absolute; top:34px; left:0; z-index:20; background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:10px; box-shadow:0 10px 24px rgba(0,0,0,.4); display:none}
+.popover{position:fixed; z-index:50; background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:10px; box-shadow:0 10px 24px rgba(0,0,0,.4); display:none}
 .popover.open{display:block}
 .swrow{display:flex; gap:6px; margin-bottom:8px}
 .swrow:last-child{margin-bottom:0}
@@ -604,6 +604,18 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     doc.execCommand("removeFormat"); afterFormatChange("書式をクリア");
   });
 
+  function positionPopover(btn, pop){
+    var r = btn.getBoundingClientRect();
+    var top = r.bottom + 6;
+    var left = r.left;
+    var maxLeft = window.innerWidth - pop.offsetWidth - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    var maxTop = window.innerHeight - pop.offsetHeight - 8;
+    if (top > maxTop) top = Math.max(8, r.top - pop.offsetHeight - 6);
+    pop.style.top = top + "px";
+    pop.style.left = left + "px";
+  }
+
   function wirePopover(btnId, popoverId){
     var btn = document.getElementById(btnId);
     var pop = document.getElementById(popoverId);
@@ -612,7 +624,10 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
       e.stopPropagation();
       var isOpen = pop.classList.contains("open");
       closeAllPopovers();
-      if (!isOpen) pop.classList.add("open");
+      if (!isOpen) {
+        pop.classList.add("open");
+        positionPopover(btn, pop);
+      }
     });
   }
   wirePopover("btnColor", "colorPopover");
@@ -1028,7 +1043,10 @@ aside{flex:0 0 314px; background:var(--bg-panel); border-left:1px solid var(--bo
     renderRecentList();
     var isOpen = el.recentPopover.classList.contains("open");
     closeAllPopovers();
-    if (!isOpen) el.recentPopover.classList.add("open");
+    if (!isOpen) {
+      el.recentPopover.classList.add("open");
+      positionPopover(el.btnRecentToggle, el.recentPopover);
+    }
   });
 
   // ---- autosave / crash recovery ----
