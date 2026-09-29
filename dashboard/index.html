@@ -264,6 +264,66 @@
   .agent-open{text-align:center;padding-top:2px;}
   .agent-open a{font-size:12px;}
 
+  /* WBSカンバン：遅延・本日〆／今週・来週の消化バー。行をクリックでアコーディオン展開 */
+  .kb-body{display:flex;flex-direction:column;}
+  .kb-group + .kb-group{border-top:1px dashed var(--border-strong);margin-top:6px;padding-top:6px;}
+  .kb-row{width:100%;box-sizing:border-box;border:none;background:none;padding:8px 6px;margin:0;
+    display:grid;grid-template-columns:1fr auto 13px;grid-template-areas:"lbl num chev" "bar bar bar" "sub sub sub";
+    align-items:center;gap:6px 8px;cursor:pointer;text-align:left;font:inherit;color:inherit;border-radius:8px;}
+  .kb-row .kb-lbl{grid-area:lbl;min-width:0;}
+  .kb-row .kb-num{grid-area:num;}
+  .kb-row .kb-chev{grid-area:chev;}
+  .kb-row .kb-track{grid-area:bar;}
+  .kb-row .kb-sub{grid-area:sub;display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--text-muted);margin-top:-2px;}
+  .kb-row:hover,.kb-row.open{background:var(--surface-2);}
+  .kb-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .kb-lbl{font-size:13px;font-weight:600;line-height:1.2;}
+  .kb-row.late .kb-lbl{color:var(--danger);}
+  .kb-track{height:10px;display:flex;border-radius:3px;overflow:hidden;min-width:0;background:var(--border);}
+  .kb-seg{height:100%;transition:width .5s cubic-bezier(.3,.7,.3,1);}
+  .kb-seg.doing{background:var(--accent);}
+  .kb-seg.todo{background:var(--text-muted);}
+  .kb-seg.held{background:#E0B252;}
+  .kb-seg.late{background:var(--danger);}
+  .kb-seg.done{background:repeating-linear-gradient(135deg,var(--border-strong) 0 3px,transparent 3px 7px);
+    box-shadow:inset 0 0 0 1px var(--border-strong);}
+  .kb-num{text-align:right;line-height:1.1;white-space:nowrap;}
+  .kb-num b{font-size:17px;font-weight:600;color:var(--accent);}
+  .kb-num span{font-size:11px;color:var(--text-muted);}
+  .kb-row.late .kb-num b{color:var(--danger);}
+  .kb-row.zero .kb-num b{color:var(--text-muted);}
+  .kb-chev{width:13px;height:13px;stroke:var(--text-muted);}
+  .kb-list{background:var(--surface-2);border-radius:0 0 8px 8px;margin:-4px 0 4px;padding:2px 8px 8px 12px;display:flex;flex-direction:column;gap:4px;}
+  .kb-item{border-left:3px solid var(--text-muted);border-radius:0;padding:5px 0 5px 9px;display:flex;flex-direction:column;gap:2px;}
+  .kb-item.late{border-left-color:var(--danger);}
+  .kb-item.now{border-left-color:var(--accent);}
+  .kb-item.held{border-left-color:#E0B252;}
+  .kb-item.done{border-left-color:var(--border-strong);opacity:.6;}
+  .kb-item.done .kb-title{text-decoration:line-through;}
+  .kb-item-head{display:flex;gap:6px;align-items:baseline;min-width:0;}
+  .kb-title{font-size:13px;flex-grow:1;min-width:0;overflow-wrap:anywhere;}
+  .kb-title small{font-size:11px;color:var(--text-muted);margin-left:4px;}
+  .kb-star{color:#E0B252;margin-right:3px;}
+  .kb-user{font-size:11px;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;}
+  .kb-meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
+  .kb-meta .over{color:var(--danger);font-weight:600;}
+  .kb-badge{font-size:10px;padding:0 6px;border-radius:99px;border:1px solid currentColor;}
+  .kb-badge.doing{color:var(--accent);}
+  .kb-badge.held{color:#E0B252;}
+  .kb-divider{font-size:10px;color:var(--text-muted);padding-top:4px;}
+  .kb-more{border:none;background:none;padding:4px 0 0;text-align:left;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;}
+  .kb-empty{font-size:11px;color:var(--text-muted);padding:6px 0;}
+  .kb-stale{font-size:11px;color:var(--danger);padding:6px 4px 0;}
+  .kb-lock{display:flex;flex-direction:column;gap:8px;padding:6px 0;}
+  .kb-lock p{margin:0;font-size:12px;color:var(--text-secondary);}
+  .kb-lock .kb-lock-row{display:flex;gap:6px;}
+  .kb-lock input{flex-grow:1;min-width:0;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:7px 9px;font:inherit;font-size:13px;}
+  .kb-lock button{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:8px;
+    padding:6px 12px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;}
+  .kb-forget{border:none;background:none;padding:0;font:inherit;font-size:11px;color:var(--text-muted);cursor:pointer;text-decoration:underline;}
+  @media (prefers-reduced-motion:reduce){.kb-seg{transition:none;}}
+
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .fx-rate span{font-size:11px;color:var(--text-muted);}
@@ -665,6 +725,7 @@
         <option value="mail">メール受信（Outlookなど）</option>
         <option value="minutes">議事録（Notion）</option>
         <option value="agent">Issue状態ダッシュボード</option>
+        <option value="kanban">WBSカンバン（遅延・今週・来週）</option>
         <option value="calc">電卓</option>
         <option value="clipgen">clipstock まとめて生成</option>
         <option value="copilot">GitHub Copilot</option>
@@ -883,6 +944,42 @@
       <label>「ダッシュボードを開く」の行き先</label>
       <input type="text" id="mf-agent-url" placeholder="https://ymatsuda-cmyk.github.io/tools-beta/utility/agent.html">
       <div class="hint">空欄なら既定のURL（utility/agent.html）を使います</div>
+    </div>
+
+    <div class="field" data-for="kanban">
+      <label>JSONBin Bin ID</label>
+      <input type="text" id="mf-kb-binid" placeholder="6512abcd1f2e3a4b5c6d7e8f">
+      <div class="hint">Mac の <span class="mono">jsonbin_sync.py</span> が暗号化して書き込むBinです。用意のしかたは <span class="mono">api/kanban/README.md</span> を見てください</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>読み取りキー</label>
+      <select id="mf-kb-keytype">
+        <option value="none">なし（公開Bin）</option>
+        <option value="access">Access Key（読み取り専用）</option>
+        <option value="master">X-Master-Key</option>
+      </select>
+      <input type="text" id="mf-kb-apikey" placeholder="$2a$10$..." style="margin-top:6px;">
+      <div class="hint">中身は暗号文なので、公開Binでも読まれて困りません。キーを使う場合も、書き込みのできる X-Master-Key は避けてください（この設定は index.json に入ります）</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>パスフレーズ</label>
+      <input type="password" id="mf-kb-pass" placeholder="このブラウザにだけ保存します" autocomplete="off">
+      <div class="hint">index.json には保存しません。空欄のままならカードの上で入力できます。Mac 側の <span class="mono">passphrase_env</span> / <span class="mono">passphrase_file</span> と同じ値です</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>担当者で絞り込む</label>
+      <input type="text" id="mf-kb-user" placeholder="空欄なら全員">
+      <div class="hint">wbsシートN列の担当者名と完全一致で絞り込みます</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>展開時に一度に出す件数</label>
+      <input type="number" id="mf-kb-max" value="8" min="1" max="30">
+      <div class="hint">行を開いたときに並べる件数です。超えた分は「残りN件を表示」から出せます</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>古いとみなす時間</label>
+      <input type="number" id="mf-kb-stale" value="24" min="1" max="720">
+      <div class="hint">データの出力時刻からこの時間（h）を過ぎると、カードに警告を出します。Macの停止や同期の止まりに気づくためです</div>
     </div>
 
     <div class="modal-actions">
@@ -1991,10 +2088,10 @@ const STATE_META = {
 };
 
 /* GAS側だけで完結し、endpoint も起動/停止トグルも持たない種別 */
-const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent'];
+const ENDPOINTLESS_TYPES = ['copilot', 'manual', 'quota', 'fx', 'fxpos', 'rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent', 'kanban'];
 
 /* GASに問い合わず、ブラウザだけで組み立てる種別 */
-const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent'];
+const LOCAL_TYPES = ['rule', 'calc', 'clipgen', 'schedule', 'mail', 'minutes', 'agent', 'kanban'];
 
 const TYPE_LABELS = {
   kaggle : 'Kaggle',
@@ -2010,6 +2107,7 @@ const TYPE_LABELS = {
   mail   : 'メール受信',
   minutes: '議事録',
   agent  : 'Issue状態',
+  kanban : 'WBSカンバン',
   api    : '汎用API'   // type 未指定（共通仕様のendpoint）
 };
 
@@ -2065,7 +2163,7 @@ function monitorType(m){
 }
 
 /* 稼働状況ではなく情報タブに出す種別 */
-const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule', 'mail', 'minutes'];
+const INFO_TYPES = ['fx', 'fxpos', 'rule', 'calc', 'schedule', 'mail', 'minutes', 'kanban'];
 
 function isInfoMonitor(m){
   return INFO_TYPES.includes(monitorType(m));
@@ -2301,6 +2399,11 @@ function loadedAtOf(m){
   if(type === 'mail') return mailState[m.id] && mailState[m.id].cache && mailState[m.id].cache.loadedAt;
   if(type === 'minutes') return minutesState[m.id] && minutesState[m.id].cache && minutesState[m.id].cache.loadedAt;
   if(type === 'agent') return agentState[m.id] && agentState[m.id].cache && agentState[m.id].cache.loadedAt;
+  if(type === 'kanban'){
+    // 取りに行った時刻ではなく、wbsシートを書き出した時刻を出す（同期が止まっていると分かるように）
+    const cur = kanbanState[m.id] && kanbanState[m.id].cache;
+    return cur && (cur.data && cur.data.updatedAt || cur.loadedAt);
+  }
   return null;
 }
 
@@ -4269,6 +4372,297 @@ function wireAgent(card){
   });
 }
 
+/* ============================================================
+   WBSカンバン
+   wbsシート → Power Automate（export-wbs.ts）→ OneDrive → Mac（暗号化）→ JSONBin を
+   api/kanban/kanban.api.js 経由で読み、遅延・本日〆／今週・来週の4行を消化バーで出す。
+   分類（classify）は kanban.api.js 側にあり、ここでは描画のたびに呼ぶだけ。
+   パスフレーズは index.json には入れず、このブラウザの localStorage にだけ置く
+   ============================================================ */
+
+const KANBAN_MODULE = new URL('../api/kanban/kanban.api.js', location.href).href;
+const KANBAN_PASS_PREFIX = 'dashboard-kanban-pass:';
+
+const KANBAN_STATE_META = {
+  loading: { color:'#66625A', label:'読み込み中' },
+  ok     : { color:'#5FA8A0', label:'取得済み'   },
+  late   : { color:'#D9694F', label:'遅延あり'   },
+  locked : { color:'#E0B252', label:'要パスフレーズ' },
+  error  : { color:'#D9694F', label:'エラー'     }
+};
+
+const kanbanState = {};
+let kanbanApi = null;
+
+async function kanbanModule(){
+  if(!kanbanApi) kanbanApi = await import(KANBAN_MODULE);
+  return kanbanApi;
+}
+
+function kanbanPass(id){
+  try{ return localStorage.getItem(KANBAN_PASS_PREFIX + id) || ''; }catch{ return ''; }
+}
+function setKanbanPass(id, value){
+  try{
+    if(value) localStorage.setItem(KANBAN_PASS_PREFIX + id, value);
+    else localStorage.removeItem(KANBAN_PASS_PREFIX + id);
+  }catch{}
+}
+
+function emptyKanbanCache(){
+  return { phase:'loading', data:null, error:'', errorCode:'', loading:false, loadedAt:0 };
+}
+
+function kanbanStateOf(m){
+  let st = kanbanState[m.id];
+  if(!st) st = kanbanState[m.id] = { expanded:new Set(), expandedFull:new Set(), cache: emptyKanbanCache() };
+  const cur = st.cache;
+  const waitingPass = cur.phase === 'locked' && !kanbanPass(m.id);
+  if(!cur.loading && !waitingPass && Date.now() - cur.loadedAt >= intervalMsOf(m)) loadKanban(m);
+  return st;
+}
+
+async function loadKanban(m){
+  const st = kanbanState[m.id] || (kanbanState[m.id] = { expanded:new Set(), expandedFull:new Set(), cache: emptyKanbanCache() });
+  const cur = st.cache;
+  cur.loading = true;
+  try{
+    const api = await kanbanModule();
+    cur.data = await api.load({
+      binId: m.binId,
+      apiKey: m.keyType === 'none' ? '' : m.apiKey,
+      keyType: m.keyType,
+      passphrase: kanbanPass(m.id)
+    });
+    cur.error = '';
+    cur.errorCode = '';
+    cur.phase = 'ok';
+  }catch(err){
+    cur.error = err.message || String(err);
+    cur.errorCode = err.code || '';
+    if(err.code === 'locked' || err.code === 'badpass'){
+      cur.data = null;           // パスフレーズが合わないなら前回の中身も出さない
+      cur.phase = 'locked';
+    }else if(!cur.data){
+      cur.phase = 'error';
+    }
+  }
+  cur.loading = false;
+  cur.loadedAt = Date.now();
+  paintKanban(m.id);
+}
+
+function kanbanRowsOf(m, cur){
+  if(!kanbanApi || !cur.data) return null;
+  return kanbanApi.classify(cur.data.tasks, { user: m.user || '' });
+}
+
+function kanbanItemHtml(t){
+  const api = kanbanApi;
+  const md = api.formatMd;
+  const over = api.overdueDays(t);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tone = t.status === 'done' ? 'done' : t.status === 'held' ? 'held' : over ? 'late'
+    : (t.start && t.end && t.start <= today && t.end >= today) ? 'now' : '';
+  const period = t.start || t.end ? `${md(t.start)}～${md(t.end)}` : '';
+  const due = t.status === 'done' ? `完了 ${md(t.actualEnd)}`
+    : over ? `<span class="over">〆 ${md(t.end)}（${over}日超過）</span>`
+    : t.end ? `〆 ${md(t.end)}` : '期限なし';
+  return `
+    <div class="kb-item ${tone}">
+      <div class="kb-item-head">
+        <span class="kb-title">${t.star && t.status !== 'done' ? '<span class="kb-star" aria-label="スター">★</span>' : ''}${esc(t.title)}${t.classification ? `<small>&lt;${esc(t.classification)}&gt;</small>` : ''}</span>
+        <span class="kb-user">${esc(t.user)}</span>
+      </div>
+      <div class="kb-meta"><span class="kb-badge ${t.status}">${esc(api.STATUS_LABELS[t.status])}</span><span>${period}</span><span>${due}</span></div>
+    </div>`;
+}
+
+function kanbanListHtml(m, row, r, st){
+  const items = r.rest.concat(r.done);
+  if(!items.length) return `<div class="kb-list"><div class="kb-empty">該当するタスクはありません</div></div>`;
+  const max = Math.max(1, Number(m.max) || 8);
+  const full = st.expandedFull.has(row.key);
+  const shown = full ? items : items.slice(0, max);
+  let html = '';
+  shown.forEach((t, i)=>{
+    if(t.status === 'done' && (i === 0 || shown[i-1].status !== 'done')) html += `<div class="kb-divider">完了 ${r.done.length}件</div>`;
+    html += kanbanItemHtml(t);
+  });
+  if(!full && items.length > max){
+    html += `<button type="button" class="kb-more" data-kb-more="${esc(m.id)}:${row.key}">残り${items.length - max}件を表示</button>`;
+  }
+  return `<div class="kb-list">${html}</div>`;
+}
+
+function kanbanRowHtml(m, row, r, scale, st){
+  const api = kanbanApi;
+  const md = api.formatMd;
+  const isOpen = st.expanded.has(row.key);
+  const n = s => r.rest.filter(t => t.status === s).length;
+  const w = x => (scale ? x / scale * 100 : 0) + '%';
+  const segs = row.key === 'late'
+    ? `<span class="kb-seg late" style="width:${w(r.rest.length)}"></span>`
+    : ['doing','todo','held'].map(s => `<span class="kb-seg ${s}" style="width:${w(n(s))}"></span>`).join('')
+      + `<span class="kb-seg done" style="width:${w(r.done.length)}"></span>`;
+  const sub = row.key === 'late' ? '期限切れ'
+    : row.key === 'today' ? `${md(r.from)} 期限` : `${md(r.from)}～${md(r.to)}`;
+  const pct = r.total ? Math.round(r.done.length / r.total * 100) : 0;
+  const num = !row.total
+    ? `<b>${r.rest.length}</b><span> 件</span>`
+    : `<span>残 </span><b>${r.rest.length}</b><span> / ${r.total}</span>`;
+  const progress = !row.total ? '' : r.total && !r.rest.length ? 'すべて完了' : r.total ? `消化 ${pct}%` : '';
+  const tip = row.key === 'late' ? `遅延 ${r.rest.length}件`
+    : `残り ${r.rest.length}（対応中${n('doing')} / 未着手${n('todo')} / 保留${n('held')}） 完了 ${r.done.length}`;
+  const cls = ['kb-row', row.key === 'late' && r.rest.length ? 'late' : '', !r.rest.length ? 'zero' : '', isOpen ? 'open' : ''].filter(Boolean).join(' ');
+  return `
+    <button type="button" class="${cls}" aria-expanded="${isOpen}" data-kb-row="${esc(m.id)}:${row.key}">
+      <span class="kb-lbl">${esc(row.label)}</span>
+      <span class="kb-track" title="${esc(tip)}">${segs}</span>
+      <span class="kb-num">${num}</span>
+      <span class="kb-sub"><span>${esc(sub)}</span><span>${esc(progress)}</span></span>
+      <svg class="kb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
+      </svg>
+    </button>
+    ${isOpen ? kanbanListHtml(m, row, r, st) : ''}`;
+}
+
+function kanbanLockHtml(m, cur){
+  const bad = cur.errorCode === 'badpass';
+  return `
+    <div class="kb-lock">
+      <p>${bad ? 'パスフレーズが違います。もう一度入力してください' : 'データは暗号化されています。パスフレーズを入力してください'}</p>
+      <div class="kb-lock-row">
+        <input type="password" autocomplete="off" draggable="false" data-kb-pass="${esc(m.id)}" aria-label="パスフレーズ">
+        <button type="button" data-kb-unlock="${esc(m.id)}">解除</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);">このブラウザにだけ保存し、index.json には入りません</p>
+    </div>`;
+}
+
+function kanbanBodyContent(m, st){
+  const cur = st.cache;
+  if(!m.binId) return `<div class="mon-err">Bin ID が未設定です。⚙ から設定してください</div>`;
+  if(cur.phase === 'locked') return kanbanLockHtml(m, cur);
+  if(cur.error && !cur.data) return `<div class="mon-err">${esc(cur.error)}</div>`;
+  const rows = kanbanRowsOf(m, cur);
+  if(!rows) return `<div class="mon-offline">読み込み中…</div>`;
+
+  const api = kanbanApi;
+  const groups = [1, 2].map(g => {
+    const defs = api.ROWS.filter(r => r.group === g);
+    const scale = Math.max(1, ...defs.map(r => r.total ? rows[r.key].total : rows[r.key].rest.length));
+    return `<div class="kb-group">${defs.map(r => kanbanRowHtml(m, r, rows[r.key], scale, st)).join('')}</div>`;
+  }).join('');
+
+  const updated = cur.data.updatedAt ? new Date(cur.data.updatedAt) : null;
+  const staleH = Number(m.staleHours) || 24;
+  const stale = updated && !isNaN(updated) && Date.now() - updated.getTime() > staleH * 3600000;
+  const staleNote = stale ? `<div class="kb-stale">データが${staleH}時間以上更新されていません（出力 ${esc(formatUpdatedAt(cur.data.updatedAt).replace('更新日時', '').trim())}）。Macの同期を確認してください</div>` : '';
+  const err = cur.error ? `<div class="mon-err">${esc(cur.error)}（前回の内容を表示中）</div>` : '';
+  const forget = kanbanPass(m.id) ? `<div style="text-align:right;padding-top:6px;"><button type="button" class="kb-forget" data-kb-forget="${esc(m.id)}">パスフレーズを消去</button></div>` : '';
+  return groups + staleNote + err + forget;
+}
+
+function kanbanHeadState(m, st){
+  const cur = st.cache;
+  if(cur.phase !== 'ok' || !cur.data || !kanbanApi){
+    return KANBAN_STATE_META[cur.phase] || KANBAN_STATE_META.loading;
+  }
+  const rows = kanbanRowsOf(m, cur);
+  const late = rows.late.rest.length;
+  return late
+    ? { color: KANBAN_STATE_META.late.color, label: `遅延 ${late}件` }
+    : { color: KANBAN_STATE_META.ok.color, label: `今週 残${rows.week.rest.length}` };
+}
+
+function renderKanbanCard(m){
+  const st = kanbanStateOf(m);
+  const meta = kanbanHeadState(m, st);
+  return `
+    <div ${monCardAttrs(m)}>
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${esc(meta.label)}</span>
+        ${monConfigBtn(m.id)}
+        ${monRefreshBtn(m.id)}
+      </div>
+      <div class="kb-body">${kanbanBodyContent(m, st)}</div>
+      ${monitorUpdatedHtml(m)}
+    </div>`;
+}
+
+function paintKanban(id){
+  const m = allMonitors().find(x => x.id === id);
+  const st = kanbanState[id];
+  if(!m || !st) return;
+  const body = document.querySelector(`[data-monitor="${CSS.escape(id)}"] .kb-body`);
+  if(!body) return;
+  const box = body.closest('.mon-card');
+  const meta = kanbanHeadState(m, st);
+  box.querySelector('.mon-dot').style.background = meta.color;
+  box.querySelector('.mon-state').textContent = meta.label;
+  body.innerHTML = kanbanBodyContent(m, st);
+  const upd = box.querySelector('.mon-updated');
+  const text = monitorUpdatedText(m);
+  if(upd && text) upd.textContent = text;
+  wireKanban(box);
+}
+
+function wireKanban(card){
+  const id = card.dataset.monitor;
+  const st = kanbanState[id];
+  if(!st) return;
+
+  card.querySelectorAll('[data-kb-row]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const key = btn.dataset.kbRow.split(':').pop();
+      if(st.expanded.has(key)) st.expanded.delete(key);
+      else st.expanded.add(key);
+      paintKanban(id);
+    });
+  });
+  card.querySelectorAll('[data-kb-more]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      st.expandedFull.add(btn.dataset.kbMore.split(':').pop());
+      paintKanban(id);
+    });
+  });
+
+  const input = card.querySelector('[data-kb-pass]');
+  const unlock = ()=>{
+    const value = input && input.value;
+    if(!value){ input && input.focus(); return; }
+    setKanbanPass(id, value);
+    const m = allMonitors().find(x => x.id === id);
+    st.cache.errorCode = '';
+    st.cache.phase = 'loading';
+    paintKanban(id);
+    if(m) loadKanban(m);
+  };
+  if(input){
+    ['mousedown','click','dragstart'].forEach(ev => input.addEventListener(ev, e => e.stopPropagation()));
+    input.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); unlock(); } });
+  }
+  card.querySelectorAll('[data-kb-unlock]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); unlock(); });
+  });
+  card.querySelectorAll('[data-kb-forget]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      setKanbanPass(id, '');
+      st.cache.data = null;
+      st.cache.phase = 'locked';
+      st.cache.errorCode = '';
+      paintKanban(id);
+    });
+  });
+}
+
 function renderMonitorCard(m, snap){
   if(monitorType(m) === 'rule') return renderRuleCard(m);
   if(monitorType(m) === 'calc') return renderCalcCard(m);
@@ -4277,6 +4671,7 @@ function renderMonitorCard(m, snap){
   if(monitorType(m) === 'mail') return renderMailCard(m);
   if(monitorType(m) === 'minutes') return renderMinutesCard(m);
   if(monitorType(m) === 'agent') return renderAgentCard(m);
+  if(monitorType(m) === 'kanban') return renderKanbanCard(m);
 
 
   const state = snap && snap.state ? snap.state : 'unknown';
@@ -4596,6 +4991,8 @@ function paintMonitorGrid(gridId, emptyId, list, emptyText){
 
   grid.querySelectorAll('.agent-body').forEach(body=>wireAgent(body.closest('.mon-card')));
 
+  grid.querySelectorAll('.kb-body').forEach(body=>wireKanban(body.closest('.mon-card')));
+
   grid.querySelectorAll('[data-refresh]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -4802,6 +5199,11 @@ function refreshMonitorCard(id){
     if(!st) return;
     st.cache.loadedAt = 0;
     loadAgent(m);
+  }else if(type === 'kanban'){
+    const st = kanbanState[id];
+    if(!st) return;
+    st.cache.loadedAt = 0;
+    loadKanban(m);
   }else if(LOCAL_TYPES.includes(type)){
     // rule/calc は取得先が無く、常に最新を計算しているのでその場で描き直すだけ
     renderMonitors();
@@ -5014,6 +5416,14 @@ function fillMonitorForm(m){
   F('mf-agent-dataurl').value = m.dataUrl || '';
   F('mf-agent-max').value = m.max || 5;
   F('mf-agent-url').value = m.dashboardUrl || '';
+  F('mf-kb-binid').value = m.binId || '';
+  F('mf-kb-keytype').value = ['none','access','master'].includes(m.keyType) ? m.keyType : (m.apiKey ? 'access' : 'none');
+  F('mf-kb-apikey').value = m.apiKey || '';
+  F('mf-kb-pass').value = '';
+  F('mf-kb-pass').placeholder = m.id && kanbanPass(m.id) ? '保存済み（変えるときだけ入力）' : 'このブラウザにだけ保存します';
+  F('mf-kb-user').value = m.user || '';
+  F('mf-kb-max').value = m.max || 8;
+  F('mf-kb-stale').value = m.staleHours || 24;
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -5153,6 +5563,31 @@ function buildMonitor(){
     m.max = Math.max(1, Math.min(20, Number(F('mf-agent-max').value) || 5));
     const dashboardUrl = F('mf-agent-url').value.trim();
     if(dashboardUrl) m.dashboardUrl = dashboardUrl; else delete m.dashboardUrl;
+  }
+  if(type === 'kanban'){
+    const binId = F('mf-kb-binid').value.trim();
+    if(!binId) throw new Error('Bin ID を入力してください');
+    m.binId = binId;
+    m.keyType = F('mf-kb-keytype').value;
+    const apiKey = F('mf-kb-apikey').value.trim();
+    if(m.keyType !== 'none'){
+      if(!apiKey) throw new Error('読み取りキーを入力するか、「なし（公開Bin）」を選んでください');
+      m.apiKey = apiKey;
+    }else delete m.apiKey;
+    const user = F('mf-kb-user').value.trim();
+    if(user) m.user = user; else delete m.user;
+    m.max = Math.max(1, Math.min(30, Number(F('mf-kb-max').value) || 8));
+    const stale = Number(F('mf-kb-stale').value);
+    if(stale > 0 && stale !== 24) m.staleHours = Math.min(720, Math.round(stale)); else delete m.staleHours;
+
+    // パスフレーズは設定(JSON)には入れず、このブラウザにだけ置く。IDを変えたら持ち越す
+    const pass = F('mf-kb-pass').value;
+    if(editingMonitorId && editingMonitorId !== id && !pass){
+      const old = kanbanPass(editingMonitorId);
+      if(old){ setKanbanPass(id, old); setKanbanPass(editingMonitorId, ''); }
+    }
+    if(pass) setKanbanPass(id, pass);
+    if(kanbanState[id]){ kanbanState[id].cache.loadedAt = 0; kanbanState[id].cache.errorCode = ''; }
   }
   return m;
 }

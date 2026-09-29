@@ -208,6 +208,67 @@
   .agent-empty{font-size:11px;color:var(--text-muted);padding:8px 0 8px 41px;}
   .agent-open{text-align:center;padding-top:2px;}
   .agent-open a{font-size:12px;}
+  /* WBSカンバン：遅延・本日〆／今週・来週の消化バー。行をクリックでアコーディオン展開 */
+  .kb-body{display:flex;flex-direction:column;}
+  .kb-group + .kb-group{border-top:1px dashed var(--border-strong);margin-top:6px;padding-top:6px;}
+  .kb-row{width:100%;box-sizing:border-box;border:none;background:none;padding:8px 6px;margin:0;
+    display:grid;grid-template-columns:1fr auto 13px;grid-template-areas:"lbl num chev" "bar bar bar" "sub sub sub";
+    align-items:center;gap:6px 8px;cursor:pointer;text-align:left;font:inherit;color:inherit;border-radius:8px;}
+  .kb-row .kb-lbl{grid-area:lbl;min-width:0;}
+  .kb-row .kb-num{grid-area:num;}
+  .kb-row .kb-chev{grid-area:chev;}
+  .kb-row .kb-track{grid-area:bar;}
+  .kb-row .kb-sub{grid-area:sub;display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--text-muted);margin-top:-2px;}
+  .kb-row:hover,.kb-row.open{background:var(--surface-2);}
+  .kb-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .kb-lbl{font-size:13px;font-weight:600;line-height:1.2;}
+  .kb-row.late .kb-lbl{color:var(--danger);}
+  .kb-track{height:10px;display:flex;border-radius:3px;overflow:hidden;min-width:0;background:var(--border);}
+  .kb-seg{height:100%;transition:width .5s cubic-bezier(.3,.7,.3,1);}
+  .kb-seg.doing{background:var(--accent);}
+  .kb-seg.todo{background:var(--text-muted);}
+  .kb-seg.held{background:#E0B252;}
+  .kb-seg.late{background:var(--danger);}
+  .kb-seg.done{background:repeating-linear-gradient(135deg,var(--border-strong) 0 3px,transparent 3px 7px);
+    box-shadow:inset 0 0 0 1px var(--border-strong);}
+  .kb-num{text-align:right;line-height:1.1;white-space:nowrap;}
+  .kb-num b{font-size:17px;font-weight:600;color:var(--accent);}
+  .kb-num span{font-size:11px;color:var(--text-muted);}
+  .kb-row.late .kb-num b{color:var(--danger);}
+  .kb-row.zero .kb-num b{color:var(--text-muted);}
+  .kb-chev{width:13px;height:13px;stroke:var(--text-muted);}
+  .kb-list{background:var(--surface-2);border-radius:0 0 8px 8px;margin:-4px 0 4px;padding:2px 8px 8px 12px;display:flex;flex-direction:column;gap:4px;}
+  .kb-item{border-left:3px solid var(--text-muted);border-radius:0;padding:5px 0 5px 9px;display:flex;flex-direction:column;gap:2px;}
+  .kb-item.late{border-left-color:var(--danger);}
+  .kb-item.now{border-left-color:var(--accent);}
+  .kb-item.held{border-left-color:#E0B252;}
+  .kb-item.done{border-left-color:var(--border-strong);opacity:.6;}
+  .kb-item.done .kb-title{text-decoration:line-through;}
+  .kb-item-head{display:flex;gap:6px;align-items:baseline;min-width:0;}
+  .kb-title{font-size:13px;flex-grow:1;min-width:0;overflow-wrap:anywhere;}
+  .kb-title small{font-size:11px;color:var(--text-muted);margin-left:4px;}
+  .kb-star{color:#E0B252;margin-right:3px;}
+  .kb-user{font-size:11px;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;}
+  .kb-meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
+  .kb-meta .over{color:var(--danger);font-weight:600;}
+  .kb-badge{font-size:10px;padding:0 6px;border-radius:99px;border:1px solid currentColor;}
+  .kb-badge.doing{color:var(--accent);}
+  .kb-badge.held{color:#E0B252;}
+  .kb-divider{font-size:10px;color:var(--text-muted);padding-top:4px;}
+  .kb-more{border:none;background:none;padding:4px 0 0;text-align:left;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;}
+  .kb-empty{font-size:11px;color:var(--text-muted);padding:6px 0;}
+  .kb-stale{font-size:11px;color:var(--danger);padding:6px 4px 0;}
+  .kb-lock{display:flex;flex-direction:column;gap:8px;padding:6px 0;}
+  .kb-lock p{margin:0;font-size:12px;color:var(--text-secondary);}
+  .kb-lock .kb-lock-row{display:flex;gap:6px;}
+  .kb-lock input{flex-grow:1;min-width:0;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:7px 9px;font:inherit;font-size:13px;}
+  .kb-lock button{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:8px;
+    padding:6px 12px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;}
+  .kb-forget{border:none;background:none;padding:0;font:inherit;font-size:11px;color:var(--text-muted);cursor:pointer;text-decoration:underline;}
+  @media (prefers-reduced-motion:reduce){.kb-seg{transition:none;}}
+  .mon-updated{font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px;margin-top:10px;}
+  .mon-card[data-size="wide"],.mon-card[data-size="large"]{max-width:480px;}
 
   .fx-rate{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-bottom:10px;}
   .fx-rate b{font-size:22px;font-weight:600;font-family:ui-monospace,"SF Mono",Menlo,monospace;}
@@ -489,6 +550,35 @@
         <div class="fields">
           <label>Issue一覧
             <textarea class="json" id="d-agent-issues" spellcheck="false" style="min-height:150px;"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="kanban">
+        <h2>プレビュー用のタスク</h2>
+        <p class="caption">JSONには出ません。実物では JSONBin の暗号文を復号した <span class="mono">wbs-tasks/v1</span> が入ります。<br>
+           日付は<b>基準日からの日数</b>で書きます（<span class="mono">-1</span> は前日、<span class="mono">0</span> は基準日）。
+           <span class="mono">actualStart</span> を入れると対応中、<span class="mono">actualEnd</span> を入れると完了、
+           <span class="mono">note</span> に <span class="mono">▲</span> で保留、先頭 <span class="mono">★</span> でスターです。
+           行をクリックするとこの見本でも展開します。</p>
+        <div class="fields">
+          <div class="row2">
+            <label>基準日（今日）
+              <input type="date" id="d-kb-today">
+            </label>
+            <label>出力からの経過（時間）
+              <input type="number" id="d-kb-age" value="1" min="0" max="999">
+            </label>
+          </div>
+          <label>パスフレーズ
+            <select id="d-kb-lock">
+              <option value="ok">解除済み（保存あり）</option>
+              <option value="locked">未入力</option>
+              <option value="badpass">違う値が保存されている</option>
+            </select>
+          </label>
+          <label>タスク一覧
+            <textarea class="json" id="d-kb-tasks" spellcheck="false" style="min-height:190px;"></textarea>
           </label>
         </div>
       </div>
@@ -2009,6 +2099,251 @@ function wireAgentPreview(){
   });
 }
 
+/* ---------- WBSカンバン ---------- */
+/* index.html の kanban カード・api/kanban/kanban.api.js の classify と同じロジック。
+   通信も復号もしない完全にオフラインの見本なので import はせず、ここに複製してある。
+   振り分けのルールを直すときは api/kanban/kanban.api.js 側も合わせて直すこと */
+
+const KB_ROWS = [
+  { key:'late',  group:1, label:'遅延',   total:false },
+  { key:'today', group:1, label:'本日〆', total:true },
+  { key:'week',  group:2, label:'今週',   total:true },
+  { key:'next',  group:2, label:'来週',   total:true }
+];
+const KB_STATUS_LABELS = { todo:'未着手', doing:'対応中', held:'保留', done:'完了' };
+const KB_STATE_META = {
+  ok    : { color:'#5FA8A0', label:'取得済み' },
+  late  : { color:'#D9694F', label:'遅延あり' },
+  locked: { color:'#E0B252', label:'要パスフレーズ' },
+  error : { color:'#D9694F', label:'エラー' }
+};
+
+/* start/end/actualStart/actualEnd は基準日からの日数 */
+const SAMPLE_KANBAN_TASKS = [
+  { title:'権限マスタ設計', classification:'設計', user:'佐藤', start:-5, end:-4 },
+  { title:'結合テスト環境構築', classification:'環境', user:'佐藤', note:'★', start:-7, end:-3, actualStart:-6 },
+  { title:'見積書ドラフト提出', classification:'管理', user:'松田', note:'★', start:-1, end:0, actualStart:-1 },
+  { title:'障害調査報告（C社）', classification:'保守', user:'佐藤', start:0, end:0 },
+  { title:'議事録共有', classification:'管理', user:'松田', start:-1, end:0, actualStart:0, actualEnd:0 },
+  { title:'API仕様書レビュー', classification:'設計', user:'松田', note:'★', start:-1, end:1, actualStart:-1 },
+  { title:'DB移行スクリプト', classification:'開発', user:'田中', note:'☆▲ 客先回答待ち', start:-4, end:4, actualStart:-4 },
+  { title:'画面設計 帳票出力', classification:'設計', user:'佐藤', note:'☆△', start:2, end:3 },
+  { title:'単体テスト 受注機能', classification:'テスト', user:'田中', start:0, end:6 },
+  { title:'週次定例資料', classification:'管理', user:'松田', start:-1, end:-1, actualStart:-1, actualEnd:-1 },
+  { title:'受注API 実装', classification:'開発', user:'田中', start:1, end:8, actualStart:1 },
+  { title:'性能試験シナリオ作成', classification:'テスト', user:'松田', start:6, end:9 },
+  { title:'リリース手順書', classification:'管理', user:'佐藤', start:8, end:10 }
+];
+
+/* この見本の中だけで覚えておく展開状態（保存はしない） */
+let kbExpanded = new Set(['late', 'today']);
+let kbExpandedFull = new Set();
+
+function kbBaseDate(){
+  const v = F('d-kb-today').value;
+  const d = v ? new Date(v + 'T00:00:00') : new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+function kbMd(d){ return d ? `${d.getMonth() + 1}/${d.getDate()}` : ''; }
+function kbMonday(d){ const t = new Date(d); const w = t.getDay(); t.setDate(t.getDate() - w + (w === 0 ? -6 : 1)); return t; }
+function kbSame(a, b){ return !!a && !!b && a.getTime() === b.getTime(); }
+function kbOverdue(t, today){ return t.status === 'done' || !t.end || t.end >= today ? 0 : Math.round((today - t.end) / 86400000); }
+
+/** kanban.api.js の classify と同じ振り分け */
+function kbClassify(tasks, today, user){
+  const mon = kbMonday(today), sun = addDays(mon, 6), nmon = addDays(mon, 7), nsun = addDays(mon, 13);
+  const list = user ? tasks.filter(t => t.user === user) : tasks;
+  const overlap = (t, a, b) => t.start && t.end && t.start <= b && t.end >= a;
+  const rules = {
+    late : { from:null, to:null, f: t => t.status !== 'done' && t.end && t.end < today },
+    today: { from:today, to:today, f: t => kbSame(t.end, today) },
+    week : { from:mon, to:sun, f: t => overlap(t, mon, sun) },
+    next : { from:nmon, to:nsun, f: t => overlap(t, nmon, nsun) }
+  };
+  const byEnd = (a, b) => (a.end ? a.end.getTime() : Infinity) - (b.end ? b.end.getTime() : Infinity);
+  const out = {};
+  KB_ROWS.forEach(row => {
+    const r = rules[row.key];
+    const hit = list.filter(r.f);
+    const rest = hit.filter(t => t.status !== 'done').sort(byEnd);
+    const done = row.total ? hit.filter(t => t.status === 'done').sort((a, b) => b.actualEnd - a.actualEnd) : [];
+    out[row.key] = { rest, done, total: rest.length + done.length, from: r.from, to: r.to };
+  });
+  return out;
+}
+
+/** JSONには出ない、プレビュー用のタスク。基準日からの日数を日付にする */
+function dummyKanban(m){
+  const today = kbBaseDate();
+  const lock = F('d-kb-lock').value;
+  if(lock !== 'ok') return { phase:'locked', badpass: lock === 'badpass', today };
+  let rows;
+  try{
+    rows = JSON.parse(F('d-kb-tasks').value || '[]');
+    if(!Array.isArray(rows)) throw new Error('配列で書いてください');
+  }catch(err){
+    return { phase:'error', error:'タスク一覧を読み取れません: ' + err.message, today };
+  }
+  const at = v => v === undefined || v === null || v === '' ? null : addDays(today, Number(v) || 0);
+  const tasks = rows.map((r, i)=>{
+    const note = String(r.note || '');
+    const t = {
+      id: String(i), title: String(r.title || '(タイトルなし)'), classification: String(r.classification || ''),
+      user: String(r.user || ''), start: at(r.start), end: at(r.end),
+      actualStart: at(r.actualStart), actualEnd: at(r.actualEnd),
+      star: note.startsWith('★'), held: note.includes('▲')
+    };
+    t.status = t.actualEnd ? 'done' : t.held ? 'held' : t.actualStart ? 'doing' : 'todo';
+    return t;
+  });
+  const age = Math.max(0, Number(F('d-kb-age').value) || 0);
+  return { phase:'ok', today, tasks, rows: kbClassify(tasks, today, m.user || ''),
+    updatedAt: new Date(Date.now() - age * 3600000) };
+}
+
+function kbItemHtml(t, today){
+  const over = kbOverdue(t, today);
+  const tone = t.status === 'done' ? 'done' : t.status === 'held' ? 'held' : over ? 'late'
+    : (t.start && t.end && t.start <= today && t.end >= today) ? 'now' : '';
+  const period = t.start || t.end ? `${kbMd(t.start)}～${kbMd(t.end)}` : '';
+  const due = t.status === 'done' ? `完了 ${kbMd(t.actualEnd)}`
+    : over ? `<span class="over">〆 ${kbMd(t.end)}（${over}日超過）</span>`
+    : t.end ? `〆 ${kbMd(t.end)}` : '期限なし';
+  return `
+    <div class="kb-item ${tone}">
+      <div class="kb-item-head">
+        <span class="kb-title">${t.star && t.status !== 'done' ? '<span class="kb-star" aria-label="スター">★</span>' : ''}${esc(t.title)}${t.classification ? `<small>&lt;${esc(t.classification)}&gt;</small>` : ''}</span>
+        <span class="kb-user">${esc(t.user)}</span>
+      </div>
+      <div class="kb-meta"><span class="kb-badge ${t.status}">${esc(KB_STATUS_LABELS[t.status])}</span><span>${period}</span><span>${due}</span></div>
+    </div>`;
+}
+
+function kbListHtml(m, row, r, today){
+  const items = r.rest.concat(r.done);
+  if(!items.length) return `<div class="kb-list"><div class="kb-empty">該当するタスクはありません</div></div>`;
+  const max = Math.max(1, Number(m.max) || 8);
+  const full = kbExpandedFull.has(row.key);
+  const shown = full ? items : items.slice(0, max);
+  let html = '';
+  shown.forEach((t, i)=>{
+    if(t.status === 'done' && (i === 0 || shown[i-1].status !== 'done')) html += `<div class="kb-divider">完了 ${r.done.length}件</div>`;
+    html += kbItemHtml(t, today);
+  });
+  if(!full && items.length > max){
+    html += `<button type="button" class="kb-more" data-kb-more="${row.key}">残り${items.length - max}件を表示</button>`;
+  }
+  return `<div class="kb-list">${html}</div>`;
+}
+
+function kbRowHtml(m, row, r, scale, today){
+  const isOpen = kbExpanded.has(row.key);
+  const n = s => r.rest.filter(t => t.status === s).length;
+  const w = x => (scale ? x / scale * 100 : 0) + '%';
+  const segs = row.key === 'late'
+    ? `<span class="kb-seg late" style="width:${w(r.rest.length)}"></span>`
+    : ['doing','todo','held'].map(s => `<span class="kb-seg ${s}" style="width:${w(n(s))}"></span>`).join('')
+      + `<span class="kb-seg done" style="width:${w(r.done.length)}"></span>`;
+  const sub = row.key === 'late' ? '期限切れ'
+    : row.key === 'today' ? `${kbMd(r.from)} 期限` : `${kbMd(r.from)}～${kbMd(r.to)}`;
+  const pct = r.total ? Math.round(r.done.length / r.total * 100) : 0;
+  const num = !row.total
+    ? `<b>${r.rest.length}</b><span> 件</span>`
+    : `<span>残 </span><b>${r.rest.length}</b><span> / ${r.total}</span>`;
+  const progress = !row.total ? '' : r.total && !r.rest.length ? 'すべて完了' : r.total ? `消化 ${pct}%` : '';
+  const tip = row.key === 'late' ? `遅延 ${r.rest.length}件`
+    : `残り ${r.rest.length}（対応中${n('doing')} / 未着手${n('todo')} / 保留${n('held')}） 完了 ${r.done.length}`;
+  const cls = ['kb-row', row.key === 'late' && r.rest.length ? 'late' : '', !r.rest.length ? 'zero' : '', isOpen ? 'open' : ''].filter(Boolean).join(' ');
+  return `
+    <button type="button" class="${cls}" aria-expanded="${isOpen}" data-kb-row="${row.key}">
+      <span class="kb-lbl">${esc(row.label)}</span>
+      <span class="kb-track" title="${esc(tip)}">${segs}</span>
+      <span class="kb-num">${num}</span>
+      <span class="kb-sub"><span>${esc(sub)}</span><span>${esc(progress)}</span></span>
+      <svg class="kb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        ${isOpen ? '<path d="m18 15-6-6-6 6"></path>' : '<path d="m6 9 6 6 6-6"></path>'}
+      </svg>
+    </button>
+    ${isOpen ? kbListHtml(m, row, r, today) : ''}`;
+}
+
+function kbBody(m, st){
+  if(!m.binId) return `<div class="mon-err">Bin ID が未設定です。⚙ から設定してください</div>`;
+  if(st.phase === 'locked'){
+    return `
+      <div class="kb-lock">
+        <p>${st.badpass ? 'パスフレーズが違います。もう一度入力してください' : 'データは暗号化されています。パスフレーズを入力してください'}</p>
+        <div class="kb-lock-row">
+          <input type="password" autocomplete="off" data-kb-pass aria-label="パスフレーズ" placeholder="見本なので何でも解除できます">
+          <button type="button" data-kb-unlock>解除</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);">このブラウザにだけ保存し、index.json には入りません</p>
+      </div>`;
+  }
+  if(st.phase === 'error') return `<div class="mon-err">${esc(st.error)}</div>`;
+  const groups = [1, 2].map(g => {
+    const defs = KB_ROWS.filter(r => r.group === g);
+    const scale = Math.max(1, ...defs.map(r => r.total ? st.rows[r.key].total : st.rows[r.key].rest.length));
+    return `<div class="kb-group">${defs.map(r => kbRowHtml(m, r, st.rows[r.key], scale, st.today)).join('')}</div>`;
+  }).join('');
+  const staleH = Number(m.staleHours) || 24;
+  const stale = Date.now() - st.updatedAt.getTime() > staleH * 3600000;
+  const u = st.updatedAt;
+  const when = `${u.getMonth() + 1}/${u.getDate()} ${String(u.getHours()).padStart(2,'0')}:${String(u.getMinutes()).padStart(2,'0')}`;
+  const staleNote = stale ? `<div class="kb-stale">データが${staleH}時間以上更新されていません（出力 ${when}）。Macの同期を確認してください</div>` : '';
+  return groups + staleNote +
+    `<div style="text-align:right;padding-top:6px;"><button type="button" class="kb-forget" data-kb-forget>パスフレーズを消去</button></div>`;
+}
+
+function renderKanbanCard(m, st){
+  let meta = KB_STATE_META[st.phase] || KB_STATE_META.ok;
+  if(st.phase === 'ok'){
+    const late = st.rows.late.rest.length;
+    meta = late ? { color: KB_STATE_META.late.color, label: `遅延 ${late}件` }
+      : { color: KB_STATE_META.ok.color, label: `今週 残${st.rows.week.rest.length}` };
+  }
+  const u = st.updatedAt;
+  const updated = u ? `<div class="mon-updated mono">最終更新 ${u.getFullYear()}/${u.getMonth() + 1}/${u.getDate()} ${String(u.getHours()).padStart(2,'0')}:${String(u.getMinutes()).padStart(2,'0')}</div>` : '';
+  return `
+    <div class="mon-card" data-monitor="${esc(m.id)}" data-size="${esc(m.cardSize || 'normal')}">
+      <div class="mon-head">
+        <span class="mon-dot" style="background:${meta.color}"></span>
+        <span class="mon-name">${esc(m.name || m.id)}</span>
+        <span class="mon-state">${esc(meta.label)}</span>
+      </div>
+      <div class="kb-body">${kbBody(m, st)}</div>
+      ${updated}
+    </div>`;
+}
+
+/** 行の開閉・解除・消去の結線。見本では保存せず、見ている間だけ覚えておく */
+function wireKanbanPreview(){
+  F('live').querySelectorAll('[data-kb-row]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.kbRow;
+      if(kbExpanded.has(key)) kbExpanded.delete(key);
+      else kbExpanded.add(key);
+      paint();
+    });
+  });
+  F('live').querySelectorAll('[data-kb-more]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      kbExpandedFull.add(btn.dataset.kbMore);
+      paint();
+    });
+  });
+  const unlock = ()=>{ F('d-kb-lock').value = 'ok'; paint(); };
+  const input = F('live').querySelector('[data-kb-pass]');
+  if(input) input.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); unlock(); } });
+  F('live').querySelectorAll('[data-kb-unlock]').forEach(btn => btn.addEventListener('click', unlock));
+  F('live').querySelectorAll('[data-kb-forget]').forEach(btn => btn.addEventListener('click', ()=>{
+    F('d-kb-lock').value = 'locked';
+    paint();
+  }));
+}
+
 /** JSONには出ない、プレビュー用のメール */
 function dummyMail(m){
   const accounts = mailAccounts(m);
@@ -2079,6 +2414,9 @@ function paint(){
   }else if(activeTab === 'agent'){
     F('live').innerHTML = renderAgentCard(m, dummyAgentIssues());
     wireAgentPreview();
+  }else if(activeTab === 'kanban'){
+    F('live').innerHTML = renderKanbanCard(m, dummyKanban(m));
+    wireKanbanPreview();
   }else{
     F('live').innerHTML = renderGenericCard(m, {
       state: F('d-state').value,
@@ -2102,6 +2440,7 @@ const TABS = [
   { id:'mail',    label:'メール受信' },
   { id:'minutes', label:'議事録' },
   { id:'agent',   label:'Issue状態' },
+  { id:'kanban',  label:'WBSカンバン' },
   { id:'api',     label:'汎用API / Kaggle' },
   { id:'copilot', label:'Copilot' },
   { id:'manual',  label:'手動カウンタ' },
@@ -2129,6 +2468,7 @@ const TEMPLATES = {
   ] },
   minutes: { id:'gijiroku', name:'議事録', type:'minutes', max:5, roles:['jba', 'kijun', 'keiei'] },
   agent  : { id:'issues', name:'Issue状態', type:'agent', max:5 },
+  kanban : { id:'wbs', name:'WBSカンバン', type:'kanban', binId:'6512abcd1f2e3a4b5c6d7e8f', keyType:'none', cardSize:'wide' },
   api    : { id:'gpu-server', name:'GPU サーバー', endpoint:'https://example.com/api/resource' },
   copilot: { id:'copilot', name:'GitHub Copilot', type:'copilot', monthlyLimit:300 },
   manual : { id:'claude', name:'Claude', type:'manual', limit:100, unit:'回', cycle:'daily' },
@@ -2216,7 +2556,8 @@ function wireDrag(){
 ['id','name','group','total','threshold','space','model','chart',
  'showSpace','showModel','showRun','includePartial','statusMatch','phase','partial','edit',
  'd-state','d-value','d-max','d-unit','d-note','d-error','d-today','d-rate',
- 'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items','d-agent-issues']
+ 'd-now','d-signin','d-events','d-mail-signin','d-mails','d-minutes-editable','d-minutes-items','d-agent-issues',
+ 'd-kb-today','d-kb-age','d-kb-lock','d-kb-tasks']
   .forEach(id => F(id).addEventListener('input', paint));
 
 [F('status-picks'), F('status-counts')].forEach(box => box.addEventListener('input', paint));
@@ -2243,6 +2584,7 @@ F('reset').addEventListener('click', ()=>{
   if(activeTab === 'mail'){ mailLocalPreview = { starred:new Set(), hidden:new Set() }; mailView = 'inbox'; }
   if(activeTab === 'minutes'){ minutesLocalPreview = {}; minutesTitleOverride = {}; minutesEditingTitle = new Set(); }
   if(activeTab === 'agent'){ agentExpanded = new Set(); agentExpandedFull = new Set(); }
+  if(activeTab === 'kanban'){ kbExpanded = new Set(['late', 'today']); kbExpandedFull = new Set(); }
   paint();
   say('見本に戻しました');
 });
@@ -2261,6 +2603,8 @@ F('d-events').value = JSON.stringify(SAMPLE_EVENTS, null, 2);
 F('d-mails').value = JSON.stringify(SAMPLE_MAILS, null, 2);
 F('d-minutes-items').value = JSON.stringify(SAMPLE_MINUTES, null, 2);
 F('d-agent-issues').value = JSON.stringify(SAMPLE_AGENT_ISSUES, null, 2);
+F('d-kb-today').value = new Date().toLocaleDateString('sv-SE');
+F('d-kb-tasks').value = '[\n' + SAMPLE_KANBAN_TASKS.map(t => '  ' + JSON.stringify(t)).join(',\n') + '\n]';
 switchTab('clipgen');
 paint();
 </script>
