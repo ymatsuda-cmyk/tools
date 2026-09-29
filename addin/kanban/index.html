@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260806c">
   <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260806c"></script>
 
-  <script src="kanban.js?v=20260929a"></script>
+  <script src="kanban.js?v=20260929b"></script>
   <link rel="stylesheet" href="style.css?v=20260806c">
 </head>
 
@@ -85,8 +85,8 @@
   </div>
 
   <!-- 実績フィルタ（更新日付U列ベース。カンバンのみ有効） -->
-  <button class="week-btn" id="btn-thisweek" title="更新日付が今週のタスクのみ表示" onclick="setWeekFilter('this')">今週実績</button>
-  <button class="week-btn" id="btn-lastweek" title="更新日付が先週のタスクのみ表示" onclick="setWeekFilter('last')">先週実績</button>
+  <button class="week-btn" id="btn-thisweek" title="更新日付が今週のタスクを表示（先週実績と併用可）" onclick="setWeekFilter('this')">今週実績</button>
+  <button class="week-btn" id="btn-lastweek" title="更新日付が先週のタスクを表示（今週実績と併用可）" onclick="setWeekFilter('last')">先週実績</button>
 
   <!-- 保留トグル -->
   <label class="held-toggle" id="held-toggle" onclick="toggleHeldDisplay(event)">

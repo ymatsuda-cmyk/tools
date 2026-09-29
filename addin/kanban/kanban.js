@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_startup";
+const APP_VERSION = "rev_20260929_weekmulti";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -57,8 +57,9 @@ let selectedUsers = [];
 let selectedCategories = [];
 let selectedSubCategories = [];
 let selectedPeriod = "all";
-/* カンバン専用：更新日付(U列)による実績フィルタ  "" | "this" | "last" */
-let weekFilter = "";
+/* カンバン専用：更新日付(U列)による実績フィルタ
+   ["this"] / ["last"] / ["this","last"]（両方選択可） / [] = 絞り込みなし */
+let weekFilter = [];
 let showHeld = true;
 let showAllDone = false;          // 完了全て（OFF時は直近のみ表示）
 let searchQuery = "";
@@ -304,7 +305,7 @@ function restoreSavedFilters() {
       selectedCategories = Array.isArray(f.categories) ? f.categories : (f.category ? [f.category] : []);
       selectedSubCategories = Array.isArray(f.subCategories) ? f.subCategories : (f.subCategory ? [f.subCategory] : []);
       selectedPeriod = f.period || "all";
-      weekFilter = f.weekFilter || "";
+      weekFilter = normalizeWeekFilter(f.weekFilter);
       aggUsers = Array.isArray(f.aggUsers) ? f.aggUsers : [];
       aggCategories = Array.isArray(f.aggCategories) ? f.aggCategories : [];
       aggSubCategories = Array.isArray(f.aggSubCategories) ? f.aggSubCategories : [];
@@ -317,7 +318,7 @@ function restoreSavedFilters() {
     selectedCategories = [];
     selectedSubCategories = [];
     selectedPeriod = "all";
-    weekFilter = "";
+    weekFilter = [];
     aggUsers = [];
     aggCategories = [];
     aggSubCategories = [];
@@ -1212,16 +1213,29 @@ function weekRangeOf(which) {
   return { start: lastMonday, end: lastSunday };
 }
 
+/* 旧形式（"" | "this" | "last"）も配列に読み替える */
+function normalizeWeekFilter(v) {
+  if (Array.isArray(v)) return v.filter(x => x === "this" || x === "last");
+  if (v === "this" || v === "last") return [v];
+  return [];
+}
+
 function matchesWeekFilter(t) {
-  if (!weekFilter) return true;
+  if (!weekFilter.length) return true;
   const d = excelDateToJS(t.updatedAt);
   if (!d || isNaN(d)) return false;               // 更新日付なしは対象外
-  const { start, end } = weekRangeOf(weekFilter);
-  return d >= start && d <= end;
+  // 選択された週のいずれかに入っていればOK（今週＋先週なら2週間分）
+  return weekFilter.some(w => {
+    const { start, end } = weekRangeOf(w);
+    return d >= start && d <= end;
+  });
 }
 
 function setWeekFilter(w) {
-  weekFilter = (weekFilter === w) ? "" : w;       // 同じボタンで解除
+  // 今週実績／先週実績は独立トグル（両方同時選択できる）
+  weekFilter = weekFilter.includes(w)
+    ? weekFilter.filter(x => x !== w)
+    : weekFilter.concat(w);
   saveFilters();
   renderWeekButtons();
   renderBoard();
@@ -1229,9 +1243,9 @@ function setWeekFilter(w) {
 
 function renderWeekButtons() {
   const t = document.getElementById("btn-thisweek");
-  if (t) t.classList.toggle("on", weekFilter === "this");
+  if (t) t.classList.toggle("on", weekFilter.includes("this"));
   const l = document.getElementById("btn-lastweek");
-  if (l) l.classList.toggle("on", weekFilter === "last");
+  if (l) l.classList.toggle("on", weekFilter.includes("last"));
 }
 
 /* ============================================================
