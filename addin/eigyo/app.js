@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_f5a2d64";
+const APP_VERSION = "rev_20260929_9d4e731";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -3776,6 +3776,9 @@ function termEndDate(term) { return new Date(term + 1989, 9, 1); }              
 
 /* --- ガント対象レコード --- */
 function ganttRecords() {
+  /* 表示中の期（t0以上 t1未満）に期間が重なる案件だけを対象にする */
+  const t0 = termStartDate(ganttTerm);
+  const t1 = termEndDate(ganttTerm);
   return activeRecords()
     .filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status))
     .filter(r => !(ganttHideDone && r.status === "完了"))
@@ -3788,6 +3791,8 @@ function ganttRecords() {
       return { rec: r, start, end, provisional: !r.workStart || !r.dueDate };
     })
     .filter(g => g.start && g.end)
+    /* 期間外（期の開始より前に終わる／期の終了以降に始まる）案件は表示しない */
+    .filter(g => g.end >= t0 && g.start < t1)
     .sort((a, b) => a.start - b.start);
 }
 
@@ -3892,7 +3897,8 @@ function ganttHtml() {
           }</div>`).join("")}
         </div>
       </div>
-      ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}
+      ${rows || `<div class="g-empty">${esc(termLabel(ganttTerm))}に該当する案件がありません（期間外の案件は表示されません。◀▶で期を切り替えてください）</div>`}
+      <div class="g-empty" id="g-noview" style="display:none">表示中の期間に該当する案件がありません（ドラッグで期間を移動するか、ズームを広げてください）</div>
     </div>
   </div>
   ${schedExpandListHtml()}
@@ -3903,6 +3909,42 @@ function ganttHtml() {
     <span class="g-dv">▲ 納品日</span>
     <span class="g-hint">バー両端＝期日変更／本体＝期間移動（点線は開始日・納品日が未確定の仮表示）</span>
   </div>`;
+}
+
+/* 表示中の横スクロール範囲（ズームで絞り込んだ期間）に
+   バーが重ならない案件行を隠す。展開したタスク行は親案件に追従する。 */
+const GANTT_LABEL_W = 108;   // .g-label の固定幅（style.css と対応）
+function applyGanttViewFilter() {
+  const wrap = document.getElementById("gantt-wrap");
+  if (!wrap) return;
+  const inner = wrap.querySelector(".gantt-inner");
+  if (!inner) return;
+
+  const trackW = Math.max(inner.scrollWidth - GANTT_LABEL_W, 1);
+  const visL = wrap.scrollLeft;                                   // トラック座標での可視左端
+  const visR = wrap.scrollLeft + wrap.clientWidth - GANTT_LABEL_W; // 同 右端
+
+  let shown = 0, total = 0, hideCur = false;
+  inner.querySelectorAll(".g-row").forEach(row => {
+    if (row.classList.contains("g-headrow")) return;
+    if (row.dataset.id) {
+      total++;
+      const bar = row.querySelector(".g-bar");
+      if (!bar) { hideCur = false; row.classList.remove("g-row-off"); shown++; return; }
+      const l = parseFloat(bar.style.left) || 0;
+      const w = parseFloat(bar.style.width) || 0;
+      const barL = l / 100 * trackW;
+      const barR = (l + w) / 100 * trackW;
+      hideCur = (barR < visL || barL > visR);
+      row.classList.toggle("g-row-off", hideCur);
+      if (!hideCur) shown++;
+    } else {
+      row.classList.toggle("g-row-off", hideCur);
+    }
+  });
+
+  const nv = document.getElementById("g-noview");
+  if (nv) nv.style.display = (total > 0 && shown === 0) ? "" : "none";
 }
 
 /* --- ドラッグ操作（バー編集＋背景パン） --- */
@@ -4014,6 +4056,14 @@ function setupGantt() {
       wrap.scrollLeft = Math.max(inner.scrollWidth * ratio - wrap.clientWidth / 2, 0);
     }
   }
+
+  /* 可視期間に合わせた行の絞り込み（スクロール／パンに追従） */
+  let vfTimer = null;
+  wrap.addEventListener("scroll", () => {
+    if (vfTimer) return;
+    vfTimer = requestAnimationFrame(() => { vfTimer = null; applyGanttViewFilter(); });
+  });
+  requestAnimationFrame(applyGanttViewFilter);
 }
 
 /* バー両端のm/dラベルをバー位置に追従させる */

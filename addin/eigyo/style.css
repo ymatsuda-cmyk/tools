@@ -742,6 +742,9 @@ body {
   position: absolute; top: 3px; transform: translateX(-50%);
   font-size: 9px; color: #8a97a0; white-space: nowrap; pointer-events: none;
 }
+/* 表示中の期間にバーが重ならない案件行は隠す */
+.g-row.g-row-off { display: none; }
+
 .g-row-selected .g-label { background: #e4f1ec; box-shadow: inset 3px 0 0 #0e7a5f; }
 .g-row-selected .g-track { background: #f5faf8; }
 
