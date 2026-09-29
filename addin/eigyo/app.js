@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260821_b91e5d3";
+const APP_VERSION = "rev_20260929_a71c4f2";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -936,6 +936,21 @@ function filteredRecords(opts) {
   });
 }
 
+/* 一覧・カンバン共通の並び順：最終更新日(AJ)の新しい順 → ID順
+   最終更新日が未設定のレコードは末尾に寄せ、ID順で並べる */
+function sortByUpdate(arr) {
+  return arr.slice().sort((a, b) => {
+    const ta = (a.lastUpdate instanceof Date && !isNaN(a.lastUpdate.getTime())) ? a.lastUpdate.getTime() : null;
+    const tb = (b.lastUpdate instanceof Date && !isNaN(b.lastUpdate.getTime())) ? b.lastUpdate.getTime() : null;
+    if (ta !== tb) {
+      if (ta === null) return 1;
+      if (tb === null) return -1;
+      return tb - ta;
+    }
+    return String(a.id).localeCompare(String(b.id), "ja", { numeric: true });
+  });
+}
+
 /* ============================================================
    一覧（優先度を左端に）
    ============================================================ */
@@ -945,7 +960,7 @@ function renderList() {
   if (!recs.length) { cont.innerHTML = `<div class="empty-note">条件に一致する案件がありません</div>`; return; }
   let html = "";
   TYPES.forEach(type => {
-    const all = recs.filter(r => r.type === type);
+    const all = sortByUpdate(recs.filter(r => r.type === type));
     if (!all.length) return;
     /* 保留は各種別グループの末尾に寄せる（本来の状態は状態ラベルに併記） */
     const group = [...all.filter(r => !isHold(r)), ...all.filter(r => isHold(r))];
@@ -1057,9 +1072,9 @@ function renderKanban() {
     ? `ondragover="onLaneDragOver(event)" ondragleave="onLaneDragLeave(event)" ondrop="onLaneDrop(event)"` : "";
   board.innerHTML = lanes.map(st => {
     /* 保留は状態ではなくフラグ。保留レーンに寄せ、他レーンからは除く */
-    const cards = (st === HOLD)
+    const cards = sortByUpdate((st === HOLD)
       ? recs.filter(r => isHold(r))
-      : recs.filter(r => !isHold(r) && r.status === st);
+      : recs.filter(r => !isHold(r) && r.status === st));
     return `<div class="lane${st === HOLD ? " lane-hold" : ""}" data-status="${esc(st)}" ${dndLane}>
       <div class="lane-head">${esc(st)}<span class="cnt">${cards.length}</span></div>
       <div class="lane-body">
