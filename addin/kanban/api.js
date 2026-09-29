@@ -1009,7 +1009,68 @@ async function moveMiniKanbanTask(task, lane, el) {
    （例：営業報告アドインは独自の #dialog-modal を既に持っているため、
     その分だけスキップし、重複IDを作らないようにする）
    ============================================================ */
+/* ============================================================
+   Ctrl + ;  … 今日の日付（yyyy/mm/dd）をカーソル位置に挿入
+   ------------------------------------------------------------
+   Excel本体と同じショートカット感覚で、備考欄などに日付を打てる。
+   モーダル内の textarea / テキスト入力が対象（日付入力欄は除く）。
+   document へ1回だけ登録する（モーダルは開閉を繰り返すため）。
+   ============================================================ */
+function todayYmd() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}/${mm}/${dd}`;
+}
+
+function insertAtCursor(el, text) {
+  const start = el.selectionStart, end = el.selectionEnd;
+  if (typeof start === "number" && typeof el.setRangeText === "function") {
+    el.setRangeText(text, start, end, "end");
+  } else {
+    // 古いホストでの保険
+    const v = el.value || "";
+    const s2 = (typeof start === "number") ? start : v.length;
+    const e2 = (typeof end === "number") ? end : v.length;
+    el.value = v.slice(0, s2) + text + v.slice(e2);
+    if (el.setSelectionRange) el.setSelectionRange(s2 + text.length, s2 + text.length);
+  }
+  // oninput（onModalNoteEdited など）を確実に走らせる
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function isDateInsertTarget(el) {
+  if (!el) return false;
+  const tag = (el.tagName || "").toLowerCase();
+  if (tag === "textarea") return true;
+  if (tag !== "input") return false;
+  const type = (el.type || "text").toLowerCase();
+  return type === "text" || type === "search";
+}
+
+function bindDateShortcut() {
+  if (window.__wapiDateShortcutBound) return;
+  window.__wapiDateShortcutBound = true;
+
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (e.altKey) return;
+    // JIS/US どちらでも拾えるように key と code の両方を見る
+    const isSemicolon = (e.key === ";" || e.key === ":" || e.code === "Semicolon");
+    if (!isSemicolon) return;
+
+    const el = e.target;
+    if (!isDateInsertTarget(el)) return;
+    // モーダル内の入力欄のみ対象
+    if (!el.closest || !el.closest(".wapi-modal")) return;
+
+    e.preventDefault();
+    insertAtCursor(el, todayYmd());
+  }, true);
+}
+
 function ensureApiDom() {
+  bindDateShortcut();
   const pieces = [];
 
   if (!document.getElementById("modal")) {
@@ -1025,7 +1086,7 @@ function ensureApiDom() {
         <div class="wapi-modal-actions">
           <button class="wapi-btn-primary" onclick="saveNote()">保存</button>
           <button class="wapi-btn-ghost" onclick="closeModal()">閉じる</button>
-          <small>ESC: 閉じる</small>
+          <small>ESC: 閉じる / Ctrl+; : 今日の日付</small>
         </div>
       </div>
     </div>`);

@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_a71c4f2";
+const APP_VERSION = "rev_20260929_c3e8b10";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -378,7 +378,11 @@ function bindStaticUI() {
   if (emodal) {
     emodal.addEventListener("input", markDirty);
     emodal.addEventListener("change", markDirty);
+    emodal.addEventListener("keydown", onModalDateShortcut);
   }
+  // 新規入力モーダルでも同じショートカットを有効化
+  const nmodal = document.getElementById("new-modal");
+  if (nmodal) nmodal.addEventListener("keydown", onModalDateShortcut);
 }
 
 function clearFilters() {
@@ -776,6 +780,39 @@ function fmtDateInput(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fromDateInput(s) { return s ? new Date(s + "T00:00:00") : null; }
+/* Ctrl+;（Excelと同じ）で本日日付を入力する。
+   type="date" は本日をセット、テキスト／textarea はカーソル位置に yyyy/mm/dd を挿入 */
+function todayYmdSlash() {
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+function onModalDateShortcut(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  /* 日本語キーボードでは Shift 併用で ":" になる場合があるため code も見る */
+  if (e.key !== ";" && e.key !== ":" && e.code !== "Semicolon") return;
+  const el = e.target;
+  if (!el || !el.tagName) return;
+  if (el.readOnly || el.disabled) return;
+  const tag = el.tagName.toLowerCase();
+  const type = (el.type || "").toLowerCase();
+
+  if (tag === "input" && type === "date") {
+    e.preventDefault();
+    el.value = fmtDateInput(new Date());
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
+  if (tag === "textarea" || (tag === "input" && ["text", "search", ""].includes(type))) {
+    e.preventDefault();
+    const t = todayYmdSlash();
+    const s = (el.selectionStart != null) ? el.selectionStart : el.value.length;
+    const n = (el.selectionEnd != null) ? el.selectionEnd : s;
+    el.value = el.value.slice(0, s) + t + el.value.slice(n);
+    try { el.selectionStart = el.selectionEnd = s + t.length; } catch (_) {}
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
