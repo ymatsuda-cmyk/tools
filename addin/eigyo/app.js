@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_c3e8b10";
+const APP_VERSION = "rev_20260929_f5a2d64";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -1134,7 +1134,62 @@ function renderKanban() {
       </div>
     </div>`;
   }).join("");
+
+  setupBoardPan();
 }
+
+/* カンバン：背景（カード以外）をつかんでドラッグでスクロール（パン操作）
+   - 横方向：ボード全体（#board）
+   - 縦方向：つかんだ位置のレーン本体（.lane-body）
+   カード上からは開始しない（カードのドラッグ＆ドロップを妨げないため） */
+function setupBoardPan() {
+  const board = document.getElementById("board");
+  if (!board || board.dataset.panBound === "1") return;
+  board.dataset.panBound = "1";
+
+  let panning = false, moved = false, pid = null;
+  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0, vTarget = null;
+
+  const endPan = () => {
+    if (!panning) return;
+    panning = false; vTarget = null;
+    board.classList.remove("panning");
+    try { if (pid != null) board.releasePointerCapture(pid); } catch (_) {}
+    pid = null;
+  };
+
+  board.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    /* カードや操作要素の上では通常動作を優先 */
+    if (t.closest(".card, button, a, input, select, textarea")) return;
+    panning = true; moved = false; pid = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    baseLeft = board.scrollLeft;
+    vTarget = t.closest(".lane-body");
+    baseTop = vTarget ? vTarget.scrollTop : 0;
+  });
+
+  board.addEventListener("pointermove", e => {
+    if (!panning) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (!moved) {
+      if (Math.abs(dx) + Math.abs(dy) < 3) return;   // 微小な揺れは無視
+      moved = true;
+      board.classList.add("panning");
+      try { board.setPointerCapture(pid); } catch (_) {}
+    }
+    e.preventDefault();
+    board.scrollLeft = baseLeft - dx;
+    if (vTarget) vTarget.scrollTop = baseTop - dy;
+  });
+
+  board.addEventListener("pointerup", endPan);
+  board.addEventListener("pointercancel", endPan);
+  window.addEventListener("blur", endPan);
+}
+
 function setKanbanType(t) { currentKanbanType = t; renderKanban(); }
 
 function onCardDragStart(ev) { dragId = ev.currentTarget.dataset.id; }

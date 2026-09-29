@@ -291,7 +291,12 @@ body {
 .board {
   display: flex; gap: 8px; align-items: flex-start; overflow-x: auto;
   padding-bottom: 10px;
+  cursor: grab;                 /* 背景をつかんでドラッグ移動できることを示す */
+  overscroll-behavior-x: contain;
 }
+/* ドラッグパン中：カーソルを握った状態にし、テキスト選択を抑止 */
+.board.panning { cursor: grabbing; user-select: none; }
+.board.panning * { cursor: grabbing !important; }
 .lane {
   flex: 0 0 170px; background: #eef1f3; border: 1px solid #dde3e7; border-radius: 6px;
   display: flex; flex-direction: column; max-height: calc(100vh - 260px);
