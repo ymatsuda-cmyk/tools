@@ -10,7 +10,7 @@
  * 旧版のJSによるレーン幅・高さ計算処理は廃止。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260920_c86e6cb";
+const APP_VERSION = "rev_20260929_startup";
 window.APP_VERSION = APP_VERSION;
 
 /* ============================================================
@@ -125,15 +125,71 @@ function whenDomReady(fn) {
   }
 }
 
+/* ============================================================
+   Excel 起動時の自動読み込み（共有ランタイム）
+   ------------------------------------------------------------
+   manifest の <Runtimes lifetime="long"> と組み合わせて使う。
+   一度手動でカンバンを開くと「ブックを開いた時に読み込む」設定が
+   登録され、次回以降は自動でこのページが読み込まれる。
+   wbs シートがあるブックでのみ作業ウィンドウを表示する。
+   ============================================================ */
+function isSharedRuntime() {
+  try {
+    return Office.context.requirements.isSetSupported("SharedRuntime", "1.1");
+  } catch (e) {
+    return false;
+  }
+}
+
+async function registerStartupLoad() {
+  if (!isSharedRuntime()) return;
+  try {
+    await Office.addin.setStartupBehavior(Office.StartupBehavior.load);
+  } catch (e) {
+    console.warn("setStartupBehavior failed:", e);
+  }
+}
+
+async function hasWbsSheet() {
+  try {
+    let exists = false;
+    await Excel.run(async (ctx) => {
+      const sh = ctx.workbook.worksheets.getItemOrNullObject("wbs");
+      await ctx.sync();
+      exists = !sh.isNullObject;
+    });
+    return exists;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function showPaneIfWbs() {
+  if (!isSharedRuntime()) return;
+  if (!(await hasWbsSheet())) return;
+  try {
+    await Office.addin.showAsTaskpane();
+  } catch (e) {
+    console.warn("showAsTaskpane failed:", e);
+  }
+}
+
 if (window.Office && Office.onReady) {
   Office.onReady(() => {
-    whenDomReady(() => {
+    whenDomReady(async () => {
+      registerStartupLoad();
       restoreSavedFilters();
       restoreHeldDisplay();
       restoreAllDoneDisplay();
       restoreTabState();
       bindStaticUI();
-      init();
+      await showPaneIfWbs();
+      try {
+        await init();
+      } catch (e) {
+        // wbs シートが無いブックで自動読み込みされた場合など
+        console.warn("init failed:", e);
+      }
     });
   });
 } else {

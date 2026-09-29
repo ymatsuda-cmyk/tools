@@ -6,7 +6,7 @@
   xsi:type="TaskPaneApp">
 
   <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.0.1.0</Version>
   <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
@@ -31,6 +31,8 @@
   <Requirements>
     <Sets DefaultMinVersion="1.7">
       <Set Name="ExcelApi" MinVersion="1.7"/>
+      <!-- 共有ランタイム：Excel起動時（ブックを開いた時）の自動読み込みに必要 -->
+      <Set Name="SharedRuntime" MinVersion="1.1"/>
     </Sets>
   </Requirements>
   
@@ -43,9 +45,13 @@
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="Workbook">
+        <!-- 共有ランタイム：作業ウィンドウを閉じてもランタイムを維持する -->
+        <Runtimes>
+          <Runtime resid="Taskpane.Url" lifetime="long"/>
+        </Runtimes>
         <DesktopFormFactor>
-          <!-- コマンド用 HTML ファイルの定義（リボンボタンに必須） -->
-          <FunctionFile resid="Commands.Html"/>
+          <!-- 共有ランタイムでは作業ウィンドウと同じURLを指定する -->
+          <FunctionFile resid="Taskpane.Url"/>
           
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
