@@ -7,8 +7,8 @@
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ledgerpilot.css?v=rev_20260930_lp002">
-<link rel="stylesheet" href="app.css?v=rev_20260930_lp002">
+<link rel="stylesheet" href="ledgerpilot.css?v=rev_20260930_lp003">
+<link rel="stylesheet" href="app.css?v=rev_20260930_lp003">
 </head>
 <body>
 <header class="bar">
@@ -19,6 +19,9 @@
     <button role="tab" data-tab="account">科目</button>
     <button role="tab" data-tab="import">取込</button>
   </nav>
+  <span class="tabs-mini tax-switch" id="tax-switch" role="group" aria-label="税込・税抜の切替" title="税抜は、課税区分・税率が入った明細から内税分（切り捨て）を差し引いて表示します">
+    <button data-tax="in" aria-pressed="true">税込</button><button data-tax="ex" aria-pressed="false">税抜</button>
+  </span>
   <button class="icon-btn" id="btn-reload" title="台帳を読み直す">↻</button>
 </header>
 
@@ -29,7 +32,7 @@
   <section id="pane-account" class="pane hidden"></section>
   <section id="pane-import" class="pane hidden">
     <div class="lp-panel">
-      <h2>CSVを取り込む <small>勘定奉行の仕訳日記帳CSV</small></h2>
+      <h2>CSVを取り込む <small>弥生会計の仕訳日記帳CSV</small></h2>
       <label class="lp-drop" id="drop-csv">
         <input type="file" id="file-csv" accept=".csv,.txt">
         <b>CSVを選ぶ</b><br><span id="csv-name">ここにドロップ、またはクリックして選択</span>
@@ -64,9 +67,9 @@
 </main>
 <footer class="foot"><span id="version-label"></span></footer>
 
-<script src="ledger-core.js?v=rev_20260930_lp002"></script>
-<script src="ledger-diffview.js?v=rev_20260930_lp002"></script>
-<script src="charts.js?v=rev_20260930_lp002"></script>
-<script src="app.js?v=rev_20260930_lp002"></script>
+<script src="ledger-core.js?v=rev_20260930_lp003"></script>
+<script src="ledger-diffview.js?v=rev_20260930_lp003"></script>
+<script src="charts.js?v=rev_20260930_lp003"></script>
+<script src="app.js?v=rev_20260930_lp003"></script>
 </body>
 </html>

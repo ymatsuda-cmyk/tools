@@ -7,7 +7,7 @@
 (function (root) {
   "use strict";
 
-  var CORE_VERSION = "rev_20260930_lp001";
+  var CORE_VERSION = "rev_20260930_lp003";
 
   // ===== シート構成 =====
   var SHEET_PREFIX = "仕訳_";          // 仕訳_2025-10
@@ -19,8 +19,8 @@
   // CSV列インデックス（元CSV基準）
   var C = {
     KUGIRI: 0, GYO: 1, DATE: 2,
-    D_CODE: 8, D_NAME: 9, D_SUBC: 10, D_SUB: 11, D_PARTNER: 23, D_AMT: 24, D_TAX: 25,
-    C_CODE: 26, C_NAME: 27, C_SUBC: 28, C_SUB: 29, C_PARTNER: 41, C_AMT: 42, C_TAX: 43,
+    D_CODE: 8, D_NAME: 9, D_SUBC: 10, D_SUB: 11, D_TAXKBN: 13, D_RATE: 16, D_PARTNER: 23, D_AMT: 24, D_TAX: 25,
+    C_CODE: 26, C_NAME: 27, C_SUBC: 28, C_SUB: 29, C_TAXKBN: 31, C_RATE: 34, C_PARTNER: 41, C_AMT: 42, C_TAX: 43,
     MEMO: 44, NEW_AT: 48, NEW_BY: 49, UPD_AT: 51, LAST_AT: 54
   };
   var NUMERIC_COLS = [16, 24, 25, 34, 42, 43]; // 税率・金額・税額
@@ -364,7 +364,7 @@
 
   // ===== 集計 =====
   // 仕訳行 → 借方・貸方の明細（posting）へ展開
-  function toPostings(entries, master) {
+  function toPostings(entries, master, mode) {
     var out = [];
     var byV = groupByVoucher(entries);
     entries.forEach(function (e) {
@@ -383,16 +383,39 @@
         var ks = Object.keys(names);
         return ks.length === 1 ? ks[0] : "諸口";
       }
-      if (f[C.D_CODE]) out.push({ side: "D", code: f[C.D_CODE], name: f[C.D_NAME], sub: f[C.D_SUB],
-        amt: Number(f[C.D_AMT] || 0), counter: counter("D"), memo: f[C.MEMO], date: e.date, ym: ym,
+      if (f[C.D_CODE]) out.push(withTax({ side: "D", code: f[C.D_CODE], name: f[C.D_NAME], sub: f[C.D_SUB],
+        counter: counter("D"), memo: f[C.MEMO], date: e.date, ym: ym,
         cat: (master[f[C.D_CODE]] || {}).cat || defaultCategory(f[C.D_CODE]), vkey: e.vkey,
-        sheet: e.sheet, rowIndex: e.rowIndex });
-      if (f[C.C_CODE]) out.push({ side: "C", code: f[C.C_CODE], name: f[C.C_NAME], sub: f[C.C_SUB],
-        amt: Number(f[C.C_AMT] || 0), counter: counter("C"), memo: f[C.MEMO], date: e.date, ym: ym,
+        sheet: e.sheet, rowIndex: e.rowIndex }, f[C.D_AMT], f[C.D_TAX], f[C.D_RATE], f[C.D_TAXKBN]));
+      if (f[C.C_CODE]) out.push(withTax({ side: "C", code: f[C.C_CODE], name: f[C.C_NAME], sub: f[C.C_SUB],
+        counter: counter("C"), memo: f[C.MEMO], date: e.date, ym: ym,
         cat: (master[f[C.C_CODE]] || {}).cat || defaultCategory(f[C.C_CODE]), vkey: e.vkey,
-        sheet: e.sheet, rowIndex: e.rowIndex });
+        sheet: e.sheet, rowIndex: e.rowIndex }, f[C.C_AMT], f[C.C_TAX], f[C.C_RATE], f[C.C_TAXKBN]));
     });
+    setTaxMode(out, mode || "in");
     return out;
+  }
+
+  /* 税込／税抜の金額を持たせる（その明細自身の税区分・税率で判定）
+   * - 税率なし（対象外・非課税）: 税込＝税抜＝本体金額
+   * - 消費税の科目（仮払消費税・未払消費税など）: 換算しない
+   * - 消費税額あり（税抜経理・別記）: 税抜＝本体、税込＝本体＋税額
+   * - 消費税額0（税込経理・内税）: 税込＝本体、税額＝本体×税率/(100+税率) 切り捨て、税抜＝本体−税額 */
+  function withTax(p, amt, taxAmt, rate, kbn) {
+    var a = Number(amt || 0), t = Number(taxAmt || 0), r = Number(rate || 0);
+    p.rate = r; p.taxKbn = kbn || "";
+    if (!r || /消費税/.test(p.name)) { p.amtIn = a; p.amtEx = a; p.tax = 0; }
+    else if (t) { p.amtEx = a; p.amtIn = a + t; p.tax = t; }
+    else {
+      var tax = (a < 0 ? -1 : 1) * Math.floor(Math.abs(a) * r / (100 + r));
+      p.amtIn = a; p.amtEx = a - tax; p.tax = tax;
+    }
+    return p;
+  }
+  // mode: "in"=税込 / "ex"=税抜。p.amt を切り替える（集計はすべて p.amt を使う）
+  function setTaxMode(postings, mode) {
+    postings.forEach(function (p) { p.amt = mode === "ex" ? p.amtEx : p.amtIn; });
+    return postings;
   }
   // 区分の性質に合わせた符号（収益・負債は貸方プラス）
   function signed(p) {
@@ -434,7 +457,7 @@
     entryFromSheetRow: entryFromSheetRow, entryToSheetRow: entryToSheetRow, columnFormats: columnFormats,
     computeDiff: computeDiff, planApply: planApply,
     defaultCategory: defaultCategory, collectAccounts: collectAccounts,
-    toPostings: toPostings, memoKey: memoKey, signed: signed, plOf: plOf, groupByVoucher: groupByVoucher
+    toPostings: toPostings, setTaxMode: setTaxMode, memoKey: memoKey, signed: signed, plOf: plOf, groupByVoucher: groupByVoucher
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LedgerCore = api;
