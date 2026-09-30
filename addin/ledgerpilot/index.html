@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LedgerPilot</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ledgerpilot.css?v=rev_20260930_lp001">
+<link rel="stylesheet" href="app.css?v=rev_20260930_lp001">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">Ledger<span>Pilot</span></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="overview" class="active">全体</button>
+    <button role="tab" data-tab="month">月別</button>
+    <button role="tab" data-tab="account">科目</button>
+    <button role="tab" data-tab="import">取込</button>
+  </nav>
+  <button class="icon-btn" id="btn-reload" title="台帳を読み直す">↻</button>
+</header>
+
+<main id="main">
+  <div id="status" class="lp-note">台帳を読み込んでいます…</div>
+  <section id="pane-overview" class="pane"></section>
+  <section id="pane-month" class="pane hidden"></section>
+  <section id="pane-account" class="pane hidden"></section>
+  <section id="pane-import" class="pane hidden">
+    <div class="lp-panel">
+      <h2>CSVを取り込む <small>弥生会計の仕訳日記帳CSV</small></h2>
+      <label class="lp-drop" id="drop-csv">
+        <input type="file" id="file-csv" accept=".csv,.txt">
+        <b>CSVを選ぶ</b><br><span id="csv-name">ここにドロップ、またはクリックして選択</span>
+      </label>
+      <div id="imp-period" class="hidden" style="margin-top:10px">
+        <p class="muted" style="margin:0 0 6px">この期間に入る台帳の仕訳をCSVの内容で置き換えます。期間外はそのまま残ります。</p>
+        <label class="lp-field">開始日<input type="date" id="p-start"></label>
+        <label class="lp-field">終了日<input type="date" id="p-end"></label>
+        <button class="lp-btn" id="btn-diff">差分を確認</button>
+        <div id="csv-info" class="muted" style="margin-top:4px;font-size:12px"></div>
+      </div>
+      <div id="imp-msg"></div>
+    </div>
+    <div class="lp-panel hidden" id="imp-diff-panel">
+      <h2>差分 <small>行をクリックで伝票の内訳</small></h2>
+      <div id="imp-diff"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="lp-btn primary" id="btn-apply" disabled>選択した月を差し替える</button>
+        <span id="apply-msg" class="muted"></span>
+      </div>
+    </div>
+    <div class="lp-panel">
+      <h2>取込履歴</h2>
+      <div id="imp-history" class="lp-scroll"></div>
+    </div>
+  </section>
+</main>
+<footer class="foot"><span id="version-label"></span></footer>
+
+<script src="ledger-core.js?v=rev_20260930_lp001"></script>
+<script src="ledger-diffview.js?v=rev_20260930_lp001"></script>
+<script src="charts.js?v=rev_20260930_lp001"></script>
+<script src="app.js?v=rev_20260930_lp001"></script>
+</body>
+</html>

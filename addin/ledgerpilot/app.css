@@ -1,0 +1,88 @@
+/* LedgerPilot アドイン画面 */
+body { min-width: 300px; }
+.hidden { display: none !important; }
+
+.bar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--rule);
+}
+.brand { font-weight: 700; font-size: 15px; letter-spacing: .02em; white-space: nowrap; }
+.brand span { color: var(--accent); }
+.tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+.tabs button {
+  border: 0; background: none; padding: 6px 10px; cursor: pointer; color: var(--ink-2);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+.icon-btn { border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius-s); width: 30px; height: 28px; cursor: pointer; font-size: 15px; }
+
+main { padding: 12px; }
+.foot { padding: 4px 12px 12px; font-size: 10px; color: var(--ink-3); text-align: right; }
+
+/* ===== ツールバー ===== */
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
+.toolbar .spacer { flex: 1; }
+.month-nav { display: inline-flex; align-items: center; gap: 4px; }
+.month-nav .cur { font-size: 18px; font-weight: 700; min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* ===== 損益サマリー（台帳の見開き風：左に科目、右に金額） ===== */
+.pl-sheet { display: grid; grid-template-columns: 1fr; gap: 0; }
+.pl-line {
+  display: grid; grid-template-columns: minmax(84px, 1fr) auto auto; align-items: baseline; gap: 10px;
+  padding: 6px 2px; border-bottom: 1px solid var(--rule-2);
+}
+.pl-line .lbl { color: var(--ink-2); }
+.pl-line .amt { font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; }
+.pl-line .sub { font-size: 11px; color: var(--ink-3); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.pl-line.profit { border-bottom: 1px solid var(--ink-3); }
+.pl-line.profit .lbl { color: var(--ink); font-weight: 700; }
+.pl-line.profit .amt { font-weight: 700; font-size: 17px; }
+.pl-line.key .amt { font-size: 22px; color: var(--accent); }
+.pl-line.clickable { cursor: pointer; }
+.pl-line.clickable:hover { background: var(--accent-soft); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 760px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+/* ===== グラフ ===== */
+.chart { width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--font); fill: var(--ink-2); }
+.chart .axis { stroke: var(--rule); }
+.chart .grid { stroke: var(--rule-2); }
+.chart .hit { cursor: pointer; }
+.chart .hit:hover rect.bar-bg { fill: var(--accent-soft); }
+.chart .legend { font-size: 11px; }
+.legend-row { display: flex; gap: 12px; font-size: 11px; color: var(--ink-2); margin: 0 0 6px; flex-wrap: wrap; }
+.legend-row i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.legend-row i.line { height: 2px; vertical-align: 3px; }
+
+/* ===== 横棒ランキング ===== */
+.rank { display: grid; gap: 4px; }
+.rank-row { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; gap: 8px; align-items: center; cursor: pointer; padding: 2px 4px; border-radius: var(--radius-s); }
+.rank-row:hover { background: var(--accent-soft); }
+.rank-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.rank-row .track { display: block; height: 10px; background: var(--rule-2); border-radius: 5px; overflow: hidden; }
+.rank-row .fill { display: block; height: 100%; background: var(--accent-2); border-radius: 5px; }
+.rank-row .fill.cost { background: #8a90b8; }
+.rank-row .v { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 84px; text-align: right; }
+
+/* ===== 月次損益表 ===== */
+.pl-table th.m { cursor: pointer; text-decoration: underline dotted var(--ink-3); text-underline-offset: 3px; }
+.pl-table th.m:hover { color: var(--accent); }
+.pl-table td:first-child, .pl-table th:first-child { position: sticky; left: 0; background: var(--paper); z-index: 1; }
+.pl-table tr.subtotal td:first-child { background: #f8f9fb; }
+
+/* ===== 科目 ===== */
+.acc-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+.acc-head select { min-width: 180px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); font-size: 12px; }
+.chip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0; font-size: 13px; }
+.search { padding: 5px 8px; border: 1px solid var(--rule); border-radius: var(--radius-s); width: 100%; max-width: 280px; background: var(--paper); }
+.more { margin-top: 8px; }
+.tabs-mini { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius-s); overflow: hidden; }
+.tabs-mini button { border: 0; background: var(--paper); padding: 3px 10px; cursor: pointer; font-size: 12px; }
+.tabs-mini button.active { background: var(--accent); color: #fff; }
+.empty { padding: 24px 12px; text-align: center; color: var(--ink-2); }
+.empty b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }

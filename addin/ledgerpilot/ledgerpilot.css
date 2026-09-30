@@ -1,0 +1,127 @@
+/* LedgerPilot — 共通スタイル（lp- 接頭辞） */
+:root {
+  --ink: #1d2433;
+  --ink-2: #4a5468;
+  --ink-3: #7b8497;
+  --canvas: #f3f5f8;
+  --paper: #ffffff;
+  --rule: #dde1e8;
+  --rule-2: #eceff4;
+  --accent: #34398f;      /* 藍 */
+  --accent-2: #5157c4;
+  --accent-soft: #eceefb;
+  --plus: #1b7a4e;
+  --plus-soft: #e5f3ec;
+  --minus: #c23a22;       /* 朱：減少・削除 */
+  --minus-soft: #fbeae6;
+  --warn: #9a6512;
+  --warn-soft: #fbf1df;
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --font: "BIZ UDPGothic", "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+.num, .lp-num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.neg { color: var(--minus); }
+.pos { color: var(--plus); }
+.muted { color: var(--ink-3); }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* ===== ボタン ===== */
+.lp-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--radius-s);
+  border: 1px solid var(--rule); background: var(--paper); cursor: pointer;
+}
+.lp-btn:hover { border-color: var(--ink-3); }
+.lp-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.lp-btn.primary:hover { background: var(--accent-2); }
+.lp-btn:disabled { opacity: .45; cursor: not-allowed; }
+.lp-btn.small { padding: 3px 8px; font-size: 12px; }
+
+/* ===== パネル ===== */
+.lp-panel {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.lp-panel > h2 {
+  font-size: 14px; margin: 0 0 10px; font-weight: 700;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.lp-panel > h2 small { font-weight: 400; color: var(--ink-3); font-size: 12px; }
+
+/* ===== 表 ===== */
+.lp-scroll { overflow-x: auto; }
+table.lp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lp-table th, .lp-table td { padding: 5px 8px; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+.lp-table thead th {
+  position: sticky; top: 0; background: var(--paper);
+  font-weight: 700; color: var(--ink-2); border-bottom: 1px solid var(--rule); text-align: left;
+  white-space: nowrap;
+}
+.lp-table thead th.num { text-align: right; }
+.lp-table tr.clickable { cursor: pointer; }
+.lp-table tr.clickable:hover td { background: var(--accent-soft); }
+.lp-table tr.subtotal td { font-weight: 700; background: #f8f9fb; }
+.lp-table tr.total td { font-weight: 700; border-top: 1px solid var(--ink-3); }
+
+/* ===== 状態タグ ===== */
+.lp-tag {
+  display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  line-height: 18px; white-space: nowrap;
+}
+.lp-tag.add { background: var(--plus-soft); color: var(--plus); }
+.lp-tag.chg { background: var(--warn-soft); color: var(--warn); }
+.lp-tag.del { background: var(--minus-soft); color: var(--minus); }
+.lp-tag.same { background: var(--rule-2); color: var(--ink-3); }
+.lp-tag.move { background: var(--accent-soft); color: var(--accent); }
+
+/* ===== メッセージ ===== */
+.lp-note { padding: 8px 12px; border-radius: var(--radius-s); background: var(--accent-soft); color: var(--accent); margin: 8px 0; }
+.lp-note.warn { background: var(--warn-soft); color: var(--warn); }
+.lp-note.err { background: var(--minus-soft); color: var(--minus); }
+.lp-note.ok { background: var(--plus-soft); color: var(--plus); }
+
+/* ===== 差分ビュー ===== */
+.lp-diff-months td.chk { width: 28px; }
+.lp-diff-months tr.nochange td { color: var(--ink-3); }
+.lp-diff-detail { background: #fafbfc; }
+.lp-diff-detail > td { padding: 8px 10px 12px !important; }
+.lp-vlist { width: 100%; border-collapse: collapse; }
+.lp-vlist { table-layout: fixed; }
+.lp-vlist td:nth-child(1) { width: 52px; }
+.lp-vlist td:nth-child(2) { width: 92px; text-align: left; }
+.lp-vlist td:nth-child(4) { width: 110px; }
+.lp-vlist td { padding: 4px 6px; border-bottom: 1px dashed var(--rule); font-size: 12px; }
+.lp-vlist .fd { color: var(--ink-2); font-size: 11px; }
+.lp-vlist .fd b { font-weight: 700; }
+.lp-vlist .fd del { color: var(--minus); }
+.lp-vlist .fd ins { color: var(--plus); text-decoration: none; }
+.lp-toggle { font-size: 12px; color: var(--ink-2); display: inline-flex; gap: 4px; align-items: center; }
+
+/* ===== ファイル選択 ===== */
+.lp-drop {
+  display: block;
+  border: 1.5px dashed var(--rule); border-radius: var(--radius-m); padding: 14px;
+  text-align: center; background: var(--paper); cursor: pointer; color: var(--ink-2);
+}
+.lp-drop.over, .lp-drop:hover { border-color: var(--accent-2); background: var(--accent-soft); }
+.lp-drop b { color: var(--ink); }
+.lp-drop input { display: none; }
+.lp-field { display: inline-flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-2); margin-right: 10px; }
+.lp-field input, .lp-field select { padding: 4px 6px; border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--paper); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
