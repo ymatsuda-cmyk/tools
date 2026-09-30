@@ -23,7 +23,7 @@
    * band: {lo:[], hi:[]}, marker: index（実績/予測の境界）
    */
   function chart(o) {
-    const W = 360, H = o.height || 180, L = 40, R = 6, T = 10, B = 22;
+    const W = 360, H = o.height || 180, L = 62, R = 6, T = 10, B = 22;
     const all = [];
     (o.bars || []).forEach(b => b.values.forEach(v => v != null && all.push(v)));
     (o.lines || []).forEach(l => l.values.forEach(v => v != null && all.push(v)));
@@ -38,7 +38,7 @@
     const s = [`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.label || "グラフ")}" class="chart">`];
     for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step) {
       s.push(`<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${v === 0 ? C.light : C.grid}"/>`);
-      s.push(`<text x="${L - 5}" y="${(y(v) + 3.5).toFixed(1)}" font-size="9.5" fill="${C.muted}" text-anchor="end">${fmtTick(v, o.unit)}</text>`);
+      s.push(`<text x="${L - 5}" y="${(y(v) + 3.5).toFixed(1)}" font-size="9" fill="${C.muted}" text-anchor="end">${fmtTick(v, o.unit)}</text>`);
     }
     if (o.band) {
       const pts = [];

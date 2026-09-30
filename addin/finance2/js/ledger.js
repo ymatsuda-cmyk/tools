@@ -6,13 +6,13 @@
  * 取込履歴 : 取込ID・期間・ファイル名・版・状態（有効／置換済）
  * 科目マスタ: キーごとの区分・行種別（明細／集計）。手で直せば次回から優先
  * 設定     : 期首月・会社名・金額区分
- * BS / PL  : 設定した期間の貸借対照表・損益計算書（TB_明細からSUMIFS）
+ * 月次PL／月次BSシートへの反映は monthly-sheets.js
  * ============================================================ */
 (function (global) {
   "use strict";
-  const S = { TB: "TB_明細", HIST: "取込履歴", ARCH: "TB_退避", MASTER: "科目マスタ", SET: "設定", BS: "BS", PL: "PL" };
+  const S = { TB: "TB_明細", HIST: "取込履歴", ARCH: "TB_退避", MASTER: "科目マスタ", SET: "設定" };
   const TB_HEAD = ["期間", "区分", "表示順", "行種別", "キー", "科目コード", "科目名", "繰越残高", "借方", "貸方", "残高", "当月", "取込ID"];
-  const HIST_HEAD = ["取込ID", "期間", "ファイル名", "会社名", "行数", "取込日時", "版", "状態", "理由"];
+  const HIST_HEAD = ["取込ID", "期間", "ファイル名", "会社名", "行数", "取込日時", "版", "状態", "理由", "月次シート検算"];
   const MASTER_HEAD = ["キー", "区分", "科目コード", "科目名", "行種別", "初回期間"];
   const SET_HEAD = ["項目", "値", "説明"];
   const DEFAULT_SETTINGS = [
@@ -63,7 +63,7 @@
       }));
       const history = (hV || []).slice(1).filter(r => r[0] !== "").map(r => ({
         id: String(r[0]), period: periodText(r[1]), file: String(r[2]), company: String(r[3]), rows: n0(r[4]),
-        at: String(r[5]), ver: n0(r[6]), status: String(r[7]), reason: String(r[8] || "")
+        at: String(r[5]), ver: n0(r[6]), status: String(r[7]), reason: String(r[8] || ""), check: String(r[9] || "")
       }));
       const master = {};
       (mV || []).slice(1).forEach(r => { if (r[0] !== "") master[String(r[0])] = { key: String(r[0]), sheet: String(r[1]), code: String(r[2] || ""), name: String(r[3]), kind: String(r[4] || "明細") }; });
@@ -156,7 +156,7 @@
       tgt.values = rows;
 
       // 履歴
-      const hRow = [[impId, period, parsed.fileName, parsed.company, rows.length, nowStr(), ver, "有効", reason]];
+      const hRow = [[impId, period, parsed.fileName, parsed.company, rows.length, nowStr(), ver, "有効", reason, ""]];
       const hr = hR.ws.getRangeByIndexes(hVals.length, 0, 1, HIST_HEAD.length);
       hr.numberFormat = [HIST_HEAD.map((_, c) => (c === 1 || c === 5 ? "@" : "General"))];
       hr.values = hRow;
@@ -184,55 +184,16 @@
     });
   }
 
-  /** BS / PL シートを作り直す（期間セルを変えると数式で切り替わる） */
-  async function buildReports(period, tb) {
-    const mk = (sheet) => tb.filter(r => r.period === period && r.sheet === sheet).sort((a, b) => a.order - b.order);
-    const bs = mk("BS"), pl = mk("PL");
-    if (!bs.length && !pl.length) return;
+  /** 取込履歴の「月次シート検算」欄を更新する */
+  async function setHistCheck(impId, text) {
     return Excel.run(async (ctx) => {
-      const refs = [S.BS, S.PL].map(n => ctx.workbook.worksheets.getItemOrNullObject(n));
+      const ws = ctx.workbook.worksheets.getItemOrNullObject(S.HIST);
       await ctx.sync();
-      const sheets = [S.BS, S.PL].map((n, i) => {
-        let ws = refs[i];
-        if (ws.isNullObject) ws = ctx.workbook.worksheets.add(n);
-        else { const u = ws.getUsedRangeOrNullObject(); u.load("address"); ws._u = u; }
-        return ws;
-      });
-      await ctx.sync();
-      sheets.forEach(ws => { if (ws._u && !ws._u.isNullObject) ws._u.clear(); });
-
-      const T = "'" + S.TB + "'!";
-      // SUMIFSは "2026-09" を日付と解釈して一致しないことがあるため、文字列の完全一致で集計する
-      const N = 30000;
-      const sumifs = (col, per, keyCell) => `=SUMPRODUCT((${T}$A$2:$A$${N}=${per})*(${T}$E$2:$E$${N}=${keyCell}),${T}$${col}$2:$${col}$${N})`;
-      const layout = (ws, rows, isBS) => {
-        const head = isBS
-          ? [["期間", period, "", "", "BS（単位：円）"], ["キー", "科目", "当月末残高", "前月末残高", "増減"]]
-          : [["期間", period, "前年同月", "", "PL（単位：円）"], ["キー", "科目", "当月", "累計", "前年同期累計"]];
-        const top = ws.getRange("A1:E2");
-        top.numberFormat = [["General", "@", "General", "@", "General"], ["General", "General", "General", "General", "General"]];
-        top.values = head;
-        if (!isBS) ws.getRange("D1").formulas = [['=TEXT(EDATE(DATEVALUE($B$1&"-01"),-12),"yyyy-mm")']];
-        ws.getRange("A2:E2").format.font.bold = true;
-        ws.getRange("A2:E2").format.fill.color = "#E4EAF3";
-        ws.getRange("B1").format.fill.color = "#FFF4D6";
-        const body = rows.map((r, i) => {
-          const rr = i + 3;
-          const label = r.kind === "集計" ? r.name : "　" + r.name;
-          return isBS
-            ? [r.key, label, sumifs("K", "$B$1", "$A" + rr), sumifs("H", "$B$1", "$A" + rr), `=C${rr}-D${rr}`]
-            : [r.key, label, sumifs("L", "$B$1", "$A" + rr), sumifs("K", "$B$1", "$A" + rr), sumifs("K", "$D$1", "$A" + rr)];
-        });
-        const b = ws.getRangeByIndexes(2, 0, body.length, 5);
-        b.formulas = body;
-        ws.getRangeByIndexes(2, 2, body.length, 3).numberFormat = body.map(() => ["#,##0;-#,##0", "#,##0;-#,##0", "#,##0;-#,##0"]);
-        rows.forEach((r, i) => { if (r.kind === "集計") ws.getRangeByIndexes(i + 2, 1, 1, 4).format.font.bold = true; });
-        try { ws.getRange("A:A").columnHidden = true; } catch (e) {}
-        try { ws.getRange("B:B").format.columnWidth = 170; ws.getRange("C:E").format.columnWidth = 100; } catch (e) {}
-      };
-      layout(sheets[0], bs, true);
-      layout(sheets[1], pl, false);
-      await ctx.sync();
+      if (ws.isNullObject) return;
+      const u = ws.getUsedRangeOrNullObject(true); u.load("values"); await ctx.sync();
+      if (u.isNullObject) return;
+      const i = u.values.findIndex(r => String(r[0]) === impId);
+      if (i > 0) { ws.getRange("J" + (i + 1)).values = [[text]]; await ctx.sync(); }
     });
   }
 
@@ -247,5 +208,5 @@
     });
   }
 
-  global.Ledger = { S, readAll, writePeriod, buildReports, activate, periodText };
+  global.Ledger = { S, readAll, writePeriod, setHistCheck, activate, periodText };
 })(window);
