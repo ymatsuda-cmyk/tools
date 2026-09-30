@@ -15,9 +15,6 @@ body { min-width: 300px; }
   border-bottom: 2px solid transparent; white-space: nowrap;
 }
 .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
-.tax-switch { flex: none; }
-.tax-switch button { padding: 3px 9px; }
-@media (max-width: 420px) { .bar { flex-wrap: wrap; } .tabs { order: 3; flex-basis: 100%; } .tax-switch { margin-left: auto; } }
 .icon-btn { border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius-s); width: 30px; height: 28px; cursor: pointer; font-size: 15px; }
 
 main { padding: 12px; }

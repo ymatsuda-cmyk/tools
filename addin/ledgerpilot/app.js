@@ -1,7 +1,7 @@
 /* LedgerPilot アドイン本体 */
 (function () {
   "use strict";
-  var APP_VERSION = "rev_20260930_lp003";
+  var APP_VERSION = "rev_20260930_lp002";
   window.APP_VERSION = APP_VERSION;
   var L = window.LedgerCore, DV = window.LedgerDiffView, CH = window.LPCharts;
   var esc = DV.esc;
@@ -12,7 +12,7 @@
 
   var S = {
     entries: [], postings: [], master: {}, months: [], history: [], byYm: {}, plYm: {},
-    tab: "overview", taxMode: "in", range: { from: null, to: null }, month: null,
+    tab: "overview", range: { from: null, to: null }, month: null,
     acc: { code: null, ym: null, q: "", limit: 200, breakdown: "partner" },
     imp: { parsed: null, diff: null, view: null, name: "" }
   };
@@ -45,7 +45,7 @@
     return p ? p.name : code;
   }
   function saveUi() {
-    try { localStorage.setItem("lp-ui", JSON.stringify({ tab: S.tab, range: S.range, month: S.month, acc: S.acc.code, tax: S.taxMode })); } catch (e) { /* noop */ }
+    try { localStorage.setItem("lp-ui", JSON.stringify({ tab: S.tab, range: S.range, month: S.month, acc: S.acc.code })); } catch (e) { /* noop */ }
   }
   function restoreUi() {
     try {
@@ -54,7 +54,6 @@
       if (u.range) S.range = u.range;
       if (u.month) S.month = u.month;
       if (u.acc) S.acc.code = u.acc;
-      if (u.tax === "ex" || u.tax === "in") S.taxMode = u.tax;
     } catch (e) { /* noop */ }
   }
 
@@ -99,38 +98,16 @@
 
   function rebuild(data) {
     S.entries = data.entries; S.master = data.master; S.history = data.history;
-    S.postings = L.toPostings(S.entries, S.master, S.taxMode);
+    S.postings = L.toPostings(S.entries, S.master);
     S.byYm = {};
     S.postings.forEach(function (p) { (S.byYm[p.ym] = S.byYm[p.ym] || []).push(p); });
     S.months = Object.keys(S.byYm).sort();
-    recalcPl();
+    S.plYm = {};
+    S.months.forEach(function (ym) { S.plYm[ym] = L.plOf(S.byYm[ym]); });
     if (!S.range.from || S.months.indexOf(S.range.from) < 0) S.range.from = S.months[0] || null;
     if (!S.range.to || S.months.indexOf(S.range.to) < 0) S.range.to = S.months[S.months.length - 1] || null;
     if (!S.month || S.months.indexOf(S.month) < 0) S.month = S.months[S.months.length - 1] || null;
   }
-
-  function recalcPl() {
-    S.plYm = {};
-    S.months.forEach(function (ym) { S.plYm[ym] = L.plOf(S.byYm[ym]); });
-  }
-  // 税込／税抜の切替（台帳の値は変えず、表示用の金額だけ切り替える）
-  function setTaxMode(mode) {
-    S.taxMode = mode;
-    L.setTaxMode(S.postings, mode);
-    recalcPl();
-    drawTaxSwitch();
-    saveUi();
-    render();
-  }
-  function drawTaxSwitch() {
-    document.querySelectorAll("#tax-switch button").forEach(function (b) {
-      var on = b.dataset.tax === S.taxMode;
-      b.classList.toggle("active", on);
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-    });
-    $("tax-switch").classList.toggle("hidden", S.tab === "import");
-  }
-  function taxLabel() { return S.taxMode === "ex" ? "税抜" : "税込"; }
 
   async function reload() {
     status("", "台帳を読み込んでいます…");
@@ -164,7 +141,6 @@
     S.tab = tab;
     document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.toggle("active", b.dataset.tab === tab); });
     ["overview", "month", "account", "import"].forEach(function (t) { $("pane-" + t).classList.toggle("hidden", t !== tab); });
-    drawTaxSwitch();
     saveUi();
     render();
   }
@@ -277,7 +253,7 @@
         '<label class="lp-field">開始月<select id="ov-from">' + monthOptions(S.range.from) + "</select></label>" +
         '<label class="lp-field">終了月<select id="ov-to">' + monthOptions(S.range.to) + "</select></label>" +
         '<button class="lp-btn small" id="ov-all">全期間</button>' +
-        '<span class="spacer"></span><span class="muted" style="font-size:12px">' + taxLabel() + "・" + ms.length + "ヶ月・" + Object.keys(vcount).length + "伝票</span>" +
+        '<span class="spacer"></span><span class="muted" style="font-size:12px">' + ms.length + "ヶ月・" + Object.keys(vcount).length + "伝票</span>" +
       "</div>" +
       '<div class="grid-2">' +
         '<div class="lp-panel"><h2>損益 <small>' + ymLabel(ms[0]) + "〜" + ymLabel(ms[ms.length - 1]) + "</small></h2>" + plSheet(pl) + "</div>" +
@@ -350,7 +326,7 @@
         '<span class="cur">' + ymLabel(ym) + "</span>" +
         '<button class="lp-btn small" id="m-next" ' + (idx >= S.months.length - 1 ? "disabled" : "") + ' aria-label="翌月">›</button>' +
       '</span><select id="m-sel" class="lp-field" style="padding:4px">' + monthOptions(ym) + "</select>" +
-      '<span class="spacer"></span><span class="muted" style="font-size:12px">' + taxLabel() + "・" + Object.keys(vset).length + "伝票" + (prevYm ? "・比較: " + ymLabel(prevYm) : "") + "</span></div>" +
+      '<span class="spacer"></span><span class="muted" style="font-size:12px">' + Object.keys(vset).length + "伝票" + (prevYm ? "・比較: " + ymLabel(prevYm) : "") + "</span></div>" +
       '<div class="grid-2">' +
         '<div class="lp-panel"><h2>損益</h2>' + plSheet(pl, ppl) + "</div>" +
         '<div class="lp-panel"><h2>売上から経常利益まで</h2><div class="chart" id="m-wf"></div></div>' +
@@ -387,18 +363,16 @@
     });
 
     // 金額の大きい伝票
-    var byV = {};
-    ps.forEach(function (p) { if (p.side === "D") (byV[p.vkey] = byV[p.vkey] || []).push(p); });
+    var byV = L.groupByVoucher(S.entries.filter(function (e) { return L.ymOf(e.date) === ym; }));
     var vs = Object.keys(byV).map(function (k) {
       var rows = byV[k], amt = 0, memos = [], accs = {};
       rows.forEach(function (r) {
-        amt += r.amt;
-        if (r.memo && memos.indexOf(r.memo) < 0) memos.push(r.memo);
-        accs[r.name] = 1;
+        amt += Number(r.fields[L.C.D_AMT] || 0);
+        if (r.fields[L.C.MEMO] && memos.indexOf(r.fields[L.C.MEMO]) < 0) memos.push(r.fields[L.C.MEMO]);
+        if (r.fields[L.C.D_NAME]) accs[r.fields[L.C.D_NAME]] = 1;
       });
       var memo = memos.slice(0, 2).join(" / ") + (memos.length > 2 ? " ほか" + (memos.length - 2) + "件" : "");
-      return { date: rows[0].date, amt: amt, memo: memo, acc: Object.keys(accs).join("・"), sheet: rows[0].sheet,
-        row: Math.min.apply(null, rows.map(function (r) { return r.rowIndex; })) };
+      return { date: rows[0].date, amt: amt, memo: memo, acc: Object.keys(accs).join("・"), sheet: rows[0].sheet, row: rows[0].rowIndex };
     }).sort(function (a, b) { return b.amt - a.amt; }).slice(0, 10);
     $("m-big").innerHTML = '<table class="lp-table"><thead><tr><th>日付</th><th>借方科目</th><th>摘要</th><th class="num">金額</th></tr></thead><tbody>' +
       vs.map(function (v, i) {
@@ -413,11 +387,6 @@
   function openAccount(code, ym, q) {
     S.acc.code = code; S.acc.ym = ym || null; S.acc.q = q || ""; S.acc.limit = 200;
     setTab("account");
-  }
-  function taxNote(list) {
-    var taxable = list.filter(function (p) { return p.tax; }).length;
-    if (!taxable) return "消費税の対象外";
-    return taxLabel() + "表示（課税 " + taxable + "/" + list.length + "件" + (S.taxMode === "ex" ? "、内税を切り捨てで除外" : "") + "）";
   }
   function renderAccount() {
     var pane = $("pane-account");
@@ -443,7 +412,7 @@
     pane.innerHTML =
       '<div class="acc-head"><label class="lp-field">勘定科目<select id="a-sel">' + opts + "</select></label>" +
         (S.acc.ym ? '<span class="chip">' + ymLabel(S.acc.ym) + ' <button id="a-clear-ym" aria-label="月の絞り込みを解除">×</button></span>' : "") +
-        '<span class="muted" style="font-size:12px">区分: ' + cat + "（科目マスタで変更できます）・" + taxNote(mine) + "</span></div>" +
+        '<span class="muted" style="font-size:12px">区分: ' + cat + "（科目マスタで変更できます）</span></div>" +
       '<div class="lp-panel"><h2>月次推移 <small>棒をクリックで月を絞り込み</small></h2>' +
         (pl ? "" : '<div class="legend-row"><span><i style="background:' + COLORS.dr + '"></i>借方</span><span><i style="background:' + COLORS.cr + '"></i>貸方</span><span><i class="line" style="background:' + COLORS.profit + '"></i>純増減</span></div>') +
         '<div class="chart" id="a-chart"></div></div>' +
@@ -509,7 +478,7 @@
       $("a-list").innerHTML = '<table class="lp-table"><thead><tr><th>日付</th><th>相手科目</th><th>摘要</th><th class="num">借方</th><th class="num">貸方</th></tr></thead><tbody>' +
         shown.map(function (p, i) {
           return '<tr class="clickable" data-i="' + i + '"><td class="num">' + p.date.slice(2) + "</td><td>" + esc(p.counter) + (p.sub ? '<div class="muted" style="font-size:11px">' + esc(p.sub) + "</div>" : "") +
-            "</td><td>" + esc(p.memo) + '</td><td class="num"' + (p.tax ? ' title="税込 ' + p.amtIn.toLocaleString("ja-JP") + "／税抜 " + p.amtEx.toLocaleString("ja-JP") + "（" + p.rate + '%）"' : "") + ">" + (p.side === "D" ? yen(p.amt) : "") + '</td><td class="num"' + (p.tax ? ' title="税込 ' + p.amtIn.toLocaleString("ja-JP") + "／税抜 " + p.amtEx.toLocaleString("ja-JP") + "（" + p.rate + '%）"' : "") + ">" + (p.side === "C" ? yen(p.amt) : "") + "</td></tr>";
+            "</td><td>" + esc(p.memo) + '</td><td class="num">' + (p.side === "D" ? yen(p.amt) : "") + '</td><td class="num">' + (p.side === "C" ? yen(p.amt) : "") + "</td></tr>";
         }).join("") +
         '<tr class="total"><td colspan="3">' + rows.length + "件の合計</td><td class=\"num\">" + yen(sd) + '</td><td class="num">' + yen(sc) + "</td></tr></tbody></table>" +
         (rows.length > shown.length ? '<div class="more"><button class="lp-btn small" id="a-more">さらに ' + Math.min(200, rows.length - shown.length) + " 件表示</button></div>" : "");
@@ -749,9 +718,6 @@
     $("btn-diff").onclick = runDiff;
     $("btn-apply").onclick = applyImport;
     $("auto-open").onchange = onAutoOpenChange;
-    document.querySelectorAll("#tax-switch button").forEach(function (b) {
-      b.onclick = function () { if (b.dataset.tax !== S.taxMode) setTaxMode(b.dataset.tax); };
-    });
     var rt;
     window.addEventListener("resize", function () {
       clearTimeout(rt);
