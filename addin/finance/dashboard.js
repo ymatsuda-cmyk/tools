@@ -214,7 +214,7 @@ function drawChart(host, spec) {
    ============================================================ */
 const S = {
   last: null, method: 'sheet', cogsMode: 'method', salesAdj: 0, cogsRate: 10,
-  sgaAdj: {}, base: 'fc37', growth: 0, season: 100, nyCogs: 10, nySgaAdj: {}
+  sgaAdj: {}, base: 'fc37', growth: 0, season: 100, nyCogs: 10, nySgaAdj: {}, acct: null
 };
 CATS.forEach(c => { S.sgaAdj[c] = 0; S.nySgaAdj[c] = 0; });
 
@@ -396,14 +396,28 @@ function render() {
       { type: 'line', name: '営業利益率', values: cur.op.map((v, i) => cur.sales[i] ? v / cur.sales[i] : null), color: SHU }]
   });
 
-  const sel = $('acctSel');
+  /* 費目別の推移：タグで切り替え */
+  const tags = $('acctTags');
   const wantNames = SGA.map(it => it.name).join('|');
-  if (sel.dataset.sig !== wantNames) {
-    sel.innerHTML = SGA.map(it => '<option>' + it.name + '</option>').join('');
-    sel.dataset.sig = wantNames;
-    if (SGA.some(it => it.name === '役員報酬')) sel.value = '役員報酬';
+  if (tags.dataset.sig !== wantNames) {
+    tags.innerHTML = '';
+    SGA.forEach(it => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.dataset.name = it.name; b.textContent = it.name;
+      tags.appendChild(b);
+    });
+    tags.dataset.sig = wantNames;
   }
-  const nm = sel.value || (SGA[0] && SGA[0].name);
+  // 選択中の費目が一覧に無ければ既定値へ（役員報酬 → 先頭）
+  if (!SGA.some(it => it.name === S.acct)) {
+    S.acct = SGA.some(it => it.name === '役員報酬') ? '役員報酬' : (SGA[0] ? SGA[0].name : null);
+  }
+  Array.prototype.forEach.call(tags.children, b => {
+    const on = b.dataset.name === S.acct;
+    b.setAttribute('aria-pressed', on);
+    b.setAttribute('role', 'tab');
+  });
+  const nm = S.acct;
   if (nm) {
     const it = plMap[nm], vals = cur.sgaItems[nm] || new Array(N).fill(0);
     drawChart($('c_acct'), {

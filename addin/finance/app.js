@@ -14,7 +14,7 @@
  * 列を挿入しても・期が変わっても読み替え不要。
  * ============================================================ */
 
-const APP_VERSION = "rev_20260909_a1";
+const APP_VERSION = "rev_20260930_a1";
 const SHEET_PL = "月次PL";
 const SHEET_BS = "月次BS";
 const SHEET_36 = "期実績";
@@ -342,6 +342,10 @@ function bindControls() {
   document.getElementById("lastActual").addEventListener("change", e => {
     S.last = +e.target.value; saveSettings(); render();
   });
+  document.getElementById("acctTags").addEventListener("click", e => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    S.acct = b.dataset.name; saveSettings(); render();
+  });
   seg("segMethod", v => S.method = v);
   seg("segCogs", v => S.cogsMode = v);
   seg("segBase", v => S.base = v);
@@ -461,7 +465,7 @@ function saveSettings() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       live: liveOn,
-      s: { last: S.last, method: S.method, cogsMode: S.cogsMode, salesAdj: S.salesAdj, cogsRate: S.cogsRate, sgaAdj: S.sgaAdj, base: S.base, growth: S.growth, season: S.season, nyCogs: S.nyCogs, nySgaAdj: S.nySgaAdj },
+      s: { last: S.last, method: S.method, cogsMode: S.cogsMode, salesAdj: S.salesAdj, cogsRate: S.cogsRate, sgaAdj: S.sgaAdj, base: S.base, growth: S.growth, season: S.season, nyCogs: S.nyCogs, nySgaAdj: S.nySgaAdj, acct: S.acct },
       b: { people: BN.people, peopleDirty: BN.peopleDirty, socRate: BN.socRate, socWhen: BN.socWhen, mnashi: BN.mnashi, kintou: BN.kintou, empSoc: BN.empSoc, empTax: BN.empTax, tgtRate: BN.tgtRate, resMonths: BN.resMonths }
     }));
   } catch (e) { }
