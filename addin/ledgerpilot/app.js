@@ -1,7 +1,7 @@
 /* LedgerPilot アドイン本体 */
 (function () {
   "use strict";
-  var APP_VERSION = "rev_20260930_lp001";
+  var APP_VERSION = "rev_20260930_lp002";
   window.APP_VERSION = APP_VERSION;
   var L = window.LedgerCore, DV = window.LedgerDiffView, CH = window.LPCharts;
   var esc = DV.esc;
@@ -498,6 +498,7 @@
 
   // ===== 取込 =====
   function renderImport() {
+    drawAutoOpen();
     var h = S.history.slice().reverse().slice(0, 50);
     $("imp-history").innerHTML = h.length ?
       '<table class="lp-table"><thead><tr><th>取込日時</th><th>年月</th><th class="num">追加</th><th class="num">変更</th><th class="num">削除</th><th class="num">行数</th><th>CSV</th></tr></thead><tbody>' +
@@ -652,7 +653,12 @@
       await writeMasterAndHistory(parsed, hist);
       await orderSheets();
       rebuild(await loadBook());
-      impMsg("ok", sel.join("、") + " を差し替えました。");
+      var autoMsg = "";
+      if (getAutoOpen() === null && await setAutoOpen(true)) { // 初回取込時のみ自動ON（明示的にOFFにしたブックは触らない）
+        drawAutoOpen();
+        autoMsg = "次回からこのブックを開くと LedgerPilot が自動で開きます（上書き保存で確定）。";
+      }
+      impMsg("ok", sel.join("、") + " を差し替えました。" + autoMsg);
       runDiff(); // 差し替え後は差分0になることを確認表示
       renderImport();
     } catch (e) {
@@ -661,6 +667,43 @@
       $("btn-apply").disabled = false;
     }
     $("apply-msg").textContent = "";
+  }
+
+  // ===== 自動で開く（ブック単位の設定） =====
+  var AUTO_KEY = "Office.AutoShowTaskpaneWithDocument";
+  function docSettings() {
+    return Office.context && Office.context.document && Office.context.document.settings;
+  }
+  function getAutoOpen() {
+    var st = docSettings();
+    return st ? st.get(AUTO_KEY) : null; // null = 未設定
+  }
+  function setAutoOpen(on) {
+    var st = docSettings();
+    if (!st) return Promise.resolve(false);
+    st.set(AUTO_KEY, !!on);
+    return new Promise(function (resolve) {
+      st.saveAsync(function (r) {
+        var ok = !r || r.status !== Office.AsyncResultStatus.Failed;
+        if (!ok) console.error("settings.saveAsync failed", r.error);
+        resolve(ok);
+      });
+    });
+  }
+  function drawAutoOpen() {
+    var cb = $("auto-open");
+    if (!cb) return;
+    cb.checked = getAutoOpen() === true;
+    cb.disabled = !docSettings();
+  }
+  async function onAutoOpenChange() {
+    var on = $("auto-open").checked;
+    var ok = await setAutoOpen(on);
+    $("auto-open-msg").textContent = ok
+      ? (on ? "次回からこのブックを開くと自動で開きます。" : "自動で開く設定を解除しました。") + "ブックを上書き保存（Ctrl+S）すると確定します。"
+      : "設定を保存できませんでした。ブックが読み取り専用でないか確認してください。";
+    $("auto-open-msg").className = ok ? "muted" : "neg";
+    drawAutoOpen();
   }
 
   // ===== 起動 =====
@@ -674,6 +717,7 @@
     d.addEventListener("drop", function (e) { e.preventDefault(); d.classList.remove("over"); if (e.dataTransfer.files[0]) readCsv(e.dataTransfer.files[0]); });
     $("btn-diff").onclick = runDiff;
     $("btn-apply").onclick = applyImport;
+    $("auto-open").onchange = onAutoOpenChange;
     var rt;
     window.addEventListener("resize", function () {
       clearTimeout(rt);

@@ -7,8 +7,8 @@
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ledgerpilot.css?v=rev_20260930_lp001">
-<link rel="stylesheet" href="app.css?v=rev_20260930_lp001">
+<link rel="stylesheet" href="ledgerpilot.css?v=rev_20260930_lp002">
+<link rel="stylesheet" href="app.css?v=rev_20260930_lp002">
 </head>
 <body>
 <header class="bar">
@@ -29,7 +29,7 @@
   <section id="pane-account" class="pane hidden"></section>
   <section id="pane-import" class="pane hidden">
     <div class="lp-panel">
-      <h2>CSVを取り込む <small>弥生会計の仕訳日記帳CSV</small></h2>
+      <h2>CSVを取り込む <small>勘定奉行の仕訳日記帳CSV</small></h2>
       <label class="lp-drop" id="drop-csv">
         <input type="file" id="file-csv" accept=".csv,.txt">
         <b>CSVを選ぶ</b><br><span id="csv-name">ここにドロップ、またはクリックして選択</span>
@@ -52,6 +52,11 @@
       </div>
     </div>
     <div class="lp-panel">
+      <h2>このブックの設定</h2>
+      <label class="lp-toggle" style="font-size:13px;color:var(--ink)"><input type="checkbox" id="auto-open"> このブックを開いたら LedgerPilot を自動で開く</label>
+      <div id="auto-open-msg" class="muted" style="font-size:12px;margin-top:4px">設定はブックに保存されます。変更後はブックを上書き保存（Ctrl+S）してください。</div>
+    </div>
+    <div class="lp-panel">
       <h2>取込履歴</h2>
       <div id="imp-history" class="lp-scroll"></div>
     </div>
@@ -59,9 +64,9 @@
 </main>
 <footer class="foot"><span id="version-label"></span></footer>
 
-<script src="ledger-core.js?v=rev_20260930_lp001"></script>
-<script src="ledger-diffview.js?v=rev_20260930_lp001"></script>
-<script src="charts.js?v=rev_20260930_lp001"></script>
-<script src="app.js?v=rev_20260930_lp001"></script>
+<script src="ledger-core.js?v=rev_20260930_lp002"></script>
+<script src="ledger-diffview.js?v=rev_20260930_lp002"></script>
+<script src="charts.js?v=rev_20260930_lp002"></script>
+<script src="app.js?v=rev_20260930_lp002"></script>
 </body>
 </html>
