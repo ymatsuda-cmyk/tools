@@ -18,7 +18,8 @@
   const DEFAULT_SETTINGS = [
     ["期首月", 10, "会計年度の開始月（1〜12）"],
     ["会社名", "", "最初に取り込んだPDFの会社名"],
-    ["金額区分", "", "PDFの【税込】／【税抜】"]
+    ["金額区分", "", "PDFの【税込】／【税抜】"],
+    ["異常値の下限額", 50000, "この金額より小さい動きは異常値にしない（円）"]
   ];
 
   const colLetter = (n) => { let s = ""; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };

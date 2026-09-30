@@ -170,3 +170,17 @@ main { padding: 12px 10px 40px; display: flex; flex-direction: column; gap: 10px
 .reflect { border-top: 1px solid var(--rule); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .reflect p { margin: 0; }
 .reflect-row { display: flex; gap: 6px; }
+
+/* 表示の切り替え・異常値 */
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.tgl { height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--rule); background: #fff; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.tgl::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #A9B3BF; }
+.tgl.on { border-color: var(--navy); color: var(--navy); font-weight: 700; background: var(--navy-s); }
+.tgl.on::before { background: var(--navy); border-color: var(--navy); }
+.kpi-c b { font-weight: 700; }
+.kpi-c { line-height: 1.6; }
+.lg-ring { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--amber); background: none; }
+.warn-ic { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--amber); color: #fff; font-size: 10px; font-weight: 700; margin-right: 4px; flex-shrink: 0; vertical-align: 1px; }
+.trow.is-anom { box-shadow: inset 3px 0 0 var(--amber); }
+.mover.anom { grid-template-columns: minmax(0, 1fr) auto 44px; }
+.grp { margin: 4px 0 0; font-size: 12px; color: var(--muted); }

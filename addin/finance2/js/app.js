@@ -2,7 +2,7 @@
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
  * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測
  * ============================================================ */
-const APP_VERSION = "rev_20260930_c19e4b2";
+const APP_VERSION = "rev_20260930_7b3d9e0";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
@@ -20,15 +20,16 @@ window.APP_VERSION = APP_VERSION;
   const pLabel = (p) => p ? p.slice(0, 4) + "年" + Number(p.slice(5)) + "月" : "期間不明";
   const LS = "finance2-ui";
 
-  const TABS = [["import", "取込"], ["dash", "全体"], ["monthly", "月別"], ["account", "科目"], ["forecast", "予測"]];
+  const TABS = [["import", "取込"], ["dash", "全体"], ["monthly", "月別"], ["account", "科目"], ["forecast", "予測"], ["plan", "計画"]];
   const state = {
     tab: "import", led: null, M: null, loadError: "",
     imports: [], seq: 0, diffId: null, diffAll: false, busy: "",
     fy: null, month: null, plMode: "month", showDetail: false,
-    account: null, fcKey: null, fcMethod: "yoy", checks: {}, lastChecks: []
+    account: null, fcKey: null, fcMethod: "yoy", checks: {}, lastChecks: [],
+    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false
   };
   try { Object.assign(state, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
-  const persist = () => { try { localStorage.setItem(LS, JSON.stringify({ tab: state.tab, plMode: state.plMode, showDetail: state.showDetail, fcMethod: state.fcMethod })); } catch (e) {} };
+  const persist = () => { try { localStorage.setItem(LS, JSON.stringify({ tab: state.tab, plMode: state.plMode, showDetail: state.showDetail, fcMethod: state.fcMethod, show: state.show, planDetail: state.planDetail })); } catch (e) {} };
 
   /* ---------- 読み込み ---------- */
   async function load() {
@@ -40,7 +41,14 @@ window.APP_VERSION = APP_VERSION;
       state.loadError = "ブックを読み込めませんでした：" + (e.message || e);
       if (!state.led) state.led = { exists: false, tb: [], history: [], master: {}, settings: { 期首月: 10 } };
     }
-    state.M = FinModel.build(state.led.tb, state.led.settings);
+    // 取込の照合用（PDF科目ベース）と、表示用（月次PL・月次BSの行ベース）を分けて持つ
+    state.MT = FinModel.build(state.led.tb, state.led.settings);
+    state.M = state.MT; state.source = "tb"; state.layout = {};
+    try {
+      const sm = await MonthlySheets.readModel(state.led.tb, state.led.settings.期首月 || 10);
+      if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; }
+    } catch (e) { console.warn("readModel", e); }
+    try { state.plan = await Plan.read(); } catch (e) { console.warn("plan", e); state.plan = null; }
     const M = state.M;
     if (!state.fy || !M.fys.includes(state.fy)) state.fy = M.latest ? M.fyOf(M.latest) : null;
     if (!state.month || !M.has(state.month)) state.month = state.fy ? M.latestIn(state.fy) : null;
@@ -94,7 +102,7 @@ window.APP_VERSION = APP_VERSION;
       list.push({ key, type, sheet: ref.sheet, code: ref.code, name: ref.name, kind: ref.kind, order: ref.order + (ref.sheet === "PL" ? 1000 : 0), a: x, b: y, d: (y ? y.bal : 0) - (x ? x.bal : 0) });
     });
     list.sort((p, q) => p.order - q.order);
-    const M = state.M, imp = {};
+    const M = state.MT, imp = {};
     const pick = { 売上高: M.K.sales, 営業利益: M.K.op, 資産合計: M.K.assets, 負債合計: M.K.liab, 純資産: M.K.equity };
     Object.entries(pick).forEach(([label, key]) => {
       if (!key) return;
@@ -107,7 +115,7 @@ window.APP_VERSION = APP_VERSION;
   }
 
   function continuity(parsed) {
-    const M = state.M, warns = [];
+    const M = state.MT, warns = [];
     const prev = FinModel.addM(parsed.period, -1), next = FinModel.addM(parsed.period, 1);
     const fyStart = Number(parsed.period.slice(5)) === M.start;
     if (M.has(prev)) {
@@ -246,7 +254,7 @@ window.APP_VERSION = APP_VERSION;
     let html = "";
     if (state.loadError) html += `<div class="banner err">${esc(state.loadError)}</div>`;
     try {
-      html += ({ import: renderImport, dash: renderDash, monthly: renderMonthly, account: renderAccount, forecast: renderForecast }[state.tab] || renderImport)();
+      html += ({ import: renderImport, dash: renderDash, monthly: renderMonthly, account: renderAccount, forecast: renderForecast, plan: renderPlan }[state.tab] || renderImport)();
     } catch (e) {
       console.error(e);
       html += `<div class="banner err">画面の表示中にエラーが発生しました：${esc(e.message)}</div>`;
@@ -259,7 +267,7 @@ window.APP_VERSION = APP_VERSION;
   /* ---------- 取込タブ ---------- */
   function renderImport() {
     if (state.diffId) { const it = state.imports.find(i => i.id === state.diffId); if (it && it.diff) return renderDiff(it); state.diffId = null; }
-    const M = state.M, led = state.led;
+    const M = state.MT, led = state.led;
     const newOnes = state.imports.filter(i => i.status === "new" && !i.companyWarn);
     const items = state.imports.map(renderItem).join("");
     return `
@@ -349,7 +357,7 @@ ${renderChecks()}
   }
 
   function renderGrid() {
-    const M = state.M;
+    const M = state.MT;
     const pend = {};
     state.imports.forEach(i => { if (i.parsed && i.parsed.period && ["new", "diff"].includes(i.status)) pend[i.parsed.period] = i.status; });
     const fys = new Set(M.fys);
@@ -424,6 +432,36 @@ ${renderChecks()}
 </section>`;
   }
 
+  /* ---------- 表示の切り替え・計画・異常値 ---------- */
+  const TOGGLES = [["prev", "前期と比較"], ["anom", "異常値"], ["fc", "予測"], ["plan", "計画"]];
+  const toggles = (keys) => `<div class="toggles" role="group" aria-label="グラフに重ねる内容">${TOGGLES.filter(([k]) => keys.includes(k)).map(([k, t]) => `<button type="button" class="tgl ${state.show[k] ? "on" : ""}" data-act="toggle" data-k="${k}" aria-pressed="${!!state.show[k]}">${t}</button>`).join("")}</div>`;
+  function planFor(fy) {
+    const pl = state.plan;
+    if (!pl || !pl.exists || !pl.rows) return null;
+    const ms = state.M.fyMonths(fy);
+    if (!ms.every(p => pl.periods.includes(p))) return null;
+    const idx = ms.map(p => pl.periods.indexOf(p));
+    const by = {};
+    pl.rows.forEach(r => { by[r.key] = { name: r.name, kind: r.kind, values: idx.map(i => r.values[i]) }; });
+    return by;
+  }
+  const minAbs = () => Number(state.led.settings["異常値の下限額"]) || 50000;
+  let anomCache = { k: "", v: [] };
+  function anomaliesOf(fy) {
+    const key = fy + "|" + state.M.periods.length + "|" + state.M.latest + "|" + minAbs();
+    if (anomCache.k !== key) anomCache = { k: key, v: FinModel.anomalies(state.M, fy, { minAbs: minAbs() }) };
+    return anomCache.v;
+  }
+  const anomText = (a) => `${a.type === "yoy" ? "前年同月" : "平常"} ${yen(a.ref)}円 → ${yen(a.v)}円`;
+  // 当期の途中なら残り月の予測を返す（当期が揃っていれば null）
+  function midForecast(key, fy) {
+    const M = state.M;
+    if (!key || M.fyOf(M.latest) !== fy) return null;
+    const f = FinModel.forecast(M, key, state.fcMethod);
+    if (!f.ok || f.targetFy !== fy) return f.ok ? null : f;
+    return f;
+  }
+
   /* ---------- 全体タブ ---------- */
   function kpi(label, val, unit, cmp, cls) {
     return `<div class="kpi"><span class="kpi-l">${label}</span><span class="kpi-v">${val}<small>${unit}</small></span><span class="kpi-c ${cls || ""}">${cmp}</span></div>`;
@@ -433,22 +471,51 @@ ${renderChecks()}
     if (!M.latest) return emptyData();
     const fy = state.fy, p = M.latestIn(fy), py = M.addM(p, -12), K = M.K;
     const prevHas = M.has(py);
+    const months = M.fyMonths(fy);
+    const reg = months.filter(q => M.has(q)).length;
+    const plan = state.show.plan ? planFor(fy) : null;
+    const planCum = (key) => { if (!plan || !plan[key]) return null; return months.filter(q => q <= p).reduce((t, q, i) => t + (plan[key].values[months.indexOf(q)] || 0), 0); };
+    const fcS = state.show.fc ? midForecast(K.sales, fy) : null, fcO = state.show.fc ? midForecast(K.op, fy) : null;
     const salesYoY = prevHas ? pct(M.bal(K.sales, p), M.bal(K.sales, py)) : null;
     const opYoY = prevHas ? pct(M.bal(K.op, p), M.bal(K.op, py)) : null;
     const eq = (q) => (M.bal(K.equity, q) != null && M.bal(K.assets, q) ? M.bal(K.equity, q) / M.bal(K.assets, q) * 100 : null);
     const er = eq(p), erP = prevHas ? eq(py) : null;
     const cash = M.bal(K.cash, p), cashO = M.open(K.cash, p);
-    const months = M.fyMonths(fy);
-    const cur = months.map(q => (M.has(q) ? M.month(K.sales, q) : null));
-    const prv = months.map(q => M.addM(q, -12)).map(q => (M.has(q) ? M.month(K.sales, q) : null));
-    const reg = months.filter(q => M.has(q)).length;
-    const bsA = [["流動資産", M.bal(K.curA, p), "#1F3F6E"], ["固定資産", (M.bal(K.fixA, p) || 0) + (M.bal(K.defA, p) || 0), "#5F7FA8"]];
-    const bsL = [["流動負債", M.bal(K.curL, p), "#9A560A"], ["固定負債", M.bal(K.fixL, p), "#C28A45"], ["純資産", M.bal(K.equity, p), "#56606B"]];
-    const bar = (label, segs) => {
-      const tot = segs.reduce((s, x) => s + Math.max(0, x[1] || 0), 0) || 1;
-      return `<div class="bsbar"><span class="muted small">${label} ${mil(segs.reduce((s, x) => s + (x[1] || 0), 0))}円</span><div class="bsbar-track">${segs.filter(x => (x[1] || 0) > 0).map(x => `<div style="width:${(x[1] / tot * 100).toFixed(1)}%;background:${x[2]}" title="${x[0]} ${yen(x[1])}円"><span>${x[0]}</span></div>`).join("")}</div></div>`;
+    const sub = (key, yoy, fc) => {
+      const lines = [];
+      lines.push(yoy != null ? `前年同期 <b class="${yoy > 0 ? "up-good" : yoy < 0 ? "up-bad" : ""}">${spct(yoy)}</b>` : `前年データなし`);
+      const pc = planCum(key);
+      if (pc != null) { const a = M.bal(key, p); const r = pc ? a / pc * 100 : null; lines.push(`計画比 <b class="${a >= pc ? "up-good" : "up-bad"}">${r == null ? "—" : r.toFixed(1) + "%"}</b>`); }
+      if (fc && fc.ok) lines.push(`着地見込 <b>${yen(fc.total)}円</b>`);
+      return lines.join("<br>");
     };
-    // 動きの大きい科目
+    const kpi2 = (label, val, unit, html) => `<div class="kpi"><span class="kpi-l">${label}</span><span class="kpi-v">${val}<small>${unit}</small></span><span class="kpi-c">${html}</span></div>`;
+    // グラフ
+    const cur = months.map(q => (M.has(q) ? M.month(K.sales, q) : null));
+    const lines = [];
+    if (state.show.prev) lines.push({ values: months.map(q => M.addM(q, -12)).map(q => (M.has(q) ? M.month(K.sales, q) : null)), color: FinCharts.C.gray, width: 2, dash: "4 3" });
+    if (plan && plan[K.sales]) lines.push({ values: plan[K.sales].values, color: "#2E7D6B", width: 2, dash: "", dots: false });
+    let band = null, marker = null;
+    if (fcS && fcS.ok) {
+      const fp = {}; fcS.points.forEach(x => fp[x.p] = x);
+      lines.push({ values: months.map(q => (fp[q] ? fp[q].v : q === p ? M.month(K.sales, q) : null)), color: FinCharts.C.navy, width: 2, dash: "6 4" });
+      band = { lo: months.map(q => (fp[q] ? fp[q].lo : null)), hi: months.map(q => (fp[q] ? fp[q].hi : null)) };
+      marker = months.indexOf(p);
+    }
+    const anoms = state.show.anom ? anomaliesOf(fy) : [];
+    const marks = anoms.filter(a => a.key === K.sales).map(a => ({ i: months.indexOf(a.p), v: a.v, title: anomText(a) }));
+    const legend = [`<span><i class="lg lg-done"></i>${esc(M.fyLabel(fy))}</span>`];
+    if (state.show.prev) legend.push(`<span><i class="lg lg-line"></i>前期</span>`);
+    if (plan && plan[K.sales]) legend.push(`<span><i class="lg lg-line" style="border-top:2px solid #2E7D6B"></i>計画</span>`);
+    if (fcS && fcS.ok) legend.push(`<span><i class="lg lg-line" style="border-top:2px dashed #1F3F6E"></i>予測</span>`);
+    if (marks.length) legend.push(`<span><i class="lg lg-ring"></i>異常値</span>`);
+    const bsA = [["流動資産", M.bal(K.curA, p), "#1F3F6E"], ["固定資産", (M.bal(K.fixA, p) || 0) + (M.bal(K.defA, p) || 0), "#5F7FA8"]];
+    const bsL = K.curL ? [["流動負債", M.bal(K.curL, p), "#9A560A"], ["固定負債", M.bal(K.fixL, p), "#C28A45"], ["純資産", M.bal(K.equity, p), "#56606B"]]
+      : [["負債", M.bal(K.liab, p), "#9A560A"], ["純資産", M.bal(K.equity, p), "#56606B"]];
+    const bar = (label, segs) => {
+      const tot = segs.reduce((t, x) => t + Math.max(0, x[1] || 0), 0) || 1;
+      return `<div class="bsbar"><span class="muted small">${label} ${yen(segs.reduce((t, x) => t + (x[1] || 0), 0))}円</span><div class="bsbar-track">${segs.filter(x => (x[1] || 0) > 0).map(x => `<div style="width:${(x[1] / tot * 100).toFixed(1)}%;background:${x[2]}" title="${x[0]} ${yen(x[1])}円"><span>${x[0]}</span></div>`).join("")}</div></div>`;
+    };
     const pl = M.keysOf("PL").filter(m => m.kind === "明細");
     let movers, moverNote;
     if (prevHas) {
@@ -459,26 +526,54 @@ ${renderChecks()}
       movers = pl.map(m => ({ m, v: M.bal(m.key, p) })).filter(x => x.v).sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, 5);
       moverNote = "前年データがないため累計金額の大きい順";
     }
+    const fcNote = state.show.fc && !(fcS && fcS.ok) ? `<p class="muted small">${fcS && fcS.reason ? esc(fcS.reason) : "当期は12か月の実績が揃っているため、予測は表示しません（翌期の見込は予測タブ）。"}</p>` : "";
+    const prevNote = state.show.prev && !months.some(q => M.has(M.addM(q, -12))) ? `<p class="muted small">前期の月次データがありません。前期の試算表PDFを取り込むと重ねて表示します。</p>` : "";
+    const planNote = state.show.plan && !plan ? `<p class="muted small">${esc(M.fyLabel(fy))}の計画シートがありません（計画タブで作成できます）。</p>` : "";
     return `
-<div class="toolbar">${fySelect()}<span class="muted small">${mLabel(p)}まで登録（${reg}/12か月）</span></div>
+<div class="toolbar">${fySelect()}<span class="muted small">${mLabel(p)}まで（${reg}/12か月）${state.source === "sheet" ? "・月次シート" : ""}</span></div>
+${toggles(["prev", "anom", "fc", "plan"])}
 <div class="kpis">
-  ${kpi("売上高 累計", mil(M.bal(K.sales, p)), "円", salesYoY != null ? "前年同期 " + spct(salesYoY) : "前年データなし", salesYoY > 0 ? "up-good" : salesYoY < 0 ? "up-bad" : "")}
-  ${kpi("営業利益 累計", mil(M.bal(K.op, p)), "円", opYoY != null ? "前年同期 " + spct(opYoY) : "前年データなし", opYoY > 0 ? "up-good" : opYoY < 0 ? "up-bad" : "")}
-  ${kpi(`現預金 ${mLabel(p)}末`, mil(cash), "円", cashO != null && cash != null ? "前月末 " + smil(cash - cashO) + "円" : "", cash - cashO >= 0 ? "up-good" : "up-bad")}
-  ${kpi("自己資本比率", er != null ? er.toFixed(1) : "—", "%", erP != null ? "前年同月 " + (er - erP >= 0 ? "+" : "−") + Math.abs(er - erP).toFixed(1) + "pt" : "前年データなし", erP != null ? (er >= erP ? "up-good" : "up-bad") : "")}
+  ${kpi2("売上高 累計", yen(M.bal(K.sales, p)), "円", sub(K.sales, salesYoY, fcS))}
+  ${kpi2("営業利益 累計", yen(M.bal(K.op, p)), "円", sub(K.op, opYoY, fcO))}
+  ${kpi2(`現預金 ${mLabel(p)}末`, yen(cash), "円", cashO != null && cash != null ? `前月末 <b class="${cash - cashO >= 0 ? "up-good" : "up-bad"}">${sgn(cash - cashO)}円</b>` : "")}
+  ${kpi2("自己資本比率", er != null ? er.toFixed(1) : "—", "%", erP != null ? `前年同月 <b>${(er - erP >= 0 ? "+" : "−") + Math.abs(er - erP).toFixed(1)}pt</b>` : "前年データなし")}
 </div>
 <section class="card">
   <div class="card-head"><h2>月次売上高</h2><span class="muted small">単位：円</span></div>
-  ${FinCharts.chart({ label: "月次売上高の前年比較", labels: months.map(q => String(Number(q.slice(5)))), unit: "円", bars: [{ values: cur, color: FinCharts.C.navy }], lines: [{ values: prv, color: FinCharts.C.gray, width: 2, dash: "4 3", dots: false }] })}
-  <div class="legend"><span><i class="lg lg-done"></i>${esc(M.fyLabel(fy))}</span><span><i class="lg lg-line"></i>前期</span></div>
+  ${FinCharts.chart({ label: "月次売上高", labels: months.map(q => String(Number(q.slice(5)))), unit: "円", bars: [{ values: cur, color: FinCharts.C.navy }], lines, band, marker, marks })}
+  <div class="legend">${legend.join("")}</div>
+  ${prevNote}${planNote}${fcNote}
 </section>
+${state.show.anom ? renderAnomCard(anoms, fy) : ""}
 <section class="card">
   <div class="card-head"><h2>${mLabel(p)}末の貸借対照表</h2></div>
   ${bar("資産", bsA)}${bar("負債・純資産", bsL)}
 </section>
 <section class="card">
   <div class="card-head"><h2>${prevHas ? "前年から大きく動いた科目" : "主な費用・収益"}</h2><span class="muted small">${moverNote}</span></div>
-  <div class="movers">${movers.map(x => `<button type="button" class="mover" data-act="open-account" data-key="${esc(x.m.key)}"><span class="strong">${esc(x.m.name)}</span><span class="num muted">${k(x.v)}円</span><span class="num strong ${x.r != null ? dirCls(x.d, x.m.key) : ""}">${x.r != null ? spct(x.r) : ""}</span></button>`).join("") || `<p class="muted">表示できる科目がありません。</p>`}</div>
+  <div class="movers">${movers.map(x => `<button type="button" class="mover" data-act="open-account" data-key="${esc(x.m.key)}"><span class="strong">${esc(x.m.name)}</span><span class="num muted">${yen(x.v)}円</span><span class="num strong ${x.r != null ? dirCls(x.d, x.m.key) : ""}">${x.r != null ? spct(x.r) : ""}</span></button>`).join("") || `<p class="muted">表示できる科目がありません。</p>`}</div>
+</section>`;
+  }
+
+  function renderAnomCard(anoms, fy) {
+    const item = (a) => `<button type="button" class="mover anom" data-act="open-account" data-key="${esc(a.key)}"><span><span class="strong">${esc(a.name)}</span><small class="muted block">${mLabel(a.p)}${a.n > 1 ? "〜" + mLabel(a.p2) + `（${a.n}か月）` : ""}・${anomText(a)}</small></span><span class="num strong ${a.dev > 0 ? "t-amber" : "t-navy"}">${sgn(a.dev)}円${a.n > 1 ? "/月" : ""}</span><span class="num small muted">${a.type === "yoy" ? "前年比" : "平常比"}</span></button>`;
+    // 同じ科目・同じ向きで連続する月は1件にまとめる（例：役員報酬 7月〜9月）
+    const merge = (list) => {
+      const by = {};
+      list.slice().sort((a, b) => (a.key + a.p < b.key + b.p ? -1 : 1)).forEach(a => {
+        const g = by[a.key] = by[a.key] || [];
+        const last = g[g.length - 1];
+        if (last && FinModel.addM(last.p2, 1) === a.p && Math.sign(last.dev) === Math.sign(a.dev) && last.type === a.type) { last.p2 = a.p; last.n++; last.sum += a.dev; }
+        else g.push(Object.assign({}, a, { p2: a.p, n: 1, sum: a.dev }));
+      });
+      return Object.values(by).flat().sort((a, b) => Math.abs(b.sum) - Math.abs(a.sum));
+    };
+    const pl = merge(anoms.filter(a => a.sheet === "PL")), bs = merge(anoms.filter(a => a.sheet === "BS"));
+    const group = (title, list, n) => list.length ? `<h3 class="grp">${title}（${list.length}件）</h3><div class="movers">${list.slice(0, n).map(item).join("")}</div>${list.length > n ? `<p class="muted small">ほか${list.length - n}件は科目タブで確認できます。</p>` : ""}` : "";
+    return `<section class="card">
+  <div class="card-head"><h2>異常値</h2><span class="muted small">${esc(state.M.fyLabel(fy))}</span></div>
+  ${anoms.length ? group("損益", pl, 6) + group("貸借（前月からの増減）", bs, 4) : `<p class="muted">大きく外れた月はありません。</p>`}
+  <p class="muted small">平常＝その科目の全期間の中央値。PLは差が${yen(minAbs())}円以上、BSは${yen(minAbs() * 4)}円以上で、ふだんの振れ幅から大きく外れた月か、前年同月から±50%以上動いた月を出しています。下限額は設定シートの「異常値の下限額」で変えられます。</p>
 </section>`;
   }
 
@@ -492,18 +587,22 @@ ${renderChecks()}
     const chips = M.fyMonths(fy).map(q => `<button type="button" class="mchip ${q === p ? "on" : ""}" data-act="month" data-p="${q}" ${M.has(q) ? "" : "disabled"}>${mLabel(q)}</button>`).join("");
     const filt = (sheet) => M.keysOf(sheet).filter(m => (state.showDetail || m.kind === "集計") && M.row(m.key, p));
     const cum = state.plMode === "cum";
+    const an = {};
+    if (state.show.anom) anomaliesOf(fy).filter(a => a.p === p).forEach(a => { an[a.key] = a; });
+    const flag = (key) => an[key] ? `<span class="warn-ic" title="${esc(anomText(an[key]))}" aria-label="異常値">!</span>` : "";
     const plRows = filt("PL").map(m => {
       const a = cum ? M.bal(m.key, p) : M.month(m.key, p);
       const b = M.has(py) ? (cum ? M.bal(m.key, py) : M.month(m.key, py)) : null;
       const d = b == null || a == null ? null : a - b;
-      return `<button type="button" class="trow ${m.kind === "集計" ? "agg" : "det"}" data-act="open-account" data-key="${esc(m.key)}"><span>${esc(m.name)}</span><span class="num">${k(a)}</span><span class="num muted">${k(b)}</span><span class="num strong ${dirCls(d, m.key)}">${sk(d)}</span></button>`;
+      return `<button type="button" class="trow ${m.kind === "集計" ? "agg" : "det"} ${an[m.key] ? "is-anom" : ""}" data-act="open-account" data-key="${esc(m.key)}"><span>${flag(m.key)}${esc(m.name)}</span><span class="num">${k(a)}</span><span class="num muted">${k(b)}</span><span class="num strong ${dirCls(d, m.key)}">${sk(d)}</span></button>`;
     }).join("");
     const bsRows = filt("BS").map(m => {
-      const a = M.bal(m.key, p), b = M.open(m.key, p), d = a - b;
-      return `<button type="button" class="trow ${m.kind === "集計" ? "agg" : "det"}" data-act="open-account" data-key="${esc(m.key)}"><span>${esc(m.name)}</span><span class="num">${k(a)}</span><span class="num muted">${k(b)}</span><span class="num strong">${sk(d)}</span></button>`;
+      const a = M.bal(m.key, p), b = M.open(m.key, p), d = b == null ? null : a - b;
+      return `<button type="button" class="trow ${m.kind === "集計" ? "agg" : "det"} ${an[m.key] ? "is-anom" : ""}" data-act="open-account" data-key="${esc(m.key)}"><span>${flag(m.key)}${esc(m.name)}</span><span class="num">${k(a)}</span><span class="num muted">${k(b)}</span><span class="num strong">${sk(d)}</span></button>`;
     }).join("");
     return `
 <div class="toolbar">${fySelect()}<label class="chk"><input type="checkbox" data-change="detail" ${state.showDetail ? "checked" : ""}>明細も表示</label></div>
+${toggles(["anom"])}
 <div class="mchips">${chips}</div>
 <section class="card">
   <div class="card-head"><h2>${mLabel(p)}の損益計算書</h2>
@@ -520,7 +619,7 @@ ${renderChecks()}
     <div class="trow thead"><span>単位：円</span><span class="num">当月末</span><span class="num">前月末</span><span class="num">増減</span></div>
     ${bsRows}
   </div>
-  <p class="muted small">前月末はPDFの繰越残高を使うため、前月が未登録でも表示できます。行を押すと科目の推移を開きます。</p>
+  <p class="muted small">行を押すと科目の推移を開きます。${state.show.anom ? "「!」は異常値の月です（明細も表示にすると科目ごとに確認できます）。" : ""}</p>
 </section>`;
   }
 
@@ -536,17 +635,48 @@ ${renderChecks()}
     if (!m) return `<p class="muted pad">科目を選んでください。</p>`;
     const isPL = m.sheet === "PL";
     const fy = state.fy;
-    const fys = M.fys.filter(f => f <= fy).slice(-3);
-    const colors = [FinCharts.C.light, FinCharts.C.gray, FinCharts.C.navy];
     const base = M.fyMonths(fy);
-    const lines = fys.map((f, i) => {
-      const off = (fy - f) * 12;
-      return { fy: f, values: base.map(q => { const r = M.addM(q, -off); return M.has(r) ? M.series(key, r) : null; }), color: colors[colors.length - fys.length + i], width: f === fy ? 3 : 2, dash: f === fy ? "" : (i === 0 && fys.length === 3 ? "2 3" : "4 3"), dots: true };
-    });
+    const labels = base.map(q => String(Number(q.slice(5))));
+    const lines = [];
+    const legend = [];
+    if (state.show.prev) {
+      const fys = M.fys.filter(f => f < fy).slice(-2);
+      const cols = [FinCharts.C.light, FinCharts.C.gray];
+      fys.forEach((f, i) => {
+        const off = (fy - f) * 12;
+        const col = cols[cols.length - fys.length + i];
+        lines.push({ values: base.map(q => { const r = M.addM(q, -off); return M.has(r) ? M.series(key, r) : null; }), color: col, width: 2, dash: i === 0 && fys.length === 2 ? "2 3" : "4 3", dots: true });
+        legend.push(`<span><i class="lg lg-line" style="border-top:2px dashed ${col}"></i>${esc(M.fyLabel(f))}</span>`);
+      });
+    }
+    const curVals = base.map(q => (M.has(q) ? M.series(key, q) : null));
+    lines.push({ values: curVals, color: FinCharts.C.navy, width: 3, dots: true });
+    legend.push(`<span><i class="lg lg-line" style="border-top:3px solid #1F3F6E"></i>${esc(M.fyLabel(fy))}</span>`);
+    const plan = state.show.plan && isPL ? planFor(fy) : null;
+    if (plan && plan[key]) { lines.push({ values: plan[key].values, color: "#2E7D6B", width: 2 }); legend.push(`<span><i class="lg lg-line" style="border-top:2px solid #2E7D6B"></i>計画</span>`); }
+    let band = null, marker = null, fcMsg = "";
+    if (state.show.fc && isPL) {
+      const f = midForecast(key, fy);
+      if (f && f.ok) {
+        const fp = {}; f.points.forEach(x => fp[x.p] = x);
+        const last = M.latestIn(fy);
+        lines.push({ values: base.map(q => (fp[q] ? fp[q].v : q === last ? M.month(key, q) : null)), color: FinCharts.C.navy, width: 2, dash: "6 4" });
+        band = { lo: base.map(q => (fp[q] ? fp[q].lo : null)), hi: base.map(q => (fp[q] ? fp[q].hi : null)) };
+        marker = base.indexOf(last);
+        legend.push(`<span><i class="lg lg-line" style="border-top:2px dashed #1F3F6E"></i>予測</span>`);
+        fcMsg = `<p class="muted small">着地見込 ${yen(f.total)}円（幅 ${yen(f.lo)}〜${yen(f.hi)}円）</p>`;
+      } else fcMsg = `<p class="muted small">${f && f.reason ? esc(f.reason) : "当期は12か月の実績が揃っているため、予測は表示しません。"}</p>`;
+    }
+    const anoms = state.show.anom ? anomaliesOf(fy).filter(a => a.key === key) : [];
+    const anomAt = {}; anoms.forEach(a => anomAt[a.p] = a);
+    const marks = isPL || m.sheet === "BS" ? anoms.map(a => ({ i: base.indexOf(a.p), v: isPL ? a.v : M.bal(key, a.p), title: anomText(a) })) : [];
+    if (marks.length) legend.push(`<span><i class="lg lg-ring"></i>異常値</span>`);
     const p = M.latestIn(fy), py = M.addM(p, -12);
     const rows = base.filter(q => M.has(q)).map(q => {
       const a = M.series(key, q), b = M.has(M.addM(q, -12)) ? M.series(key, M.addM(q, -12)) : null;
-      return `<div class="trow"><span>${mLabel(q)}</span><span class="num">${k(a)}</span><span class="num muted">${k(b)}</span><span class="num strong ${dirCls(b == null ? null : a - b, key)}">${b == null ? "—" : sk(a - b)}</span></div>`;
+      const pv = plan && plan[key] ? plan[key].values[base.indexOf(q)] : null;
+      const an = anomAt[q];
+      return `<div class="trow ${an ? "is-anom" : ""}"><span>${an ? `<span class="warn-ic" title="${esc(anomText(an))}">!</span>` : ""}${mLabel(q)}</span><span class="num">${yen(a)}</span><span class="num muted">${plan ? yen(pv) : yen(b)}</span><span class="num strong ${dirCls(plan ? (pv == null ? null : a - pv) : (b == null ? null : a - b), key)}">${plan ? (pv == null ? "—" : sgn(a - pv)) : (b == null ? "—" : sgn(a - b))}</span></div>`;
     }).join("");
     const cum = isPL ? M.bal(key, p) : null, cumP = isPL && M.has(py) ? M.bal(key, py) : null;
     return `
@@ -554,19 +684,22 @@ ${renderChecks()}
 <label class="lbl" for="acc-sel">科目</label>
 <select id="acc-sel" class="inp" data-change="account">${accountOptions(key)}</select>
 <div class="acc-head">
-  <span class="muted small">${isPL ? "損益計算書" : "貸借対照表"}${m.code ? "／" + esc(m.code) : ""}${m.kind === "集計" ? "／集計行" : ""}</span>
+  <span class="muted small">${isPL ? "損益計算書" : "貸借対照表"}${m.kind === "集計" ? "／集計行" : ""}</span>
   <h2 class="title">${esc(m.name)}</h2>
-  ${isPL ? `<span class="muted small">${mLabel(p)}までの累計 ${k(cum)}円${cumP != null ? "　前年同期 " + spct(pct(cum, cumP)) : ""}</span>` : `<span class="muted small">${mLabel(p)}末残高 ${k(M.bal(key, p))}円</span>`}
+  ${isPL ? `<span class="muted small">${mLabel(p)}までの累計 ${yen(cum)}円${cumP != null ? "　前年同期 " + spct(pct(cum, cumP)) : ""}</span>` : `<span class="muted small">${mLabel(p)}末残高 ${yen(M.bal(key, p))}円</span>`}
 </div>
+${toggles(isPL ? ["prev", "anom", "fc", "plan"] : ["prev", "anom"])}
 <section class="card">
   <div class="card-head"><h2>${isPL ? "月次発生額" : "月末残高"}</h2><span class="muted small">単位：円</span></div>
-  ${FinCharts.chart({ label: m.name + "の推移", labels: base.map(q => String(Number(q.slice(5)))), unit: "円", lines, zero: isPL })}
-  <div class="legend">${lines.map(l => `<span><i class="lg lg-line" style="border-top:${l.width}px ${l.dash ? "dashed" : "solid"} ${l.color}"></i>${esc(M.fyLabel(l.fy))}</span>`).join("")}</div>
+  ${FinCharts.chart({ label: m.name + "の推移", labels, unit: "円", lines, band, marker, marks, zero: isPL })}
+  <div class="legend">${legend.join("")}</div>
+  ${fcMsg}
+  ${state.show.prev && !base.some(q => M.has(M.addM(q, -12))) ? `<p class="muted small">前期の月次データがありません。前期の試算表PDFを取り込むと重ねて表示します。</p>` : ""}
 </section>
+${anoms.length ? `<section class="card"><div class="card-head"><h2>異常値</h2><span class="muted small">${anoms.length}件</span></div>${anoms.map(a => `<div class="kv"><span>${mLabel(a.p)}</span><span>${anomText(a)}</span></div>`).join("")}</section>` : ""}
 <section class="card">
-  <div class="card-head"><h2>月別の比較</h2></div>
-  <div class="table"><div class="trow thead"><span>月</span><span class="num">当期</span><span class="num">前期</span><span class="num">前年差</span></div>${rows}</div>
-  ${M.fys.length < 2 ? `<p class="muted small">前期のPDFを取り込むと、前年との比較が表示されます。</p>` : ""}
+  <div class="card-head"><h2>月別の比較</h2><span class="muted small">単位：円</span></div>
+  <div class="table"><div class="trow thead"><span>月</span><span class="num">当期</span><span class="num">${plan ? "計画" : "前期"}</span><span class="num">${plan ? "計画差" : "前年差"}</span></div>${rows}</div>
 </section>`;
   }
 
@@ -623,6 +756,74 @@ ${renderChecks()}
 ${body}`;
   }
 
+  /* ---------- 計画タブ ---------- */
+  function renderPlan() {
+    const M = state.M;
+    if (!M.latest) return emptyData();
+    const pl = state.plan;
+    const latestFy = M.fyOf(M.latest);
+    const targets = [latestFy + 1, latestFy].filter(f => M.fys.includes(f - 1) || f - 1 === latestFy || M.fys.includes(f - 1));
+    const tsel = state.planTarget && [latestFy + 1, latestFy].includes(state.planTarget) ? state.planTarget : latestFy + 1;
+    const canCreate = !!(state.layout && state.layout.PL);
+    const createCard = (again) => `<section class="card">
+  <div class="card-head"><h2>${again ? "計画シートを作り直す" : "計画シートを作る"}</h2></div>
+  <p class="muted small">前期の月次実績（月次PL）をそのまま各月の基準にして「計画」シートを作ります。シートのC列に調整率、D列に年間の調整額を入れると月の計画が変わります。月のセルを直接書き換えても構いません。</p>
+  <label class="lbl" for="plan-fy">計画する期</label>
+  <select id="plan-fy" class="inp" data-change="planfy">${[latestFy + 1, latestFy].map(f => `<option value="${f}" ${f === tsel ? "selected" : ""}>${esc(M.fyLabel(f))}（前期＝${esc(M.fyLabel(f - 1))}）</option>`).join("")}</select>
+  ${M.fyMonths(tsel - 1).filter(q => M.has(q)).length < 12 ? `<p class="small t-amber">前期（${esc(M.fyLabel(tsel - 1))}）の月次実績は${M.fyMonths(tsel - 1).filter(q => M.has(q)).length}か月分です。ない月の基準は0になります。</p>` : ""}
+  ${again ? `<label class="chk"><input type="checkbox" id="plan-confirm">今の計画シートを消して作り直す（入力した調整率・金額は消えます）</label>` : ""}
+  <button type="button" class="btn primary" data-act="plan-create" ${canCreate ? "" : "disabled"}>${again ? "作り直す" : "計画シートを作成"}</button>
+  ${canCreate ? "" : `<p class="muted small">月次PLシートがないため作れません。先に取込タブで試算表を反映してください。</p>`}
+</section>`;
+    if (!pl || !pl.exists) return createCard(false);
+    if (pl.error) return `<div class="banner err">${esc(pl.error)}</div>` + createCard(true);
+    const fy = M.fyOf(pl.periods[0]);
+    const months = M.fyMonths(fy);
+    const plan = planFor(fy) || {};
+    const last = M.latestIn(fy);
+    const done = last ? months.filter(q => q <= last) : [];
+    const cumOf = (arr, n) => arr.slice(0, n).reduce((t, v) => t + (v || 0), 0);
+    const K = M.K;
+    const planYear = (key) => plan[key] ? cumOf(plan[key].values, 12) : null;
+    const actCum = (key) => (last ? M.bal(key, last) : null);
+    const planCumN = (key) => plan[key] ? cumOf(plan[key].values, done.length) : null;
+    const kp = (label, key) => {
+      const a = actCum(key), pc = planCumN(key), py = planYear(key);
+      const r = a != null && pc ? a / pc * 100 : null;
+      return `<div class="kpi"><span class="kpi-l">${label}</span><span class="kpi-v">${yen(py)}<small>円</small></span><span class="kpi-c">年間計画<br>${done.length ? `実績 ${yen(a)}円（${done.length}か月）<br>計画比 <b class="${r >= 100 ? "up-good" : "up-bad"}">${r == null ? "—" : r.toFixed(1) + "%"}</b>` : "実績はまだありません"}</span></div>`;
+    };
+    const salesPlan = plan[K.sales] ? plan[K.sales].values : months.map(() => null);
+    const actual = months.map(q => (M.has(q) ? M.month(K.sales, q) : null));
+    const planCumLine = []; const actCumLine = [];
+    let t1 = 0, t2 = 0;
+    months.forEach((q, i) => { t1 += salesPlan[i] || 0; planCumLine.push(t1); if (actual[i] != null) { t2 += actual[i]; actCumLine.push(t2); } else actCumLine.push(null); });
+    const cumMode = state.plMode === "cum";
+    const rowsSrc = pl.rows.filter(r => state.planDetail || r.kind === "集計" || r.key === K.sales);
+    const tRows = rowsSrc.map(r => {
+      const pv = cumOf(plan[r.key] ? plan[r.key].values : [], done.length || 0);
+      const a = done.length && M.meta[r.key] ? M.bal(r.key, last) : null;
+      const d = a == null ? null : a - pv;
+      const rt = a != null && pv ? a / pv * 100 : null;
+      const big = rt != null && Math.abs(rt - 100) >= 10 && Math.abs(d) >= minAbs();
+      return `<button type="button" class="trow ${r.kind === "集計" ? "agg" : "det"} ${big ? "is-anom" : ""}" data-act="open-account" data-key="${esc(r.key)}"><span>${big ? `<span class="warn-ic" title="計画との差が10%以上">!</span>` : ""}${esc(r.name)}</span><span class="num">${done.length ? yen(pv) : yen(planYear(r.key))}</span><span class="num muted">${a == null ? "—" : yen(a)}</span><span class="num strong ${dirCls(d, r.key)}">${d == null ? "—" : sgn(d)}</span></button>`;
+    }).join("");
+    return `
+<div class="toolbar"><span class="strong">${esc(M.fyLabel(fy))}の計画</span><button type="button" class="link" data-act="sheet" data-sheet="${esc(pl.sheet)}">計画シートを開く</button></div>
+<div class="kpis">${kp("売上高", K.sales)}${kp("営業利益", K.op)}</div>
+<section class="card">
+  <div class="card-head"><h2>売上高 計画と実績</h2>
+    <div class="seg" role="group" aria-label="表示"><button type="button" class="${!cumMode ? "on" : ""}" data-act="plmode" data-v="month">月次</button><button type="button" class="${cumMode ? "on" : ""}" data-act="plmode" data-v="cum">累計</button></div></div>
+  ${FinCharts.chart({ label: "売上高の計画と実績", labels: months.map(q => String(Number(q.slice(5)))), unit: "円", bars: [{ values: cumMode ? actCumLine : actual, color: FinCharts.C.navy }], lines: [{ values: cumMode ? planCumLine : salesPlan, color: "#2E7D6B", width: 2, dots: true }] })}
+  <div class="legend"><span><i class="lg lg-done"></i>実績</span><span><i class="lg lg-line" style="border-top:2px solid #2E7D6B"></i>計画</span></div>
+</section>
+<section class="card">
+  <div class="card-head"><h2>${done.length ? `${mLabel(last)}までの計画と実績` : "年間計画"}</h2><label class="chk"><input type="checkbox" data-change="plandetail" ${state.planDetail ? "checked" : ""}>明細も表示</label></div>
+  <div class="table"><div class="trow thead"><span>単位：円</span><span class="num">${done.length ? "計画累計" : "年間計画"}</span><span class="num">実績累計</span><span class="num">差額</span></div>${tRows}</div>
+  <p class="muted small">「!」は計画との差が10%以上かつ${yen(minAbs())}円以上の科目です。</p>
+</section>
+${createCard(true)}`;
+  }
+
   /* ---------- イベント ---------- */
   document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-act]");
@@ -651,6 +852,20 @@ ${body}`;
       case "plmode": state.plMode = b.dataset.v; persist(); render(); break;
       case "open-account": state.account = b.dataset.key; state.tab = "account"; persist(); render(); window.scrollTo(0, 0); break;
       case "fcmethod": state.fcMethod = b.dataset.v; persist(); render(); break;
+      case "toggle": state.show[b.dataset.k] = !state.show[b.dataset.k]; persist(); render(); break;
+      case "plan-create": {
+        const fy = Number(($("#plan-fy") || {}).value || state.planTarget);
+        const cf = $("#plan-confirm");
+        if (cf && !cf.checked) { toast("作り直す場合はチェックを入れてください"); break; }
+        if (!state.layout.PL) { toast("月次PLシートが見つかりません", true); break; }
+        state.busy = "計画シートを作成しています…"; render();
+        try {
+          const r = await Plan.create(state.layout.PL, state.M, fy);
+          state.plan = await Plan.read();
+          toast(`${state.M.fyLabel(fy)}の計画シートを作成しました` + (r.warn.length ? `（数式を写せなかった行：${r.warn.join("、")}）` : ""));
+        } catch (err) { console.error(err); toast("計画シートを作れませんでした：" + (err.message || err), true); }
+        state.busy = ""; render(); break;
+      }
       case "sheet": try { const ok = await MonthlySheets.activateByPrefix(b.dataset.sheet); if (!ok) toast("シートが見つかりません"); } catch (err) { toast("シートを開けませんでした", true); } break;
       case "re-reflect": {
         const p = ($("#re-period") || {}).value;
@@ -669,6 +884,8 @@ ${body}`;
     else if (c === "detail") { state.showDetail = t.checked; persist(); render(); }
     else if (c === "account") { state.account = t.value; render(); }
     else if (c === "fckey") { state.fcKey = t.value; render(); }
+    else if (c === "planfy") { state.planTarget = Number(t.value); render(); }
+    else if (c === "plandetail") { state.planDetail = t.checked; persist(); render(); }
   });
   ["dragenter", "dragover"].forEach(ev => document.addEventListener(ev, (e) => {
     if (!e.dataTransfer || ![...(e.dataTransfer.types || [])].includes("Files")) return;

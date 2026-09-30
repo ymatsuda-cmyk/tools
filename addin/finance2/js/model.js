@@ -13,7 +13,7 @@
     sales: ["純売上高", "売上高合計", "売上高計", "売上高"],
     cogs: ["売上原価"],
     gross: ["売上総利益", "売上総損失"],
-    sga: ["販売費及び一般管理費", "販売費及び一般管理費計"],
+    sga: ["販管費合計", "販売費及び一般管理費", "販売費及び一般管理費計"],
     op: ["営業利益", "営業損失"],
     ord: ["経常利益", "経常損失"],
     net: ["当期純利益", "当期純損失"],
@@ -58,7 +58,7 @@
 
     const row = (key, p) => (byP[p] && byP[p][key]) || null;
     const bal = (key, p) => { const r = row(key, p); return r ? r.bal : null; };
-    const month = (key, p) => { const r = row(key, p); return r ? r.bal - r.open : null; };
+    const month = (key, p) => { const r = row(key, p); return r && r.open != null ? r.bal - r.open : (r && r.sheet === "PL" ? r.bal : null); };
     const open = (key, p) => { const r = row(key, p); return r ? r.open : null; };
     // PLは残高＝期首からの累計、BSは残高＝月末残高。月次値：PLは当月発生、BSは月末残高
     const series = (key, p) => (meta[key] && meta[key].sheet === "BS" ? bal(key, p) : month(key, p));
@@ -145,5 +145,46 @@
     return res;
   }
 
-  global.FinModel = { build, forecast, norm, addM };
+  /* ---------- 異常値 ----------
+   * PL：月次発生額、BS：前月からの増減 を対象に、次のどちらかに当たる月を拾う
+   *   水準：その科目の全期間の中央値から、MAD換算で z ≥ 3.5 離れている
+   *   前年：前年同月から ±50%以上、かつ差が下限額以上
+   * どちらも「差が下限額（既定5万円）以上」のときだけ（少額科目のブレは拾わない）
+   */
+  function anomalies(M, fy, opt) {
+    const minAbs = (opt && opt.minAbs) || 50000, zTh = (opt && opt.z) || 3.5;
+    const months = M.fyMonths(fy);
+    const val = (key, p) => {
+      const m = M.meta[key]; if (!m) return null;
+      if (m.sheet === "PL") return M.month(key, p);
+      const r = M.row(key, p); return r && r.open != null ? r.bal - r.open : null;
+    };
+    const out = [];
+    Object.values(M.meta).forEach(m => {
+      if (m.kind !== "明細") return;
+      const series = M.periods.map(p => val(m.key, p)).filter(v => v != null);
+      if (series.length < 6) return;
+      const sorted = series.slice().sort((a, b) => a - b);
+      const med = sorted[Math.floor(sorted.length / 2)];
+      const devs = series.map(v => Math.abs(v - med)).sort((a, b) => a - b);
+      const mad = devs[Math.floor(devs.length / 2)];
+      // BSは残高の増減がもともと大きいので、下限額×4・z≥5 と厳しめにする
+      const lim = m.sheet === "BS" ? minAbs * 4 : minAbs, zz = m.sheet === "BS" ? Math.max(zTh, 5) : zTh;
+      months.forEach(p => {
+        const v = val(m.key, p); if (v == null) return;
+        const dev = v - med;
+        if (Math.abs(dev) >= lim) {
+          const z = mad > 0 ? 0.6745 * Math.abs(dev) / mad : Infinity;
+          if (z >= zz) out.push({ key: m.key, name: m.name, sheet: m.sheet, p, v, ref: med, dev, type: "level", z });
+        }
+        const pv = val(m.key, addM(p, -12));
+        if (pv != null && Math.abs(v - pv) >= lim && (pv === 0 || Math.abs(v / pv - 1) >= 0.5)) {
+          if (!out.some(x => x.key === m.key && x.p === p)) out.push({ key: m.key, name: m.name, sheet: m.sheet, p, v, ref: pv, dev: v - pv, type: "yoy" });
+        }
+      });
+    });
+    return out.sort((a, b) => Math.abs(b.dev) - Math.abs(a.dev));
+  }
+
+  global.FinModel = { build, forecast, anomalies, norm, addM };
 })(window);

@@ -27,6 +27,7 @@
     const all = [];
     (o.bars || []).forEach(b => b.values.forEach(v => v != null && all.push(v)));
     (o.lines || []).forEach(l => l.values.forEach(v => v != null && all.push(v)));
+    (o.marks || []).forEach(m => m.v != null && all.push(m.v));
     if (o.band) { o.band.lo.forEach(v => v != null && all.push(v)); o.band.hi.forEach(v => v != null && all.push(v)); }
     if (!all.length) return `<div class="chart-empty">表示できるデータがありません</div>`;
     let mn = Math.min(...all), mx = Math.max(...all);
@@ -61,6 +62,10 @@
       l.values.forEach((v, i) => { if (v == null) flush(); else seg.push(cx(i).toFixed(1) + "," + y(v).toFixed(1)); });
       flush();
       if (l.dots) l.values.forEach((v, i) => { if (v != null) s.push(`<circle cx="${cx(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${l.color}"><title>${esc(o.labels[i])}：${Math.round(v).toLocaleString()}</title></circle>`); });
+    });
+    (o.marks || []).forEach(mk => {
+      if (mk.v == null) return;
+      s.push(`<circle cx="${cx(mk.i).toFixed(1)}" cy="${y(mk.v).toFixed(1)}" r="7" fill="none" stroke="${C.amber}" stroke-width="2.2"><title>${esc(mk.title || "")}</title></circle>`);
     });
     if (o.marker != null) {
       const x = L + step * (o.marker + 1);

@@ -53,6 +53,17 @@
     }
     return String(v == null ? "" : v).trim();
   }
+  // 相対参照の行番号をずらす（$付きの行は固定、他シート参照は対象外）
+  function shiftRows(f, d) {
+    return f.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)/g, (m, ca, col, ra, row) => ca + col + ra + (ra ? row : String(Number(row) + d)));
+  }
+  // 数式の月列と行を別の位置へ写す（計画シート用）
+  function moveFormula(f, dRow, fromCol, toCol) {
+    return f.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)/g, (m, ca, col, ra, row) => {
+      const c = !ca && col === fromCol ? toCol : col;
+      return ca + c + ra + (ra ? row : String(Number(row) + dRow));
+    });
+  }
   const toMonthLabel = (period) => period.slice(0, 4) + "/" + Number(period.slice(5));
   const colLetter = (n) => { let s = ""; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
 
@@ -162,13 +173,14 @@
         const findPdf = (nm) => P.byKey[mkey(nm)] || null;
         const checkKeys = new Set(CHECKS[sh].flatMap(c => c.row));
 
-        // 各行の取込元を決める
+        // 各行の取込元を決める（自分の行がある科目は既定の合算から外す＝二重計上防止）
+        const ownRow = new Set(srows.filter(s => !s.section).map(s => s.key));
         const used2 = new Set();     // 参照されたPDF科目（照合キー）
         srows.forEach(s => {
           if (s.section) return;
           const m = mapping[sheetName + "|" + s.key] || mapping["月次" + sh + "|" + s.key];
           if (m) { s.sources = m.sources; s.method = m.method || "手入力"; }
-          else if (DEFAULTS[s.bkey]) { s.sources = DEFAULTS[s.bkey]; s.method = "既定"; }
+          else if (DEFAULTS[s.bkey]) { s.sources = DEFAULTS[s.bkey].filter(n => mkey(n) === s.key || !ownRow.has(mkey(n))); s.method = "既定"; }
           else if (findPdf(s.raw)) { s.sources = [findPdf(s.raw).name]; s.method = "名前一致"; }
           else { s.sources = []; s.method = "対応なし"; }
           if (!m) newMap.push([sheetName, s.raw, s.sources.join("＋"), s.method]);
@@ -230,8 +242,20 @@
           cell.numberFormat = [["#,##0;-#,##0"]];
           info.written++;
         });
+        const monthCols = new Set(hdr.cols);
         adds.forEach(a => {
           const rr = a.newR + 1;
+          // 月以外の列（累計・計画比など）の数式を上の行からコピー。他シート参照を含む数式はコピーしない
+          const srcR = a.at - 1;
+          if (srcR > hdr.row) {
+            const fr = fmls[srcR] || [];
+            fr.forEach((f, c) => {
+              if (c === 0 || monthCols.has(c)) return;
+              const t = String(f == null ? "" : f);
+              if (!t.startsWith("=") || t.includes("!")) return;
+              ws.getRange(colLetter(c) + rr).formulas = [[shiftRows(t, rr - (srcR + 1))]];
+            });
+          }
           const nm = ws.getRange("A" + rr);
           nm.values = [[a.pdf.name]];
           const cell = ws.getRange(info.col + rr);
@@ -285,6 +309,120 @@
     return result;
   }
 
+  /**
+   * 月次PL／月次BSを読み、ダッシュボード用の行（TB_明細と同じ形）を作る。
+   * シートに値がない月（前期以前など）は TB_明細 を科目対応で集計して補う。
+   * 戻り値：{ found, rows, layout }
+   */
+  async function readModel(tb, startMonth) {
+    return Excel.run(async (ctx) => {
+      const wss = ctx.workbook.worksheets;
+      wss.load("items/name");
+      await ctx.sync();
+      const names = wss.items.map(w => w.name);
+      const pick = (frag) => names.find(n => n.indexOf(frag) === 0) || names.find(n => n.indexOf(frag) >= 0);
+      const target = { PL: pick("月次PL"), BS: pick("月次BS") };
+      if (!target.PL && !target.BS) return { found: false, rows: [], layout: {} };
+      const grab = {};
+      for (const sh of ["PL", "BS"]) {
+        if (!target[sh]) continue;
+        const ws = wss.getItem(target[sh]);
+        const used = ws.getUsedRange(true).getBoundingRect(ws.getRange("A1"));
+        used.load("values,formulas");
+        grab[sh] = used;
+      }
+      const mapWs = wss.getItemOrNullObject(MAP_SHEET);
+      await ctx.sync();
+      let mapVals = [];
+      if (!mapWs.isNullObject) { const u = mapWs.getUsedRangeOrNullObject(true); u.load("values"); await ctx.sync(); if (!u.isNullObject) mapVals = u.values; }
+      const mapping = {};
+      mapVals.slice(1).forEach(r => { if (r[0] && r[1]) mapping[r[0] + "|" + mkey(r[1])] = String(r[2] || "").split(/[＋+]/).map(x => x.trim()).filter(Boolean); });
+
+      const out = [], layout = {};
+      const tbBy = {};
+      tb.forEach(r => { ((tbBy[r.period] = tbBy[r.period] || {})[r.sheet] = tbBy[r.period][r.sheet] || []).push(r); });
+      for (const sh of ["PL", "BS"]) {
+        const used = grab[sh]; if (!used) continue;
+        const vals = used.values, fmls = used.formulas;
+        const hdr = findHeader(vals); if (!hdr) continue;
+        const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
+        const srows = [];
+        for (let r = hdr.row + 1; r < vals.length; r++) {
+          const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
+          if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
+          if (!raw || /^[【※]/.test(raw)) { srows.push({ r, section: true, raw }); continue; }
+          const f0 = String(fmls[r][hdr.cols[0]] == null ? "" : fmls[r][hdr.cols[0]]);
+          srows.push({ r, raw, key: mkey(raw), bkey: base(raw), formula: f0.startsWith("="), f0 });
+          if (sh === "PL" && ["経常利益", "経常損失"].includes(mkey(raw))) break;
+        }
+        const ownRow = new Set(srows.filter(s => !s.section).map(s => s.key));
+        const checkAlias = {};
+        CHECKS[sh].forEach(c => c.row.forEach(k => { checkAlias[k] = c.pdf; }));
+        srows.forEach(s => {
+          if (s.section) return;
+          const m = mapping[target[sh] + "|" + s.key];
+          if (m) s.sources = m;
+          else if (DEFAULTS[s.bkey]) s.sources = DEFAULTS[s.bkey].filter(n => mkey(n) === s.key || !ownRow.has(mkey(n)));
+          else if (checkAlias[s.key]) s.sources = checkAlias[s.key].slice(0, 1);
+          else s.sources = [s.raw];
+        });
+        layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows };
+        const items = srows.filter(s => !s.section);
+        const key = (s) => sh + ":" + s.key;
+        // シートの値
+        const have = {};  // period -> key -> value
+        periods.forEach((p, i) => {
+          const c = hdr.cols[i];
+          items.forEach(s => {
+            const v = vals[s.r][c];
+            if (v === "" || v == null || typeof v !== "number") return;
+            (have[p] = have[p] || {})[key(s)] = v;
+          });
+        });
+        // 列が空の月（全科目が空）は、TBから補う
+        const tbPeriods = Object.keys(tbBy).filter(p => tbBy[p][sh]);
+        const allPeriods = [...new Set([...periods.filter(p => have[p] && Object.values(have[p]).some(v => v !== 0)), ...tbPeriods])].sort();
+        const fromTb = (p, s, field) => {
+          const list = (tbBy[p] || {})[sh] || [];
+          let t = 0, hit = false;
+          s.sources.forEach(n => { const x = list.find(r => mkey(r.name) === mkey(n)); if (x) { hit = true; t += field(x); } });
+          return hit ? t : null;
+        };
+        const fyOf = (p) => { const y = Number(p.slice(0, 4)), m = Number(p.slice(5)); return startMonth === 1 ? y : (m >= startMonth ? y + 1 : y); };
+        const cum = {};   // PLの期首からの累計
+        allPeriods.forEach(p => {
+          const onSheet = have[p] && Object.values(have[p]).some(v => v !== 0);
+          items.forEach(s => {
+            const k = key(s);
+            let month = null, bal = null, open = null;
+            if (onSheet) {
+              const v = have[p][k];
+              if (v == null && !(s.formula)) { month = 0; } else month = v == null ? null : v;
+              if (month == null) return;
+              if (sh === "PL") {
+                const prevP = allPeriods[allPeriods.indexOf(p) - 1];
+                const base = prevP && fyOf(prevP) === fyOf(p) && cum[prevP] && cum[prevP][k] != null ? cum[prevP][k] : 0;
+                open = base; bal = base + month;
+              } else {
+                bal = month;
+                const prevP = allPeriods[allPeriods.indexOf(p) - 1];
+                open = prevP && cum[prevP] && cum[prevP][k] != null ? cum[prevP][k] : null;
+              }
+            } else {
+              if (sh === "PL") { bal = fromTb(p, s, x => x.bal); open = fromTb(p, s, x => x.open); }
+              else { bal = fromTb(p, s, x => x.bal); open = fromTb(p, s, x => x.open); }
+              if (bal == null) return;
+              month = bal - (open || 0);
+            }
+            (cum[p] = cum[p] || {})[k] = bal;
+            out.push({ period: p, sheet: sh, order: s.r, kind: s.formula ? "集計" : "明細", key: k, code: "", name: s.raw.replace(/[（(]旧[:：][^）)]*[）)]/g, ""), open: open == null ? null : open, bal, month, src: onSheet ? "sheet" : "tb" });
+          });
+        });
+      }
+      return { found: true, rows: out, layout };
+    });
+  }
+
   async function activateByPrefix(prefix) {
     return Excel.run(async (ctx) => {
       const wss = ctx.workbook.worksheets; wss.load("items/name"); await ctx.sync();
@@ -294,5 +432,5 @@
     });
   }
 
-  global.MonthlySheets = { reflect, activateByPrefix, mkey, CHECKS, DEFAULTS };
+  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, moveFormula, findHeader, CHECKS, DEFAULTS };
 })(window);
