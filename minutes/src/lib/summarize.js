@@ -1,5 +1,6 @@
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
+import { fetchRules } from './gas.js'
 
 const SYSTEM_PROMPT = `あなたは会議の文字起こしを要約するアシスタントです。
 必ず次のJSON形式のみで回答してください。前後に説明文やコードフェンスを付けないこと。
@@ -34,6 +35,21 @@ function extractJson(text) {
 }
 
 /**
+ * 過去に「この修正をルール化」した内容を取得する。
+ * GAS未設定や通信失敗でも要約生成自体は止めたくないため、失敗時は空配列にする。
+ */
+async function fetchActiveRulesText() {
+  try {
+    const { rules } = await fetchRules()
+    const active = rules.filter((r) => r.enabled)
+    if (!active.length) return ''
+    return `\n\n過去の修正から得られた注意点(必ず守ってください):\n${active.map((r) => `・${r.rule}`).join('\n')}`
+  } catch {
+    return ''
+  }
+}
+
+/**
  * 文字起こし全文からカード要約と詳細を生成する。
  * @param {string} transcriptText
  * @param {(partial: string) => void} [onProgress] ストリーミング中のテキストを都度受け取る
@@ -46,8 +62,10 @@ export async function generateSummary(transcriptText, onProgress) {
     throw new Error('LLM接続が未設定です。設定から接続先とモデルを追加してください。')
   }
 
+  const rulesText = await fetchActiveRulesText()
+
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: SYSTEM_PROMPT + rulesText },
     { role: 'user', content: transcriptText.slice(0, 30000) }, // モデルの実質上限に合わせて切り詰め
   ]
 

@@ -25,6 +25,7 @@ var NOTION_VERSION = '2022-06-28';
 var PROP_SUMMARY   = '要約';       // カード用の短い要約 (rich_text)
 var PROP_DECISIONS = '決定事項';   // 改行区切り (rich_text)
 var PROP_TODOS     = 'ToDo';       // 改行区切り (rich_text)
+var PROP_TODO_LOGS = 'ToDo経過';   // ToDoごとの経過ログ (rich_text、JSON文字列で格納)
 var PROP_TOPICS    = '論点';       // 改行区切り (rich_text)
 var PROP_MODEL     = '要約モデル'; // 生成に使ったモデル名 (rich_text)
 var PROP_GENERATED = '要約日時';   // 生成日時、鮮度判定に使用 (date)
@@ -35,8 +36,8 @@ var STATUS_DELETED = '削除';       // 削除ボタン押下時にセットす�
 var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
 var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
 var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
-var PROP_MINDMAP   = 'マインドマップ'; // マインドマップのツリー (rich_text、JSON文字列で格納)
 var PROP_RAW_COUNT = '原文文字数'; // 文字起こし全文の文字数キャッシュ (number)
+var RULES_DB_ID = '463313495202442fb7dfcd611a9334d8'; // 要約ルールDB
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
 var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
@@ -87,20 +88,20 @@ function doPost(e) {
       case 'saveMemo':
         result = saveMemo_(body.pageId, body.memo);
         break;
-      case 'saveMindmap':
-        result = saveMindmap_(body.pageId, body.mindmap);
-        break;
       case 'updateRawContextCount':
         result = updateRawContextCount_(body.pageId, body.count);
         break;
-      case 'initUpload':
-        result = initUpload_(body);
+      case 'fetchRules':
+        result = fetchRules_();
         break;
-      case 'putChunk':
-        result = putChunk_(body);
+      case 'saveRule':
+        result = saveRule_(body.rule, body.source);
         break;
-      case 'writeSidecar':
-        result = writeSidecar_(body);
+      case 'deleteRule':
+        result = deleteRule_(body.ruleId);
+        break;
+      case 'setRuleEnabled':
+        result = setRuleEnabled_(body.ruleId, body.enabled);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -220,7 +221,6 @@ function fetchSummary_(pageId) {
       updatedAt: page.last_edited_time,
       tags: tagsOf_(props),
       memo: richTextOf_(props, PROP_MEMO),
-      mindmap: richTextOf_(props, PROP_MINDMAP),
       rawContextCount: numberOf_(props, PROP_RAW_COUNT),
     };
   }
@@ -229,7 +229,7 @@ function fetchSummary_(pageId) {
     cardSummary: richTextOf_(props, PROP_SUMMARY) || null,
     detail: {
       decisions: splitLines_(richTextOf_(props, PROP_DECISIONS)),
-      todos: parseTodos_(richTextOf_(props, PROP_TODOS)),
+      todos: attachTodoLogs_(parseTodos_(richTextOf_(props, PROP_TODOS)), richTextOf_(props, PROP_TODO_LOGS)),
       topics: splitLines_(richTextOf_(props, PROP_TOPICS)),
       agenda: parseAgenda_(richTextOf_(props, PROP_AGENDA)),
     },
@@ -238,7 +238,6 @@ function fetchSummary_(pageId) {
     updatedAt: page.last_edited_time,
     tags: tagsOf_(props),
     memo: richTextOf_(props, PROP_MEMO),
-    mindmap: richTextOf_(props, PROP_MINDMAP),
     rawContextCount: numberOf_(props, PROP_RAW_COUNT),
   };
 }
@@ -272,6 +271,48 @@ function serializeTodos_(todos) {
   }).join('\n');
 }
 
+/**
+ * ToDo経過(JSON)を、本文が一致するToDoに貼り付ける。
+ * ToDo本文と経過は同時に保存しているため、本文の完全一致で対応付けられる。
+ * 対応先が見つからない経過は、黙って捨てずに「引き継げなかったToDo」として末尾に残す。
+ */
+function attachTodoLogs_(todos, logsJson) {
+  var entries = [];
+  if (logsJson) {
+    try {
+      var parsed = JSON.parse(logsJson);
+      if (Array.isArray(parsed)) entries = parsed;
+    } catch (e) {
+      console.error('ToDo経過JSONのパースに失敗しました(長さ ' + logsJson.length + '): ' + e);
+    }
+  }
+  var used = {};
+  var result = todos.map(function (t) {
+    for (var i = 0; i < entries.length; i++) {
+      if (!used[i] && entries[i].text === t.text) {
+        used[i] = true;
+        return { text: t.text, done: t.done, logs: entries[i].logs || [] };
+      }
+    }
+    return { text: t.text, done: t.done, logs: [] };
+  });
+  entries.forEach(function (e, i) {
+    if (!used[i] && e.logs && e.logs.length) {
+      result.push({ text: e.text, done: !!e.done, logs: e.logs, orphan: true });
+    }
+  });
+  return result;
+}
+
+/** 経過ログを持つToDoだけをJSON化する(ログが無いものは保存不要) */
+function serializeTodoLogs_(todos) {
+  if (!Array.isArray(todos)) return '';
+  var withLogs = todos
+    .filter(function (t) { return t && typeof t === 'object' && t.logs && t.logs.length; })
+    .map(function (t) { return { text: t.text, done: !!t.done, logs: t.logs }; });
+  return withLogs.length ? JSON.stringify(withLogs) : '';
+}
+
 /** 議事JSONをパースする。壊れていれば空配列を返す */
 function parseAgenda_(text) {
   if (!text) return [];
@@ -297,6 +338,7 @@ function saveDetail_(pageId, cardSummary, detail) {
   props[PROP_SUMMARY]   = richTextProp_(cardSummary);
   props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
   props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
+  props[PROP_TODO_LOGS] = richTextProp_(serializeTodoLogs_(detail.todos));
   props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
   props[PROP_AGENDA]    = richTextProp_(detail.agenda ? JSON.stringify(detail.agenda) : '');
 
@@ -395,14 +437,6 @@ function saveMemo_(pageId, memo) {
   return { saved: true };
 }
 
-/** マインドマップのツリーをJSON文字列のまま保存する */
-function saveMindmap_(pageId, mindmap) {
-  var props = {};
-  props[PROP_MINDMAP] = richTextProp_(mindmap);
-  notionFetch_('pages/' + pageId, 'patch', { properties: props });
-  return { saved: true };
-}
-
 /**
  * 状態を「削除」に変更する。Notionページ自体は削除しない
  * (アプリの一覧から除外するだけの論理削除)。
@@ -450,6 +484,7 @@ function saveSummary_(pageId, cardSummary, detail, model, rawContextCount) {
   props[PROP_SUMMARY]   = richTextProp_(cardSummary);
   props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
   props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
+  props[PROP_TODO_LOGS] = richTextProp_(serializeTodoLogs_(detail.todos));
   props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
   // 議事は「議題ごとに複数の経緯を持つ」入れ子構造のため、行区切りでは表現できない。
   // Notion上での可読性より構造保持を優先し、JSON文字列として保存する。
@@ -473,12 +508,61 @@ function updateRawContextCount_(pageId, count) {
   return { saved: true };
 }
 
+/**
+ * 要約ルールを全件取得する。有効なものだけを絞り込むかは呼び出し側の責務とし、
+ * ここでは全件(有効/無効問わず)を返す(設定画面での一覧表示にも使うため)。
+ */
+function fetchRules_() {
+  var res = notionFetch_('data_sources/' + RULES_DB_ID + '/query', 'post', {
+    sorts: [{ property: '作成日時', direction: 'descending' }],
+    page_size: 100,
+  });
+  return {
+    rules: res.results.map(function (page) {
+      var props = page.properties;
+      return {
+        id: page.id,
+        rule: (props['ルール'] && props['ルール'].title) ? plainTextOf_(props['ルール'].title) : '',
+        enabled: !!(props['有効'] && props['有効'].checkbox),
+        source: richTextOf_(props, '元の指摘'),
+      };
+    }),
+  };
+}
+
+/** ルールを1件追加する。デフォルトで有効にする */
+function saveRule_(rule, source) {
+  var props = {};
+  props['ルール'] = { title: [{ text: { content: String(rule || '').slice(0, 2000) } }] };
+  props['有効'] = { checkbox: true };
+  if (source) props['元の指摘'] = richTextProp_(source);
+
+  var page = notionFetch_('pages', 'post', {
+    parent: { data_source_id: RULES_DB_ID },
+    properties: props,
+  });
+  return { saved: true, id: page.id };
+}
+
+/** ルールを1件削除する(Notion上ではアーカイブ) */
+function deleteRule_(ruleId) {
+  notionFetch_('pages/' + ruleId, 'patch', { archived: true });
+  return { saved: true };
+}
+
+/** ルールの有効/無効を切り替える */
+function setRuleEnabled_(ruleId, enabled) {
+  notionFetch_('pages/' + ruleId, 'patch', { properties: { '有効': { checkbox: !!enabled } } });
+  return { saved: true };
+}
+
 /** rich_text プロパティ値からプレーンテキストを取り出す(無ければ空文字) */
 function richTextOf_(properties, name) {
   var prop = properties[name];
   return prop && prop.rich_text ? plainTextOf_(prop.rich_text) : '';
 }
 
+/** 2000字上限に収めた rich_text プロパティのペイロードを作る */
 /**
  * rich_text プロパティのペイロードを作る。
  * Notionは1チャンクあたり2000文字までだが、チャンクを複数並べれば
@@ -505,152 +589,4 @@ function joinLines_(arr) {
 function splitLines_(text) {
   if (!text) return [];
   return text.split('\n').filter(function (line) { return line.length > 0; });
-}
-
-// ============ 音声アップロード(ログイン不要) ============
-
-/**
- * Drive API(高度なサービス)を実際に呼び出すことで、Apps Script の静的解析に
- * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() が発行する
- * トークンに Drive の書き込みスコープを含めさせる。
- *
- * 事前に「サービス」→「+」→「Drive API」を追加しておくこと
- * (エディタ左側の「サービス」から追加。関数名は Drive でグローバルに使えるようになる)。
- * 戻り値は使わない。呼ぶこと自体に意味がある。
- */
-function touchDriveScope_() {
-  try {
-    Drive.About.get({ fields: 'user' });
-  } catch (e) {
-    // 高度なサービスが未追加、または一時的なエラーでも致命的ではないので握りつぶす。
-    // これが原因で本当にスコープが付かない場合は、初回のトークン発行 403 で気づける。
-  }
-}
-
-/** デバッグ用。読み取り(About.get)ではなく、実際に書き込み(ファイル作成)を試す。
- *  403 の原因はここ（Files.create）だったので、これが通るかどうかで切り分ける。
- *  成功したら Drive にテスト用の空ファイルができるので、確認後に手動で削除してよい。 */
-function testDriveAuth() {
-  Logger.log('OAuth token: ' + ScriptApp.getOAuthToken().slice(0, 20) + '...');
-  var file = Drive.Files.create({ name: 'drive_auth_test.txt' }, Utilities.newBlob('test'));
-  Logger.log('Drive.Files.create 成功: ' + JSON.stringify(file));
-}
-
-/**
- * Drive の resumable upload セッションを、このスクリプト自身(管理者)の権限で
- * 発行する。Google の resumable upload は「セッション URL の発行」にだけ認証が要り、
- * 発行された URL への実際のバイト送信(PUT)には認証が要らない仕様になっている。
- * そのため、ブラウザはここで受け取った URL に直接 PUT するだけで済み、
- * Google へのログインが一切不要になる。ファイル本体もこの GAS を経由しない
- * (経由すると doPost 全体で約50MBのペイロード上限に当たるため)。
- */
-function initUpload_(body) {
-  touchDriveScope_();
-  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
-  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
-
-  var token = ScriptApp.getOAuthToken();
-  var res = UrlFetchApp.fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name',
-    {
-      method: 'post',
-      contentType: 'application/json; charset=UTF-8',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
-        'X-Upload-Content-Length': String(body.size || 0),
-      },
-      payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
-      muteHttpExceptions: true,
-    }
-  );
-
-  if (res.getResponseCode() >= 300) {
-    throw new Error('Drive session failed (' + res.getResponseCode() + '): ' + res.getContentText());
-  }
-
-  var headers = res.getAllHeaders();
-  var sessionUrl = headers['Location'] || headers['location'];
-  if (!sessionUrl) throw new Error('セッション URL が取得できませんでした');
-
-  return { sessionUrl: sessionUrl };
-}
-
-/**
- * 音声のバイトそのものを、ブラウザ→GAS→Google と中継する。
- *
- * 【なぜ直接PUTできないか】
- * initUpload_ で発行したセッション URL に、ブラウザから直接 PUT できれば
- * 一番シンプルだった。だが実際に試すと CORS で弾かれ、Origin ヘッダーを
- * 明示しても改善しなかった。Google Cloud Storage の resumable upload とは
- * 違い、Drive API v3 のセッション URL はブラウザからの直接アクセスを
- * サポートしていないと判断し、バイト自体も GAS 経由にした。
- *
- * 【50MBペイロード上限に当たらない理由】
- * GAS の上限は「1回の doPost リクエストのサイズ」に対してかかる。ここでは
- * 音声全体を1回で送るのではなく、数MB単位のチャンクに分割して何度も
- * doPost を呼ぶので、1回あたりのペイロードは小さいまま保たれる。
- */
-function putChunk_(body) {
-  var bytes = Utilities.base64Decode(body.chunk);
-  var start = body.offset;
-  var end = start + bytes.length - 1;
-
-  var res = UrlFetchApp.fetch(body.sessionUrl, {
-    method: 'put',
-    contentType: 'application/octet-stream',
-    headers: {
-      'Content-Range': 'bytes ' + start + '-' + end + '/' + body.total,
-    },
-    payload: bytes,
-    muteHttpExceptions: true,
-  });
-
-  var code = res.getResponseCode();
-  if (code === 200 || code === 201) {
-    return { done: true, file: JSON.parse(res.getContentText()) };
-  }
-  if (code === 308) {
-    return { done: false };
-  }
-  throw new Error('chunk upload failed (' + code + '): ' + res.getContentText());
-}
-
-/**
- * 打合せ日時などのメタデータをサイドカー JSON として同じフォルダに置く。
- * ファイルサイズが小さいので multipart で一発アップロードする
- * (resumable にする必要がない)。Mac mini 側の drive_inbox.py は
- * このファイルの出現を処理開始の合図として使う。
- */
-function writeSidecar_(body) {
-  touchDriveScope_();
-  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
-  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
-
-  var token = ScriptApp.getOAuthToken();
-  var boundary = '-------minutesUploader' + Date.now();
-  var payload =
-    '--' + boundary + '\r\n' +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify({ name: body.name, parents: [folderId] }) + '\r\n' +
-    '--' + boundary + '\r\n' +
-    'Content-Type: application/json\r\n\r\n' +
-    JSON.stringify(body.meta) + '\r\n' +
-    '--' + boundary + '--';
-
-  var res = UrlFetchApp.fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
-    {
-      method: 'post',
-      contentType: 'multipart/related; boundary=' + boundary,
-      headers: { Authorization: 'Bearer ' + token },
-      payload: payload,
-      muteHttpExceptions: true,
-    }
-  );
-
-  if (res.getResponseCode() >= 300) {
-    throw new Error('JSON登録に失敗 (' + res.getResponseCode() + '): ' + res.getContentText());
-  }
-  return JSON.parse(res.getContentText());
 }

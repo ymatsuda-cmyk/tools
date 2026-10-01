@@ -1,14 +1,14 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
-import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, saveMindmap, deleteItem, updateRawContextCount } from './lib/gas.js'
+import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, deleteItem, updateRawContextCount, saveRule, fetchRules, deleteRule, setRuleEnabled } from './lib/gas.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
 import { loadSettings, saveSettings, newConnection, connectionOf, activeConnection, activeModelName, allModels } from './lib/llm-settings.js'
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
 import { renderMarkdown } from './lib/markdown.js'
+import { mergeTodos } from './lib/todos.js'
 import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
-import { renderMindmapTab, buildMarkdownFromSummary, generateMarkdownWithAI } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
 
 const listEl = document.getElementById('list')
@@ -23,10 +23,7 @@ let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
 const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
-const mindmapByKey = {} // pageId -> string、Notionの「マインドマップ」カラムに保存済みのMarkdown
-const mindmapDraftByKey = {} // pageId -> string、手直し中の未保存Markdown
-const mindmapEditingByKey = {} // item.key -> boolean、Markdownを直接編集中かどうか
-const activeTabByKey = {} // item.key -> 'summary'|'mindmap'|'decisions'|'todos'|'memo'、選択中タブの記憶
+const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
 let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
@@ -273,31 +270,18 @@ function detailTarget(rowEl) {
 
 function paintDetail(target, item, state) {
   const pid = item.notionPageId
-  // 同じ議事録・同じタブの再描画なら、編集やマーカー適用の前後でスクロール位置を保つ
-  const paintKey = `${item.key}::${activeTabByKey[item.key] || 'summary'}`
-  const prevScroll = target.dataset.paintKey === paintKey
-    ? target.querySelector('.detail-scroll')?.scrollTop || 0
-    : 0
   const renderState = {
     ...state,
     tags: tagsByKey[pid],
     // 未保存の下書きがあればそれを表示する(タブを切り替えても入力内容を失わないため)
     memo: memoDraftByKey[pid] !== undefined ? memoDraftByKey[pid] : memoByKey[pid],
     memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
-    mindmap: mindmapDraftByKey[pid] !== undefined ? mindmapDraftByKey[pid] : mindmapByKey[pid],
-    mindmapDirty: hasUnsavedMindmap(pid),
-    mindmapEditing: Boolean(mindmapEditingByKey[item.key]),
     activeTab: activeTabByKey[item.key],
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
     searchQuery,
   }
   target.innerHTML = renderDetailHtml(item, renderState)
-  target.dataset.paintKey = paintKey
-  if (prevScroll) {
-    const scrollEl = target.querySelector('.detail-scroll')
-    if (scrollEl) scrollEl.scrollTop = prevScroll
-  }
   const generateBtn = target.querySelector('.btn-generate, .btn-regenerate')
   generateBtn?.addEventListener('click', () => runGenerate(target, item))
   target.querySelector('.btn-retry')?.addEventListener('click', () => onSelect(item, findRow(item.key)))
@@ -315,11 +299,6 @@ function paintDetail(target, item, state) {
 
   target.querySelectorAll('.detail-tab').forEach((el) => {
     el.addEventListener('click', () => {
-      // マインドマップの編集内容はNotionに自動保存されないため、離れる前に知らせる
-      if (activeTabByKey[item.key] === 'mindmap' && el.dataset.tab !== 'mindmap' && hasUnsavedMindmap(pid)) {
-        const ok = confirm('マインドマップに未保存の変更があります。保存してください。\n保存せずにタブを移動しますか?')
-        if (!ok) return
-      }
       activeTabByKey[item.key] = el.dataset.tab
       paintDetail(target, item, state)
     })
@@ -330,37 +309,27 @@ function paintDetail(target, item, state) {
   if (target.querySelector('#rawchat-messages')) {
     setupRawChatTab(target, item, renderState)
   }
-  if (target.querySelector('#mindmap-host')) {
-    // 枝をその場で直した結果は下書きに溜め、保存ボタンでNotionへ送る
-    renderMindmapTab(target, renderState.mindmap, (markdown) => {
-      mindmapDraftByKey[pid] = markdown
-      const statusEl = target.querySelector('#mindmap-save-status')
-      if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
-    })
-  }
-  // Markdownを直接直している間は、入力のたびに下書きへ退避する
-  const mindmapEl = target.querySelector('#mindmap-source')
-  mindmapEl?.addEventListener('input', () => {
-    mindmapDraftByKey[pid] = mindmapEl.value
-    const statusEl = target.querySelector('#mindmap-save-status')
-    if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
-  })
-  target.querySelector('.btn-mm-create')?.addEventListener('click', () => createMindmap(target, item, renderState))
-  target.querySelector('.btn-mm-edit')?.addEventListener('click', () => {
-    mindmapEditingByKey[item.key] = !mindmapEditingByKey[item.key]
-    paintDetail(target, item, state)
-  })
-  target.querySelector('.btn-mm-save')?.addEventListener('click', () => saveMindmapField(target, item))
   setupMarkerUI(target, item, renderState)
 
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, renderState, el.dataset.field))
   })
-  target.querySelectorAll('.btn-line-edit').forEach((el) => {
-    el.addEventListener('click', () => startLineEdit(target, item, renderState, el.closest('.agenda-line')))
-  })
   target.querySelectorAll('.todo-check').forEach((el) => {
     el.addEventListener('change', () => toggleTodo(target, item, renderState, Number(el.dataset.index), el.checked))
+  })
+  target.querySelectorAll('.todo-log-add').forEach((el) => {
+    el.addEventListener('click', () => {
+      const input = target.querySelector(`.todo-log-input[data-index="${el.dataset.index}"]`)
+      appendTodoLog(target, item, renderState, Number(el.dataset.index), input?.value || '')
+    })
+  })
+  target.querySelectorAll('.todo-log-input').forEach((el) => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault()
+        appendTodoLog(target, item, renderState, Number(el.dataset.index), el.value)
+      }
+    })
   })
 
   target.querySelectorAll('.tag-remove').forEach((el) => {
@@ -373,6 +342,32 @@ function paintDetail(target, item, state) {
   target.querySelector('.tag-add-btn')?.addEventListener('click', () => {
     openTagPicker(target, item, renderState)
   })
+}
+
+/** ToDoに経過ログを1件追記してNotionに保存する(上書きではなく追記のみ) */
+async function appendTodoLog(target, item, state, index, text) {
+  const value = text.trim()
+  if (!value) return
+  const summary = state.summary
+  const prev = summary.detail.todos
+  const next = prev.map((t, i) => (i === index
+    ? { ...t, logs: [...(t.logs || []), { date: new Date().toISOString(), text: value }] }
+    : t))
+
+  const apply = (todos) => {
+    const updated = { ...summary, detail: { ...summary.detail, todos }, updatedAt: new Date().toISOString() }
+    setDetailCache(item.key, updated)
+    paintDetail(target, item, { ...state, summary: updated })
+    return updated
+  }
+
+  const updated = apply(next)
+  try {
+    await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+  } catch (err) {
+    apply(prev)
+    alert('経過の保存に失敗しました: ' + (err.message || err))
+  }
 }
 
 /** ToDoのチェック状態を変更してNotionに保存する */
@@ -394,97 +389,6 @@ async function toggleTodo(target, item, state, index, done) {
   } catch (err) {
     apply(prev)
     alert('ToDoの更新に失敗しました: ' + (err.message || err))
-  }
-}
-
-/**
- * 議事の1行(議題名・箇条書き・結論)をその場でテキストエリアに切り替えて編集する。
- * 保存時は文言が変わらなかった部分のマーカーだけ引き継ぐ。
- */
-function startLineEdit(target, item, state, lineEl) {
-  if (!lineEl || lineEl.querySelector('.line-editor')) return
-  const index = Number(lineEl.dataset.index)
-  const sub = lineEl.dataset.sub
-  const raw = getMarkerText(state.summary, 'agenda', index, sub)
-  const textEl = lineEl.querySelector('.agenda-line-text')
-  const editBtn = lineEl.querySelector('.btn-line-edit')
-  if (!textEl) return
-
-  const editor = document.createElement('div')
-  editor.className = 'line-editor'
-  editor.innerHTML = `
-    <textarea class="line-edit-input" rows="1"></textarea>
-    <div class="line-edit-actions">
-      <button class="btn btn-line-save">保存</button>
-      <button class="btn btn-line-cancel">キャンセル</button>
-      <span class="line-edit-hint">Enterで保存 / Shift+Enterで改行 / Escでキャンセル</span>
-    </div>
-  `
-  textEl.style.display = 'none'
-  if (editBtn) editBtn.style.display = 'none'
-  textEl.after(editor)
-
-  const input = editor.querySelector('.line-edit-input')
-  const autoGrow = () => {
-    input.style.height = 'auto'
-    input.style.height = `${input.scrollHeight}px`
-  }
-  input.value = plainTextOf(raw)
-  autoGrow()
-  input.addEventListener('input', autoGrow)
-  input.focus()
-  input.setSelectionRange(input.value.length, input.value.length)
-
-  const cancel = () => {
-    editor.remove()
-    textEl.style.display = ''
-    if (editBtn) editBtn.style.display = ''
-  }
-  const save = () => commitLineEdit(target, item, state, index, sub, input.value)
-
-  editor.querySelector('.btn-line-cancel').addEventListener('click', cancel)
-  editor.querySelector('.btn-line-save').addEventListener('click', save)
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      cancel()
-    } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault()
-      save()
-    }
-  })
-}
-
-/** 行編集の内容を反映してNotionに保存する。箇条書きを空にした場合はその行を削除する */
-async function commitLineEdit(target, item, state, index, sub, value) {
-  const summary = state.summary
-  const raw = getMarkerText(summary, 'agenda', index, sub)
-  const text = value.trim()
-  if (text === plainTextOf(raw)) {
-    paintDetail(target, item, state)
-    return
-  }
-
-  let updated
-  if (!text && sub.startsWith('point:')) {
-    const pj = Number(sub.split(':')[1])
-    const agenda = (summary.detail.agenda || []).map((a, i) =>
-      i === index ? { ...a, points: (a.points || []).filter((_, j) => j !== pj) } : a
-    )
-    updated = { ...summary, detail: { ...summary.detail, agenda } }
-  } else {
-    updated = setMarkerText(summary, 'agenda', index, sub, reconcileMarkers(raw, text))
-  }
-  updated = { ...updated, updatedAt: new Date().toISOString() }
-
-  setDetailCache(item.key, updated)
-  paintDetail(target, item, { ...state, summary: updated })
-  try {
-    await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
-  } catch (err) {
-    setDetailCache(item.key, summary)
-    paintDetail(target, item, { ...state, summary })
-    alert('保存に失敗しました: ' + (err.message || err))
   }
 }
 
@@ -564,10 +468,17 @@ function openFieldEditor(target, item, state, field) {
     } else if (field === 'todos') {
       const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
       const prevTodos = summary.detail.todos || []
-      // 同じ本文(プレーンテキスト比較)のToDoが残っていれば、チェック状態とマーカーを引き継ぐ
-      const next = lines.map((text) => {
-        const found = prevTodos.find((t) => plainTextOf(t.text || '') === text)
-        return { text: found ? reconcileMarkers(found.text, text) : text, done: found ? found.done : false }
+      // 文言の近さで修正前後を突き合わせ、チェック状態と経過ログを引き継ぐ。
+      // 手編集での削除は人の意図なので、行ごと消したToDoの経過は残さない(消える前に確認する)。
+      const { todos: merged, lostLogs } = mergeTodos(prevTodos, lines.map((text) => ({ text })), { keepOrphans: false })
+      if (lostLogs.length) {
+        const names = lostLogs.map((t) => '・' + plainTextOf(t.text)).join('\n')
+        if (!confirm(`次のToDoは経過が記録されていますが、編集後のToDoと対応付けられませんでした。\n保存すると経過も削除されます。\n\n${names}\n\nこのまま保存しますか?`)) return
+      }
+      // マーカーは同じ本文の行からのみ引き継ぐ(従来どおり)
+      const next = merged.map((t) => {
+        const found = prevTodos.find((p) => plainTextOf(p.text || '') === t.text)
+        return { ...t, text: found ? reconcileMarkers(found.text, t.text) : t.text }
       })
       updated = { ...summary, detail: { ...summary.detail, todos: next } }
     } else {
@@ -588,12 +499,63 @@ function openFieldEditor(target, item, state, field) {
 
     try {
       await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+      // 保存成功後、修正があれば裏側で自動的に学習ルールを抽出する(画面はブロックしない)
+      if (initial.trim() !== raw.trim()) {
+        autoRulifyInBackground(labels[field], initial, raw)
+      }
     } catch (err) {
       setDetailCache(item.key, summary)
       paintDetail(target, item, { ...state, summary })
       alert('保存に失敗しました: ' + (err.message || err))
     }
   })
+}
+
+/**
+ * 手修正の前後をAIに渡し、次回以降の要約生成に活かす1行のルールを自動抽出して保存する。
+ * 確認画面は挟まない(都度確認すると編集のたびに手間が増えるため)。
+ * 代わりに、不要なルールは設定画面の「学習一覧」からいつでもオフ・削除できる。
+ * 失敗しても保存自体には影響させないよう、ここでは例外を握りつぶす。
+ */
+async function autoRulifyInBackground(fieldLabel, before, after) {
+  try {
+    const connection = connectionOf(loadSettings())
+    if (!connection) return // 接続未設定なら黙ってスキップ(要約生成の失敗として表には出さない)
+
+    const prompt = `以下は会議要約の「${fieldLabel}」項目に対する人手の修正です。
+修正前と修正後を比較し、次回以降の要約生成で同じ修正を繰り返さずに済むよう、
+一般化した指示文を1つだけ日本語で作ってください。
+
+対象にすべき修正の例:
+・書式や言い回しの統一(体言止めにしない、敬体で書く、など)
+・表記揺れの統一(例:「さーば」「サーバ」「鯖」を「サーバー」に直した
+  → 「"サーバ"や"鯖"は"サーバー"に統一する」という指示にする)
+用語の表記統一は固有名詞であっても対象にしてください。
+
+対象外にすべき修正の例:
+・日付や金額など、その回限りの事実の訂正
+・誤字脱字で、統一すべき表記が特定できないもの
+これらに該当し、次回以降に活かせる一般則が無い場合は「なし」とだけ出力してください。
+
+説明や前置きは不要です。指示文1行、または「なし」だけを出力してください。
+
+修正前:
+${before.slice(0, 1000)}
+
+修正後:
+${after.slice(0, 1000)}`
+
+    let rule = ''
+    for await (const chunk of streamChat(connection, [{ role: 'user', content: prompt }])) {
+      if (chunk.delta) rule += chunk.delta
+    }
+    rule = rule.trim().replace(/^["「]|["」]$/g, '')
+    if (!rule || rule === 'なし') return
+
+    await saveRule(rule, `[${fieldLabel}] 修正前: ${before.slice(0, 300)} / 修正後: ${after.slice(0, 300)}`)
+  } catch (err) {
+    console.warn('学習ルールの自動抽出に失敗しました(保存自体は成功しています):', err)
+  }
 }
 
 /**
@@ -693,66 +655,6 @@ async function saveMemoField(target, item, state) {
 function hasUnsavedMemo(pageId) {
   const draft = memoDraftByKey[pageId]
   return draft !== undefined && draft !== (memoByKey[pageId] ?? '')
-}
-
-/** 未保存のマインドマップ編集があるか調べる */
-function hasUnsavedMindmap(pageId) {
-  const draft = mindmapDraftByKey[pageId]
-  return draft !== undefined && draft !== (mindmapByKey[pageId] ?? '')
-}
-
-/** 原文(文字起こし全文)をもとにAIでマインドマップを作り、Notionの「マインドマップ」カラムへ保存する */
-async function createMindmap(target, item, state) {
-  const pid = item.notionPageId
-  if (mindmapByKey[pid] && !confirm('現在のマインドマップをAIで作り直します。よろしいですか?')) return
-
-  const statusEl = target.querySelector('#mindmap-save-status')
-  const createBtn = target.querySelector('.btn-mm-create')
-  if (createBtn) createBtn.disabled = true
-  if (statusEl) statusEl.textContent = 'AIで作成しています...'
-
-  let markdown
-  try {
-    const { text } = await fetchTranscript(pid)
-    markdown = await generateMarkdownWithAI(item, text)
-  } catch (err) {
-    // AIが使えないときも作成できるよう、要約の構造をそのまま使う手段を残す
-    const useLocal = confirm('AIでの生成に失敗しました: ' + (err.message || err) + '\n要約の構成をそのまま使って作成しますか?')
-    if (!useLocal) {
-      if (createBtn) createBtn.disabled = false
-      if (statusEl) statusEl.textContent = hasUnsavedMindmap(pid) ? '未保存の変更があります' : ''
-      return
-    }
-    markdown = buildMarkdownFromSummary(item, state.summary)
-  }
-
-  mindmapDraftByKey[pid] = markdown
-  mindmapEditingByKey[item.key] = false
-  paintDetail(target, item, state)
-  await saveMindmapField(target, item)
-}
-
-/** 編集中のマインドマップMarkdownをNotionの「マインドマップ」カラムへ保存する */
-async function saveMindmapField(target, item) {
-  const pid = item.notionPageId
-  const markdown = mindmapDraftByKey[pid] ?? mindmapByKey[pid] ?? ''
-  const statusEl = target.querySelector('#mindmap-save-status')
-  const prev = mindmapByKey[pid]
-
-  mindmapByKey[pid] = markdown // 楽観的に即反映
-  if (statusEl) statusEl.textContent = '保存中...'
-
-  try {
-    await saveMindmap(pid, markdown)
-    delete mindmapDraftByKey[pid]
-    if (statusEl) statusEl.textContent = '保存しました'
-    setTimeout(() => { if (statusEl) statusEl.textContent = '' }, 2000)
-  } catch (err) {
-    mindmapByKey[pid] = prev
-    mindmapDraftByKey[pid] = markdown // 失敗時は編集内容を残す
-    if (statusEl) statusEl.textContent = '未保存の変更があります'
-    alert('マインドマップの保存に失敗しました: ' + (err.message || err))
-  }
 }
 
 /**
@@ -1053,7 +955,6 @@ function setMarkerText(summary, field, index, sub, value) {
 }
 
 function setupMarkerUI(target, item, state) {
-  document.querySelectorAll('body > .marker-toolbar').forEach((el) => el.remove())
   if (!state.canEditContent || state.searchQuery || !state.summary) {
     currentMarkerContext = null
     return
@@ -1064,9 +965,6 @@ function setupMarkerUI(target, item, state) {
     currentMarkerContext = null
     return
   }
-  // 詳細ペインには拡大率(zoom)が掛かっており、その中だとposition:fixedの座標がずれる。
-  // 素の viewport 座標で配置できるよう body 直下へ退避させる。
-  document.body.appendChild(toolbar)
   currentMarkerContext = { target, item, state, toolbar, pending: null }
 
   toolbar.querySelectorAll('.marker-swatch').forEach((el) => {
@@ -1139,26 +1037,9 @@ function handleMarkerMouseUp(el) {
     }
     ctx.toolbar.style.display = 'flex'
     ctx.toolbar.style.position = 'fixed'
-    positionMarkerToolbar(ctx.toolbar, offsets.rect)
+    ctx.toolbar.style.left = `${offsets.rect.left}px`
+    ctx.toolbar.style.top = `${Math.max(8, offsets.rect.top - 38)}px`
   }, 0)
-}
-
-/** 選択範囲のすぐ下にツールバーを出す。下が画面外になる場合は上に回り込ませる */
-function positionMarkerToolbar(toolbar, rect) {
-  const gap = 6
-  const margin = 8
-  const width = toolbar.offsetWidth
-  const height = toolbar.offsetHeight
-
-  let top = rect.bottom + gap
-  if (top + height + margin > window.innerHeight) {
-    top = rect.top - height - gap
-    if (top < margin) top = Math.min(rect.bottom + gap, window.innerHeight - height - margin)
-  }
-  const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin)
-
-  toolbar.style.left = `${Math.max(margin, left)}px`
-  toolbar.style.top = `${Math.max(margin, top)}px`
 }
 
 function handleMarkerDocumentClick(e) {
@@ -1295,7 +1176,6 @@ async function onSelect(item, rowEl) {
     const remote = await fetchSummary(item.notionPageId)
     tagsByKey[item.notionPageId] = remote.tags || []
     memoByKey[item.notionPageId] = remote.memo || ''
-    mindmapByKey[item.notionPageId] = remote.mindmap || ''
 
     if (!remote.generatedAt) {
       paintDetail(target, item, { phase: 'no-summary' })
@@ -1323,6 +1203,18 @@ async function generateAndSave(item, onProgress) {
   const { text } = await fetchTranscript(item.notionPageId)
   const rawContextCount = text.length
   const result = await generateSummary(text, onProgress)
+
+  // 再生成でToDoが作り直されても、経過ログとチェック状態を失わないよう修正前とマージする。
+  // 他の端末での追記を取りこぼさないよう、手元のキャッシュではなくNotionの最新を基準にする。
+  let prevTodos = getDetailCache(item.key)?.detail?.todos || []
+  try {
+    const remote = await fetchSummary(item.notionPageId)
+    if (remote.detail?.todos) prevTodos = remote.detail.todos
+  } catch {
+    // 取得に失敗した場合は手元のキャッシュでマージする
+  }
+  const { todos: mergedTodos } = mergeTodos(prevTodos, result.todos, { keepOrphans: true })
+  result.todos = mergedTodos
 
   await saveSummary(item.notionPageId, result.cardSummary, {
     agenda: result.agenda,
@@ -1427,6 +1319,12 @@ function openSettings() {
         <div id="cfg-conn-list"></div>
         <button id="cfg-conn-add" class="btn" style="width:100%;font-size:12px;padding:7px 0;margin-bottom:14px"><i class="ti ti-plus" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>接続を追加</button>
 
+        <details id="cfg-rules-details" style="margin:12px 0">
+          <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">学習一覧(要約ルール)</summary>
+          <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0">手修正を保存すると自動的に抽出されます。学習対象にしたくないものはオフにしてください。</p>
+          <div id="cfg-rules-list" style="margin-top:6px;font-size:11px;color:var(--text-muted)">開くと読み込みます</div>
+        </details>
+
         <details style="margin:12px 0">
           <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">JSON文字列で一括設定</summary>
           <textarea id="cfg-json" rows="8" style="width:100%;margin-top:6px;font-family:var(--font-mono,monospace);font-size:11px;padding:6px;border:0.5px solid var(--border);border-radius:6px"></textarea>
@@ -1442,6 +1340,57 @@ function openSettings() {
       </div>
     </div>
   `
+
+  let rulesLoaded = false
+  document.getElementById('cfg-rules-details').addEventListener('toggle', async (e) => {
+    if (!e.target.open || rulesLoaded) return
+    rulesLoaded = true
+    const listEl = document.getElementById('cfg-rules-list')
+    try {
+      const { rules } = await fetchRules()
+      paintRulesList(listEl, rules)
+    } catch (err) {
+      listEl.innerHTML = `<p class="error-text">取得に失敗しました: ${escapeHtml(String(err.message || err))}</p>`
+    }
+  })
+
+  function paintRulesList(listEl, rules) {
+    if (!rules.length) {
+      listEl.innerHTML = '<p style="color:var(--text-muted)">まだルールがありません。「この修正をルール化」から登録できます。</p>'
+      return
+    }
+    listEl.innerHTML = rules.map((r) => `
+      <div class="rule-item" data-id="${r.id}" style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+        <input type="checkbox" class="rule-toggle" data-id="${r.id}" ${r.enabled ? 'checked' : ''} style="margin-top:3px" />
+        <span style="flex:1;color:${r.enabled ? 'var(--text-primary)' : 'var(--text-muted)'}">${escapeHtml(r.rule)}</span>
+        <button class="btn-ghost rule-delete" data-id="${r.id}" aria-label="削除"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>
+    `).join('')
+
+    listEl.querySelectorAll('.rule-toggle').forEach((el) => {
+      el.addEventListener('change', async () => {
+        el.disabled = true
+        try {
+          await setRuleEnabled(el.dataset.id, el.checked)
+        } catch (err) {
+          alert('更新に失敗しました: ' + (err.message || err))
+          el.checked = !el.checked
+        }
+        el.disabled = false
+      })
+    })
+    listEl.querySelectorAll('.rule-delete').forEach((el) => {
+      el.addEventListener('click', async () => {
+        if (!confirm('このルールを削除しますか?')) return
+        try {
+          await deleteRule(el.dataset.id)
+          el.closest('.rule-item').remove()
+        } catch (err) {
+          alert('削除に失敗しました: ' + (err.message || err))
+        }
+      })
+    })
+  }
 
   /** 接続一覧を描画。各カードはbaseUrl/APIキー+モデルのチップ一覧を持つ */
   function paintConnections() {
