@@ -244,7 +244,22 @@
     return records.filter((r) => originOf(r, noteMap) === origin);
   }
 
+  /** グループの内訳に出す短い請求先名（社名・法人格・末尾のコードを除く） */
+  function shortMemberName(name, groupName) {
+    let t = str(name).normalize("NFKC")
+      .replace(/株式会社|有限会社|合同会社|\(株\)|\(有\)|\(合\)/g, " ");
+    t = t.replace(/^\s*(?=[A-Z0-9\-]*\d)[A-Z0-9\-]{4,}\s+/, "").replace(/\s+/g, " ").trim();
+    const g = str(groupName).normalize("NFKC");
+    if (g && t.indexOf(g) === 0) t = t.slice(g.length);
+    let ws = t.split(" ").filter((w) => w && !/^(?=[A-Z0-9()]*\d)[A-Z0-9()]{5,}$/.test(w));
+    if (ws.length >= 2 && /^[A-Z0-9]{6}$/.test(ws[ws.length - 1])) ws = ws.slice(0, -1);
+    t = ws.join(" ");
+    t = t.replace(/\s*(?=[A-Z0-9]*\d)[A-Z0-9]{6}$/, "").replace(/^[\s　・]+|[\s　]+$/g, "");
+    return t || "本社";
+  }
+
   const api = {
+    shortMemberName,
     MANUAL, originOf, originLabel, originShort, originSummary, filterByOrigin,
     GROUP_SHEET, LIST_SHEET, OUTPUT_PREFIX,
     findHeader, parseRecords, isSystemSheet, buildNoteMap, groupKey, suggestGroups, suggestForNew,

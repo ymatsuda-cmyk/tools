@@ -71,7 +71,7 @@ select { padding: 5px 6px; border: 1px solid var(--line2); border-radius: 4px; b
 .sl span { min-width: 92px; text-align: right; color: var(--ink); font-weight: 700; }
 
 .rank { display: flex; flex-direction: column; }
-.rk { display: grid; grid-template-columns: 18px minmax(0, 118px) minmax(0, 1fr) 44px; gap: 6px; align-items: center; min-height: 22px; font-size: 12px; }
+.rk { display: grid; grid-template-columns: 18px 12px minmax(0, 112px) minmax(0, 1fr) 44px; gap: 6px; align-items: center; min-height: 22px; font-size: 12px; }
 .rk .no { color: var(--mute); text-align: right; font-size: 11px; }
 .rk .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rk .nm small { color: var(--amb); font-size: 10px; margin-left: 3px; }
@@ -95,3 +95,20 @@ select { padding: 5px 6px; border: 1px solid var(--line2); border-radius: 4px; b
 .org-l .c { color: var(--sub); font-weight: 400; }
 .org-n { font-size: 11px; color: var(--sub); line-height: 1.6; background: var(--soft); border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
 .kpis .kpi .kd { color: var(--amb); }
+
+.rk-i { border-bottom: 1px solid #EEF1F4; }
+.rk { padding: 3px 0; }
+.rk-g { width: 100%; border: 0; background: #fff; font-family: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.rk-g:hover { background: var(--soft); }
+.rk-i.open .rk-g { background: var(--soft); }
+.rk-i.open .rk-g .nm { font-weight: 700; }
+.rk .cv { color: var(--sub); font-size: 9px; }
+.acc { margin: 0 0 8px 24px; padding: 8px 10px; background: var(--soft); border-radius: 6px; }
+.acc-h { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+.acc-r { display: grid; grid-template-columns: minmax(0, 1fr) 60px 36px 40px; gap: 6px; align-items: center; min-height: 20px; font-size: 11px; }
+.acc-n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-b { height: 8px; background: #DCE3F6; border-radius: 2px; display: flex; overflow: hidden; }
+.acc-b span { display: block; height: 100%; border-radius: 2px; }
+.acc-c { text-align: right; }
+.acc-p { text-align: right; color: var(--sub); }
+.acc-f { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }

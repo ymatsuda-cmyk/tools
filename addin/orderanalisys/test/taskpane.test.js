@@ -47,7 +47,7 @@ function makeWorkbook(data) {
       const z = range({ r1: 0, c1: 0, r2: Math.max(maxR, 0), c2: Math.max(maxC, 0) }); if (maxR < 0) z.isNullObject = true; return z;
     };
     ws.getUsedRange = ws.getUsedRangeOrNullObject;
-    ws.freezePanes = { freezeRows() {} }; ws.autoFilter = { apply() {} };
+    ws.freezePanes = { freezeRows() {} }; ws.autoFilter = { apply(rg, col, crit) { ws.filtered = crit; } };
     ws.activate = () => { wb.active = ws.name; };
     ws.delete = () => { sheets.splice(sheets.indexOf(ws), 1); };
     ws.onChanged = { add(h) { ws.handler = h; return {}; } };
@@ -79,7 +79,7 @@ function makeWorkbook(data) {
   w.Excel = {
     run: async (f) => f({ workbook: wb, runtime: {}, sync: async () => {} }),
     SheetVisibility: { hidden: "Hidden" }, ClearApplyTo: { contents: "Contents" },
-    ChartType: { barStacked: "BarStacked", barClustered: "BarClustered", line: "Line", doughnut: "Doughnut" }, ChartSeriesBy: { columns: "Columns" }, ChartLegendPosition: { top: "Top", right: "Right" }
+    ChartType: { barStacked: "BarStacked", barClustered: "BarClustered", line: "Line", doughnut: "Doughnut" }, ChartSeriesBy: { columns: "Columns" }, ChartLegendPosition: { top: "Top", right: "Right" }, FilterOn: { values: "Values" }
   };
   w.eval(fs.readFileSync(path.join(__dirname, "../core.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(__dirname, "../taskpane.js"), "utf8"));
@@ -114,6 +114,24 @@ function makeWorkbook(data) {
   w.document.querySelector('#donut path[data-o="手作業"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
   $("vGroup").click();
   assert.equal($("k10").textContent, "50.9%");
+  // アコーディオン
+  const g1 = $("rank").querySelector("[data-key]");
+  console.log("first group:", g1.querySelector(".nm").textContent, g1.getAttribute("aria-expanded"));
+  g1.click();
+  let acc = $("rank").querySelector(".acc");
+  console.log("open rows:", acc.querySelectorAll(".acc-r").length, Array.from(acc.querySelectorAll(".acc-n")).slice(0, 3).map((x) => x.textContent), acc.querySelector(".acc-p").textContent);
+  assert.equal(acc.querySelectorAll(".acc-r").length, 8);
+  acc.querySelector("[data-more]").click();
+  assert.equal($("rank").querySelectorAll(".acc-r").length, 16);
+  $("rank").querySelectorAll("[data-key]")[1].click();
+  assert.equal($("rank").querySelectorAll(".acc").length, 1);
+  console.log("switched to:", $("rank").querySelector(".rk-i.open .nm").textContent, $("rank").querySelectorAll(".acc-r").length);
+  const singles = $("rank").querySelectorAll(".rk-i > div.rk").length;
+  console.log("non-expandable rows:", singles);
+  $("rank").querySelector("[data-sheet]").click(); await tick();
+  console.log("sheet filter:", JSON.stringify(gs.filtered), wb.active, $("msg").textContent);
+  $("rank").querySelector(".rk-i.open [data-key]").click();
+  assert.equal($("rank").querySelectorAll(".acc").length, 0);
 
   // ユーザーがC列を書き換える（西原商会九州 → 西原商会）
   const idx = gs.grid.findIndex((r) => String(r[1]).includes("西原商会九州　鹿児島"));

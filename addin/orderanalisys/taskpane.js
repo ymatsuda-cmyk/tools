@@ -19,6 +19,8 @@
     period: null,
     view: "group",
     origin: "手作業",
+    openKey: null,
+    showAll: false,
     pending: 0,
     handler: null,
     writing: false,
@@ -438,18 +440,58 @@
     $("rkOut").textContent = "上位" + k + " → " + pct(v);
   }
 
+  const MEMBER_LIMIT = 8;
+
   function renderRanking(agg, color) {
     const N = Number($("topn").value);
     const top = agg.units.slice(0, N);
     const max = top.length ? top[0].n : 1;
+    if (st.openKey && !top.some((u) => u.key === st.openKey && u.isGroup)) { st.openKey = null; st.showAll = false; }
     $("rank").innerHTML = top.map((u, i) => {
-      const tip = u.name + "：" + fmt(u.n) + "件（" + pct(u.share) + "）" +
-        (u.isGroup ? "\n" + u.members.slice(0, 15).map((x) => "・" + x.name + " " + fmt(x.n)).join("\n") + (u.members.length > 15 ? "\nほか" + (u.members.length - 15) + "件" : "") : "");
-      return '<div class="rk" title="' + esc(tip) + '"><span class="no">' + (i + 1) + '</span>' +
-        '<span class="nm">' + esc(u.name) + (u.isGroup ? "<small>" + u.members.length + "</small>" : "") + "</span>" +
-        '<span class="bar" style="width:' + (u.n / max * 100).toFixed(1) + '%"><span style="flex:1;background:' + color + '"></span></span>' +
-        '<span class="n">' + fmt(u.n) + "</span></div>";
+      const bar = '<span class="bar" style="width:' + (u.n / max * 100).toFixed(1) + '%"><span style="flex:1;background:' + color + '"></span></span>';
+      const no = '<span class="no">' + (i + 1) + "</span>";
+      const num = '<span class="n">' + fmt(u.n) + "</span>";
+      if (!u.isGroup) {
+        return '<div class="rk-i"><div class="rk" title="' + esc(u.name + "：" + fmt(u.n) + "件（" + pct(u.share) + "）") + '">' + no +
+          '<span class="cv"></span><span class="nm">' + esc(u.name) + "</span>" + bar + num + "</div></div>";
+      }
+      const open = st.openKey === u.key;
+      let body = "";
+      if (open) {
+        const top1 = u.members[0] ? u.members[0].n : 1;
+        const list = st.showAll ? u.members : u.members.slice(0, MEMBER_LIMIT);
+        body = '<div class="acc" id="acc-' + i + '">' +
+          '<div class="acc-h"><span>' + u.members.length + "件の請求先</span><span>グループ内の割合</span></div>" +
+          list.map((m) => '<div class="acc-r" title="' + esc(m.cd + "　" + m.name) + '">' +
+            '<span class="acc-n">' + esc(C.shortMemberName(m.name, u.name)) + "</span>" +
+            '<span class="acc-b"><span style="width:' + (m.n / top1 * 100).toFixed(1) + "%;background:" + color + '"></span></span>' +
+            '<span class="acc-c">' + fmt(m.n) + '</span><span class="acc-p">' + pct(u.n ? m.n / u.n * 100 : 0) + "</span></div>").join("") +
+          '<div class="acc-f">' +
+          (u.members.length > MEMBER_LIMIT ? '<button class="lnk sm" data-more="1">' + (st.showAll ? "上位" + MEMBER_LIMIT + "件だけ表示" : "残り" + (u.members.length - MEMBER_LIMIT) + "件を表示") + "</button>" : "<span></span>") +
+          '<button class="lnk sm" data-sheet="' + esc(u.name) + '">グループシートで表示</button></div></div>';
+      }
+      return '<div class="rk-i' + (open ? " open" : "") + '"><button class="rk rk-g" data-key="' + esc(u.key) + '" aria-expanded="' + open + '"' + (open ? ' aria-controls="acc-' + i + '"' : "") + ">" + no +
+        '<span class="cv" aria-hidden="true">' + (open ? "▼" : "▶") + "</span>" +
+        '<span class="nm">' + esc(u.name) + "<small>" + u.members.length + "</small></span>" + bar + num + "</button>" + body + "</div>";
     }).join("") || '<div class="msg">この入力起因の受注はありません。</div>';
+  }
+
+  /** グループシートで、そのグループの行だけを表示する */
+  async function showGroupInSheet(groupName) {
+    await Excel.run(async (ctx) => {
+      const ws = ctx.workbook.worksheets.getItem(C.GROUP_SHEET);
+      ws.activate();
+      const rows = st.groupRows.filter((r) => r.group === groupName);
+      const last = st.groupRows.length ? st.groupRows[st.groupRows.length - 1].row + 1 : 1;
+      if (Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
+        ws.autoFilter.apply(ws.getRange("A1:D" + last), 2, { filterOn: Excel.FilterOn.values, values: [groupName] });
+        say("グループシートを「" + groupName + "」で絞り込みました。解除はC列のフィルターから行います。");
+      } else if (rows.length) {
+        ws.getRange("A" + (rows[0].row + 1) + ":D" + (rows[0].row + 1)).select();
+        say("グループシートの「" + groupName + "」の先頭行を選びました。");
+      }
+      await ctx.sync();
+    });
   }
 
   /* ---------- 集計シートへの出力 ---------- */
@@ -570,6 +612,19 @@
     const pickOrigin = (e) => { const el = e.target.closest("[data-o]"); if (el) { st.origin = el.getAttribute("data-o"); render(); } };
     $("orgList").onclick = pickOrigin;
     $("donut").onclick = pickOrigin;
+    $("rank").onclick = (e) => {
+      const more = e.target.closest("[data-more]");
+      if (more) { st.showAll = !st.showAll; render(); return; }
+      const sh = e.target.closest("[data-sheet]");
+      if (sh) { run("グループシートで表示", () => showGroupInSheet(sh.getAttribute("data-sheet"))); return; }
+      const row = e.target.closest("[data-key]");
+      if (row) {
+        const k = row.getAttribute("data-key");
+        st.openKey = st.openKey === k ? null : k;
+        st.showAll = false;
+        render();
+      }
+    };
     $("btnCreate").onclick = () => run("グループシートを作成", createGroupSheet);
     $("btnRecalc").onclick = () => run("再集計", async () => { await recalc(); if (!$("msg").textContent) say("再集計しました。"); });
     $("btnRecalc2").onclick = $("btnRecalc").onclick;
