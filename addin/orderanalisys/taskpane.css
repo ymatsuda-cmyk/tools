@@ -82,3 +82,16 @@ select { padding: 5px 6px; border: 1px solid var(--line2); border-radius: 4px; b
 .msg.err { color: #A3301F; }
 .ft { position: sticky; bottom: 0; background: #fff; padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
 .ft .pri { flex: 1; }
+
+.org-b { display: flex; gap: 12px; align-items: center; }
+.donut { width: 128px; flex-shrink: 0; }
+.donut svg { display: block; width: 100%; height: auto; }
+.donut path { cursor: pointer; }
+.org-l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.org-l button { font-family: inherit; display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 11px; color: var(--ink); text-align: left; cursor: pointer; }
+.org-l button:hover { border-color: var(--line2); }
+.org-l button[aria-pressed="true"] { border: 1.5px solid var(--ink); background: var(--soft); font-weight: 700; padding: 4.5px 5.5px; }
+.org-l .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-l .c { color: var(--sub); font-weight: 400; }
+.org-n { font-size: 11px; color: var(--sub); line-height: 1.6; background: var(--soft); border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
+.kpis .kpi .kd { color: var(--amb); }

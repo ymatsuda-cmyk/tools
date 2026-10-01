@@ -6,7 +6,7 @@
   xsi:type="TaskPaneApp">
 
   <Id>1b816369-ec97-44a6-95fd-e33d22776ed7</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.0.1.0</Version>
   <ProviderName>RightArm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 

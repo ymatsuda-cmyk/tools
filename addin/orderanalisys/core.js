@@ -205,7 +205,47 @@
     return Array.from(m.values());
   }
 
+  /* ---------- 入力起因（G列：備考） ---------- */
+
+  const MANUAL = "手作業";
+
+  /** 受注1行の入力起因。備考が空欄なら手作業、値があればその値（INFOMARTから取込 など） */
+  function originOf(r, noteMap) {
+    const note = r.note !== null && r.note !== undefined ? r.note : (noteMap.get(r.cd) || "");
+    return note ? note : MANUAL;
+  }
+
+  /** 表示用の名前（長い名前と短い名前） */
+  function originLabel(o) { return o === MANUAL ? "手作業（備考なし）" : o; }
+  function originShort(o) { return o === MANUAL ? MANUAL : o.replace(/から.*$/, "") || o; }
+
+  /** 入力起因ごとの件数。手作業を先頭に、ほかは件数の多い順 */
+  function originSummary(records, noteMap) {
+    const m = new Map();
+    let total = 0;
+    records.forEach((r) => {
+      const o = originOf(r, noteMap);
+      if (!m.has(o)) m.set(o, { origin: o, n: 0, cds: new Set() });
+      const x = m.get(o);
+      x.n += r.n;
+      x.cds.add(r.cd);
+      total += r.n;
+    });
+    const list = Array.from(m.values()).map((x) => ({
+      origin: x.origin, label: originLabel(x.origin), short: originShort(x.origin),
+      n: x.n, customers: x.cds.size, share: total ? x.n / total * 100 : 0
+    }));
+    list.sort((a, b) => (a.origin === MANUAL ? -1 : b.origin === MANUAL ? 1 : b.n - a.n));
+    return { list: list, total: total };
+  }
+
+  /** 選んだ入力起因の受注だけを残す */
+  function filterByOrigin(records, noteMap, origin) {
+    return records.filter((r) => originOf(r, noteMap) === origin);
+  }
+
   const api = {
+    MANUAL, originOf, originLabel, originShort, originSummary, filterByOrigin,
     GROUP_SHEET, LIST_SHEET, OUTPUT_PREFIX,
     findHeader, parseRecords, isSystemSheet, buildNoteMap, groupKey, suggestGroups, suggestForNew,
     aggregate, topShare, parseGroupSheet, groupStatus, buildInitialGroupRows, collectCustomers, primarySource

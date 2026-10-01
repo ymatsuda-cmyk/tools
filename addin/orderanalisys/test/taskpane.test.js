@@ -79,7 +79,7 @@ function makeWorkbook(data) {
   w.Excel = {
     run: async (f) => f({ workbook: wb, runtime: {}, sync: async () => {} }),
     SheetVisibility: { hidden: "Hidden" }, ClearApplyTo: { contents: "Contents" },
-    ChartType: { barStacked: "BarStacked", line: "Line" }, ChartSeriesBy: { columns: "Columns" }, ChartLegendPosition: { top: "Top" }
+    ChartType: { barStacked: "BarStacked", barClustered: "BarClustered", line: "Line", doughnut: "Doughnut" }, ChartSeriesBy: { columns: "Columns" }, ChartLegendPosition: { top: "Top", right: "Right" }
   };
   w.eval(fs.readFileSync(path.join(__dirname, "../core.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(__dirname, "../taskpane.js"), "utf8"));
@@ -92,6 +92,7 @@ function makeWorkbook(data) {
   console.log("banner:", $("bnSugTitle").textContent, "|", $("bnSugDesc").textContent);
   assert.equal($("bnSuggest").hidden, false);
   assert.equal($("vGroup").disabled, true);
+  assert.equal($("k10").textContent, "34.8%");
   console.log("customer view top10:", $("k10").textContent, "rank rows:", $("rank").children.length);
 
   $("btnCreate").click(); await tick(); await tick();
@@ -100,7 +101,19 @@ function makeWorkbook(data) {
   console.log("group sheet rows:", gs.grid.length, "header:", gs.grid[0]);
   console.log("validation:", JSON.stringify(gs.dv[0]));
   console.log("after create: view group pressed", $("vGroup").getAttribute("aria-pressed"), "top10", $("k10").textContent, $("k10d").textContent, "| status", $("stAuto").textContent, $("stOk").textContent, $("stBlank").textContent);
-  assert.equal($("k10").textContent, "51.6%");
+  assert.equal($("k10").textContent, "50.9%");
+  const orgBtns = Array.from($("orgList").querySelectorAll("button")).map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : ""));
+  console.log("origins:", orgBtns, "| note:", $("orgNote").textContent);
+  console.log("pareto title:", $("paretoTitle").textContent);
+  const fin = Array.from($("orgList").querySelectorAll("button")).find((b) => b.textContent.includes("FINET"));
+  fin.click();
+  console.log("FINET group:", $("k10").textContent, "| note:", $("orgNote").textContent);
+  $("vCust").click();
+  console.log("FINET customer:", $("k10").textContent, $("k20").textContent, "top:", $("rank").children[0].querySelector(".nm").textContent);
+  assert.equal($("k10").textContent, "47.9%");
+  w.document.querySelector('#donut path[data-o="手作業"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  $("vGroup").click();
+  assert.equal($("k10").textContent, "50.9%");
 
   // ユーザーがC列を書き換える（西原商会九州 → 西原商会）
   const idx = gs.grid.findIndex((r) => String(r[1]).includes("西原商会九州　鹿児島"));
@@ -115,7 +128,7 @@ function makeWorkbook(data) {
 
   // 期間の切り替え
   $("period").value = "202607"; $("period").onchange({ target: $("period") });
-  console.log("July:", $("kTot").textContent, $("k10").textContent, $("kMan").textContent);
+  console.log("July:", $("k10").textContent, Array.from($("orgList").querySelectorAll("button")).map((b) => b.textContent).join(" / "));
 
   // 新しい請求先が追加された場合
   const src = wb.worksheets.getItem("202601から202608");
@@ -131,7 +144,7 @@ function makeWorkbook(data) {
   $("btnOutput").click(); await tick(); await tick();
   const out = wb.sheets.find((s) => s.name.startsWith("集計_"));
   console.log("output sheet:", out && out.name, out && out.grid[4], "charts", out && out.charts.list.length, "| msg", $("msg").textContent);
-  assert(out && out.charts.list.length === 2);
+  assert(out && out.charts.list.length === 3);
   // 出力シートは再読み込みで集計対象にならない
   $("btnRecalc").click(); await tick(); await tick();
   assert.deepEqual(Array.from($("period").options).map((o) => o.value).sort(), ["202601から202608", "202607"]);

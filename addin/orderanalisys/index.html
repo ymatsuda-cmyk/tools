@@ -18,6 +18,15 @@
       <select id="period" aria-label="集計する期間のシート"></select>
     </label>
 
+    <section class="org" aria-labelledby="orgTitle">
+      <div class="sh" id="orgTitle">入力起因（G列：備考）</div>
+      <div class="org-b">
+        <div id="donut" class="donut"></div>
+        <div id="orgList" class="org-l" role="group" aria-label="集計する入力起因"></div>
+      </div>
+      <div id="orgNote" class="org-n"></div>
+    </section>
+
     <section id="bnSuggest" class="bn bn-sug" hidden>
       <div class="bn-t" id="bnSugTitle"></div>
       <div class="bn-d" id="bnSugDesc"></div>
@@ -46,12 +55,10 @@
     <div class="kpis">
       <div class="kpi"><div class="kl">上位10のシェア</div><div class="kv" id="k10"></div><div class="kd" id="k10d"></div></div>
       <div class="kpi"><div class="kl">上位20のシェア</div><div class="kv" id="k20"></div><div class="kd" id="k20d"></div></div>
-      <div class="kpi"><div class="kl">受注件数</div><div class="kv" id="kTot"></div><div class="kd" id="kUnits"></div></div>
-      <div class="kpi"><div class="kl">連携なし</div><div class="kv" id="kMan"></div><div class="kd" id="kManN"></div></div>
     </div>
 
     <section>
-      <div class="sh"><span>累計シェア（上位100まで）</span><span class="lg" id="paretoLg"></span></div>
+      <div class="sh"><span id="paretoTitle">累計シェア</span><span class="lg" id="paretoLg"></span></div>
       <div id="pareto"></div>
       <div class="sl">
         <label for="rk">上位</label>
@@ -65,7 +72,6 @@
         <span>ランキング</span>
         <select id="topn" aria-label="表示件数"><option value="10">上位10</option><option value="20" selected>上位20</option><option value="30">上位30</option></select>
       </div>
-      <div class="lg2"><span><i class="sw" style="background:var(--man)"></i>連携なし</span><span><i class="sw" style="background:var(--edi)"></i>連携</span></div>
       <div id="rank" class="rank"></div>
     </section>
 

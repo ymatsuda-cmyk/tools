@@ -18,6 +18,7 @@
     suggestion: null,     // グループシートがないときの候補
     period: null,
     view: "group",
+    origin: "手作業",
     pending: 0,
     handler: null,
     writing: false,
@@ -293,20 +294,46 @@
     return s ? s.records : [];
   }
 
-  function render() {
-    const recs = currentRecords();
+  /* 入力起因の色：手作業は青、外部連携は緑系（明るさを変えて区別） */
+  const EXT_COLORS = ["#0F6B5C", "#17917E", "#4DB6A4", "#86CFC2", "#B4E2D9"];
+  function originColors(summary) {
+    const m = new Map();
+    let k = 0;
+    summary.list.forEach((o) => m.set(o.origin, o.origin === C.MANUAL ? COLOR.man : EXT_COLORS[Math.min(k++, EXT_COLORS.length - 1)]));
+    return m;
+  }
+
+  function currentView() {
+    const recsAll = currentRecords();
+    const summary = C.originSummary(recsAll, st.noteMap);
+    if (!summary.list.some((o) => o.origin === st.origin)) {
+      st.origin = summary.list.length ? summary.list[0].origin : C.MANUAL;
+    }
+    const recs = C.filterByOrigin(recsAll, st.noteMap, st.origin);
     const view = st.hasGroupSheet ? st.view : "customer";
-    const agg = C.aggregate(recs, st.groupMap, st.noteMap, view);
-    const base = C.aggregate(recs, st.groupMap, st.noteMap, "customer");
+    return {
+      summary: summary, colors: originColors(summary), recs: recs, view: view,
+      origin: summary.list.find((o) => o.origin === st.origin) || { origin: st.origin, label: C.originLabel(st.origin), short: C.originShort(st.origin), n: 0, customers: 0, share: 0 },
+      agg: C.aggregate(recs, st.groupMap, st.noteMap, view),
+      base: C.aggregate(recs, st.groupMap, st.noteMap, "customer")
+    };
+  }
+
+  function render() {
+    const v = currentView();
+    const { agg, base, view } = v;
+    const color = v.colors.get(st.origin) || COLOR.man;
+
+    renderOrigins(v);
 
     // バナー
     const sugCount = st.suggestion ? new Set(st.suggestion.values()).size : 0;
     $("bnSuggest").hidden = st.hasGroupSheet || !sugCount;
     if (!st.hasGroupSheet && sugCount) {
-      const preview = C.aggregate(recs, st.suggestion, st.noteMap, "group");
+      const preview = C.aggregate(v.recs, st.suggestion, st.noteMap, "group");
       const big = preview.units.filter((u) => u.isGroup).slice(0, 2).map((u) => u.name + "（" + u.members.length + "拠点）").join("、");
       $("bnSugTitle").textContent = "同じ会社の請求先が" + sugCount + "組あります";
-      $("bnSugDesc").textContent = big + "など。まとめると上位10のシェアは " + pct(C.topShare(base, 10)) + " → " + pct(C.topShare(preview, 10)) + " になります。";
+      $("bnSugDesc").textContent = (big ? big + "など。" : "") + "まとめると上位10のシェアは " + pct(C.topShare(base, 10)) + " → " + pct(C.topShare(preview, 10)) + " になります（" + v.origin.short + "）。";
     }
     $("bnChanged").hidden = st.pending === 0;
 
@@ -329,32 +356,66 @@
 
     // KPI
     const t10 = C.topShare(agg, 10), t20 = C.topShare(agg, 20);
-    $("k10").textContent = pct(t10);
-    $("k20").textContent = pct(t20);
+    $("k10").textContent = agg.total ? pct(t10) : "—";
+    $("k20").textContent = agg.total ? pct(t20) : "—";
     const diff = (a, b) => view === "group" && Math.abs(a - b) >= 0.05 ? "請求先別より " + (a > b ? "+" : "") + (a - b).toFixed(1) + "pt" : "";
     $("k10d").textContent = diff(t10, C.topShare(base, 10));
     $("k20d").textContent = diff(t20, C.topShare(base, 20));
-    $("kTot").textContent = fmt(agg.total) + "件";
-    $("kUnits").textContent = view === "group" ? fmt(agg.units.length) + "単位（請求先 " + fmt(base.units.length) + "）" : fmt(agg.units.length) + "請求先";
-    $("kMan").textContent = agg.total ? pct((agg.total - agg.linked) / agg.total * 100) : "—";
-    $("kManN").textContent = fmt(agg.total - agg.linked) + "件";
 
-    renderPareto(agg, view === "group" ? base : null);
-    renderRanking(agg);
-    $("footer").hidden = !recs.length;
+    $("paretoTitle").textContent = "累計シェア：" + v.origin.label + "（上位100まで）";
+    renderPareto(agg, view === "group" ? base : null, color);
+    renderRanking(agg, color);
+    $("footer").hidden = !currentRecords().length;
+  }
+
+  /** ドーナツグラフと切り替えボタン */
+  function renderOrigins(v) {
+    const list = v.summary.list, T = v.summary.total;
+    const cx = 80, cy = 80, R = 70, r = 44;
+    const pt = (rad, ang) => (cx + rad * Math.cos(ang * Math.PI / 180)).toFixed(1) + " " + (cy + rad * Math.sin(ang * Math.PI / 180)).toFixed(1);
+    let a = -90;
+    const arcs = list.map((o) => {
+      const s = T ? o.n / T * 360 : 0;
+      const b = a + Math.min(s, 359.99);
+      const la = s > 180 ? 1 : 0;
+      const d = "M" + pt(R, a) + " A" + R + " " + R + " 0 " + la + " 1 " + pt(R, b) + " L" + pt(r, b) + " A" + r + " " + r + " 0 " + la + " 0 " + pt(r, a) + " Z";
+      a += s;
+      const on = o.origin === st.origin;
+      return '<path data-o="' + esc(o.origin) + '" d="' + d + '" fill="' + (on ? v.colors.get(o.origin) : "#D5DAE0") + '" stroke="#fff" stroke-width="2"><title>' + esc(o.label + "：" + fmt(o.n) + "件（" + pct(o.share) + "）") + "</title></path>";
+    }).join("");
+    $("donut").innerHTML = '<svg viewBox="0 0 160 160" role="img" aria-label="入力起因の構成比">' + arcs +
+      '<text x="80" y="74" font-size="12" fill="#5B6573" text-anchor="middle">' + esc(v.origin.short) + "</text>" +
+      '<text x="80" y="96" font-size="20" font-weight="700" fill="#1B2430" text-anchor="middle">' + pct(v.origin.share) + "</text></svg>";
+    $("orgList").innerHTML = list.map((o) =>
+      '<button data-o="' + esc(o.origin) + '" aria-pressed="' + (o.origin === st.origin) + '"><i class="sw" style="width:9px;height:9px;background:' + v.colors.get(o.origin) + '"></i>' +
+      '<span class="t">' + esc(o.label) + '</span><span class="c">' + fmt(o.n) + "</span></button>").join("");
+
+    const ext = list.filter((o) => o.origin !== C.MANUAL).map((o) => o.short);
+    let note;
+    if (st.origin === C.MANUAL) {
+      note = ext.length ? "外部連携（" + ext.join("・") + "）は累計シェアの対象外です。入力起因を押すと、その起因だけで集計します。"
+        : "この期間に外部連携の受注はありません。";
+    } else {
+      const g = C.aggregate(v.recs, st.groupMap, st.noteMap, "group");
+      const groups = g.units.filter((u) => u.isGroup);
+      note = v.origin.short + "の" + fmt(v.origin.customers) + "請求先を集計しています。" +
+        (st.hasGroupSheet && groups.length ? "グループ別では" + fmt(g.units.length) + "単位（" + groups.slice(0, 2).map((u) => u.name + " " + fmt(u.n) + "件").join("、") + (groups.length > 2 ? "など" : "") + "）です。" : "") +
+        "手作業に戻すには「手作業（備考なし）」を押します。";
+    }
+    $("orgNote").textContent = note;
   }
 
   function curve(agg, N, W, H) {
     const pts = ["M0 " + H];
     for (let i = 0; i < N; i++) {
       const u = agg.units[i];
-      const c = u ? u.cum : 100;
+      const c = u ? u.cum : (agg.units.length ? 100 : 0);
       pts.push("L" + ((i + 1) / N * W).toFixed(1) + " " + (H - c / 100 * H).toFixed(1));
     }
     return pts.join(" ");
   }
 
-  function renderPareto(agg, base) {
+  function renderPareto(agg, base, color) {
     const W = 316, H = 150, N = 100;
     const k = Number($("rk").value);
     const u = agg.units[Math.min(k, agg.units.length) - 1];
@@ -367,40 +428,37 @@
       [25, 50, 75, 100].map((p) => '<line x1="0" y1="' + (H - p / 100 * H) + '" x2="' + W + '" y2="' + (H - p / 100 * H) + '" stroke="#EEF1F4"/>' +
         '<text x="-4" y="' + (H - p / 100 * H + 3) + '" font-size="9" fill="#7A8492" text-anchor="end">' + p + '</text>').join("") +
       (base ? '<path d="' + curve(base, N, W, H) + '" fill="none" stroke="' + COLOR.sub + '" stroke-width="2" stroke-dasharray="4 3"/>' : "") +
-      '<path d="' + curve(agg, N, W, H) + '" fill="none" stroke="' + COLOR.man + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="' + curve(agg, N, W, H) + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round"/>' +
       '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + H + '" stroke="#A65F0A" stroke-dasharray="2 3"/>' +
-      '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + COLOR.man + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
       '<text x="' + lx + '" y="' + Math.max(y - 6, 10) + '" font-size="11" fill="#1B2430" text-anchor="' + anchor + '">上位' + k + ' → ' + pct(v) + '</text>' +
       '<text x="0" y="166" font-size="9" fill="#7A8492">1</text><text x="' + W + '" y="166" font-size="9" fill="#7A8492" text-anchor="end">100</text>' +
       "</svg>";
-    $("paretoLg").innerHTML = base ? '<span style="color:' + COLOR.man + '">━ グループ別</span><span style="color:#7A8492">┅ 請求先別</span>' : "";
+    $("paretoLg").innerHTML = base ? '<span style="color:' + color + '">━ グループ別</span><span style="color:#7A8492">┅ 請求先別</span>' : "";
     $("rkOut").textContent = "上位" + k + " → " + pct(v);
   }
 
-  function renderRanking(agg) {
+  function renderRanking(agg, color) {
     const N = Number($("topn").value);
     const top = agg.units.slice(0, N);
     const max = top.length ? top[0].n : 1;
     $("rank").innerHTML = top.map((u, i) => {
-      const m = u.n - u.linked;
-      const tip = u.name + "：" + fmt(u.n) + "件（連携なし " + fmt(m) + "／連携 " + fmt(u.linked) + "）" +
+      const tip = u.name + "：" + fmt(u.n) + "件（" + pct(u.share) + "）" +
         (u.isGroup ? "\n" + u.members.slice(0, 15).map((x) => "・" + x.name + " " + fmt(x.n)).join("\n") + (u.members.length > 15 ? "\nほか" + (u.members.length - 15) + "件" : "") : "");
       return '<div class="rk" title="' + esc(tip) + '"><span class="no">' + (i + 1) + '</span>' +
         '<span class="nm">' + esc(u.name) + (u.isGroup ? "<small>" + u.members.length + "</small>" : "") + "</span>" +
-        '<span class="bar" style="width:' + (u.n / max * 100).toFixed(1) + '%">' +
-        (m ? '<span style="flex:' + m + ';background:' + COLOR.man + '"></span>' : "") +
-        (u.linked ? '<span style="flex:' + u.linked + ';background:' + COLOR.edi + '"></span>' : "") +
-        '</span><span class="n">' + fmt(u.n) + "</span></div>";
-    }).join("") || '<div class="msg">この期間のデータがありません。</div>';
+        '<span class="bar" style="width:' + (u.n / max * 100).toFixed(1) + '%"><span style="flex:1;background:' + color + '"></span></span>' +
+        '<span class="n">' + fmt(u.n) + "</span></div>";
+    }).join("") || '<div class="msg">この入力起因の受注はありません。</div>';
   }
 
   /* ---------- 集計シートへの出力 ---------- */
 
   async function output() {
-    const view = st.hasGroupSheet ? st.view : "customer";
-    const agg = C.aggregate(currentRecords(), st.groupMap, st.noteMap, view);
+    const v = currentView();
+    const { agg, view } = v;
     const label = view === "group" ? "グループ別" : "請求先別";
-    const name = (C.OUTPUT_PREFIX + label + "_" + st.period).slice(0, 31).replace(/[\\/?*[\]:]/g, "");
+    const name = (C.OUTPUT_PREFIX + label + "_" + v.origin.short + "_" + st.period).replace(/[\\/?*[\]:]/g, "").slice(0, 31);
 
     await Excel.run(async (ctx) => {
       const old = ctx.workbook.worksheets.getItemOrNullObject(name);
@@ -408,54 +466,67 @@
       if (!old.isNullObject) old.delete();
       const ws = ctx.workbook.worksheets.add(name);
 
-      ws.getRange("A1").values = [["受注件数の集計（" + label + "）　期間：" + st.period]];
+      ws.getRange("A1").values = [["受注件数の集計（" + label + "）　入力起因：" + v.origin.label + "　期間：" + st.period]];
       ws.getRange("A1").format.font.bold = true;
       ws.getRange("A1").format.font.size = 14;
-      ws.getRange("A2:H2").values = [["受注件数", agg.total, "連携なし", agg.total - agg.linked, "上位10のシェア", C.topShare(agg, 10) / 100, "上位20のシェア", C.topShare(agg, 20) / 100]];
+      ws.getRange("A2:F2").values = [["受注件数", agg.total, "上位10のシェア", C.topShare(agg, 10) / 100, "上位20のシェア", C.topShare(agg, 20) / 100]];
       ws.getRange("B2").numberFormat = [["#,##0"]];
-      ws.getRange("D2").numberFormat = [["#,##0"]];
+      ws.getRange("D2").numberFormat = [["0.0%"]];
       ws.getRange("F2").numberFormat = [["0.0%"]];
-      ws.getRange("H2").numberFormat = [["0.0%"]];
 
-      const head = [["順位", label === "グループ別" ? "グループ／請求先" : "請求先", "請求先数", "受注件数", "連携なし", "連携", "割合", "累計割合"]];
-      const rows = agg.units.map((u, i) => [i + 1, u.name, u.members.length, u.n, u.n - u.linked, u.linked, u.share / 100, u.cum / 100]);
+      const head = [["順位", view === "group" ? "グループ／請求先" : "請求先", "請求先数", "受注件数", "割合", "累計割合"]];
+      const rows = agg.units.map((u, i) => [i + 1, u.name, u.members.length, u.n, u.share / 100, u.cum / 100]);
       const n = rows.length;
-      ws.getRange("A4:H4").values = head;
-      ws.getRange("A5:H" + (n + 4)).values = rows;
-      const hr = ws.getRange("A4:H4");
+      ws.getRange("A4:F4").values = head;
+      const hr = ws.getRange("A4:F4");
       hr.format.font.bold = true;
       hr.format.fill.color = COLOR.headFill;
-      ws.getRange("D5:F" + (n + 4)).numberFormat = Array(n).fill(["#,##0", "#,##0", "#,##0"]);
-      ws.getRange("G5:H" + (n + 4)).numberFormat = Array(n).fill(["0.0%", "0.0%"]);
+      if (n) {
+        ws.getRange("A5:F" + (n + 4)).values = rows;
+        ws.getRange("D5:D" + (n + 4)).numberFormat = Array(n).fill(["#,##0"]);
+        ws.getRange("E5:F" + (n + 4)).numberFormat = Array(n).fill(["0.0%", "0.0%"]);
+      }
       ws.getRange("A:A").format.columnWidth = 40;
       ws.getRange("B:B").format.columnWidth = 260;
-      ws.getRange("C:H").format.columnWidth = 70;
+      ws.getRange("C:F").format.columnWidth = 70;
       ws.freezePanes.freezeRows(4);
 
-      // グラフ用のデータ（右側の列。グラフの元データなので非表示にしない）
+      // グラフ用のデータ（グラフの元データなので非表示にしない）
+      const os = v.summary.list, on = os.length;
+      ws.getRange("H4:I4").values = [["入力起因", "受注件数"]];
+      ws.getRange("H5:I" + (on + 4)).values = os.map((o) => [o.label, o.n]);
       const tn = Math.min(20, n), pn = Math.min(100, n);
-      ws.getRange("J4:L4").values = [["上位20", "連携なし", "連携"]];
-      ws.getRange("J5:L" + (tn + 4)).values = agg.units.slice(0, tn).map((u) => [u.name, u.n - u.linked, u.linked]);
+      ws.getRange("K4:L4").values = [["上位" + tn, "受注件数"]];
       ws.getRange("N4:O4").values = [["順位", "累計割合"]];
-      ws.getRange("N5:O" + (pn + 4)).values = agg.units.slice(0, pn).map((u, i) => [i + 1, Math.round(u.cum * 10) / 10]);
-      ws.getRange("J4:O4").format.font.color = "#7A8492";
+      ws.getRange("H4:O4").format.font.color = "#7A8492";
 
-      const bar = ws.charts.add(Excel.ChartType.barStacked, ws.getRange("J4:L" + (tn + 4)), Excel.ChartSeriesBy.columns);
-      bar.title.text = "受注件数ランキング（上位" + tn + "）";
-      bar.setPosition("Q4", "Z30");
-      bar.axes.categoryAxis.reversePlotOrder = true;
-      bar.legend.position = Excel.ChartLegendPosition.top;
-      bar.series.getItemAt(0).format.fill.setSolidColor(COLOR.man);
-      bar.series.getItemAt(1).format.fill.setSolidColor(COLOR.edi);
+      const pie = ws.charts.add(Excel.ChartType.doughnut, ws.getRange("H4:I" + (on + 4)), Excel.ChartSeriesBy.columns);
+      pie.title.text = "入力起因の構成比";
+      pie.setPosition("Q4", "Z22");
+      pie.legend.position = Excel.ChartLegendPosition.right;
+      pie.series.getItemAt(0).hasDataLabels = true;
 
-      const line = ws.charts.add(Excel.ChartType.line, ws.getRange("O4:O" + (pn + 4)), Excel.ChartSeriesBy.columns);
-      line.title.text = "累計シェア（上位" + pn + "まで・%）";
-      line.setPosition("Q32", "Z52");
-      line.legend.visible = false;
-      line.series.getItemAt(0).setXAxisValues(ws.getRange("N5:N" + (pn + 4)));
-      line.series.getItemAt(0).format.line.color = COLOR.man;
-      line.axes.valueAxis.maximum = 100;
-      line.axes.valueAxis.minimum = 0;
+      if (n) {
+        ws.getRange("K5:L" + (tn + 4)).values = agg.units.slice(0, tn).map((u) => [u.name, u.n]);
+        ws.getRange("N5:O" + (pn + 4)).values = agg.units.slice(0, pn).map((u, i) => [i + 1, Math.round(u.cum * 10) / 10]);
+
+        const color = v.colors.get(st.origin) || COLOR.man;
+        const bar = ws.charts.add(Excel.ChartType.barClustered, ws.getRange("K4:L" + (tn + 4)), Excel.ChartSeriesBy.columns);
+        bar.title.text = "受注件数ランキング（" + v.origin.short + "・上位" + tn + "）";
+        bar.setPosition("Q24", "Z48");
+        bar.axes.categoryAxis.reversePlotOrder = true;
+        bar.legend.visible = false;
+        bar.series.getItemAt(0).format.fill.setSolidColor(color);
+
+        const line = ws.charts.add(Excel.ChartType.line, ws.getRange("O4:O" + (pn + 4)), Excel.ChartSeriesBy.columns);
+        line.title.text = "累計シェア（" + v.origin.short + "・上位" + pn + "まで・%）";
+        line.setPosition("Q50", "Z70");
+        line.legend.visible = false;
+        line.series.getItemAt(0).setXAxisValues(ws.getRange("N5:N" + (pn + 4)));
+        line.series.getItemAt(0).format.line.color = color;
+        line.axes.valueAxis.maximum = 100;
+        line.axes.valueAxis.minimum = 0;
+      }
 
       ws.activate();
       await ctx.sync();
@@ -496,6 +567,9 @@
     $("vCust").onclick = () => { st.view = "customer"; render(); };
     $("rk").oninput = () => render();
     $("topn").onchange = () => render();
+    const pickOrigin = (e) => { const el = e.target.closest("[data-o]"); if (el) { st.origin = el.getAttribute("data-o"); render(); } };
+    $("orgList").onclick = pickOrigin;
+    $("donut").onclick = pickOrigin;
     $("btnCreate").onclick = () => run("グループシートを作成", createGroupSheet);
     $("btnRecalc").onclick = () => run("再集計", async () => { await recalc(); if (!$("msg").textContent) say("再集計しました。"); });
     $("btnRecalc2").onclick = $("btnRecalc").onclick;
