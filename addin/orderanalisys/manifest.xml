@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>1b816369-ec97-44a6-95fd-e33d22776ed7</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>RightArm</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+
+  <DisplayName DefaultValue="受注件数分析"/>
+  <Description DefaultValue="取引先別・グループ別に受注件数の偏りと連携状況を可視化します"/>
+
+  <!-- 管理センター展開に必須の3要素 -->
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/icons/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/icons/icon-80.png"/>
+  <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/"/>
+
+  <!-- 外部ドメイン許可（GitHub Pages用）- 管理センター検証必須 -->
+  <AppDomains>
+    <AppDomain>ymatsuda-cmyk.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+
+  <!-- デスクトップ版との互換性重視（プルダウンの入力規則は 1.8 以上の環境でのみ設定） -->
+  <Requirements>
+    <Sets DefaultMinVersion="1.7">
+      <Set Name="ExcelApi" MinVersion="1.7"/>
+      <!-- 共有ランタイム：作業ウィンドウを閉じてもグループシートの変更を検知し続けるために使用 -->
+      <Set Name="SharedRuntime" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/index.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <!-- 共有ランタイム：作業ウィンドウを閉じてもランタイムを維持する -->
+        <Runtimes>
+          <Runtime resid="Taskpane.Url" lifetime="long"/>
+        </Runtimes>
+        <DesktopFormFactor>
+          <!-- 共有ランタイムでは作業ウィンドウと同じURLを指定する -->
+          <FunctionFile resid="Taskpane.Url"/>
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <!-- 独自タブ「受注分析」 -->
+            <CustomTab id="OrderAnalysisTab">
+              <Group id="OrderAnalysisGroup">
+                <Label resid="OrderGroupLabel"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="ShowOrderPaneButton">
+                  <Label resid="ShowOrderPaneButtonLabel"/>
+                  <Supertip>
+                    <Title resid="ShowOrderPaneButtonLabel"/>
+                    <Description resid="ShowOrderPaneButtonTooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>OrderAnalysisTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="OpenGroupSheetButton">
+                  <Label resid="OpenGroupSheetButtonLabel"/>
+                  <Supertip>
+                    <Title resid="OpenGroupSheetButtonLabel"/>
+                    <Description resid="OpenGroupSheetButtonTooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openGroupSheet</FunctionName>
+                  </Action>
+                </Control>
+              </Group>
+              <Label resid="OrderTabLabel"/>
+            </CustomTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/icons/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/icons/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/icons/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/index.html"/>
+        <!-- コマンド用 HTML（リボンボタン専用） -->
+        <bt:Url id="Commands.Html" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/commands.html"/>
+        <!-- 従来のCommands.Urlも保持（互換性のため） -->
+        <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/orderanalisys/commands.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="OrderTabLabel" DefaultValue="受注分析"/>
+        <bt:String id="OrderGroupLabel" DefaultValue="受注件数分析"/>
+        <bt:String id="ShowOrderPaneButtonLabel" DefaultValue="分析を開く"/>
+        <bt:String id="OpenGroupSheetButtonLabel" DefaultValue="グループシート"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="ShowOrderPaneButtonTooltip" DefaultValue="累計シェアとランキングを表示する作業ウィンドウを開きます"/>
+        <bt:String id="OpenGroupSheetButtonTooltip" DefaultValue="グループ設定用の「グループ」シートを開きます"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+
+</OfficeApp>

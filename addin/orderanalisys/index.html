@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受注件数分析</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+<div id="app">
+  <header class="hd">受注件数分析</header>
+
+  <div id="loading" class="loading" role="status">シートを読み込んでいます…</div>
+
+  <main id="main" hidden>
+    <label class="fld">期間（シート）
+      <select id="period" aria-label="集計する期間のシート"></select>
+    </label>
+
+    <section id="bnSuggest" class="bn bn-sug" hidden>
+      <div class="bn-t" id="bnSugTitle"></div>
+      <div class="bn-d" id="bnSugDesc"></div>
+      <button class="btn pri" id="btnCreate">グループシートを作ってまとめる</button>
+      <div class="bn-n">あとからシートで自由に直せます。</div>
+    </section>
+
+    <section id="bnChanged" class="bn bn-chg" hidden>
+      <span id="bnChgText">グループシートが変更されました</span>
+      <button class="btn blue" id="btnRecalc2">再集計</button>
+    </section>
+
+    <section id="gstat" class="gstat" hidden>
+      <div class="gs-h"><b>グループシート</b><button class="lnk" id="btnOpenSheet">シートを開く</button></div>
+      <div class="gs-r"><i class="sw sw-auto"></i>自動で入力（未確認）<b id="stAuto">0</b></div>
+      <div class="gs-r"><i class="sw sw-ok"></i>確認済み・手入力<b id="stOk">0</b></div>
+      <div class="gs-r"><i class="sw sw-blank"></i>まとめない（空欄）<b id="stBlank">0</b></div>
+      <div class="gs-a"><button class="lnk sm" id="btnConfirmSel">選んだ行を確認済みにする</button><button class="lnk sm" id="btnConfirmAll">黄色をすべて確認済みにする</button></div>
+    </section>
+
+    <div class="seg" role="group" aria-label="集計単位">
+      <button id="vGroup" aria-pressed="true">グループ別</button>
+      <button id="vCust" aria-pressed="false">請求先別</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="kl">上位10のシェア</div><div class="kv" id="k10"></div><div class="kd" id="k10d"></div></div>
+      <div class="kpi"><div class="kl">上位20のシェア</div><div class="kv" id="k20"></div><div class="kd" id="k20d"></div></div>
+      <div class="kpi"><div class="kl">受注件数</div><div class="kv" id="kTot"></div><div class="kd" id="kUnits"></div></div>
+      <div class="kpi"><div class="kl">連携なし</div><div class="kv" id="kMan"></div><div class="kd" id="kManN"></div></div>
+    </div>
+
+    <section>
+      <div class="sh"><span>累計シェア（上位100まで）</span><span class="lg" id="paretoLg"></span></div>
+      <div id="pareto"></div>
+      <div class="sl">
+        <label for="rk">上位</label>
+        <input type="range" id="rk" min="1" max="100" step="1" value="20">
+        <span id="rkOut"></span>
+      </div>
+    </section>
+
+    <section>
+      <div class="sh">
+        <span>ランキング</span>
+        <select id="topn" aria-label="表示件数"><option value="10">上位10</option><option value="20" selected>上位20</option><option value="30">上位30</option></select>
+      </div>
+      <div class="lg2"><span><i class="sw" style="background:var(--man)"></i>連携なし</span><span><i class="sw" style="background:var(--edi)"></i>連携</span></div>
+      <div id="rank" class="rank"></div>
+    </section>
+
+    <div id="msg" class="msg" role="status"></div>
+  </main>
+
+  <footer class="ft" id="footer" hidden>
+    <button class="btn pri" id="btnOutput">集計シートに出力</button>
+    <button class="btn" id="btnRecalc">再集計</button>
+  </footer>
+</div>
+<script src="core.js"></script>
+<script src="taskpane.js"></script>
+</body>
+</html>
