@@ -28,6 +28,8 @@
   --border-danger: #d98f8f;
   --bg-danger: #fcebeb;
   --bg-highlight: #fff3b0;
+  /* メモ欄(textarea)と本文で共通に使うフォント */
+  --font-content: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Hiragino Sans", "Yu Gothic", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -210,6 +212,37 @@ body {
   gap: 4px;
 }
 .agenda-outcome i { font-size: 14px; color: var(--text-muted); }
+
+.agenda-line { position: relative; }
+.agenda-line-text { flex: 1; min-width: 0; }
+.btn-line-edit {
+  padding: 0 3px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.agenda-line:hover .btn-line-edit,
+.btn-line-edit:focus-visible { opacity: 1; }
+
+.line-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; margin: 2px 0; }
+.line-edit-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  resize: vertical;
+  overflow: hidden;
+}
+.line-edit-actions { display: flex; align-items: center; gap: 6px; }
+.line-edit-actions .btn { padding: 2px 9px; font-size: 11px; }
+.line-edit-hint { font-size: 10px; color: var(--text-muted); }
 
 .btn-edit-title { padding: 2px 5px; font-size: 12px; }
 
@@ -516,6 +549,24 @@ body {
 .detail-tab:hover { color: var(--text-primary); }
 .detail-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); font-weight: 500; }
 
+/* --- マインドマップタブ(描画まわりの共通分は api/mindmap2/mindmap2.css) --- */
+.mindmap-host { width: 100%; height: calc(100vh - 340px); min-height: 300px; background: var(--surface-2); border-radius: var(--radius); }
+.mindmap-source {
+  width: 100%;
+  height: calc(100vh - 360px);
+  min-height: 280px;
+  font-family: var(--font-content);
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 10px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  resize: vertical;
+}
+.mindmap-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0 0; }
+
 .memo-textarea {
   width: 100%;
   min-height: calc(100vh - 320px);
@@ -534,6 +585,12 @@ body {
 .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .detail-title { font-size: 18px; font-weight: 500; }
 .detail-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+
+.summary-text,
+.plain-list,
+.agenda-list,
+.todo-box,
+.memo-textarea { font-family: var(--font-content); }
 
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .stat-card { background: var(--surface-1); border-radius: var(--radius); padding: 9px 12px; }
@@ -773,6 +830,77 @@ body {
   .resize-handle { display: none; }
   .detail-pane.side-panel { display: none; }
 }
+
+/* ==================================================================
+   音声アップロード機能の追加分。styles.css の末尾に追記する。
+   既存トークン（--surface-1, --border, --accent 等）をそのまま使い、
+   モーダルの見た目は既存の .raw-modal 系クラスに乗せている。
+   ================================================================== */
+
+/* 一覧の状態バッジに「新規」を追加。既存の badge.status-* と同じ並びに置く */
+.badge.status-新規 { background: var(--accent-bg); color: var(--accent-text); }
+
+.upload-field { margin-bottom: 14px; }
+.upload-field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+.upload-field input[type="text"],
+.upload-field input[type="datetime-local"] {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 9px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+}
+.upload-field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.upload-drop {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 22px 14px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.upload-drop:hover { background: var(--surface-1); }
+.upload-drop.drag-over { border-color: var(--accent); background: var(--accent-bg); color: var(--accent-text); }
+.upload-drop strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.upload-drop.drag-over strong { color: var(--accent-text); }
+.upload-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.upload-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+  margin-top: 10px;
+  display: none;
+}
+.upload-progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+
+.upload-msg { font-size: 11px; margin-top: 8px; min-height: 14px; color: var(--text-secondary); }
+.upload-msg.error { color: var(--text-danger); }
+.upload-msg.ok { color: var(--success-text); }
+
+/* 一覧の先頭に差し込む「アップロード中／文字起こし待ち」の仮カード。
+   実データが index に載ったら自動で消える（upload.js 側で照合） */
+.pending-list-item { opacity: 0.7; }
+.pending-list-item .list-item-body { border-left-color: var(--accent); }
 
 .todo-card { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 9px 11px; margin-bottom: 8px; }
 .todo-card .todo-row { align-items: flex-start; }

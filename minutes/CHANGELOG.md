@@ -1,5 +1,30 @@
 # Change Log
 
+## 1.4.0 - 2026-10-01
+
+### Release Title
+
+ToDo progress log and learning rules from manual edits (restored on top of 1.3.0)
+
+### Release Changes
+
+- Restored the 1.3.0 base after commit 3467906c overwrote `src/upload.js`, `src/lib/mindmap-view.js` and the upload/mindmap actions in `gas/Code.gs`; only the features below are layered on top.
+- Added a per-ToDo progress log (日付付きで追記のみ). Logs are stored in the new Notion「ToDo経過」column as JSON; the「ToDo」column stays human-readable.
+- Moved the log input to the fixed footer of the ToDo tab; clicking a card selects the target (defaults to the first open ToDo).
+- Merged ToDos before/after an update by text similarity so logs and checks survive re-summarisation; unmatched logs are kept as orphans on regenerate and confirmed before deletion on manual edit.
+- Added learning rules: saving a manual edit extracts a one-line rule in the background into the「要約ルール」DB, and active rules are appended to the summary prompt.
+- Added a 学習一覧 section in settings to toggle or delete rules.
+
+### Release Affected Files
+
+- `minutes/gas/Code.gs`
+- `minutes/src/main.js`
+- `minutes/src/ui/render.js`
+- `minutes/src/lib/todos.js`
+- `minutes/src/lib/gas.js`
+- `minutes/src/lib/summarize.js`
+- `minutes/css/styles.css`
+
 ## 1.3.0 - 2026-09-12
 
 ### Release Title
