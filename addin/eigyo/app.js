@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_9d4e731";
+const APP_VERSION = "rev_20260821_b91e5d3";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -378,11 +378,7 @@ function bindStaticUI() {
   if (emodal) {
     emodal.addEventListener("input", markDirty);
     emodal.addEventListener("change", markDirty);
-    emodal.addEventListener("keydown", onModalDateShortcut);
   }
-  // 新規入力モーダルでも同じショートカットを有効化
-  const nmodal = document.getElementById("new-modal");
-  if (nmodal) nmodal.addEventListener("keydown", onModalDateShortcut);
 }
 
 function clearFilters() {
@@ -780,39 +776,6 @@ function fmtDateInput(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fromDateInput(s) { return s ? new Date(s + "T00:00:00") : null; }
-/* Ctrl+;（Excelと同じ）で本日日付を入力する。
-   type="date" は本日をセット、テキスト／textarea はカーソル位置に yyyy/mm/dd を挿入 */
-function todayYmdSlash() {
-  const d = new Date();
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-}
-function onModalDateShortcut(e) {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-  /* 日本語キーボードでは Shift 併用で ":" になる場合があるため code も見る */
-  if (e.key !== ";" && e.key !== ":" && e.code !== "Semicolon") return;
-  const el = e.target;
-  if (!el || !el.tagName) return;
-  if (el.readOnly || el.disabled) return;
-  const tag = el.tagName.toLowerCase();
-  const type = (el.type || "").toLowerCase();
-
-  if (tag === "input" && type === "date") {
-    e.preventDefault();
-    el.value = fmtDateInput(new Date());
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    return;
-  }
-  if (tag === "textarea" || (tag === "input" && ["text", "search", ""].includes(type))) {
-    e.preventDefault();
-    const t = todayYmdSlash();
-    const s = (el.selectionStart != null) ? el.selectionStart : el.value.length;
-    const n = (el.selectionEnd != null) ? el.selectionEnd : s;
-    el.value = el.value.slice(0, s) + t + el.value.slice(n);
-    try { el.selectionStart = el.selectionEnd = s + t.length; } catch (_) {}
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -973,21 +936,6 @@ function filteredRecords(opts) {
   });
 }
 
-/* 一覧・カンバン共通の並び順：最終更新日(AJ)の新しい順 → ID順
-   最終更新日が未設定のレコードは末尾に寄せ、ID順で並べる */
-function sortByUpdate(arr) {
-  return arr.slice().sort((a, b) => {
-    const ta = (a.lastUpdate instanceof Date && !isNaN(a.lastUpdate.getTime())) ? a.lastUpdate.getTime() : null;
-    const tb = (b.lastUpdate instanceof Date && !isNaN(b.lastUpdate.getTime())) ? b.lastUpdate.getTime() : null;
-    if (ta !== tb) {
-      if (ta === null) return 1;
-      if (tb === null) return -1;
-      return tb - ta;
-    }
-    return String(a.id).localeCompare(String(b.id), "ja", { numeric: true });
-  });
-}
-
 /* ============================================================
    一覧（優先度を左端に）
    ============================================================ */
@@ -997,7 +945,7 @@ function renderList() {
   if (!recs.length) { cont.innerHTML = `<div class="empty-note">条件に一致する案件がありません</div>`; return; }
   let html = "";
   TYPES.forEach(type => {
-    const all = sortByUpdate(recs.filter(r => r.type === type));
+    const all = recs.filter(r => r.type === type);
     if (!all.length) return;
     /* 保留は各種別グループの末尾に寄せる（本来の状態は状態ラベルに併記） */
     const group = [...all.filter(r => !isHold(r)), ...all.filter(r => isHold(r))];
@@ -1109,9 +1057,9 @@ function renderKanban() {
     ? `ondragover="onLaneDragOver(event)" ondragleave="onLaneDragLeave(event)" ondrop="onLaneDrop(event)"` : "";
   board.innerHTML = lanes.map(st => {
     /* 保留は状態ではなくフラグ。保留レーンに寄せ、他レーンからは除く */
-    const cards = sortByUpdate((st === HOLD)
+    const cards = (st === HOLD)
       ? recs.filter(r => isHold(r))
-      : recs.filter(r => !isHold(r) && r.status === st));
+      : recs.filter(r => !isHold(r) && r.status === st);
     return `<div class="lane${st === HOLD ? " lane-hold" : ""}" data-status="${esc(st)}" ${dndLane}>
       <div class="lane-head">${esc(st)}<span class="cnt">${cards.length}</span></div>
       <div class="lane-body">
@@ -1134,62 +1082,7 @@ function renderKanban() {
       </div>
     </div>`;
   }).join("");
-
-  setupBoardPan();
 }
-
-/* カンバン：背景（カード以外）をつかんでドラッグでスクロール（パン操作）
-   - 横方向：ボード全体（#board）
-   - 縦方向：つかんだ位置のレーン本体（.lane-body）
-   カード上からは開始しない（カードのドラッグ＆ドロップを妨げないため） */
-function setupBoardPan() {
-  const board = document.getElementById("board");
-  if (!board || board.dataset.panBound === "1") return;
-  board.dataset.panBound = "1";
-
-  let panning = false, moved = false, pid = null;
-  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0, vTarget = null;
-
-  const endPan = () => {
-    if (!panning) return;
-    panning = false; vTarget = null;
-    board.classList.remove("panning");
-    try { if (pid != null) board.releasePointerCapture(pid); } catch (_) {}
-    pid = null;
-  };
-
-  board.addEventListener("pointerdown", e => {
-    if (e.button !== 0) return;
-    const t = e.target;
-    if (!t || !t.closest) return;
-    /* カードや操作要素の上では通常動作を優先 */
-    if (t.closest(".card, button, a, input, select, textarea")) return;
-    panning = true; moved = false; pid = e.pointerId;
-    startX = e.clientX; startY = e.clientY;
-    baseLeft = board.scrollLeft;
-    vTarget = t.closest(".lane-body");
-    baseTop = vTarget ? vTarget.scrollTop : 0;
-  });
-
-  board.addEventListener("pointermove", e => {
-    if (!panning) return;
-    const dx = e.clientX - startX, dy = e.clientY - startY;
-    if (!moved) {
-      if (Math.abs(dx) + Math.abs(dy) < 3) return;   // 微小な揺れは無視
-      moved = true;
-      board.classList.add("panning");
-      try { board.setPointerCapture(pid); } catch (_) {}
-    }
-    e.preventDefault();
-    board.scrollLeft = baseLeft - dx;
-    if (vTarget) vTarget.scrollTop = baseTop - dy;
-  });
-
-  board.addEventListener("pointerup", endPan);
-  board.addEventListener("pointercancel", endPan);
-  window.addEventListener("blur", endPan);
-}
-
 function setKanbanType(t) { currentKanbanType = t; renderKanban(); }
 
 function onCardDragStart(ev) { dragId = ev.currentTarget.dataset.id; }
@@ -3776,9 +3669,6 @@ function termEndDate(term) { return new Date(term + 1989, 9, 1); }              
 
 /* --- ガント対象レコード --- */
 function ganttRecords() {
-  /* 表示中の期（t0以上 t1未満）に期間が重なる案件だけを対象にする */
-  const t0 = termStartDate(ganttTerm);
-  const t1 = termEndDate(ganttTerm);
   return activeRecords()
     .filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status))
     .filter(r => !(ganttHideDone && r.status === "完了"))
@@ -3791,8 +3681,6 @@ function ganttRecords() {
       return { rec: r, start, end, provisional: !r.workStart || !r.dueDate };
     })
     .filter(g => g.start && g.end)
-    /* 期間外（期の開始より前に終わる／期の終了以降に始まる）案件は表示しない */
-    .filter(g => g.end >= t0 && g.start < t1)
     .sort((a, b) => a.start - b.start);
 }
 
@@ -3897,8 +3785,7 @@ function ganttHtml() {
           }</div>`).join("")}
         </div>
       </div>
-      ${rows || `<div class="g-empty">${esc(termLabel(ganttTerm))}に該当する案件がありません（期間外の案件は表示されません。◀▶で期を切り替えてください）</div>`}
-      <div class="g-empty" id="g-noview" style="display:none">表示中の期間に該当する案件がありません（ドラッグで期間を移動するか、ズームを広げてください）</div>
+      ${rows || `<div class="g-empty">受注確定済みの案件がありません（確認中で受注→受注タブで最終登録すると表示されます）</div>`}
     </div>
   </div>
   ${schedExpandListHtml()}
@@ -3909,42 +3796,6 @@ function ganttHtml() {
     <span class="g-dv">▲ 納品日</span>
     <span class="g-hint">バー両端＝期日変更／本体＝期間移動（点線は開始日・納品日が未確定の仮表示）</span>
   </div>`;
-}
-
-/* 表示中の横スクロール範囲（ズームで絞り込んだ期間）に
-   バーが重ならない案件行を隠す。展開したタスク行は親案件に追従する。 */
-const GANTT_LABEL_W = 108;   // .g-label の固定幅（style.css と対応）
-function applyGanttViewFilter() {
-  const wrap = document.getElementById("gantt-wrap");
-  if (!wrap) return;
-  const inner = wrap.querySelector(".gantt-inner");
-  if (!inner) return;
-
-  const trackW = Math.max(inner.scrollWidth - GANTT_LABEL_W, 1);
-  const visL = wrap.scrollLeft;                                   // トラック座標での可視左端
-  const visR = wrap.scrollLeft + wrap.clientWidth - GANTT_LABEL_W; // 同 右端
-
-  let shown = 0, total = 0, hideCur = false;
-  inner.querySelectorAll(".g-row").forEach(row => {
-    if (row.classList.contains("g-headrow")) return;
-    if (row.dataset.id) {
-      total++;
-      const bar = row.querySelector(".g-bar");
-      if (!bar) { hideCur = false; row.classList.remove("g-row-off"); shown++; return; }
-      const l = parseFloat(bar.style.left) || 0;
-      const w = parseFloat(bar.style.width) || 0;
-      const barL = l / 100 * trackW;
-      const barR = (l + w) / 100 * trackW;
-      hideCur = (barR < visL || barL > visR);
-      row.classList.toggle("g-row-off", hideCur);
-      if (!hideCur) shown++;
-    } else {
-      row.classList.toggle("g-row-off", hideCur);
-    }
-  });
-
-  const nv = document.getElementById("g-noview");
-  if (nv) nv.style.display = (total > 0 && shown === 0) ? "" : "none";
 }
 
 /* --- ドラッグ操作（バー編集＋背景パン） --- */
@@ -4056,14 +3907,6 @@ function setupGantt() {
       wrap.scrollLeft = Math.max(inner.scrollWidth * ratio - wrap.clientWidth / 2, 0);
     }
   }
-
-  /* 可視期間に合わせた行の絞り込み（スクロール／パンに追従） */
-  let vfTimer = null;
-  wrap.addEventListener("scroll", () => {
-    if (vfTimer) return;
-    vfTimer = requestAnimationFrame(() => { vfTimer = null; applyGanttViewFilter(); });
-  });
-  requestAnimationFrame(applyGanttViewFilter);
 }
 
 /* バー両端のm/dラベルをバー位置に追従させる */
