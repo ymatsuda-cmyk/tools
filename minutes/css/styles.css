@@ -785,3 +785,8 @@ body {
 .todo-log-input-row { display: flex; gap: 6px; margin: 7px 0 0 24px; }
 .todo-log-input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 8px; border: 0.5px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-primary); }
 .todo-log-add { font-size: 11px; padding: 4px 10px; }
+.todo-card { cursor: pointer; }
+.todo-card:hover { border-color: var(--border-strong); }
+.todo-card.selected { border: 1.5px solid var(--border-accent); background: var(--bg-accent); }
+.todo-card.selected .todo-log-list { border-left-color: var(--border-accent); }
+.todo-log-target { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

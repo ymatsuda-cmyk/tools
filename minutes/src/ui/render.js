@@ -279,7 +279,7 @@ export function renderDetailHtml(item, state) {
       ${todos.length ? todos.map((t, i) => {
         const logs = t.logs || []
         return `
-        <div class="todo-card ${t.done ? 'done' : ''}">
+        <div class="todo-card ${t.done ? 'done' : ''} ${state.canEditContent && i === state.todoTarget ? 'selected' : ''}" data-index="${i}">
           <div class="todo-row ${t.done ? 'done' : ''}">
             <input type="checkbox" class="todo-check" data-index="${i}" ${t.done ? 'checked' : ''} ${state.canEditContent ? '' : 'disabled'} />
             <span ${markerAttrs('todos', i)}>${markerText(t.text)}</span>
@@ -289,10 +289,6 @@ export function renderDetailHtml(item, state) {
           ${logs.length ? `<div class="todo-log-list">${logs.map((l) => `
             <div class="todo-log-item"><span class="todo-log-date">${escapeHtml(fmtLogDate(l.date))}</span>${escapeHtml(l.text)}</div>
           `).join('')}</div>` : ''}
-          ${state.canEditContent ? `<div class="todo-log-input-row">
-            <input type="text" class="todo-log-input" data-index="${i}" placeholder="経過を追記" />
-            <button class="btn todo-log-add" data-index="${i}">追記</button>
-          </div>` : ''}
         </div>`
       }).join('') : '<p class="empty-section">未登録</p>'}
     `,
@@ -334,6 +330,14 @@ export function renderDetailHtml(item, state) {
           <div class="chat-input-row">
             <textarea id="rawchat-input" class="chat-textarea" rows="1" placeholder="質問する(Shift+Enterで改行)"></textarea>
             <button id="rawchat-send" class="btn" aria-label="送信"><i class="ti ti-send" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      ` : activeTab === 'todos' && state.canEditContent && todos.length ? `
+        <div class="chat-composer">
+          <div class="todo-log-target"><i class="ti ti-corner-down-right" aria-hidden="true"></i>追記先:${escapeHtml(plainTextOf(todos[state.todoTarget]?.text || ''))}</div>
+          <div class="chat-input-row">
+            <input type="text" id="todo-log-input" class="todo-log-input" placeholder="経過を追記(Enterで追記)" />
+            <button id="todo-log-add" class="btn">追記</button>
           </div>
         </div>
       ` : activeTab === 'memo' ? `

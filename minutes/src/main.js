@@ -23,6 +23,7 @@ let selectedKey = null
 const tagsByKey = {} // pageId(notionPageId) -> string[]、タグ編集の楽観更新用
 const memoByKey = {} // pageId(notionPageId) -> string、保存済みメモ
 const memoDraftByKey = {} // pageId -> string、入力中の未保存メモ。タブ切替でDOMが作り直されても内容を保つ
+const todoTargetByKey = {} // item.key -> 追記先ToDoのindex(案A:カードをクリックして選ぶ)
 const activeTabByKey = {} // item.key -> 'summary'|'decisions'|'todos'|'memo'、選択中タブの記憶
 
 // --- 一覧の絞り込み状態 ---
@@ -277,6 +278,7 @@ function paintDetail(target, item, state) {
     memo: memoDraftByKey[pid] !== undefined ? memoDraftByKey[pid] : memoByKey[pid],
     memoDirty: memoDraftByKey[pid] !== undefined && memoDraftByKey[pid] !== (memoByKey[pid] ?? ''),
     activeTab: activeTabByKey[item.key],
+    todoTarget: resolveTodoTarget(item, state),
     canEdit: isAdmin(loadConfig()), // タグ・タイトル・文字起こし・要約生成は管理者のみ
     canEditContent: true, // サマリ/議事/決定事項/ToDo/論点の編集は誰でも可能
     searchQuery,
@@ -317,19 +319,28 @@ function paintDetail(target, item, state) {
   target.querySelectorAll('.todo-check').forEach((el) => {
     el.addEventListener('change', () => toggleTodo(target, item, renderState, Number(el.dataset.index), el.checked))
   })
-  target.querySelectorAll('.todo-log-add').forEach((el) => {
-    el.addEventListener('click', () => {
-      const input = target.querySelector(`.todo-log-input[data-index="${el.dataset.index}"]`)
-      appendTodoLog(target, item, renderState, Number(el.dataset.index), input?.value || '')
+  // 案A:カードをクリックして追記先を選ぶ。追記欄は下部固定エリアに1つだけ置く。
+  target.querySelectorAll('.todo-card').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.todo-check')) return // チェックボックスは完了切り替えのみ
+      // マーカーを引くためのテキスト選択中は、再描画で選択が消えないよう追記先を変えない
+      const sel = window.getSelection()
+      if (sel && !sel.isCollapsed) return
+      const idx = Number(el.dataset.index)
+      if (todoTargetByKey[item.key] === idx) return
+      todoTargetByKey[item.key] = idx
+      paintDetail(target, item, state)
+      target.querySelector('#todo-log-input')?.focus()
     })
   })
-  target.querySelectorAll('.todo-log-input').forEach((el) => {
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) {
-        e.preventDefault()
-        appendTodoLog(target, item, renderState, Number(el.dataset.index), el.value)
-      }
-    })
+  const todoLogInput = target.querySelector('#todo-log-input')
+  const submitTodoLog = () => appendTodoLog(target, item, renderState, renderState.todoTarget, todoLogInput?.value || '')
+  target.querySelector('#todo-log-add')?.addEventListener('click', submitTodoLog)
+  todoLogInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault()
+      submitTodoLog()
+    }
   })
 
   target.querySelectorAll('.tag-remove').forEach((el) => {
@@ -342,6 +353,19 @@ function paintDetail(target, item, state) {
   target.querySelector('.tag-add-btn')?.addEventListener('click', () => {
     openTagPicker(target, item, renderState)
   })
+}
+
+/**
+ * 追記先のToDoを決める。選択済みで有効ならそれを使い、
+ * 未選択なら未完了の先頭(完了済みに追記することは少ないため)、全件完了なら先頭にする。
+ */
+function resolveTodoTarget(item, state) {
+  const todos = state.summary?.detail?.todos || []
+  if (!todos.length) return 0
+  const chosen = todoTargetByKey[item.key]
+  if (Number.isInteger(chosen) && chosen >= 0 && chosen < todos.length) return chosen
+  const firstOpen = todos.findIndex((t) => !(typeof t === 'object' && t.done))
+  return firstOpen >= 0 ? firstOpen : 0
 }
 
 /** ToDoに経過ログを1件追記してNotionに保存する(上書きではなく追記のみ) */
@@ -362,10 +386,14 @@ async function appendTodoLog(target, item, state, index, text) {
   }
 
   const updated = apply(next)
+  target.querySelector('#todo-log-input')?.focus() // 続けて追記しやすいよう入力欄にフォーカスを戻す
   try {
     await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
   } catch (err) {
     apply(prev)
+    // 失敗時は入力内容を戻して、書き直さずに再送できるようにする
+    const input = target.querySelector('#todo-log-input')
+    if (input) input.value = value
     alert('経過の保存に失敗しました: ' + (err.message || err))
   }
 }
