@@ -1,0 +1,8 @@
+{
+  "id": "mail-sync",
+  "description": "メールカード（api/mail, provider: jsonbin）向けの共有メールJSON",
+  "enabled": true,
+  "source_file": "/Users/yuya/Library/CloudStorage/OneDrive-株式会社ライターム/data/mail/mail.json",
+  "bin_id": "REPLACE_WITH_BIN_ID",
+  "api_key": "REPLACE_WITH_X_MASTER_KEY"
+}
