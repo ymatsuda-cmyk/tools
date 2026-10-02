@@ -110,8 +110,11 @@
   <button id="add-source">取り込み元を追加</button>
   <button id="add-space">スペースを追加</button>
   <span class="spacer"></span>
+  <label class="field" style="min-width:260px;">読み込み元URL
+    <input type="text" id="current-url" placeholder="../../data/clipstock/spaces.json">
+  </label>
   <button id="load-file">ファイルから読み込み</button>
-  <button id="load-current">いまの spaces.json を読み込み</button>
+  <button id="load-current">上のURLの spaces.json を読み込み</button>
   <button id="copy">コピー</button>
   <button id="download" class="primary">ダウンロード</button>
   <span id="status" class="status"></span>
@@ -170,7 +173,9 @@
 
 <script>
 const DB_OPTIONS = ['video', 'web'];
-const CURRENT_URL = '../../data/clipstock/spaces.json';
+// 読み込み元URLはヘッダーの入力欄で指定できる。未入力ならこの相対パス(このリポジトリの data/clipstock/)を使う
+const DEFAULT_CURRENT_URL = '../../data/clipstock/spaces.json';
+const CURRENT_URL_KEY = 'spaces-editor:current-url';
 
 let state = {
   version: 1,
@@ -560,11 +565,13 @@ document.getElementById('file').addEventListener('change', async (e) => {
 });
 
 document.getElementById('load-current').addEventListener('click', async () => {
+  const url = document.getElementById('current-url').value.trim() || DEFAULT_CURRENT_URL;
   try {
-    const res = await fetch(CURRENT_URL, { cache: 'no-store' });
+    localStorage.setItem(CURRENT_URL_KEY, url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     load(await res.json());
-    status('いまの spaces.json を読み込みました');
+    status('spaces.json を読み込みました(' + url + ')');
   } catch (err) {
     status('読み込めません: ' + String(err?.message ?? err));
   }
@@ -582,6 +589,8 @@ document.getElementById('parse').addEventListener('click', () => {
 });
 
 /* ---------- 初期表示 ---------- */
+
+document.getElementById('current-url').value = localStorage.getItem(CURRENT_URL_KEY) || DEFAULT_CURRENT_URL;
 
 load({
   version: 1,
