@@ -2120,19 +2120,19 @@ const KB_STATE_META = {
 
 /* start/end/actualStart/actualEnd は基準日からの日数 */
 const SAMPLE_KANBAN_TASKS = [
-  { title:'権限マスタ設計', classification:'設計', user:'佐藤', start:-5, end:-4 },
-  { title:'結合テスト環境構築', classification:'環境', user:'佐藤', note:'★', start:-7, end:-3, actualStart:-6 },
-  { title:'見積書ドラフト提出', classification:'管理', user:'松田', note:'★', start:-1, end:0, actualStart:-1 },
-  { title:'障害調査報告（C社）', classification:'保守', user:'佐藤', start:0, end:0 },
-  { title:'議事録共有', classification:'管理', user:'松田', start:-1, end:0, actualStart:0, actualEnd:0 },
-  { title:'API仕様書レビュー', classification:'設計', user:'松田', note:'★', start:-1, end:1, actualStart:-1 },
-  { title:'DB移行スクリプト', classification:'開発', user:'田中', note:'☆▲ 客先回答待ち', start:-4, end:4, actualStart:-4 },
-  { title:'画面設計 帳票出力', classification:'設計', user:'佐藤', note:'☆△', start:2, end:3 },
-  { title:'単体テスト 受注機能', classification:'テスト', user:'田中', start:0, end:6 },
-  { title:'週次定例資料', classification:'管理', user:'松田', start:-1, end:-1, actualStart:-1, actualEnd:-1 },
-  { title:'受注API 実装', classification:'開発', user:'田中', start:1, end:8, actualStart:1 },
-  { title:'性能試験シナリオ作成', classification:'テスト', user:'松田', start:6, end:9 },
-  { title:'リリース手順書', classification:'管理', user:'佐藤', start:8, end:10 }
+  { title:'権限マスタ設計', category:'案件A', classification:'設計', user:'佐藤', start:-5, end:-4 },
+  { title:'結合テスト環境構築', category:'案件A', classification:'環境', user:'佐藤', note:'★', start:-7, end:-3, actualStart:-6 },
+  { title:'見積書ドラフト提出', category:'案件A', classification:'管理', user:'松田', note:'★', start:-1, end:0, actualStart:-1 },
+  { title:'障害調査報告（C社）', category:'案件C', classification:'保守', user:'佐藤', start:0, end:0 },
+  { title:'議事録共有', category:'社内', classification:'管理', user:'松田', start:-1, end:0, actualStart:0, actualEnd:0 },
+  { title:'API仕様書レビュー', category:'案件A', classification:'設計', user:'松田', note:'★', start:-1, end:1, actualStart:-1 },
+  { title:'DB移行スクリプト', category:'案件B', classification:'開発', user:'田中', note:'☆▲ 客先回答待ち', start:-4, end:4, actualStart:-4 },
+  { title:'画面設計 帳票出力', category:'案件B', classification:'設計', user:'佐藤', note:'☆△', start:2, end:3 },
+  { title:'単体テスト 受注機能', category:'案件B', classification:'テスト', user:'田中', start:0, end:6 },
+  { title:'週次定例資料', category:'社内', classification:'管理', user:'松田', start:-1, end:-1, actualStart:-1, actualEnd:-1 },
+  { title:'受注API 実装', category:'案件B', classification:'開発', user:'田中', start:1, end:8, actualStart:1 },
+  { title:'性能試験シナリオ作成', category:'案件B', classification:'テスト', user:'松田', start:6, end:9 },
+  { title:'リリース手順書', category:'案件A', classification:'管理', user:'佐藤', start:8, end:10 }
 ];
 
 /* この見本の中だけで覚えておく展開状態（保存はしない） */
@@ -2150,10 +2150,12 @@ function kbMonday(d){ const t = new Date(d); const w = t.getDay(); t.setDate(t.g
 function kbSame(a, b){ return !!a && !!b && a.getTime() === b.getTime(); }
 function kbOverdue(t, today){ return t.status === 'done' || !t.end || t.end >= today ? 0 : Math.round((today - t.end) / 86400000); }
 
-/** kanban.api.js の classify と同じ振り分け */
-function kbClassify(tasks, today, user){
+/** kanban.api.js の classify と同じ振り分け。category/classification は大分類(A列)/小分類(B列)の完全一致絞り込み */
+function kbClassify(tasks, today, user, category, classification){
   const mon = kbMonday(today), sun = addDays(mon, 6), nmon = addDays(mon, 7), nsun = addDays(mon, 13);
-  const list = user ? tasks.filter(t => t.user === user) : tasks;
+  let list = user ? tasks.filter(t => t.user === user) : tasks;
+  if(category) list = list.filter(t => t.category === category);
+  if(classification) list = list.filter(t => t.classification === classification);
   const overlap = (t, a, b) => t.start && t.end && t.start <= b && t.end >= a;
   const rules = {
     late : { from:null, to:null, f: t => t.status !== 'done' && t.end && t.end < today },
@@ -2189,7 +2191,7 @@ function dummyKanban(m){
   const tasks = rows.map((r, i)=>{
     const note = String(r.note || '');
     const t = {
-      id: String(i), title: String(r.title || '(タイトルなし)'), classification: String(r.classification || ''),
+      id: String(i), title: String(r.title || '(タイトルなし)'), category: String(r.category || ''), classification: String(r.classification || ''),
       user: String(r.user || ''), start: at(r.start), end: at(r.end),
       actualStart: at(r.actualStart), actualEnd: at(r.actualEnd),
       star: note.startsWith('★'), held: note.includes('▲')
@@ -2198,7 +2200,7 @@ function dummyKanban(m){
     return t;
   });
   const age = Math.max(0, Number(F('d-kb-age').value) || 0);
-  return { phase:'ok', today, tasks, rows: kbClassify(tasks, today, m.user || ''),
+  return { phase:'ok', today, tasks, rows: kbClassify(tasks, today, m.user || '', m.category || '', m.classification || ''),
     updatedAt: new Date(Date.now() - age * 3600000) };
 }
 

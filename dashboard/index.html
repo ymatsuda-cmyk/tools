@@ -983,6 +983,16 @@
       <div class="hint">wbsシートN列の担当者名と完全一致で絞り込みます</div>
     </div>
     <div class="field" data-for="kanban">
+      <label>大分類で絞り込む</label>
+      <input type="text" id="mf-kb-category" placeholder="空欄ならすべて">
+      <div class="hint">wbsシートA列の大分類と完全一致で絞り込みます</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>小分類で絞り込む</label>
+      <input type="text" id="mf-kb-classification" placeholder="空欄ならすべて">
+      <div class="hint">wbsシートB列の小分類と完全一致で絞り込みます</div>
+    </div>
+    <div class="field" data-for="kanban">
       <label>展開時に一度に出す件数</label>
       <input type="number" id="mf-kb-max" value="8" min="1" max="30">
       <div class="hint">行を開いたときに並べる件数です。超えた分は「残りN件を表示」から出せます</div>
@@ -4468,7 +4478,7 @@ async function loadKanban(m){
 
 function kanbanRowsOf(m, cur){
   if(!kanbanApi || !cur.data) return null;
-  return kanbanApi.classify(cur.data.tasks, { user: m.user || '' });
+  return kanbanApi.classify(cur.data.tasks, { user: m.user || '', category: m.category || '', classification: m.classification || '' });
 }
 
 function kanbanItemHtml(t){
@@ -5446,6 +5456,8 @@ function fillMonitorForm(m){
   F('mf-kb-pass').value = '';
   F('mf-kb-pass').placeholder = m.id && kanbanPass(m.id) ? '保存済み（変えるときだけ入力）' : 'このブラウザにだけ保存します';
   F('mf-kb-user').value = m.user || '';
+  F('mf-kb-category').value = m.category || '';
+  F('mf-kb-classification').value = m.classification || '';
   F('mf-kb-max').value = m.max || 8;
   F('mf-kb-stale').value = m.staleHours || 24;
 }
@@ -5601,6 +5613,10 @@ function buildMonitor(){
     }else delete m.apiKey;
     const user = F('mf-kb-user').value.trim();
     if(user) m.user = user; else delete m.user;
+    const category = F('mf-kb-category').value.trim();
+    if(category) m.category = category; else delete m.category;
+    const classification = F('mf-kb-classification').value.trim();
+    if(classification) m.classification = classification; else delete m.classification;
     m.max = Math.max(1, Math.min(30, Number(F('mf-kb-max').value) || 8));
     const stale = Number(F('mf-kb-stale').value);
     if(stale > 0 && stale !== 24) m.staleHours = Math.min(720, Math.round(stale)); else delete m.staleHours;

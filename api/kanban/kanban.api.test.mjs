@@ -44,6 +44,24 @@ test('遅延・本日〆・今週・来週の振り分けと総数', async () =>
   assert.deepEqual([r.next.rest.length, r.next.total], [1, 1])
 })
 
+test('options.category / options.classification で大分類・小分類を絞り込める', async () => {
+  const now = new Date(2026, 8, 29)       // 火曜
+  const t = (id, s, e, extra = {}) => ({ id, title: 't' + id, start: serial(day(now, s)), end: serial(day(now, e)), ...extra })
+  const raw = {
+    schema: kanban.SCHEMA,
+    tasks: [
+      t(1, -1, 0, { category: '受注', classification: 'A社' }),
+      t(2, -1, 0, { category: '受注', classification: 'B社' }),
+      t(3, -1, 0, { category: '保守', classification: 'A社' })
+    ]
+  }
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => raw })
+  const data = await kanban.load({ binId: 'x' })
+  assert.equal(kanban.classify(data.tasks, { now, category: '受注' }).today.total, 2)
+  assert.equal(kanban.classify(data.tasks, { now, classification: 'A社' }).today.total, 2)
+  assert.equal(kanban.classify(data.tasks, { now, category: '受注', classification: 'A社' }).today.total, 1)
+})
+
 test('暗号文をパスフレーズなしで読むと locked', async () => {
   const env = await kanban.encrypt({ schema: kanban.SCHEMA, tasks: [] }, 'p', 1000)
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => env })

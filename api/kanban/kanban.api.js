@@ -148,7 +148,8 @@ export function toDate(v) {
  *   today: 予定完了日が今日（完了済みも総数に含む）
  *   week : 予定期間が今週（月〜日）に重なる（完了済みも総数に含む）
  *   next : 予定期間が来週に重なる（同上）
- * options.user を渡すとその担当者だけにする。
+ * options.user / options.category / options.classification を渡すと、
+ * それぞれ担当者（N列）・大分類（A列）・小分類（B列）が完全一致するものだけにする。
  * 戻り値: { late:{rest,done,total,from,to}, today:{...}, week:{...}, next:{...} }
  */
 export function classify(tasks, options = {}) {
@@ -157,7 +158,9 @@ export function classify(tasks, options = {}) {
   const sun = addDays(mon, 6)
   const nmon = addDays(mon, 7)
   const nsun = addDays(mon, 13)
-  const list = options.user ? tasks.filter(t => t.user === options.user) : tasks
+  let list = options.user ? tasks.filter(t => t.user === options.user) : tasks
+  if (options.category) list = list.filter(t => t.category === options.category)
+  if (options.classification) list = list.filter(t => t.classification === options.classification)
 
   const overlap = (t, a, b) => t.start && t.end && t.start <= b && t.end >= a
   const rules = {
