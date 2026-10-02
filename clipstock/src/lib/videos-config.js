@@ -1,6 +1,10 @@
 import { fetchBin, updateBin } from './jsonbin.js'
+import { loadSettings, saveSettings } from './llm-settings.js'
+import { exportPromptOverrides, importPromptOverrides } from './prompts.js'
+import { encryptConfig, decryptConfig, isEnvelope } from './jsonbin-crypto.js'
 
 const KEY = 'videos:config'
+const PASS_KEY = 'videos:jsonbin-pass' // Binの中身を暗号化するパスフレーズ。configには含めない(この端末にだけ置く)
 
 const DEFAULTS = {
   gasUrl: '',
@@ -31,6 +35,24 @@ export function jsonbinReady(c = loadConfig()) {
   return Boolean(c.useJsonbin && c.jsonbinBinId && c.jsonbinApiKey)
 }
 
+/** Binを暗号化するパスフレーズ。configには含めず、この端末のブラウザにだけ保存する */
+export function loadJsonbinPassphrase() {
+  try {
+    return localStorage.getItem(PASS_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+export function saveJsonbinPassphrase(p) {
+  try {
+    if (p) localStorage.setItem(PASS_KEY, p)
+    else localStorage.removeItem(PASS_KEY)
+  } catch {
+    // 保存できなくてもこのセッションの同期自体は続ける
+  }
+}
+
 /**
  * アプリ起動時に呼ぶ。JSONBinを使う設定になっていれば、クラウド側の内容で
  * localStorageの設定を上書きしてから返す。使っていない/取得に失敗したときは
@@ -38,20 +60,35 @@ export function jsonbinReady(c = loadConfig()) {
  *
  * useJsonbin・jsonbinBinId・jsonbinApiKey はクラウドへ聞きに行くための鍵なので、
  * クラウド側の値では上書きしない(常にこの端末で入力したものを使う)。
+ *
+ * Binには config だけでなく、AI接続(llm-settings.js)とAIへの指示(prompts.jsの上書き)も
+ * 並べて入れてあるので、そちらも合わせて取り込む。
+ * 中身が暗号文(封筒)なら、この端末のパスフレーズで復号してから取り込む。
  */
 export async function syncConfigFromJsonbin() {
   const local = loadConfig()
   if (!jsonbinReady(local)) return local
   try {
-    const remote = await fetchBin(local.jsonbinBinId, local.jsonbinApiKey)
+    let remote = await fetchBin(local.jsonbinBinId, local.jsonbinApiKey)
+    if (isEnvelope(remote)) {
+      const passphrase = loadJsonbinPassphrase()
+      if (!passphrase) {
+        console.warn('JSONBinの中身は暗号化されています。設定でパスフレーズを入力してください')
+        return local
+      }
+      remote = await decryptConfig(remote, passphrase)
+    }
+    const { llmSettings, promptOverrides, ...remoteConfig } = remote || {}
     const merged = {
       ...local,
-      ...remote,
+      ...remoteConfig,
       useJsonbin: local.useJsonbin,
       jsonbinBinId: local.jsonbinBinId,
       jsonbinApiKey: local.jsonbinApiKey,
     }
     saveConfig(merged)
+    if (llmSettings) saveSettings(llmSettings)
+    if (promptOverrides) importPromptOverrides(promptOverrides)
     return merged
   } catch (err) {
     console.warn('JSONBinから設定を取得できなかったため、この端末の設定を使います:', err)
@@ -63,10 +100,20 @@ export async function syncConfigFromJsonbin() {
  * 設定を保存したときに呼ぶ。JSONBinを使う設定なら、いま保存した内容をクラウド側にも書き込む。
  * 使わない設定なら何もしない。失敗したときは例外を投げるので、呼び出し側で状況を伝えること
  * (この端末への保存はすでに済んでいるので、ここで失敗してもデータは失われない)。
+ *
+ * config に加えて llmSettings(AI接続)と promptOverrides(AIへの指示)もまとめて書き込む。
+ * パスフレーズが設定されていれば暗号化して登録する。
  */
 export async function pushConfigToJsonbin(c) {
   if (!jsonbinReady(c)) return
-  await updateBin(c.jsonbinBinId, c.jsonbinApiKey, c)
+  const payload = {
+    ...c,
+    llmSettings: loadSettings(),
+    promptOverrides: exportPromptOverrides(),
+  }
+  const passphrase = loadJsonbinPassphrase()
+  const body = passphrase ? await encryptConfig(payload, passphrase) : payload
+  await updateBin(c.jsonbinBinId, c.jsonbinApiKey, body)
 }
 
 export function isConfigured(c) {

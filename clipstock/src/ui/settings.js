@@ -1,9 +1,17 @@
 import { escapeHtml } from './render.js'
-import { loadConfig, saveConfig, jsonbinReady, pushConfigToJsonbin } from '../lib/videos-config.js'
+import {
+  loadConfig,
+  saveConfig,
+  jsonbinReady,
+  pushConfigToJsonbin,
+  loadJsonbinPassphrase,
+  saveJsonbinPassphrase,
+} from '../lib/videos-config.js'
 import { loadSettings, saveSettings, newConnection } from '../lib/llm-settings.js'
 import { verifyCode } from '../lib/gas.js'
 import { PROMPT_IDS, promptLabel, promptOf, defaultPromptOf, savePrompt } from '../lib/prompts.js'
 import { fetchBin, createBin } from '../lib/jsonbin.js'
+import { isEnvelope, decryptConfig, encryptConfig } from '../lib/jsonbin-crypto.js'
 
 function roleLabel(role) {
   if (!role) return '<span class="muted">未確認</span>'
@@ -52,7 +60,7 @@ export function openSettings(onSaved, list) {
 
         <details class="json-block" id="cfg-jsonbin-block">
           <summary>設定の保存先(JSONBin)</summary>
-          <div class="foot-note">この設定(GAS URL・共有トークン・コード・一覧JSONの場所)はふだんこの端末のブラウザにだけ保存されます。JSONBin(jsonbin.io)のBinを用意すると、他の端末やブラウザでも同じ設定を使えます</div>
+          <div class="foot-note">この設定(GAS URL・共有トークン・コード・一覧JSONの場所・AI接続・AIへの指示)はふだんこの端末のブラウザにだけ保存されます。JSONBin(jsonbin.io)のBinを用意すると、他の端末やブラウザでも同じ設定を使えます</div>
           <label class="row">
             <input type="checkbox" id="cfg-jsonbin-use" ${config.useJsonbin ? 'checked' : ''} />
             <span>JSONBinを使う(設定をクラウドにも保存する)</span>
@@ -61,6 +69,9 @@ export function openSettings(onSaved, list) {
           <input id="cfg-jsonbin-id" class="input" value="${escapeHtml(config.jsonbinBinId)}" placeholder="jsonbin.ioで作成したBinのID" />
           <label class="field-label">APIキー(X-Master-Key)</label>
           <input id="cfg-jsonbin-key" class="input" type="password" value="${escapeHtml(config.jsonbinApiKey)}" placeholder="jsonbin.ioのアカウントで発行したキー" />
+          <label class="field-label">パスフレーズ(暗号化)</label>
+          <input id="cfg-jsonbin-pass" class="input" type="password" autocomplete="off" placeholder="${loadJsonbinPassphrase() ? '保存済み(変えるときだけ入力)' : 'このブラウザにだけ保存します'}" />
+          <div class="foot-note">Binの中身はこのパスフレーズでAES-256-GCM暗号化してから登録します。パスフレーズ自体はBinにもこの画面のJSONにも入らず、この端末のブラウザにだけ保存されます。空欄のまま保存すると平文のまま登録されるので、必ず入力してください</div>
           <div class="row">
             <button id="cfg-jsonbin-pull" class="btn">クラウドから取得</button>
             <button id="cfg-jsonbin-create" class="btn">空のBinを作る</button>
@@ -324,6 +335,10 @@ export function openSettings(onSaved, list) {
    * JSONで受け取った設定をフォームへ反映する。
    * 手貼りのJSON一括設定と、JSONBinからの取得の両方から使う。
    * ここで反映しても保存を押すまでは確定しない。
+   *
+   * connections はJSONBinからの取得なら parsed.llmSettings.connections(AI接続まるごと)、
+   * 手貼りのJSON一括設定なら parsed.connections(簡易形式)のどちらかで入ってくる。
+   * promptOverrides はJSONBinからの取得のときだけ入ってくる(AIへの指示)。
    */
   function applyParsedConfig(parsed) {
     if (parsed.gasUrl !== undefined) $('cfg-gas').value = parsed.gasUrl
@@ -331,7 +346,16 @@ export function openSettings(onSaved, list) {
     if (parsed.code !== undefined) $('cfg-code').value = parsed.code
     if (parsed.dataUrl !== undefined) $('cfg-data').value = parsed.dataUrl
 
-    if (Array.isArray(parsed.connections) && parsed.connections.length) {
+    const llm = parsed.llmSettings
+    if (llm && Array.isArray(llm.connections) && llm.connections.length) {
+      draft.length = 0
+      openConns.clear()
+      llm.connections.forEach((c) => draft.push(newConnection(c)))
+      const match = draft.find((c) => c.id === llm.activeConnectionId) || draft[0]
+      activeId = match.id
+      activeModel = match.models?.includes(llm.activeModel) ? llm.activeModel : match.models?.[0] ?? null
+      paintConns()
+    } else if (Array.isArray(parsed.connections) && parsed.connections.length) {
       draft.length = 0
       openConns.clear()
       parsed.connections.forEach((c) => draft.push(newConnection(c)))
@@ -340,6 +364,14 @@ export function openSettings(onSaved, list) {
       activeModel = match.models?.includes(parsed.activeModel) ? parsed.activeModel : match.models?.[0] ?? null
       paintConns()
     }
+
+    if (parsed.promptOverrides && typeof parsed.promptOverrides === 'object') {
+      PROMPT_IDS.forEach((id) => {
+        if (typeof parsed.promptOverrides[id] === 'string') promptDraft[id] = parsed.promptOverrides[id]
+      })
+      $('cfg-prompt-text').value = promptDraft[promptId]
+    }
+
     if (parsed.code) $('cfg-verify').click()
   }
 
@@ -364,7 +396,12 @@ export function openSettings(onSaved, list) {
     }
     msg.textContent = '取得中...'
     try {
-      const remote = await fetchBin(binId, apiKey)
+      let remote = await fetchBin(binId, apiKey)
+      if (isEnvelope(remote)) {
+        const passphrase = $('cfg-jsonbin-pass').value.trim() || loadJsonbinPassphrase()
+        if (!passphrase) throw new Error('暗号化されています。パスフレーズを入力してください')
+        remote = await decryptConfig(remote, passphrase)
+      }
       applyParsedConfig(remote)
       msg.innerHTML = '<span class="ok-text">クラウドの設定を反映しました(保存を押すまでは確定しません)</span>'
     } catch (err) {
@@ -387,7 +424,9 @@ export function openSettings(onSaved, list) {
         code: $('cfg-code').value.trim(),
         dataUrl: $('cfg-data').value.trim(),
       }
-      const id = await createBin(apiKey, snapshot, { name: 'clipstock-config' })
+      const passphrase = $('cfg-jsonbin-pass').value.trim() || loadJsonbinPassphrase()
+      const body = passphrase ? await encryptConfig(snapshot, passphrase) : snapshot
+      const id = await createBin(apiKey, body, { name: 'clipstock-config' })
       $('cfg-jsonbin-id').value = id
       msg.innerHTML = `<span class="ok-text">Binを作成しました(ID: ${escapeHtml(id)})。保存を押して確定してください</span>`
     } catch (err) {
@@ -424,6 +463,15 @@ export function openSettings(onSaved, list) {
       jsonbinBinId: $('cfg-jsonbin-id').value.trim(),
       jsonbinApiKey: $('cfg-jsonbin-key').value.trim(),
     }
+
+    // パスフレーズは空欄なら「保存済みのものを変えない」。JSONBinを使うなら必須(平文で登録させない)
+    const passInput = $('cfg-jsonbin-pass').value.trim()
+    if (newConfig.useJsonbin && !passInput && !loadJsonbinPassphrase()) {
+      $('cfg-jsonbin-msg').innerHTML = '<span class="error-text">JSONBinを使うにはパスフレーズを入力してください(中身を暗号化して登録するため)</span>'
+      return
+    }
+    if (passInput) saveJsonbinPassphrase(passInput)
+
     // この端末への保存は先に済ませる。クラウドへの書き込みが失敗しても消えないように
     saveConfig(newConfig)
     saveSettings({ ...settings, connections: draft, activeConnectionId: activeId, activeModel })

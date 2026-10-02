@@ -86,3 +86,15 @@ export function resetPrompt(id) {
   delete overrides[id]
   persist()
 }
+
+/** JSONBin同期用。いまの上書き内容をまとめて返す */
+export function exportPromptOverrides() {
+  return { ...overrides }
+}
+
+/** JSONBin同期用。他端末の上書き内容をまとめて取り込む */
+export function importPromptOverrides(obj) {
+  if (!obj || typeof obj !== 'object') return
+  overrides = { ...obj }
+  persist()
+}
