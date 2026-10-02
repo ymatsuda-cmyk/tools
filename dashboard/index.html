@@ -48,9 +48,11 @@
     -webkit-font-smoothing:antialiased;
   }
   .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
-  .wrap{max-width:1100px;margin:0 auto;padding:24px 20px 80px;}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px 80px;}
 
-  .dash-fixed{position:sticky;top:0;z-index:10;background:var(--bg);display:flow-root;}
+  /* dash-fixedの上側のすき間はpadding-top側に持たせる。wrap側に持たせると、
+     スクロール開始直後だけsticky化前の位置からガタつくため */
+  .dash-fixed{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:24px;display:flow-root;}
   .links-fixed{position:sticky;top:var(--dash-fixed-h,0px);z-index:5;background:var(--bg);display:flow-root;}
   header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
   header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:0.2px;}
