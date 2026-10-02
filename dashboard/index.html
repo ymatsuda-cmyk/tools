@@ -4549,7 +4549,6 @@ function kanbanLockHtml(m, cur){
 
 function kanbanBodyContent(m, st){
   const cur = st.cache;
-  if(!m.binId) return `<div class="mon-err">Bin ID が未設定です。⚙ から設定してください</div>`;
   if(cur.phase === 'locked') return kanbanLockHtml(m, cur);
   if(cur.error && !cur.data) return `<div class="mon-err">${esc(cur.error)}</div>`;
   const rows = kanbanRowsOf(m, cur);
