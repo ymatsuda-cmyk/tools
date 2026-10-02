@@ -2163,7 +2163,7 @@ function kbClassify(tasks, today, user, category, classification){
     today: { from:today, to:today, f: t => kbSame(t.end, today) },
     week : { from:mon, to:sun, f: t => overlap(t, mon, sun) },
     next : { from:nmon, to:nsun, f: t => overlap(t, nmon, nsun) },
-    todo : { from:null, to:null, f: t => t.status === 'todo' }
+    todo : { from:null, to:null, f: t => !t.start && !t.end }
   };
   const byEnd = (a, b) => (a.end ? a.end.getTime() : Infinity) - (b.end ? b.end.getTime() : Infinity);
   const out = {};
@@ -2251,7 +2251,7 @@ function kbRowHtml(m, row, r, scale, today){
       + `<span class="kb-seg done" style="width:${w(r.done.length)}"></span>`;
   const sub = row.key === 'late' ? '期限切れ'
     : row.key === 'today' ? `${kbMd(r.from)} 期限`
-    : row.key === 'todo' ? '日付を問わず未着手'
+    : row.key === 'todo' ? '開始日・終了日が未設定'
     : `${kbMd(r.from)}～${kbMd(r.to)}`;
   const pct = r.total ? Math.round(r.done.length / r.total * 100) : 0;
   const num = !row.total
@@ -2259,7 +2259,7 @@ function kbRowHtml(m, row, r, scale, today){
     : `<span>残 </span><b>${r.rest.length}</b><span> / ${r.total}</span>`;
   const progress = !row.total ? '' : r.total && !r.rest.length ? 'すべて完了' : r.total ? `消化 ${pct}%` : '';
   const tip = row.key === 'late' ? `遅延 ${r.rest.length}件`
-    : row.key === 'todo' ? `未着手 ${r.rest.length}件`
+    : row.key === 'todo' ? `日付未設定 ${r.rest.length}件`
     : `残り ${r.rest.length}（対応中${n('doing')} / 未着手${n('todo')} / 保留${n('held')}） 完了 ${r.done.length}`;
   const cls = ['kb-row', row.key === 'late' && r.rest.length ? 'late' : '', !r.rest.length ? 'zero' : '', isOpen ? 'open' : ''].filter(Boolean).join(' ');
   return `

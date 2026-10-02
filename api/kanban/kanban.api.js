@@ -149,7 +149,7 @@ export function toDate(v) {
  *   today: 予定完了日が今日（完了済みも総数に含む）
  *   week : 予定期間が今週（月〜日）に重なる（完了済みも総数に含む）
  *   next : 予定期間が来週に重なる（同上）
- *   todo : 未着手（日付に関係なく全部。件数のみ。他の行と重複してよい）
+ *   todo : 予定開始日・予定終了日がどちらも未設定（件数のみ。未完了のものだけ）
  * options.user / options.category / options.classification を渡すと、
  * それぞれ担当者（N列）・大分類（A列）・小分類（B列）が完全一致するものだけにする。
  * 戻り値: { late:{rest,done,total,from,to}, today:{...}, week:{...}, next:{...}, todo:{...} }
@@ -170,7 +170,7 @@ export function classify(tasks, options = {}) {
     today: { from: today, to: today, f: t => sameDay(t.end, today) },
     week:  { from: mon, to: sun, f: t => overlap(t, mon, sun) },
     next:  { from: nmon, to: nsun, f: t => overlap(t, nmon, nsun) },
-    todo:  { from: null, to: null, f: t => t.status === 'todo' }
+    todo:  { from: null, to: null, f: t => !t.start && !t.end }
   }
 
   const out = {}

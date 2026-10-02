@@ -4531,7 +4531,7 @@ function kanbanRowHtml(m, row, r, scale, st){
       + `<span class="kb-seg done" style="width:${w(r.done.length)}"></span>`;
   const sub = row.key === 'late' ? '期限切れ'
     : row.key === 'today' ? `${md(r.from)} 期限`
-    : row.key === 'todo' ? '日付を問わず未着手'
+    : row.key === 'todo' ? '開始日・終了日が未設定'
     : `${md(r.from)}～${md(r.to)}`;
   const pct = r.total ? Math.round(r.done.length / r.total * 100) : 0;
   const num = !row.total
@@ -4539,7 +4539,7 @@ function kanbanRowHtml(m, row, r, scale, st){
     : `<span>残 </span><b>${r.rest.length}</b><span> / ${r.total}</span>`;
   const progress = !row.total ? '' : r.total && !r.rest.length ? 'すべて完了' : r.total ? `消化 ${pct}%` : '';
   const tip = row.key === 'late' ? `遅延 ${r.rest.length}件`
-    : row.key === 'todo' ? `未着手 ${r.rest.length}件`
+    : row.key === 'todo' ? `日付未設定 ${r.rest.length}件`
     : `残り ${r.rest.length}（対応中${n('doing')} / 未着手${n('todo')} / 保留${n('held')}） 完了 ${r.done.length}`;
   const cls = ['kb-row', row.key === 'late' && r.rest.length ? 'late' : '', !r.rest.length ? 'zero' : '', isOpen ? 'open' : ''].filter(Boolean).join(' ');
   return `
