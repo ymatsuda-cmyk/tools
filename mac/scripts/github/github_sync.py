@@ -223,6 +223,19 @@ def has_staged_diff(g):
     return g.quiet("diff", "--cached", "--quiet").returncode != 0
 
 
+def push_if_ahead(g, remote_name, branch):
+    """working treeに差分が無くても、前回commitまで進んでpushだけ失敗した
+    状態が残っていることがある。そのときは差分なしのまま黙って終わってしまうので、
+    remoteより進んでいるcommitが無いか確認し、あればpushする。"""
+    g.quiet("fetch", remote_name, branch)
+    ahead = g.quiet("rev-list", f"{remote_name}/{branch}..HEAD", "--count")
+    if ahead.returncode != 0 or ahead.stdout.strip() in ("", "0"):
+        return
+    print(f"ローカルに未pushのcommitが{ahead.stdout.strip()}件あるためpushします")
+    g.run("push", remote_name, branch)
+    print(f"push 完了 : {remote_name}/{branch}")
+
+
 # ============================================================
 # 1設定ぶんの同期
 # ============================================================
@@ -306,6 +319,7 @@ def sync_config(config_path, dry_run=False):
     #
     if not has_staged_diff(g):
         print("差分なし")
+        push_if_ahead(g, config["remote_name"], config["branch"])
         return
 
     if dry_run:
@@ -333,6 +347,7 @@ def sync_config(config_path, dry_run=False):
     # rebase後に差分が吸収される場合があるため、commit直前でも再確認する
     if not has_staged_diff(g):
         print("差分なし（pull後に同期済み）")
+        push_if_ahead(g, config["remote_name"], config["branch"])
         return
 
     #
