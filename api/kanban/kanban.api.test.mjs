@@ -42,6 +42,7 @@ test('遅延・本日〆・今週・来週の振り分けと総数', async () =>
   assert.deepEqual([r.week.rest.length, r.week.total], [2, 3])   // 9/28〜10/4 に重なるのは 2・3・4
   assert.equal(r.week.rest.find(x => x.id === '4').status, 'held')
   assert.deepEqual([r.next.rest.length, r.next.total], [1, 1])
+  assert.deepEqual(r.todo.rest.map(x => x.id).sort(), ['1', '5'])   // 未着手は1・5（日付を問わない）
 })
 
 test('options.category / options.classification で大分類・小分類を絞り込める', async () => {
