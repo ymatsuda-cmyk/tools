@@ -1,0 +1,14 @@
+{
+  "id": "kanban-data-aes",
+  "description": "カンバンデータフォルダ（暗号化）",
+  "enabled": true,
+  "source_folder": "/Users/yuya/Library/CloudStorage/OneDrive-株式会社日本ビジネスアシスト/200_事業部/001_管理/output",
+  "repository_root": "/Users/yuya/tools",
+  "repo_subfolder": "data/kanban",
+  "branch": "main",
+  "commit_message": "auto: update kanban data (encrypted)",
+  "remote_name": "origin",
+
+  "account": "rtm",
+  "passphrase_file": "~/.config/github_aes_sync/jba.pass"
+}
