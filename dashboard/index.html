@@ -50,6 +50,8 @@
   .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
   .wrap{max-width:1100px;margin:0 auto;padding:24px 20px 80px;}
 
+  .dash-fixed{position:sticky;top:0;z-index:10;background:var(--bg);display:flow-root;}
+  .links-fixed{position:sticky;top:var(--dash-fixed-h,0px);z-index:5;background:var(--bg);display:flow-root;}
   header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
   header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:0.2px;}
   .head-actions{display:flex;gap:8px;}
@@ -550,6 +552,7 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="dash-fixed" id="dashFixed">
   <header>
     <h1 id="pageTitle">マイリソース</h1>
     <div class="head-actions">
@@ -564,10 +567,12 @@
     <button data-view="info">情報</button>
     <button type="button" class="add-tab" id="addMainTab" title="タブを追加" aria-label="タブを追加">＋</button>
   </div>
+  </div>
 
   <div class="status-line mono" id="statusLine">読み込み中…</div>
 
   <div class="view" data-view="links">
+  <div class="links-fixed" id="linksFixed">
   <div class="toolbar">
     <input type="text" class="search-input" id="searchInput" placeholder="検索">
     <div class="size-group" id="sizeGroup">
@@ -578,6 +583,7 @@
   </div>
 
   <div class="chips" id="chips"></div>
+  </div>
   <div class="grid" id="grid"></div>
   </div>
 
@@ -1435,6 +1441,8 @@ function renderTabStructure(){
       <div class="monitor-grid" id="customMonitorGrid-${esc(tab.id)}"></div>
       <div class="monitor-empty" id="customEmpty-${esc(tab.id)}">このタブに表示するカードはありません。</div>
     </div>`).join('');
+  // innerHTMLで作り直した直後なので、カスタムタブのグリッドにもドラッグ並び替えを付け直す
+  tabs.forEach(tab=>setupMonitorDnD('customMonitorGrid-' + tab.id));
   if(!['links','monitor','info',...tabs.map(tab=>tab.id)].includes(currentView)) currentView = 'links';
   document.querySelectorAll('.view').forEach(view=>{ view.hidden = view.dataset.view !== currentView; });
   document.querySelectorAll('#mainTabs button').forEach(button=>button.classList.toggle('active', button.dataset.view === currentView));
@@ -5286,6 +5294,16 @@ function stopMonitorLoop(){
 document.addEventListener('click', e=>{
   if(!e.target.closest('.calc-chip')) clearChipSelection();
 });
+
+/* リンクタブの検索・タグ切替を、上の固定ヘッダーの直下に隙間なく固定するための高さ連携 */
+(function setupDashFixedHeight(){
+  const dashFixed = document.getElementById('dashFixed');
+  if(!dashFixed) return;
+  const apply = ()=>document.documentElement.style.setProperty('--dash-fixed-h', dashFixed.offsetHeight + 'px');
+  apply();
+  if(window.ResizeObserver) new ResizeObserver(apply).observe(dashFixed);
+  else window.addEventListener('resize', apply);
+})();
 
 document.getElementById('mainTabs').addEventListener('click', e=>{
   const btn = e.target.closest('button');
