@@ -50,3 +50,21 @@ test('暗号文をパスフレーズなしで読むと locked', async () => {
   await assert.rejects(kanban.load({ binId: 'x' }), e => e.code === 'locked')
   assert.deepEqual((await kanban.load({ binId: 'x', passphrase: 'p' })).tasks, [])
 })
+
+test('binId も url も省略すると data/kanban/wbs-tasks.enc.json の既定URLを使う', async () => {
+  const raw = { schema: kanban.SCHEMA, tasks: [{ id: 1, title: 't1' }] }
+  let calledUrl = ''
+  globalThis.fetch = async (url) => { calledUrl = url; return { ok: true, status: 200, json: async () => raw } }
+  const data = await kanban.load({})
+  assert.match(calledUrl, /data\/kanban\/wbs-tasks\.enc\.json/)
+  assert.equal(data.tasks[0].title, 't1')
+})
+
+test('config.url を指定すると、そのURLからそのまま読む', async () => {
+  const raw = { schema: kanban.SCHEMA, tasks: [] }
+  let calledUrl = ''
+  globalThis.fetch = async (url) => { calledUrl = url; return { ok: true, status: 200, json: async () => raw } }
+  await kanban.load({ url: 'https://example.test/mirror.json' })
+  assert.match(calledUrl, /^https:\/\/example\.test\/mirror\.json\?t=\d+$/)
+})
+

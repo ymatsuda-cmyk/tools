@@ -2,7 +2,9 @@
 
 WBSカンバンアドイン（`addin/kanban`）が使っている Excel の `wbs` シートを、
 ダッシュボードなど Excel の外から「遅延・本日〆・今週・来週」で見るための入口です。
-JSONBin に置くデータは**暗号化**してあり、復号はブラウザの中だけで行います。
+取得先に置くデータは**暗号化**してあり、復号はブラウザの中だけで行います。
+既定の取得先は `data/kanban/wbs-tasks.enc.json`（GitHub Pages経由）です。旧方式の
+JSONBinにも引き続き対応しています。
 
 ```
 api/kanban/
@@ -25,14 +27,17 @@ Power Automate  … OneDrive for Business「ファイルが変更されたとき
 OneDrive  Apps/kanban-sync/wbs-tasks.json（平文。Microsoft 365 の中だけ）
   │ OneDrive アプリで Mac に同期
   ▼
-Mac  mac/scripts/jsonbin/jsonbin_sync.py（encrypt: true）
-  │ AES-256-GCM で暗号化して PUT（X-Master-Key はMacにだけ置く）
+Mac  mac/scripts/github/github_aes_sync.py（kanban_aes.json）
+  │ AES-256-GCM で暗号化して data/kanban/wbs-tasks.enc.json に commit / push
   ▼
-JSONBin（暗号文だけ）
-  │ GET /latest
+GitHub（リポジトリ内の暗号文だけ）→ GitHub Pages で配信
+  │ GET data/kanban/wbs-tasks.enc.json
   ▼
 ダッシュボード  kanban.api.js が復号・分類して描画
 ```
+
+旧方式（JSONBinに直接PUTする `mac/scripts/jsonbin/jsonbin_sync.py`）も
+`load({ binId, apiKey, keyType })` でそのまま読めます。
 
 平文が存在するのは Excel・OneDrive・Mac の中だけです。JSONBin とブラウザの通信経路、
 ダッシュボードの設定（`index.json`）には、タスクの中身もパスフレーズも入りません。
@@ -44,7 +49,11 @@ JSONBin（暗号文だけ）
 ```javascript
 const kanban = await import('/api/kanban/kanban.api.js')
 
-const data = await kanban.load({
+// 既定（data/kanban/wbs-tasks.enc.json）から読むだけなら passphrase だけでよい
+const data = await kanban.load({ passphrase: '…' })
+
+// 旧方式のJSONBinから読みたいときは binId を指定する
+const dataFromBin = await kanban.load({
   binId: '6512abcd…',
   apiKey: '',            // 公開Binなら空でよい
   keyType: 'access',     // 'access'（X-Access-Key）/ 'master'（X-Master-Key）
@@ -61,7 +70,7 @@ rows.week, rows.next
 
 | 関数 | 内容 |
 |---|---|
-| `load(config)` | JSONBinから読み、暗号文なら復号して `{ schema, updatedAt, tasks }` を返す |
+| `load(config)` | 既定（`data/kanban/wbs-tasks.enc.json`）または `config.url`/`config.binId` から読み、復号して `{ schema, updatedAt, tasks }` を返す |
 | `classify(tasks, { user, now })` | 4行ぶんに振り分ける。`user` で担当者を絞れる |
 | `decrypt(envelope, passphrase)` / `encrypt(json, passphrase)` | 暗号化の形式どおりに復号・暗号化 |
 | `overdueDays(task)` | 期限切れの日数 |
@@ -71,7 +80,6 @@ rows.week, rows.next
 
 | code | 意味 |
 |---|---|
-| `config` | Bin ID が無い |
 | `fetch` | 接続できない・キーが違う |
 | `empty` | Bin にまだ何も無い |
 | `locked` | 暗号文なのにパスフレーズが渡されていない |

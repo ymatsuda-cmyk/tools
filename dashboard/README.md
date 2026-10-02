@@ -403,20 +403,23 @@ WBSカンバンアドインの `wbs` シートを、**遅延・本日〆**と**�
 行を押すと、その行のタスクがアコーディオンで開きます（未完了が上、完了は取り消し線で下）。
 
 ```json
-{ "id": "wbs", "name": "WBSカンバン", "type": "kanban",
-  "binId": "6512abcd1f2e3a4b5c6d7e8f", "keyType": "none", "cardSize": "wide" }
+{ "id": "wbs", "name": "WBSカンバン", "type": "kanban", "cardSize": "wide" }
 ```
+
+`url`・`binId` をどちらも省略すると、既定の `data/kanban/wbs-tasks.enc.json`（GitHub Pages経由）から
+読みます。`mac/scripts/github/github_aes_sync.py` が暗号化して書き込んだものです。
 
 | キー | 内容 |
 |---|---|
-| `binId` | Mac の `jsonbin_sync.py` が暗号化して書き込む Bin |
-| `keyType` | `none`（公開Bin・既定のおすすめ）/ `access`（Access Key）/ `master` |
-| `apiKey` | `keyType` が `none` 以外のときの読み取りキー |
+| `url` | 取得元を直接指定したいときのURL。省略時は既定のURLを使う |
+| `binId` | 旧方式。`url` を省略し、JSONBinから読みたいときに指定する（`jsonbin_sync.py` が書き込むBin） |
+| `keyType` | `binId` 使用時のみ。`none`（公開Bin・既定のおすすめ）/ `access`（Access Key）/ `master` |
+| `apiKey` | `binId` 使用時、`keyType` が `none` 以外のときの読み取りキー |
 | `user` | その担当者（N列）だけにする。省略で全員 |
 | `max` | 行を開いたときに一度に出す件数。既定 8 |
 | `staleHours` | データの出力からこの時間を過ぎたら警告を出す。既定 24 |
 
-Bin の中身は暗号文です。**パスフレーズは `index.json` に入れません。**
+取得先の中身は暗号文です。**パスフレーズは `index.json` に入れません。**
 カードに入力欄が出るので、そこで入れるとこのブラウザの localStorage にだけ保存されます
 （追加・編集フォームの「パスフレーズ」欄でも入れられます）。端末やブラウザを変えたときは入れ直してください。
 カード下の「パスフレーズを消去」で、このブラウザから消せます。

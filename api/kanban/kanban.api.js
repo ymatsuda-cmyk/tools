@@ -3,16 +3,18 @@
  *
  * WBSカンバンアドイン（addin/kanban）が使っている Excel の wbs シートを、
  * Power Automate + Office Script（office-script/export-wbs.ts）が JSON にし、
- * Mac（mac/scripts/jsonbin/jsonbin_sync.py）が暗号化して JSONBin に置いたものを読む。
+ * Mac（mac/scripts/github/github_aes_sync.py）が暗号化して
+ * data/kanban/wbs-tasks.enc.json（GitHub Pages経由）に置いたものを読む。
+ * 旧方式の JSONBin（mac/scripts/jsonbin/jsonbin_sync.py）にも引き続き対応する。
  * ダッシュボードなど他の画面から「遅延・本日〆・今週・来週」の件数と中身を出すための入口。
  *
- * JSONBin の中身は暗号文だけ（形式は README.md の「暗号化の形式」）。
+ * 取得先の中身は暗号文だけ（形式は README.md の「暗号化の形式」）。
  * 復号は Web Crypto（AES-256-GCM / PBKDF2-SHA256）でブラウザ内だけで行い、
  * パスフレーズはこのモジュールでは保存しない（保存するかどうかは呼び出し側が決める）。
  *
  * 使い方:
  *   const kanban = await import('/api/kanban/kanban.api.js')
- *   const data = await kanban.load({ binId, apiKey, keyType: 'access', passphrase })
+ *   const data = await kanban.load({ passphrase })    // 既定は data/kanban/wbs-tasks.enc.json
  *   const rows = kanban.classify(data.tasks)          // 描画のたびに呼ぶ（日付で変わる）
  *   rows.late.rest / rows.today.rest / rows.today.done / rows.week.total ...
  *
@@ -23,6 +25,10 @@
 
 export const SCHEMA = 'wbs-tasks/v1'
 export const ENC = 'kanban-aesgcm/v1'
+
+/* github_aes_sync.py が置く既定の取得先（GitHub Pages）。config.url / config.binId が
+   どちらも無いときに使う */
+const DEFAULT_URL = 'https://ymatsuda-cmyk.github.io/tools-beta/data/kanban/wbs-tasks.enc.json'
 
 /* 行の並びと見出し。group が同じ行どうしでバーの長さの基準を揃える */
 export const ROWS = [
@@ -39,31 +45,33 @@ export const STATUS_LABELS = { todo: '未着手', doing: '対応中', held: '保
    ============================================================ */
 
 /**
- * JSONBin から読み、暗号文なら復号して { schema, updatedAt, tasks } を返す。
- *   config.binId      必須
- *   config.apiKey     任意。公開Binなら不要（中身は暗号文なので公開でも読まれて困らない）
- *   config.keyType    'access'（既定。X-Access-Key）/ 'master'（X-Master-Key）
+ * 暗号化されたJSONを読み、復号して { schema, updatedAt, tasks } を返す。
+ *   config.url        直接URLを指定（既定は DEFAULT_URL = data/kanban/wbs-tasks.enc.json）
+ *   config.binId      旧方式。JSONBinから読みたいときに指定（config.url より優先度低）
+ *   config.apiKey     JSONBin使用時のみ。公開Binなら不要（中身は暗号文なので公開でも読まれて困らない）
+ *   config.keyType    JSONBin使用時のみ。'access'（既定。X-Access-Key）/ 'master'（X-Master-Key）
  *   config.passphrase 暗号文のときに必須
- *   config.url        binId の代わりに直接URLを指定（テスト・ミラー用）
- * 失敗の理由は err.code で分かる: 'config' / 'fetch' / 'empty' / 'locked' / 'badpass' / 'format'
+ * 失敗の理由は err.code で分かる: 'fetch' / 'empty' / 'locked' / 'badpass' / 'format'
  */
 export async function load(config = {}) {
+  const isBin = !config.url && !!config.binId
   const url = config.url ||
-    (config.binId ? `https://api.jsonbin.io/v3/b/${encodeURIComponent(config.binId)}/latest` : '')
-  if (!url) throw fail('config', 'Bin ID が未設定です')
+    (config.binId ? `https://api.jsonbin.io/v3/b/${encodeURIComponent(config.binId)}/latest` : DEFAULT_URL)
+  const sep = url.includes('?') ? '&' : '?'
+  const fetchUrl = isBin ? url : `${url}${sep}t=${Date.now()}`  // 静的ファイルはCDNキャッシュを避ける
 
   const headers = { 'X-Bin-Meta': 'false' }
-  if (config.apiKey) headers[config.keyType === 'master' ? 'X-Master-Key' : 'X-Access-Key'] = config.apiKey
+  if (isBin && config.apiKey) headers[config.keyType === 'master' ? 'X-Master-Key' : 'X-Access-Key'] = config.apiKey
 
   let res
   try {
-    res = await fetch(url, { headers, cache: 'no-store' })
+    res = await fetch(fetchUrl, { headers, cache: 'no-store' })
   } catch (err) {
-    throw fail('fetch', `JSONBinに接続できません（${err.message || err}）`)
+    throw fail('fetch', `データを取得できません（${err.message || err}）`)
   }
   if (res.status === 404) throw fail('empty', 'まだ何も登録されていません')
-  if (res.status === 401 || res.status === 403) throw fail('fetch', `JSONBinのキーが違うか、読み取り権限がありません（HTTP ${res.status}）`)
-  if (!res.ok) throw fail('fetch', `JSONBinを取得できません（HTTP ${res.status}）`)
+  if (res.status === 401 || res.status === 403) throw fail('fetch', `読み取り権限がありません（HTTP ${res.status}）`)
+  if (!res.ok) throw fail('fetch', `データを取得できません（HTTP ${res.status}）`)
 
   let body = await res.json()
   if (body && body.record && !body.enc && !body.tasks) body = body.record  // X-Bin-Meta が効かなかったとき

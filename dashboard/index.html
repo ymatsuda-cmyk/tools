@@ -947,12 +947,17 @@
     </div>
 
     <div class="field" data-for="kanban">
-      <label>JSONBin Bin ID</label>
-      <input type="text" id="mf-kb-binid" placeholder="6512abcd1f2e3a4b5c6d7e8f">
-      <div class="hint">Mac の <span class="mono">jsonbin_sync.py</span> が暗号化して書き込むBinです。用意のしかたは <span class="mono">api/kanban/README.md</span> を見てください</div>
+      <label>データJSONのURL</label>
+      <input type="text" id="mf-kb-url" placeholder="https://ymatsuda-cmyk.github.io/tools-beta/data/kanban/wbs-tasks.enc.json">
+      <div class="hint">空欄なら既定のURL（<span class="mono">data/kanban/wbs-tasks.enc.json</span>）から取得します。中身は暗号文（<span class="mono">mac/scripts/github/github_aes_sync.py</span> が書き込みます）なので、公開URLでも読まれて困りません</div>
     </div>
     <div class="field" data-for="kanban">
-      <label>読み取りキー</label>
+      <label>JSONBin Bin ID（旧方式）</label>
+      <input type="text" id="mf-kb-binid" placeholder="6512abcd1f2e3a4b5c6d7e8f">
+      <div class="hint">上のURLが空欄のときだけ使います。Mac の <span class="mono">jsonbin_sync.py</span> が暗号化して書き込むBinです。用意のしかたは <span class="mono">api/kanban/README.md</span> を見てください</div>
+    </div>
+    <div class="field" data-for="kanban">
+      <label>読み取りキー（JSONBin使用時のみ）</label>
       <select id="mf-kb-keytype">
         <option value="none">なし（公開Bin）</option>
         <option value="access">Access Key（読み取り専用）</option>
@@ -4429,7 +4434,8 @@ async function loadKanban(m){
   try{
     const api = await kanbanModule();
     cur.data = await api.load({
-      binId: m.binId,
+      url: m.url || '',
+      binId: m.url ? '' : m.binId,
       apiKey: m.keyType === 'none' ? '' : m.apiKey,
       keyType: m.keyType,
       passphrase: kanbanPass(m.id)
@@ -5416,6 +5422,7 @@ function fillMonitorForm(m){
   F('mf-agent-dataurl').value = m.dataUrl || '';
   F('mf-agent-max').value = m.max || 5;
   F('mf-agent-url').value = m.dashboardUrl || '';
+  F('mf-kb-url').value = m.url || '';
   F('mf-kb-binid').value = m.binId || '';
   F('mf-kb-keytype').value = ['none','access','master'].includes(m.keyType) ? m.keyType : (m.apiKey ? 'access' : 'none');
   F('mf-kb-apikey').value = m.apiKey || '';
@@ -5565,12 +5572,13 @@ function buildMonitor(){
     if(dashboardUrl) m.dashboardUrl = dashboardUrl; else delete m.dashboardUrl;
   }
   if(type === 'kanban'){
+    const url = F('mf-kb-url').value.trim();
+    if(url) m.url = url; else delete m.url;
     const binId = F('mf-kb-binid').value.trim();
-    if(!binId) throw new Error('Bin ID を入力してください');
-    m.binId = binId;
+    if(binId) m.binId = binId; else delete m.binId;
     m.keyType = F('mf-kb-keytype').value;
     const apiKey = F('mf-kb-apikey').value.trim();
-    if(m.keyType !== 'none'){
+    if(!url && binId && m.keyType !== 'none'){
       if(!apiKey) throw new Error('読み取りキーを入力するか、「なし（公開Bin）」を選んでください');
       m.apiKey = apiKey;
     }else delete m.apiKey;
