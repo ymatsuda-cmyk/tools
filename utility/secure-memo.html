@@ -56,7 +56,11 @@ select{font:inherit;color:inherit;background:var(--panel);border:1px solid var(-
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
 
 /* アプリ */
-#app{height:100%;display:grid;grid-template-columns:280px 1fr;grid-template-rows:auto minmax(0,1fr)}
+#app{height:100%;display:grid;grid-template-columns:280px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);transition:grid-template-columns .22s ease}
+#app.side-hidden{grid-template-columns:0 minmax(0,1fr)}
+#app.side-hidden aside{visibility:hidden;border-right-color:transparent;transition:visibility 0s linear .22s}
+@media (prefers-reduced-motion:reduce){#app,#app.side-hidden aside{transition:none}}
+#sideBtn{margin-left:-4px}
 header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
 header .brand{font-weight:700;letter-spacing:.04em}
 #status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-right:auto;margin-left:12px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -69,7 +73,25 @@ header .brand{font-weight:700;letter-spacing:.04em}
 @keyframes blink{50%{opacity:.25}}
 @media (prefers-reduced-motion:reduce){#status[data-kind="busy"]::before{animation:none}}
 
-aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+aside>*{width:280px;flex-shrink:0}
+#tagCloud{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);max-height:112px;overflow:auto}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:1px 9px;font-size:12px;line-height:1.6;color:var(--ink);cursor:pointer}
+.chip .n{color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.8}
+#tagCloud .clear{font-size:12px}
+#list .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+#list .tags .chip{display:inline-flex;font-size:11px;line-height:1.6;padding:0 7px;margin:0;color:var(--muted);border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+#list .tags .chip:hover{color:var(--ink);border-color:var(--muted)}
+.tagbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:5px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+.tagbar>svg{width:15px;height:15px;color:var(--muted);flex:none}
+.tagbar .chip{padding-right:3px}
+.tagbar .chip .rm{border:0;background:none;padding:0;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;color:var(--muted)}
+.tagbar .chip .rm:hover{background:var(--line);color:var(--ink)}
+.tagbar .chip .rm svg{width:11px;height:11px}
+.tagbar input{border:0;background:none;padding:2px 4px;width:9em;font-size:13px;min-width:6em}
+.tagbar input:focus-visible{outline:none;box-shadow:inset 0 -1px 0 var(--accent)}
 aside .search{padding:10px;border-bottom:1px solid var(--line)}
 #list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
 #list li{border-bottom:1px solid var(--line);padding:8px 14px 10px;cursor:pointer}
@@ -139,7 +161,10 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 .statusbar #pos{margin-right:auto}
 #back{display:none}
 @media (max-width:720px){
-  #app{grid-template-columns:1fr}
+  #app,#app.side-hidden{grid-template-columns:1fr}
+  #app.side-hidden aside{visibility:visible}
+  aside>*{width:auto}
+  #sideBtn{display:none}
   #app.editing aside{display:none}
   #app:not(.editing) main{display:none}
   #back{display:inline-block}
@@ -234,6 +259,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 <section id="app" class="hidden">
   <header>
     <button id="back" aria-label="一覧に戻る">一覧</button>
+    <button class="ib" id="sideBtn" title="一覧を隠す（⌘B / Ctrl+B）" aria-label="一覧を隠す" aria-expanded="true" aria-controls="side"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15"/><path d="M5.5 8.5h2M5.5 11.5h2"/></svg></button>
     <span class="brand">MemoStock</span>
     <span id="status" role="status"></span>
     <button id="newBtn" class="primary">新規メモ</button>
@@ -241,8 +267,10 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
     <button id="openSettings2">設定</button>
     <button id="lockBtn">ロック</button>
   </header>
-  <aside>
-    <div class="search"><input id="q" type="search" placeholder="メモを検索" aria-label="メモを検索"></div>
+  <aside id="side">
+    <div class="search"><input id="q" type="search" placeholder="メモを検索（#タグ で絞り込み）" aria-label="メモを検索"></div>
+    <div id="tagCloud" class="hidden" aria-label="タグで絞り込み"></div>
+    <datalist id="tagList"></datalist>
     <ul id="list"></ul>
   </aside>
   <main>
@@ -277,9 +305,9 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib danger" id="delBtn" title="このメモを削除" aria-label="このメモを削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>
       <div id="panes" class="layout-single">
-        <div class="pane" data-i="0"><div class="tabbar" role="tablist" aria-label="開いているメモ（左／上）"></div><div class="host"></div></div>
+        <div class="pane" data-i="0"><div class="tabbar" role="tablist" aria-label="開いているメモ（左／上）"></div><div class="tagbar hidden"></div><div class="host"></div></div>
         <div class="splitter" role="separator" tabindex="0" aria-label="分割位置（矢印キーで調整、ダブルクリックで中央）"></div>
-        <div class="pane" data-i="1"><div class="tabbar" role="tablist" aria-label="開いているメモ（右／下）"></div><div class="host"></div></div>
+        <div class="pane" data-i="1"><div class="tabbar" role="tablist" aria-label="開いているメモ（右／下）"></div><div class="tagbar hidden"></div><div class="host"></div></div>
       </div>
       <div class="statusbar">
         <span id="pos"></span>
@@ -416,7 +444,7 @@ function saveSettingsSoon(){
 }
 
 /* ---------- 表示設定 ---------- */
-const VIEW_DEFAULT = { fs:12, lh:1.8, ln:false };
+const VIEW_DEFAULT = { fs:12, lh:1.8, ln:false, side:true };
 let viewCfg = { ...VIEW_DEFAULT };
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 function applyView(persist){
@@ -427,6 +455,11 @@ function applyView(persist){
   $('#fsVal').textContent = viewCfg.fs + 'pt';
   $('#lhVal').textContent = viewCfg.lh.toFixed(1);
   $('#lnBtn').setAttribute('aria-pressed', viewCfg.ln ? 'true' : 'false');
+  $('#app').classList.toggle('side-hidden', viewCfg.side === false);
+  const sb = $('#sideBtn');
+  sb.setAttribute('aria-expanded', viewCfg.side === false ? 'false' : 'true');
+  sb.title = viewCfg.side === false ? '一覧を表示（⌘B / Ctrl+B）' : '一覧を隠す（⌘B / Ctrl+B）';
+  sb.setAttribute('aria-label', viewCfg.side === false ? '一覧を表示' : '一覧を隠す');
   if (persist && settings){ settings.view = { ...viewCfg }; saveSettingsSoon(); }
   if (typeof panes !== 'undefined') for (const p of panes) if (p.view){
     p.view.dispatch({ effects: lnComp.reconfigure(lnExt()) });
@@ -438,7 +471,15 @@ $('#fsDown').onclick = () => { viewCfg.fs -= 1;   applyView(true); };
 $('#lhUp').onclick   = () => { viewCfg.lh += 0.1; applyView(true); };
 $('#lhDown').onclick = () => { viewCfg.lh -= 0.1; applyView(true); };
 $('#lnBtn').onclick  = () => { viewCfg.ln = !viewCfg.ln; applyView(true); };
-$('#viewReset').onclick = () => { viewCfg = { ...VIEW_DEFAULT, ln:viewCfg.ln }; applyView(true); };
+$('#viewReset').onclick = () => { viewCfg = { ...VIEW_DEFAULT, ln:viewCfg.ln, side:viewCfg.side }; applyView(true); };
+function toggleSide(show){
+  viewCfg.side = show ?? (viewCfg.side === false);
+  applyView(true);
+}
+$('#sideBtn').onclick = () => toggleSide();
+$('#app').addEventListener('transitionend', e => {
+  if (e.target === $('#app') && typeof panes !== 'undefined') for (const p of panes) p.view?.requestMeasure();
+});
 
 /* ---------- 暗号 ---------- */
 const b2a = u8 => { let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); };
@@ -517,7 +558,7 @@ async function getMemo(id){
 }
 async function putMemo(m, sha){
   const { id, name, body, createdAt, updatedAt } = m;
-  const env = await seal({ id, name, body, createdAt, updatedAt }, 'encrypted-memo');
+  const env = await seal({ id, name, tags:tagsOf(m), body, createdAt, updatedAt }, 'encrypted-memo');
   const payload = { message:`Update memo ${id}`, content:b2a(te.encode(JSON.stringify(env, null, 2))), branch:cfg().branch };
   if (sha) payload.sha = sha;
   const r = await gh(fileURL(id), { method:'PUT', body:JSON.stringify(payload) });
@@ -544,7 +585,7 @@ const find = id => memos.find(m => m.id === id);
 function applyRemote(r){
   const local = find(r.id);
   if (!local){ memos.push(r); return; }
-  Object.assign(local, { name:r.name, body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
+  Object.assign(local, { name:r.name, tags:tagsOf(r), body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
   if (r.id === renamingId) renamingId = null;
   for (const p of panes){ if (p.active === r.id) replaceDoc(p.view, r.body); else p.states.delete(r.id); }
 }
@@ -574,10 +615,10 @@ async function sync(){
       if (!f) return;
       const local = find(id);
       if (local && dirtyIds.has(id)){
-        if (f.memo.body !== local.body || f.memo.name !== local.name){
+        if (f.memo.body !== local.body || f.memo.name !== local.name || tagsOf(f.memo).join('\n') !== tagsOf(local).join('\n')){
           // 両方で編集された：手元を残し、GitHub 側は競合コピーとして別メモにする
           const now = Date.now();
-          memos.push({ id:crypto.randomUUID(), name:`${nameOf(f.memo)}（競合コピー）`, body:f.memo.body, createdAt:now, updatedAt:now });
+          memos.push({ id:crypto.randomUUID(), name:`${nameOf(f.memo)}（競合コピー）`, tags:tagsOf(f.memo), body:f.memo.body, createdAt:now, updatedAt:now });
           dirtyIds.add(memos[memos.length-1].id);
         }
       }else{
@@ -694,7 +735,7 @@ function makeState(text){
 
 /* ---------- タブと分割 ---------- */
 const panes = [...document.querySelectorAll('#panes .pane')].map((el, i) => ({
-  i, el, tabbar: el.querySelector('.tabbar'), host: el.querySelector('.host'),
+  i, el, tabbar: el.querySelector('.tabbar'), tagbar: el.querySelector('.tagbar'), host: el.querySelector('.host'),
   tabs: [], active: null, view: null, states: new Map()   // states: id -> EditorState（タブごとの undo 履歴）
 }));
 let layout = 'single', activePane = 0, splitPct = 50;
@@ -857,6 +898,7 @@ function renderTabs(){
   }
 }
 function renderPanes(){
+  renderTagbars();
   const el = $('#panes');
   el.className = 'layout-' + layout;
   el.style.setProperty('--split', splitPct + '%');
@@ -1015,11 +1057,22 @@ function fmt(ts){
 }
 function renderList(){
   if (renamingId && document.activeElement?.classList.contains('rename')) return;  // 名前の入力中は描き直さない
-  const q = $('#q').value.trim().toLowerCase();
+  renderTagCloud();
+  const toks = $('#q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tagToks = toks.filter(w => w.startsWith('#') && w.length > 1).map(w => w.slice(1));
+  const words = toks.filter(w => !w.startsWith('#'));
+  const want = [...activeTags].map(x => x.toLowerCase());
+  const q = toks.length || want.length;
   const list = $('#list');
   list.textContent = '';
-  const items = memos.filter(m => !q || nameOf(m).toLowerCase().includes(q) || m.body.toLowerCase().includes(q))
-                     .sort((a,b) => b.updatedAt - a.updatedAt);
+  const items = memos.filter(m => {
+    const tl = tagsOf(m).map(x => x.toLowerCase());
+    if (!want.every(x => tl.includes(x))) return false;
+    if (!tagToks.every(x => tl.some(y => y.includes(x)))) return false;
+    if (!words.length) return true;
+    const hay = (nameOf(m) + '\n' + m.body + '\n' + tl.join(' ')).toLowerCase();
+    return words.every(w => hay.includes(w));
+  }).sort((a,b) => b.updatedAt - a.updatedAt);
   if (!items.length){
     const li = document.createElement('li'); li.className = 'none';
     li.textContent = q ? '一致するメモはありません' : 'メモはまだありません。「新規メモ」から作成できます';
@@ -1067,6 +1120,105 @@ function renderList(){
     ss.className = 's';
     ss.textContent = `${fmt(m.updatedAt)}　${firstLine(m.body)}`;
     li.append(ss);
+    if (tagsOf(m).length){
+      const tg = document.createElement('div'); tg.className = 'tags';
+      for (const x of tagsOf(m)){
+        const c = document.createElement('button');
+        c.className = 'chip'; c.textContent = x;
+        c.title = `「${x}」で絞り込み`;
+        c.onclick = e => { e.stopPropagation(); toggleFilter(x); };
+        tg.append(c);
+      }
+      li.append(tg);
+    }
+  }
+}
+
+/* ---------- タグ ---------- */
+let activeTags = new Set();
+const tagsOf = m => Array.isArray(m?.tags) ? m.tags : [];
+const normTag = s => s.replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+const tagIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l9.5 9.5-8 8z"/><circle cx="7.5" cy="8.5" r="1.4"/></svg>';
+function allTags(){
+  const c = new Map();
+  for (const m of memos) for (const x of tagsOf(m)) c.set(x, (c.get(x) || 0) + 1);
+  return [...c].sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'));
+}
+function setTags(m, tags, focusPane){
+  m.tags = tags; m.updatedAt = Date.now();
+  dirtyIds.add(m.id); schedule();
+  renderList(); renderTabs(); renderTagbars(focusPane); updateStatusBar();
+}
+function addTags(m, raw, focusPane){
+  const cur = tagsOf(m), next = [...cur];
+  for (const part of raw.split(/[,、]/)){
+    const x = normTag(part);
+    if (x && !next.some(y => y.toLowerCase() === x.toLowerCase())) next.push(x);
+  }
+  if (next.length !== cur.length) setTags(m, next, focusPane);
+  else renderTagbars(focusPane);
+}
+function toggleFilter(x){
+  activeTags.has(x) ? activeTags.delete(x) : activeTags.add(x);
+  if (viewCfg.side === false) toggleSide(true);
+  renderList();
+}
+function renderTagCloud(){
+  const tags = allTags(), el = $('#tagCloud');
+  for (const x of [...activeTags]) if (!tags.some(([y]) => y === x)) activeTags.delete(x);
+  el.textContent = '';
+  el.classList.toggle('hidden', !tags.length);
+  for (const [x, n] of tags){
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.setAttribute('aria-pressed', activeTags.has(x) ? 'true' : 'false');
+    b.append(x);
+    const c = document.createElement('span'); c.className = 'n'; c.textContent = n;
+    b.append(c);
+    b.onclick = () => toggleFilter(x);
+    el.append(b);
+  }
+  if (activeTags.size){
+    const clr = document.createElement('button');
+    clr.className = 'link clear'; clr.textContent = '絞り込みを解除';
+    clr.onclick = () => { activeTags.clear(); renderList(); };
+    el.append(clr);
+  }
+  const dl = $('#tagList'); dl.textContent = '';
+  for (const [x] of tags){ const o = document.createElement('option'); o.value = x; dl.append(o); }
+}
+function renderTagbars(focusPane){
+  for (const p of panes){
+    const bar = p.tagbar;
+    if (p !== focusPane && bar.contains(document.activeElement)) continue;   // 入力中は描き直さない
+    bar.textContent = '';
+    const m = find(p.active);
+    bar.classList.toggle('hidden', !m);
+    if (!m) continue;
+    bar.insertAdjacentHTML('beforeend', tagIcon);
+    for (const x of tagsOf(m)){
+      const chip = document.createElement('span'); chip.className = 'chip';
+      const lb = document.createElement('span'); lb.textContent = x;
+      lb.title = `「${x}」で絞り込み`; lb.onclick = () => toggleFilter(x);
+      const rm = document.createElement('button'); rm.className = 'rm';
+      rm.innerHTML = closeIcon; rm.setAttribute('aria-label', `タグ「${x}」を外す`); rm.title = 'タグを外す';
+      rm.onclick = () => setTags(m, tagsOf(m).filter(y => y !== x));
+      chip.append(lb, rm);
+      bar.append(chip);
+    }
+    const input = document.createElement('input');
+    input.placeholder = tagsOf(m).length ? '＋タグ' : 'タグを追加';
+    input.setAttribute('list', 'tagList');
+    input.setAttribute('aria-label', 'タグを追加（Enter で確定）');
+    input.onkeydown = e => {
+      if (e.isComposing) return;
+      if (e.key === 'Enter' || e.key === ','){ e.preventDefault(); const v = input.value; input.value = ''; if (v.trim()) addTags(m, v, p); }
+      else if (e.key === 'Backspace' && !input.value && tagsOf(m).length){ e.preventDefault(); setTags(m, tagsOf(m).slice(0, -1), p); }
+      else if (e.key === 'Escape'){ input.value = ''; input.blur(); }
+    };
+    input.onblur = () => { if (input.value.trim()) addTags(m, input.value); };
+    bar.append(input);
+    if (p === focusPane) input.focus();
   }
 }
 function newMemo(){
@@ -1094,6 +1246,7 @@ $('#lockBtn').onclick = lock;
 
 document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); sync(); }
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && pass){ e.preventDefault(); toggleSide(); }
 });
 const hasPending = () => dirtyIds.size || pendingDeletes.size;
 window.addEventListener('beforeunload', e => { if (pass && hasPending()){ e.preventDefault(); e.returnValue = ''; } });
