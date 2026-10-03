@@ -35,12 +35,22 @@ input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--
 
 /* ロック画面 */
 #lock{min-height:100%;display:grid;place-items:center;padding:24px}
-#lockForm{width:min(360px,100%);display:grid;gap:14px}
+#lock .box{width:min(440px,100%);display:grid;gap:16px}
+#lock form{display:grid;gap:12px}
+#lock .lead{margin:0;font-size:13px;color:var(--muted)}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{border:0;border-radius:0;background:none;padding:8px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:500}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px 12px;margin:0;display:grid;gap:10px}
+legend{font-size:13px;font-weight:500;padding:0 4px}
+select{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.ro{display:flex;gap:8px}.ro input{font-variant-numeric:tabular-nums;color:var(--muted)}
 #lock h1{font-size:30px;font-weight:700;margin:0;letter-spacing:.04em;display:flex;align-items:center;gap:10px}
 #lock h1 svg{width:26px;height:26px;color:var(--accent)}
 #lock .dest{margin:0;color:var(--muted);font-size:13px;word-break:break-all}
 #lock .note{margin:0;color:var(--muted);font-size:12px}
 #lock label{display:grid;gap:4px;font-size:13px}
+#lock .hint{font-size:12px;color:var(--muted);margin:0}
 .msg{color:var(--warn);font-size:13px;min-height:1.3em;margin:0}
 .msg.info{color:var(--ink)}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
@@ -126,18 +136,71 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 <body>
 
 <section id="lock">
-  <form id="lockForm" autocomplete="off">
+  <div class="box">
     <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>暗号メモ</h1>
-    <p class="dest" id="dest"></p>
-    <label>パスフレーズ<input id="pass" type="password" autocomplete="current-password"></label>
-    <label id="pass2Wrap" class="hidden">確認のためもう一度<input id="pass2" type="password" autocomplete="new-password"></label>
-    <p class="msg" id="lockMsg" role="status"></p>
-    <div class="row">
-      <button type="button" class="link" id="openSettings1">接続設定</button>
-      <button type="submit" class="primary" id="unlockBtn">開く</button>
+
+    <!-- 接続済みの端末 -->
+    <form id="unlockForm" class="hidden" autocomplete="off">
+      <p class="dest" id="dest"></p>
+      <label>パスフレーズ<input id="pass" type="password" autocomplete="current-password"></label>
+      <p class="msg" id="unlockMsg" role="status"></p>
+      <div class="row">
+        <button type="button" class="link" id="forgetBtn">別の設定を使う</button>
+        <button type="submit" class="primary" id="unlockBtn">開く</button>
+      </div>
+    </form>
+
+    <!-- 初回 -->
+    <div id="setup" class="hidden">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tabLoad" aria-selected="true">JSONBin から読み込む</button>
+        <button type="button" role="tab" id="tabNew" aria-selected="false">手入力で設定</button>
+      </div>
+
+      <form id="loadForm" autocomplete="off" style="margin-top:14px">
+        <p class="lead">別の端末で保存した設定を JSONBin から読み込みます。</p>
+        <label>Bin ID<input name="binId" required></label>
+        <div class="two">
+          <label>JSONBin のキー<input name="key" type="password" required></label>
+          <label>キーの種類<select name="keyType"><option value="access">Access Key</option><option value="master">Master Key</option></select></label>
+        </div>
+        <label>パスフレーズ<input name="pass" type="password" required autocomplete="current-password"></label>
+        <p class="msg" id="loadMsg" role="status"></p>
+        <div class="row"><span></span><button type="submit" class="primary" id="loadBtn">読み込んで開く</button></div>
+      </form>
+
+      <form id="newForm" class="hidden" autocomplete="off" style="margin-top:14px">
+        <p class="lead">入力した設定はパスフレーズで暗号化して JSONBin に保存します。同じパスフレーズでメモも暗号化します。</p>
+        <fieldset><legend>GitHub（メモの保存先）</legend>
+          <div class="two">
+            <label>オーナー<input name="owner" placeholder="ユーザー名 or 組織名" required></label>
+            <label>リポジトリ<input name="repo" placeholder="my-memos" required></label>
+          </div>
+          <div class="two">
+            <label>ブランチ<input name="branch" value="main" required></label>
+            <label>保存フォルダ<input name="folder" value="memos" required></label>
+          </div>
+          <label>アクセストークン<input name="token" type="password" placeholder="github_pat_…" required></label>
+        </fieldset>
+        <fieldset><legend>JSONBin（設定の保存先）</legend>
+          <div class="two">
+            <label>JSONBin のキー<input name="key" type="password" required></label>
+            <label>キーの種類<select name="keyType"><option value="access">Access Key</option><option value="master">Master Key</option></select></label>
+          </div>
+          <label>Bin ID（空欄なら新しく作成）<input name="binId"></label>
+          <p class="hint">Access Key を使う場合は、Bins の Create・Read・Update 権限を付けてください。</p>
+        </fieldset>
+        <fieldset><legend>パスフレーズ</legend>
+          <label>パスフレーズ（8文字以上）<input name="pass" type="password" required minlength="8" autocomplete="new-password"></label>
+          <label>確認のためもう一度<input name="pass2" type="password" required autocomplete="new-password"></label>
+        </fieldset>
+        <p class="msg" id="newMsg" role="status"></p>
+        <div class="row"><span></span><button type="submit" class="primary" id="newBtnSave">保存して開く</button></div>
+      </form>
     </div>
-    <p class="note">メモはこのブラウザ内で暗号化してから GitHub に送ります。パスフレーズを忘れると誰にも復元できません。</p>
-  </form>
+
+    <p class="note">設定もメモも、このブラウザ内で暗号化してから送ります。パスフレーズを忘れると誰にも復元できません。</p>
+  </div>
 </section>
 
 <section id="app" class="hidden">
@@ -193,18 +256,25 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
-    <h2>GitHub の接続設定</h2>
-    <div class="two">
-      <label>オーナー<input name="owner" placeholder="ユーザー名 or 組織名" required></label>
-      <label>リポジトリ<input name="repo" placeholder="my-memos" required></label>
-    </div>
-    <div class="two">
-      <label>ブランチ<input name="branch" value="main" required></label>
-      <label>保存フォルダ<input name="folder" value="memos" required></label>
-    </div>
-    <label>アクセストークン<input name="token" type="password" placeholder="github_pat_…" autocomplete="off"></label>
-    <label class="check"><input type="checkbox" name="remember" checked>トークンをこのブラウザに保存する</label>
-    <p>メモは 1件ずつ「保存フォルダ/ランダムなID.json」として保存されます。ファイル名からタイトルは分かりません。Fine-grained token で対象リポジトリだけに「Contents: Read and write」を付け、リポジトリは Private にしてください。</p>
+    <h2>設定</h2>
+    <fieldset><legend>GitHub（メモの保存先）</legend>
+      <div class="two">
+        <label>オーナー<input name="owner" required></label>
+        <label>リポジトリ<input name="repo" required></label>
+      </div>
+      <div class="two">
+        <label>ブランチ<input name="branch" required></label>
+        <label>保存フォルダ<input name="folder" required></label>
+      </div>
+      <label>アクセストークン<input name="token" type="password" required autocomplete="off"></label>
+    </fieldset>
+    <fieldset><legend>JSONBin（設定の保存先）</legend>
+      <label>Bin ID（他の端末で読み込むときに使います）
+        <span class="ro"><input id="binIdView" readonly><button type="button" id="copyBin">コピー</button></span>
+      </label>
+      <button type="button" class="danger" id="forgetConn">この端末から接続情報を消去してロック</button>
+    </fieldset>
+    <p>保存すると、設定は暗号化されて JSONBin に送られます。</p>
     <div class="row">
       <button value="cancel" formnovalidate>キャンセル</button>
       <button value="ok" class="primary">保存</button>
@@ -244,26 +314,78 @@ let pendingDeletes = new Set(); // GitHub から削除待ちのメモ
 let currentId = null;
 let syncing = false, syncAgain = false;
 let syncTimer = null, localTimer = null, lastSync = 0;
-let sessionToken = '';
 const states = new Map();       // id -> EditorState（メモごとの undo 履歴）
 
 /* ---------- 保存領域 ---------- */
 const store = {
   get(k){ try{ return localStorage.getItem(k); }catch{ return null; } },
-  set(k,v){ try{ localStorage.setItem(k,v); }catch{} }
+  set(k,v){ try{ localStorage.setItem(k,v); }catch{} },
+  del(k){ try{ localStorage.removeItem(k); }catch{} }
 };
+// この端末に残すのは JSONBin への接続情報と、暗号化済みの設定の控えだけ
+const conn = {
+  get(){ try{ return JSON.parse(store.get('memo.jsonbin') || 'null'); }catch{ return null; } },
+  set(c){ store.set('memo.jsonbin', JSON.stringify(c)); },
+  clear(){ store.del('memo.jsonbin'); store.del('memo.cfgcache'); }
+};
+let settings = null;   // { github:{owner,repo,branch,folder,token}, view:{fs,lh,ln} } 復号後のみメモリ上に持つ
+let cfgTimer = null;
 function cfg(){
-  let c = {};
-  try{ c = JSON.parse(store.get('memo.cfg') || '{}'); }catch{}
-  return { owner:'', repo:'', branch:'main', folder:'memos', ...c, token: c.token || sessionToken || '' };
+  return { owner:'', repo:'', branch:'main', folder:'memos', token:'', ...(settings?.github || {}) };
+}
+
+/* ---------- JSONBin ---------- */
+const JB = 'https://api.jsonbin.io/v3/b';
+function jbHeaders(c, json){
+  const h = {};
+  h[c.keyType === 'master' ? 'X-Master-Key' : 'X-Access-Key'] = c.key;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+function jbErr(status){
+  const m = {
+    400:'Bin ID の形式が正しくありません（400）',
+    401:'JSONBin のキーが正しくないか、この Bin を操作する権限がありません（401）',
+    403:'JSONBin のキーにこの操作の権限がありません（403）。Access Key の権限を確認してください',
+    404:'Bin ID が見つかりません（404）',
+    429:'JSONBin の利用上限に達しました（429）'
+  };
+  return new Error(m[status] || `JSONBin がエラーを返しました（${status}）`);
+}
+async function jbRead(c){
+  const r = await fetch(`${JB}/${encodeURIComponent(c.binId)}/latest?meta=false`, { headers:jbHeaders(c), cache:'no-store' });
+  if (!r.ok) throw jbErr(r.status);
+  return r.json();
+}
+async function jbWrite(c, env){
+  if (c.binId){
+    const r = await fetch(`${JB}/${encodeURIComponent(c.binId)}`, { method:'PUT', headers:jbHeaders(c, true), body:JSON.stringify(env) });
+    if (!r.ok) throw jbErr(r.status);
+    return c.binId;
+  }
+  const r = await fetch(JB, { method:'POST', headers:{ ...jbHeaders(c, true), 'X-Bin-Private':'true', 'X-Bin-Name':'secure-memo-settings' }, body:JSON.stringify(env) });
+  if (!r.ok) throw jbErr(r.status);
+  return (await r.json()).metadata.id;
+}
+async function saveSettings(){
+  clearTimeout(cfgTimer); cfgTimer = null;
+  if (!settings || !pass) return;
+  const env = await seal({ ...settings, updatedAt:Date.now() }, 'encrypted-settings');
+  store.set('memo.cfgcache', JSON.stringify(env));
+  const c = conn.get();
+  const id = await jbWrite(c, env);
+  if (c.binId !== id){ c.binId = id; conn.set(c); }
+}
+function saveSettingsSoon(){
+  clearTimeout(cfgTimer);
+  cfgTimer = setTimeout(() => saveSettings().catch(err => setStatus(err instanceof TypeError ? '設定を JSONBin に保存できませんでした（オフライン）' : err.message, 'err')), 3000);
 }
 
 /* ---------- 表示設定 ---------- */
 const VIEW_DEFAULT = { fs:12, lh:1.8, ln:false };
 let viewCfg = { ...VIEW_DEFAULT };
-try{ viewCfg = { ...VIEW_DEFAULT, ...JSON.parse(store.get('memo.view') || '{}') }; }catch{}
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
-function applyView(){
+function applyView(persist){
   viewCfg.fs = clamp(Math.round(viewCfg.fs*2)/2, 8, 32);
   viewCfg.lh = clamp(Math.round(viewCfg.lh*10)/10, 1.0, 3.0);
   document.documentElement.style.setProperty('--fs', viewCfg.fs + 'pt');
@@ -271,18 +393,18 @@ function applyView(){
   $('#fsVal').textContent = viewCfg.fs + 'pt';
   $('#lhVal').textContent = viewCfg.lh.toFixed(1);
   $('#lnBtn').setAttribute('aria-pressed', viewCfg.ln ? 'true' : 'false');
-  store.set('memo.view', JSON.stringify(viewCfg));
+  if (persist && settings){ settings.view = { ...viewCfg }; saveSettingsSoon(); }
   if (view){
     view.dispatch({ effects: lnComp.reconfigure(viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : []) });
     view.requestMeasure();
   }
 }
-$('#fsUp').onclick   = () => { viewCfg.fs += 1;   applyView(); };
-$('#fsDown').onclick = () => { viewCfg.fs -= 1;   applyView(); };
-$('#lhUp').onclick   = () => { viewCfg.lh += 0.1; applyView(); };
-$('#lhDown').onclick = () => { viewCfg.lh -= 0.1; applyView(); };
-$('#lnBtn').onclick  = () => { viewCfg.ln = !viewCfg.ln; applyView(); };
-$('#viewReset').onclick = () => { viewCfg = { ...VIEW_DEFAULT, ln:viewCfg.ln }; applyView(); };
+$('#fsUp').onclick   = () => { viewCfg.fs += 1;   applyView(true); };
+$('#fsDown').onclick = () => { viewCfg.fs -= 1;   applyView(true); };
+$('#lhUp').onclick   = () => { viewCfg.lh += 0.1; applyView(true); };
+$('#lhDown').onclick = () => { viewCfg.lh -= 0.1; applyView(true); };
+$('#lnBtn').onclick  = () => { viewCfg.ln = !viewCfg.ln; applyView(true); };
+$('#viewReset').onclick = () => { viewCfg = { ...VIEW_DEFAULT, ln:viewCfg.ln }; applyView(true); };
 
 /* ---------- 暗号 ---------- */
 const b2a = u8 => { let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); };
@@ -668,132 +790,227 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ---------- ロック／解除 ---------- */
-function showDest(){
-  const c = cfg();
-  $('#dest').textContent = c.owner && c.repo
-    ? `保存先 ${c.owner}/${c.repo}/${folder()}/（${c.branch}）`
-    : '最初に「接続設定」で保存先の GitHub リポジトリを登録してください。';
+const PASS_MISMATCH = 'GitHub のメモが、このパスフレーズとは別のパスフレーズで暗号化されています';
+
+// GitHub 上のメモがこのパスフレーズで読めるか確かめる
+async function verifyMemos(listing){
+  if (!listing || !listing.size) return;
+  const [firstId] = listing.keys();
+  const f = await getFile(fileURL(firstId));
+  if (!f) return;
+  try{ await unseal(f.env); }catch(err){ throw err.message === 'BADPASS' ? new Error(PASS_MISMATCH) : err; }
+  if (f.env.kdf.iterations === ITER) currentSalt = f.env.kdf.salt;
 }
-function lockMsg(t, info){ const el = $('#lockMsg'); el.textContent = t; el.classList.toggle('info', !!info); }
 
-$('#lockForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const c = cfg();
-  if (!c.owner || !c.repo || !c.token){ openSettings(); return; }
-  const p = $('#pass').value;
-  if (!p){ lockMsg('パスフレーズを入力してください'); return; }
+// 設定を復号できた後に、メモを開く
+async function openNotebook(){
+  viewCfg = { ...VIEW_DEFAULT, ...(settings.view || {}) };
+  let listing = null, offline = false;
+  try{ listing = await listDir(); }
+  catch(err){ if (err instanceof TypeError) offline = true; else throw err; }
 
-  const btn = $('#unlockBtn');
-  btn.disabled = true; btn.textContent = '開いています…';
-  pass = p; keys = new Map(); currentSalt = null;
-  try{
-    let listing = null, offline = false;
-    try{ listing = await listDir(); }
-    catch(err){ if (err instanceof TypeError) offline = true; else throw err; }
+  let cache = null;
+  const lc = store.get('memo.local2');
+  if (lc){ try{ cache = await unseal(JSON.parse(lc)); }catch(err){ if (offline) throw new Error(PASS_MISMATCH); } }
+  if (offline && !cache) throw new Error('GitHub に接続できず、このブラウザにもメモの控えがありません');
 
-    // 手元の控え
-    let cache = null;
-    const lc = store.get('memo.local2');
-    if (lc){ try{ cache = await unseal(JSON.parse(lc)); }catch(err){ if (offline) throw err; } }
-    if (offline && !cache) throw new Error('GitHub に接続できず、このブラウザにも控えがありません');
-
-    let imported = [];
-    if (listing && listing.size){
-      // パスフレーズ確認：1件復号してみる
-      const [firstId] = listing.keys();
-      const f = await getFile(fileURL(firstId));
-      if (f){ await unseal(f.env); if (f.env.kdf.iterations === ITER) currentSalt = f.env.kdf.salt; }
-    }else if (listing && !cache){
-      await checkRepo();
-      // 旧形式（memos.json 1ファイル）があれば取り込む
-      const legacyPath = c.path || 'memos.json';
-      const legacy = await getFile(`${repoURL()}/contents/${enc(legacyPath)}`).catch(() => null);
-      if (legacy && legacy.env && legacy.env.format === 'encrypted-memos'){
+  let imported = [];
+  if (listing && listing.size){
+    await verifyMemos(listing);
+  }else if (listing && !cache){
+    await checkRepo();
+    // 旧形式（memos.json 1ファイル）があれば取り込む
+    const legacy = await getFile(`${repoURL()}/contents/memos.json`).catch(() => null);
+    if (legacy && legacy.env && legacy.env.format === 'encrypted-memos'){
+      try{
         const old = await unseal(legacy.env);
         imported = (old.memos || []).filter(m => !m.deleted).map(m => ({ id:m.id, body:m.body, createdAt:m.createdAt, updatedAt:m.updatedAt }));
-        if (legacy.env.kdf.iterations === ITER) currentSalt = legacy.env.kdf.salt;
-      }else{
-        const wrap = $('#pass2Wrap');
-        if (wrap.classList.contains('hidden')){
-          wrap.classList.remove('hidden'); $('#pass2').focus();
-          lockMsg('このフォルダにはまだメモがありません。新しく始めるので、同じパスフレーズをもう一度入力してください。', true);
-          pass = null; return;
-        }
-        if ($('#pass2').value !== p){ lockMsg('2つのパスフレーズが一致しません'); pass = null; return; }
-      }
+      }catch{}
     }
-
-    memos = cache?.memos || [];
-    shas = cache?.shas || {};
-    dirtyIds = new Set(cache?.dirty || []);
-    pendingDeletes = new Set(cache?.deletes || []);
-    for (const m of imported){ if (!find(m.id)){ memos.push(m); dirtyIds.add(m.id); } }
-    currentId = null; states.clear();
-
-    $('#pass').value = ''; $('#pass2').value = '';
-    $('#pass2Wrap').classList.add('hidden');
-    lockMsg('');
-    $('#lock').classList.add('hidden');
-    $('#app').classList.remove('hidden');
-    applyView(); renderList(); renderEditor();
-
-    if (offline) setStatus('オフラインです。このブラウザの控えを表示しています', 'err');
-    else sync();
-  }catch(err){
-    pass = null; keys = new Map();
-    lockMsg(err.message === 'BADPASS' ? 'パスフレーズが違います' : err.message);
-  }finally{
-    btn.disabled = false; btn.textContent = '開く';
   }
+
+  memos = cache?.memos || [];
+  shas = cache?.shas || {};
+  dirtyIds = new Set(cache?.dirty || []);
+  pendingDeletes = new Set(cache?.deletes || []);
+  for (const m of imported){ if (!find(m.id)){ memos.push(m); dirtyIds.add(m.id); } }
+  currentId = null; states.clear();
+
+  document.querySelectorAll('#lock input[type=password]').forEach(i => i.value = '');
+  $('#lock').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  applyView(); renderList(); renderEditor();
+
+  if (offline) setStatus('オフラインです。このブラウザの控えを表示しています', 'err');
+  else sync();
+}
+
+function resetSecrets(){ pass = null; keys = new Map(); currentSalt = null; settings = null; }
+function friendly(err){ return err instanceof TypeError ? 'ネットワークに接続できません' : err.message; }
+async function busy(btn, label, fn){
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = label;
+  try{ await fn(); } finally{ btn.disabled = false; btn.textContent = orig; }
+}
+
+// 1) 接続済みの端末：パスフレーズだけで開く
+$('#unlockForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const p = $('#pass').value, msg = $('#unlockMsg');
+  if (!p){ msg.textContent = 'パスフレーズを入力してください'; return; }
+  busy($('#unlockBtn'), '開いています…', async () => {
+    resetSecrets(); pass = p; msg.textContent = '';
+    try{
+      let env;
+      try{
+        env = await jbRead(conn.get());
+        store.set('memo.cfgcache', JSON.stringify(env));
+      }catch(err){
+        const cached = store.get('memo.cfgcache');
+        if (err instanceof TypeError && cached) env = JSON.parse(cached); else throw err;
+      }
+      try{ settings = await unseal(env); }catch(err){ throw err.message === 'BADPASS' ? new Error('パスフレーズが違います') : err; }
+      await openNotebook();
+    }catch(err){ resetSecrets(); msg.textContent = friendly(err); }
+  });
 });
 
+// 2) 初回：JSONBin から読み込む
+$('#loadForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, msg = $('#loadMsg');
+  const c = { binId:f.binId.value.trim(), key:f.key.value.trim(), keyType:f.keyType.value };
+  busy($('#loadBtn'), '読み込んでいます…', async () => {
+    resetSecrets(); pass = f.pass.value; msg.textContent = '';
+    try{
+      const env = await jbRead(c);
+      try{ settings = await unseal(env); }catch(err){ throw err.message === 'BADPASS' ? new Error('パスフレーズが違うか、この Bin は暗号メモの設定ではありません') : err; }
+      if (!settings.github) throw new Error('この Bin は暗号メモの設定ではありません');
+      conn.set(c);
+      store.set('memo.cfgcache', JSON.stringify(env));
+      await openNotebook();
+    }catch(err){ resetSecrets(); msg.textContent = friendly(err); }
+  });
+});
+
+// 3) 初回：手入力で設定し、JSONBin に保存
+$('#newForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, msg = $('#newMsg');
+  if (f.pass.value !== f.pass2.value){ msg.textContent = '2つのパスフレーズが一致しません'; return; }
+  busy($('#newBtnSave'), '保存しています…', async () => {
+    resetSecrets(); pass = f.pass.value; msg.textContent = '';
+    try{
+      settings = {
+        github:{ owner:f.owner.value.trim(), repo:f.repo.value.trim(), branch:f.branch.value.trim() || 'main',
+                 folder:f.folder.value.trim().replace(/^\/+|\/+$/g, '') || 'memos', token:f.token.value.trim() },
+        view:{ ...VIEW_DEFAULT }
+      };
+      await checkRepo();
+      await verifyMemos(await listDir());       // 既存メモと同じパスフレーズか先に確認
+      const c = { binId:f.binId.value.trim(), key:f.key.value.trim(), keyType:f.keyType.value };
+      const env = await seal({ ...settings, updatedAt:Date.now() }, 'encrypted-settings');
+      c.binId = await jbWrite(c, env);
+      conn.set(c);
+      store.set('memo.cfgcache', JSON.stringify(env));
+      store.del('memo.cfg');                      // 旧バージョンの平文設定を消す
+      await openNotebook();
+    }catch(err){ resetSecrets(); msg.textContent = friendly(err); }
+  });
+});
+
+function setTab(which){
+  $('#tabLoad').setAttribute('aria-selected', which === 'load');
+  $('#tabNew').setAttribute('aria-selected', which === 'new');
+  $('#loadForm').classList.toggle('hidden', which !== 'load');
+  $('#newForm').classList.toggle('hidden', which !== 'new');
+}
+$('#tabLoad').onclick = () => setTab('load');
+$('#tabNew').onclick = () => setTab('new');
+
+function showLockView(){
+  const c = conn.get();
+  $('#unlockForm').classList.toggle('hidden', !c);
+  $('#setup').classList.toggle('hidden', !!c);
+  document.querySelectorAll('#lock .msg').forEach(m => m.textContent = '');
+  if (c){
+    $('#dest').textContent = `JSONBin の設定（Bin ID ${c.binId}）で開きます。`;
+    $('#pass').focus();
+  }else{
+    // 旧バージョンの設定があれば手入力欄に下書きとして入れる
+    try{
+      const old = JSON.parse(store.get('memo.cfg') || 'null');
+      if (old){
+        const f = $('#newForm');
+        for (const k of ['owner','repo','branch','folder','token']) if (old[k]) f[k].value = old[k];
+        setTab('new');
+      }
+    }catch{}
+  }
+}
+$('#forgetBtn').onclick = () => {
+  if (!confirm('この端末から JSONBin の接続情報を消去します。設定そのものは JSONBin に残ります。')) return;
+  conn.clear(); showLockView();
+};
+
 async function lock(){
+  if (cfgTimer) await saveSettings().catch(() => {});
   if (hasPending()){ await saveLocal(); await sync(); }
-  pass = null; keys = new Map(); currentSalt = null;
+  resetSecrets();
   memos = []; shas = {}; dirtyIds = new Set(); pendingDeletes = new Set();
   currentId = null; states.clear();
   if (view){ view.destroy(); view = null; }
   clearTimeout(syncTimer); clearTimeout(localTimer);
+  viewCfg = { ...VIEW_DEFAULT }; applyView();
   $('#app').classList.add('hidden');
   $('#lock').classList.remove('hidden');
-  showDest(); lockMsg('');
-  $('#pass').focus();
+  showLockView();
 }
 
-/* ---------- 設定 ---------- */
+/* ---------- 設定ダイアログ ---------- */
 const dlg = $('#settings');
 function openSettings(){
   const c = cfg(), f = $('#settingsForm');
   f.owner.value = c.owner; f.repo.value = c.repo;
   f.branch.value = c.branch; f.folder.value = c.folder;
   f.token.value = c.token;
-  f.remember.checked = !sessionToken;
+  $('#binIdView').value = conn.get()?.binId || '';
   dlg.showModal();
 }
-dlg.addEventListener('close', () => {
-  if (dlg.returnValue !== 'ok') return;
+dlg.addEventListener('close', async () => {
+  if (dlg.returnValue !== 'ok' || !settings) return;
   const f = $('#settingsForm');
   const prev = cfg();
-  const c = {
+  settings.github = {
     owner:f.owner.value.trim(), repo:f.repo.value.trim(),
     branch:f.branch.value.trim() || 'main',
-    folder:f.folder.value.trim().replace(/^\/+|\/+$/g, '') || 'memos'
+    folder:f.folder.value.trim().replace(/^\/+|\/+$/g, '') || 'memos',
+    token:f.token.value.trim()
   };
-  if (prev.path) c.path = prev.path;
-  const token = f.token.value.trim();
-  if (f.remember.checked){ c.token = token; sessionToken = ''; } else { sessionToken = token; }
-  const moved = prev.owner !== c.owner || prev.repo !== c.repo || prev.branch !== c.branch || prev.folder !== c.folder;
-  store.set('memo.cfg', JSON.stringify(c));
-  if (moved){ shas = {}; for (const m of memos) dirtyIds.add(m.id); }  // 保存先が変わったら全件を送り直す
-  showDest();
-  if (pass) sync();
+  const c = cfg();
+  if (prev.owner !== c.owner || prev.repo !== c.repo || prev.branch !== c.branch || prev.folder !== c.folder){
+    shas = {}; for (const m of memos) dirtyIds.add(m.id);   // 保存先が変わったら全件を送り直す
+  }
+  setStatus('設定を保存中…', 'busy');
+  try{ await saveSettings(); setStatus('設定を保存しました', 'ok'); }
+  catch(err){ setStatus(err instanceof TypeError ? '設定を JSONBin に保存できませんでした（オフライン）' : err.message, 'err'); }
+  sync();
 });
-$('#openSettings1').onclick = openSettings;
+$('#copyBin').onclick = async () => {
+  try{ await navigator.clipboard.writeText($('#binIdView').value); $('#copyBin').textContent = 'コピーしました'; }
+  catch{ $('#binIdView').select(); }
+  setTimeout(() => $('#copyBin').textContent = 'コピー', 1500);
+};
+$('#forgetConn').onclick = async () => {
+  if (!confirm('この端末から JSONBin の接続情報を消去してロックします。設定そのものは JSONBin に残ります。')) return;
+  dlg.close('cancel');
+  await lock();
+  conn.clear(); showLockView();
+};
 $('#openSettings2').onclick = openSettings;
 
 applyView();
-showDest();
-$('#pass').focus();
+showLockView();
 })();
 </script>
 </body>
