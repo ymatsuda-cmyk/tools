@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>暗号メモ</title>
+<title>MemoStock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -72,10 +72,13 @@ header .brand{font-weight:700;letter-spacing:.04em}
 aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 aside .search{padding:10px;border-bottom:1px solid var(--line)}
 #list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
-#list li>button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 14px}
-#list li>button[aria-current="true"]{background:var(--sel)}
-#list .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#list .s{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#list li{border-bottom:1px solid var(--line);padding:8px 14px 10px;cursor:pointer}
+#list li[aria-current="true"]{background:var(--sel)}
+#list li button{display:block;max-width:100%;text-align:left;border:0;border-radius:4px;background:none;padding:2px 4px;margin-left:-4px}
+#list .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text}
+#list .t:hover{background:var(--panel);box-shadow:inset 0 0 0 1px var(--line)}
+#list .s{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+#list .rename{font-weight:500;padding:2px 4px;margin:0 0 0 -4px;border-color:var(--accent)}
 #list .none{padding:16px 14px;color:var(--muted);font-size:13px}
 
 main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
@@ -137,7 +140,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 
 <section id="lock">
   <div class="box">
-    <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>暗号メモ</h1>
+    <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>MemoStock</h1>
 
     <!-- 接続済みの端末 -->
     <form id="unlockForm" class="hidden" autocomplete="off">
@@ -206,7 +209,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 <section id="app" class="hidden">
   <header>
     <button id="back" aria-label="一覧に戻る">一覧</button>
-    <span class="brand">暗号メモ</span>
+    <span class="brand">MemoStock</span>
     <span id="status" role="status"></span>
     <button id="newBtn" class="primary">新規メモ</button>
     <button id="syncBtn" title="今すぐ同期（⌘S / Ctrl+S）">同期</button>
@@ -363,7 +366,7 @@ async function jbWrite(c, env){
     if (!r.ok) throw jbErr(r.status);
     return c.binId;
   }
-  const r = await fetch(JB, { method:'POST', headers:{ ...jbHeaders(c, true), 'X-Bin-Private':'true', 'X-Bin-Name':'secure-memo-settings' }, body:JSON.stringify(env) });
+  const r = await fetch(JB, { method:'POST', headers:{ ...jbHeaders(c, true), 'X-Bin-Private':'true', 'X-Bin-Name':'memostock-settings' }, body:JSON.stringify(env) });
   if (!r.ok) throw jbErr(r.status);
   return (await r.json()).metadata.id;
 }
@@ -482,8 +485,8 @@ async function getMemo(id){
   return { sha:f.sha, memo: await unseal(f.env) };
 }
 async function putMemo(m, sha){
-  const { id, body, createdAt, updatedAt } = m;
-  const env = await seal({ id, body, createdAt, updatedAt }, 'encrypted-memo');
+  const { id, name, body, createdAt, updatedAt } = m;
+  const env = await seal({ id, name, body, createdAt, updatedAt }, 'encrypted-memo');
   const payload = { message:`Update memo ${id}`, content:b2a(te.encode(JSON.stringify(env, null, 2))), branch:cfg().branch };
   if (sha) payload.sha = sha;
   const r = await gh(fileURL(id), { method:'PUT', body:JSON.stringify(payload) });
@@ -510,7 +513,8 @@ const find = id => memos.find(m => m.id === id);
 function applyRemote(r){
   const local = find(r.id);
   if (!local){ memos.push(r); return; }
-  Object.assign(local, { body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
+  Object.assign(local, { name:r.name, body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
+  if (r.id === renamingId) renamingId = null;
   if (r.id === currentId) replaceEditorDoc(r.body); else states.delete(r.id);
 }
 
@@ -539,10 +543,10 @@ async function sync(){
       if (!f) return;
       const local = find(id);
       if (local && dirtyIds.has(id)){
-        if (f.memo.body !== local.body){
+        if (f.memo.body !== local.body || f.memo.name !== local.name){
           // 両方で編集された：手元を残し、GitHub 側は競合コピーとして別メモにする
           const now = Date.now();
-          memos.push({ id:crypto.randomUUID(), body:'【競合コピー】\n' + f.memo.body, createdAt:now, updatedAt:now });
+          memos.push({ id:crypto.randomUUID(), name:`${nameOf(f.memo)}（競合コピー）`, body:f.memo.body, createdAt:now, updatedAt:now });
           dirtyIds.add(memos[memos.length-1].id);
         }
       }else{
@@ -649,7 +653,7 @@ function makeState(text){
       lnComp.of(viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : []),
       highlightActiveLine(),
       EditorView.lineWrapping,
-      placeholder('1行目がタイトルになります。行頭に「# 」〜「#### 」で見出し'),
+      placeholder('ここに書きます。行頭に「# 」〜「#### 」で見出し'),
       headingPlugin,
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.updateListener.of(onUpdate)
@@ -706,9 +710,16 @@ $('#headBtn').onclick = () => {
 };
 
 /* ---------- 一覧・選択 ---------- */
-function titleOf(m){
-  const lines = m.body.split('\n').map(s => s.replace(/^#{1,4} /, '').trim()).filter(Boolean);
-  return { t: lines[0] || '無題のメモ', s: lines[1] || '' };
+let renamingId = null;
+const firstLine = body => (body.split('\n').map(s => s.replace(/^#{1,4} /, '').trim()).find(Boolean) || '');
+const nameOf = m => (m.name && m.name.trim()) || firstLine(m.body) || '無題のメモ';
+function nextName(){
+  let max = 0;
+  for (const m of memos){
+    const r = /^新規メモ(\d+)$/.exec(m.name || '');
+    if (r) max = Math.max(max, +r[1]);
+  }
+  return `新規メモ${max + 1}`;
 }
 function fmt(ts){
   const d = new Date(ts), now = new Date();
@@ -716,25 +727,59 @@ function fmt(ts){
     : d.toLocaleDateString('ja-JP', { year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric', month:'numeric', day:'numeric' });
 }
 function renderList(){
+  if (renamingId && document.activeElement?.classList.contains('rename')) return;  // 名前の入力中は描き直さない
   const q = $('#q').value.trim().toLowerCase();
   const list = $('#list');
   list.textContent = '';
-  const items = memos.filter(m => !q || m.body.toLowerCase().includes(q)).sort((a,b) => b.updatedAt - a.updatedAt);
+  const items = memos.filter(m => !q || nameOf(m).toLowerCase().includes(q) || m.body.toLowerCase().includes(q))
+                     .sort((a,b) => b.updatedAt - a.updatedAt);
   if (!items.length){
     const li = document.createElement('li'); li.className = 'none';
     li.textContent = q ? '一致するメモはありません' : 'メモはまだありません。「新規メモ」から作成できます';
     list.append(li); return;
   }
   for (const m of items){
-    const { t, s } = titleOf(m);
     const li = document.createElement('li');
-    const b = document.createElement('button');
-    b.setAttribute('aria-current', m.id === currentId ? 'true' : 'false');
-    const tt = document.createElement('div'); tt.className = 't'; tt.textContent = t;
-    const ss = document.createElement('div'); ss.className = 's'; ss.textContent = `${fmt(m.updatedAt)}　${s}`;
-    b.append(tt, ss);
-    b.onclick = () => select(m.id);
-    li.append(b); list.append(li);
+    li.setAttribute('aria-current', m.id === currentId ? 'true' : 'false');
+    li.onclick = () => select(m.id);
+
+    if (m.id === renamingId){
+      const input = document.createElement('input');
+      input.className = 'rename'; input.value = nameOf(m);
+      input.setAttribute('aria-label', 'メモの名前');
+      let done = false;
+      const finish = save => {
+        if (done) return; done = true;
+        const v = input.value.trim();
+        renamingId = null;
+        if (save && v && v !== m.name){
+          m.name = v; m.updatedAt = Date.now();
+          dirtyIds.add(m.id); schedule(); updateStatusBar();
+        }
+        renderList();
+      };
+      input.onkeydown = e => {
+        if (e.isComposing) return;
+        if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+        if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+      };
+      input.onblur = () => finish(true);
+      input.onclick = e => e.stopPropagation();
+      li.append(input);
+      list.append(li);
+      requestAnimationFrame(() => { input.focus(); input.select(); });
+    }else{
+      const tt = document.createElement('button');
+      tt.className = 't'; tt.textContent = nameOf(m);
+      tt.title = 'クリックして名前を変更';
+      tt.onclick = e => { e.stopPropagation(); if (m.id !== currentId) select(m.id); renamingId = m.id; renderList(); };
+      li.append(tt);
+      list.append(li);
+    }
+    const ss = document.createElement('div');
+    ss.className = 's';
+    ss.textContent = `${fmt(m.updatedAt)}　${firstLine(m.body)}`;
+    li.append(ss);
   }
 }
 function renderEditor(){
@@ -757,14 +802,14 @@ function select(id){
 }
 function newMemo(){
   const now = Date.now();
-  const m = { id: crypto.randomUUID(), body:'', createdAt:now, updatedAt:now };
+  const m = { id: crypto.randomUUID(), name: nextName(), body:'', createdAt:now, updatedAt:now };
   memos.push(m); dirtyIds.add(m.id);
   $('#q').value = '';
   select(m.id); view.focus(); schedule();
 }
 $('#delBtn').onclick = () => {
   const m = find(currentId); if (!m) return;
-  if (!confirm(`「${titleOf(m).t}」を削除しますか？`)) return;
+  if (!confirm(`「${nameOf(m)}」を削除しますか？`)) return;
   memos = memos.filter(x => x !== m);
   states.delete(m.id); dirtyIds.delete(m.id);
   if (shas[m.id]) pendingDeletes.add(m.id);
@@ -824,7 +869,7 @@ async function openNotebook(){
     if (legacy && legacy.env && legacy.env.format === 'encrypted-memos'){
       try{
         const old = await unseal(legacy.env);
-        imported = (old.memos || []).filter(m => !m.deleted).map(m => ({ id:m.id, body:m.body, createdAt:m.createdAt, updatedAt:m.updatedAt }));
+        imported = (old.memos || []).filter(m => !m.deleted).map(m => ({ id:m.id, name:firstLine(m.body) || undefined, body:m.body, createdAt:m.createdAt, updatedAt:m.updatedAt }));
       }catch{}
     }
   }
@@ -884,8 +929,8 @@ $('#loadForm').addEventListener('submit', e => {
     resetSecrets(); pass = f.pass.value; msg.textContent = '';
     try{
       const env = await jbRead(c);
-      try{ settings = await unseal(env); }catch(err){ throw err.message === 'BADPASS' ? new Error('パスフレーズが違うか、この Bin は暗号メモの設定ではありません') : err; }
-      if (!settings.github) throw new Error('この Bin は暗号メモの設定ではありません');
+      try{ settings = await unseal(env); }catch(err){ throw err.message === 'BADPASS' ? new Error('パスフレーズが違うか、この Bin は MemoStock の設定ではありません') : err; }
+      if (!settings.github) throw new Error('この Bin は MemoStock の設定ではありません');
       conn.set(c);
       store.set('memo.cfgcache', JSON.stringify(env));
       await openNotebook();
