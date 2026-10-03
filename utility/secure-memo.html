@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>暗号メモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F7;--panel:#FFFFFF;--ink:#1D2733;--muted:#6B7785;--line:#D7DDE3;
+  --accent:#2F6F62;--accent-ink:#FFFFFF;--warn:#B4492F;--sel:#E3ECE9;--amber:#B98A2E;
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#14181D;--panel:#1B2027;--ink:#E4E8EC;--muted:#8E99A6;--line:#2C333C;
+    --accent:#6FB3A3;--accent-ink:#0F1A17;--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B}
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 12px}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+button.danger{color:var(--warn)}
+button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+button:disabled{opacity:.6;cursor:wait}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.hidden{display:none!important}
+
+/* ロック画面 */
+#lock{min-height:100%;display:grid;place-items:center;padding:24px}
+#lockForm{width:min(360px,100%);display:grid;gap:14px}
+#lock h1{font-size:30px;font-weight:700;margin:0;letter-spacing:.04em;display:flex;align-items:center;gap:10px}
+#lock h1 svg{width:26px;height:26px;color:var(--accent)}
+#lock .dest{margin:0;color:var(--muted);font-size:13px;word-break:break-all}
+#lock .note{margin:0;color:var(--muted);font-size:12px}
+#lock label{display:grid;gap:4px;font-size:13px}
+.msg{color:var(--warn);font-size:13px;min-height:1.3em;margin:0}
+.msg.info{color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+
+/* アプリ本体 */
+#app{height:100%;display:grid;grid-template-columns:300px 1fr;grid-template-rows:auto minmax(0,1fr)}
+header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+header .brand{font-weight:700;letter-spacing:.04em}
+#status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-right:auto;margin-left:12px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--muted)}
+#status[data-kind="ok"]::before{background:var(--accent)}
+#status[data-kind="dirty"]::before{background:var(--amber)}
+#status[data-kind="busy"]::before{background:var(--amber);animation:blink 1s infinite}
+#status[data-kind="err"]{color:var(--warn)}
+#status[data-kind="err"]::before{background:var(--warn)}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){#status[data-kind="busy"]::before{animation:none}}
+
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside .search{padding:10px;border-bottom:1px solid var(--line)}
+#list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
+#list li>button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 14px}
+#list li>button[aria-current="true"]{background:var(--sel)}
+#list .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#list .s{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#list .none{padding:16px 14px;color:var(--muted);font-size:13px}
+
+main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+#editor{flex:1;resize:none;border:0;background:transparent;color:inherit;font:inherit;font-size:16px;line-height:1.85;
+  padding:28px max(24px,calc((100% - 70ch)/2));outline:none}
+.meta{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.meta span{margin-right:auto}
+#empty{margin:auto;color:var(--muted);text-align:center;display:grid;gap:12px;justify-items:center;padding:24px}
+#back{display:none}
+@media (max-width:720px){
+  #app{grid-template-columns:1fr}
+  #app.editing aside{display:none}
+  #app:not(.editing) main{display:none}
+  #back{display:inline-block}
+  header .brand{display:none}
+}
+
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);width:min(460px,92vw);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog form{display:grid;gap:12px}
+dialog h2{margin:0;font-size:18px}
+dialog label{font-size:13px;display:grid;gap:4px}
+dialog .check{display:flex;gap:8px;align-items:center}
+dialog .check input{width:auto}
+dialog p{margin:0;font-size:12px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+</style>
+</head>
+<body>
+
+<!-- ロック画面 -->
+<section id="lock">
+  <form id="lockForm" autocomplete="off">
+    <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>暗号メモ</h1>
+    <p class="dest" id="dest"></p>
+    <label>パスフレーズ
+      <input id="pass" type="password" autocomplete="current-password">
+    </label>
+    <label id="pass2Wrap" class="hidden">確認のためもう一度
+      <input id="pass2" type="password" autocomplete="new-password">
+    </label>
+    <p class="msg" id="lockMsg" role="status"></p>
+    <div class="row">
+      <button type="button" class="link" id="openSettings1">接続設定</button>
+      <button type="submit" class="primary" id="unlockBtn">開く</button>
+    </div>
+    <p class="note">メモはこのブラウザ内で暗号化してから GitHub に送ります。パスフレーズを忘れると誰にも復元できません。</p>
+  </form>
+</section>
+
+<!-- アプリ本体 -->
+<section id="app" class="hidden">
+  <header>
+    <button id="back" aria-label="一覧に戻る">一覧</button>
+    <span class="brand">暗号メモ</span>
+    <span id="status" role="status"></span>
+    <button id="newBtn" class="primary">新規メモ</button>
+    <button id="syncBtn" title="今すぐ同期（⌘S / Ctrl+S）">同期</button>
+    <button id="openSettings2">設定</button>
+    <button id="lockBtn">ロック</button>
+  </header>
+  <aside>
+    <div class="search"><input id="q" type="search" placeholder="メモを検索" aria-label="メモを検索"></div>
+    <ul id="list"></ul>
+  </aside>
+  <main>
+    <div id="empty">
+      <div>メモを選ぶか、新しく作成してください。</div>
+      <button class="primary" id="newBtn2">新規メモ</button>
+    </div>
+    <textarea id="editor" class="hidden" placeholder="1行目がタイトルになります" aria-label="メモ本文" spellcheck="false"></textarea>
+    <div class="meta hidden" id="meta"><span id="metaText"></span><button class="danger" id="delBtn">削除</button></div>
+  </main>
+</section>
+
+<!-- 接続設定 -->
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>GitHub の接続設定</h2>
+    <div class="two">
+      <label>オーナー<input name="owner" placeholder="ユーザー名 or 組織名" required></label>
+      <label>リポジトリ<input name="repo" placeholder="my-memos" required></label>
+    </div>
+    <div class="two">
+      <label>ブランチ<input name="branch" value="main" required></label>
+      <label>ファイルパス<input name="path" value="memos.json" required></label>
+    </div>
+    <label>アクセストークン<input name="token" type="password" placeholder="github_pat_…" autocomplete="off"></label>
+    <label class="check"><input type="checkbox" name="remember" checked>トークンをこのブラウザに保存する</label>
+    <p>Fine-grained token で、対象リポジトリだけに「Contents: Read and write」を付けたものを推奨します。リポジトリは Private にしてください。保存しない場合はページを閉じるたびに入力が必要です。</p>
+    <div class="row">
+      <button value="cancel" formnovalidate>キャンセル</button>
+      <button value="ok" class="primary" id="saveSettings">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const te = new TextEncoder(), td = new TextDecoder();
+const ITER = 600000;
+
+let pass = null;            // メモリ上のみ。保存しない
+let keys = new Map();       // salt:iter -> CryptoKey
+let currentSalt = null;
+let memos = [];             // {id, body, createdAt, updatedAt, deleted?}
+let currentId = null;
+let dirty = false, syncing = false, syncAgain = false;
+let syncTimer = null, localTimer = null, lastSync = 0;
+let sessionToken = '';
+
+/* ---------- 保存領域 ---------- */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch{ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch{} },
+  del(k){ try{ localStorage.removeItem(k); }catch{} }
+};
+function cfg(){
+  let c = {};
+  try{ c = JSON.parse(store.get('memo.cfg') || '{}'); }catch{}
+  return { owner:'', repo:'', branch:'main', path:'memos.json', ...c, token: c.token || sessionToken || '' };
+}
+
+/* ---------- 暗号 ---------- */
+const b2a = u8 => { let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); };
+const a2b = s => Uint8Array.from(atob(s.replace(/\s/g,'')), c => c.charCodeAt(0));
+
+async function keyFor(salt, iter){
+  const id = salt + ':' + iter;
+  if (keys.has(id)) return keys.get(id);
+  const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  const k = await crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:a2b(salt), iterations:iter, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+  keys.set(id, k);
+  return k;
+}
+async function seal(obj){
+  if (!currentSalt) currentSalt = b2a(crypto.getRandomValues(new Uint8Array(16)));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await keyFor(currentSalt, ITER);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, k, te.encode(JSON.stringify(obj))));
+  return {
+    format:'encrypted-memos', version:1,
+    kdf:{ name:'PBKDF2', hash:'SHA-256', iterations:ITER, salt:currentSalt },
+    cipher:{ name:'AES-GCM', iv:b2a(iv) },
+    data:b2a(ct),
+    updatedAt:new Date().toISOString()
+  };
+}
+async function unseal(env){
+  if (!env || env.format !== 'encrypted-memos') throw new Error('対応していないファイル形式です');
+  const k = await keyFor(env.kdf.salt, env.kdf.iterations);
+  let pt;
+  try{ pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:a2b(env.cipher.iv) }, k, a2b(env.data)); }
+  catch{ throw new Error('BADPASS'); }
+  return JSON.parse(td.decode(pt));
+}
+
+/* ---------- GitHub ---------- */
+function httpErr(status){
+  const m = {
+    401:'トークンが無効か期限切れです（401）',
+    403:'権限がありません（403）。トークンに Contents の読み書き権限があるか確認してください',
+    404:'リポジトリかブランチが見つかりません（404）。設定とトークンの対象リポジトリを確認してください'
+  };
+  return new Error(m[status] || `GitHub がエラーを返しました（${status}）`);
+}
+function contentsURL(c){
+  return `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/contents/` +
+    c.path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+}
+function gh(url, opt = {}){
+  const c = cfg();
+  const headers = {
+    'Accept':'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28',
+    'Authorization':`Bearer ${c.token}`
+  };
+  if (opt.body) headers['Content-Type'] = 'application/json';
+  return fetch(url, { ...opt, cache:'no-store', headers });
+}
+async function checkRepo(){
+  const c = cfg();
+  const r = await gh(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}`);
+  if (!r.ok) throw httpErr(r.status);
+}
+async function pull(){
+  const c = cfg();
+  const r = await gh(`${contentsURL(c)}?ref=${encodeURIComponent(c.branch)}`);
+  if (r.status === 404) return { sha:null, env:null };
+  if (!r.ok) throw httpErr(r.status);
+  const j = await r.json();
+  let b64 = j.content;
+  if (!b64 || j.encoding === 'none'){           // 1MB超のファイル
+    const b = await gh(j.git_url);
+    if (!b.ok) throw httpErr(b.status);
+    b64 = (await b.json()).content;
+  }
+  return { sha:j.sha, env:JSON.parse(td.decode(a2b(b64))) };
+}
+async function push(env, sha){
+  const c = cfg();
+  const body = {
+    message:`Update memos ${new Date().toISOString()}`,
+    content:b2a(te.encode(JSON.stringify(env, null, 2))),
+    branch:c.branch
+  };
+  if (sha) body.sha = sha;
+  const r = await gh(contentsURL(c), { method:'PUT', body:JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) throw new Error('CONFLICT');
+  if (!r.ok) throw httpErr(r.status);
+  return (await r.json()).content.sha;
+}
+
+/* ---------- マージ・同期 ---------- */
+function merge(a, b){
+  const m = new Map();
+  for (const x of [...a, ...b]){
+    const y = m.get(x.id);
+    if (!y || x.updatedAt > y.updatedAt) m.set(x.id, x);
+  }
+  return [...m.values()];
+}
+const canon = arr => JSON.stringify([...arr].sort((x,y) => x.id < y.id ? -1 : 1));
+
+function setStatus(text, kind){
+  const s = $('#status');
+  s.textContent = text;
+  s.dataset.kind = kind || '';
+}
+const hm = d => d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+
+async function sync(){
+  if (!pass) return;
+  if (syncing){ syncAgain = true; return; }
+  syncing = true;
+  clearTimeout(syncTimer);
+  setStatus('同期中…', 'busy');
+  try{
+    for (let attempt = 0; ; attempt++){
+      const remote = await pull();
+      const rm = remote.env ? ((await unseal(remote.env)).memos || []) : [];
+      const merged = merge(memos, rm);
+      memos = merged;
+      refreshFromMerge();
+      const needPush = dirty || !remote.env || canon(merged) !== canon(rm);
+      if (!needPush) break;
+      dirty = false;
+      const env = await seal({ memos: merged });
+      try{
+        await push(env, remote.sha);
+        break;
+      }catch(err){
+        dirty = true;
+        if (err.message === 'CONFLICT' && attempt < 3) continue;
+        if (err.message === 'CONFLICT') throw new Error('他の端末と更新が重なりました。もう一度同期してください');
+        throw err;
+      }
+    }
+    lastSync = Date.now();
+    setStatus(dirty ? '未保存の変更あり' : `同期済み ${hm(new Date())}`, dirty ? 'dirty' : 'ok');
+  }catch(err){
+    dirty = true;
+    const msg = err instanceof TypeError ? 'オフラインです。変更はこのブラウザに保存しています'
+              : err.message === 'BADPASS' ? 'GitHub のメモを復号できません（別のパスフレーズで保存されています）'
+              : err.message;
+    setStatus(msg, 'err');
+  }finally{
+    syncing = false;
+    saveLocal();
+    if (syncAgain){ syncAgain = false; sync(); }
+  }
+}
+function schedule(){
+  setStatus('未保存の変更あり', 'dirty');
+  clearTimeout(localTimer); localTimer = setTimeout(saveLocal, 800);
+  clearTimeout(syncTimer);  syncTimer  = setTimeout(sync, 4000);
+}
+async function saveLocal(){
+  if (!pass) return;
+  try{ store.set('memo.local', JSON.stringify(await seal({ memos }))); }catch{}
+}
+
+/* ---------- 画面 ---------- */
+const editor = $('#editor');
+const cur = () => memos.find(m => m.id === currentId && !m.deleted);
+
+function titleOf(m){
+  const lines = m.body.split('\n').map(s => s.trim()).filter(Boolean);
+  return { t: lines[0] || '無題のメモ', s: lines[1] || '' };
+}
+function fmt(ts){
+  const d = new Date(ts), now = new Date();
+  return d.toDateString() === now.toDateString() ? hm(d)
+    : d.toLocaleDateString('ja-JP', { year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric', month:'numeric', day:'numeric' });
+}
+function renderList(){
+  const q = $('#q').value.trim().toLowerCase();
+  const list = $('#list');
+  list.textContent = '';
+  const items = memos.filter(m => !m.deleted && (!q || m.body.toLowerCase().includes(q)))
+                     .sort((a,b) => b.updatedAt - a.updatedAt);
+  if (!items.length){
+    const li = document.createElement('li');
+    li.className = 'none';
+    li.textContent = q ? '一致するメモはありません' : 'メモはまだありません。「新規メモ」から作成できます';
+    list.append(li);
+    return;
+  }
+  for (const m of items){
+    const { t, s } = titleOf(m);
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.setAttribute('aria-current', m.id === currentId ? 'true' : 'false');
+    const tt = document.createElement('div'); tt.className = 't'; tt.textContent = t;
+    const ss = document.createElement('div'); ss.className = 's'; ss.textContent = `${fmt(m.updatedAt)}　${s}`;
+    b.append(tt, ss);
+    b.onclick = () => select(m.id);
+    li.append(b);
+    list.append(li);
+  }
+}
+function renderEditor(){
+  const m = cur();
+  $('#empty').classList.toggle('hidden', !!m);
+  editor.classList.toggle('hidden', !m);
+  $('#meta').classList.toggle('hidden', !m);
+  if (!m){ $('#app').classList.remove('editing'); return; }
+  if (editor.value !== m.body) editor.value = m.body;
+  updateMeta();
+}
+function updateMeta(){
+  const m = cur(); if (!m) return;
+  $('#metaText').textContent = `最終更新 ${new Date(m.updatedAt).toLocaleString('ja-JP')}　${m.body.length}文字`;
+}
+function refreshFromMerge(){
+  const m = cur();
+  if (m && m.body !== editor.value && document.activeElement === editor){
+    const p = editor.selectionStart;
+    editor.value = m.body;
+    editor.setSelectionRange(p, p);
+  }
+  if (currentId && !m) currentId = null;
+  renderList(); renderEditor();
+}
+function select(id){
+  currentId = id;
+  $('#app').classList.add('editing');
+  renderList(); renderEditor();
+}
+function newMemo(){
+  const now = Date.now();
+  const m = { id: crypto.randomUUID(), body:'', createdAt:now, updatedAt:now };
+  memos.push(m);
+  $('#q').value = '';
+  select(m.id);
+  editor.focus();
+  dirty = true; schedule();
+}
+
+editor.addEventListener('input', () => {
+  const m = cur(); if (!m) return;
+  m.body = editor.value;
+  m.updatedAt = Date.now();
+  dirty = true;
+  renderList(); updateMeta(); schedule();
+});
+$('#delBtn').onclick = () => {
+  const m = cur(); if (!m) return;
+  if (!confirm(`「${titleOf(m).t}」を削除しますか？`)) return;
+  m.deleted = true; m.body = ''; m.updatedAt = Date.now();
+  currentId = null; dirty = true;
+  renderList(); renderEditor(); schedule();
+};
+$('#newBtn').onclick = newMemo;
+$('#newBtn2').onclick = newMemo;
+$('#syncBtn').onclick = () => sync();
+$('#back').onclick = () => { $('#app').classList.remove('editing'); };
+$('#q').addEventListener('input', renderList);
+$('#lockBtn').onclick = lock;
+
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); sync(); }
+});
+window.addEventListener('beforeunload', e => { if (pass && dirty){ e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('visibilitychange', () => {
+  if (!pass) return;
+  if (document.visibilityState === 'hidden' && dirty) sync();
+  if (document.visibilityState === 'visible' && Date.now() - lastSync > 30000) sync();
+});
+
+/* ---------- ロック／解除 ---------- */
+function showDest(){
+  const c = cfg();
+  $('#dest').textContent = c.owner && c.repo
+    ? `保存先 ${c.owner}/${c.repo}/${c.path}（${c.branch}）`
+    : '最初に「接続設定」で保存先の GitHub リポジトリを登録してください。';
+}
+function lockMsg(t, info){ const el = $('#lockMsg'); el.textContent = t; el.classList.toggle('info', !!info); }
+
+$('#lockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const c = cfg();
+  if (!c.owner || !c.repo || !c.token){ openSettings(); return; }
+  const p = $('#pass').value;
+  if (!p){ lockMsg('パスフレーズを入力してください'); return; }
+
+  const btn = $('#unlockBtn');
+  btn.disabled = true; btn.textContent = '開いています…';
+  pass = p; keys = new Map(); currentSalt = null;
+  try{
+    let remote = null, offline = false;
+    try{ remote = await pull(); }
+    catch(err){ if (err instanceof TypeError) offline = true; else throw err; }
+
+    // 新しいメモ帳を作る場合は確認入力を求める
+    if (remote && !remote.env){
+      await checkRepo();
+      const wrap = $('#pass2Wrap');
+      if (wrap.classList.contains('hidden')){
+        wrap.classList.remove('hidden');
+        $('#pass2').focus();
+        lockMsg('このリポジトリにはまだメモがありません。新しく作成するので、同じパスフレーズをもう一度入力してください。', true);
+        pass = null; return;
+      }
+      if ($('#pass2').value !== p){ lockMsg('2つのパスフレーズが一致しません'); pass = null; return; }
+    }
+
+    let rm = null, lm = [];
+    if (remote?.env) rm = (await unseal(remote.env)).memos || [];
+    const lc = store.get('memo.local');
+    if (lc){
+      try{ lm = (await unseal(JSON.parse(lc))).memos || []; }
+      catch(err){ if (offline) throw err; }   // オンライン時は古い控えを無視
+    }
+    if (offline && !lc) throw new Error('GitHub に接続できず、このブラウザにも控えがありません');
+    currentSalt = remote?.env && remote.env.kdf.iterations === ITER ? remote.env.kdf.salt : null;
+
+    memos = merge(lm, rm || []);
+    currentId = null;
+    $('#pass').value = ''; $('#pass2').value = '';
+    $('#pass2Wrap').classList.add('hidden');
+    lockMsg('');
+    $('#lock').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    renderList(); renderEditor();
+
+    if (offline){ dirty = true; setStatus('オフラインです。このブラウザの控えを表示しています', 'err'); }
+    else if (!rm || canon(memos) !== canon(rm)){ dirty = true; sync(); }
+    else { lastSync = Date.now(); setStatus(`同期済み ${hm(new Date())}`, 'ok'); }
+  }catch(err){
+    pass = null; keys = new Map();
+    lockMsg(err.message === 'BADPASS' ? 'パスフレーズが違います' : err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '開く';
+  }
+});
+
+async function lock(){
+  if (dirty){ await saveLocal(); await sync(); }
+  pass = null; keys = new Map(); currentSalt = null;
+  memos = []; currentId = null; editor.value = '';
+  clearTimeout(syncTimer); clearTimeout(localTimer);
+  $('#app').classList.add('hidden');
+  $('#lock').classList.remove('hidden');
+  showDest(); lockMsg('');
+  $('#pass').focus();
+}
+
+/* ---------- 設定 ---------- */
+const dlg = $('#settings');
+function openSettings(){
+  const c = cfg(), f = $('#settingsForm');
+  f.owner.value = c.owner; f.repo.value = c.repo;
+  f.branch.value = c.branch; f.path.value = c.path;
+  f.token.value = c.token;
+  f.remember.checked = !!store.get('memo.cfg') ? !!JSON.parse(store.get('memo.cfg')).token || !sessionToken : true;
+  dlg.showModal();
+}
+dlg.addEventListener('close', () => {
+  if (dlg.returnValue !== 'ok') return;
+  const f = $('#settingsForm');
+  const c = {
+    owner:f.owner.value.trim(), repo:f.repo.value.trim(),
+    branch:f.branch.value.trim() || 'main',
+    path:f.path.value.trim().replace(/^\/+/, '') || 'memos.json'
+  };
+  const token = f.token.value.trim();
+  if (f.remember.checked){ c.token = token; sessionToken = ''; }
+  else { sessionToken = token; }
+  store.set('memo.cfg', JSON.stringify(c));
+  showDest();
+  if (pass) sync();
+});
+$('#openSettings1').onclick = openSettings;
+$('#openSettings2').onclick = openSettings;
+
+showDest();
+$('#pass').focus();
+})();
+</script>
+</body>
+</html>
