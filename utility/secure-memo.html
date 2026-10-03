@@ -96,22 +96,44 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 .step .lbl{font-size:12px;color:var(--muted);margin-right:2px}
 
 /* エディタ */
-#host{flex:1;min-height:0;display:flex}
-#host .cm-editor{flex:1;height:100%;font-size:var(--fs);background:transparent;color:var(--ink)}
-#host .cm-editor.cm-focused{outline:none}
-#host .cm-scroller{font-family:inherit;line-height:var(--lh)}
-#host .cm-content{padding:24px 0;caret-color:var(--ink)}
-#host .cm-line{padding:0 28px}
-#host .cm-cursor{border-left-color:var(--ink)}
-#host .cm-activeLine{background:var(--active)}
-#host .cm-gutters{background:var(--panel);border-right:1px solid var(--line);color:var(--muted);font-size:.8em}
-#host .cm-activeLineGutter{background:var(--active);color:var(--ink)}
-#host .cm-placeholder{color:var(--muted)}
-#host .cm-h1{font-size:calc(var(--fs) + 4pt);font-weight:700}
-#host .cm-h2{font-size:calc(var(--fs) + 3pt);font-weight:700}
-#host .cm-h3{font-size:calc(var(--fs) + 2pt);font-weight:700}
-#host .cm-h4{font-size:calc(var(--fs) + 1pt);font-weight:700}
-#host .cm-hmark{color:var(--muted);font-weight:400}
+#panes{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);--split:50%}
+#panes.layout-single .splitter,#panes.layout-single .pane[data-i="1"]{display:none}
+#panes.layout-v{grid-template-columns:minmax(0,var(--split)) 5px minmax(0,1fr)}
+#panes.layout-h{grid-template-rows:minmax(0,var(--split)) 5px minmax(0,1fr)}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0}
+#panes .host{flex:1;min-height:0;display:flex}
+.splitter{background:var(--line);cursor:col-resize;touch-action:none}
+#panes.layout-h .splitter{cursor:row-resize}
+.splitter:hover,.splitter.drag,.splitter:focus-visible{background:var(--accent);outline:none}
+.tabbar{display:flex;overflow-x:auto;background:var(--paper);border-bottom:1px solid var(--line);min-height:36px;scrollbar-width:thin;flex:none}
+.tab{display:flex;align-items:center;gap:6px;padding:0 4px 0 12px;height:36px;border-right:1px solid var(--line);font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap;max-width:220px;user-select:none;flex:none;position:relative}
+.tab .nm{overflow:hidden;text-overflow:ellipsis}
+.tab .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);flex:none;display:none}
+.tab.dirty .dot{display:block}
+.tab[aria-selected="true"]{background:var(--panel);color:var(--ink);margin-bottom:-1px;border-bottom:1px solid var(--panel)}
+.pane.active .tab[aria-selected="true"]{box-shadow:inset 0 2px 0 var(--accent)}
+.tab .x{border:0;background:none;width:22px;height:22px;padding:0;border-radius:4px;display:grid;place-items:center;color:var(--muted);opacity:0}
+.tab:hover .x,.tab[aria-selected="true"] .x,.tab .x:focus-visible{opacity:1}
+.tab .x:hover{background:var(--line);color:var(--ink)}
+.tab .x svg{width:14px;height:14px}
+.tab.drop-before::before,.tabbar.drop-end::after{content:"";width:2px;align-self:stretch;background:var(--accent)}
+.tab.drop-before::before{position:absolute;left:-1px;top:0;bottom:0}
+.tabbar.drop-end::after{flex:none}
+#panes .host .cm-editor{flex:1;height:100%;font-size:var(--fs);background:transparent;color:var(--ink)}
+#panes .host .cm-editor.cm-focused{outline:none}
+#panes .host .cm-scroller{font-family:inherit;line-height:var(--lh)}
+#panes .host .cm-content{padding:24px 0;caret-color:var(--ink)}
+#panes .host .cm-line{padding:0 28px}
+#panes .host .cm-cursor{border-left-color:var(--ink)}
+#panes .host .cm-activeLine{background:var(--active)}
+#panes .host .cm-gutters{background:var(--panel);border-right:1px solid var(--line);color:var(--muted);font-size:.8em}
+#panes .host .cm-activeLineGutter{background:var(--active);color:var(--ink)}
+#panes .host .cm-placeholder{color:var(--muted)}
+#panes .host .cm-h1{font-size:calc(var(--fs) + 4pt);font-weight:700}
+#panes .host .cm-h2{font-size:calc(var(--fs) + 3pt);font-weight:700}
+#panes .host .cm-h3{font-size:calc(var(--fs) + 2pt);font-weight:700}
+#panes .host .cm-h4{font-size:calc(var(--fs) + 1pt);font-weight:700}
+#panes .host .cm-hmark{color:var(--muted);font-weight:400}
 
 .statusbar{display:flex;align-items:center;gap:16px;padding:6px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .statusbar #pos{margin-right:auto}
@@ -123,6 +145,9 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
   #back{display:inline-block}
   header .brand{display:none}
   .statusbar #updated{display:none}
+  #panes.layout-v,#panes.layout-h{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+  #panes .splitter{display:none}
+  #panes:not(.layout-single) .pane:not(.active){display:none}
 }
 
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);width:min(460px,92vw);padding:20px}
@@ -245,9 +270,17 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         </span>
         <button class="ib" id="viewReset" title="文字サイズと行間を初期値に戻す" aria-label="表示を初期値に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
         <span class="sep"></span>
+        <button class="ib" id="lay1" title="分割しない" aria-label="分割しない" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/></svg></button>
+        <button class="ib" id="layV" title="縦に2分割（左右に並べる）" aria-label="縦に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/></svg></button>
+        <button class="ib" id="layH" title="横に2分割（上下に並べる）" aria-label="横に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 12h17"/></svg></button>
+        <span class="sep"></span>
         <button class="ib danger" id="delBtn" title="このメモを削除" aria-label="このメモを削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>
-      <div id="host"></div>
+      <div id="panes" class="layout-single">
+        <div class="pane" data-i="0"><div class="tabbar" role="tablist" aria-label="開いているメモ（左／上）"></div><div class="host"></div></div>
+        <div class="splitter" role="separator" tabindex="0" aria-label="分割位置（矢印キーで調整、ダブルクリックで中央）"></div>
+        <div class="pane" data-i="1"><div class="tabbar" role="tablist" aria-label="開いているメモ（右／下）"></div><div class="host"></div></div>
+      </div>
       <div class="statusbar">
         <span id="pos"></span>
         <span id="counts"></span>
@@ -314,10 +347,8 @@ let memos = [];                 // {id, body, createdAt, updatedAt}
 let shas = {};                  // id -> GitHub 上の最後に同期した sha
 let dirtyIds = new Set();       // 未送信の変更があるメモ
 let pendingDeletes = new Set(); // GitHub から削除待ちのメモ
-let currentId = null;
 let syncing = false, syncAgain = false;
 let syncTimer = null, localTimer = null, lastSync = 0;
-const states = new Map();       // id -> EditorState（メモごとの undo 履歴）
 
 /* ---------- 保存領域 ---------- */
 const store = {
@@ -397,9 +428,9 @@ function applyView(persist){
   $('#lhVal').textContent = viewCfg.lh.toFixed(1);
   $('#lnBtn').setAttribute('aria-pressed', viewCfg.ln ? 'true' : 'false');
   if (persist && settings){ settings.view = { ...viewCfg }; saveSettingsSoon(); }
-  if (view){
-    view.dispatch({ effects: lnComp.reconfigure(viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : []) });
-    view.requestMeasure();
+  if (typeof panes !== 'undefined') for (const p of panes) if (p.view){
+    p.view.dispatch({ effects: lnComp.reconfigure(lnExt()) });
+    p.view.requestMeasure();
   }
 }
 $('#fsUp').onclick   = () => { viewCfg.fs += 1;   applyView(true); };
@@ -422,11 +453,11 @@ async function keyFor(salt, iter){
   return k;
 }
 async function seal(obj, format){
-  if (!currentSalt) currentSalt = b2a(crypto.getRandomValues(new Uint8Array(16)));
+  const salt = currentSalt || (currentSalt = b2a(crypto.getRandomValues(new Uint8Array(16))));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const k = await keyFor(currentSalt, ITER);
+  const k = await keyFor(salt, ITER);
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, k, te.encode(JSON.stringify(obj))));
-  return { format, version:2, kdf:{ name:'PBKDF2', hash:'SHA-256', iterations:ITER, salt:currentSalt },
+  return { format, version:2, kdf:{ name:'PBKDF2', hash:'SHA-256', iterations:ITER, salt },
            cipher:{ name:'AES-GCM', iv:b2a(iv) }, data:b2a(ct) };
 }
 async function unseal(env){
@@ -515,7 +546,7 @@ function applyRemote(r){
   if (!local){ memos.push(r); return; }
   Object.assign(local, { name:r.name, body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
   if (r.id === renamingId) renamingId = null;
-  if (r.id === currentId) replaceEditorDoc(r.body); else states.delete(r.id);
+  for (const p of panes){ if (p.active === r.id) replaceDoc(p.view, r.body); else p.states.delete(r.id); }
 }
 
 async function sync(){
@@ -559,13 +590,13 @@ async function sync(){
     for (const m of [...memos]){
       if (listing.has(m.id)) continue;
       if (shas[m.id] && !dirtyIds.has(m.id)){
-        memos = memos.filter(x => x !== m); delete shas[m.id]; states.delete(m.id);
-        if (m.id === currentId) currentId = null;
+        memos = memos.filter(x => x !== m); delete shas[m.id];
+        closeEverywhere(m.id);
       }else{
         delete shas[m.id]; dirtyIds.add(m.id);
       }
     }
-    renderList(); renderEditor();
+    renderList(); renderPanes();
 
     // 4. 手元の変更を送る
     await pool([...dirtyIds], async id => {
@@ -608,7 +639,7 @@ function schedule(){
 async function saveLocal(){
   if (!pass) return;
   try{
-    const env = await seal({ memos, shas, dirty:[...dirtyIds], deletes:[...pendingDeletes] }, 'encrypted-memo-cache');
+    const env = await seal({ memos, shas, dirty:[...dirtyIds], deletes:[...pendingDeletes], layout:layoutState() }, 'encrypted-memo-cache');
     store.set('memo.local2', JSON.stringify(env));
   }catch{}
 }
@@ -616,7 +647,7 @@ async function saveLocal(){
 /* ---------- エディタ ---------- */
 const Remote = Annotation.define();
 const lnComp = new Compartment();
-let view = null;
+const lnExt = () => viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : [];
 
 function buildHeadings(v){
   const st = v.state, doc = st.doc, out = [];
@@ -650,7 +681,7 @@ function makeState(text){
     doc: text,
     extensions: [
       history(),
-      lnComp.of(viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : []),
+      lnComp.of(lnExt()),
       highlightActiveLine(),
       EditorView.lineWrapping,
       placeholder('ここに書きます。行頭に「# 」〜「#### 」で見出し'),
@@ -660,30 +691,287 @@ function makeState(text){
     ]
   });
 }
+
+/* ---------- タブと分割 ---------- */
+const panes = [...document.querySelectorAll('#panes .pane')].map((el, i) => ({
+  i, el, tabbar: el.querySelector('.tabbar'), host: el.querySelector('.host'),
+  tabs: [], active: null, view: null, states: new Map()   // states: id -> EditorState（タブごとの undo 履歴）
+}));
+let layout = 'single', activePane = 0, splitPct = 50;
+const P = () => panes[activePane];
+const curId = () => P().active;
+const curView = () => P().active ? P().view : null;
+const paneOf = v => panes.find(p => p.view === v);
+
 function onUpdate(u){
+  const p = paneOf(u.view); if (!p) return;
+  if (u.focusChanged && u.view.hasFocus && activePane !== p.i) setActivePane(p.i);
   if (u.docChanged && !u.transactions.some(t => t.annotation(Remote))){
-    const m = find(currentId);
+    const m = find(p.active);
     if (m){
       m.body = u.state.doc.toString();
       m.updatedAt = Date.now();
       dirtyIds.add(m.id);
-      renderList(); schedule();
+      // もう一方のペインで同じメモを開いていれば反映
+      for (const q of panes) if (q !== p){ if (q.active === m.id) replaceDoc(q.view, m.body); else q.states.delete(m.id); }
+      renderList(); renderTabs(); schedule();
     }
   }
-  if (u.docChanged || u.selectionSet || u.focusChanged) updateStatusBar();
+  if (p.i === activePane && (u.docChanged || u.selectionSet || u.focusChanged)) updateStatusBar();
 }
-function replaceEditorDoc(text){
-  if (!view || view.state.doc.toString() === text) return;
-  const head = Math.min(view.state.selection.main.head, text.length);
-  view.dispatch({
-    changes:{ from:0, to:view.state.doc.length, insert:text },
+function replaceDoc(v, text){
+  if (!v || v.state.doc.toString() === text) return;
+  const head = Math.min(v.state.selection.main.head, text.length);
+  v.dispatch({
+    changes:{ from:0, to:v.state.doc.length, insert:text },
     selection:{ anchor:head },
     annotations:[ Remote.of(true), Transaction.addToHistory.of(false) ]
   });
 }
+function setActivePane(i){
+  if (layout === 'single') i = 0;
+  if (activePane === i) return;
+  activePane = i;
+  for (const p of panes) p.el.classList.toggle('active', p.i === i);   // タブは描き直さない（クリックを失わないため）
+  renderList(); updateStatusBar(); saveLayoutSoon();
+}
+
+function openMemo(id){
+  const p = layout === 'single' ? panes[0] : P();
+  if (!p.tabs.includes(id)){
+    const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length;
+    p.tabs.splice(at, 0, id);
+  }
+  activateTab(p.i, id);
+}
+function activateTab(pi, id){
+  const p = panes[pi], m = find(id);
+  if (!m) return;
+  if (p.view && p.active) p.states.set(p.active, p.view.state);
+  p.active = id; activePane = pi;
+  let st = p.states.get(id);
+  if (!st || st.doc.toString() !== m.body) st = makeState(m.body);
+  if (!p.view) p.view = new EditorView({ state: st, parent: p.host });
+  else p.view.setState(st);
+  p.view.dispatch({ effects: lnComp.reconfigure(lnExt()) });
+  $('#app').classList.add('editing');
+  renderPanes(); renderList(); updateStatusBar(); saveLayoutSoon();
+}
+function closeTab(pi, id){
+  const p = panes[pi], idx = p.tabs.indexOf(id);
+  if (idx < 0) return;
+  p.tabs.splice(idx, 1); p.states.delete(id);
+  if (p.active === id){
+    p.active = null;
+    const next = p.tabs[Math.min(idx, p.tabs.length - 1)];
+    if (next){ activateTab(pi, next); return; }
+  }
+  if (!p.tabs.length && layout !== 'single'){ collapse(1 - pi); return; }
+  renderPanes(); renderList(); updateStatusBar(); saveLayoutSoon();
+}
+function closeEverywhere(id){ for (const p of panes) if (p.tabs.includes(id)) closeTab(p.i, id); }
+
+// 分割をやめて keepIdx 側の内容を残す（もう一方のタブは後ろに合流）
+function collapse(keepIdx){
+  for (const p of panes) if (p.view && p.active) p.states.set(p.active, p.view.state);
+  const keep = panes[keepIdx], other = panes[1 - keepIdx];
+  const tabs = [...keep.tabs];
+  for (const id of other.tabs) if (!tabs.includes(id)) tabs.push(id);
+  const states = new Map([...other.states, ...keep.states]);
+  const active = keep.active || other.active;
+  for (const p of panes){ p.tabs = []; p.active = null; p.states = new Map(); }
+  if (panes[1].view){ panes[1].view.destroy(); panes[1].view = null; }
+  layout = 'single'; activePane = 0;
+  panes[0].tabs = tabs; panes[0].states = states;
+  if (active) activateTab(0, active);
+  else { renderPanes(); renderList(); updateStatusBar(); saveLayoutSoon(); }
+}
+function setLayout(mode){
+  if (mode === layout) return;
+  if (mode === 'single'){ collapse(activePane); return; }
+  const wasSingle = layout === 'single';
+  layout = mode;
+  if (wasSingle && panes[0].active){
+    // 分割直後は、今のメモを反対側にも開く
+    panes[1].tabs = [panes[0].active];
+    activateTab(1, panes[0].active);
+  }else{
+    renderPanes();
+  }
+  saveLayoutSoon();
+}
+function moveTab(from, id, to, idx){
+  const src = panes[from], dst = panes[to];
+  if (from === to){
+    const cur = src.tabs.indexOf(id);
+    src.tabs.splice(cur, 1);
+    if (idx > cur) idx--;
+    src.tabs.splice(idx, 0, id);
+    renderTabs(); saveLayoutSoon();
+    return;
+  }
+  if (src.view && src.active === id) src.states.set(id, src.view.state);
+  const st = src.states.get(id);
+  const si = src.tabs.indexOf(id);
+  src.tabs.splice(si, 1); src.states.delete(id);
+  if (src.active === id){
+    src.active = null;
+    const next = src.tabs[Math.min(si, src.tabs.length - 1)];
+    if (next) activateTab(from, next);
+  }
+  const di = dst.tabs.indexOf(id);
+  if (di >= 0){ dst.tabs.splice(di, 1); if (di < idx) idx--; }
+  dst.tabs.splice(Math.min(idx, dst.tabs.length), 0, id);
+  if (st && dst.active !== id) dst.states.set(id, st);
+  activateTab(to, id);
+  if (!src.tabs.length) collapse(to);
+}
+
+const closeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+function renderTabs(){
+  for (const p of panes){
+    p.el.classList.toggle('active', p.i === activePane);
+    p.tabbar.textContent = '';
+    for (const id of p.tabs){
+      const m = find(id); if (!m) continue;
+      const tab = document.createElement('div');
+      tab.className = 'tab' + (dirtyIds.has(id) ? ' dirty' : '');
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', id === p.active ? 'true' : 'false');
+      tab.draggable = true;
+      tab.title = nameOf(m);
+      const dot = document.createElement('span'); dot.className = 'dot'; dot.title = '未同期の変更あり';
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = nameOf(m);
+      const x = document.createElement('button'); x.className = 'x'; x.innerHTML = closeIcon;
+      x.setAttribute('aria-label', `「${nameOf(m)}」のタブを閉じる`); x.title = 'タブを閉じる';
+      tab.append(dot, nm, x);
+      tab.onclick = () => activateTab(p.i, id);
+      tab.onauxclick = e => { if (e.button === 1){ e.preventDefault(); closeTab(p.i, id); } };
+      x.onclick = e => { e.stopPropagation(); closeTab(p.i, id); };
+      tab.ondragstart = e => {
+        e.dataTransfer.setData('text/x-memo-tab', JSON.stringify({ from:p.i, id }));
+        e.dataTransfer.effectAllowed = 'move';
+      };
+      p.tabbar.append(tab);
+    }
+  }
+}
+function renderPanes(){
+  const el = $('#panes');
+  el.className = 'layout-' + layout;
+  el.style.setProperty('--split', splitPct + '%');
+  $('.splitter').setAttribute('aria-orientation', layout === 'h' ? 'horizontal' : 'vertical');
+  const any = panes[0].tabs.length > 0 || (layout !== 'single' && panes[1].tabs.length > 0);
+  $('#empty').classList.toggle('hidden', any);
+  $('#editorWrap').classList.toggle('hidden', !any);
+  if (!any) $('#app').classList.remove('editing');
+  for (const p of panes) if (p.view){ p.view.dom.style.display = p.active ? '' : 'none'; p.view.requestMeasure(); }
+  $('#lay1').setAttribute('aria-pressed', layout === 'single');
+  $('#layV').setAttribute('aria-pressed', layout === 'v');
+  $('#layH').setAttribute('aria-pressed', layout === 'h');
+  renderTabs();
+}
+
+// タブのドラッグ（並べ替え・ペイン間の移動）
+function dropIndex(p, x){
+  const tabs = [...p.tabbar.querySelectorAll('.tab')];
+  for (let i = 0; i < tabs.length; i++){
+    const r = tabs[i].getBoundingClientRect();
+    if (x < r.left + r.width / 2) return i;
+  }
+  return tabs.length;
+}
+function clearDrop(p){
+  p.tabbar.classList.remove('drop-end');
+  p.tabbar.querySelectorAll('.drop-before').forEach(t => t.classList.remove('drop-before'));
+}
+for (const p of panes){
+  p.tabbar.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('text/x-memo-tab')) return;
+    e.preventDefault();
+    clearDrop(p);
+    const i = dropIndex(p, e.clientX), tabs = p.tabbar.querySelectorAll('.tab');
+    if (i < tabs.length) tabs[i].classList.add('drop-before'); else p.tabbar.classList.add('drop-end');
+  });
+  p.tabbar.addEventListener('dragleave', e => { if (!p.tabbar.contains(e.relatedTarget)) clearDrop(p); });
+  p.tabbar.addEventListener('drop', e => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('text/x-memo-tab');
+    const i = dropIndex(p, e.clientX);
+    clearDrop(p);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    moveTab(d.from, d.id, p.i, i);
+  });
+  p.el.addEventListener('mousedown', () => setActivePane(p.i));
+}
+
+// 分割位置の調整
+const splitter = $('.splitter');
+function setSplit(v){
+  splitPct = clamp(Math.round(v), 15, 85);
+  $('#panes').style.setProperty('--split', splitPct + '%');
+  for (const p of panes) p.view?.requestMeasure();
+}
+splitter.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  splitter.setPointerCapture(e.pointerId);
+  splitter.classList.add('drag');
+  const rect = $('#panes').getBoundingClientRect();
+  const move = ev => setSplit(layout === 'v' ? (ev.clientX - rect.left) / rect.width * 100 : (ev.clientY - rect.top) / rect.height * 100);
+  const up = () => {
+    splitter.classList.remove('drag');
+    splitter.removeEventListener('pointermove', move);
+    splitter.removeEventListener('pointerup', up);
+    saveLayoutSoon();
+  };
+  splitter.addEventListener('pointermove', move);
+  splitter.addEventListener('pointerup', up);
+});
+splitter.addEventListener('dblclick', () => { setSplit(50); saveLayoutSoon(); });
+splitter.addEventListener('keydown', e => {
+  const dec = layout === 'v' ? 'ArrowLeft' : 'ArrowUp', inc = layout === 'v' ? 'ArrowRight' : 'ArrowDown';
+  if (e.key === dec){ e.preventDefault(); setSplit(splitPct - 5); saveLayoutSoon(); }
+  if (e.key === inc){ e.preventDefault(); setSplit(splitPct + 5); saveLayoutSoon(); }
+});
+$('#lay1').onclick = () => setLayout('single');
+$('#layV').onclick = () => setLayout('v');
+$('#layH').onclick = () => setLayout('h');
+
+// 開いているタブの保存・復元（暗号化した控えに含める）
+function layoutState(){
+  return { layout, splitPct, activePane, panes: panes.map(p => ({ tabs:[...p.tabs], active:p.active })) };
+}
+function saveLayoutSoon(){ if (!pass) return; clearTimeout(localTimer); localTimer = setTimeout(saveLocal, 800); }
+function resetPanes(){
+  for (const p of panes){ if (p.view){ p.view.destroy(); p.view = null; } p.tabs = []; p.active = null; p.states = new Map(); }
+  layout = 'single'; activePane = 0;
+}
+function restoreLayout(s){
+  resetPanes();
+  if (s){
+    splitPct = s.splitPct || 50;
+    const ok = id => !!find(id);
+    const t0 = (s.panes?.[0]?.tabs || []).filter(ok), t1 = (s.panes?.[1]?.tabs || []).filter(ok);
+    layout = (s.layout === 'v' || s.layout === 'h') && t0.length && t1.length ? s.layout : 'single';
+    panes[0].tabs = layout === 'single' ? [...new Set([...t0, ...t1])] : t0;
+    if (layout !== 'single') panes[1].tabs = t1;
+    for (const p of (layout === 'single' ? [panes[0]] : panes)){
+      const want = s.panes?.[p.i]?.active;
+      const a = p.tabs.includes(want) ? want : p.tabs[0];
+      if (a) activateTab(p.i, a);
+    }
+    activePane = layout === 'single' ? 0 : (s.activePane === 1 ? 1 : 0);
+  }
+  renderPanes(); renderList(); updateStatusBar();
+}
+
 function updateStatusBar(){
-  if (!view) return;
-  const st = view.state, doc = st.doc, sel = st.selection.main;
+  const v = curView();
+  $('#undoBtn').disabled = !v || undoDepth(v.state) === 0;
+  $('#redoBtn').disabled = !v || redoDepth(v.state) === 0;
+  if (!v){ $('#pos').textContent = ''; $('#counts').textContent = ''; $('#updated').textContent = ''; return; }
+  const st = v.state, doc = st.doc, sel = st.selection.main;
   const line = doc.lineAt(sel.head);
   const col = [...line.text.slice(0, sel.head - line.from)].length + 1;
   const lineLen = [...line.text].length;
@@ -691,22 +979,21 @@ function updateStatusBar(){
   $('#pos').textContent = `${line.number} 行 ${col} 列　この行 ${lineLen} 文字` + (selLen ? `　選択 ${selLen} 文字` : '');
   const total = [...doc.toString()].length;
   $('#counts').textContent = `全 ${doc.lines} 行　${total} 文字`;
-  const m = find(currentId);
+  const m = find(curId());
   $('#updated').textContent = m ? `最終更新 ${new Date(m.updatedAt).toLocaleString('ja-JP')}` : '';
-  $('#undoBtn').disabled = undoDepth(st) === 0;
-  $('#redoBtn').disabled = redoDepth(st) === 0;
 }
 
-$('#undoBtn').onclick = () => { undo(view); view.focus(); };
-$('#redoBtn').onclick = () => { redo(view); view.focus(); };
+$('#undoBtn').onclick = () => { const v = curView(); if (v){ undo(v); v.focus(); } };
+$('#redoBtn').onclick = () => { const v = curView(); if (v){ redo(v); v.focus(); } };
 $('#headBtn').onclick = () => {
-  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const v = curView(); if (!v) return;
+  const line = v.state.doc.lineAt(v.state.selection.main.head);
   const m = /^(#{1,4}) /.exec(line.text);
   const level = m ? m[1].length : 0;
   const next = (level + 1) % 5;
   const insert = next ? '#'.repeat(next) + ' ' : '';
-  view.dispatch({ changes:{ from:line.from, to:line.from + (m ? m[0].length : 0), insert } });
-  view.focus();
+  v.dispatch({ changes:{ from:line.from, to:line.from + (m ? m[0].length : 0), insert } });
+  v.focus();
 };
 
 /* ---------- 一覧・選択 ---------- */
@@ -740,8 +1027,8 @@ function renderList(){
   }
   for (const m of items){
     const li = document.createElement('li');
-    li.setAttribute('aria-current', m.id === currentId ? 'true' : 'false');
-    li.onclick = () => select(m.id);
+    li.setAttribute('aria-current', m.id === curId() ? 'true' : 'false');
+    li.onclick = () => openMemo(m.id);
 
     if (m.id === renamingId){
       const input = document.createElement('input');
@@ -754,7 +1041,7 @@ function renderList(){
         renamingId = null;
         if (save && v && v !== m.name){
           m.name = v; m.updatedAt = Date.now();
-          dirtyIds.add(m.id); schedule(); updateStatusBar();
+          dirtyIds.add(m.id); schedule(); updateStatusBar(); renderTabs();
         }
         renderList();
       };
@@ -772,7 +1059,7 @@ function renderList(){
       const tt = document.createElement('button');
       tt.className = 't'; tt.textContent = nameOf(m);
       tt.title = 'クリックして名前を変更';
-      tt.onclick = e => { e.stopPropagation(); if (m.id !== currentId) select(m.id); renamingId = m.id; renderList(); };
+      tt.onclick = e => { e.stopPropagation(); if (m.id !== curId()) openMemo(m.id); renamingId = m.id; renderList(); };
       li.append(tt);
       list.append(li);
     }
@@ -782,39 +1069,21 @@ function renderList(){
     li.append(ss);
   }
 }
-function renderEditor(){
-  const has = !!find(currentId);
-  $('#empty').classList.toggle('hidden', has);
-  $('#editorWrap').classList.toggle('hidden', !has);
-  if (!has){ $('#app').classList.remove('editing'); currentId = null; }
-}
-function select(id){
-  if (view && currentId) states.set(currentId, view.state);
-  const m = find(id); if (!m) return;
-  currentId = id;
-  let st = states.get(id);
-  if (!st || st.doc.toString() !== m.body) st = makeState(m.body);
-  if (!view) view = new EditorView({ state: st, parent: $('#host') });
-  else view.setState(st);
-  view.dispatch({ effects: lnComp.reconfigure(viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : []) });
-  $('#app').classList.add('editing');
-  renderList(); renderEditor(); updateStatusBar();
-}
 function newMemo(){
   const now = Date.now();
   const m = { id: crypto.randomUUID(), name: nextName(), body:'', createdAt:now, updatedAt:now };
   memos.push(m); dirtyIds.add(m.id);
   $('#q').value = '';
-  select(m.id); view.focus(); schedule();
+  openMemo(m.id); curView()?.focus(); schedule();
 }
 $('#delBtn').onclick = () => {
-  const m = find(currentId); if (!m) return;
+  const m = find(curId()); if (!m) return;
   if (!confirm(`「${nameOf(m)}」を削除しますか？`)) return;
-  memos = memos.filter(x => x !== m);
-  states.delete(m.id); dirtyIds.delete(m.id);
+  dirtyIds.delete(m.id);
   if (shas[m.id]) pendingDeletes.add(m.id);
-  currentId = null;
-  renderList(); renderEditor(); schedule();
+  closeEverywhere(m.id);
+  memos = memos.filter(x => x !== m);
+  renderList(); renderPanes(); schedule();
 };
 $('#newBtn').onclick = newMemo;
 $('#newBtn2').onclick = newMemo;
@@ -879,12 +1148,11 @@ async function openNotebook(){
   dirtyIds = new Set(cache?.dirty || []);
   pendingDeletes = new Set(cache?.deletes || []);
   for (const m of imported){ if (!find(m.id)){ memos.push(m); dirtyIds.add(m.id); } }
-  currentId = null; states.clear();
 
   document.querySelectorAll('#lock input[type=password]').forEach(i => i.value = '');
   $('#lock').classList.add('hidden');
   $('#app').classList.remove('hidden');
-  applyView(); renderList(); renderEditor();
+  applyView(); restoreLayout(cache?.layout);
 
   if (offline) setStatus('オフラインです。このブラウザの控えを表示しています', 'err');
   else sync();
@@ -1000,11 +1268,11 @@ $('#forgetBtn').onclick = () => {
 
 async function lock(){
   if (cfgTimer) await saveSettings().catch(() => {});
-  if (hasPending()){ await saveLocal(); await sync(); }
+  if (hasPending()) await sync();
+  await saveLocal();
   resetSecrets();
   memos = []; shas = {}; dirtyIds = new Set(); pendingDeletes = new Set();
-  currentId = null; states.clear();
-  if (view){ view.destroy(); view = null; }
+  resetPanes(); renderPanes();
   clearTimeout(syncTimer); clearTimeout(localTimer);
   viewCfg = { ...VIEW_DEFAULT }; applyView();
   $('#app').classList.add('hidden');
