@@ -11,13 +11,13 @@
 :root{
   --paper:#F3F5F7;--panel:#FFFFFF;--ink:#1D2733;--muted:#6B7785;--line:#D7DDE3;
   --accent:#2F6F62;--accent-ink:#FFFFFF;--warn:#B4492F;--sel:#E3ECE9;--amber:#B98A2E;--active:rgba(47,111,98,.06);
-  --fs:12pt;--lh:1.8;
+  --fs:12pt;--lh:1.8;--mark:#FFE58A;
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
   color-scheme:light dark;
 }
 @media (prefers-color-scheme:dark){
   :root{--paper:#14181D;--panel:#1B2027;--ink:#E4E8EC;--muted:#8E99A6;--line:#2C333C;
-    --accent:#6FB3A3;--accent-ink:#0F1A17;--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B;--active:rgba(111,179,163,.07)}
+    --accent:#6FB3A3;--accent-ink:#0F1A17;--mark:rgba(240,200,60,.38);--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B;--active:rgba(111,179,163,.07)}
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -156,15 +156,26 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-h3{font-size:calc(var(--fs) + 3pt);font-weight:700}
 #panes .host .cm-h4{font-size:calc(var(--fs) + 1.5pt);font-weight:700}
 #panes .host .cm-hmark{color:var(--muted);font-weight:400}
-#panes .host .cm-tbl{padding:6px 28px;display:flex;align-items:flex-start}
+#panes .host .cm-tbl{padding:6px 28px;display:flex;align-items:flex-start;outline:none}
 #panes .host .cm-tbl .ind{white-space:pre;flex:none}
-#panes .host .cm-tbl .tscroll{overflow-x:auto;min-width:0;max-width:100%;padding-bottom:2px}
+#panes .host .cm-tbl .tbox{position:relative;flex:0 0 auto}
+#panes .host .cm-tbl:focus table{outline:2px solid var(--accent);outline-offset:3px}
 #panes .host .cm-tbl table{border-collapse:collapse;line-height:1.5}
-#panes .host .cm-tbl th,#panes .host .cm-tbl td{border:1px solid var(--line);padding:4px 10px;position:relative;vertical-align:top;cursor:text;min-width:2.5em;overflow-wrap:anywhere;white-space:pre-wrap}
+#panes .host .cm-tbl th,#panes .host .cm-tbl td{border:1px solid var(--line);padding:0;position:relative;vertical-align:top;min-width:2.5em}
 #panes .host .cm-tbl th{background:var(--paper);font-weight:600}
-#panes .host .cm-tbl .rz{position:absolute;top:0;bottom:0;right:-5px;width:9px;cursor:col-resize;z-index:2}
+#panes .host .cm-tbl .ce{display:block;padding:4px 10px;min-height:calc(1.5em + 8px);outline:none;white-space:pre-wrap;overflow-wrap:anywhere;cursor:text}
+#panes .host .cm-tbl .ce:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+#panes .host .cm-tbl .rz{position:absolute;top:0;bottom:0;right:-4px;width:7px;cursor:col-resize;z-index:2}
 #panes .host .cm-tbl .rz:hover,#panes .host .cm-tbl .rz.on{background:var(--accent);opacity:.45}
-#panes .host .cm-tbl .wlabel{position:absolute;top:-22px;right:0;background:var(--ink);color:var(--panel);font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;white-space:nowrap;pointer-events:none}
+#panes .host .cm-tbl .wlabel{position:absolute;top:-22px;right:0;background:var(--ink);color:var(--panel);font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:4}
+#panes .host .cm-tbl .ttools{position:absolute;bottom:calc(100% + 4px);left:0;display:none;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.1);z-index:3;white-space:nowrap;font-size:12px}
+#panes .host .cm-tbl:focus-within .ttools{display:flex}
+#panes .host .cm-tbl .ttools button{border:0;background:none;font-size:12px;padding:1px 8px;border-radius:4px;line-height:1.7;color:var(--ink)}
+#panes .host .cm-tbl .ttools button:hover:not(:disabled){background:var(--paper)}
+#panes .host .cm-tbl .ttools button:disabled{opacity:.35}
+#panes .host .cm-tbl .ttools .danger{color:var(--warn)}
+#panes .host .cm-tbl .ttools .sep{width:1px;background:var(--line);margin:2px 3px}
+#panes .host .cm-marker{background:var(--mark);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 #panes .host .cm-img{display:inline-block;position:relative;vertical-align:bottom;max-width:100%;line-height:0;margin:3px 0;border-radius:4px}
 #panes .host .cm-img img{max-width:100%;height:auto;display:block;border-radius:4px;user-select:none}
 #panes .host .cm-img:hover{box-shadow:0 0 0 1px var(--line)}
@@ -205,6 +216,9 @@ dialog form{display:grid;gap:12px}
 dialog h2{margin:0;font-size:18px}
 dialog label{font-size:13px;display:grid;gap:4px}
 dialog .check{display:flex;gap:8px;align-items:center}
+.keytbl{border-collapse:collapse;font-size:13px;width:100%}
+.keytbl th{text-align:left;font-weight:400;padding:5px 12px 5px 0;border-bottom:1px solid var(--line)}
+.keytbl td{text-align:right;padding:5px 0;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
 dialog .check input{width:auto}
 dialog p{margin:0;font-size:12px;color:var(--muted)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -307,12 +321,14 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="undoBtn" title="元に戻す（⌘Z）" aria-label="元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
         <button class="ib" id="redoBtn" title="やり直す（⇧⌘Z）" aria-label="やり直す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
         <span class="sep"></span>
-        <button class="ib" id="headBtn" title="見出しを切り替え（なし → # → ## → ### → #### ）" aria-label="見出しを切り替え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5v14M14 5v14M5 12h9"/><path d="M18 19v-7l-2 1.5"/></svg></button>
+        <button class="ib" id="headBtn" title="見出しを切り替え（⌘⌥1〜4 で直接指定、⌘⌥0 で解除）" aria-label="見出しを切り替え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5v14M14 5v14M5 12h9"/><path d="M18 19v-7l-2 1.5"/></svg></button>
+        <button class="ib" id="markBtn" title="マーカーを塗る（⌘⇧H / Ctrl+Shift+H）" aria-label="マーカーを塗る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 15 7.5-9.5a2 2 0 0 1 3 2.5L12 17"/><path d="m9 15 3 2-2 2.5H6.5z"/><path d="M3 21h18" stroke="#E0B12E" stroke-width="3"/></svg></button>
+        <button class="ib" id="unmarkBtn" title="マーカーを消す（⌘⇧X / Ctrl+Shift+X）" aria-label="マーカーを消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4 10-10 6 6-8 8z"/><path d="M11 21h10"/><path d="m9 11 6 6"/></svg></button>
         <button class="ib" id="tableBtn" title="表を挿入" aria-label="表を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/></svg></button>
         <button class="ib" id="imageBtn" title="画像を挿入（コピーした画像は ⌘V で貼り付け）" aria-label="画像を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5.5-5 4 3.5 2.5-2 4.5 3.5"/></svg></button>
         <input type="file" id="imageFile" accept="image/*" hidden>
-        <button class="ib" id="outdentBtn" title="インデントを減らす（⇧Tab）" aria-label="インデントを減らす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h9M11 12h9M11 18h9M7 9l-3 3 3 3"/></svg></button>
-        <button class="ib" id="indentBtn" title="インデントを増やす（Tab）" aria-label="インデントを増やす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h9M11 12h9M11 18h9M4 9l3 3-3 3"/></svg></button>
+        <button class="ib" id="outdentBtn" title="インデントを減らす（⇧Tab / ⌘[）" aria-label="インデントを減らす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h9M11 12h9M11 18h9M7 9l-3 3 3 3"/></svg></button>
+        <button class="ib" id="indentBtn" title="インデントを増やす（Tab / ⌘]）" aria-label="インデントを増やす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h9M11 12h9M11 18h9M4 9l3 3-3 3"/></svg></button>
         <button class="ib" id="lnBtn" title="行番号を表示" aria-label="行番号を表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 6h1v4M4 10h2M4 14.5c.5-.7 2-.7 2 .3 0 1-2 1.5-2 3.2h2"/></svg></button>
         <span class="sep"></span>
         <span class="step"><span class="lbl">文字</span>
@@ -331,6 +347,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="layV" title="縦に2分割（左右に並べる）" aria-label="縦に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/></svg></button>
         <button class="ib" id="layH" title="横に2分割（上下に並べる）" aria-label="横に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 12h17"/></svg></button>
         <span class="sep"></span>
+        <button class="ib" id="keysBtn" title="ショートカット一覧" aria-label="ショートカット一覧"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
         <button class="ib danger" id="delBtn" title="このメモを削除" aria-label="このメモを削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>
       <div id="panes" class="layout-single">
@@ -346,6 +363,29 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
     </div>
   </main>
 </section>
+
+<dialog id="keys">
+  <form method="dialog">
+    <h2>ショートカット</h2>
+    <table class="keytbl">
+      <tr><th>マーカーを塗る（マーカー上なら消す）</th><td>⌘⇧H</td></tr>
+      <tr><th>選択範囲のマーカーを消す</th><td>⌘⇧X</td></tr>
+      <tr><th>見出し # 〜 ####</th><td>⌘⌥1 〜 ⌘⌥4</td></tr>
+      <tr><th>見出しを解除</th><td>⌘⌥0</td></tr>
+      <tr><th>インデントを増やす</th><td>Tab ／ ⌘]</td></tr>
+      <tr><th>インデントを減らす</th><td>⇧Tab ／ ⌘[</td></tr>
+      <tr><th>表：次のセル／前のセル</th><td>Tab ／ ⇧Tab</td></tr>
+      <tr><th>表：下のセル（最終行なら行を追加）</th><td>Enter</td></tr>
+      <tr><th>表：表全体を選ぶ</th><td>Esc（または表の左の余白をクリック）</td></tr>
+      <tr><th>表を選んだ状態で前に空白／タブ</th><td>Space ／ Tab（⇧Tab・Backspace で戻す）</td></tr>
+      <tr><th>元に戻す／やり直す</th><td>⌘Z ／ ⇧⌘Z</td></tr>
+      <tr><th>同期</th><td>⌘S</td></tr>
+      <tr><th>一覧を隠す／表示</th><td>⌘B</td></tr>
+    </table>
+    <p>Windows では ⌘ を Ctrl、⌥ を Alt に読み替えてください。</p>
+    <div class="row"><span></span><button value="close" class="primary">閉じる</button></div>
+  </form>
+</dialog>
 
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
@@ -375,7 +415,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
   </form>
 </dialog>
 
-<script>var CM=(()=>{var Ln=Object.defineProperty;var za=Object.getOwnPropertyDescriptor;var Ka=Object.getOwnPropertyNames;var qa=Object.prototype.hasOwnProperty;var ja=(n,t)=>{for(var e in t)Ln(n,e,{get:t[e],enumerable:!0})},Ua=(n,t,e,i)=>{if(t&&typeof t=="object"||typeof t=="function")for(let s of Ka(t))!qa.call(n,s)&&s!==e&&Ln(n,s,{get:()=>t[s],enumerable:!(i=za(t,s))||i.enumerable});return n};var $a=n=>Ua(Ln({},"__esModule",{value:!0}),n);var Ou={};ja(Ou,{Annotation:()=>rt,Compartment:()=>Oe,Decoration:()=>I,EditorState:()=>K,EditorView:()=>D,StateEffect:()=>F,StateField:()=>ht,Transaction:()=>_,ViewPlugin:()=>Ct,WidgetType:()=>It,defaultKeymap:()=>Wa,highlightActiveLine:()=>Rl,highlightActiveLineGutter:()=>Nl,history:()=>aa,historyKeymap:()=>pa,indentLess:()=>Lr,indentMore:()=>Er,indentUnit:()=>je,keymap:()=>ir,lineNumbers:()=>Il,placeholder:()=>Pl,redo:()=>Di,redoDepth:()=>ca,undo:()=>Dn,undoDepth:()=>fa});var Pn=[],Fr=[];(()=>{let n="lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,1n,9,16,o,,x,1i,3,,i,,7,a,2,t,3,1k,,,7,2,2,2,3,9,,a,2,q,,2,3,1k,,,5,4,2,2,3,3,,u,2,3,,b,3,1k,,,8,,3,,3,k,2,m,6,,3,1k,,,7,2,2,2,3,7,3,a,2,u,,1n,5,3,3,,4,9,,14,5,1j,,,7,,3,,4,7,2,b,2,t,3,1k,,,7,,3,,4,7,2,b,2,f,,c,4,1j,2,,7,,3,,4,9,,a,2,t,3,1y,,4,6,,,,8,i,2,1p,,,8,c,8,2q,,,a,b,7,21,2,r,,,,,,4,2,1d,k,,2,5,b,,10,9,,2u,b,,6,n,4,4,3,g,4,d,,,3,6,,f,,jj,3,qa,4,s,3,t,2,u,2,1s,w,9,,19,3,,,39,2,y,,3a,c,4,c,63,5,1l,a,,,,,2,o,2,,1c,1a,2,c,k,5,1b,h,12,9,c,3,u,d,1k,e,1c,k,48,3,,l,4,,6,,2,3,5i,1s,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,n,5,4,,2b,2,1e,i,q,i,d,,12,8,p,d,18,4,1b,e,10,,1v,e,c,,8,2,1a,,1f,,,3,2,2,5,2,,,15,5,5,2,6k,8,,2,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,1t,5,8t,2,25,6,1y,b,1d,4,3e,3,1h,f,15,,2,2,a,4,19,b,7,,1p,3,10,e,g,2,18,,c,3,1c,e,8,4,,2,2k,c,6,,2,,4d,c,l,4,1j,2,,7,2,2,2,3,9,,a,2,2,7,3,5,1v,9,,,2,,,4,,5,,,e,2,2a,i,n,,29,k,6j,7,2,9,r,2,2a,h,2y,d,2t,3,2,a,74,f,6t,6,,2,2,4,,,,2,3x,7,2,7,3,,s,a,14,7,,4,8,,9,b,1a,g,5i,8,5j,8,,8,2a,m,,e,3e,6,3,,,2,,7,,,1u,5,,2,,5,9n,4,9,2,,,1c,7,3,5,n,,44l,,6,f,8ug,i,1xc,5,1n,7,t4,,,1j,7,4,29,,b,2,f57,2,3mp,1a,2,n,f2,5,3,6,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,2s,,4g,7,af,,1p,4,e4,4,72,2,6r,,2,,7,2,5,,d6,7,31,7,240,5".split(",").map(t=>t?parseInt(t,36):1);for(let t=0,e=0;t<n.length;t++)(t%2?Fr:Pn).push(e=e+n[t])})();function Ga(n){if(n<768)return!1;for(let t=0,e=Pn.length;;){let i=t+e>>1;if(n<Pn[i])e=i;else if(n>=Fr[i])t=i+1;else return!0;if(t==e)return!1}}function Ir(n){return n>=127462&&n<=127487}var Nr=8205;function Vr(n,t,e=!0,i=!0){return(e?Wr:_a)(n,t,i)}function Wr(n,t,e){if(t==n.length)return t;t&&zr(n.charCodeAt(t))&&Kr(n.charCodeAt(t-1))&&t--;let i=Rn(n,t);for(t+=Hr(i);t<n.length;){let s=Rn(n,t);if(i==Nr||s==Nr||e&&Ga(s))t+=Hr(s),i=s;else if(Ir(s)){let r=0,o=t-2;for(;o>=0&&Ir(Rn(n,o));)r++,o-=2;if(r%2==0)break;t+=2}else break}return t}function _a(n,t,e){for(;t>1;){let i=Wr(n,t-2,e);if(i<t)return i;t--}return 0}function Rn(n,t){let e=n.charCodeAt(t);if(!Kr(e)||t+1==n.length)return e;let i=n.charCodeAt(t+1);return zr(i)?(e-55296<<10)+(i-56320)+65536:e}function zr(n){return n>=56320&&n<57344}function Kr(n){return n>=55296&&n<56320}function Hr(n){return n<65536?1:2}var E=class n{lineAt(t){if(t<0||t>this.length)throw new RangeError(`Invalid position ${t} in document of length ${this.length}`);return this.lineInner(t,!1,1,0)}line(t){if(t<1||t>this.lines)throw new RangeError(`Invalid line number ${t} in ${this.lines}-line document`);return this.lineInner(t,!0,1,0)}replace(t,e,i){[t,e]=De(this,t,e);let s=[];return this.decompose(0,t,s,2),i.length&&i.decompose(0,i.length,s,3),this.decompose(e,this.length,s,1),Ae.from(s,this.length-(e-t)+i.length)}append(t){return this.replace(this.length,this.length,t)}slice(t,e=this.length){[t,e]=De(this,t,e);let i=[];return this.decompose(t,e,i,0),Ae.from(i,e-t)}eq(t){if(t==this)return!0;if(t.length!=this.length||t.lines!=this.lines)return!1;let e=this.scanIdentical(t,1),i=this.length-this.scanIdentical(t,-1),s=new ae(this),r=new ae(t);for(let o=e,l=e;;){if(s.next(o),r.next(o),o=0,s.lineBreak!=r.lineBreak||s.done!=r.done||s.value!=r.value)return!1;if(l+=s.value.length,s.done||l>=i)return!0}}iter(t=1){return new ae(this,t)}iterRange(t,e=this.length){return new Ni(this,t,e)}iterLines(t,e){let i;if(t==null)i=this.iter();else{e==null&&(e=this.lines+1);let s=this.line(t).from;i=this.iterRange(s,Math.max(s,e==this.lines+1?this.length:e<=1?0:this.line(e-1).to))}return new Hi(i)}toString(){return this.sliceString(0)}toJSON(){let t=[];return this.flatten(t),t}constructor(){}static of(t){if(t.length==0)throw new RangeError("A document must have at least one line");return t.length==1&&!t[0]?n.empty:t.length<=32?new at(t):Ae.from(at.split(t,[]))}},at=class n extends E{constructor(t,e=Ya(t)){super(),this.text=t,this.length=e}get lines(){return this.text.length}get children(){return null}lineInner(t,e,i,s){for(let r=0;;r++){let o=this.text[r],l=s+o.length;if((e?i:l)>=t)return new Nn(s,l,i,o);s=l+1,i++}}decompose(t,e,i,s){let r=t<=0&&e>=this.length?this:new n(qr(this.text,t,e),Math.min(e,this.length)-Math.max(0,t));if(s&1){let o=i.pop(),l=Ii(r.text,o.text.slice(),0,r.length);if(l.length<=32)i.push(new n(l,o.length+r.length));else{let a=l.length>>1;i.push(new n(l.slice(0,a)),new n(l.slice(a)))}}else i.push(r)}replace(t,e,i){if(!(i instanceof n))return super.replace(t,e,i);[t,e]=De(this,t,e);let s=Ii(this.text,Ii(i.text,qr(this.text,0,t)),e),r=this.length+i.length-(e-t);return s.length<=32?new n(s,r):Ae.from(n.split(s,[]),r)}sliceString(t,e=this.length,i=`
+<script>var CM=(()=>{var Ln=Object.defineProperty;var za=Object.getOwnPropertyDescriptor;var Ka=Object.getOwnPropertyNames;var qa=Object.prototype.hasOwnProperty;var ja=(n,t)=>{for(var e in t)Ln(n,e,{get:t[e],enumerable:!0})},Ua=(n,t,e,i)=>{if(t&&typeof t=="object"||typeof t=="function")for(let s of Ka(t))!qa.call(n,s)&&s!==e&&Ln(n,s,{get:()=>t[s],enumerable:!(i=za(t,s))||i.enumerable});return n};var $a=n=>Ua(Ln({},"__esModule",{value:!0}),n);var Ou={};ja(Ou,{Annotation:()=>rt,Compartment:()=>Oe,Decoration:()=>I,EditorSelection:()=>b,EditorState:()=>K,EditorView:()=>D,StateEffect:()=>F,StateField:()=>ht,Transaction:()=>_,ViewPlugin:()=>Ct,WidgetType:()=>It,defaultKeymap:()=>Wa,highlightActiveLine:()=>Rl,highlightActiveLineGutter:()=>Nl,history:()=>aa,historyKeymap:()=>pa,indentLess:()=>Lr,indentMore:()=>Er,indentUnit:()=>je,keymap:()=>ir,lineNumbers:()=>Il,placeholder:()=>Pl,redo:()=>Di,redoDepth:()=>ca,undo:()=>Dn,undoDepth:()=>fa});var Pn=[],Fr=[];(()=>{let n="lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,1n,9,16,o,,x,1i,3,,i,,7,a,2,t,3,1k,,,7,2,2,2,3,9,,a,2,q,,2,3,1k,,,5,4,2,2,3,3,,u,2,3,,b,3,1k,,,8,,3,,3,k,2,m,6,,3,1k,,,7,2,2,2,3,7,3,a,2,u,,1n,5,3,3,,4,9,,14,5,1j,,,7,,3,,4,7,2,b,2,t,3,1k,,,7,,3,,4,7,2,b,2,f,,c,4,1j,2,,7,,3,,4,9,,a,2,t,3,1y,,4,6,,,,8,i,2,1p,,,8,c,8,2q,,,a,b,7,21,2,r,,,,,,4,2,1d,k,,2,5,b,,10,9,,2u,b,,6,n,4,4,3,g,4,d,,,3,6,,f,,jj,3,qa,4,s,3,t,2,u,2,1s,w,9,,19,3,,,39,2,y,,3a,c,4,c,63,5,1l,a,,,,,2,o,2,,1c,1a,2,c,k,5,1b,h,12,9,c,3,u,d,1k,e,1c,k,48,3,,l,4,,6,,2,3,5i,1s,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,n,5,4,,2b,2,1e,i,q,i,d,,12,8,p,d,18,4,1b,e,10,,1v,e,c,,8,2,1a,,1f,,,3,2,2,5,2,,,15,5,5,2,6k,8,,2,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,1t,5,8t,2,25,6,1y,b,1d,4,3e,3,1h,f,15,,2,2,a,4,19,b,7,,1p,3,10,e,g,2,18,,c,3,1c,e,8,4,,2,2k,c,6,,2,,4d,c,l,4,1j,2,,7,2,2,2,3,9,,a,2,2,7,3,5,1v,9,,,2,,,4,,5,,,e,2,2a,i,n,,29,k,6j,7,2,9,r,2,2a,h,2y,d,2t,3,2,a,74,f,6t,6,,2,2,4,,,,2,3x,7,2,7,3,,s,a,14,7,,4,8,,9,b,1a,g,5i,8,5j,8,,8,2a,m,,e,3e,6,3,,,2,,7,,,1u,5,,2,,5,9n,4,9,2,,,1c,7,3,5,n,,44l,,6,f,8ug,i,1xc,5,1n,7,t4,,,1j,7,4,29,,b,2,f57,2,3mp,1a,2,n,f2,5,3,6,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,2s,,4g,7,af,,1p,4,e4,4,72,2,6r,,2,,7,2,5,,d6,7,31,7,240,5".split(",").map(t=>t?parseInt(t,36):1);for(let t=0,e=0;t<n.length;t++)(t%2?Fr:Pn).push(e=e+n[t])})();function Ga(n){if(n<768)return!1;for(let t=0,e=Pn.length;;){let i=t+e>>1;if(n<Pn[i])e=i;else if(n>=Fr[i])t=i+1;else return!0;if(t==e)return!1}}function Ir(n){return n>=127462&&n<=127487}var Nr=8205;function Vr(n,t,e=!0,i=!0){return(e?Wr:_a)(n,t,i)}function Wr(n,t,e){if(t==n.length)return t;t&&zr(n.charCodeAt(t))&&Kr(n.charCodeAt(t-1))&&t--;let i=Rn(n,t);for(t+=Hr(i);t<n.length;){let s=Rn(n,t);if(i==Nr||s==Nr||e&&Ga(s))t+=Hr(s),i=s;else if(Ir(s)){let r=0,o=t-2;for(;o>=0&&Ir(Rn(n,o));)r++,o-=2;if(r%2==0)break;t+=2}else break}return t}function _a(n,t,e){for(;t>1;){let i=Wr(n,t-2,e);if(i<t)return i;t--}return 0}function Rn(n,t){let e=n.charCodeAt(t);if(!Kr(e)||t+1==n.length)return e;let i=n.charCodeAt(t+1);return zr(i)?(e-55296<<10)+(i-56320)+65536:e}function zr(n){return n>=56320&&n<57344}function Kr(n){return n>=55296&&n<56320}function Hr(n){return n<65536?1:2}var E=class n{lineAt(t){if(t<0||t>this.length)throw new RangeError(`Invalid position ${t} in document of length ${this.length}`);return this.lineInner(t,!1,1,0)}line(t){if(t<1||t>this.lines)throw new RangeError(`Invalid line number ${t} in ${this.lines}-line document`);return this.lineInner(t,!0,1,0)}replace(t,e,i){[t,e]=De(this,t,e);let s=[];return this.decompose(0,t,s,2),i.length&&i.decompose(0,i.length,s,3),this.decompose(e,this.length,s,1),Ae.from(s,this.length-(e-t)+i.length)}append(t){return this.replace(this.length,this.length,t)}slice(t,e=this.length){[t,e]=De(this,t,e);let i=[];return this.decompose(t,e,i,0),Ae.from(i,e-t)}eq(t){if(t==this)return!0;if(t.length!=this.length||t.lines!=this.lines)return!1;let e=this.scanIdentical(t,1),i=this.length-this.scanIdentical(t,-1),s=new ae(this),r=new ae(t);for(let o=e,l=e;;){if(s.next(o),r.next(o),o=0,s.lineBreak!=r.lineBreak||s.done!=r.done||s.value!=r.value)return!1;if(l+=s.value.length,s.done||l>=i)return!0}}iter(t=1){return new ae(this,t)}iterRange(t,e=this.length){return new Ni(this,t,e)}iterLines(t,e){let i;if(t==null)i=this.iter();else{e==null&&(e=this.lines+1);let s=this.line(t).from;i=this.iterRange(s,Math.max(s,e==this.lines+1?this.length:e<=1?0:this.line(e-1).to))}return new Hi(i)}toString(){return this.sliceString(0)}toJSON(){let t=[];return this.flatten(t),t}constructor(){}static of(t){if(t.length==0)throw new RangeError("A document must have at least one line");return t.length==1&&!t[0]?n.empty:t.length<=32?new at(t):Ae.from(at.split(t,[]))}},at=class n extends E{constructor(t,e=Ya(t)){super(),this.text=t,this.length=e}get lines(){return this.text.length}get children(){return null}lineInner(t,e,i,s){for(let r=0;;r++){let o=this.text[r],l=s+o.length;if((e?i:l)>=t)return new Nn(s,l,i,o);s=l+1,i++}}decompose(t,e,i,s){let r=t<=0&&e>=this.length?this:new n(qr(this.text,t,e),Math.min(e,this.length)-Math.max(0,t));if(s&1){let o=i.pop(),l=Ii(r.text,o.text.slice(),0,r.length);if(l.length<=32)i.push(new n(l,o.length+r.length));else{let a=l.length>>1;i.push(new n(l.slice(0,a)),new n(l.slice(a)))}}else i.push(r)}replace(t,e,i){if(!(i instanceof n))return super.replace(t,e,i);[t,e]=De(this,t,e);let s=Ii(this.text,Ii(i.text,qr(this.text,0,t)),e),r=this.length+i.length-(e-t);return s.length<=32?new n(s,r):Ae.from(n.split(s,[]),r)}sliceString(t,e=this.length,i=`
 `){[t,e]=De(this,t,e);let s="";for(let r=0,o=0;r<=e&&o<this.text.length;o++){let l=this.text[o],a=r+l.length;r>t&&o&&(s+=i),t<a&&e>r&&(s+=l.slice(Math.max(0,t-r),e-r)),r=a+1}return s}flatten(t){for(let e of this.text)t.push(e)}scanIdentical(){return 0}static split(t,e){let i=[],s=-1;for(let r of t)i.push(r),s+=r.length+1,i.length==32&&(e.push(new n(i,s)),i=[],s=-1);return s>-1&&e.push(new n(i,s)),e}},Ae=class n extends E{constructor(t,e){super(),this.children=t,this.length=e,this.lines=0;for(let i of t)this.lines+=i.lines}lineInner(t,e,i,s){for(let r=0;;r++){let o=this.children[r],l=s+o.length,a=i+o.lines-1;if((e?a:l)>=t)return o.lineInner(t,e,i,s);s=l+1,i=a+1}}decompose(t,e,i,s){for(let r=0,o=0;o<=e&&r<this.children.length;r++){let l=this.children[r],a=o+l.length;if(t<=a&&e>=o){let h=s&((o<=t?1:0)|(a>=e?2:0));o>=t&&a<=e&&!h?i.push(l):l.decompose(t-o,e-o,i,h)}o=a+1}}replace(t,e,i){if([t,e]=De(this,t,e),i.lines<this.lines)for(let s=0,r=0;s<this.children.length;s++){let o=this.children[s],l=r+o.length;if(t>=r&&e<=l){let a=o.replace(t-r,e-r,i),h=this.lines-o.lines+a.lines;if(a.lines<h>>4&&a.lines>h>>6){let f=this.children.slice();return f[s]=a,new n(f,this.length-(e-t)+i.length)}return super.replace(r,l,a)}r=l+1}return super.replace(t,e,i)}sliceString(t,e=this.length,i=`
 `){[t,e]=De(this,t,e);let s="";for(let r=0,o=0;r<this.children.length&&o<=e;r++){let l=this.children[r],a=o+l.length;o>t&&r&&(s+=i),t<a&&e>o&&(s+=l.sliceString(t-o,e-o,i)),o=a+1}return s}flatten(t){for(let e of this.children)e.flatten(t)}scanIdentical(t,e){if(!(t instanceof n))return 0;let i=0,[s,r,o,l]=e>0?[0,0,this.children.length,t.children.length]:[this.children.length-1,t.children.length-1,-1,-1];for(;;s+=e,r+=e){if(s==o||r==l)return i;let a=this.children[s],h=t.children[r];if(a!=h)return i+a.scanIdentical(h,e);i+=a.length+1}}static from(t,e=t.reduce((i,s)=>i+s.length+1,-1)){let i=0;for(let d of t)i+=d.lines;if(i<32){let d=[];for(let p of t)p.flatten(d);return new at(d,e)}let s=Math.max(32,i>>5),r=s<<1,o=s>>1,l=[],a=0,h=-1,f=[];function c(d){let p;if(d.lines>r&&d instanceof n)for(let g of d.children)c(g);else d.lines>o&&(a>o||!a)?(u(),l.push(d)):d instanceof at&&a&&(p=f[f.length-1])instanceof at&&d.lines+p.lines<=32?(a+=d.lines,h+=d.length+1,f[f.length-1]=new at(p.text.concat(d.text),p.length+1+d.length)):(a+d.lines>s&&u(),a+=d.lines,h+=d.length+1,f.push(d))}function u(){a!=0&&(l.push(f.length==1?f[0]:n.from(f,h)),h=-1,a=f.length=0)}for(let d of t)c(d);return u(),l.length==1?l[0]:new n(l,e)}};E.empty=new at([""],0);function Ya(n){let t=-1;for(let e of n)t+=e.length+1;return t}function Ii(n,t,e=0,i=1e9){for(let s=0,r=0,o=!0;r<n.length&&s<=i;r++){let l=n[r],a=s+l.length;a>=e&&(a>i&&(l=l.slice(0,i-s)),s<e&&(l=l.slice(e-s)),o?(t[t.length-1]+=l,o=!1):t.push(l)),s=a+1}return t}function qr(n,t,e){return Ii(n,[""],t,e)}var ae=class{constructor(t,e=1){this.dir=e,this.done=!1,this.lineBreak=!1,this.value="",this.nodes=[t],this.offsets=[e>0?1:(t instanceof at?t.text.length:t.children.length)<<1]}nextInner(t,e){for(this.done=this.lineBreak=!1;;){let i=this.nodes.length-1,s=this.nodes[i],r=this.offsets[i],o=r>>1,l=s instanceof at?s.text.length:s.children.length;if(o==(e>0?l:0)){if(i==0)return this.done=!0,this.value="",this;e>0&&this.offsets[i-1]++,this.nodes.pop(),this.offsets.pop()}else if((r&1)==(e>0?0:1)){if(this.offsets[i]+=e,t==0)return this.lineBreak=!0,this.value=`
 `,this;t--}else if(s instanceof at){let a=s.text[o+(e<0?-1:0)];if(this.offsets[i]+=e,a.length>Math.max(0,t))return this.value=t==0?a:e>0?a.slice(t):a.slice(0,a.length-t),this;t-=a.length}else{let a=s.children[o+(e<0?-1:0)];t>a.length?(t-=a.length,this.offsets[i]+=e):(e<0&&this.offsets[i]--,this.nodes.push(a),this.offsets.push(e>0?1:(a instanceof at?a.text.length:a.children.length)<<1))}}}next(t=0){return t<0&&(this.nextInner(-t,-this.dir),t=this.value.length),this.nextInner(t,this.dir)}},Ni=class{constructor(t,e,i){this.value="",this.done=!1,this.cursor=new ae(t,e>i?-1:1),this.pos=e>i?t.length:0,this.from=Math.min(e,i),this.to=Math.max(e,i)}nextInner(t,e){if(e<0?this.pos<=this.from:this.pos>=this.to)return this.value="",this.done=!0,this;t+=Math.max(0,e<0?this.pos-this.to:this.from-this.pos);let i=e<0?this.pos-this.from:this.to-this.pos;t>i&&(t=i),i-=t;let{value:s}=this.cursor.next(t);return this.pos+=(s.length+t)*e,this.value=s.length<=i?s:e<0?s.slice(s.length-i):s.slice(0,i),this.done=!this.value,this}next(t=0){return t<0?t=Math.max(t,this.from-this.pos):t>0&&(t=Math.min(t,this.to-this.pos)),this.nextInner(t,this.cursor.dir)}get lineBreak(){return this.cursor.lineBreak&&this.value!=""}},Hi=class{constructor(t){this.inner=t,this.afterBreak=!0,this.value="",this.done=!1}next(t=0){let{done:e,lineBreak:i,value:s}=this.inner.next(t);return e&&this.afterBreak?(this.value="",this.afterBreak=!1):e?(this.done=!0,this.value=""):i?this.afterBreak?this.value="":(this.afterBreak=!0,this.next()):(this.value=s,this.afterBreak=!1),this}get lineBreak(){return!1}};typeof Symbol<"u"&&(E.prototype[Symbol.iterator]=function(){return this.iter()},ae.prototype[Symbol.iterator]=Ni.prototype[Symbol.iterator]=Hi.prototype[Symbol.iterator]=function(){return this});var Nn=class{constructor(t,e,i,s){this.from=t,this.to=e,this.number=i,this.text=s}get length(){return this.to-this.from}};function De(n,t,e){return t=Math.max(0,Math.min(n.length,t)),[t,Math.max(t,Math.min(n.length,e))]}function J(n,t,e=!0,i=!0){return Vr(n,t,e,i)}function Ja(n){return n>=56320&&n<57344}function Xa(n){return n>=55296&&n<56320}function _r(n,t){let e=n.charCodeAt(t);if(!Xa(e)||t+1==n.length)return e;let i=n.charCodeAt(t+1);return Ja(i)?(e-55296<<10)+(i-56320)+65536:e}function Yr(n){return n<65536?1:2}var Hn=/\r\n?|\n/,st=(function(n){return n[n.Simple=0]="Simple",n[n.TrackDel=1]="TrackDel",n[n.TrackBefore=2]="TrackBefore",n[n.TrackAfter=3]="TrackAfter",n})(st||(st={})),zt=class n{constructor(t){this.sections=t}get length(){let t=0;for(let e=0;e<this.sections.length;e+=2)t+=this.sections[e];return t}get newLength(){let t=0;for(let e=0;e<this.sections.length;e+=2){let i=this.sections[e+1];t+=i<0?this.sections[e]:i}return t}get empty(){return this.sections.length==0||this.sections.length==2&&this.sections[1]<0}iterGaps(t){for(let e=0,i=0,s=0;e<this.sections.length;){let r=this.sections[e++],o=this.sections[e++];o<0?(t(i,s,r),s+=r):s+=o,i+=r}}iterChangedRanges(t,e=!1){Fn(this,t,e)}get invertedDesc(){let t=[];for(let e=0;e<this.sections.length;){let i=this.sections[e++],s=this.sections[e++];s<0?t.push(i,s):t.push(s,i)}return new n(t)}composeDesc(t){return this.empty?t:t.empty?this:Jr(this,t)}mapDesc(t,e=!1){return t.empty?this:Vn(this,t,e)}mapPos(t,e=-1,i=st.Simple){let s=0,r=0;for(let o=0;o<this.sections.length;){let l=this.sections[o++],a=this.sections[o++],h=s+l;if(a<0){if(h>t)return r+(t-s);r+=l}else{if(i!=st.Simple&&h>=t&&(i==st.TrackDel&&s<t&&h>t||i==st.TrackBefore&&s<t||i==st.TrackAfter&&h>t))return null;if(h>t||h==t&&e<0&&!l)return t==s||e<0?r:r+a;r+=a}s=h}if(t>s)throw new RangeError(`Position ${t} is out of range for changeset of length ${s}`);return r}touchesRange(t,e=t){for(let i=0,s=0;i<this.sections.length&&s<=e;){let r=this.sections[i++],o=this.sections[i++],l=s+r;if(o>=0&&s<=e&&l>=t)return s<t&&l>e?"cover":!0;s=l}return!1}toString(){let t="";for(let e=0;e<this.sections.length;){let i=this.sections[e++],s=this.sections[e++];t+=(t?" ":"")+i+(s>=0?":"+s:"")}return t}toJSON(){return this.sections}static fromJSON(t){if(!Array.isArray(t)||t.length%2||t.some(e=>typeof e!="number"))throw new RangeError("Invalid JSON representation of ChangeDesc");return new n(t)}static create(t){return new n(t)}},et=class n extends zt{constructor(t,e){super(t),this.inserted=e}apply(t){if(this.length!=t.length)throw new RangeError("Applying change set to a document with the wrong length");return Fn(this,(e,i,s,r,o)=>t=t.replace(s,s+(i-e),o),!1),t}mapDesc(t,e=!1){return Vn(this,t,e,!0)}invert(t){let e=this.sections.slice(),i=[];for(let s=0,r=0;s<e.length;s+=2){let o=e[s],l=e[s+1];if(l>=0){e[s]=l,e[s+1]=o;let a=s>>1;for(;i.length<a;)i.push(E.empty);i.push(o?t.slice(r,r+o):E.empty)}r+=o}return new n(e,i)}compose(t){return this.empty?t:t.empty?this:Jr(this,t,!0)}map(t,e=!1){return t.empty?this:Vn(this,t,e,!0)}iterChanges(t,e=!1){Fn(this,t,e)}get desc(){return zt.create(this.sections)}filter(t){let e=[],i=[],s=[],r=new fe(this);t:for(let o=0,l=0;;){let a=o==t.length?1e9:t[o++];for(;l<a||l==a&&r.len==0;){if(r.done)break t;let f=Math.min(r.len,a-l);Z(s,f,-1);let c=r.ins==-1?-1:r.off==0?r.ins:0;Z(e,f,c),c>0&&_t(i,e,r.text),r.forward(f),l+=f}let h=t[o++];for(;l<h;){if(r.done)break t;let f=Math.min(r.len,h-l);Z(e,f,-1),Z(s,f,r.ins==-1?-1:r.off==0?r.ins:0),r.forward(f),l+=f}}return{changes:new n(e,i),filtered:zt.create(s)}}toJSON(){let t=[];for(let e=0;e<this.sections.length;e+=2){let i=this.sections[e],s=this.sections[e+1];s<0?t.push(i):s==0?t.push([i]):t.push([i].concat(this.inserted[e>>1].toJSON()))}return t}static of(t,e,i){let s=[],r=[],o=0,l=null;function a(f=!1){if(!f&&!s.length)return;o<e&&Z(s,e-o,-1);let c=new n(s,r);l=l?l.compose(c.map(l)):c,s=[],r=[],o=0}function h(f){if(Array.isArray(f))for(let c of f)h(c);else if(f instanceof n){if(f.length!=e)throw new RangeError(`Mismatched change set length (got ${f.length}, expected ${e})`);a(),l=l?l.compose(f.map(l)):f}else{let{from:c,to:u=c,insert:d}=f;if(c>u||c<0||u>e)throw new RangeError(`Invalid change range ${c} to ${u} (in doc of length ${e})`);let p=d?typeof d=="string"?E.of(d.split(i||Hn)):d:E.empty,g=p.length;if(c==u&&g==0)return;c<o&&a(),c>o&&Z(s,c-o,-1),Z(s,u-c,g),_t(r,s,p),o=u}}return h(t),a(!l),l}static empty(t){return new n(t?[t,-1]:[],[])}static fromJSON(t){if(!Array.isArray(t))throw new RangeError("Invalid JSON representation of ChangeSet");let e=[],i=[];for(let s=0;s<t.length;s++){let r=t[s];if(typeof r=="number")e.push(r,-1);else{if(!Array.isArray(r)||typeof r[0]!="number"||r.some((o,l)=>l&&typeof o!="string"))throw new RangeError("Invalid JSON representation of ChangeSet");if(r.length==1)e.push(r[0],0);else{for(;i.length<s;)i.push(E.empty);i[s]=E.of(r.slice(1)),e.push(r[0],i[s].length)}}}return new n(e,i)}static createSet(t,e){return new n(t,e)}};function Z(n,t,e,i=!1){if(t==0&&e<=0)return;let s=n.length-2;s>=0&&e<=0&&e==n[s+1]?n[s]+=t:s>=0&&t==0&&n[s]==0?n[s+1]+=e:i?(n[s]+=t,n[s+1]+=e):n.push(t,e)}function _t(n,t,e){if(e.length==0)return;let i=t.length-2>>1;if(i<n.length)n[n.length-1]=n[n.length-1].append(e);else{for(;n.length<i;)n.push(E.empty);n.push(e)}}function Fn(n,t,e){let i=n.inserted;for(let s=0,r=0,o=0;o<n.sections.length;){let l=n.sections[o++],a=n.sections[o++];if(a<0)s+=l,r+=l;else{let h=s,f=r,c=E.empty;for(;h+=l,f+=a,a&&i&&(c=c.append(i[o-2>>1])),!(e||o==n.sections.length||n.sections[o+1]<0);)l=n.sections[o++],a=n.sections[o++];t(s,h,r,f,c),s=h,r=f}}}function Vn(n,t,e,i=!1){let s=[],r=i?[]:null,o=new fe(n),l=new fe(t);for(let a=-1;;){if(o.done&&l.len||l.done&&o.len)throw new Error("Mismatched change set lengths");if(o.ins==-1&&l.ins==-1){let h=Math.min(o.len,l.len);Z(s,h,-1),o.forward(h),l.forward(h)}else if(l.ins>=0&&(o.ins<0||a==o.i||o.off==0&&(l.len<o.len||l.len==o.len&&!e))){let h=l.len;for(Z(s,l.ins,-1);h;){let f=Math.min(o.len,h);o.ins>=0&&a<o.i&&o.len<=f&&(Z(s,0,o.ins),r&&_t(r,s,o.text),a=o.i),o.forward(f),h-=f}l.next()}else if(o.ins>=0){let h=0,f=o.len;for(;f;)if(l.ins==-1){let c=Math.min(f,l.len);h+=c,f-=c,l.forward(c)}else if(l.ins==0&&l.len<f)f-=l.len,l.next();else break;Z(s,h,a<o.i?o.ins:0),r&&a<o.i&&_t(r,s,o.text),a=o.i,o.forward(o.len-f)}else{if(o.done&&l.done)return r?et.createSet(s,r):zt.create(s);throw new Error("Mismatched change set lengths")}}}function Jr(n,t,e=!1){let i=[],s=e?[]:null,r=new fe(n),o=new fe(t);for(let l=!1;;){if(r.done&&o.done)return s?et.createSet(i,s):zt.create(i);if(r.ins==0)Z(i,r.len,0,l),r.next();else if(o.len==0&&!o.done)Z(i,0,o.ins,l),s&&_t(s,i,o.text),o.next();else{if(r.done||o.done)throw new Error("Mismatched change set lengths");{let a=Math.min(r.len2,o.len),h=i.length;if(r.ins==-1){let f=o.ins==-1?-1:o.off?0:o.ins;Z(i,a,f,l),s&&f&&_t(s,i,o.text)}else o.ins==-1?(Z(i,r.off?0:r.len,a,l),s&&_t(s,i,r.textBit(a))):(Z(i,r.off?0:r.len,o.off?0:o.ins,l),s&&!o.off&&_t(s,i,o.text));l=(r.ins>a||o.ins>=0&&o.len>a)&&(l||i.length>h),r.forward2(a),o.forward(a)}}}}var fe=class{constructor(t){this.set=t,this.i=0,this.next()}next(){let{sections:t}=this.set;this.i<t.length?(this.len=t[this.i++],this.ins=t[this.i++]):(this.len=0,this.ins=-2),this.off=0}get done(){return this.ins==-2}get len2(){return this.ins<0?this.len:this.ins}get text(){let{inserted:t}=this.set,e=this.i-2>>1;return e>=t.length?E.empty:t[e]}textBit(t){let{inserted:e}=this.set,i=this.i-2>>1;return i>=e.length&&!t?E.empty:e[i].slice(this.off,t==null?void 0:this.off+t)}forward(t){t==this.len?this.next():(this.len-=t,this.off+=t)}forward2(t){this.ins==-1?this.forward(t):t==this.ins?this.next():(this.ins-=t,this.off+=t)}},re=class n{constructor(t,e,i,s){this.from=t,this.to=e,this.flags=i,this.goalColumn=s}get anchor(){return this.flags&32?this.to:this.from}get head(){return this.flags&32?this.from:this.to}get empty(){return this.from==this.to}get assoc(){return this.flags&8?-1:this.flags&16?1:0}get undirectional(){return(this.flags&64)>0}get bidiLevel(){let t=this.flags&7;return t==7?null:t}map(t,e=-1){let i,s;return this.empty?i=s=t.mapPos(this.from,e):(i=t.mapPos(this.from,1),s=t.mapPos(this.to,-1)),i==this.from&&s==this.to?this:new n(i,s,this.flags,this.goalColumn)}extend(t,e=t,i=0){if(t<=this.anchor&&e>=this.anchor)return b.range(t,e,void 0,void 0,i);let s=Math.abs(t-this.anchor)>Math.abs(e-this.anchor)?t:e;return b.range(this.anchor,s,void 0,void 0,i)}eq(t,e=!1){return this.anchor==t.anchor&&this.head==t.head&&this.goalColumn==t.goalColumn&&(!e||!this.empty||this.assoc==t.assoc)}toJSON(){return{anchor:this.anchor,head:this.head}}static fromJSON(t){if(!t||typeof t.anchor!="number"||typeof t.head!="number")throw new RangeError("Invalid JSON representation for SelectionRange");return b.range(t.anchor,t.head)}static create(t,e,i,s){return new n(t,e,i,s)}},b=class n{constructor(t,e){this.ranges=t,this.mainIndex=e}map(t,e=-1){return t.empty?this:n.create(this.ranges.map(i=>i.map(t,e)),this.mainIndex)}eq(t,e=!1){if(this.ranges.length!=t.ranges.length||this.mainIndex!=t.mainIndex)return!1;for(let i=0;i<this.ranges.length;i++)if(!this.ranges[i].eq(t.ranges[i],e))return!1;return!0}get main(){return this.ranges[this.mainIndex]}asSingle(){return this.ranges.length==1?this:new n([this.main],0)}addRange(t,e=!0){return n.create([t].concat(this.ranges),e?0:this.mainIndex+1)}replaceRange(t,e=this.mainIndex){let i=this.ranges.slice();return i[e]=t,n.create(i,this.mainIndex)}toJSON(){return{ranges:this.ranges.map(t=>t.toJSON()),main:this.mainIndex}}static fromJSON(t){if(!t||!Array.isArray(t.ranges)||typeof t.main!="number"||t.main>=t.ranges.length)throw new RangeError("Invalid JSON representation for EditorSelection");return new n(t.ranges.map(e=>re.fromJSON(e)),t.main)}static single(t,e=t){return new n([n.range(t,e)],0)}static create(t,e=0){if(t.length==0)throw new RangeError("A selection needs at least one range");for(let i=0,s=0;s<t.length;s++){let r=t[s];if(r.empty?r.from<=i:r.from<i)return n.normalized(t.slice(),e);i=r.to}return new n(t,e)}static cursor(t,e=0,i,s){return re.create(t,t,(e==0?0:e<0?8:16)|(i==null?7:Math.min(6,i)),s)}static range(t,e,i,s,r){let o=s==null?7:Math.min(6,s);return!r&&t!=e&&(r=e<t?1:-1),r&&(o|=r<0?8:16),e<t?re.create(e,t,o|32,i):re.create(t,e,o,i)}static undirectionalRange(t,e){return re.create(t,e,64,void 0)}static normalized(t,e=0){let i=t[e];t.sort((s,r)=>s.from-r.from),e=t.indexOf(i);for(let s=1;s<t.length;s++){let r=t[s],o=t[s-1];if(r.empty?r.from<=o.to:r.from<o.to){let l=o.from,a=Math.max(r.to,o.to);s<=e&&e--,t.splice(--s,2,r.anchor>r.head?n.range(a,l):n.range(l,a))}}return new n(t,e)}};function Xr(n,t){for(let e of n.ranges)if(e.to>t)throw new RangeError("Selection points outside of document")}var Yn=0,A=class n{constructor(t,e,i,s,r){this.combine=t,this.compareInput=e,this.compare=i,this.isStatic=s,this.id=Yn++,this.default=t([]),this.extensions=typeof r=="function"?r(this):r}get reader(){return this}static define(t={}){return new n(t.combine||(e=>e),t.compareInput||((e,i)=>e===i),t.compare||(t.combine?(e,i)=>e===i:Jn),!!t.static,t.enables)}of(t){return new Me([],this,0,t)}compute(t,e){if(this.isStatic)throw new Error("Can't compute a static facet");return new Me(t,this,1,e)}computeN(t,e){if(this.isStatic)throw new Error("Can't compute a static facet");return new Me(t,this,2,e)}from(t,e){return e||(e=i=>i),this.compute([t],i=>e(i.field(t)))}};function Jn(n,t){return n==t||n.length==t.length&&n.every((e,i)=>e===t[i])}var Me=class{constructor(t,e,i,s){this.dependencies=t,this.facet=e,this.type=i,this.value=s,this.id=Yn++}dynamicSlot(t){var e;let i=this.value,s=this.facet.compareInput,r=this.id,o=t[r]>>1,l=this.type==2,a=!1,h=!1,f=[];for(let c of this.dependencies)c=="doc"?a=!0:c=="selection"?h=!0:(((e=t[c.id])!==null&&e!==void 0?e:1)&1)==0&&f.push(t[c.id]);return{create(c){return c.values[o]=i(c),1},update(c,u){if(a&&u.docChanged||h&&(u.docChanged||u.selection)||Wn(c,f)){let d=i(c);if(l?!jr(d,c.values[o],s):!s(d,c.values[o]))return c.values[o]=d,1}return 0},reconfigure:(c,u)=>{let d,p=u.config.address[r];if(p!=null){let g=Wi(u,p);if(this.dependencies.every(m=>m instanceof A?u.facet(m)===c.facet(m):m instanceof ht?u.field(m,!1)==c.field(m,!1):!0)||(l?jr(d=i(c),g,s):s(d=i(c),g)))return c.values[o]=g,0}else d=i(c);return c.values[o]=d,1}}}get extension(){return this}};function jr(n,t,e){if(n.length!=t.length)return!1;for(let i=0;i<n.length;i++)if(!e(n[i],t[i]))return!1;return!0}function Wn(n,t){let e=!1;for(let i of t)_e(n,i)&1&&(e=!0);return e}function Qa(n,t,e){let i=e.map(a=>n[a.id]),s=e.map(a=>a.type),r=i.filter(a=>!(a&1)),o=n[t.id]>>1;function l(a){let h=[];for(let f=0;f<i.length;f++){let c=Wi(a,i[f]);if(s[f]==2)for(let u of c)h.push(u);else h.push(c)}return t.combine(h)}return{create(a){for(let h of i)_e(a,h);return a.values[o]=l(a),1},update(a,h){if(!Wn(a,r))return 0;let f=l(a);return t.compare(f,a.values[o])?0:(a.values[o]=f,1)},reconfigure(a,h){let f=Wn(a,i),c=h.config.facets[t.id],u=h.facet(t);if(c&&!f&&Jn(e,c))return a.values[o]=u,0;let d=l(a);return t.compare(d,u)?(a.values[o]=u,0):(a.values[o]=d,1)}}}var Li=A.define({static:!0}),ht=class n{constructor(t,e,i,s,r){this.id=t,this.createF=e,this.updateF=i,this.compareF=s,this.spec=r,this.provides=void 0}static define(t){let e=new n(Yn++,t.create,t.update,t.compare||((i,s)=>i===s),t);return t.provide&&(e.provides=t.provide(e)),e}create(t){let e=t.facet(Li).find(i=>i.field==this);return(e?.create||this.createF)(t)}slot(t){let e=t[this.id]>>1;return{create:i=>(i.values[e]=this.create(i),1),update:(i,s)=>{let r=i.values[e],o=this.updateF(r,s);return this.compareF(r,o)?0:(i.values[e]=o,1)},reconfigure:(i,s)=>{let r=i.facet(Li),o=s.facet(Li),l;return(l=r.find(a=>a.field==this))&&l!=o.find(a=>a.field==this)?(i.values[e]=l.create(i),1):s.config.address[this.id]!=null?(i.values[e]=s.field(this),0):(i.values[e]=this.create(i),1)}}}init(t){return[this,Li.of({field:this,create:t})]}get extension(){return this}},oe={lowest:4,low:3,default:2,high:1,highest:0};function Ge(n){return t=>new Fi(t,n)}var Qe={highest:Ge(oe.highest),high:Ge(oe.high),default:Ge(oe.default),low:Ge(oe.low),lowest:Ge(oe.lowest)},Fi=class{constructor(t,e){this.inner=t,this.prec=e}get extension(){return this}},Oe=class n{of(t){return new Ye(this,t)}reconfigure(t){return n.reconfigure.of({compartment:this,extension:t})}get(t){return t.config.compartments.get(this)}},Ye=class{constructor(t,e){this.compartment=t,this.inner=e}get extension(){return this}},Vi=class n{constructor(t,e,i,s,r,o){for(this.base=t,this.compartments=e,this.dynamicSlots=i,this.address=s,this.staticValues=r,this.facets=o,this.statusTemplate=[];this.statusTemplate.length<i.length;)this.statusTemplate.push(0)}staticFacet(t){let e=this.address[t.id];return e==null?t.default:this.staticValues[e>>1]}static resolve(t,e,i){let s=[],r=Object.create(null),o=new Map;for(let u of Za(t,e,o))u instanceof ht?s.push(u):(r[u.facet.id]||(r[u.facet.id]=[])).push(u);let l=Object.create(null),a=[],h=[];for(let u of s)l[u.id]=h.length<<1,h.push(d=>u.slot(d));let f=i?.config.facets;for(let u in r){let d=r[u],p=d[0].facet,g=f&&f[u]||[];if(d.every(m=>m.type==0))if(l[p.id]=a.length<<1|1,Jn(g,d))a.push(i.facet(p));else{let m=p.combine(d.map(y=>y.value));a.push(i&&p.compare(m,i.facet(p))?i.facet(p):m)}else{for(let m of d)m.type==0?(l[m.id]=a.length<<1|1,a.push(m.value)):(l[m.id]=h.length<<1,h.push(y=>m.dynamicSlot(y)));l[p.id]=h.length<<1,h.push(m=>Qa(m,p,d))}}let c=h.map(u=>u(l));return new n(t,o,c,l,a,r)}};function Za(n,t,e){let i=[[],[],[],[],[]],s=new Map;function r(o,l){let a=s.get(o);if(a!=null){if(a<=l)return;let h=i[a].indexOf(o);h>-1&&i[a].splice(h,1),o instanceof Ye&&e.delete(o.compartment)}if(s.set(o,l),Array.isArray(o))for(let h of o)r(h,l);else if(o instanceof Ye){if(e.has(o.compartment))throw new RangeError("Duplicate use of compartment in extensions");let h=t.get(o.compartment)||o.inner;e.set(o.compartment,h),r(h,l)}else if(o instanceof Fi)r(o.inner,o.prec);else if(o instanceof ht)i[l].push(o),o.provides&&r(o.provides,l);else if(o instanceof Me)i[l].push(o),o.facet.extensions&&r(o.facet.extensions,oe.default);else{let h=o.extension;if(!h)throw new Error(`Unrecognized extension value in extension set (${o}).`);if(h==o)throw new Error(`Unrecognized extension value in extension set (${o}). This sometimes happens because multiple instances of @codemirror/state are loaded, breaking instanceof checks.`);r(h,l)}}return r(n,oe.default),i.reduce((o,l)=>o.concat(l))}function _e(n,t){if(t&1)return 2;let e=t>>1,i=n.status[e];if(i==4)throw new Error("Cyclic dependency between fields and/or facets");if(i&2)return i;n.status[e]=4;let s=n.computeSlot(n,n.config.dynamicSlots[e]);return n.status[e]=2|s}function Wi(n,t){return t&1?n.config.staticValues[t>>1]:n.values[t>>1]}var Qr=A.define(),zn=A.define({combine:n=>n.some(t=>t),static:!0}),Zr=A.define({combine:n=>n.length?n[0]:void 0,static:!0}),to=A.define(),eo=A.define(),io=A.define(),no=A.define({combine:n=>n.length?n[0]:!1}),rt=class{constructor(t,e){this.type=t,this.value=e}static define(){return new Kn}},Kn=class{of(t){return new rt(this,t)}},qn=class{constructor(t){this.map=t}of(t){return new F(this,t)}},F=class n{constructor(t,e){this.type=t,this.value=e}map(t){let e=this.type.map(this.value,t);return e===void 0?void 0:e==this.value?this:new n(this.type,e)}is(t){return this.type==t}static define(t={}){return new qn(t.map||(e=>e))}static mapEffects(t,e){if(!t.length)return t;let i=[];for(let s of t){let r=s.map(e);r&&i.push(r)}return i}};F.reconfigure=F.define();F.appendConfig=F.define();var _=class n{constructor(t,e,i,s,r,o){this.startState=t,this.changes=e,this.selection=i,this.effects=s,this.annotations=r,this.scrollIntoView=o,this._doc=null,this._state=null,i&&Xr(i,e.newLength),r.some(l=>l.type==n.time)||(this.annotations=r.concat(n.time.of(Date.now())))}static create(t,e,i,s,r,o){return new n(t,e,i,s,r,o)}get newDoc(){return this._doc||(this._doc=this.changes.apply(this.startState.doc))}get newSelection(){return this.selection||this.startState.selection.map(this.changes)}get state(){return this._state||this.startState.applyTransaction(this),this._state}annotation(t){for(let e of this.annotations)if(e.type==t)return e.value}get docChanged(){return!this.changes.empty}get reconfigured(){return this.startState.config!=this.state.config}isUserEvent(t){let e=this.annotation(n.userEvent);return!!(e&&(e==t||e.length>t.length&&e.slice(0,t.length)==t&&e[t.length]=="."))}};_.time=rt.define();_.userEvent=rt.define();_.addToHistory=rt.define();_.remote=rt.define();function th(n,t){let e=[];for(let i=0,s=0;;){let r,o;if(i<n.length&&(s==t.length||t[s]>=n[i]))r=n[i++],o=n[i++];else if(s<t.length)r=t[s++],o=t[s++];else return e;!e.length||e[e.length-1]<r?e.push(r,o):e[e.length-1]<o&&(e[e.length-1]=o)}}function so(n,t,e){var i;let s,r,o;return e?(s=t.changes,r=et.empty(t.changes.length),o=n.changes.compose(t.changes)):(s=t.changes.map(n.changes),r=n.changes.mapDesc(t.changes,!0),o=n.changes.compose(s)),{changes:o,selection:t.selection?t.selection.map(r):(i=n.selection)===null||i===void 0?void 0:i.map(s),effects:F.mapEffects(n.effects,s).concat(F.mapEffects(t.effects,r)),annotations:n.annotations.length?n.annotations.concat(t.annotations):t.annotations,scrollIntoView:n.scrollIntoView||t.scrollIntoView}}function jn(n,t,e){let i=t.selection,s=Te(t.annotations);return t.userEvent&&(s=s.concat(_.userEvent.of(t.userEvent))),{changes:t.changes instanceof et?t.changes:et.of(t.changes||[],e,n.facet(Zr)),selection:i&&(i instanceof b?i:b.single(i.anchor,i.head)),effects:Te(t.effects),annotations:s,scrollIntoView:!!t.scrollIntoView}}function ro(n,t,e){let i=jn(n,t.length?t[0]:{},n.doc.length);t.length&&t[0].filter===!1&&(e=!1);for(let r=1;r<t.length;r++){t[r].filter===!1&&(e=!1);let o=!!t[r].sequential;i=so(i,jn(n,t[r],o?i.changes.newLength:n.doc.length),o)}let s=_.create(n,i.changes,i.selection,i.effects,i.annotations,i.scrollIntoView);return ih(e?eh(s):s)}function eh(n){let t=n.startState,e=!0;for(let s of t.facet(to)){let r=s(n);if(r===!1){e=!1;break}Array.isArray(r)&&(e=e===!0?r:th(e,r))}if(e!==!0){let s,r;if(e===!1)r=n.changes.invertedDesc,s=et.empty(t.doc.length);else{let o=n.changes.filter(e);s=o.changes,r=o.filtered.mapDesc(o.changes).invertedDesc}n=_.create(t,s,n.selection&&n.selection.map(r),F.mapEffects(n.effects,r),n.annotations,n.scrollIntoView)}let i=t.facet(eo);for(let s=i.length-1;s>=0;s--){let r=i[s](n);r instanceof _?n=r:Array.isArray(r)&&r.length==1&&r[0]instanceof _?n=r[0]:n=ro(t,Te(r),!1)}return n}function ih(n){let t=n.startState,e=t.facet(io),i=n;for(let s=e.length-1;s>=0;s--){let r=e[s](n);r&&Object.keys(r).length&&(i=so(i,jn(t,r,n.changes.newLength),!0))}return i==n?n:_.create(t,n.changes,n.selection,i.effects,i.annotations,i.scrollIntoView)}var nh=[];function Te(n){return n==null?nh:Array.isArray(n)?n:[n]}var xt=(function(n){return n[n.Word=0]="Word",n[n.Space=1]="Space",n[n.Other=2]="Other",n})(xt||(xt={})),sh=/[\u00df\u0587\u0590-\u05f4\u0600-\u06ff\u3040-\u309f\u30a0-\u30ff\u3400-\u4db5\u4e00-\u9fcc\uac00-\ud7af]/,Un;try{Un=new RegExp("[\\p{Alphabetic}\\p{Number}_]","u")}catch{}function rh(n){if(Un)return Un.test(n);for(let t=0;t<n.length;t++){let e=n[t];if(/\w/.test(e)||e>"\x80"&&(e.toUpperCase()!=e.toLowerCase()||sh.test(e)))return!0}return!1}function oh(n){return t=>{if(!/\S/.test(t))return xt.Space;if(rh(t))return xt.Word;for(let e=0;e<n.length;e++)if(t.indexOf(n[e])>-1)return xt.Word;return xt.Other}}var K=class n{constructor(t,e,i,s,r,o){this.config=t,this.doc=e,this.selection=i,this.values=s,this.status=t.statusTemplate.slice(),this.computeSlot=r,o&&(o._state=this);for(let l=0;l<this.config.dynamicSlots.length;l++)_e(this,l<<1);this.computeSlot=null}field(t,e=!0){let i=this.config.address[t.id];if(i==null){if(e)throw new RangeError("Field is not present in this state");return}return _e(this,i),Wi(this,i)}update(...t){return ro(this,t,!0)}applyTransaction(t){let e=this.config,{base:i,compartments:s}=e;for(let l of t.effects)l.is(Oe.reconfigure)?(e&&(s=new Map,e.compartments.forEach((a,h)=>s.set(h,a)),e=null),s.set(l.value.compartment,l.value.extension)):l.is(F.reconfigure)?(e=null,i=l.value):l.is(F.appendConfig)&&(e=null,i=Te(i).concat(l.value));let r;e?r=t.startState.values.slice():(e=Vi.resolve(i,s,this),r=new n(e,this.doc,this.selection,e.dynamicSlots.map(()=>null),(a,h)=>h.reconfigure(a,this),null).values);let o=t.startState.facet(zn)?t.newSelection:t.newSelection.asSingle();new n(e,t.newDoc,o,r,(l,a)=>a.update(l,t),t)}replaceSelection(t){return typeof t=="string"&&(t=this.toText(t)),this.changeByRange(e=>({changes:{from:e.from,to:e.to,insert:t},range:b.cursor(e.from+t.length,-1)}))}changeByRange(t){let e=this.selection,i=t(e.ranges[0]),s=this.changes(i.changes),r=[i.range],o=Te(i.effects);for(let l=1;l<e.ranges.length;l++){let a=t(e.ranges[l]),h=this.changes(a.changes),f=h.map(s);for(let u=0;u<l;u++)r[u]=r[u].map(f);let c=s.mapDesc(h,!0);r.push(a.range.map(c)),s=s.compose(f),o=F.mapEffects(o,f).concat(F.mapEffects(Te(a.effects),c))}return{changes:s,selection:b.create(r,e.mainIndex),effects:o}}changes(t=[]){return t instanceof et?t:et.of(t,this.doc.length,this.facet(n.lineSeparator))}toText(t){return E.of(t.split(this.facet(n.lineSeparator)||Hn))}sliceDoc(t=0,e=this.doc.length){return this.doc.sliceString(t,e,this.lineBreak)}facet(t){let e=this.config.address[t.id];return e==null?t.default:(_e(this,e),Wi(this,e))}toJSON(t){let e={doc:this.sliceDoc(),selection:this.selection.toJSON()};if(t)for(let i in t){let s=t[i];s instanceof ht&&this.config.address[s.id]!=null&&(e[i]=s.spec.toJSON(this.field(t[i]),this))}return e}static fromJSON(t,e={},i){if(!t||typeof t.doc!="string")throw new RangeError("Invalid JSON representation for EditorState");let s=[];if(i){for(let r in i)if(Object.prototype.hasOwnProperty.call(t,r)){let o=i[r],l=t[r];s.push(o.init(a=>o.spec.fromJSON(l,a)))}}return n.create({doc:t.doc,selection:b.fromJSON(t.selection),extensions:e.extensions?s.concat([e.extensions]):s})}static create(t={}){let e=Vi.resolve(t.extensions||[],new Map),i=t.doc instanceof E?t.doc:E.of((t.doc||"").split(e.staticFacet(n.lineSeparator)||Hn)),s=t.selection?t.selection instanceof b?t.selection:b.single(t.selection.anchor,t.selection.head):b.single(0);return Xr(s,i.length),e.staticFacet(zn)||(s=s.asSingle()),new n(e,i,s,e.dynamicSlots.map(()=>null),(r,o)=>o.create(r),null)}get tabSize(){return this.facet(n.tabSize)}get lineBreak(){return this.facet(n.lineSeparator)||`
@@ -389,7 +429,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
 <script>
 (() => {
 'use strict';
-const { EditorState, Annotation, Transaction, Compartment, StateField, StateEffect, EditorView, Decoration, ViewPlugin, WidgetType, keymap,
+const { EditorState, EditorSelection, Annotation, Transaction, Compartment, StateField, StateEffect, EditorView, Decoration, ViewPlugin, WidgetType, keymap,
         lineNumbers, highlightActiveLine, highlightActiveLineGutter, placeholder,
         history, undo, redo, undoDepth, redoDepth, defaultKeymap, historyKeymap, indentMore, indentLess, indentUnit } = CM;
 const $ = s => document.querySelector(s);
@@ -731,6 +771,8 @@ const Remote = Annotation.define();
 const lnComp = new Compartment();
 const lnExt = () => viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : [];
 
+const headRe = /^([ \t]*)(#{1,4}) /;
+const markRe = /==([^=\n](?:[^\n]*?[^=\n])?)==/g;
 function buildHeadings(v){
   const st = v.state, doc = st.doc, out = [];
   const active = new Set();
@@ -738,15 +780,33 @@ function buildHeadings(v){
     const a = doc.lineAt(r.from).number, z = doc.lineAt(r.to).number;
     for (let i = a; i <= z; i++) active.add(i);
   }
+  const touching = (s, e) => v.hasFocus && st.selection.ranges.some(r => r.from <= e && r.to >= s);
   for (const { from, to } of v.visibleRanges){
     let pos = from;
     while (pos <= to){
       const line = doc.lineAt(pos);
-      const m = /^(#{1,4}) /.exec(line.text);
+      const m = headRe.exec(line.text);
       if (m){
-        out.push(Decoration.line({ class:'cm-h' + m[1].length }).range(line.from));
-        if (active.has(line.number)) out.push(Decoration.mark({ class:'cm-hmark' }).range(line.from, line.from + m[0].length));
-        else out.push(Decoration.replace({}).range(line.from, line.from + m[0].length));
+        // 行頭の空白（インデント）の後ろの # を見出しとして扱う
+        const s = line.from + m[1].length, e = line.from + m[0].length;
+        out.push(Decoration.line({ class:'cm-h' + m[2].length }).range(line.from));
+        if (active.has(line.number)) out.push(Decoration.mark({ class:'cm-hmark' }).range(s, e));
+        else out.push(Decoration.replace({}).range(s, e));
+      }
+      if (line.text.includes('==') && !rowRe.test(line.text)){
+        markRe.lastIndex = 0;
+        let k;
+        while ((k = markRe.exec(line.text))){
+          const s = line.from + k.index, e = s + k[0].length;
+          if (touching(s, e)){
+            out.push(Decoration.mark({ class:'cm-hmark' }).range(s, s + 2));
+            out.push(Decoration.mark({ class:'cm-hmark' }).range(e - 2, e));
+          }else{
+            out.push(Decoration.replace({}).range(s, s + 2));
+            out.push(Decoration.replace({}).range(e - 2, e));
+          }
+          out.push(Decoration.mark({ class:'cm-marker' }).range(s + 2, e - 2));
+        }
       }
       pos = line.to + 1;
     }
@@ -783,82 +843,265 @@ function findTables(doc){
 const tableAt = (state, pos) => { const n = state.doc.lineAt(pos).number; return findTables(state.doc).find(x => n >= x.from && n <= x.to); };
 function parseTable(src){
   const lines = src.split('\n');
-  let base = 0;
-  const rows = lines.map(text => {
-    const m = rowRe.exec(text);
-    let off = m[1].length + 1;
-    const cells = m[2].split('|').map(p => {
-      const lead = p.length - p.trimStart().length;
-      const c = { text:p.trim(), off: base + off + lead };
-      off += p.length + 1;
-      return c;
-    });
-    base += text.length + 1;
-    return cells;
-  });
+  const cells = text => rowRe.exec(text)[2].split('|').map(s => s.trim());
   const indent = rowRe.exec(lines[0])[1];
-  const sep = rows[1].map(c => { const m = sepCellRe.exec(c.text); return { l:!!m[1], r:!!m[2], w: m[3] ? +m[3] : 0 }; });
-  return { indent, head:rows[0], sep, body:rows.slice(2) };
+  const sep = cells(lines[1]).map(c => { const m = sepCellRe.exec(c); return { l:!!m[1], r:!!m[2], w: m[3] ? +m[3] : 0 }; });
+  const rows = [cells(lines[0]), ...lines.slice(2).map(cells)];
+  const ncol = Math.max(sep.length, ...rows.map(r => r.length));
+  for (const r of rows) while (r.length < ncol) r.push('');
+  while (sep.length < ncol) sep.push({ l:false, r:false, w:0 });
+  return { indent, sep, rows, ncol };
 }
+function serializeTable(t){
+  const row = r => `${t.indent}| ${r.join(' | ')} |`;
+  const sep = `${t.indent}|${t.sep.map(s => `${s.l ? ':' : ''}---${s.r ? ':' : ''}${s.w || ''}`).join('|')}|`;
+  return [row(t.rows[0]), sep, ...t.rows.slice(1).map(row)].join('\n');
+}
+const cleanCell = s => s.replace(/[\r\n]+/g, ' ').replace(/\|/g, '｜').trim();
+
+// 表の中身を書き換える（focus：書き換え後にフォーカスする場所）
+function writeTable(view, wrap, edit, focus, self){
+  const t0 = tableAt(view.state, view.posAtDOM(wrap));
+  if (!t0) return;
+  const doc = view.state.doc, a = doc.line(t0.from).from, b = doc.line(t0.to).to;
+  const t = parseTable(doc.sliceString(a, b));
+  if (edit(t) === false) return;
+  if (!t.rows.length){   // 表ごと削除
+    const to = b < doc.length ? b + 1 : b, from = b < doc.length ? a : Math.max(0, a - 1);
+    view.dispatch({ changes:{ from, to }, selection:{ anchor: from } });
+    view.focus();
+    return;
+  }
+  const text = serializeTable(t);
+  if (text === doc.sliceString(a, b)) return;
+  wrap._focus = focus || null;
+  wrap._selfSrc = self ? text : null;
+  view.dispatch({ changes:{ from:a, to:b, insert:text } });
+}
+function focusCell(wrap, r, c, selectAll){
+  const ce = wrap.querySelector(`.ce[data-r="${r}"][data-c="${c}"]`);
+  if (!ce) return false;
+  ce.focus();
+  const range = document.createRange();
+  range.selectNodeContents(ce);
+  if (!selectAll) range.collapse(false);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(range);
+  return true;
+}
+function tableIndent(view, wrap, dir, ch = '\t'){
+  const t = tableAt(view.state, view.posAtDOM(wrap));
+  if (!t) return;
+  const changes = [];
+  for (let i = t.from; i <= t.to; i++){
+    const l = view.state.doc.line(i);
+    if (dir > 0) changes.push({ from:l.from, insert:ch });
+    else {
+      const m = (ch === 'bs' ? /^[ \t]/ : /^(\t| {1,4})/).exec(l.text);
+      if (m) changes.push({ from:l.from, to:l.from + m[0].length });
+    }
+  }
+  if (!changes.length) return;
+  const ae = document.activeElement?.closest?.('.ce');
+  wrap._focus = ae ? { r:+ae.dataset.r, c:+ae.dataset.c } : 'wrap';
+  view.dispatch({ changes });
+}
+// 表の前後に出る
+function leaveTable(view, wrap, dir){
+  const t = tableAt(view.state, view.posAtDOM(wrap));
+  if (!t) return;
+  const doc = view.state.doc;
+  const first = doc.line(t.from), last = doc.line(t.to);
+  const ind = rowRe.exec(first.text)[1];
+  if (dir > 0){
+    view.dispatch({ changes:{ from:last.to, insert:'\n' + ind }, selection:{ anchor:last.to + 1 + ind.length }, scrollIntoView:true });
+  }else if (t.from > 1){
+    view.dispatch({ selection:{ anchor: doc.line(t.from - 1).to }, scrollIntoView:true });
+  }else{
+    view.dispatch({ changes:{ from:first.from, insert:ind + '\n' }, selection:{ anchor:first.from + ind.length } });
+  }
+  view.focus();
+}
+
+function renderTable(wrap, src){
+  const t = parseTable(src);
+  wrap._src = src;
+  wrap.textContent = '';
+  const ind = document.createElement('span'); ind.className = 'ind'; ind.textContent = t.indent;
+  const box = document.createElement('div'); box.className = 'tbox';
+  const tools = document.createElement('div'); tools.className = 'ttools';
+  const ops = [
+    ['up', '上に行'], ['down', '下に行'], ['left', '左に列'], ['right', '右に列'], ['|'],
+    ['delrow', '行を削除'], ['delcol', '列を削除'], ['|'], ['deltable', '表を削除', 'danger']
+  ];
+  for (const [op, label, cls] of ops){
+    if (op === '|'){ const s = document.createElement('span'); s.className = 'sep'; tools.append(s); continue; }
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.op = op; b.textContent = label;
+    if (cls) b.className = cls;
+    tools.append(b);
+  }
+  const table = document.createElement('table');
+  const cg = document.createElement('colgroup');
+  const allSet = t.sep.every(s => s.w);
+  for (let i = 0; i < t.ncol; i++){
+    const col = document.createElement('col');
+    if (t.sep[i].w) col.style.width = t.sep[i].w + 'px';
+    cg.append(col);
+  }
+  table.append(cg);
+  if (allSet){ table.style.tableLayout = 'fixed'; table.style.width = t.sep.reduce((a, s) => a + s.w, 0) + 'px'; }
+  const thead = document.createElement('thead'), tbody = document.createElement('tbody');
+  t.rows.forEach((cells, r) => {
+    const tr = document.createElement('tr');
+    cells.forEach((text, c) => {
+      const td = document.createElement(r === 0 ? 'th' : 'td');
+      const a = t.sep[c];
+      if (a.l && a.r) td.style.textAlign = 'center'; else if (a.r) td.style.textAlign = 'right';
+      const ce = document.createElement('div');
+      ce.className = 'ce';
+      ce.contentEditable = 'plaintext-only';
+      ce.spellcheck = false;
+      ce.dataset.r = r; ce.dataset.c = c;
+      ce.textContent = text;
+      const rz = document.createElement('div'); rz.className = 'rz'; rz.dataset.col = c;
+      td.append(ce, rz);
+      tr.append(td);
+    });
+    (r === 0 ? thead : tbody).append(tr);
+  });
+  table.append(thead, tbody);
+  box.append(tools, table);
+  wrap.append(ind, box);
+  wrap._ncol = t.ncol; wrap._nrow = t.rows.length;
+}
+
 class TableWidget extends WidgetType {
   constructor(src){ super(); this.src = src; }
   eq(o){ return o.src === this.src; }
   ignoreEvent(){ return true; }
-  toDOM(view){
-    const t = parseTable(this.src);
-    const ncol = Math.max(t.head.length, t.sep.length, ...t.body.map(r => r.length));
-    const wrap = document.createElement('div'); wrap.className = 'cm-tbl';
-    const ind = document.createElement('span'); ind.className = 'ind'; ind.textContent = t.indent;
-    const sc = document.createElement('div'); sc.className = 'tscroll';
-    const table = document.createElement('table');
-    const cg = document.createElement('colgroup');
-    const allSet = t.sep.length === ncol && t.sep.every(s => s.w);
-    for (let i = 0; i < ncol; i++){
-      const col = document.createElement('col');
-      if (t.sep[i]?.w) col.style.width = t.sep[i].w + 'px';
-      cg.append(col);
+  updateDOM(dom, view){
+    if (dom._selfSrc === this.src){ dom._src = this.src; dom._selfSrc = null; return true; }
+    let keep = dom._focus;
+    if (!keep){
+      const ae = document.activeElement;
+      if (ae && dom.contains(ae)){ const ce = ae.closest('.ce'); keep = ce ? { r:+ce.dataset.r, c:+ce.dataset.c } : 'wrap'; }
     }
-    table.append(cg);
-    if (allSet){ table.style.tableLayout = 'fixed'; table.style.width = t.sep.reduce((a, s) => a + s.w, 0) + 'px'; }
-    const addRow = (cells, tag) => {
-      const tr = document.createElement('tr');
-      for (let i = 0; i < ncol; i++){
-        const c = cells[i];
-        const td = document.createElement(tag);
-        td.textContent = c && c.text ? c.text : '\u00a0';
-        if (c) td.dataset.off = c.off;
-        const a = t.sep[i];
-        if (a && a.l && a.r) td.style.textAlign = 'center'; else if (a && a.r) td.style.textAlign = 'right';
-        const rz = document.createElement('div'); rz.className = 'rz'; rz.dataset.col = i;
-        td.append(rz);
-        tr.append(td);
-      }
-      return tr;
+    dom._focus = null; dom._selfSrc = null;
+    renderTable(dom, this.src);
+    if (keep === 'wrap') dom.focus();
+    else if (keep && !focusCell(dom, Math.min(keep.r, dom._nrow - 1), Math.min(keep.c, dom._ncol - 1))) dom.focus();
+    return true;
+  }
+  toDOM(view){
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-tbl';
+    wrap.tabIndex = -1;
+    wrap.setAttribute('aria-label', '表（Space・Tab で前に空白、Enter で表の後ろへ）');
+    renderTable(wrap, this.src);
+    const cur = () => { const ce = document.activeElement?.closest?.('.ce'); return ce && wrap.contains(ce) ? { r:+ce.dataset.r, c:+ce.dataset.c, ce } : null; };
+    const commit = ce => {
+      const r = +ce.dataset.r, c = +ce.dataset.c, v = cleanCell(ce.textContent);
+      writeTable(view, wrap, t => { if (t.rows[r][c] === v) return false; t.rows[r][c] = v; }, null, true);
     };
-    const thead = document.createElement('thead'); thead.append(addRow(t.head, 'th'));
-    const tbody = document.createElement('tbody'); for (const r of t.body) tbody.append(addRow(r, 'td'));
-    table.append(thead, tbody);
-    sc.append(table);
-    wrap.append(ind, sc);
+    const go = (r, c) => {
+      if (r >= wrap._nrow){
+        writeTable(view, wrap, t => { t.rows.push(Array(t.ncol).fill('')); }, { r, c });
+        return;
+      }
+      focusCell(wrap, r, c, true);
+    };
 
     wrap.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
-      const rz = e.target.closest('.rz');
-      if (rz) return;                                  // 列幅の調整は pointerdown で扱う
-      const cell = e.target.closest('th,td');
+      if (e.target.closest('.ce, .rz')) return;
       e.preventDefault();
-      const from = view.posAtDOM(wrap);
-      const off = cell && cell.dataset.off ? +cell.dataset.off : 0;
-      view.dispatch({ selection:{ anchor: Math.min(from + off, view.state.doc.length) }, effects: focusFx.of(true) });
-      view.focus();
+      if (e.target.closest('.ttools')) return;
+      wrap.focus();
     });
+    wrap.addEventListener('input', e => { const ce = e.target.closest('.ce'); if (ce && !e.isComposing) commit(ce); });
+    wrap.addEventListener('compositionend', e => { const ce = e.target.closest('.ce'); if (ce) commit(ce); });
+    wrap.addEventListener('click', e => {
+      const b = e.target.closest('.ttools button');
+      if (!b) return;
+      const p = cur() || wrap._last;
+      const op = b.dataset.op;
+      if (op === 'deltable'){ writeTable(view, wrap, t => { t.rows = []; }); return; }
+      if (!p) return;
+      const { r, c } = p;
+      writeTable(view, wrap, t => {
+        if (op === 'up'){ if (r === 0) return false; t.rows.splice(r, 0, Array(t.ncol).fill('')); }
+        if (op === 'down') t.rows.splice(r + 1, 0, Array(t.ncol).fill(''));
+        if (op === 'left' || op === 'right'){
+          const at = op === 'left' ? c : c + 1;
+          for (const row of t.rows) row.splice(at, 0, '');
+          t.sep.splice(at, 0, { l:false, r:false, w: t.sep.every(s => s.w) ? 100 : 0 });
+          t.ncol++;
+        }
+        if (op === 'delrow'){ if (r === 0) return false; t.rows.splice(r, 1); }
+        if (op === 'delcol'){ if (t.ncol <= 1) return false; for (const row of t.rows) row.splice(c, 1); t.sep.splice(c, 1); t.ncol--; }
+      }, op === 'up' ? { r, c } : op === 'down' ? { r:r + 1, c } : op === 'left' ? { r, c } : op === 'right' ? { r, c:c + 1 }
+        : op === 'delrow' ? { r:Math.max(0, r - 1), c } : { r, c:Math.max(0, c - 1) });
+    });
+    wrap.addEventListener('focusin', e => {
+      const ce = e.target.closest('.ce');
+      wrap._last = ce ? { r:+ce.dataset.r, c:+ce.dataset.c } : null;
+      const tools = wrap.querySelector('.ttools');
+      tools.querySelectorAll('button:not(.danger)').forEach(b => b.disabled = !ce);
+      if (ce){
+        tools.querySelector('[data-op="up"]').disabled = +ce.dataset.r === 0;
+        tools.querySelector('[data-op="delrow"]').disabled = +ce.dataset.r === 0;
+      }
+    });
+
+    wrap.addEventListener('keydown', e => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (e.isComposing || e.keyCode === 229) return;
+      // 元に戻す／やり直す は エディタの履歴で
+      if (mod && e.key.toLowerCase() === 'z'){
+        e.preventDefault();
+        const ae = cur(); wrap._focus = ae ? { r:ae.r, c:ae.c } : 'wrap';
+        (e.shiftKey ? redo : undo)(view);
+        return;
+      }
+      if (mod && (e.key === ']' || e.key === '[')){ e.preventDefault(); tableIndent(view, wrap, e.key === ']' ? 1 : -1); return; }
+      const p = cur();
+      if (p){
+        if (e.key === 'Tab'){
+          e.preventDefault();
+          let i = p.r * wrap._ncol + p.c + (e.shiftKey ? -1 : 1);
+          if (i < 0) return;
+          go(Math.floor(i / wrap._ncol), i % wrap._ncol);
+        }else if (e.key === 'Enter'){
+          e.preventDefault();
+          go(p.r + 1, p.c);
+        }else if (e.key === 'Escape'){
+          e.preventDefault(); wrap.focus();
+        }else if (e.key === 'ArrowUp' && p.r === 0 && !e.shiftKey){
+          e.preventDefault(); leaveTable(view, wrap, -1);
+        }else if (e.key === 'ArrowDown' && p.r === wrap._nrow - 1 && !e.shiftKey){
+          e.preventDefault(); leaveTable(view, wrap, 1);
+        }
+        return;
+      }
+      if (e.target !== wrap) return;
+      // 表全体を選んでいるとき
+      if (mod || e.altKey) return;
+      if (e.key === ' '){ e.preventDefault(); tableIndent(view, wrap, 1, ' '); }
+      else if (e.key === 'Tab'){ e.preventDefault(); tableIndent(view, wrap, e.shiftKey ? -1 : 1); }
+      else if (e.key === 'Backspace'){ e.preventDefault(); tableIndent(view, wrap, -1, 'bs'); }
+      else if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowRight'){ e.preventDefault(); leaveTable(view, wrap, 1); }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft'){ e.preventDefault(); leaveTable(view, wrap, -1); }
+      else if (e.key === 'Escape'){ e.preventDefault(); leaveTable(view, wrap, 1); }
+      else if (e.key === 'Delete'){ e.preventDefault(); writeTable(view, wrap, t => { t.rows = []; }); }
+    });
+
+    // 列幅の調整
     wrap.addEventListener('pointerdown', e => {
       const rz = e.target.closest('.rz');
       if (!rz) return;
       e.preventDefault(); e.stopPropagation();
+      const table = wrap.querySelector('table'), cols = [...wrap.querySelectorAll('col')];
       const ci = +rz.dataset.col;
-      const widths = [...table.rows[0].cells].map(c => c.getBoundingClientRect().width);
-      const cols = [...cg.children];
+      const widths = [...table.rows[0].cells].map(c => Math.round(c.getBoundingClientRect().width));
       table.style.tableLayout = 'fixed';
       widths.forEach((w, i) => cols[i].style.width = w + 'px');
       table.style.width = widths.reduce((a, b) => a + b, 0) + 'px';
@@ -867,6 +1110,7 @@ class TableWidget extends WidgetType {
       rz.classList.add('on');
       rz.setPointerCapture(e.pointerId);
       const x0 = e.clientX, w0 = widths[ci];
+      label.textContent = w0 + 'px';
       const move = ev => {
         widths[ci] = Math.max(40, Math.round(w0 + ev.clientX - x0));
         cols[ci].style.width = widths[ci] + 'px';
@@ -876,17 +1120,7 @@ class TableWidget extends WidgetType {
       const up = () => {
         rz.removeEventListener('pointermove', move); rz.removeEventListener('pointerup', up);
         rz.classList.remove('on'); label.remove();
-        // 区切り行に列幅を書き戻す
-        const from = view.posAtDOM(wrap);
-        const first = view.state.doc.lineAt(from);
-        if (first.number >= view.state.doc.lines) return;
-        const sepLine = view.state.doc.line(first.number + 1);
-        const m = rowRe.exec(sepLine.text);
-        if (!m) return;
-        const old = m[2].split('|').map(c => sepCellRe.exec(c) || ['', '', '', '']);
-        const cells = widths.map((w, i) => `${old[i]?.[1] || ''}---${old[i]?.[2] || ''}${Math.round(w)}`);
-        const insert = `${m[1]}|${cells.join('|')}|`;
-        if (insert !== sepLine.text) view.dispatch({ changes:{ from:sepLine.from, to:sepLine.to, insert } });
+        writeTable(view, wrap, t => { t.sep.forEach((s, i) => s.w = widths[i] || s.w); });
       };
       rz.addEventListener('pointermove', move); rz.addEventListener('pointerup', up);
     });
@@ -899,25 +1133,82 @@ function insertTable(v){
   const rows = ['| 見出し1 | 見出し2 | 見出し3 |', '|---|---|---|', '|  |  |  |', '|  |  |  |'].map(r => ind + r);
   const blank = line.text.trim() === '';
   const next = line.number < st.doc.lines ? st.doc.line(line.number + 1).text : '';
-  let insert = (blank ? '' : '\n') + rows.join('\n') + (next.trim() ? '\n' : '');
-  const from = blank ? line.from : line.to, to = line.to;
-  const anchor = from + (blank ? 0 : 1) + ind.length + 2;
-  v.dispatch({ changes:{ from, to, insert }, selection:{ anchor, head: anchor + 4 }, effects: focusFx.of(true) });
-  v.focus();
+  const insert = (blank ? '' : '\n') + rows.join('\n') + (next.trim() ? '\n' : '');
+  const from = blank ? line.from : line.to;
+  const tableFrom = from + (blank ? 0 : 1);
+  v.dispatch({ changes:{ from, to:line.to, insert } });
+  for (const w of v.contentDOM.querySelectorAll('.cm-tbl')) if (v.posAtDOM(w) === tableFrom){ focusCell(w, 0, 0, true); return; }
 }
 // 表の中なら表全体を、それ以外は選択行をインデント
+function activeTable(){
+  const w = document.activeElement?.closest?.('.cm-tbl');
+  const p = w && panes.find(p => p.view && p.view.contentDOM.contains(w));
+  return p ? { view:p.view, wrap:w } : null;
+}
 function indentCmd(v, dir){
-  const t = tableAt(v.state, v.state.selection.main.head);
-  if (!t) return dir > 0 ? indentMore(v) : indentLess(v);
-  const changes = [];
-  for (let i = t.from; i <= t.to; i++){
-    const l = v.state.doc.line(i);
-    if (dir > 0) changes.push({ from:l.from, insert:'\t' });
-    else { const m = /^(\t| {1,4})/.exec(l.text); if (m) changes.push({ from:l.from, to:l.from + m[0].length }); }
-  }
-  if (changes.length) v.dispatch({ changes });
+  const at = activeTable();
+  if (at){ tableIndent(at.view, at.wrap, dir); return true; }
+  return dir > 0 ? indentMore(v) : indentLess(v);
+}
+// Enter：前の行の先頭の空白（スペース・タブ）をそのまま引き継ぐ
+function newlineKeepIndent(v){
+  v.dispatch(v.state.changeByRange(r => {
+    const line = v.state.doc.lineAt(r.from);
+    const ws = /^[ \t]*/.exec(line.text)[0].slice(0, Math.max(0, r.from - line.from));
+    const insert = '\n' + ws;
+    return { changes:{ from:r.from, to:r.to, insert }, range: EditorSelection.cursor(r.from + insert.length) };
+  }), { scrollIntoView:true, userEvent:'input' });
   return true;
 }
+
+/* ---------- マーカー ---------- */
+function markSpans(state, from, to){
+  const out = [], doc = state.doc;
+  for (let n = doc.lineAt(from).number; n <= doc.lineAt(to).number; n++){
+    const line = doc.line(n);
+    markRe.lastIndex = 0;
+    let m;
+    while ((m = markRe.exec(line.text))){
+      const s = line.from + m.index, e = s + m[0].length;
+      if (s <= to && e >= from) out.push({ s, e });
+    }
+  }
+  return out;
+}
+function markerErase(v){
+  const sel = v.state.selection.main;
+  const spans = markSpans(v.state, sel.from, sel.to);
+  if (spans.length) v.dispatch({ changes: spans.flatMap(sp => [{ from:sp.s, to:sp.s + 2 }, { from:sp.e - 2, to:sp.e }]) });
+  return true;
+}
+function markerToggle(v){
+  const sel = v.state.selection.main;
+  const spans = markSpans(v.state, sel.from, sel.to);
+  if (sel.empty || (spans.length === 1 && spans[0].s + 2 <= sel.from && sel.to <= spans[0].e - 2)) return markerErase(v);
+  const doc = v.state.doc;
+  const from = Math.min(sel.from, ...spans.map(s => s.s)), to = Math.max(sel.to, ...spans.map(s => s.e));
+  const changes = spans.flatMap(sp => [{ from:sp.s, to:sp.s + 2 }, { from:sp.e - 2, to:sp.e }]);
+  for (let n = doc.lineAt(from).number; n <= doc.lineAt(to).number; n++){
+    const line = doc.line(n);
+    let a = Math.max(from, line.from), b = Math.min(to, line.to);
+    const seg = doc.sliceString(a, b);
+    a += seg.length - seg.trimStart().length;
+    b -= seg.length - seg.trimEnd().length;
+    if (b <= a) continue;
+    changes.push({ from:a, insert:'==' }, { from:b, insert:'==' });
+  }
+  v.dispatch({ changes });
+  return true;
+}
+function setHeading(v, n){
+  const line = v.state.doc.lineAt(v.state.selection.main.head);
+  const ws = /^[ \t]*/.exec(line.text)[0];
+  const m = headRe.exec(line.text);
+  const insert = n ? '#'.repeat(n) + ' ' : '';
+  v.dispatch({ changes:{ from:line.from + ws.length, to:line.from + (m ? m[0].length : ws.length), insert } });
+  return true;
+}
+function headingLevel(v){ const m = headRe.exec(v.state.doc.lineAt(v.state.selection.main.head).text); return m ? m[2].length : 0; }
 
 /* ---------- 画像 ---------- */
 // 書式： ![](img:ID){w=幅px}  画像本体は GitHub の 保存フォルダ/_img/ID.json に暗号化して保存
@@ -1061,13 +1352,12 @@ class ImageWidget extends WidgetType {
 }
 
 /* ---------- 表と画像の描画 ---------- */
-const focusFx = StateEffect.define();
-function buildBlocks(state, focused){
-  const doc = state.doc, sel = state.selection, decos = [], atoms = [];
+function buildBlocks(state){
+  const doc = state.doc, decos = [], atoms = [];
   for (const t of findTables(doc)){
     const from = doc.line(t.from).from, to = doc.line(t.to).to;
-    const inside = focused && sel.ranges.some(r => r.to >= from && r.from <= to);
-    if (!inside) decos.push(Decoration.replace({ widget:new TableWidget(doc.sliceString(from, to)), block:true }).range(from, to));
+    const d = Decoration.replace({ widget:new TableWidget(doc.sliceString(from, to)), block:true }).range(from, to);
+    decos.push(d); atoms.push(d);
   }
   for (let i = 1; i <= doc.lines; i++){
     const line = doc.line(i);
@@ -1080,15 +1370,11 @@ function buildBlocks(state, focused){
       decos.push(d); atoms.push(d);
     }
   }
-  return { deco: Decoration.set(decos, true), atoms: Decoration.set(atoms, true), focused };
+  return { deco: Decoration.set(decos, true), atoms: Decoration.set(atoms, true) };
 }
 const blockField = StateField.define({
-  create: st => buildBlocks(st, false),
-  update(v, tr){
-    let focused = v.focused;
-    for (const e of tr.effects) if (e.is(focusFx)) focused = e.value;
-    return (tr.docChanged || tr.selection || focused !== v.focused) ? buildBlocks(tr.state, focused) : v;
-  },
+  create: st => buildBlocks(st),
+  update: (v, tr) => tr.docChanged ? buildBlocks(tr.state) : v,
   provide: f => [
     EditorView.decorations.from(f, v => v.deco),
     EditorView.atomicRanges.of(view => view.state.field(f).atoms)
@@ -1096,7 +1382,6 @@ const blockField = StateField.define({
 });
 const blockExt = [
   blockField,
-  EditorView.focusChangeEffect.of((state, focusing) => focusFx.of(focusing)),
   EditorView.domEventHandlers({
     paste(e, v){
       const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
@@ -1128,8 +1413,18 @@ function makeState(text){
       blockExt,
       indentUnit.of('\t'),
       keymap.of([
+        { key:'Enter', run: newlineKeepIndent },
         { key:'Tab', run: v => indentCmd(v, 1) },
         { key:'Shift-Tab', run: v => indentCmd(v, -1) },
+        { key:'Mod-]', run: v => indentCmd(v, 1) },
+        { key:'Mod-[', run: v => indentCmd(v, -1) },
+        { key:'Mod-Shift-h', run: markerToggle },
+        { key:'Mod-Shift-x', run: markerErase },
+        { key:'Mod-Alt-1', run: v => setHeading(v, 1) },
+        { key:'Mod-Alt-2', run: v => setHeading(v, 2) },
+        { key:'Mod-Alt-3', run: v => setHeading(v, 3) },
+        { key:'Mod-Alt-4', run: v => setHeading(v, 4) },
+        { key:'Mod-Alt-0', run: v => setHeading(v, 0) },
         ...defaultKeymap, ...historyKeymap
       ]),
       EditorView.updateListener.of(onUpdate)
@@ -1434,8 +1729,11 @@ function updateStatusBar(){
 // ツールバーのボタンでエディタのフォーカスを奪わない
 $('#toolbar').addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 $('#tableBtn').onclick = () => { const v = curView(); if (v) insertTable(v); };
-$('#indentBtn').onclick = () => { const v = curView(); if (v){ indentCmd(v, 1); v.focus(); } };
-$('#outdentBtn').onclick = () => { const v = curView(); if (v){ indentCmd(v, -1); v.focus(); } };
+$('#indentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, 1); else { indentCmd(v, 1); v.focus(); } };
+$('#outdentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, -1); else { indentCmd(v, -1); v.focus(); } };
+$('#markBtn').onclick = () => { const v = curView(); if (v){ markerToggle(v); v.focus(); } };
+$('#unmarkBtn').onclick = () => { const v = curView(); if (v){ markerErase(v); v.focus(); } };
+$('#keysBtn').onclick = () => $('#keys').showModal();
 $('#imageBtn').onclick = () => { if (curView()) $('#imageFile').click(); };
 $('#imageFile').onchange = e => {
   const v = curView(), files = [...e.target.files];
@@ -1446,12 +1744,7 @@ $('#undoBtn').onclick = () => { const v = curView(); if (v){ undo(v); v.focus();
 $('#redoBtn').onclick = () => { const v = curView(); if (v){ redo(v); v.focus(); } };
 $('#headBtn').onclick = () => {
   const v = curView(); if (!v) return;
-  const line = v.state.doc.lineAt(v.state.selection.main.head);
-  const m = /^(#{1,4}) /.exec(line.text);
-  const level = m ? m[1].length : 0;
-  const next = (level + 1) % 5;
-  const insert = next ? '#'.repeat(next) + ' ' : '';
-  v.dispatch({ changes:{ from:line.from, to:line.from + (m ? m[0].length : 0), insert } });
+  setHeading(v, (headingLevel(v) + 1) % 5);
   v.focus();
 };
 
