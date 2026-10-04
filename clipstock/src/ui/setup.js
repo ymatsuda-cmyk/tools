@@ -1,20 +1,19 @@
 import { escapeHtml } from './render.js'
-import { loadConfig, saveConfig, connectJsonbin, saveJsonbinPassphrase } from '../lib/videos-config.js'
+import { loadConfig, saveConfig, setupJsonbin, saveJsonbinPassphrase } from '../lib/videos-config.js'
 import { loadSettings, saveSettings, newConnection } from '../lib/llm-settings.js'
 import { verifyCode } from '../lib/gas.js'
-import { openSettings } from './settings.js'
 
 /**
  * 初回設定画面。GAS URL と共有トークンが未設定のときに、起動直後に出す。
  *
- * 保存先を最初に選ぶ:
- *   JSONBin  … Bin ID・APIキー・パスフレーズで保存済みの設定を読み込む。
- *              以降の変更(設定画面での保存)もJSONBinに書く。
- *   この端末のみ … GAS URL・共有トークン・一覧JSONの場所・コード・AI接続を入力し、
- *              これまでどおりlocalStorageだけに保存する。JSONBinには何も送らない。
+ * 入力欄(GAS URL・共有トークン・一覧JSONの場所・コード・AI接続)はどちらの保存先でも同じで、
+ * 保存先だけを選ぶ:
+ *   JSONBin  … 入力した内容をJSONBinに保存する。以降の変更(設定画面での保存)もJSONBinに書く。
+ *              Bin IDを入れればそのBinの保存済み設定を読み込み(空欄の項目はBinの値を使う)、
+ *              空欄なら新しいBinを作る。
+ *   この端末のみ … これまでどおりlocalStorageだけに保存する。JSONBinには何も送らない。
  *
- * 設定画面(settings.js)と違い、保存を押すまで何も書かない。読み込みに失敗したときも
- * この端末の設定は変えない。
+ * 保存を押すまで何も書かない。Binを読めなかったときもこの端末の設定は変えない。
  *
  * @param {() => void} onDone 設定が済んだあとに呼ぶ(一覧の読み込みを始める)
  */
@@ -33,7 +32,7 @@ export function openSetup(onDone) {
 
           <label class="row">
             <input type="radio" name="su-mode" value="jsonbin" ${mode === 'jsonbin' ? 'checked' : ''} />
-            <span>JSONBinを使う(保存してある設定を読み込み、変更もJSONBinに書く)</span>
+            <span>JSONBinを使う(下の設定をJSONBinに保存し、変更もJSONBinに書く)</span>
           </label>
           <label class="row">
             <input type="radio" name="su-mode" value="local" ${mode === 'local' ? 'checked' : ''} />
@@ -42,15 +41,16 @@ export function openSetup(onDone) {
 
           <div id="su-jsonbin">
             <label class="field-label">Bin ID</label>
-            <input id="su-bin-id" class="input" value="${escapeHtml(config.jsonbinBinId)}" placeholder="jsonbin.ioのBinのID" />
+            <input id="su-bin-id" class="input" value="${escapeHtml(config.jsonbinBinId)}" placeholder="空欄なら新しいBinを作ります" />
+            <div class="foot-note">すでにBinがあるときはそのIDを入れると、保存してある設定を読み込みます。下の入力欄が空の項目はBinの値を使います</div>
             <label class="field-label">APIキー(X-Master-Key)</label>
             <input id="su-bin-key" class="input" type="password" value="${escapeHtml(config.jsonbinApiKey)}" placeholder="jsonbin.ioで発行したキー" />
             <label class="field-label">パスフレーズ(暗号化)</label>
-            <input id="su-bin-pass" class="input" type="password" autocomplete="off" placeholder="Binを暗号化したときのパスフレーズ" />
-            <div class="foot-note">パスフレーズはこの端末のブラウザにだけ保存します。Binの中身は設定画面と同じ形式(AES-256-GCM)で読み書きします</div>
+            <input id="su-bin-pass" class="input" type="password" autocomplete="off" placeholder="Binを暗号化するパスフレーズ(新規なら好きな文字列)" />
+            <div class="foot-note">Binの中身はこのパスフレーズでAES-256-GCM暗号化してから保存します(GAS URL・共有トークン・AIのAPIキーがそのまま載りません)。パスフレーズはこの端末のブラウザにだけ保存します。忘れると復号できないので控えておいてください</div>
           </div>
 
-          <div id="su-local">
+          <div id="su-settings">
             <label class="field-label">GAS URL</label>
             <input id="su-gas" class="input" value="${escapeHtml(config.gasUrl)}" placeholder="https://script.google.com/macros/s/.../exec" />
 
@@ -91,8 +91,7 @@ export function openSetup(onDone) {
 
   function paintMode() {
     $('su-jsonbin').hidden = mode !== 'jsonbin'
-    $('su-local').hidden = mode !== 'local'
-    $('su-go').textContent = mode === 'jsonbin' ? '読み込む' : '保存して始める'
+    $('su-go').textContent = mode === 'jsonbin' ? 'JSONBinに保存して始める' : '保存して始める'
     msg('')
   }
   paintMode()
@@ -141,21 +140,51 @@ export function openSetup(onDone) {
     }
   })
 
-  /** JSONBinから読み込む。読めなければ(キー違い・パスフレーズ違い等)何も書き換えずにここへ戻る */
+  /** 入力欄の内容を、AI接続1件(表示名・baseUrl・モデル名が揃っているときだけ)として登録する */
+  function registerConnection() {
+    const base = $('su-ai-base').value.trim()
+    const model = $('su-ai-model').value.trim()
+    if (!base || !model) return // 空のままなら今ある接続に触らない
+    const settings = loadSettings()
+    const conn = newConnection({
+      label: $('su-ai-label').value.trim() || '接続1',
+      baseUrl: base,
+      apiKey: $('su-ai-key').value.trim(),
+      models: [model],
+    })
+    // 初期状態の空の接続(baseUrlなし・モデルなし)は置き換え、既存の接続は残す
+    const kept = settings.connections.filter((c) => c.baseUrl || (c.models || []).length)
+    saveSettings({ ...settings, connections: [...kept, conn], activeConnectionId: conn.id, activeModel: model })
+  }
+
+  /**
+   * 入力した設定をJSONBinに保存する。Bin IDがあればそのBinを先に読み(読めなければ何も書かない)、
+   * 空欄ならBinを新しく作る。成功すると以降の設定画面での保存もJSONBinへ書かれる。
+   */
   async function goJsonbin() {
     const binId = $('su-bin-id').value.trim()
     const apiKey = $('su-bin-key').value.trim()
     const passphrase = $('su-bin-pass').value.trim()
-    if (!binId || !apiKey) throw new Error('Bin IDとAPIキーを入力してください')
-    if (!passphrase) throw new Error('パスフレーズを入力してください(JSONBinの中身は暗号化されています)')
-    msg('読み込み中...')
-    const merged = await connectJsonbin({ binId, apiKey, passphrase })
+    if (!apiKey) throw new Error('APIキーを入力してください')
+    if (!passphrase) throw new Error('パスフレーズを入力してください(Binの中身を暗号化するため)')
+    msg(binId ? '読み込んで保存中...' : 'Binを作って保存中...')
+    const saved = await setupJsonbin({
+      binId,
+      apiKey,
+      passphrase,
+      overrides: {
+        gasUrl: $('su-gas').value.trim(),
+        accessToken: $('su-token').value.trim(),
+        dataUrl: $('su-data').value.trim(),
+        code: $('su-code').value.trim(),
+        role: verifiedRole,
+      },
+      beforeSave: registerConnection,
+    })
     root.innerHTML = ''
-    // Binは読めたが GAS URL・共有トークンが入っていなかったときは、設定画面で足してもらう。
-    // 設定画面の保存はJSONBinにも書くので、足した内容がそのままBinに反映される
-    if (!merged.gasUrl || !merged.accessToken) {
-      openSettings(() => onDone?.())
-      return
+    if (!binId) {
+      // 作ったBin IDは設定画面に残るが、控えておかないと別の端末で読めない
+      alert(`JSONBinに保存しました。\n\nBin ID: ${saved.jsonbinBinId}\n\n別の端末ではこのBin ID・APIキー・パスフレーズを入力すると同じ設定を読み込めます。控えておいてください。`)
     }
     onDone?.()
   }
@@ -176,22 +205,7 @@ export function openSetup(onDone) {
       useJsonbin: false,
     })
     saveJsonbinPassphrase('') // 使わない選択なので、以前のパスフレーズも残さない
-
-    // AI接続は表示名以外が揃っているときだけ登録する(空のままなら今ある接続に触らない)
-    const base = $('su-ai-base').value.trim()
-    const model = $('su-ai-model').value.trim()
-    if (base && model) {
-      const settings = loadSettings()
-      const conn = newConnection({
-        label: $('su-ai-label').value.trim() || '接続1',
-        baseUrl: base,
-        apiKey: $('su-ai-key').value.trim(),
-        models: [model],
-      })
-      // 初期状態の空の接続(baseUrlなし・モデルなし)は置き換え、既存の接続は残す
-      const kept = settings.connections.filter((c) => c.baseUrl || (c.models || []).length)
-      saveSettings({ ...settings, connections: [...kept, conn], activeConnectionId: conn.id, activeModel: model })
-    }
+    registerConnection()
 
     root.innerHTML = ''
     onDone?.()

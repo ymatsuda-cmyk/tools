@@ -1,4 +1,4 @@
-import { fetchBin, updateBin } from './jsonbin.js'
+import { fetchBin, updateBin, createBin } from './jsonbin.js'
 import { loadSettings, saveSettings } from './llm-settings.js'
 import { exportPromptOverrides, importPromptOverrides } from './prompts.js'
 import { encryptConfig, decryptConfig, isEnvelope } from './jsonbin-crypto.js'
@@ -76,20 +76,22 @@ export async function syncConfigFromJsonbin() {
   }
 }
 
-/**
- * Binを読み、(暗号文なら復号して)この端末のlocalStorageへ取り込む。失敗したら例外を投げる。
- * 起動時の同期(失敗してもローカルで続行)と、初回設定画面(失敗を画面に出す)の両方から使う。
- */
-async function pullFromJsonbin(local, passphrase) {
-  let remote = await fetchBin(local.jsonbinBinId, local.jsonbinApiKey)
+/** Binを読み、(暗号文なら復号して)中身を3つに分けて返す。この端末には何も書かない */
+async function readRemote(c, passphrase) {
+  let remote = await fetchBin(c.jsonbinBinId, c.jsonbinApiKey)
   if (isEnvelope(remote)) {
     if (!passphrase) throw new Error('JSONBinの中身は暗号化されています。パスフレーズを入力してください')
     remote = await decryptConfig(remote, passphrase)
   }
-  const { llmSettings, promptOverrides, ...remoteConfig } = remote || {}
+  const { llmSettings, promptOverrides, ...config } = remote || {}
+  return { config, llmSettings, promptOverrides }
+}
+
+/** readRemote の中身をこの端末のlocalStorageへ取り込む */
+function applyRemote(local, { config, llmSettings, promptOverrides }) {
   const merged = {
     ...local,
-    ...remoteConfig,
+    ...config,
     useJsonbin: local.useJsonbin,
     jsonbinBinId: local.jsonbinBinId,
     jsonbinApiKey: local.jsonbinApiKey,
@@ -100,16 +102,72 @@ async function pullFromJsonbin(local, passphrase) {
   return merged
 }
 
+/** 起動時の同期(失敗してもローカルで続行)から使う。失敗したら例外を投げる */
+async function pullFromJsonbin(local, passphrase) {
+  return applyRemote(local, await readRemote(local, passphrase))
+}
+
+/** Binに置く中身。config に AI接続とAIへの指示を並べ、パスフレーズがあれば暗号化する */
+async function buildBinBody(c) {
+  const payload = {
+    ...c,
+    llmSettings: loadSettings(),
+    promptOverrides: exportPromptOverrides(),
+  }
+  const passphrase = loadJsonbinPassphrase()
+  return passphrase ? await encryptConfig(payload, passphrase) : payload
+}
+
 /**
- * 初回設定画面から使う。Bin ID・APIキー・パスフレーズでBinを読み、
- * 保存してある設定をこの端末に取り込んで、以降の変更もJSONBinへ書く状態(useJsonbin)にする。
- * 読めなかった(キー違い・パスフレーズ違いなど)ときは、この端末の設定を何も変えずに例外を投げる。
+ * 初回設定画面から使う。入力された GAS URL・共有トークンなどをJSONBinに保存し、
+ * 以降の変更もJSONBinへ書く状態(useJsonbin)にする。
+ *
+ * - binId があれば、そのBinを先に読む(読めなければ何も書かずに例外)。Binに入っている設定を土台にして、
+ *   入力欄が空でない項目(overrides)だけ上書きする。空欄の項目はBinの値がそのまま残る。
+ * - binId が空なら、新しいBinを作ってそこへ保存し、そのIDを設定に入れる。
+ *
+ * @param {object} o
+ * @param {string} o.binId 空なら新規作成
+ * @param {string} o.apiKey
+ * @param {string} o.passphrase
+ * @param {object} o.overrides { gasUrl, accessToken, dataUrl, code, role }。空文字は「指定なし」
+ * @param {() => void} [o.beforeSave] この端末へ書く直前に呼ぶ(AI接続の登録などに使う)
+ * @returns {Promise<object>} 保存した設定
  */
-export async function connectJsonbin({ binId, apiKey, passphrase }) {
-  const probe = { ...loadConfig(), useJsonbin: true, jsonbinBinId: binId, jsonbinApiKey: apiKey }
-  const merged = await pullFromJsonbin(probe, passphrase) // 復号できて初めて何か書く
+export async function setupJsonbin({ binId, apiKey, passphrase, overrides = {}, beforeSave }) {
+  let base = { ...loadConfig() }
+  let remote = null
+  if (binId) {
+    remote = await readRemote({ jsonbinBinId: binId, jsonbinApiKey: apiKey }, passphrase)
+  }
+  const typed = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v))
+  const config = {
+    ...base,
+    ...(remote?.config || {}),
+    ...typed,
+    useJsonbin: true,
+    jsonbinBinId: binId,
+    jsonbinApiKey: apiKey,
+  }
+  if (!config.gasUrl || !config.accessToken) {
+    throw new Error('GAS URLと共有トークンを入力してください(Binにも入っていませんでした)')
+  }
+
+  // ここまで来たら書き込む。パスフレーズは buildBinBody が使うので先に置く
   saveJsonbinPassphrase(passphrase)
-  return merged
+  if (remote?.llmSettings) saveSettings(remote.llmSettings)
+  if (remote?.promptOverrides) importPromptOverrides(remote.promptOverrides)
+  beforeSave?.()
+  saveConfig(config)
+
+  const body = await buildBinBody(config)
+  if (binId) {
+    await updateBin(binId, apiKey, body)
+    return config
+  }
+  config.jsonbinBinId = await createBin(apiKey, body, { name: 'clipstock-config' })
+  saveConfig(config) // 新しいBin IDを残す
+  return config
 }
 
 /**
@@ -122,14 +180,7 @@ export async function connectJsonbin({ binId, apiKey, passphrase }) {
  */
 export async function pushConfigToJsonbin(c) {
   if (!jsonbinReady(c)) return
-  const payload = {
-    ...c,
-    llmSettings: loadSettings(),
-    promptOverrides: exportPromptOverrides(),
-  }
-  const passphrase = loadJsonbinPassphrase()
-  const body = passphrase ? await encryptConfig(payload, passphrase) : payload
-  await updateBin(c.jsonbinBinId, c.jsonbinApiKey, body)
+  await updateBin(c.jsonbinBinId, c.jsonbinApiKey, await buildBinBody(c))
 }
 
 export function isConfigured(c) {
