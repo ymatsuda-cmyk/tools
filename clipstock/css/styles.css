@@ -235,8 +235,34 @@ mark { background: var(--highlight); color: inherit; }
   background: var(--accent-bg);
   overflow: hidden;
   display: block;
+  position: relative;
 }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 動画のサムネイル中央に出す再生ボタン。押すと小窓で再生する */
+.thumb-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+.thumb-play:hover, .thumb-play:focus-visible { background: rgba(0, 0, 0, 0.85); transform: translate(-50%, -50%) scale(1.08); }
+.thumb-box { position: relative; flex-shrink: 0; width: 208px; }
+.thumb-box .thumb-hero { width: 100%; }
+.thumb-box .thumb-play { top: calc(50% ); }
+
 .thumb-blank {
   display: flex;
   align-items: center;
@@ -837,6 +863,7 @@ mark { background: var(--highlight); color: inherit; }
   .card-summary { -webkit-line-clamp: 2; }
   .detail-hero { flex-direction: column; }
   .thumb-hero { width: 100%; }
+  .thumb-box { width: 100%; }
   .idea-feed { grid-template-columns: 1fr; }
   .mindmap-host { height: 62vh; }
 }

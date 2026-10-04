@@ -124,7 +124,7 @@ export function openMiniPlayer(id, at) {
     if (placed) clampAndPlace(host, placed.left, placed.top)
   }
 
-  host.querySelector('.mp-time').textContent = `${formatTimecode(at)} から再生`
+  host.querySelector('.mp-time').textContent = at ? `${formatTimecode(at)} から再生` : '再生中'
   host.querySelector('.mp-open').href = `https://www.youtube.com/watch?v=${id}&t=${at}s`
   // src を差し替えるだけだと同じ動画のときに巻き直らないので、iframe ごと作り直す
   host.querySelector('.mp-frame').innerHTML = `

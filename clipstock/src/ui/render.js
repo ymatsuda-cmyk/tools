@@ -31,13 +31,31 @@ function fallbackThumb(url) {
   return m ? `https://i.ytimg.com/vi/${m[1]}/mqdefault.jpg` : ''
 }
 
-function thumbHtml(item, extraClass = '') {
+/** 動画(YouTube)なら動画ID。Web記事や、URLから取れないものは null */
+function videoIdOf(item) {
+  if (item.source === 'web') return null
+  return String(item.url ?? '').match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/)?.[1] ?? null
+}
+
+/**
+ * 再生ボタン。押すと画面隅の小窓で再生する(配線は main.js が data-play を委譲で拾う)。
+ * リンクの中に button は置けないので、サムネイルが <a> の中にある詳細画面では
+ * thumbHtml に play:false を渡し、この関数の結果を <a> の外に並べる。
+ */
+function playButtonHtml(item) {
+  const id = videoIdOf(item)
+  if (!id) return ''
+  return `<button type="button" class="thumb-play" data-play="${id}" aria-label="動画を再生"><i class="ti ti-player-play-filled" aria-hidden="true"></i></button>`
+}
+
+function thumbHtml(item, extraClass = '', { play = true } = {}) {
   const src = item.thumb || fallbackThumb(item.url)
+  const btn = play ? playButtonHtml(item) : ''
   if (!src) {
     const icon = item.source === 'web' ? 'ti-world' : 'ti-video-off'
-    return `<div class="thumb thumb-blank ${extraClass}"><i class="ti ${icon}" aria-hidden="true"></i></div>`
+    return `<div class="thumb thumb-blank ${extraClass}"><i class="ti ${icon}" aria-hidden="true"></i>${btn}</div>`
   }
-  return `<div class="thumb ${extraClass}"><img src="${escapeHtml(src)}" alt="" loading="lazy" /></div>`
+  return `<div class="thumb ${extraClass}"><img src="${escapeHtml(src)}" alt="" loading="lazy" />${btn}</div>`
 }
 
 // ============ タグレール ============
@@ -130,6 +148,7 @@ export function renderLibrary(container, items, state, handlers) {
     const open = () => handlers.onOpen(el.dataset.key)
     el.addEventListener('click', open)
     el.addEventListener('keydown', (e) => {
+      if (e.target !== el) return // 中のボタン(再生・お気に入りなど)のキー操作ではカードを開かない
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
         open()
@@ -193,6 +212,7 @@ export function renderMindmapGallery(container, items, state, handlers) {
     const open = () => handlers.onOpen(el.dataset.key)
     el.addEventListener('click', open)
     el.addEventListener('keydown', (e) => {
+      if (e.target !== el) return // 中のボタン(再生・お気に入りなど)のキー操作ではカードを開かない
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
         open()
@@ -410,7 +430,10 @@ export function detailHtml(item, state) {
   // サムネイルとタグはスクロールで送れるように本文側に置き、タブ列だけ上端に貼り付ける
   const hero = `
     <div class="detail-hero">
-      ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${thumbHtml(item, 'thumb-hero')}</a>` : thumbHtml(item, 'thumb-hero')}
+      <div class="thumb-box">
+        ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${thumbHtml(item, 'thumb-hero', { play: false })}</a>` : thumbHtml(item, 'thumb-hero', { play: false })}
+        ${playButtonHtml(item)}
+      </div>
       <div class="hero-side">
         <div class="tag-row">
           ${(state.tags || []).map((t) => `<span class="tag${canEdit ? ' tag-edit' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}${canEdit ? '<i class="ti ti-x" aria-hidden="true"></i>' : ''}</span>`).join('')}

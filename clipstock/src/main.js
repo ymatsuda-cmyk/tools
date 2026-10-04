@@ -1933,6 +1933,22 @@ document.addEventListener('click', (e) => {
   openMiniPlayer(hit.id, hit.at)
 })
 
+/**
+ * サムネイルの再生ボタン(data-play)は、最初から小窓で再生する。
+ * カード自体のクリック(詳細を開く)より先に拾いたいので、キャプチャ段階で受けて止める。
+ */
+document.addEventListener(
+  'click',
+  (e) => {
+    const btn = e.target.closest?.('[data-play]')
+    if (!btn) return
+    e.preventDefault()
+    e.stopPropagation()
+    openMiniPlayer(btn.dataset.play, 0)
+  },
+  true
+)
+
 $('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
   refresh()

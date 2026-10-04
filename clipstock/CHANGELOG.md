@@ -1,18 +1,38 @@
 # Change Log
 
+## 1.11.0 - 2026-10-04
+
+### Title
+
+Play videos from a button on the thumbnail
+
+### Changes
+
+- Put a play button in the middle of every video thumbnail (library, favorites, mindmap gallery cards and the detail header). Web articles and items without a YouTube URL get none.
+- Opened the existing mini player from it, so the video plays in the draggable, resizable window at the corner of the screen and the list or detail underneath stays where it was. It starts from 0:00 and the bar reads "再生中" instead of a timecode.
+- Caught the click in the capture phase so pressing the button never also opens the card's detail view, and made the card's keyboard handler ignore keys that bubble up from inner buttons (play, favorite, edit), which would otherwise open the card on Enter/Space.
+- Kept the button outside the thumbnail link in the detail header (a button cannot live inside an `<a>`), so clicking the image itself still opens YouTube in a new tab.
+
+### Affected Files
+
+- `clipstock/src/ui/render.js`
+- `clipstock/src/ui/player.js`
+- `clipstock/src/main.js`
+- `clipstock/css/styles.css`
+- `clipstock/CHANGELOG.md`
+
 ## 1.10.0 - 2026-10-04
 
 ### Title
 
-First-run setup screen: load settings from JSONBin, or keep everything local
+First-run setup screen: save settings to JSONBin, or keep everything local
 
 ### Changes
 
 - Showed a setup screen at startup whenever the GAS URL or shared token is missing (first launch, or a browser that has never been configured), instead of leaving an empty list with a hint to find the gear icon. "あとで" closes it and falls back to the old empty state.
-- Offered two storage choices up front. "JSONBinを使う" takes a Bin ID, API key and passphrase, reads the saved settings (GAS URL, token, list-JSON location, code, AI connections, prompts) and turns on `useJsonbin`, so every later save in the settings modal is written back to the Bin. "JSONBinを使わない" takes GAS URL, shared token, list-JSON location, code and one AI connection and stores them in localStorage only; nothing is sent to JSONBin and any stored passphrase is cleared.
-- Wrote nothing to this browser until the Bin has been read and decrypted successfully, so a wrong key or passphrase leaves the existing local settings untouched.
-- Opened the normal settings modal when the Bin was readable but held no GAS URL/token, so what gets filled in there is pushed straight to the Bin.
-- Split the Bin read in `videos-config.js` into `pullFromJsonbin`, shared by the startup sync (which still falls back silently) and the new `connectJsonbin` (which reports failures on screen).
+- Offered two storage choices up front, over one shared form (GAS URL, shared token, list-JSON location, code, one AI connection). "JSONBinを使う" saves what was typed into JSONBin (AES-GCM encrypted with the passphrase) and turns on `useJsonbin`, so every later save in the settings modal is written back to the Bin too. With a Bin ID it reads that Bin first and uses its values for any field left blank; with no Bin ID it creates a new Bin and shows the new ID once so it can be noted for other devices. "JSONBinを使わない" keeps the old behaviour: localStorage only, nothing sent to JSONBin, any stored passphrase cleared.
+- Wrote nothing to this browser until an existing Bin has been read and decrypted successfully and GAS URL/token are present (typed or from the Bin), so a wrong key or passphrase leaves the current local settings untouched.
+- Split the Bin read in `videos-config.js` into `readRemote`/`applyRemote` and the body building into `buildBinBody`, shared by the startup sync, the settings-modal push and the new `setupJsonbin`.
 
 ### Affected Files
 
