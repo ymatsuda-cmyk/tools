@@ -69,31 +69,47 @@ export async function syncConfigFromJsonbin() {
   const local = loadConfig()
   if (!jsonbinReady(local)) return local
   try {
-    let remote = await fetchBin(local.jsonbinBinId, local.jsonbinApiKey)
-    if (isEnvelope(remote)) {
-      const passphrase = loadJsonbinPassphrase()
-      if (!passphrase) {
-        console.warn('JSONBinの中身は暗号化されています。設定でパスフレーズを入力してください')
-        return local
-      }
-      remote = await decryptConfig(remote, passphrase)
-    }
-    const { llmSettings, promptOverrides, ...remoteConfig } = remote || {}
-    const merged = {
-      ...local,
-      ...remoteConfig,
-      useJsonbin: local.useJsonbin,
-      jsonbinBinId: local.jsonbinBinId,
-      jsonbinApiKey: local.jsonbinApiKey,
-    }
-    saveConfig(merged)
-    if (llmSettings) saveSettings(llmSettings)
-    if (promptOverrides) importPromptOverrides(promptOverrides)
-    return merged
+    return await pullFromJsonbin(local, loadJsonbinPassphrase())
   } catch (err) {
     console.warn('JSONBinから設定を取得できなかったため、この端末の設定を使います:', err)
     return local
   }
+}
+
+/**
+ * Binを読み、(暗号文なら復号して)この端末のlocalStorageへ取り込む。失敗したら例外を投げる。
+ * 起動時の同期(失敗してもローカルで続行)と、初回設定画面(失敗を画面に出す)の両方から使う。
+ */
+async function pullFromJsonbin(local, passphrase) {
+  let remote = await fetchBin(local.jsonbinBinId, local.jsonbinApiKey)
+  if (isEnvelope(remote)) {
+    if (!passphrase) throw new Error('JSONBinの中身は暗号化されています。パスフレーズを入力してください')
+    remote = await decryptConfig(remote, passphrase)
+  }
+  const { llmSettings, promptOverrides, ...remoteConfig } = remote || {}
+  const merged = {
+    ...local,
+    ...remoteConfig,
+    useJsonbin: local.useJsonbin,
+    jsonbinBinId: local.jsonbinBinId,
+    jsonbinApiKey: local.jsonbinApiKey,
+  }
+  saveConfig(merged)
+  if (llmSettings) saveSettings(llmSettings)
+  if (promptOverrides) importPromptOverrides(promptOverrides)
+  return merged
+}
+
+/**
+ * 初回設定画面から使う。Bin ID・APIキー・パスフレーズでBinを読み、
+ * 保存してある設定をこの端末に取り込んで、以降の変更もJSONBinへ書く状態(useJsonbin)にする。
+ * 読めなかった(キー違い・パスフレーズ違いなど)ときは、この端末の設定を何も変えずに例外を投げる。
+ */
+export async function connectJsonbin({ binId, apiKey, passphrase }) {
+  const probe = { ...loadConfig(), useJsonbin: true, jsonbinBinId: binId, jsonbinApiKey: apiKey }
+  const merged = await pullFromJsonbin(probe, passphrase) // 復号できて初めて何か書く
+  saveJsonbinPassphrase(passphrase)
+  return merged
 }
 
 /**

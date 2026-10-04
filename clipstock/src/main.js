@@ -9,6 +9,7 @@ import {
   tabsOf,
 } from './ui/render.js'
 import { openSettings, openEditor } from './ui/settings.js'
+import { openSetup } from './ui/setup.js'
 import { openVocabPanel } from './ui/vocab.js'
 import { openMiniPlayer, seekTargetOf } from './ui/player.js'
 import {
@@ -121,7 +122,7 @@ async function loadList() {
       <div class="empty-state">
         <i class="ti ti-plug-connected-x" aria-hidden="true"></i>
         <p>まず接続の設定が必要です</p>
-        <p class="empty-hint">右上の歯車から GAS URL と共有トークンを入れてください</p>
+        <p class="empty-hint">右上の歯車から GAS URL と共有トークンを入れるか、JSONBinから設定を読み込んでください</p>
       </div>`
       : `
       <div class="empty-state">
@@ -2033,10 +2034,14 @@ initPrompts()
 // 使っていない/取得できないときはローカルの設定のまま進む
 syncConfigFromJsonbin().finally(() => {
   // どのJSONを読むかがスペースで決まるので、一覧より先に解決させる
-  initSpaces().then(() => {
-    paintSpaceSwitch()
-    loadList()
-  })
+  const start = () =>
+    initSpaces().then(() => {
+      paintSpaceSwitch()
+      loadList()
+    })
+  // GAS URL・共有トークンが無い(初回、または別ブラウザ)ときは、先に設定画面を出す
+  if (isConfigured(loadConfig())) start()
+  else openSetup(start)
 })
 
 /** 表示対象の切り替え。選択はURLに入るのでリンクとして配れる */

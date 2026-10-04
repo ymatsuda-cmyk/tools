@@ -1,5 +1,26 @@
 # Change Log
 
+## 1.10.0 - 2026-10-04
+
+### Title
+
+First-run setup screen: load settings from JSONBin, or keep everything local
+
+### Changes
+
+- Showed a setup screen at startup whenever the GAS URL or shared token is missing (first launch, or a browser that has never been configured), instead of leaving an empty list with a hint to find the gear icon. "あとで" closes it and falls back to the old empty state.
+- Offered two storage choices up front. "JSONBinを使う" takes a Bin ID, API key and passphrase, reads the saved settings (GAS URL, token, list-JSON location, code, AI connections, prompts) and turns on `useJsonbin`, so every later save in the settings modal is written back to the Bin. "JSONBinを使わない" takes GAS URL, shared token, list-JSON location, code and one AI connection and stores them in localStorage only; nothing is sent to JSONBin and any stored passphrase is cleared.
+- Wrote nothing to this browser until the Bin has been read and decrypted successfully, so a wrong key or passphrase leaves the existing local settings untouched.
+- Opened the normal settings modal when the Bin was readable but held no GAS URL/token, so what gets filled in there is pushed straight to the Bin.
+- Split the Bin read in `videos-config.js` into `pullFromJsonbin`, shared by the startup sync (which still falls back silently) and the new `connectJsonbin` (which reports failures on screen).
+
+### Affected Files
+
+- `clipstock/src/ui/setup.js` (new)
+- `clipstock/src/lib/videos-config.js`
+- `clipstock/src/main.js`
+- `clipstock/CHANGELOG.md`
+
 ## 1.9.0 - 2026-09-27
 
 ### Title
