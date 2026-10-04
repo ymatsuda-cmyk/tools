@@ -1779,7 +1779,28 @@ function mmLocate(view, wrap){
   const n = view.state.doc.lineAt(view.posAtDOM(wrap)).number;
   return findMindmaps(view.state.doc).find(x => n >= x.from && n <= x.to);
 }
+// マップの操作中は、メモのスクロール位置を動かさない
+// （マップ内のフォーカス移動や本文の書き換えでスクロールが飛ぶのを防ぐ。ホイールを回したら解除）
+function holdScroll(view, ms = 900){
+  const sc = view.scrollDOM;
+  if (sc._hold) sc._hold.until = performance.now() + ms;
+  else {
+    const hold = sc._hold = { top: sc.scrollTop, left: sc.scrollLeft, until: performance.now() + ms };
+    const stop = () => { sc.removeEventListener('scroll', onScroll); sc.removeEventListener('wheel', stop, true); sc.removeEventListener('touchmove', stop, true); sc._hold = null; };
+    const onScroll = () => {
+      if (performance.now() > hold.until){ stop(); return; }
+      if (sc.scrollTop !== hold.top) sc.scrollTop = hold.top;
+      if (sc.scrollLeft !== hold.left) sc.scrollLeft = hold.left;
+    };
+    sc.addEventListener('scroll', onScroll);
+    sc.addEventListener('wheel', stop, true);
+    sc.addEventListener('touchmove', stop, true);
+    const tick = () => { if (!sc._hold) return; if (performance.now() > hold.until) stop(); else setTimeout(tick, 200); };
+    setTimeout(tick, 200);
+  }
+}
 function writeMindmap(view, wrap, edit, self){
+  holdScroll(view);
   const b = mmLocate(view, wrap);
   if (!b) return;
   const doc = view.state.doc, a = doc.line(b.from).from, z = doc.line(b.to).to;
@@ -1920,8 +1941,11 @@ class MindmapWidget extends WidgetType {
     });
     // マップ上のホイールはページのスクロールに使う（⌘／Ctrl＋ホイールでマップを拡大縮小）
     wrap.addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }, { capture:true });
+    wrap.addEventListener('pointerdown', () => holdScroll(view), { capture:true });
+    wrap.addEventListener('focusin', () => holdScroll(view), { capture:true });
     // マップがキーを受け取る前に、アプリ共通のキーを処理する
     wrap.addEventListener('keydown', e => {
+      if (!(e.metaKey || e.ctrlKey) && e.key !== 'Escape') holdScroll(view);
       if (e.target.closest('input, textarea')) return;
       const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
       if (mod && k === 'z'){ e.preventDefault(); e.stopPropagation(); (e.shiftKey ? redo : undo)(view); }
