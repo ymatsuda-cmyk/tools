@@ -179,6 +179,31 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-img img{cursor:zoom-in}
 #panes .host .cm-comment{background:var(--cmt);border-bottom:2px solid var(--cmt-line);cursor:pointer;border-radius:2px 2px 0 0}
 #panes .host .cm-comment.on{background:var(--cmt-on)}
+#panes .host .cm-mm{padding:6px 28px;display:flex;align-items:flex-start;outline:none}
+#panes .host .cm-mm .ind{white-space:pre;flex:none}
+#panes .host .cm-mm .mmbox{position:relative;flex:none;max-width:100%;border:1px solid var(--line);border-radius:8px;background:var(--panel);
+  --accent-bg:var(--sel);--surface-1:var(--paper);--surface-2:var(--panel);--text-primary:var(--ink);--text-muted:var(--muted);--markmap-text-color:var(--ink)}
+#panes .host .cm-mm .mmbox:focus-within,#panes .host .cm-mm .mmbox.resizing{border-color:var(--accent)}
+#panes .host .cm-mm .mmc{width:100%;height:100%;overflow:hidden;border-radius:8px;font-size:14px;line-height:1.4}
+#panes .host .cm-mm .mmc .markmap-foreign{color:var(--ink)}
+#panes .host .cm-mm .mmc .mm-host:focus,#panes .host .cm-mm .mmc:focus{box-shadow:none}
+#panes .host .cm-mm .mmc.loading{display:grid;place-items:center;color:var(--muted);font-size:13px}
+#panes .host .cm-mm .mmc textarea{width:100%;height:100%;border:0;resize:none;padding:12px 14px;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--paper);color:var(--ink);outline:none;tab-size:2}
+#panes .host .cm-mm .mmerr{color:var(--warn);font-size:12px;margin:10px 12px 4px}
+#panes .host .cm-mm .mmc pre{margin:0 12px;font-size:12px;white-space:pre-wrap;color:var(--muted)}
+#panes .host .cm-mm .mmtools{position:absolute;top:6px;right:6px;display:none;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.1);z-index:6}
+#panes .host .cm-mm .mmbox:hover .mmtools,#panes .host .cm-mm .mmbox:focus-within .mmtools{display:flex}
+#panes .host .cm-mm .mmtools button{border:0;background:none;font-size:12px;padding:1px 8px;border-radius:4px;line-height:1.7;color:var(--ink)}
+#panes .host .cm-mm .mmtools button:hover{background:var(--paper)}
+#panes .host .cm-mm .mmtools .danger{color:var(--warn)}
+#panes .host .cm-mm .h{position:absolute;width:12px;height:12px;background:var(--panel);border:2px solid var(--accent);border-radius:3px;opacity:0;z-index:7;touch-action:none}
+#panes .host .cm-mm .mmbox:hover .h,#panes .host .cm-mm .mmbox.resizing .h{opacity:1}
+#panes .host .cm-mm .h-nw{left:-6px;top:-6px;cursor:nwse-resize}
+#panes .host .cm-mm .h-ne{right:-6px;top:-6px;cursor:nesw-resize}
+#panes .host .cm-mm .h-sw{left:-6px;bottom:-6px;cursor:nesw-resize}
+#panes .host .cm-mm .h-se{right:-6px;bottom:-6px;cursor:nwse-resize}
+#panes .host .cm-mm .sz{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;display:none;z-index:7}
+#panes .host .cm-mm .mmbox.resizing .sz{display:block}
 #panes .host .cm-marker{background:var(--mark);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 #panes .host .cm-img{display:inline-block;position:relative;vertical-align:bottom;max-width:100%;line-height:0;margin:3px 0;border-radius:4px}
 #panes .host .cm-img img{max-width:100%;height:auto;display:block;border-radius:4px;user-select:none}
@@ -364,6 +389,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="cmtAdd" title="コメントを追加（⌘⌥M / Ctrl+Alt+M）" aria-label="コメントを追加"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg></button>
         <button class="ib" id="cmtToggle" title="コメント一覧" aria-label="コメント一覧" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg><span id="ccount"></span></button>
         <button class="ib" id="tableBtn" title="表を挿入" aria-label="表を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/></svg></button>
+        <button class="ib" id="mindmapBtn" title="マインドマップを挿入" aria-label="マインドマップを挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8.5" y="9.5" width="7" height="5" rx="1.5"/><circle cx="4" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="4" cy="19" r="1.8"/><circle cx="20" cy="19" r="1.8"/><path d="M8.5 11 5.5 6.3M15.5 11l3-4.7M8.5 13l-3 4.7M15.5 13l3 4.7"/></svg></button>
         <button class="ib" id="imageBtn" title="画像を挿入（コピーした画像は ⌘V で貼り付け）" aria-label="画像を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5.5-5 4 3.5 2.5-2 4.5 3.5"/></svg></button>
         <input type="file" id="imageFile" accept="image/*" hidden>
         <button class="ib" id="outdentBtn" title="インデントを減らす（⇧Tab / ⌘[）" aria-label="インデントを減らす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h9M11 12h9M11 18h9M7 9l-3 3 3 3"/></svg></button>
@@ -436,6 +462,11 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
       <tr><th>表：セル内で改行</th><td>Enter</td></tr>
       <tr><th>表：下のセル（最終行なら行を追加）</th><td>⌘Enter</td></tr>
       <tr><th>コメントを追加（文字を選んで）</th><td>⌘⌥M</td></tr>
+      <tr><th>マインドマップ：枝の移動／開閉</th><td>↑ ↓ ← →</td></tr>
+      <tr><th>マインドマップ：文字を編集</th><td>Space</td></tr>
+      <tr><th>マインドマップ：子の枝／同じ階層の枝を追加</th><td>Tab ／ Enter</td></tr>
+      <tr><th>マインドマップ：枝を削除</th><td>Delete</td></tr>
+      <tr><th>マインドマップ：拡大縮小／マップから出る</th><td>⌘＋ホイール ／ Esc</td></tr>
       <tr><th>画像ビューア：拡大／縮小／実サイズ／画面に合わせる</th><td>＋ ／ − ／ 0 ／ F（ホイールでも拡大縮小）</td></tr>
       <tr><th>表：表全体を選ぶ</th><td>Esc（または表の左の余白をクリック）</td></tr>
       <tr><th>表を選んだ状態で前に空白／タブ</th><td>Space ／ Tab（⇧Tab・Backspace で戻す）</td></tr>
@@ -848,8 +879,10 @@ function buildHeadings(v){
   const touching = (s, e) => v.hasFocus && st.selection.ranges.some(r => r.from <= e && r.to >= s);
   for (const { from, to } of v.visibleRanges){
     let pos = from;
+    const skip = st.field(blockField, false)?.skip;
     while (pos <= to){
       const line = doc.lineAt(pos);
+      if (skip && skip.has(line.number)){ pos = line.to + 1; continue; }
       const m = headRe.exec(line.text);
       if (m){
         // 行頭の空白（インデント）の後ろの # を見出しとして扱う
@@ -1699,11 +1732,262 @@ $('#cmtAdd').onclick = () => { const v = curView(); if (v) addComment(v); };
 $('#cmtToggle').onclick = () => { cpanelOpen = !cpanelOpen; renderComments(); };
 $('#cpClose').onclick = () => { cpanelOpen = false; renderComments(); };
 
+/* ---------- マインドマップ（ymatsuda-cmyk/tools の api/mindmap2 を利用） ---------- */
+// 書式：
+//   ```mindmap{w=640,h=360}
+//   # 中心テーマ
+//   ## 大項目
+//   - 枝
+//   ```
+const MM_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@main/api/mindmap2/';
+let mmLib = null;
+function loadMindmapLib(){
+  if (!mmLib){
+    if (!document.querySelector('link[data-mm]')){
+      const l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = MM_BASE + 'mindmap2.css'; l.dataset.mm = '1';
+      document.head.prepend(l);   // アプリ側の CSS を優先させる
+    }
+    mmLib = import(MM_BASE + 'mindmap2.js').catch(err => { mmLib = null; throw err; });
+  }
+  return mmLib;
+}
+const mmFenceRe = /^([ \t]*)```mindmap(?:[ \t]*\{w=(\d+),h=(\d+)\})?[ \t]*$/;
+const fenceEndRe = /^[ \t]*```[ \t]*$/;
+function findMindmaps(doc){
+  const out = [];
+  for (let i = 1; i <= doc.lines; i++){
+    const text = doc.line(i).text;
+    if (!text.includes('```mindmap') || !mmFenceRe.test(text)) continue;
+    for (let j = i + 1; j <= doc.lines; j++){
+      if (fenceEndRe.test(doc.line(j).text)){ out.push({ from:i, to:j }); i = j; break; }
+    }
+  }
+  return out;
+}
+function parseMindmap(src){
+  const lines = src.split('\n');
+  const m = mmFenceRe.exec(lines[0]);
+  const indent = m[1];
+  const md = lines.slice(1, -1).map(l => l.startsWith(indent) ? l.slice(indent.length) : l.replace(/^[ \t]+(?=[#\-*+\d])/, '')).join('\n');
+  return { indent, w: m[2] ? +m[2] : 640, h: m[3] ? +m[3] : 360, md };
+}
+function serializeMindmap(t){
+  return [`${t.indent}\`\`\`mindmap{w=${t.w},h=${t.h}}`, ...t.md.split('\n').map(l => l ? t.indent + l : l), `${t.indent}\`\`\``].join('\n');
+}
+function mmLocate(view, wrap){
+  const n = view.state.doc.lineAt(view.posAtDOM(wrap)).number;
+  return findMindmaps(view.state.doc).find(x => n >= x.from && n <= x.to);
+}
+function writeMindmap(view, wrap, edit, self){
+  const b = mmLocate(view, wrap);
+  if (!b) return;
+  const doc = view.state.doc, a = doc.line(b.from).from, z = doc.line(b.to).to;
+  const t = parseMindmap(doc.sliceString(a, z));
+  if (edit(t) === false) return;
+  if (t.remove){
+    const to = z < doc.length ? z + 1 : z, from = z < doc.length ? a : Math.max(0, a - 1);
+    view.dispatch({ changes:{ from, to }, selection:{ anchor:from } });
+    view.focus();
+    return;
+  }
+  const text = serializeMindmap(t);
+  if (text === doc.sliceString(a, z)) return;
+  wrap._selfSrc = self ? text : null;
+  view.dispatch({ changes:{ from:a, to:z, insert:text } });
+}
+function mmIndent(view, wrap, dir){
+  const b = mmLocate(view, wrap);
+  if (!b) return;
+  const changes = [];
+  for (let i = b.from; i <= b.to; i++){
+    const l = view.state.doc.line(i);
+    if (!l.text) continue;
+    if (dir > 0) changes.push({ from:l.from, insert:'\t' });
+    else { const m = /^(\t| {1,4})/.exec(l.text); if (!m) return; changes.push({ from:l.from, to:l.from + m[0].length }); }
+  }
+  if (changes.length) view.dispatch({ changes });
+}
+function leaveMindmap(view, wrap){
+  const b = mmLocate(view, wrap);
+  if (!b) return;
+  const doc = view.state.doc, last = doc.line(b.to);
+  const ind = mmFenceRe.exec(doc.line(b.from).text)[1];
+  if (b.to < doc.lines) view.dispatch({ selection:{ anchor: doc.line(b.to + 1).from }, scrollIntoView:true });
+  else view.dispatch({ changes:{ from:last.to, insert:'\n' + ind }, selection:{ anchor:last.to + 1 + ind.length } });
+  view.focus();
+}
+async function drawMindmap(wrap, view, md){
+  const c = wrap.querySelector('.mmc');
+  const token = wrap._token = (wrap._token || 0) + 1;
+  c.className = 'mmc loading';
+  c.textContent = 'マインドマップを読み込み中…';
+  try{
+    const lib = await loadMindmapLib();
+    if (token !== wrap._token) return;
+    c.className = 'mmc';
+    wrap._mm = await lib.renderMindmap(c, md, {
+      autoFocus: false,
+      emptyText: '（空のマインドマップです。「テキストで編集」から項目を書いてください）',
+      onChange: next => writeMindmap(view, wrap, t => { t.md = next; }, true)
+    });
+  }catch(err){
+    if (token !== wrap._token) return;
+    c.className = 'mmc';
+    c.textContent = '';
+    const p = document.createElement('p'); p.className = 'mmerr';
+    p.textContent = `マインドマップを表示できません（${err.message || err}）。ネットワーク接続を確認してください。`;
+    const pre = document.createElement('pre'); pre.textContent = md;
+    c.append(p, pre);
+  }
+}
+function applyMMBox(wrap, t){
+  wrap.querySelector('.ind').textContent = t.indent;
+  const box = wrap.querySelector('.mmbox');
+  box.style.width = t.w + 'px';
+  box.style.height = t.h + 'px';
+}
+function mmTextMode(wrap, view, on){
+  const c = wrap.querySelector('.mmc'), btn = wrap.querySelector('[data-op="text"]');
+  if (on){
+    wrap._textMode = true;
+    wrap._token = (wrap._token || 0) + 1;
+    c.className = 'mmc';
+    c.textContent = '';
+    const ta = document.createElement('textarea');
+    ta.value = parseMindmap(wrap._src).md;
+    ta.spellcheck = false;
+    ta.setAttribute('aria-label', 'マインドマップの内容（# 中心、## 大項目、- 枝）');
+    ta.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Tab' && !e.isComposing){ e.preventDefault(); document.execCommand('insertText', false, '  '); }
+      if (e.key === 'Escape'){ e.preventDefault(); mmTextMode(wrap, view, false); }
+    });
+    c.append(ta);
+    ta.focus();
+    btn.textContent = '完了';
+  }else{
+    const ta = c.querySelector('textarea');
+    const md = ta ? ta.value.replace(/\s+$/, '') : null;
+    wrap._textMode = false;
+    btn.textContent = 'テキストで編集';
+    const before = parseMindmap(wrap._src).md;
+    if (md != null && md !== before) writeMindmap(view, wrap, t => { t.md = md; }, false);
+    else drawMindmap(wrap, view, before);
+  }
+}
+class MindmapWidget extends WidgetType {
+  constructor(src){ super(); this.src = src; }
+  eq(o){ return o.src === this.src; }
+  ignoreEvent(){ return true; }
+  updateDOM(dom, view){
+    if (dom._selfSrc === this.src){ dom._selfSrc = null; dom._src = this.src; return true; }
+    const prev = parseMindmap(dom._src), next = parseMindmap(this.src);
+    dom._src = this.src;
+    applyMMBox(dom, next);
+    if (prev.md !== next.md){ dom._textMode = false; dom.querySelector('[data-op="text"]').textContent = 'テキストで編集'; drawMindmap(dom, view, next.md); }
+    return true;
+  }
+  toDOM(view){
+    const t = parseMindmap(this.src);
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-mm';
+    wrap._src = this.src;
+    const ind = document.createElement('span'); ind.className = 'ind';
+    const box = document.createElement('div'); box.className = 'mmbox';
+    const tools = document.createElement('div'); tools.className = 'mmtools';
+    for (const [op, label, cls, title] of [['text','テキストで編集'], ['fit','全体を表示'], ['out','←','', 'インデントを減らす'], ['in','→','', 'インデントを増やす'], ['del','削除','danger','マインドマップを削除']]){
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.op = op; b.textContent = label;
+      if (cls) b.className = cls;
+      if (title) b.title = title;
+      tools.append(b);
+    }
+    const c = document.createElement('div'); c.className = 'mmc';
+    box.append(tools, c);
+    for (const k of ['nw','ne','sw','se']){ const h = document.createElement('span'); h.className = 'h h-' + k; h.dataset.k = k; box.append(h); }
+    const sz = document.createElement('span'); sz.className = 'sz'; box.append(sz);
+    wrap.append(ind, box);
+    applyMMBox(wrap, t);
+    wrap._ready = drawMindmap(wrap, view, t.md);
+
+    tools.addEventListener('mousedown', e => e.preventDefault());
+    tools.addEventListener('click', e => {
+      const op = e.target.closest('button')?.dataset.op;
+      if (op === 'text') mmTextMode(wrap, view, !wrap._textMode);
+      if (op === 'fit') wrap._mm?.fit?.();
+      if (op === 'in' || op === 'out') mmIndent(view, wrap, op === 'in' ? 1 : -1);
+      if (op === 'del' && confirm('このマインドマップを削除しますか？（⌘Z で戻せます）')) writeMindmap(view, wrap, t => { t.remove = true; }, false);
+    });
+    // マップ上のホイールはページのスクロールに使う（⌘／Ctrl＋ホイールでマップを拡大縮小）
+    wrap.addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); }, { capture:true });
+    // マップがキーを受け取る前に、アプリ共通のキーを処理する
+    wrap.addEventListener('keydown', e => {
+      if (e.target.closest('input, textarea')) return;
+      const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+      if (mod && k === 'z'){ e.preventDefault(); e.stopPropagation(); (e.shiftKey ? redo : undo)(view); }
+      else if (mod && k === 's'){ e.preventDefault(); e.stopPropagation(); sync(); }
+      else if (mod && (e.key === ']' || e.key === '[')){ e.preventDefault(); e.stopPropagation(); mmIndent(view, wrap, e.key === ']' ? 1 : -1); }
+      else if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); leaveMindmap(view, wrap); }
+    }, { capture:true });
+
+    // 四隅のドラッグで大きさを変える
+    box.addEventListener('pointerdown', e => {
+      const h = e.target.closest('.h');
+      if (!h || h.parentElement !== box) return;
+      e.preventDefault(); e.stopPropagation();
+      h.setPointerCapture(e.pointerId);
+      box.classList.add('resizing');
+      const k = h.dataset.k, sx = k.endsWith('e') ? 1 : -1, sy = k.startsWith('s') ? 1 : -1;
+      const r0 = box.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+      const host = wrap.closest('.cm-content');
+      const maxW = Math.max(240, (host ? host.clientWidth : 1200) - 60);
+      let w = Math.round(r0.width), hh = Math.round(r0.height);
+      sz.textContent = `${w} × ${hh}`;
+      const move = ev => {
+        w = Math.round(clamp(r0.width + sx * (ev.clientX - x0), 200, maxW));
+        hh = Math.round(clamp(r0.height + sy * (ev.clientY - y0), 120, 2000));
+        box.style.width = w + 'px'; box.style.height = hh + 'px';
+        sz.textContent = `${w} × ${hh}`;
+      };
+      const up = () => {
+        h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up);
+        box.classList.remove('resizing');
+        writeMindmap(view, wrap, t => { if (t.w === w && t.h === hh) return false; t.w = w; t.h = hh; }, false);
+        setTimeout(() => wrap._mm?.fit?.(), 50);
+      };
+      h.addEventListener('pointermove', move); h.addEventListener('pointerup', up);
+    });
+    return wrap;
+  }
+}
+function insertMindmap(v){
+  const st = v.state, line = st.doc.lineAt(st.selection.main.head);
+  const ind = /^[ \t]*/.exec(line.text)[0];
+  const w = Math.max(240, Math.min(640, v.contentDOM.clientWidth - 80));
+  const body = [`\`\`\`mindmap{w=${w},h=360}`, '# 中心テーマ', '## 項目1', '- 枝', '## 項目2', '```'].map(l => ind + l);
+  const blank = line.text.trim() === '';
+  const next = line.number < st.doc.lines ? st.doc.line(line.number + 1).text : '';
+  const insert = (blank ? '' : '\n') + body.join('\n') + (next.trim() ? '\n' : '');
+  const from = blank ? line.from : line.to;
+  const at = from + (blank ? 0 : 1);
+  v.dispatch({ changes:{ from, to:line.to, insert } });
+  for (const w of v.contentDOM.querySelectorAll('.cm-mm')) if (v.posAtDOM(w) === at){
+    Promise.resolve(w._ready).then(() => w.querySelector('.mmc')?.focus({ preventScroll:true }));
+  }
+}
+
 /* ---------- 表と画像の描画 ---------- */
 function buildBlocks(state){
   const doc = state.doc, decos = [], atoms = [];
   const inTable = new Set();
+  for (const b of findMindmaps(doc)){
+    const from = doc.line(b.from).from, to = doc.line(b.to).to;
+    const d = Decoration.replace({ widget:new MindmapWidget(doc.sliceString(from, to)), block:true }).range(from, to);
+    decos.push(d); atoms.push(d);
+    for (let i = b.from; i <= b.to; i++) inTable.add(i);
+  }
   for (const t of findTables(doc)){
+    if (inTable.has(t.from) || inTable.has(t.to)) continue;
     const from = doc.line(t.from).from, to = doc.line(t.to).to;
     const d = Decoration.replace({ widget:new TableWidget(doc.sliceString(from, to)), block:true }).range(from, to);
     decos.push(d); atoms.push(d);
@@ -1721,7 +2005,7 @@ function buildBlocks(state){
       decos.push(d); atoms.push(d);
     }
   }
-  return { deco: Decoration.set(decos, true), atoms: Decoration.set(atoms, true) };
+  return { deco: Decoration.set(decos, true), atoms: Decoration.set(atoms, true), skip: inTable };
 }
 const blockField = StateField.define({
   create: st => buildBlocks(st),
@@ -2087,6 +2371,7 @@ function updateStatusBar(){
 
 // ツールバーのボタンでエディタのフォーカスを奪わない
 $('#toolbar').addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+$('#mindmapBtn').onclick = () => { const v = curView(); if (v) insertMindmap(v); };
 $('#tableBtn').onclick = () => { const v = curView(); if (v) insertTable(v); };
 $('#indentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, 1); else { indentCmd(v, 1); v.focus(); } };
 $('#outdentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, -1); else { indentCmd(v, -1); v.focus(); } };
@@ -2118,7 +2403,7 @@ $('#headBtn').onclick = () => {
 
 /* ---------- 一覧・選択 ---------- */
 let renamingId = null;
-const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/\[([^\[\]\n]+)\]\(c:[\w-]+\)/g, '$1').replace(/==([^=\n]+)==/g, '$1').replace(/<br\s*\/?>/gi, ' ').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
+const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/\[([^\[\]\n]+)\]\(c:[\w-]+\)/g, '$1').replace(/==([^=\n]+)==/g, '$1').replace(/<br\s*\/?>/gi, ' ').replace(/^\s*```mindmap.*$/, '［マインドマップ］').replace(/^\s*```\s*$/, '').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
 const nameOf = m => (m.name && m.name.trim()) || firstLine(m.body) || '無題のメモ';
 function nextName(){
   let max = 0;
