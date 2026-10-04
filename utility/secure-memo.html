@@ -11,13 +11,13 @@
 :root{
   --paper:#F3F5F7;--panel:#FFFFFF;--ink:#1D2733;--muted:#6B7785;--line:#D7DDE3;
   --accent:#2F6F62;--accent-ink:#FFFFFF;--warn:#B4492F;--sel:#E3ECE9;--amber:#B98A2E;--active:rgba(47,111,98,.06);
-  --fs:12pt;--lh:1.8;--mark:#FFE58A;
+  --fs:12pt;--lh:1.8;--mark:#FFE58A;--cmt:rgba(255,160,40,.16);--cmt-line:#E8A33A;--cmt-on:rgba(255,160,40,.38);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
   color-scheme:light dark;
 }
 @media (prefers-color-scheme:dark){
   :root{--paper:#14181D;--panel:#1B2027;--ink:#E4E8EC;--muted:#8E99A6;--line:#2C333C;
-    --accent:#6FB3A3;--accent-ink:#0F1A17;--mark:rgba(240,200,60,.38);--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B;--active:rgba(111,179,163,.07)}
+    --accent:#6FB3A3;--accent-ink:#0F1A17;--mark:rgba(240,200,60,.38);--cmt:rgba(255,170,60,.14);--cmt-line:#D99A45;--cmt-on:rgba(255,170,60,.32);--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B;--active:rgba(111,179,163,.07)}
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -108,13 +108,13 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 
 /* ツールバー */
 #toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid var(--line)}
-#toolbar .sep{width:1px;height:22px;background:var(--line);margin:0 6px}
-.ib{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border-color:transparent;background:none}
+#toolbar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.ib{display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border-color:transparent;background:none}
 .ib:hover:not(:disabled){background:var(--paper)}
 .ib svg{width:18px;height:18px}
 .ib[aria-pressed="true"]{background:var(--sel);border-color:var(--line)}
 .step{display:inline-flex;align-items:center;gap:2px}
-.step .val{font-size:12px;min-width:44px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted)}
+.step .val{font-size:12px;min-width:36px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted)}
 .step .lbl{font-size:12px;color:var(--muted);margin-right:2px}
 
 /* エディタ */
@@ -164,6 +164,7 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-tbl th,#panes .host .cm-tbl td{border:1px solid var(--line);padding:0;position:relative;vertical-align:top;min-width:2.5em}
 #panes .host .cm-tbl th{background:var(--paper);font-weight:600}
 #panes .host .cm-tbl .ce{display:block;padding:4px 10px;min-height:calc(1.5em + 8px);outline:none;white-space:pre-wrap;overflow-wrap:anywhere;cursor:text}
+#panes .host .cm-tbl .ce .cm-img{margin:2px 0;vertical-align:top}
 #panes .host .cm-tbl .ce:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 #panes .host .cm-tbl .rz{position:absolute;top:0;bottom:0;right:-4px;width:7px;cursor:col-resize;z-index:2}
 #panes .host .cm-tbl .rz:hover,#panes .host .cm-tbl .rz.on{background:var(--accent);opacity:.45}
@@ -175,6 +176,9 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-tbl .ttools button:disabled{opacity:.35}
 #panes .host .cm-tbl .ttools .danger{color:var(--warn)}
 #panes .host .cm-tbl .ttools .sep{width:1px;background:var(--line);margin:2px 3px}
+#panes .host .cm-img img{cursor:zoom-in}
+#panes .host .cm-comment{background:var(--cmt);border-bottom:2px solid var(--cmt-line);cursor:pointer;border-radius:2px 2px 0 0}
+#panes .host .cm-comment.on{background:var(--cmt-on)}
 #panes .host .cm-marker{background:var(--mark);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 #panes .host .cm-img{display:inline-block;position:relative;vertical-align:bottom;max-width:100%;line-height:0;margin:3px 0;border-radius:4px}
 #panes .host .cm-img img{max-width:100%;height:auto;display:block;border-radius:4px;user-select:none}
@@ -192,6 +196,39 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-img .sz{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;display:none}
 #panes .host .cm-img.resizing .sz{display:block}
 
+.mid{flex:1;min-height:0;display:flex}
+.mid #panes{flex:1;min-width:0}
+#cpanel{width:280px;flex:none;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--paper)}
+#cpanel .chead{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line);font-weight:500;font-size:14px}
+#cpanel .chead span{margin-right:auto}
+#clist{overflow:auto;flex:1;padding:10px;display:grid;gap:10px;align-content:start}
+#clist .none{color:var(--muted);font-size:13px;padding:6px 4px}
+.ccard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px}
+.ccard.on{border-color:var(--cmt-line);box-shadow:0 0 0 1px var(--cmt-line)}
+.ccard .cq{all:unset;cursor:pointer;font-size:12px;color:var(--muted);border-left:3px solid var(--cmt-line);padding-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccard .cq:hover{color:var(--ink)}
+.ccard textarea{font:inherit;font-size:13px;color:inherit;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;margin:0 -6px;resize:none;min-height:2.2em;field-sizing:content;line-height:1.6}
+.ccard textarea:hover{border-color:var(--line)}
+.ccard textarea:focus{outline:none;border-color:var(--accent);background:var(--panel)}
+.ccard .cm{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted)}
+.ccard .cm button{border:0;background:none;padding:2px 6px;font-size:12px;color:var(--warn);border-radius:4px}
+.ccard .cm button:hover{background:var(--paper)}
+#ccount{font-size:11px;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:var(--cmt-line);color:#fff;padding:0 4px;position:absolute;top:1px;right:0}
+#ccount:empty{display:none}
+#cmtToggle{position:relative}
+@media (max-width:720px){#cpanel{position:fixed;inset:auto 0 0 0;width:auto;height:45%;z-index:20;border-left:0;border-top:1px solid var(--line)}}
+
+/* 画像ビューア */
+#viewer{position:fixed;inset:0;z-index:100;background:rgba(10,12,15,.95);display:flex;flex-direction:column}
+#viewer .vstage{flex:1;position:relative;overflow:hidden;cursor:grab;touch-action:none}
+#viewer .vstage.drag{cursor:grabbing}
+#viewer #vimg{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none;box-shadow:0 4px 30px rgba(0,0,0,.5);background:#fff}
+#viewer .vbar{background:#14171B;border-top:1px solid #262B31;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));color:#E8ECEF;font-size:13px}
+#viewer .vbar button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:5px 12px}
+#viewer .vbar button:hover{background:rgba(255,255,255,.2)}
+#viewer #vPct{min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
+#viewer #vInfo{color:#A9B2BB;margin:0 10px;font-variant-numeric:tabular-nums}
+#viewer #vClose{margin-left:12px}
 .statusbar{display:flex;align-items:center;gap:16px;padding:6px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .statusbar #pos{margin-right:auto}
 #back{display:none}
@@ -324,6 +361,8 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="headBtn" title="見出しを切り替え（⌘⌥1〜4 で直接指定、⌘⌥0 で解除）" aria-label="見出しを切り替え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5v14M14 5v14M5 12h9"/><path d="M18 19v-7l-2 1.5"/></svg></button>
         <button class="ib" id="markBtn" title="マーカーを塗る（⌘⇧H / Ctrl+Shift+H）" aria-label="マーカーを塗る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 15 7.5-9.5a2 2 0 0 1 3 2.5L12 17"/><path d="m9 15 3 2-2 2.5H6.5z"/><path d="M3 21h18" stroke="#E0B12E" stroke-width="3"/></svg></button>
         <button class="ib" id="unmarkBtn" title="マーカーを消す（⌘⇧X / Ctrl+Shift+X）" aria-label="マーカーを消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4 10-10 6 6-8 8z"/><path d="M11 21h10"/><path d="m9 11 6 6"/></svg></button>
+        <button class="ib" id="cmtAdd" title="コメントを追加（⌘⌥M / Ctrl+Alt+M）" aria-label="コメントを追加"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg></button>
+        <button class="ib" id="cmtToggle" title="コメント一覧" aria-label="コメント一覧" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg><span id="ccount"></span></button>
         <button class="ib" id="tableBtn" title="表を挿入" aria-label="表を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/></svg></button>
         <button class="ib" id="imageBtn" title="画像を挿入（コピーした画像は ⌘V で貼り付け）" aria-label="画像を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5.5-5 4 3.5 2.5-2 4.5 3.5"/></svg></button>
         <input type="file" id="imageFile" accept="image/*" hidden>
@@ -350,10 +389,16 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="keysBtn" title="ショートカット一覧" aria-label="ショートカット一覧"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
         <button class="ib danger" id="delBtn" title="このメモを削除" aria-label="このメモを削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>
+      <div class="mid">
       <div id="panes" class="layout-single">
         <div class="pane" data-i="0"><div class="tabbar" role="tablist" aria-label="開いているメモ（左／上）"></div><div class="tagbar hidden"></div><div class="host"></div></div>
         <div class="splitter" role="separator" tabindex="0" aria-label="分割位置（矢印キーで調整、ダブルクリックで中央）"></div>
         <div class="pane" data-i="1"><div class="tabbar" role="tablist" aria-label="開いているメモ（右／下）"></div><div class="tagbar hidden"></div><div class="host"></div></div>
+      </div>
+      <aside id="cpanel" class="hidden" aria-label="コメント">
+        <div class="chead"><span>コメント</span><button class="ib" id="cpClose" title="閉じる" aria-label="コメント欄を閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+        <div id="clist"></div>
+      </aside>
       </div>
       <div class="statusbar">
         <span id="pos"></span>
@@ -363,6 +408,19 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
     </div>
   </main>
 </section>
+
+<div id="viewer" class="hidden" role="dialog" aria-label="画像ビューア">
+  <div class="vstage"><img id="vimg" alt="画像"></div>
+  <div class="vbar">
+    <button id="vOut" title="縮小（−）" aria-label="縮小">−</button>
+    <span id="vPct">100%</span>
+    <button id="vIn" title="拡大（＋）" aria-label="拡大">＋</button>
+    <button id="v100" title="実サイズ（0）">実サイズ</button>
+    <button id="vFit" title="画面に合わせる（F）">画面に合わせる</button>
+    <span id="vInfo"></span>
+    <button id="vClose" title="閉じる（Esc）">閉じる</button>
+  </div>
+</div>
 
 <dialog id="keys">
   <form method="dialog">
@@ -375,7 +433,10 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
       <tr><th>インデントを増やす</th><td>Tab ／ ⌘]</td></tr>
       <tr><th>インデントを減らす</th><td>⇧Tab ／ ⌘[</td></tr>
       <tr><th>表：次のセル／前のセル</th><td>Tab ／ ⇧Tab</td></tr>
-      <tr><th>表：下のセル（最終行なら行を追加）</th><td>Enter</td></tr>
+      <tr><th>表：セル内で改行</th><td>Enter</td></tr>
+      <tr><th>表：下のセル（最終行なら行を追加）</th><td>⌘Enter</td></tr>
+      <tr><th>コメントを追加（文字を選んで）</th><td>⌘⌥M</td></tr>
+      <tr><th>画像ビューア：拡大／縮小／実サイズ／画面に合わせる</th><td>＋ ／ − ／ 0 ／ F（ホイールでも拡大縮小）</td></tr>
       <tr><th>表：表全体を選ぶ</th><td>Esc（または表の左の余白をクリック）</td></tr>
       <tr><th>表を選んだ状態で前に空白／タブ</th><td>Space ／ Tab（⇧Tab・Backspace で戻す）</td></tr>
       <tr><th>元に戻す／やり直す</th><td>⌘Z ／ ⇧⌘Z</td></tr>
@@ -627,7 +688,9 @@ async function getMemo(id){
 }
 async function putMemo(m, sha){
   const { id, name, body, createdAt, updatedAt } = m;
-  const env = await seal({ id, name, tags:tagsOf(m), body, createdAt, updatedAt }, 'encrypted-memo');
+  const used = new Set(commentsIn(body).map(c => c.id));
+  const comments = Object.fromEntries(Object.entries(m.comments || {}).filter(([k]) => used.has(k)));
+  const env = await seal({ id, name, tags:tagsOf(m), comments, body, createdAt, updatedAt }, 'encrypted-memo');
   const payload = { message:`Update memo ${id}`, content:b2a(te.encode(JSON.stringify(env, null, 2))), branch:cfg().branch };
   if (sha) payload.sha = sha;
   const r = await gh(fileURL(id), { method:'PUT', body:JSON.stringify(payload) });
@@ -654,7 +717,7 @@ const find = id => memos.find(m => m.id === id);
 function applyRemote(r){
   const local = find(r.id);
   if (!local){ memos.push(r); return; }
-  Object.assign(local, { name:r.name, tags:tagsOf(r), body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
+  Object.assign(local, { name:r.name, tags:tagsOf(r), comments:r.comments || {}, body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt });
   if (r.id === renamingId) renamingId = null;
   for (const p of panes){ if (p.active === r.id) replaceDoc(p.view, r.body); else p.states.delete(r.id); }
 }
@@ -684,10 +747,10 @@ async function sync(){
       if (!f) return;
       const local = find(id);
       if (local && dirtyIds.has(id)){
-        if (f.memo.body !== local.body || f.memo.name !== local.name || tagsOf(f.memo).join('\n') !== tagsOf(local).join('\n')){
+        if (f.memo.body !== local.body || f.memo.name !== local.name || tagsOf(f.memo).join('\n') !== tagsOf(local).join('\n') || JSON.stringify(f.memo.comments || {}) !== JSON.stringify(local.comments || {})){
           // 両方で編集された：手元を残し、GitHub 側は競合コピーとして別メモにする
           const now = Date.now();
-          memos.push({ id:crypto.randomUUID(), name:`${nameOf(f.memo)}（競合コピー）`, tags:tagsOf(f.memo), body:f.memo.body, createdAt:now, updatedAt:now });
+          memos.push({ id:crypto.randomUUID(), name:`${nameOf(f.memo)}（競合コピー）`, tags:tagsOf(f.memo), comments:f.memo.comments || {}, body:f.memo.body, createdAt:now, updatedAt:now });
           dirtyIds.add(memos[memos.length-1].id);
         }
       }else{
@@ -772,6 +835,8 @@ const lnComp = new Compartment();
 const lnExt = () => viewCfg.ln ? [lineNumbers(), highlightActiveLineGutter()] : [];
 
 const headRe = /^([ \t]*)(#{1,4}) /;
+const commentRe = /\[([^\[\]\n]+)\]\(c:([\w-]+)\)/g;
+const refreshFx = StateEffect.define();
 const markRe = /==([^=\n](?:[^\n]*?[^=\n])?)==/g;
 function buildHeadings(v){
   const st = v.state, doc = st.doc, out = [];
@@ -792,6 +857,23 @@ function buildHeadings(v){
         out.push(Decoration.line({ class:'cm-h' + m[2].length }).range(line.from));
         if (active.has(line.number)) out.push(Decoration.mark({ class:'cm-hmark' }).range(s, e));
         else out.push(Decoration.replace({}).range(s, e));
+      }
+      if (line.text.includes('](c:') && !rowRe.test(line.text)){
+        const memo = find(paneOf(v)?.active);
+        commentRe.lastIndex = 0;
+        let k;
+        while ((k = commentRe.exec(line.text))){
+          const s = line.from + k.index, e = s + k[0].length, ie = s + 1 + k[1].length;
+          const note = memo?.comments?.[k[2]]?.text || '（コメントなし）';
+          if (touching(s, e)){
+            out.push(Decoration.mark({ class:'cm-hmark' }).range(s, s + 1));
+            out.push(Decoration.mark({ class:'cm-hmark' }).range(ie, e));
+          }else{
+            out.push(Decoration.replace({}).range(s, s + 1));
+            out.push(Decoration.replace({}).range(ie, e));
+          }
+          out.push(Decoration.mark({ class:'cm-comment' + (k[2] === activeCid ? ' on' : ''), attributes:{ title:note, 'data-cid':k[2] } }).range(s + 1, ie));
+        }
       }
       if (line.text.includes('==') && !rowRe.test(line.text)){
         markRe.lastIndex = 0;
@@ -815,7 +897,10 @@ function buildHeadings(v){
 }
 const headingPlugin = ViewPlugin.fromClass(class {
   constructor(v){ this.decorations = buildHeadings(v); }
-  update(u){ if (u.docChanged || u.selectionSet || u.viewportChanged || u.focusChanged) this.decorations = buildHeadings(u.view); }
+  update(u){
+    if (u.docChanged || u.selectionSet || u.viewportChanged || u.focusChanged || u.transactions.some(tr => tr.effects.some(e => e.is(refreshFx))))
+      this.decorations = buildHeadings(u.view);
+  }
 }, { decorations: v => v.decorations });
 
 /* ---------- 表 ---------- */
@@ -843,7 +928,7 @@ function findTables(doc){
 const tableAt = (state, pos) => { const n = state.doc.lineAt(pos).number; return findTables(state.doc).find(x => n >= x.from && n <= x.to); };
 function parseTable(src){
   const lines = src.split('\n');
-  const cells = text => rowRe.exec(text)[2].split('|').map(s => s.trim());
+  const cells = text => rowRe.exec(text)[2].split('|').map(s => s.trim().replace(/<br\s*\/?>/gi, '\n'));
   const indent = rowRe.exec(lines[0])[1];
   const sep = cells(lines[1]).map(c => { const m = sepCellRe.exec(c); return { l:!!m[1], r:!!m[2], w: m[3] ? +m[3] : 0 }; });
   const rows = [cells(lines[0]), ...lines.slice(2).map(cells)];
@@ -853,11 +938,54 @@ function parseTable(src){
   return { indent, sep, rows, ncol };
 }
 function serializeTable(t){
-  const row = r => `${t.indent}| ${r.join(' | ')} |`;
+  const row = r => `${t.indent}| ${r.map(c => c.replace(/\n/g, '<br>')).join(' | ')} |`;
   const sep = `${t.indent}|${t.sep.map(s => `${s.l ? ':' : ''}---${s.r ? ':' : ''}${s.w || ''}`).join('|')}|`;
   return [row(t.rows[0]), sep, ...t.rows.slice(1).map(row)].join('\n');
 }
-const cleanCell = s => s.replace(/[\r\n]+/g, ' ').replace(/\|/g, '｜').trim();
+const cleanCell = s => s.replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/\|/g, '｜').replace(/^[ \t]+|[ \t]+$/g, '');
+// セルの DOM ⇔ 書式（改行は \n、画像は ![](img:…) のまま）
+function readCell(ce){
+  let out = '';
+  const walk = n => {
+    for (const c of n.childNodes){
+      if (c.nodeType === 3) out += c.nodeValue;
+      else if (c.nodeName === 'BR') out += '\n';
+      else if (c.dataset && c.dataset.md) out += c.dataset.md;
+      else if (c.nodeType === 1){
+        if ((c.nodeName === 'DIV' || c.nodeName === 'P') && out && !out.endsWith('\n')) out += '\n';
+        walk(c);
+      }
+    }
+  };
+  walk(ce);
+  if (ce.lastChild && ce.lastChild.nodeName === 'BR' && out.endsWith('\n')) out = out.slice(0, -1);  // 末尾の改行用の <br>
+  return out;
+}
+function fillCell(ce, raw, view){
+  ce.textContent = '';
+  const addText = s => s.split('\n').forEach((part, i) => { if (i) ce.append(document.createElement('br')); if (part) ce.append(part); });
+  let last = 0, m;
+  imgRe.lastIndex = 0;
+  while ((m = imgRe.exec(raw))){
+    addText(raw.slice(last, m.index));
+    ce.append(cellImage(m[0], m[2], m[3] ? +m[3] : 0, view));
+    last = m.index + m[0].length;
+  }
+  addText(raw.slice(last));
+  if (raw.endsWith('\n')) ce.append(document.createElement('br'));
+}
+function cellImage(md, id, w, view){
+  const span = makeImageEl(id, w, null);
+  span.contentEditable = 'false';
+  span.dataset.md = md;
+  attachResize(span, w2 => {
+    const m = /!\[([^\]\n]*)\]/.exec(span.dataset.md);
+    span.dataset.md = `![${m ? m[1] : ''}](img:${id}){w=${w2}}`;
+    const ce = span.closest('.ce');
+    if (ce) ce.dispatchEvent(new Event('input', { bubbles:true }));
+  });
+  return span;
+}
 
 // 表の中身を書き換える（focus：書き換え後にフォーカスする場所）
 function writeTable(view, wrap, edit, focus, self){
@@ -958,10 +1086,10 @@ function renderTable(wrap, src){
       if (a.l && a.r) td.style.textAlign = 'center'; else if (a.r) td.style.textAlign = 'right';
       const ce = document.createElement('div');
       ce.className = 'ce';
-      ce.contentEditable = 'plaintext-only';
+      ce.contentEditable = 'true';
       ce.spellcheck = false;
       ce.dataset.r = r; ce.dataset.c = c;
-      ce.textContent = text;
+      fillCell(ce, text);
       const rz = document.createElement('div'); rz.className = 'rz'; rz.dataset.col = c;
       td.append(ce, rz);
       tr.append(td);
@@ -999,7 +1127,7 @@ class TableWidget extends WidgetType {
     renderTable(wrap, this.src);
     const cur = () => { const ce = document.activeElement?.closest?.('.ce'); return ce && wrap.contains(ce) ? { r:+ce.dataset.r, c:+ce.dataset.c, ce } : null; };
     const commit = ce => {
-      const r = +ce.dataset.r, c = +ce.dataset.c, v = cleanCell(ce.textContent);
+      const r = +ce.dataset.r, c = +ce.dataset.c, v = cleanCell(readCell(ce));
       writeTable(view, wrap, t => { if (t.rows[r][c] === v) return false; t.rows[r][c] = v; }, null, true);
     };
     const go = (r, c) => {
@@ -1012,13 +1140,32 @@ class TableWidget extends WidgetType {
 
     wrap.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
-      if (e.target.closest('.ce, .rz')) return;
+      if (e.target.closest('.ce, .rz, .cm-img')) return;
       e.preventDefault();
       if (e.target.closest('.ttools')) return;
       wrap.focus();
     });
     wrap.addEventListener('input', e => { const ce = e.target.closest('.ce'); if (ce && !e.isComposing) commit(ce); });
     wrap.addEventListener('compositionend', e => { const ce = e.target.closest('.ce'); if (ce) commit(ce); });
+    wrap.addEventListener('paste', e => {
+      const ce = e.target.closest('.ce');
+      if (!ce) return;
+      e.preventDefault();
+      const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+      if (files.length){ insertCellImages(ce, files); return; }
+      const text = (e.clipboardData.getData('text/plain') || '').replace(/\r/g, '');
+      text.split('\n').forEach((line, i) => { if (i) document.execCommand('insertLineBreak'); if (line) document.execCommand('insertText', false, line); });
+    });
+    wrap.addEventListener('drop', e => {
+      const ce = e.target.closest('.ce');
+      const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
+      if (!ce || !files.length) return;
+      e.preventDefault();
+      ce.focus();
+      const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY);
+      if (pos){ const r = document.createRange(); r.setStart(pos.offsetNode, pos.offset); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+      insertCellImages(ce, files);
+    });
     wrap.addEventListener('click', e => {
       const b = e.target.closest('.ttools button');
       if (!b) return;
@@ -1070,15 +1217,14 @@ class TableWidget extends WidgetType {
           let i = p.r * wrap._ncol + p.c + (e.shiftKey ? -1 : 1);
           if (i < 0) return;
           go(Math.floor(i / wrap._ncol), i % wrap._ncol);
-        }else if (e.key === 'Enter'){
+        }else if (e.key === 'Enter' && mod){
           e.preventDefault();
           go(p.r + 1, p.c);
+        }else if (e.key === 'Enter'){
+          e.preventDefault();
+          document.execCommand('insertLineBreak');     // セル内で改行
         }else if (e.key === 'Escape'){
           e.preventDefault(); wrap.focus();
-        }else if (e.key === 'ArrowUp' && p.r === 0 && !e.shiftKey){
-          e.preventDefault(); leaveTable(view, wrap, -1);
-        }else if (e.key === 'ArrowDown' && p.r === wrap._nrow - 1 && !e.shiftKey){
-          e.preventDefault(); leaveTable(view, wrap, 1);
         }
         return;
       }
@@ -1261,7 +1407,7 @@ function loadImage(id){
 }
 async function addImageFromFile(file){
   const bmp = await createImageBitmap(file);
-  const s = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const s = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
   const cw = Math.max(1, Math.round(bmp.width * s)), ch = Math.max(1, Math.round(bmp.height * s));
   const c = document.createElement('canvas'); c.width = cw; c.height = ch;
   c.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
@@ -1272,7 +1418,7 @@ async function addImageFromFile(file){
   await idbPut({ id, env, pending:true });
   pendingImgs.add(id);
   imgURLs.set(id, URL.createObjectURL(blob));
-  return { id, w: Math.min(cw, 480) };
+  return { id, w: Math.min(cw, 480), nat: cw };
 }
 async function insertImages(v, files, pos){
   for (const file of files){
@@ -1296,25 +1442,75 @@ function imgAt(state, pos){
   }
   return null;
 }
+// 画像要素（読み込み・四隅のつまみ・クリックでビューア）
+function makeImageEl(id, w){
+  const wrap = document.createElement('span'); wrap.className = 'cm-img';
+  const img = document.createElement('img'); img.alt = '画像'; img.draggable = false;
+  if (w) img.style.width = w + 'px';
+  const url = imgURLs.get(id);
+  if (url) img.src = url;
+  else {
+    wrap.classList.add('loading');
+    loadImage(id).then(u => { img.src = u; wrap.classList.remove('loading'); for (const p of panes) p.view?.requestMeasure(); })
+                 .catch(() => { wrap.classList.remove('loading'); wrap.classList.add('broken'); });
+  }
+  wrap.append(img);
+  for (const k of ['nw','ne','sw','se']){ const h = document.createElement('span'); h.className = 'h h-' + k; h.dataset.k = k; wrap.append(h); }
+  const sz = document.createElement('span'); sz.className = 'sz'; wrap.append(sz);
+  img.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if (img.src) openViewer(img.src); });
+  return wrap;
+}
+function attachResize(wrap, done){
+  const img = wrap.querySelector('img'), sz = wrap.querySelector('.sz');
+  wrap.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.h');
+    if (!h || h.parentElement !== wrap) return;
+    e.preventDefault(); e.stopPropagation();
+    h.setPointerCapture(e.pointerId);
+    wrap.classList.add('resizing');
+    const sign = h.dataset.k.endsWith('e') ? 1 : -1;
+    const x0 = e.clientX, w0 = img.getBoundingClientRect().width;
+    const host = wrap.closest('.cm-content');
+    const maxW = Math.max(60, (host ? host.clientWidth : 1200) - 60);
+    let w = Math.round(w0);
+    sz.textContent = w + 'px';
+    const move = ev => {
+      w = Math.round(Math.min(maxW, Math.max(40, w0 + sign * (ev.clientX - x0))));
+      img.style.width = w + 'px';
+      sz.textContent = w + 'px';
+    };
+    const up = () => {
+      h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up);
+      wrap.classList.remove('resizing');
+      if (w !== Math.round(w0)) done(w);
+    };
+    h.addEventListener('pointermove', move); h.addEventListener('pointerup', up);
+  });
+}
+async function insertCellImages(ce, files){
+  const sel = getSelection();
+  let range = sel.rangeCount && ce.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+  for (const file of files){
+    try{
+      const { id, nat } = await addImageFromFile(file);
+      const w = Math.min(nat, 240);
+      const span = cellImage(`![](img:${id}){w=${w}}`, id, w);
+      if (!range){ range = document.createRange(); range.selectNodeContents(ce); range.collapse(false); }
+      range.deleteContents();
+      range.insertNode(span);
+      range.setStartAfter(span); range.collapse(true);
+    }catch(err){ setStatus('画像を読み込めませんでした：' + err.message, 'err'); }
+  }
+  ce.focus();
+  if (range){ sel.removeAllRanges(); sel.addRange(range); }
+  ce.dispatchEvent(new Event('input', { bubbles:true }));
+}
 class ImageWidget extends WidgetType {
   constructor(id, w){ super(); this.id = id; this.w = w; }
   eq(o){ return o.id === this.id && o.w === this.w; }
   ignoreEvent(){ return true; }
   toDOM(view){
-    const wrap = document.createElement('span'); wrap.className = 'cm-img';
-    const img = document.createElement('img'); img.alt = '画像'; img.draggable = false;
-    if (this.w) img.style.width = this.w + 'px';
-    const url = imgURLs.get(this.id);
-    if (url) img.src = url;
-    else {
-      wrap.classList.add('loading');
-      loadImage(this.id).then(u => { img.src = u; wrap.classList.remove('loading'); view.requestMeasure(); })
-                        .catch(() => { wrap.classList.remove('loading'); wrap.classList.add('broken'); });
-    }
-    wrap.append(img);
-    for (const k of ['nw','ne','sw','se']){ const h = document.createElement('span'); h.className = 'h h-' + k; h.dataset.k = k; wrap.append(h); }
-    const sz = document.createElement('span'); sz.className = 'sz'; wrap.append(sz);
-
+    const wrap = makeImageEl(this.id, this.w);
     wrap.addEventListener('mousedown', e => {
       if (e.button !== 0 || e.target.classList.contains('h')) return;
       e.preventDefault();
@@ -1322,44 +1518,199 @@ class ImageWidget extends WidgetType {
       if (r) view.dispatch({ selection:{ anchor: r.to } });
       view.focus();
     });
-    wrap.addEventListener('pointerdown', e => {
-      const h = e.target.closest('.h');
-      if (!h) return;
-      e.preventDefault(); e.stopPropagation();
-      h.setPointerCapture(e.pointerId);
-      wrap.classList.add('resizing');
-      const sign = h.dataset.k.endsWith('e') ? 1 : -1;
-      const x0 = e.clientX, w0 = img.getBoundingClientRect().width;
-      const maxW = Math.max(60, view.contentDOM.clientWidth - 60);
-      let w = Math.round(w0);
-      sz.textContent = w + 'px';
-      const move = ev => {
-        w = Math.round(Math.min(maxW, Math.max(40, w0 + sign * (ev.clientX - x0))));
-        img.style.width = w + 'px';
-        sz.textContent = w + 'px';
-      };
-      const up = () => {
-        h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up);
-        wrap.classList.remove('resizing');
-        const r = imgAt(view.state, view.posAtDOM(wrap));
-        if (!r || w === this.w) return;
-        view.dispatch({ changes:{ from:r.from, to:r.to, insert:`![${r.alt}](img:${r.id}){w=${w}}` } });
-      };
-      h.addEventListener('pointermove', move); h.addEventListener('pointerup', up);
+    attachResize(wrap, w => {
+      const r = imgAt(view.state, view.posAtDOM(wrap));
+      if (r) view.dispatch({ changes:{ from:r.from, to:r.to, insert:`![${r.alt}](img:${r.id}){w=${w}}` } });
     });
     return wrap;
   }
 }
 
+/* ---------- 画像ビューア ---------- */
+const vw = { s:1, x:0, y:0, nw:0, nh:0 };
+const vimg = $('#vimg'), vstage = $('#viewer .vstage');
+function vApply(){
+  vimg.style.transform = `translate(${vw.x}px, ${vw.y}px) scale(${vw.s})`;
+  $('#vPct').textContent = Math.round(vw.s * 100) + '%';
+}
+function vCenter(){
+  const r = vstage.getBoundingClientRect();
+  vw.x = (r.width - vw.nw * vw.s) / 2; vw.y = (r.height - vw.nh * vw.s) / 2;
+  vApply();
+}
+function vZoom(ns, cx, cy){
+  const r = vstage.getBoundingClientRect();
+  ns = clamp(ns, 0.05, 20);
+  if (cx == null){ cx = r.width / 2; cy = r.height / 2; }
+  vw.x = cx - (cx - vw.x) * ns / vw.s;
+  vw.y = cy - (cy - vw.y) * ns / vw.s;
+  vw.s = ns; vApply();
+}
+const vFitScale = () => { const r = vstage.getBoundingClientRect(); return Math.min(1, (r.width - 40) / vw.nw, (r.height - 40) / vw.nh); };
+function openViewer(url){
+  $('#viewer').classList.remove('hidden');
+  vimg.onload = () => {
+    vw.nw = vimg.naturalWidth; vw.nh = vimg.naturalHeight; vw.s = 1;
+    vimg.style.width = vw.nw + 'px'; vimg.style.height = vw.nh + 'px';
+    $('#vInfo').textContent = `${vw.nw} × ${vw.nh} px`;
+    vCenter();
+  };
+  vimg.src = url;
+  $('#vClose').focus();
+}
+function closeViewer(){ $('#viewer').classList.add('hidden'); vimg.removeAttribute('src'); }
+$('#vIn').onclick = () => vZoom(vw.s * 1.25);
+$('#vOut').onclick = () => vZoom(vw.s / 1.25);
+$('#v100').onclick = () => { vw.s = 1; vCenter(); };
+$('#vFit').onclick = () => { vw.s = vFitScale(); vCenter(); };
+$('#vClose').onclick = closeViewer;
+vstage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = vstage.getBoundingClientRect();
+  vZoom(vw.s * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive:false });
+vstage.addEventListener('pointerdown', e => {
+  vstage.setPointerCapture(e.pointerId); vstage.classList.add('drag');
+  let px = e.clientX, py = e.clientY;
+  const move = ev => { vw.x += ev.clientX - px; vw.y += ev.clientY - py; px = ev.clientX; py = ev.clientY; vApply(); };
+  const up = () => { vstage.classList.remove('drag'); vstage.removeEventListener('pointermove', move); vstage.removeEventListener('pointerup', up); };
+  vstage.addEventListener('pointermove', move); vstage.addEventListener('pointerup', up);
+});
+vstage.addEventListener('dblclick', e => {
+  const r = vstage.getBoundingClientRect();
+  if (Math.abs(vw.s - 1) < 0.01){ vw.s = vFitScale(); vCenter(); } else vZoom(1, e.clientX - r.left, e.clientY - r.top);
+});
+document.addEventListener('keydown', e => {
+  if ($('#viewer').classList.contains('hidden')) return;
+  const k = e.key;
+  if (k === 'Escape'){ closeViewer(); }
+  else if (k === '+' || k === '=' || k === ';'){ vZoom(vw.s * 1.25); }
+  else if (k === '-'){ vZoom(vw.s / 1.25); }
+  else if (k === '0'){ vw.s = 1; vCenter(); }
+  else if (k === 'f' || k === 'F'){ vw.s = vFitScale(); vCenter(); }
+  else return;
+  e.preventDefault(); e.stopPropagation();
+}, true);
+window.addEventListener('resize', () => { if (!$('#viewer').classList.contains('hidden')) vApply(); });
+
+/* ---------- コメント ---------- */
+// 書式： [対象の文字](c:ID)   コメント本文はメモの comments に暗号化して保存
+let cpanelOpen = false, activeCid = null;
+function commentsIn(body){
+  const out = [];
+  commentRe.lastIndex = 0;
+  let m;
+  while ((m = commentRe.exec(body))) out.push({ id:m[2], quote:m[1], index:m.index, len:m[0].length });
+  return out;
+}
+function refreshDecos(){ for (const p of panes) if (p.view) p.view.dispatch({ effects: refreshFx.of(null) }); }
+function touchMemo(m){ m.updatedAt = Date.now(); dirtyIds.add(m.id); renderTabs(); schedule(); }
+function addComment(v){
+  const p = paneOf(v), m = find(p?.active);
+  if (!m) return true;
+  const sel = v.state.selection.main;
+  if (sel.empty){ setStatus('コメントを付ける文字を選択してください', 'err'); return true; }
+  const line = v.state.doc.lineAt(sel.from);
+  const to = Math.min(sel.to, line.to);
+  const text = v.state.sliceDoc(sel.from, to);
+  if (!text.trim() || /[\[\]]/.test(text)){ setStatus('［ ］ を含む範囲や空白だけの範囲にはコメントを付けられません', 'err'); return true; }
+  const id = crypto.randomUUID().slice(0, 8);
+  m.comments = { ...(m.comments || {}), [id]: { text:'', at:Date.now() } };
+  v.dispatch({ changes:[{ from:sel.from, insert:'[' }, { from:to, insert:`](c:${id})` }], selection:{ anchor: to + 1 } });
+  openComments(id, true);
+  return true;
+}
+function deleteComment(id){
+  const m = find(curId());
+  if (!m) return;
+  const c = commentsIn(m.body).find(x => x.id === id);
+  if (m.comments) delete m.comments[id];
+  if (c){
+    const v = curView();
+    if (v) v.dispatch({ changes:{ from:c.index, to:c.index + c.len, insert:c.quote } });
+    else { m.body = m.body.slice(0, c.index) + c.quote + m.body.slice(c.index + c.len); }
+  }
+  touchMemo(m);
+  if (activeCid === id) activeCid = null;
+  renderComments(); refreshDecos();
+}
+function jumpToComment(id){
+  const v = curView(), m = find(curId());
+  const c = m && commentsIn(m.body).find(x => x.id === id);
+  if (!v || !c) return;
+  activeCid = id;
+  v.dispatch({ selection:{ anchor:c.index + 1, head:c.index + 1 + c.quote.length }, scrollIntoView:true, effects: refreshFx.of(null) });
+  v.focus();
+  renderComments();
+}
+function openComments(focusId, edit){
+  cpanelOpen = true;
+  if (focusId) activeCid = focusId;
+  renderComments(focusId, edit);
+  refreshDecos();
+}
+function renderComments(focusId, edit){
+  $('#cpanel').classList.toggle('hidden', !cpanelOpen || $('#editorWrap').classList.contains('hidden'));
+  $('#cmtToggle').setAttribute('aria-pressed', cpanelOpen ? 'true' : 'false');
+  const m = find(curId());
+  const cs = m ? commentsIn(m.body) : [];
+  $('#ccount').textContent = cs.length || '';
+  if (!cpanelOpen) return;
+  const list = $('#clist');
+  if (!focusId && list.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
+  list.textContent = '';
+  if (!cs.length){
+    const d = document.createElement('div'); d.className = 'none';
+    d.textContent = 'コメントはありません。文字を選んで ⌘⌥M（Ctrl+Alt+M）で追加できます。';
+    list.append(d); return;
+  }
+  for (const c of cs){
+    const data = m.comments?.[c.id];
+    const card = document.createElement('div');
+    card.className = 'ccard' + (c.id === activeCid ? ' on' : '');
+    const q = document.createElement('button'); q.className = 'cq'; q.textContent = c.quote; q.title = '本文のこの場所へ移動';
+    q.onclick = () => jumpToComment(c.id);
+    const ta = document.createElement('textarea');
+    ta.rows = 1; ta.value = data?.text || ''; ta.placeholder = 'コメントを入力';
+    ta.setAttribute('aria-label', `「${c.quote}」へのコメント`);
+    ta.oninput = () => {
+      m.comments = m.comments || {};
+      m.comments[c.id] = { ...(m.comments[c.id] || { at:Date.now() }), text: ta.value };
+      touchMemo(m);
+      clearTimeout(ta._t); ta._t = setTimeout(refreshDecos, 300);
+    };
+    ta.onfocus = () => { activeCid = c.id; list.querySelectorAll('.ccard').forEach(x => x.classList.toggle('on', x === card)); refreshDecos(); };
+    ta.onkeydown = e => { if (e.key === 'Escape'){ e.preventDefault(); ta.blur(); curView()?.focus(); } };
+    ta.onblur = () => { if (!ta.value.trim() && !(m.comments?.[c.id]?.text)) setTimeout(() => { if (document.activeElement !== ta) deleteComment(c.id); }, 0); };
+    const meta = document.createElement('div'); meta.className = 'cm';
+    const at = document.createElement('span'); at.textContent = data?.at ? new Date(data.at).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    const del = document.createElement('button'); del.textContent = '削除'; del.title = 'コメントを削除（本文の文字は残ります）';
+    del.onmousedown = e => e.preventDefault();
+    del.onclick = () => deleteComment(c.id);
+    meta.append(at, del);
+    card.append(q, ta, meta);
+    list.append(card);
+    if (c.id === focusId){
+      requestAnimationFrame(() => { card.scrollIntoView({ block:'nearest' }); if (edit) ta.focus(); });
+    }
+  }
+}
+$('#cmtAdd').onclick = () => { const v = curView(); if (v) addComment(v); };
+$('#cmtToggle').onclick = () => { cpanelOpen = !cpanelOpen; renderComments(); };
+$('#cpClose').onclick = () => { cpanelOpen = false; renderComments(); };
+
 /* ---------- 表と画像の描画 ---------- */
 function buildBlocks(state){
   const doc = state.doc, decos = [], atoms = [];
+  const inTable = new Set();
   for (const t of findTables(doc)){
     const from = doc.line(t.from).from, to = doc.line(t.to).to;
     const d = Decoration.replace({ widget:new TableWidget(doc.sliceString(from, to)), block:true }).range(from, to);
     decos.push(d); atoms.push(d);
+    for (let i = t.from; i <= t.to; i++) inTable.add(i);
   }
   for (let i = 1; i <= doc.lines; i++){
+    if (inTable.has(i)) continue;
     const line = doc.line(i);
     if (!line.text.includes('](img:')) continue;
     imgRe.lastIndex = 0;
@@ -1383,6 +1734,11 @@ const blockField = StateField.define({
 const blockExt = [
   blockField,
   EditorView.domEventHandlers({
+    click(e, v){
+      const el = e.target.closest?.('.cm-comment');
+      if (el && el.dataset.cid) openComments(el.dataset.cid, false);
+      return false;
+    },
     paste(e, v){
       const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
       if (!files.length) return false;
@@ -1420,6 +1776,7 @@ function makeState(text){
         { key:'Mod-[', run: v => indentCmd(v, -1) },
         { key:'Mod-Shift-h', run: markerToggle },
         { key:'Mod-Shift-x', run: markerErase },
+        { key:'Mod-Alt-m', run: addComment },
         { key:'Mod-Alt-1', run: v => setHeading(v, 1) },
         { key:'Mod-Alt-2', run: v => setHeading(v, 2) },
         { key:'Mod-Alt-3', run: v => setHeading(v, 3) },
@@ -1455,6 +1812,7 @@ function onUpdate(u){
       // もう一方のペインで同じメモを開いていれば反映
       for (const q of panes) if (q !== p){ if (q.active === m.id) replaceDoc(q.view, m.body); else q.states.delete(m.id); }
       renderList(); renderTabs(); schedule();
+      if (cpanelOpen || m.body.includes('](c:')) renderComments();
     }
   }
   if (p.i === activePane && (u.docChanged || u.selectionSet || u.focusChanged)) updateStatusBar();
@@ -1473,7 +1831,7 @@ function setActivePane(i){
   if (activePane === i) return;
   activePane = i;
   for (const p of panes) p.el.classList.toggle('active', p.i === i);   // タブは描き直さない（クリックを失わないため）
-  renderList(); updateStatusBar(); saveLayoutSoon();
+  renderList(); updateStatusBar(); saveLayoutSoon(); renderComments();
 }
 
 function openMemo(id){
@@ -1491,7 +1849,7 @@ function activateTab(pi, id){
   p.active = id; activePane = pi;
   let st = p.states.get(id);
   if (!st || st.doc.toString() !== m.body) st = makeState(m.body);
-  if (!p.view) p.view = new EditorView({ state: st, parent: p.host });
+  if (!p.view){ p.view = new EditorView({ state: st, parent: p.host }); p.view.dispatch({ effects: refreshFx.of(null) }); }
   else p.view.setState(st);
   p.view.dispatch({ effects: lnComp.reconfigure(lnExt()) });
   $('#app').classList.add('editing');
@@ -1598,6 +1956,7 @@ function renderTabs(){
 }
 function renderPanes(){
   renderTagbars();
+  queueMicrotask(() => renderComments());
   const el = $('#panes');
   el.className = 'layout-' + layout;
   el.style.setProperty('--split', splitPct + '%');
@@ -1715,7 +2074,7 @@ function updateStatusBar(){
   const st = v.state, doc = st.doc, sel = st.selection.main;
   const line = doc.lineAt(sel.head);
   // 画像の書式は1文字として数える
-  const vlen = s => [...s.replace(imgRe, '□')].length;
+  const vlen = s => [...s.replace(imgRe, '□').replace(commentRe, '$1').replace(markRe, '$1')].length;
   const col = vlen(line.text.slice(0, sel.head - line.from)) + 1;
   const lineLen = vlen(line.text);
   const selLen = sel.empty ? 0 : vlen(st.sliceDoc(sel.from, sel.to));
@@ -1734,11 +2093,20 @@ $('#outdentBtn').onclick = () => { const v = curView(); if (!v) return; if (acti
 $('#markBtn').onclick = () => { const v = curView(); if (v){ markerToggle(v); v.focus(); } };
 $('#unmarkBtn').onclick = () => { const v = curView(); if (v){ markerErase(v); v.focus(); } };
 $('#keysBtn').onclick = () => $('#keys').showModal();
-$('#imageBtn').onclick = () => { if (curView()) $('#imageFile').click(); };
+let imgTargetCell = null;
+$('#imageBtn').onclick = () => {
+  if (!curView()) return;
+  const ce = document.activeElement?.closest?.('.ce');
+  imgTargetCell = ce || null;
+  $('#imageFile').click();
+};
 $('#imageFile').onchange = e => {
   const v = curView(), files = [...e.target.files];
   e.target.value = '';
-  if (v && files.length) insertImages(v, files);
+  if (!files.length) return;
+  if (imgTargetCell && imgTargetCell.isConnected) insertCellImages(imgTargetCell, files);
+  else if (v) insertImages(v, files);
+  imgTargetCell = null;
 };
 $('#undoBtn').onclick = () => { const v = curView(); if (v){ undo(v); v.focus(); } };
 $('#redoBtn').onclick = () => { const v = curView(); if (v){ redo(v); v.focus(); } };
@@ -1750,7 +2118,7 @@ $('#headBtn').onclick = () => {
 
 /* ---------- 一覧・選択 ---------- */
 let renamingId = null;
-const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
+const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/\[([^\[\]\n]+)\]\(c:[\w-]+\)/g, '$1').replace(/==([^=\n]+)==/g, '$1').replace(/<br\s*\/?>/gi, ' ').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
 const nameOf = m => (m.name && m.name.trim()) || firstLine(m.body) || '無題のメモ';
 function nextName(){
   let max = 0;
@@ -1780,7 +2148,7 @@ function renderList(){
     if (!want.every(x => tl.includes(x))) return false;
     if (!tagToks.every(x => tl.some(y => y.includes(x)))) return false;
     if (!words.length) return true;
-    const hay = (nameOf(m) + '\n' + m.body + '\n' + tl.join(' ')).toLowerCase();
+    const hay = (nameOf(m) + '\n' + m.body + '\n' + tl.join(' ') + '\n' + Object.values(m.comments || {}).map(c => c.text).join('\n')).toLowerCase();
     return words.every(w => hay.includes(w));
   }).sort((a,b) => b.updatedAt - a.updatedAt);
   if (!items.length){
