@@ -226,26 +226,35 @@ def refresh_workspace_token(account):
     成功すると account["token"] / account["refresh_token"] を更新し、rotateしたrefresh_tokenは
     .env にも書き戻して次回実行以降も使えるようにする。"""
     refresh_token = account.get("refresh_token")
-    if not refresh_token or not account.get("workspace"):
+    if not refresh_token:
+        account["_refresh_error"] = "PLAUD_REFRESH_TOKEN が未設定"
+        return False
+    if not account.get("workspace"):
+        account["_refresh_error"] = "workspaceId 未指定（PLAUD_WS_ID_n を設定してください）"
         return False
     url = f"{account['domain']}/user-app/auth/workspace/refresh/{account['workspace']}"
     bearer_prefix = "Bearer" if not refresh_token.lower().startswith("bearer ") else ""
     headers = {"Authorization": f"{bearer_prefix} {refresh_token}".strip()}
     try:
         resp = requests.post(url, json={}, headers=headers, timeout=30)
-    except requests.RequestException:
+    except requests.RequestException as e:
+        account["_refresh_error"] = f"通信エラー: {e}"
         return False
     if resp.status_code != 200:
+        account["_refresh_error"] = f"HTTP {resp.status_code} {resp.text[:200]}"
         return False
     try:
         body = resp.json()
     except ValueError:
+        account["_refresh_error"] = "レスポンスがJSONではありません"
         return False
     if body.get("status") != 0:
+        account["_refresh_error"] = f"status={body.get('status')} msg={body.get('msg')}"
         return False
     data = body.get("data") or {}
     new_token = data.get("workspace_token") or data.get("access_token")
     if not new_token:
+        account["_refresh_error"] = f"トークンが応答に無い keys={list(data)[:6]}"
         return False
     account["token"] = new_token if new_token.lower().startswith("bearer ") else f"Bearer {new_token}"
     account["_bearer_toggled"] = True  # 形式は判明済みなのでplaud_get側の自動反転は不要
@@ -259,7 +268,7 @@ def get_plaud_files_for_account(account):
     if account.get("refresh_token"):
         # workspaceTokenは約10日で失効するため、リクエスト前に必ず更新しておく
         if not refresh_workspace_token(account):
-            print(f"    ⚠️ [{account['name']}] workspaceTokenの自動更新に失敗しました（refresh_tokenが失効している可能性）")
+            print(f"    ⚠️ [{account['name']}] workspaceTokenの自動更新に失敗しました: {account.get('_refresh_error', '不明')}")
     all_files = []
     page = 1
     while True:
