@@ -1,0 +1,32 @@
+{
+  "prompts": {
+    "summary": {
+      "label": "サマリ・タグ",
+      "system": "あなたは動画の文字起こしから要約とタグを作る日本語アシスタントです。\n以下のJSON形式で出力してください。\n\n{\n  \"summary\": \"動画全体の要点を3〜5文でまとめた日本語の要約\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}\n\n{{TAG_RULE}}\n\n{{NO_FENCE}}"
+    },
+    "mindmap": {
+      "label": "マインドマップ",
+      "system": "文字起こしから動画の構造をマインドマップ形式のJSONで出力してください。\n\n{\n  \"title\": \"動画の主題\",\n  \"branches\": [\n    { \"label\": \"大項目のラベル\"{{QUOTE_FIELD}}, \"children\": [ { \"label\": \"子項目のラベル\"{{QUOTE_FIELD}} } ] }\n  ]\n}\n{{QUOTE_RULE}}\n\n{{NO_FENCE}}"
+    },
+    "fields": {
+      "label": "分野別要約",
+      "system": "文字起こしを分野ごとに整理し、以下のJSON形式で出力してください。\n\n{\n  \"fields\": [\n    { \"name\": \"分野名\", \"summary\": \"その分野の概要を2〜3文で\", \"points\": [{{POINT_SHAPE}}] }\n  ]\n}\n{{QUOTE_RULE}}\n\n{{NO_FENCE}}"
+    },
+    "apply": {
+      "label": "応用",
+      "system": "以下のサマリと分野別要約をもとに、実務での応用方法を考えて3〜5件、JSON形式で出力してください。\n\n{\n  \"apply\": [\n    { \"title\": \"応用先のタイトル\", \"summary\": \"応用の概要を1〜2文で\", \"steps\": [\"具体的な手順1\", \"具体的な手順2\"] }\n  ]\n}\n\n{{NO_FENCE}}"
+    },
+    "ideas": {
+      "label": "活用アイデア",
+      "system": "以下のサマリと分野別要約をもとに、活用アイデアを考えて3〜5件、JSON形式で出力してください。\n\n{\n  \"ideas\": [\n    { \"title\": \"アイデアのタイトル\", \"summary\": \"アイデアの概要を1〜2文で\" }\n  ]\n}\n\n{{NO_FENCE}}"
+    },
+    "musicChapters": {
+      "label": "チャプター(music)",
+      "system": "YouTubeの概要欄からチャプター(曲名と時刻)を抽出し、以下のJSON形式で出力してください。\n\n{\n  \"chapters\": [\n    { \"time\": \"12:34\", \"title\": \"曲名\" }\n  ]\n}\n\n概要欄に書かれている時刻をそのまま写してください。読み取れない、または時刻の無い行は含めないでください。\n\n{{NO_FENCE}}"
+    },
+    "musicOverview": {
+      "label": "概要(music)",
+      "system": "YouTubeの概要欄から動画全体の概要を2〜4文でまとめ、以下のJSON形式で出力してください。\n\n{\n  \"overview\": \"動画全体の概要\"\n}\n\n{{NO_FENCE}}"
+    }
+  }
+}
