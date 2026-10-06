@@ -37,8 +37,8 @@
     periods.forEach(p => Object.values(byP[p]).forEach(r => { meta[r.key] = { key: r.key, sheet: r.sheet, name: r.name, kind: r.kind, code: r.code, order: r.order }; }));
 
     const fyOf = (p) => { const { y, m } = ym(p); return start === 1 ? y : (m >= start ? y + 1 : y); };
-    const endMonth = start === 1 ? 12 : start - 1;
-    const fyLabel = (fy) => `${fy}年${endMonth}月期`;
+    // 期の番号は他アドイン（eigyo等）と同じ基準（開始年-1988）に揃える
+    const fyLabel = (fy) => `第${(start === 1 ? fy : fy - 1) - 1988}期`;
     const fyMonths = (fy) => { const first = start === 1 ? pstr(fy, 1) : pstr(fy - 1, start); return Array.from({ length: 12 }, (_, i) => addM(first, i)); };
     const fys = [...new Set(periods.map(fyOf))].sort();
     const latest = periods[periods.length - 1] || null;
