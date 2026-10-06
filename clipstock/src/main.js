@@ -91,6 +91,8 @@ let items = []
 let listMeta = { generatedAt: null }
 let view = 'library' // 'library' | 'favorites' | 'detail' | 'ideas' | 'mindmaps' | 'crosschat'
 let selectedKey = null
+// 詳細を開く直前の一覧スクロール位置。戻ったときに復元する
+let libraryScrollTop = 0
 let searchQuery = ''
 let showTags = true
 const selectedStatuses = new Set()
@@ -468,10 +470,13 @@ function paintActiveModel() {
 }
 
 function setView(next) {
+  const from = view
   view = next
   selectedKey = view === 'detail' ? selectedKey : null
   document.querySelectorAll('.viewtab').forEach((t) => t.classList.toggle('on', t.dataset.view === next))
   refresh()
+  // 詳細から一覧に戻ったときだけ、開く前のスクロール位置を戻す
+  if (from === 'detail' && next === 'library') stageEl.scrollTop = libraryScrollTop
 }
 
 // ============ 詳細 ============
@@ -479,6 +484,7 @@ function setView(next) {
 async function openDetail(key) {
   const item = itemOf(key)
   if (!item) return
+  if (view === 'library') libraryScrollTop = stageEl.scrollTop
   selectedKey = key
   view = 'detail'
   transcriptInFlight = null

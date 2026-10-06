@@ -77,7 +77,7 @@
 
   .monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
   .monitor-bar .mono{font-size:11px;color:var(--text-muted);}
-  .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
+  .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(190px,100%),1fr));gap:14px;}
   .monitor-empty{padding:50px 20px;text-align:center;color:var(--text-muted);font-size:13px;}
   .mon-card{background:var(--surface);border:var(--card-border-w) solid var(--border);border-radius:var(--card-radius);padding:16px;
     cursor:grab;transition:opacity .15s ease;}
@@ -86,6 +86,10 @@
   .mon-card[data-size="wide"]{grid-column:span 2;}
   .mon-card[data-size="tall"]{min-height:calc(100% + var(--thumb-h));}
   .mon-card[data-size="large"]{grid-column:span 2;min-height:calc(100% + var(--thumb-h));}
+  /* 1列しか収まらない幅ではspan 2が暗黙列を作って右にはみ出すため、1列に落とす */
+  @media (max-width:480px){
+    .mon-card[data-size="wide"],.mon-card[data-size="large"]{grid-column:span 1;}
+  }
   .mon-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
   .mon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .mon-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
