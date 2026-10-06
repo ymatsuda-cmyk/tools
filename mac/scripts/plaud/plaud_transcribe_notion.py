@@ -281,6 +281,20 @@ def get_plaud_files_for_account(account):
             break
         files = data.get("data_file_list", [])
         total = data.get("data_file_total", 0)
+        # 200だが0件かつ code=-419(workspaceToken期限切れ)の場合、プロアクティブ更新をすり抜けて
+        # 実行中に失効したケースなので、ここでも一度だけ更新して再試行する
+        if not files and page == 1 and not account.get("_refresh_retried") and account.get("refresh_token"):
+            code = data.get("code") or data.get("status")
+            msg = data.get("msg") or data.get("message") or ""
+            if code == -419 or "expired" in str(msg).lower():
+                account["_refresh_retried"] = True
+                if refresh_workspace_token(account):
+                    resp, data = _fetch_file_page(account, url)
+                    if data is not None:
+                        files = data.get("data_file_list", [])
+                        total = data.get("data_file_total", 0)
+                        if files:
+                            print(f"    ℹ️ [{account['name']}] workspaceToken期限切れを検知して再取得しました")
         # 200だが0件の場合、401/403にならず素通りする「Bearer有無の不一致」があり得るので
         # 一度だけ反転して再試行する（成功しなければ元のトークンに戻す）
         if not files and page == 1 and not account.get("_bearer_toggled"):
