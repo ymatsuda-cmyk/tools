@@ -1324,9 +1324,13 @@ function rowsFromClipboardData(cd){
   if (html && /<table[\s>]/i.test(html)){
     try{
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      const table = doc.querySelector('table');
-      if (table){
-        const rows = [...table.rows].map(tr => [...tr.cells].map(td => td.textContent.replace(/\u00a0/g, ' ').trim()));
+      const tables = [...doc.querySelectorAll('table')];
+      // 表以外にも本文がある（文書全体の貼り付けなど）場合は表の抜き出しをせず、本文を丸ごと貼る側に回す
+      const outside = doc.body?.cloneNode(true);
+      outside?.querySelectorAll('table, style, script').forEach(n => n.remove());
+      const outsideLen = (outside?.textContent || '').replace(/\s+/g, '').length;
+      if (tables.length === 1 && outsideLen <= 20){
+        const rows = [...tables[0].rows].map(tr => [...tr.cells].map(td => td.textContent.replace(/\u00a0/g, ' ').trim()));
         if (rows.length && rows.some(r => r.length > 1)) return rows;
       }
     }catch{}
