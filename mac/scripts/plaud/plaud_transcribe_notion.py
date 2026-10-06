@@ -10,7 +10,13 @@ def load_env():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
+                k = k.strip()
+                # ローテーションするトークン類はファイルの値が常に最新のため、
+                # 実行環境に古い値が残っていても上書きする（setdefaultだと更新が永久に反映されない）
+                if k.startswith("PLAUD_REFRESH_TOKEN") or k.startswith("PLAUD_TOKEN"):
+                    os.environ[k] = v.strip()
+                else:
+                    os.environ.setdefault(k, v.strip())
 load_env()
 
 def update_env_var(key, value):
@@ -328,6 +334,10 @@ def report_empty_listing(account, data):
     if code == -3900 or "auth" in str(msg).lower():
         print(f"       トークンが無効または期限切れです。PLAUD_TOKEN_n を取り直してください")
     elif code == -419 or "expired" in str(msg).lower():
+        refresh_error = account.get("_refresh_error")
+        if refresh_error:
+            # 自動更新も試みたが失敗した具体的な理由（refresh_token側の問題切り分け用）
+            print(f"       workspaceTokenの自動更新に失敗しました: {refresh_error}")
         print(f"       workspaceのログインセッションが期限切れです（PLAUD_WS_ID_n の設定は問題ありません）。"
               f"web.plaud.ai にそのアカウントで再ログインし、DevToolsのNetworkで file/simple/web の"
               f"Authorization ヘッダーを控えて PLAUD_TOKEN_n を更新してください")
