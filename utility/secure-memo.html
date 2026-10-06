@@ -1318,6 +1318,49 @@ function insertTable(v){
   v.dispatch({ changes:{ from, to:line.to, insert } });
   for (const w of v.contentDOM.querySelectorAll('.cm-tbl')) if (v.posAtDOM(w) === tableFrom){ focusCell(w, 0, 0, true); return; }
 }
+// 貼り付け内容が表（Excel等のHTML表／タブ区切り）かどうかを判定し、行×列の配列にする
+function rowsFromClipboardData(cd){
+  const html = cd.getData('text/html');
+  if (html && /<table[\s>]/i.test(html)){
+    try{
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const table = doc.querySelector('table');
+      if (table){
+        const rows = [...table.rows].map(tr => [...tr.cells].map(td => td.textContent.replace(/\u00a0/g, ' ').trim()));
+        if (rows.length && rows.some(r => r.length > 1)) return rows;
+      }
+    }catch{}
+  }
+  const text = (cd.getData('text/plain') || '').replace(/\r/g, '');
+  const lines = text.split('\n');
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  if (lines.length < 2) return null;
+  const counts = lines.map(l => (l.match(/\t/g) || []).length);
+  // タブの数が全行で揃っている（＝表の列区切り）ときだけ表とみなす。先頭タブのみの行（コードのインデント等）は除外
+  if (!counts[0] || !counts.every(c => c === counts[0])) return null;
+  if (!lines.some(l => l.split('\t')[0].trim() !== '')) return null;
+  return lines.map(l => l.split('\t'));
+}
+function tableTextFromRows(rows, indent){
+  const ncol = Math.max(1, ...rows.map(r => r.length));
+  const norm = r => { const a = r.slice(0, ncol).map(c => cleanCell(String(c ?? '')).replace(/\n/g, '<br>')); while (a.length < ncol) a.push(''); return a; };
+  const row = r => `${indent}| ${norm(r).join(' | ')} |`;
+  const sep = `${indent}|${Array(ncol).fill('---').join('|')}|`;
+  return [row(rows[0] || []), sep, ...rows.slice(1).map(row)].join('\n');
+}
+function insertPastedTable(v, rows){
+  const st = v.state, line = st.doc.lineAt(st.selection.main.head);
+  const ind = /^[ \t]*/.exec(line.text)[0];
+  const text = tableTextFromRows(rows, ind);
+  const blank = line.text.trim() === '';
+  const next = line.number < st.doc.lines ? st.doc.line(line.number + 1).text : '';
+  const insert = (blank ? '' : '\n') + text + (next.trim() ? '\n' : '');
+  const from = blank ? line.from : line.to;
+  const tableFrom = from + (blank ? 0 : 1);
+  v.dispatch({ changes:{ from, to:line.to, insert } });
+  for (const w of v.contentDOM.querySelectorAll('.cm-tbl')) if (v.posAtDOM(w) === tableFrom){ focusCell(w, 0, 0, true); return; }
+  v.focus();
+}
 // 表の中なら表全体を、それ以外は選択行をインデント
 function activeTable(){
   const w = document.activeElement?.closest?.('.cm-tbl');
@@ -2049,10 +2092,18 @@ const blockExt = [
     },
     paste(e, v){
       const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
-      if (!files.length) return false;
-      e.preventDefault();
-      insertImages(v, files);
-      return true;
+      if (files.length){
+        e.preventDefault();
+        insertImages(v, files);
+        return true;
+      }
+      const rows = e.clipboardData && rowsFromClipboardData(e.clipboardData);
+      if (rows){
+        e.preventDefault();
+        insertPastedTable(v, rows);
+        return true;
+      }
+      return false;
     },
     drop(e, v){
       const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
