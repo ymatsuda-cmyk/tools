@@ -264,6 +264,15 @@ def refresh_workspace_token(account):
         return False
     account["token"] = new_token if new_token.lower().startswith("bearer ") else f"Bearer {new_token}"
     account["_bearer_toggled"] = True  # 形式は判明済みなのでplaud_get側の自動反転は不要
+    # refresh_tokenの実際の有効期間は非公開APIで未文書化のため、観測のため毎回出力する
+    expires_in = data.get("expires_in")
+    refresh_expires_in = data.get("refresh_expires_in")
+    if expires_in is not None or refresh_expires_in is not None:
+        print(f"    ℹ️ [{account['name']}] token有効期限: expires_in={expires_in}s "
+              f"refresh_expires_in={refresh_expires_in}s")
+    # 再発行したworkspaceTokenも.envに書き戻す。plaud_transcribe_v2.py等このrefresh機構を
+    # 持たない別スクリプトが直接PLAUD_TOKEN_nを読んでも最新の値を使えるようにするため
+    update_env_var(f"PLAUD_TOKEN{account['env_suffix']}", account["token"])
     new_refresh = data.get("refresh_token")
     if new_refresh and new_refresh != refresh_token:
         account["refresh_token"] = new_refresh
