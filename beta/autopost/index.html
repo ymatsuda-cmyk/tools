@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16181D; --ink2:#3D424C; --mute:#5B616E; --line:#E1E4E9; --line2:#C9CDD4;
+  --ground:#ECEEF1; --lane:#E1E4E9; --card:#fff; --navy:#16181D; --nav2:#2A2E37;
+  --blue:#1D4FBF; --blue-d:#163C91; --hot:#FBE6D6; --hot-ink:#7A2E04; --ok:#1E7A3E; --bad:#B42318;
+  --body:'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif;
+  --head:'Zen Kaku Gothic New','Hiragino Sans',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--body);color:var(--ink);background:var(--ground);font-size:14px}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #8DB0F5;outline-offset:2px}
+a{color:var(--blue)} a:hover{color:var(--blue-d)}
+.app{display:flex;min-height:100%}
+/* サイドバー */
+.side{width:232px;flex:none;background:var(--navy);color:#E6E8EC;padding:24px 14px;display:flex;flex-direction:column;gap:4px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;font-family:var(--head);font-weight:700;font-size:17px}
+.brand i{width:32px;height:32px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center}
+.side h6{margin:0;padding:8px 8px 6px;font-size:11px;color:#9AA1AD;font-weight:700}
+.acct{border:0;background:transparent;color:#E6E8EC;display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;border-radius:8px;text-align:left}
+.acct.on{background:var(--nav2);font-weight:700}
+.acct .n{flex:1}
+.acct .c{font-family:var(--mono);font-size:12px;color:#B8BDC7}
+.badge{width:26px;height:26px;border-radius:13px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.navs{display:flex;flex-direction:column;gap:4px}
+.nav{border:0;background:transparent;color:#B8BDC7;text-align:left;min-height:42px;padding:10px 12px;border-radius:8px}
+.nav.on{background:var(--nav2);color:#fff;font-weight:500}
+/* メイン */
+.main{flex:1;min-width:0;padding:26px 30px 40px;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.top h1{margin:4px 0 0;font-family:var(--head);font-size:26px;font-weight:700}
+.sub{font-size:13px;color:var(--mute)}
+.btn{height:44px;padding:0 18px;border-radius:8px;border:1px solid var(--line2);background:#fff;font-size:14px;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.btn.pri:hover{background:var(--blue-d)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--mute)}
+.btn.sm{height:36px;padding:0 12px;font-size:12px}
+.btn[disabled]{opacity:.55;cursor:default}
+.banner{background:#FFF7E6;border:1px solid #F3D18C;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.7}
+/* ボード */
+.lanes-wrap{overflow-x:auto;padding-bottom:6px}
+.lanes{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;min-width:1120px;align-items:start}
+.lane{background:var(--lane);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:420px}
+.lane.hot{background:var(--hot)}
+.lane-h{padding:6px 6px 8px;border-bottom:1px solid #D0D4DA;display:flex;flex-direction:column;gap:2px}
+.lane.hot .lane-h{border-color:#F2C6A6;color:var(--hot-ink)}
+.lane-h .row{display:flex;justify-content:space-between;align-items:baseline}
+.lane-h b{font-size:12px}
+.lane-h .num{font-family:var(--mono);font-size:22px}
+.lane-h small{font-size:11px;opacity:.85}
+.card{background:var(--card);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.65;box-shadow:0 1px 0 rgba(22,24,29,.06)}
+.card .who{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:4px;display:inline-block}
+.card .txt{white-space:pre-wrap;word-break:break-word}
+.card .src,.big .src{display:block;min-width:0;font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .why{font-size:12px;color:var(--ink2);background:#F6F7F9;border-radius:8px;padding:6px 8px}
+.card .acts{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:700;border-radius:10px;padding:1px 8px}
+.tag.warn{background:#FFF3EA;color:#A63F06}
+.tag.bad{background:#FDECEA;color:var(--bad)}
+.tag.ok{background:#E3F2E8;color:var(--ok)}
+.empty{font-size:12px;color:var(--mute);padding:8px 6px;line-height:1.7}
+.sk{height:8px;border-radius:4px;background:#EEF0F3}
+/* 承認（1件ずつ） */
+.one{max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.one .bar{display:flex;gap:6px}
+.one .bar span{flex:1;height:4px;border-radius:2px;background:#D5D9DF}
+.big{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.big .band{color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;font-weight:700}
+.big .band .badge{background:#fff}
+.big .body{padding:18px;display:flex;flex-direction:column;gap:14px}
+.big p{margin:0;font-size:15px;line-height:1.85;white-space:pre-wrap;word-break:break-word}
+.row2{display:flex;gap:10px}
+.row2 .btn{flex:1;height:52px;border-radius:12px;font-size:15px}
+.row2 .btn.pri{flex:2}
+/* 設定 */
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;max-width:760px}
+.panel h2{margin:0;font-size:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.f{display:flex;flex-direction:column;gap:6px}
+.f label,.lbl{font-size:12px;color:var(--mute);font-weight:500}
+.f input,.f textarea,.f select{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-height:44px;background:#fff;font-size:14px;line-height:1.6}
+.f textarea{resize:vertical}
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px}
+.chk input{width:20px;height:20px;accent-color:var(--blue)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:#fff;display:flex;align-items:center;gap:8px;font-size:13px}
+.tabs button.on{border:2px solid var(--blue);font-weight:700}
+.swatches{display:flex;gap:8px}
+.swatches button{width:36px;height:36px;border-radius:18px;border:3px solid transparent}
+.swatches button.on{border-color:var(--ink)}
+.xbox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#F6F7F9;border-radius:10px;padding:12px 14px}
+.hint{font-size:12px;color:var(--mute);line-height:1.7}
+/* モーダル・トースト */
+.modal{position:fixed;inset:0;background:rgba(22,24,29,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal .box{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:560px;display:flex;flex-direction:column;gap:12px}
+.counter{font-family:var(--mono);font-size:12px;color:var(--mute);text-align:right}
+.counter.over{color:var(--bad);font-weight:700}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;z-index:20;max-width:90vw}
+.toast.err{background:var(--bad)}
+.busy{position:fixed;inset:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;z-index:15;font-weight:700;color:var(--ink2)}
+@media (max-width:820px){
+  .app{flex-direction:column}
+  .side{width:auto;flex-direction:row;flex-wrap:wrap;padding:12px;gap:6px;align-items:center}
+  .brand{padding:0 8px 0 4px}
+  .side h6{display:none}
+  .acct{min-height:40px;padding:6px 10px}
+  .acct .n{display:none}
+  .acct.on .n{display:inline}
+  .navs{display:flex;gap:4px;width:100%}
+  .nav{flex:1;text-align:center}
+  .main{padding:18px 14px 32px}
+  .grid2{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" aria-label="メインメニュー" id="side"></nav>
+  <main class="main" id="main"><div class="sub">読み込み中…</div></main>
+</div>
+<div id="layer"></div>
+
+<script>
+const S = { board: null, settings: null, filter: 'all', view: window.innerWidth < 820 ? 'approve' : 'board', idx: 0, editAcct: null };
+const COLORS = ['#1D4FBF', '#A63F06', '#0F5E57', '#6D28D9', '#16181D'];
+
+function call(fn) {
+  const args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (res, rej) {
+    google.script.run.withSuccessHandler(res).withFailureHandler(function (e) { rej(e && e.message ? e : new Error(String(e))); })[fn].apply(null, args);
+  });
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function toast(msg, err) {
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.setAttribute('role', 'status'); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, err ? 6000 : 2600);
+}
+function busy(on, msg) {
+  const b = $('busyLayer');
+  if (on && !b) { const d = document.createElement('div'); d.id = 'busyLayer'; d.className = 'busy'; d.textContent = msg || '処理中…'; document.body.appendChild(d); }
+  if (!on && b) b.remove();
+}
+async function act(fn, args, msg, busyMsg) {
+  try {
+    if (busyMsg) busy(true, busyMsg);
+    await call.apply(null, [fn].concat(args || []));
+    if (msg) toast(msg);
+    await load();
+  } catch (e) { toast(e.message, true); }
+  finally { busy(false); }
+}
+
+function wlen(t) {
+  let n = 0;
+  for (const ch of String(t)) {
+    const c = ch.codePointAt(0);
+    n += (c <= 0x10FF || (c >= 0x2000 && c <= 0x200D) || (c >= 0x2010 && c <= 0x201F) || (c >= 0x2032 && c <= 0x2037)) ? 1 : 2;
+  }
+  const urls = String(t).match(/https?:\/\/\S+/g) || [];
+  urls.forEach(function (u) { n = n - wlenRaw(u) + 23; });
+  return n;
+}
+function wlenRaw(u) { return u.length; }
+function fmtSlot(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const day = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  const hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  if (day === 0) return '今日 ' + hm;
+  if (day === 1) return '明日 ' + hm;
+  if (day === -1) return '昨日 ' + hm;
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
+}
+function toLocalInput(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  const p = function (n) { return ('0' + n).slice(-2); };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function acctOf(id) { return (S.board.accounts.find(function (a) { return String(a.id) === String(id); })) || { name: '（削除済み）', color: '#5B616E', badge: '?' }; }
+function inFilter(x) { return S.filter === 'all' || String(x.accountId) === String(S.filter); }
+
+async function load() {
+  S.board = await call('getBoard');
+  if (S.filter !== 'all' && !S.board.accounts.some(function (a) { return String(a.id) === String(S.filter); })) S.filter = 'all';
+  render();
+}
+
+// ===== サイドバー =====
+function renderSide() {
+  const b = S.board;
+  const pend = function (k) { return b.drafts.filter(function (d) { return d.status === 'pending' && (k === 'all' || String(d.accountId) === String(k)); }).length; };
+  const accts = [{ id: 'all', name: 'すべて', badge: '全', color: '#5B616E' }].concat(b.accounts);
+  $('side').innerHTML =
+    '<div class="brand"><i aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l6-16 4 10 6-4"/></svg></i>PostPilot</div>' +
+    '<h6>アカウント</h6>' +
+    accts.map(function (a) {
+      return '<button type="button" class="acct' + (String(S.filter) === String(a.id) ? ' on' : '') + '" data-filter="' + esc(a.id) + '" aria-label="' + esc(a.name) + 'で絞り込み">' +
+        '<span class="badge" style="background:' + esc(a.color) + '">' + esc(a.badge) + '</span><span class="n">' + esc(a.name) + '</span><span class="c">' + pend(a.id) + '</span></button>';
+    }).join('') +
+    '<h6 style="margin-top:14px">メニュー</h6><div class="navs">' +
+    [['board', '投稿ボード'], ['approve', '承認'], ['settings', '設定']].map(function (v) {
+      return '<button type="button" class="nav' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '">' + v[1] + '</button>';
+    }).join('') + '</div>';
+}
+
+// ===== 投稿ボード =====
+function renderBoard() {
+  const b = S.board;
+  const drafts = b.drafts.filter(inFilter).sort(function (x, y) { return new Date(x.slotAt) - new Date(y.slotAt); });
+  const cands = b.candidates.filter(inFilter).slice(0, 8);
+  const by = function (st) { return drafts.filter(function (d) { return st.indexOf(d.status) >= 0; }); };
+  const lanes = [
+    { key: 'idea', step: '1-2', label: 'ネタ候補', sub: '収集→AIが採点', list: cands, card: candCard },
+    { key: 'gen', step: '3', label: '生成中', sub: 'AIが下書きを作成', list: by(['generating']), card: genCard },
+    { key: 'pending', step: '4', label: '承認待ち', sub: 'あなたの確認待ち', list: by(['pending']), card: pendCard, hot: true },
+    { key: 'sched', step: '5', label: '予約済み', sub: '時刻になると自動投稿', list: by(['scheduled']), card: schedCard },
+    { key: 'posted', step: '✓', label: '投稿済み', sub: '直近36時間', list: by(['posted', 'failed']).reverse(), card: postedCard }
+  ];
+  const name = S.filter === 'all' ? '全アカウント' : acctOf(S.filter).name;
+  return topBar('投稿ボード：' + name) + setupBanner() +
+    '<div class="lanes-wrap"><div class="lanes">' + lanes.map(function (l) {
+      return '<section class="lane' + (l.hot ? ' hot' : '') + '" aria-label="' + l.label + '"><div class="lane-h"><div class="row"><b>' + l.step + ' ' + l.label + '</b><span class="num">' + l.list.length + '</span></div><small>' + l.sub + '</small></div>' +
+        (l.list.length ? l.list.map(l.card).join('') : '<div class="empty">' + emptyText(l.key) + '</div>') + '</section>';
+    }).join('') + '</div></div>';
+}
+function emptyText(k) {
+  return { idea: '「今すぐネタを探す」で収集できます', gen: 'なし', pending: '確認待ちの下書きはありません', sched: '予約はありません', posted: 'まだ投稿はありません' }[k];
+}
+function who(accountId, meta) {
+  const a = acctOf(accountId);
+  return '<span class="who" style="color:' + esc(a.color) + '"><span class="dot" style="background:' + esc(a.color) + '"></span>' + esc(a.name) + (meta ? ' ・ ' + esc(meta) : '') + '</span>';
+}
+function srcLine(d) { return d.sourceUrl ? '<a class="src" href="' + esc(d.sourceUrl) + '" target="_blank" rel="noopener">ネタ元：' + esc(d.sourceTitle) + '</a>' : ''; }
+function candCard(c) {
+  return '<article class="card">' + who(c.accountId, c.score !== '' ? 'スコア ' + c.score : '未採点') +
+    '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.title) + '</a>' +
+    (c.reason ? '<div class="why">' + esc(c.reason) + '</div>' : '') +
+    '<div class="acts"><button type="button" class="btn sm pri" data-act="fromItem" data-id="' + esc(c.id) + '">下書きにする</button><button type="button" class="btn sm" data-act="skip" data-id="' + esc(c.id) + '">見送る</button></div></article>';
+}
+function genCard(d) { return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + '<span class="sk"></span><span class="sk" style="width:65%"></span><span class="sub" style="font-size:11px">AIが執筆中…</span></article>'; }
+function warnTag(d) { return d.warn ? ' <span class="tag warn">要確認：' + esc(d.warn) + '</span>' : ''; }
+function pendCard(d) {
+  return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + warnTag(d) + '<div class="txt">' + esc(d.text) + '</div>' + srcLine(d) +
+    (d.reason ? '<div class="why">選定理由：' + esc(d.reason) + '</div>' : '') +
+    '<div class="acts"><button type="button" class="btn sm pri" data-act="approve" data-id="' + esc(d.id) + '">承認して予約</button>' +
+    '<button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button>' +
+    '<button type="button" class="btn sm" data-act="regen" data-id="' + esc(d.id) + '">別案</button>' +
+    '<button type="button" class="btn sm ghost" data-act="reject" data-id="' + esc(d.id) + '">却下</button></div></article>';
+}
+function schedCard(d) {
+  return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + '<div class="txt">' + esc(d.text) + '</div>' +
+    '<div class="acts"><button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button><button type="button" class="btn sm ghost" data-act="unsched" data-id="' + esc(d.id) + '">承認待ちに戻す</button></div></article>';
+}
+function postedCard(d) {
+  const ok = d.status === 'posted';
+  const acc = acctOf(d.accountId);
+  const link = ok && d.tweetId && acc.handle ? '<a href="https://x.com/' + esc(acc.handle) + '/status/' + esc(d.tweetId) + '" target="_blank" rel="noopener">Xで見る</a>' : '';
+  return '<article class="card">' + who(d.accountId, fmtSlot(d.postedAt || d.slotAt)) +
+    (ok ? '<span><span class="tag ok">投稿済み</span></span>' : '<span><span class="tag bad">失敗</span></span><div class="why">' + esc(d.error) + '</div>') +
+    '<div class="txt">' + esc(d.text) + '</div>' + link +
+    (ok ? '' : '<div class="acts"><button type="button" class="btn sm" data-act="retry" data-id="' + esc(d.id) + '">今すぐ再投稿</button><button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button></div>') + '</article>';
+}
+function topBar(title) {
+  const b = S.board;
+  return '<div class="top"><div><div class="sub">最終収集：' + (b.lastRun ? fmtSlot(b.lastRun) : 'まだありません') + ' ・ 自動実行 ' + (b.autoOn ? 'ON' : 'OFF') + '</div><h1>' + esc(title) + '</h1></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" data-act="reload">再読み込み</button>' +
+    '<button type="button" class="btn pri" data-act="run"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>今すぐネタを探す</button></div></div>';
+}
+function setupBanner() {
+  const b = S.board;
+  if (!b.setupDone) return '<div class="banner">最初に「設定」で Claude APIキーを登録し、アカウントを追加してください。</div>';
+  if (!b.accounts.length) return '<div class="banner">「設定」でアカウントを追加すると、キーワードからネタ探しを始められます。</div>';
+  if (b.accounts.some(function (a) { return !a.xConnected; })) return '<div class="banner">Xと未連携のアカウントがあります。予約した投稿は連携するまで失敗扱いになります（設定から連携できます）。</div>';
+  return '';
+}
+
+// ===== 承認（1件ずつ） =====
+function renderApprove() {
+  const list = S.board.drafts.filter(function (d) { return d.status === 'pending' && inFilter(d); }).sort(function (x, y) { return new Date(x.slotAt) - new Date(y.slotAt); });
+  if (S.idx >= list.length) S.idx = 0;
+  const head = '<div class="top"><div><div class="sub">承認待ち ' + list.length + '件</div><h1>下書きの確認</h1></div></div>' + setupBanner();
+  if (!list.length) {
+    return head + '<div class="one"><div class="big"><div class="body"><p>確認待ちの下書きはありません。</p><button type="button" class="btn pri" data-act="run">今すぐネタを探す</button></div></div></div>';
+  }
+  const d = list[S.idx], a = acctOf(d.accountId);
+  return head + '<div class="one"><div class="bar">' + list.map(function (x, i) { return '<span style="background:' + (i === S.idx ? esc(acctOf(x.accountId).color) : '#D5D9DF') + '"></span>'; }).join('') + '</div>' +
+    '<article class="big"><div class="band" style="background:' + esc(a.color) + '"><span class="badge" style="color:' + esc(a.color) + '">' + esc(a.badge) + '</span><span style="flex:1">' + esc(a.name) + '</span><span style="font-weight:500;font-size:12px">' + esc(fmtSlot(d.slotAt)) + '</span></div>' +
+    '<div class="body"><p>' + esc(d.text) + '</p>' + (d.warn ? '<span><span class="tag warn">要確認：' + esc(d.warn) + '</span></span>' : '') +
+    '<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--mute);border-top:1px solid #EEF0F3;padding-top:12px">' + srcLine(d) + '<span style="font-family:var(--mono);flex:none">' + wlen(d.text) + '/280</span></div>' +
+    (d.reason ? '<div class="why" style="font-size:12px;background:#F6F7F9;border-radius:10px;padding:10px 12px;line-height:1.7">選定理由：' + esc(d.reason) + '</div>' : '') + '</div></article>' +
+    '<div class="row2"><button type="button" class="btn" data-act="edit" data-id="' + esc(d.id) + '">編集</button><button type="button" class="btn" data-act="regen" data-id="' + esc(d.id) + '">別案を生成</button></div>' +
+    '<div class="row2"><button type="button" class="btn" data-act="reject" data-id="' + esc(d.id) + '">却下</button><button type="button" class="btn pri" data-act="approve" data-id="' + esc(d.id) + '">承認して予約</button></div></div>';
+}
+
+// ===== 設定 =====
+async function openSettings() {
+  try { S.settings = await call('getSettings'); } catch (e) { toast(e.message, true); return; }
+  if (!S.editAcct) S.editAcct = S.settings.accounts[0] ? S.settings.accounts[0].id : 'new';
+  render();
+}
+function renderSettings() {
+  if (!S.settings) { openSettings(); return '<div class="sub">読み込み中…</div>'; }
+  const g = S.settings.global;
+  const accts = S.settings.accounts;
+  const a = S.editAcct === 'new' ? { id: '', name: '', badge: '', color: COLORS[accts.length % COLORS.length], keywords: '', rss: '', persona: '', target: '', tone: 'です・ます', ng: '政治・他社批判は扱わない。数値は出典がある場合のみ。', examples: '', slots: '08:00,12:30,19:00', approvalMode: 'manual', includeUrl: false, avoidCrossDup: true, active: true, picksPerRun: 2 }
+    : (accts.find(function (x) { return String(x.id) === String(S.editAcct); }) || accts[0]);
+  const set = function (v) { return v ? '<span class="tag ok">設定済み</span>' : '<span class="tag warn">未設定</span>'; };
+  return '<div class="top"><div><div class="sub">データの保存先：<a href="' + esc(g.sheetUrl) + '" target="_blank" rel="noopener">スプレッドシートを開く</a></div><h1>設定</h1></div></div>' +
+  '<section class="panel" aria-label="全体の設定"><h2>全体の設定</h2>' +
+    '<div class="grid2"><div class="f"><label for="gAk">Claude APIキー ' + set(g.anthropicKeySet) + '</label><input id="gAk" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
+    '<div class="f"><label for="gModel">使用するモデル</label><input id="gModel" value="' + esc(g.model) + '"></div>' +
+    '<div class="f"><label for="gXk">X API Key（Consumer Key） ' + set(g.xKeySet) + '</label><input id="gXk" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
+    '<div class="f"><label for="gXs">X API Key Secret</label><input id="gXs" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
+    '<div class="f"><label for="gHours">自動収集の間隔</label><select id="gHours">' + [2, 4, 6, 8, 12].map(function (h) { return '<option value="' + h + '"' + (Number(g.collectHours) === h ? ' selected' : '') + '>' + h + '時間ごと</option>'; }).join('') + '</select></div>' +
+    '<label class="chk" style="align-self:end"><input type="checkbox" id="gAuto"' + (g.autoOn ? ' checked' : '') + '>自動実行（収集と予約投稿）を有効にする</label></div>' +
+    '<div><button type="button" class="btn pri" data-act="saveGlobal">全体の設定を保存</button></div></section>' +
+  '<section class="panel" aria-label="アカウント別の設定"><h2>アカウント別の設定</h2>' +
+    '<div class="tabs">' + accts.map(function (x) {
+      return '<button type="button" class="' + (a && String(x.id) === String(a.id) && S.editAcct !== 'new' ? 'on' : '') + '" data-edit="' + esc(x.id) + '"><span class="dot" style="background:' + esc(x.color) + '"></span>' + esc(x.name) + '</button>';
+    }).join('') + '<button type="button" class="' + (S.editAcct === 'new' ? 'on' : '') + '" data-edit="new">＋ アカウントを追加</button></div>' +
+    (a ? accountForm(a) : '<div class="empty">アカウントを追加してください。</div>') + '</section>';
+}
+function accountForm(a) {
+  const txt = function (id, label, val, rows, ph) {
+    return '<div class="f"><label for="' + id + '">' + label + '</label>' + (rows ? '<textarea id="' + id + '" rows="' + rows + '" placeholder="' + esc(ph || '') + '">' + esc(val) + '</textarea>' : '<input id="' + id + '" value="' + esc(val) + '" placeholder="' + esc(ph || '') + '">') + '</div>';
+  };
+  const xPart = !a.id ? '<div class="hint">保存するとXと連携できるようになります。</div>' :
+    a.xConnected ? '<div class="xbox"><span class="tag ok">X連携済み</span><b>@' + esc(a.handle) + '</b><button type="button" class="btn sm ghost" data-act="xOff" data-id="' + esc(a.id) + '">連携を解除</button></div>' :
+    '<div class="xbox"><button type="button" class="btn sm pri" data-act="xStart" data-id="' + esc(a.id) + '">Xと連携</button>' +
+    '<div class="f" style="flex:1;min-width:160px"><label for="xPin">表示されたPINコード</label><input id="xPin" inputmode="numeric" autocomplete="one-time-code"></div>' +
+    '<button type="button" class="btn sm" data-act="xFinish" data-id="' + esc(a.id) + '">PINで連携を完了</button>' +
+    '<div class="hint" style="width:100%">「Xと連携」で開いた画面に、投稿したいアカウントでログインして許可してください。表示されたPINを入力します。</div></div>';
+  return '<input type="hidden" id="aId" value="' + esc(a.id) + '">' + xPart +
+    '<div class="grid2">' + txt('aName', 'アカウント名（表示用）', a.name, 0, '例：暮らしの時短') + txt('aBadge', 'アイコン文字（1〜2文字）', a.badge, 0, '例：時') + '</div>' +
+    '<div class="f"><span class="lbl">色</span><div class="swatches" role="radiogroup" aria-label="色">' + COLORS.map(function (c) {
+      return '<button type="button" role="radio" aria-checked="' + (a.color === c) + '" aria-label="' + c + '" class="' + (a.color === c ? 'on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>';
+    }).join('') + '<input type="hidden" id="aColor" value="' + esc(a.color) + '"></div></div>' +
+    txt('aKw', '監視キーワード（カンマ区切り）', a.keywords, 0, '例：時短家事, 作り置き, 共働き') +
+    txt('aRss', '追加のRSS（1行に1つ）', a.rss, 2, 'https://example.com/feed') +
+    txt('aPersona', 'ペルソナ（誰として書くか）', a.persona, 2) +
+    txt('aTarget', 'ターゲット（誰に届けるか）', a.target, 2) +
+    '<div class="grid2"><div class="f"><label for="aTone">口調</label><select id="aTone">' + ['です・ます', 'やわらかめ', 'カジュアル', '専門的'].map(function (t) { return '<option' + (a.tone === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
+    txt('aSlots', '投稿時刻（カンマ区切り）', a.slots, 0, '08:00,12:30,19:00') + '</div>' +
+    txt('aNg', 'NGルール', a.ng, 2) +
+    txt('aEx', 'お手本の投稿（反応が良かったもの）', a.examples, 3) +
+    '<div class="grid2"><div class="f"><label for="aMode">承認モード</label><select id="aMode"><option value="manual"' + (a.approvalMode !== 'auto' ? ' selected' : '') + '>毎回承認する</option><option value="auto"' + (a.approvalMode === 'auto' ? ' selected' : '') + '>全自動で投稿</option></select></div>' +
+    '<div class="f"><label for="aPicks">1回の収集で作る下書き数</label><select id="aPicks">' + [1, 2, 3, 4, 5].map(function (n) { return '<option' + (Number(a.picksPerRun) === n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div></div>' +
+    '<label class="chk"><input type="checkbox" id="aUrl"' + (a.includeUrl ? ' checked' : '') + '>投稿に出典URLを付ける</label>' +
+    '<label class="chk"><input type="checkbox" id="aCross"' + (a.avoidCrossDup ? ' checked' : '') + '>他アカウントで使ったネタは使わない</label>' +
+    '<label class="chk"><input type="checkbox" id="aActive"' + (a.active ? ' checked' : '') + '>このアカウントを稼働させる</label>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="saveAcct">アカウントを保存</button>' +
+    (a.id ? '<button type="button" class="btn" data-act="runOne" data-id="' + esc(a.id) + '">保存済みの設定でテスト生成</button><button type="button" class="btn ghost" data-act="delAcct" data-id="' + esc(a.id) + '">アカウントを削除</button>' : '') + '</div>';
+}
+function readAcctForm() {
+  const v = function (id) { return $(id).value; };
+  return { id: v('aId'), name: v('aName'), badge: v('aBadge'), color: v('aColor'), keywords: v('aKw'), rss: v('aRss'), persona: v('aPersona'),
+           target: v('aTarget'), tone: v('aTone'), slots: v('aSlots'), ng: v('aNg'), examples: v('aEx'), approvalMode: v('aMode'),
+           picksPerRun: Number(v('aPicks')), includeUrl: $('aUrl').checked, avoidCrossDup: $('aCross').checked, active: $('aActive').checked };
+}
+
+// ===== 編集モーダル =====
+function openEdit(id) {
+  const d = S.board.drafts.find(function (x) { return String(x.id) === String(id); });
+  if (!d) return;
+  const a = acctOf(d.accountId);
+  $('layer').innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><div class="box">' +
+    '<h2 id="mTitle" style="margin:0;font-size:16px">下書きを編集（' + esc(a.name) + '）</h2>' +
+    '<div class="f"><label for="mText">投稿文</label><textarea id="mText" rows="7">' + esc(d.text) + '</textarea><div class="counter" id="mCount"></div></div>' +
+    '<div class="f"><label for="mSlot">投稿日時</label><input id="mSlot" type="datetime-local" value="' + toLocalInput(d.slotAt) + '"></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="btn" data-act="closeModal">キャンセル</button><button type="button" class="btn pri" data-act="saveEdit" data-id="' + esc(d.id) + '">保存</button></div></div></div>';
+  const upd = function () { const n = wlen($('mText').value); const c = $('mCount'); c.textContent = n + ' / 280'; c.className = 'counter' + (n > 280 ? ' over' : ''); };
+  $('mText').addEventListener('input', upd); upd(); $('mText').focus();
+}
+function closeModal() { $('layer').innerHTML = ''; }
+
+// ===== 描画とイベント =====
+function render() {
+  if (!S.board) return;
+  renderSide();
+  $('main').innerHTML = S.view === 'board' ? renderBoard() : S.view === 'approve' ? renderApprove() : renderSettings();
+}
+
+document.addEventListener('click', async function (e) {
+  const el = e.target.closest('[data-filter],[data-view],[data-act],[data-edit],[data-color]');
+  if (!el) return;
+  if (el.dataset.filter) { S.filter = el.dataset.filter; S.idx = 0; render(); return; }
+  if (el.dataset.view) { S.view = el.dataset.view; if (S.view === 'settings') S.settings = null; render(); return; }
+  if (el.dataset.edit) { S.editAcct = el.dataset.edit; render(); return; }
+  if (el.dataset.color) {
+    $('aColor').value = el.dataset.color;
+    document.querySelectorAll('.swatches button').forEach(function (b) { const on = b === el; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    return;
+  }
+  const id = el.dataset.id;
+  switch (el.dataset.act) {
+    case 'reload': busy(true, '読み込み中…'); try { await load(); } finally { busy(false); } break;
+    case 'run': await act('runNow', [S.filter], 'ネタ探しが完了しました', 'ネタを探して下書きを作っています（1〜2分）…'); break;
+    case 'runOne': await act('runNow', [id], 'テスト生成が完了しました。ボードで確認できます', '下書きを作っています…'); break;
+    case 'approve': await act('approveDraft', [id], '承認して予約しました'); break;
+    case 'reject': await act('rejectDraft', [id], '却下しました'); break;
+    case 'unsched': await act('unscheduleDraft', [id], '承認待ちに戻しました'); break;
+    case 'regen': await act('regenerateDraft', [id], '別案を作りました', '別案を作っています…'); break;
+    case 'retry': await act('retryDraft', [id], '再投稿を予約しました（5分以内に投稿されます）'); break;
+    case 'fromItem': await act('draftFromItem', [id], '下書きを作りました', '下書きを作っています…'); break;
+    case 'skip': await act('skipItem', [id], '見送りました'); break;
+    case 'edit': openEdit(id); break;
+    case 'closeModal': closeModal(); break;
+    case 'saveEdit': {
+      const text = $('mText').value;
+      if (wlen(text) > 280) { toast('280（全角140文字）を超えています。短くしてください。', true); return; }
+      const slot = $('mSlot').value ? new Date($('mSlot').value).toISOString() : '';
+      closeModal(); await act('updateDraft', [id, text, slot], '保存しました'); break;
+    }
+    case 'saveGlobal': {
+      const g = { anthropicKey: $('gAk').value, model: $('gModel').value, xConsumerKey: $('gXk').value, xConsumerSecret: $('gXs').value,
+                  collectHours: Number($('gHours').value), autoOn: $('gAuto').checked };
+      busy(true, '保存しています…');
+      try { S.settings = await call('saveGlobal', g); toast('全体の設定を保存しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'saveAcct': {
+      busy(true, '保存しています…');
+      try { const newId = await call('saveAccount', readAcctForm()); S.editAcct = newId; S.settings = null; toast('アカウントを保存しました'); await load(); }
+      catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'delAcct': {
+      if (!confirm('このアカウントを削除しますか？下書きや履歴はスプレッドシートに残ります。')) return;
+      busy(true, '削除しています…');
+      try { await call('deleteAccount', id); S.editAcct = null; S.settings = null; toast('削除しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'xStart': {
+      busy(true, 'Xと通信しています…');
+      try { const url = await call('xStartAuth', id); window.open(url, '_blank', 'noopener'); toast('開いた画面で許可し、表示されたPINを入力してください'); }
+      catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'xFinish': {
+      const pin = $('xPin').value.trim();
+      if (!pin) { toast('PINを入力してください', true); return; }
+      busy(true, '連携しています…');
+      try { const h = await call('xFinishAuth', id, pin); S.settings = null; toast('@' + h + ' と連携しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'xOff': {
+      if (!confirm('Xとの連携を解除しますか？')) return;
+      S.settings = null; await act('xDisconnect', [id], '連携を解除しました'); break;
+    }
+  }
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('layer').innerHTML) closeModal(); });
+
+load().catch(function (e) { $('main').innerHTML = '<div class="banner">読み込みに失敗しました：' + esc(e.message) + '</div>'; });
+</script>
+</body>
+</html>
