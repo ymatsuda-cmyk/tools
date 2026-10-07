@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>空中写真から街を起こす（Googleマップ連動）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E4E9EE; --panel:#F6F8FA; --ink:#1D2733; --sub:#5B6875; --line:#C3CCD5;
+  --mark:#B8136F; --mark-soft:rgba(184,19,111,.16); --sel:#0E7C86; --btn:#1D2733; --btnink:#F6F8FA; --pin:#E08A00;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121920; --panel:#1A232C; --ink:#E3E8EE; --sub:#93A0AD; --line:#2E3A46;
+    --mark:#F0559F; --mark-soft:rgba(240,85,159,.2); --sel:#3FC1CC; --btn:#E3E8EE; --btnink:#121920; --pin:#F2B705;}
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-variant-numeric:tabular-nums;line-height:1.5}
+[hidden]{display:none!important}
+.app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px 8px;flex-wrap:wrap}
+h1{font-size:1.1rem;font-weight:700;margin:0;letter-spacing:.03em}
+.count{color:var(--sub);font-size:.85rem}
+.spacer{flex:1}
+button,.btn{font:inherit;font-size:.9rem;min-height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary,button.primary{background:var(--btn);color:var(--btnink);border-color:var(--btn)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,label.btn:focus-within{outline:2px solid var(--sel);outline-offset:2px}
+.tabs{display:flex;gap:6px;padding:0 16px 10px}
+.tabs button{flex:1}
+.tabs button[aria-selected="true"]{background:var(--btn);color:var(--btnink);border-color:var(--btn)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr;gap:12px;padding:0 12px 12px}
+@media (min-width:900px){
+  main{grid-template-columns:1fr 1fr}
+  .tabs{max-width:360px;margin-left:auto}
+  .tabs [data-tab="edit"]{display:none}
+  body[data-right="map"] #paneView{display:none}
+  body[data-right="view"] #paneMap{display:none}
+}
+@media (max-width:899px){
+  body:not([data-tab="edit"]) #paneEd{display:none}
+  body:not([data-tab="map"]) #paneMap{display:none}
+  body:not([data-tab="view"]) #paneView{display:none}
+}
+.pane{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stage{position:relative;flex:1;min-height:220px;background:var(--bg)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#gmap{position:absolute;inset:0}
+#ed{cursor:crosshair}
+.hint{position:absolute;left:10px;top:10px;max-width:calc(100% - 20px);z-index:2;
+  font-size:.8rem;padding:6px 10px;border-radius:6px;pointer-events:none;
+  background:var(--panel);color:var(--ink);opacity:.94;border:1px solid var(--line)}
+.setup{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg)}
+.setup form{width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px}
+.setup h2{font-size:1rem;margin:0}
+.setup input[type=text]{width:100%}
+.err{color:var(--mark);font-size:.85rem;margin:0}
+.controls{padding:12px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);max-height:45%;overflow:auto}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--mark);color:#fff}
+input[type=range]{flex:1;min-width:110px;accent-color:var(--mark)}
+input[type=number],input[type=text]{min-height:36px;font:inherit;font-size:.9rem;padding:0 8px;border-radius:6px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+input[type=number]{width:5.5em}
+label.chk{display:inline-flex;gap:6px;align-items:center;min-height:36px;font-size:.9rem}
+.box{border-left:3px solid var(--sel);padding:2px 0 2px 10px;display:flex;flex-direction:column;gap:8px}
+.box.shadow{border-left-color:var(--mark)}
+.box.align{border-left-color:var(--pin)}
+.lbl{font-size:.85rem;color:var(--sub);min-width:5.5em}
+.muted{color:var(--sub);font-size:.85rem;margin:0}
+.msg{font-size:.85rem;color:var(--mark);padding:0 16px 8px}
+.mk{pointer-events:none;font:700 12px/1 "Zen Kaku Gothic New",sans-serif}
+.mk.pin{width:22px;height:22px;border-radius:50%;background:var(--pin);color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transform:translateY(11px)}
+.mk.cur{width:18px;height:18px;border-radius:50%;border:2px solid var(--sel);background:rgba(255,255,255,.5);transform:translateY(9px)}
+</style>
+</head>
+<body data-tab="edit" data-right="map">
+<div class="app">
+  <header>
+    <h1>空中写真から街を起こす</h1>
+    <span class="count" id="count"></span>
+    <span class="spacer"></span>
+    <label class="btn primary">写真を読み込む<input type="file" id="file" accept="image/*" hidden></label>
+    <button id="sampleBtn">サンプルに戻す</button>
+    <button id="exGlb">3Dモデルを保存</button>
+  </header>
+  <div class="msg" id="msg" hidden></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="edit" aria-selected="true">写真をなぞる</button>
+    <button role="tab" data-tab="map" aria-selected="false">地図</button>
+    <button role="tab" data-tab="view" aria-selected="false">3Dで見る</button>
+  </nav>
+  <main>
+    <section class="pane" id="paneEd">
+      <div class="stage" id="edStage">
+        <canvas id="ed"></canvas>
+        <div class="hint" id="hint"></div>
+      </div>
+      <div class="controls">
+        <div class="row">
+          <div class="seg" role="group" aria-label="操作">
+            <button data-mode="align">位置合わせ</button>
+            <button data-mode="draw">描く</button>
+            <button data-mode="select">選ぶ</button>
+            <button data-mode="shadow">影で測る</button>
+          </div>
+          <button id="undoBtn">1点戻す</button>
+          <button id="closeBtn">形を閉じる</button>
+        </div>
+
+        <div class="box align" id="alignBox" hidden>
+          <p class="muted" id="alignText"></p>
+          <div class="row"><button id="alignReset">最初からやり直す</button></div>
+        </div>
+
+        <div class="box" id="selBox" hidden>
+          <div class="row"><strong id="selName"></strong><span class="spacer"></span><button id="delBtn">この建物を削除</button></div>
+          <div class="row">
+            <span class="lbl">高さ</span>
+            <input type="range" id="hRange" min="1" max="150" step="0.5">
+            <input type="number" id="hNum" min="0.5" max="800" step="0.5"> m
+          </div>
+        </div>
+
+        <div class="box shadow" id="shadowBox" hidden>
+          <div id="shadowText" class="muted"></div>
+          <div class="row">
+            <span class="lbl">太陽の高さ</span>
+            <input type="range" class="sunIn" min="10" max="85" step="1">
+            <span class="sunOut"></span>
+          </div>
+          <div class="row"><button id="applyShadow" disabled>選んだ建物をこの高さにする</button></div>
+        </div>
+
+        <div class="row">
+          <span class="lbl">写真の横幅</span>
+          <input type="number" id="widthM" min="10" max="50000" step="1"> m
+          <span class="muted">位置合わせをすると自動で入ります</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" id="paneMap">
+      <div class="stage" id="mapStage">
+        <div id="gmap"></div>
+        <div class="hint" id="mapHint" hidden></div>
+        <div class="setup" id="setup">
+          <form id="keyForm">
+            <h2>Googleマップにつなぐ</h2>
+            <p class="muted">Maps JavaScript APIのキーを入力してください。キーはこのブラウザの中だけに保存されます。</p>
+            <input type="text" id="key" placeholder="APIキー" autocomplete="off" spellcheck="false">
+            <input type="text" id="mapId" placeholder="Map ID" spellcheck="false">
+            <p class="muted">回転と立体表示にはベクター地図のMap IDを使います。試すだけなら DEMO_MAP_ID のままで構いません。</p>
+            <div class="row"><button class="primary" type="submit">地図を開く</button></div>
+            <p class="err" id="keyErr"></p>
+          </form>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="syncOn" checked> 写真と連動</label>
+          <button id="tiltBtn">斜めから見る</button>
+          <button id="mtypeBtn">航空写真にする</button>
+        </div>
+        <div class="row">
+          <span class="lbl">昔の写真</span>
+          <input type="range" id="op" min="0" max="100" step="1"><span id="opOut"></span>
+          <label class="chk"><input type="checkbox" id="b3d" checked> 建物を立体で</label>
+        </div>
+        <div class="row">
+          <span class="lbl">向き</span>
+          <input type="range" id="rot" min="-180" max="180" step="0.25"><span id="rotOut"></span>
+        </div>
+        <div class="row">
+          <button id="placeBtn">地図の中央に置く</button>
+          <button id="keyBtn">APIキー設定</button>
+          <span class="muted" id="geoInfo"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" id="paneView">
+      <div class="stage" id="v3Stage">
+        <canvas id="c3"></canvas>
+        <div class="hint">ドラッグで回転、2本指またはホイールで拡大と移動</div>
+      </div>
+      <div class="controls">
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="showB" checked> 建物</label>
+          <label class="chk"><input type="checkbox" id="reliefOn"> 明るさから地面に起伏をつける</label>
+          <button id="resetCam">視点を戻す</button>
+        </div>
+        <div class="row" id="reliefRow">
+          <span class="lbl">起伏の強さ</span>
+          <input type="range" id="reliefStr" min="1" max="80" step="1">
+          <label class="chk"><input type="checkbox" id="reliefInv"> 暗い所を高く</label>
+        </div>
+        <div class="row">
+          <span class="lbl">太陽の高さ</span>
+          <input type="range" class="sunIn" min="10" max="85" step="1">
+          <span class="sunOut"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script>
+(function(){
+const KEY='aerial-city-gmaps:v1', KEYCFG='aerial-city-gmaps:cfg';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const ed=$('#ed'), ctx=ed.getContext('2d');
+const RE=6378137, D2R=Math.PI/180, R2D=180/Math.PI;
+const S={img:null,imgW:0,imgH:0,imgURL:null,isSample:false,widthM:600,buildings:[],draft:[],selId:null,
+  mode:'draw',relief:{on:false,strength:15,invert:false},sunElev:45,shadow:[],shadowH:null,nextId:1,lastH:10,showB:true,
+  lum:null,col:null,geo:null,align:[],hover:null,mapHover:null,op:60,b3d:true,sync:true};
+let view={s:1,ox:0,oy:0,fit:1}, needFit=true;
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mpp=()=>S.widthM/S.imgW;
+const selB=()=>S.buildings.find(b=>b.id===S.selId)||null;
+function msg(t){const m=$('#msg'); if(!t){m.hidden=true;return;} m.textContent=t; m.hidden=false;}
+
+/* ---------- geo math ---------- */
+function pxToLL(px,py){
+  const g=S.geo, th=-g.rot*D2R, m=mpp(), vx=px-S.imgW/2, vy=-(py-S.imgH/2);
+  const e=m*(Math.cos(th)*vx-Math.sin(th)*vy), n=m*(Math.sin(th)*vx+Math.cos(th)*vy);
+  return {lat:g.lat+n/RE*R2D, lng:g.lng+e/(RE*Math.cos(g.lat*D2R))*R2D};
+}
+function llToPx(lat,lng){
+  const g=S.geo, th=-g.rot*D2R, m=mpp();
+  const e=(lng-g.lng)*D2R*RE*Math.cos(g.lat*D2R), n=(lat-g.lat)*D2R*RE;
+  const vx=(Math.cos(th)*e+Math.sin(th)*n)/m, vy=(-Math.sin(th)*e+Math.cos(th)*n)/m;
+  return [vx+S.imgW/2, -vy+S.imgH/2];
+}
+const mppAtZoom=(lat,z)=>156543.03392*Math.cos(lat*D2R)/Math.pow(2,z);
+const normDeg=d=>((d+540)%360)-180;
+
+/* ---------- persistence ---------- */
+let saveT=null;
+function scheduleSave(){clearTimeout(saveT);saveT=setTimeout(save,400);}
+function save(){
+  const o={widthM:S.widthM,buildings:S.buildings,nextId:S.nextId,sunElev:S.sunElev,relief:S.relief,sample:S.isSample,lastH:S.lastH,geo:S.geo,op:S.op,b3d:S.b3d};
+  if(!S.isSample) o.img=S.imgURL;
+  try{localStorage.setItem(KEY,JSON.stringify(o));}
+  catch(e){ if(!S.isSample) msg('写真が大きく、このブラウザには保存できませんでした。閉じると作業内容は消えます。'); }
+}
+function applySaved(o){
+  S.widthM=o.widthM||600; S.buildings=Array.isArray(o.buildings)?o.buildings:[];
+  S.nextId=o.nextId||S.buildings.length+1; S.sunElev=o.sunElev||45; S.lastH=o.lastH||10;
+  if(o.relief) S.relief=Object.assign(S.relief,o.relief);
+  S.geo=o.geo||null; if(o.op!=null)S.op=o.op; if(o.b3d!=null)S.b3d=o.b3d;
+}
+
+/* ---------- image setup ---------- */
+function imgToCanvas(im){
+  const max=2048, k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
+  const c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height); return c;
+}
+function buildData(){
+  const W=S.imgW,H=S.imgH;
+  const gw=180, gh=Math.max(2,Math.round(gw*H/W));
+  let c=document.createElement('canvas'); c.width=gw;c.height=gh; let x=c.getContext('2d'); x.drawImage(S.img,0,0,gw,gh);
+  const d=x.getImageData(0,0,gw,gh).data; let a=new Float32Array(gw*gh);
+  for(let i=0;i<gw*gh;i++) a[i]=(.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2])/255;
+  for(let pass=0;pass<3;pass++){const b=new Float32Array(a.length);
+    for(let yy=0;yy<gh;yy++)for(let xx=0;xx<gw;xx++){let s=0,n=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const X=xx+dx,Y=yy+dy; if(X>=0&&Y>=0&&X<gw&&Y<gh){s+=a[Y*gw+X];n++;}}
+      b[yy*gw+xx]=s/n;} a=b;}
+  let mn=1,mx=0; for(const v of a){if(v<mn)mn=v;if(v>mx)mx=v;} const rg=mx-mn||1;
+  for(let i=0;i<a.length;i++) a[i]=(a[i]-mn)/rg;
+  S.lum={w:gw,h:gh,a};
+  const cw=400, ch=Math.max(2,Math.round(cw*H/W));
+  c=document.createElement('canvas'); c.width=cw;c.height=ch; x=c.getContext('2d'); x.drawImage(S.img,0,0,cw,ch);
+  S.col={w:cw,h:ch,d:x.getImageData(0,0,cw,ch).data};
+}
+function lumAt(u,v){
+  const L=S.lum; const fx=Math.min(L.w-1,Math.max(0,u*(L.w-1))), fy=Math.min(L.h-1,Math.max(0,v*(L.h-1)));
+  const x0=Math.floor(fx),y0=Math.floor(fy),x1=Math.min(L.w-1,x0+1),y1=Math.min(L.h-1,y0+1),tx=fx-x0,ty=fy-y0;
+  const a=L.a; const top=a[y0*L.w+x0]*(1-tx)+a[y0*L.w+x1]*tx, bot=a[y1*L.w+x0]*(1-tx)+a[y1*L.w+x1]*tx;
+  return top*(1-ty)+bot*ty;
+}
+function groundY(px,py){
+  if(!S.relief.on||!S.lum) return 0;
+  const l=lumAt(px/S.imgW,py/S.imgH); return (S.relief.invert?1-l:l)*S.relief.strength;
+}
+function setImage(c,opts){
+  S.img=c; S.imgW=c.width; S.imgH=c.height; S.isSample=!!opts.sample; S.imgURL=opts.url||null;
+  if(!opts.keep){S.buildings=[];S.nextId=1;S.geo=null;}
+  S.draft=[];S.selId=null;S.shadow=[];S.shadowH=null;S.align=[];
+  buildData(); needFit=true; fitView();
+  if(tex){tex.dispose();tex=null;}
+  dirty.g=true; fitCamera(); M.imageChanged(); syncUI(); draw(); scheduleSave();
+  if(S.geo) M.pushView();
+}
+
+/* ---------- sample: a synthetic old monochrome aerial photo ---------- */
+function makeSample(){
+  const W=1600,H=1100,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  let s=20260; const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+  const MPP=600/W, TAN=Math.tan(45*Math.PI/180);
+  x.fillStyle='#7f8570';x.fillRect(0,0,W,H);
+  for(let i=0;i<1400;i++){x.fillStyle=rnd()<.5?'rgba(40,50,30,.18)':'rgba(170,165,140,.15)';x.beginPath();x.arc(rnd()*W,rnd()*H,6+rnd()*36,0,7);x.fill();}
+  x.strokeStyle='#3d4a4f';x.lineWidth=80;x.lineCap='round';x.beginPath();x.moveTo(-60,960);x.bezierCurveTo(400,880,760,1160,1700,1030);x.stroke();
+  const vx=[150,520,900,1260], hy=[120,470,800], rw=30;
+  x.fillStyle='#cfccc2'; vx.forEach(v=>x.fillRect(v-rw/2,0,rw,H)); hy.forEach(h=>x.fillRect(0,h-rw/2,W,rw));
+  const xs=[0,...vx,W], ys=[0,...hy];
+  const list=[], trees=[];
+  for(let i=0;i<xs.length-1;i++)for(let j=0;j<ys.length-1;j++){
+    const x0=xs[i]+(i?rw/2:0)+10, x1=xs[i+1]-(i+1<xs.length-1?rw/2:0)-10, y0=ys[j]+(j?rw/2:0)+10, y1=ys[j+1]-rw/2-10;
+    if(i===2&&j===1){x.fillStyle='#5e6b4c';x.fillRect(x0,y0,x1-x0,y1-y0);for(let k=0;k<70;k++)trees.push([x0+15+rnd()*(x1-x0-30),y0+15+rnd()*(y1-y0-30),5+rnd()*8]);continue;}
+    let y=y0;
+    while(y<y1-30){let rh=40+rnd()*70; if(y+rh>y1)rh=y1-y; let xx=x0;
+      while(xx<x1-30){let bw=40+rnd()*90; if(xx+bw>x1)bw=x1-xx; if(bw<28)break;
+        if(rnd()<.85){const hm=Math.round((rnd()<.1?25+rnd()*25:5+rnd()*10)*2)/2; list.push({x:xx+4,y:y+4,w:bw-8,h:rh-8,hm});}
+        xx+=bw;}
+      y+=rh;}
+  }
+  for(let k=0;k<60;k++)trees.push([rnd()*W,850+rnd()*40,4+rnd()*7]);
+  x.fillStyle='rgba(18,20,22,.55)';
+  for(const b of list){const L=b.hm/TAN/MPP, d=L/Math.SQRT2;
+    x.beginPath();x.moveTo(b.x,b.y);x.lineTo(b.x+b.w,b.y);x.lineTo(b.x+b.w+d,b.y+d);x.lineTo(b.x+b.w+d,b.y+b.h+d);x.lineTo(b.x+d,b.y+b.h+d);x.lineTo(b.x,b.y+b.h);x.closePath();x.fill();}
+  for(const t of trees){x.fillStyle='rgba(18,22,15,.5)';x.beginPath();x.arc(t[0]+t[2]*.8,t[1]+t[2]*.8,t[2],0,7);x.fill();x.fillStyle='#3f4a33';x.beginPath();x.arc(t[0],t[1],t[2],0,7);x.fill();}
+  for(const b of list){const t=120+rnd()*110|0; x.fillStyle=`rgb(${t},${t-5},${t-12})`;x.fillRect(b.x,b.y,b.w,b.h);
+    x.strokeStyle='rgba(255,255,255,.35)';x.lineWidth=1.5;x.beginPath();x.moveTo(b.x,b.y+b.h);x.lineTo(b.x,b.y);x.lineTo(b.x+b.w,b.y);x.stroke();
+    if(rnd()<.5){x.strokeStyle='rgba(0,0,0,.25)';x.beginPath(); if(b.w>b.h){x.moveTo(b.x+3,b.y+b.h/2);x.lineTo(b.x+b.w-3,b.y+b.h/2);}else{x.moveTo(b.x+b.w/2,b.y+3);x.lineTo(b.x+b.w/2,b.y+b.h-3);} x.stroke();}}
+  const id=x.getImageData(0,0,W,H),p=id.data;
+  for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2]+(rnd()-.5)*22; g=Math.max(0,Math.min(255,g));
+    p[i]=Math.min(255,g*1.05+8);p[i+1]=g;p[i+2]=g*.88;}
+  x.putImageData(id,0,0);
+  const vg=x.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,W*.75);vg.addColorStop(0,'rgba(30,20,10,0)');vg.addColorStop(1,'rgba(30,20,10,.45)');x.fillStyle=vg;x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(255,250,235,.12)';x.lineWidth=1;for(let k=0;k<4;k++){const sx=rnd()*W;x.beginPath();x.moveTo(sx,0);x.lineTo(sx+rnd()*30-15,H);x.stroke();}
+  return {canvas:c,list};
+}
+
+function loadSample(){
+  const smp=makeSample();
+  S.widthM=600; S.sunElev=45; S.nextId=1; S.relief.on=false; S.geo=null;
+  S.buildings=smp.list.filter((b,i)=>i%4!==0).map(b=>({id:S.nextId++,pts:[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h]].map(p=>p.map(Math.round)),h:b.hm}));
+  setImage(smp.canvas,{sample:true,keep:true});
+}
+
+/* ---------- 2D editor ---------- */
+function stageSize(){return {w:ed.clientWidth,h:ed.clientHeight};}
+function fitView(){
+  const {w,h}=stageSize(); if(!w||!h||!S.img){needFit=true;return;}
+  const s=Math.min(w/S.imgW,h/S.imgH)*.96; view={s,fit:s,ox:(w-S.imgW*s)/2,oy:(h-S.imgH*s)/2}; needFit=false;
+}
+const clampS=s=>Math.max(view.fit*.3,Math.min(40,s));
+function inPoly(x,y,pts){let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];
+  if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function draw(){
+  const dpr=window.devicePixelRatio||1,{w,h}=stageSize();
+  if(ed.width!==Math.round(w*dpr)||ed.height!==Math.round(h*dpr)){ed.width=Math.round(w*dpr);ed.height=Math.round(h*dpr);}
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if(!S.img) return;
+  ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.s,view.s);ctx.imageSmoothingQuality='high';ctx.drawImage(S.img,0,0);ctx.restore();
+  const mark=cssv('--mark'),soft=cssv('--mark-soft'),sel=cssv('--sel'),panel=cssv('--panel'),ink=cssv('--ink'),pin=cssv('--pin');
+  const P=p=>[p[0]*view.s+view.ox,p[1]*view.s+view.oy];
+  ctx.lineJoin='round';
+  for(const b of S.buildings){
+    const isSel=b.id===S.selId; ctx.beginPath();
+    b.pts.forEach((p,i)=>{const q=P(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);}); ctx.closePath();
+    ctx.fillStyle=isSel?'rgba(14,124,134,.28)':soft; ctx.fill();
+    ctx.strokeStyle=isSel?sel:mark; ctx.lineWidth=isSel?2.5:1.5; ctx.stroke();
+    let mnx=Infinity,mxx=-Infinity,cx=0,cy=0; for(const p of b.pts){mnx=Math.min(mnx,p[0]);mxx=Math.max(mxx,p[0]);cx+=p[0];cy+=p[1];}
+    if(isSel||(mxx-mnx)*view.s>46){
+      const q=P([cx/b.pts.length,cy/b.pts.length]); const t=`${b.h}m`;
+      ctx.font='700 12px "Zen Kaku Gothic New",sans-serif'; const tw=ctx.measureText(t).width+10;
+      ctx.fillStyle=panel; ctx.fillRect(q[0]-tw/2,q[1]-9,tw,18); ctx.fillStyle=isSel?sel:ink; ctx.textAlign='center';ctx.textBaseline='middle'; ctx.fillText(t,q[0],q[1]+1);
+    }
+  }
+  if(S.draft.length){
+    ctx.beginPath(); S.draft.forEach((p,i)=>{const q=P(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);});
+    ctx.strokeStyle=mark;ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
+    S.draft.forEach((p,i)=>{const q=P(p);ctx.beginPath();ctx.arc(q[0],q[1],i===0&&S.draft.length>=3?8:5,0,7);ctx.fillStyle=i===0?mark:panel;ctx.fill();ctx.strokeStyle=mark;ctx.lineWidth=2;ctx.stroke();});
+  }
+  if(S.shadow.length){
+    const a=P(S.shadow[0]); ctx.strokeStyle=pin; ctx.fillStyle=pin; ctx.lineWidth=2.5;
+    if(S.shadow[1]){const b=P(S.shadow[1]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.beginPath();ctx.arc(b[0],b[1],5,0,7);ctx.fill();}
+    ctx.beginPath();ctx.arc(a[0],a[1],5,0,7);ctx.fill();
+  }
+  if(S.mode==='align'){
+    S.align.forEach((p,i)=>{ if(i%2)return; const q=P(p);
+      ctx.beginPath();ctx.arc(q[0],q[1],11,0,7);ctx.fillStyle=pin;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='700 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i/2+1),q[0],q[1]+1);});
+  }
+  if(S.mapHover){
+    const q=P(S.mapHover); ctx.strokeStyle=sel; ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(q[0],q[1],9,0,7);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(q[0]-16,q[1]);ctx.lineTo(q[0]-5,q[1]);ctx.moveTo(q[0]+5,q[1]);ctx.lineTo(q[0]+16,q[1]);
+    ctx.moveTo(q[0],q[1]-16);ctx.lineTo(q[0],q[1]-5);ctx.moveTo(q[0],q[1]+5);ctx.lineTo(q[0],q[1]+16);ctx.stroke();
+  }
+}
+function userView(){draw();M.pushView();}
+new ResizeObserver(()=>{if(needFit){fitView();M.pushView();}draw();}).observe($('#edStage'));
+
+const ptrs=new Map(); let g=null;
+function pos(e){const r=ed.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+ed.addEventListener('pointerdown',e=>{
+  ed.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,pos(e));
+  if(ptrs.size===1){const p=pos(e);g={t:'pan',sx:p.x,sy:p.y,ox:view.ox,oy:view.oy,moved:false};}
+  else if(ptrs.size===2){const [a,b]=[...ptrs.values()];g={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:view.s,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,ox:view.ox,oy:view.oy};}
+});
+ed.addEventListener('pointermove',e=>{
+  if(e.pointerType==='mouse'&&S.img){const p=pos(e); S.hover=[(p.x-view.ox)/view.s,(p.y-view.oy)/view.s]; M.hover();}
+  if(!ptrs.has(e.pointerId))return; ptrs.set(e.pointerId,pos(e)); if(!g)return;
+  if(g.t==='pan'){const p=pos(e),dx=p.x-g.sx,dy=p.y-g.sy; if(!g.moved&&Math.hypot(dx,dy)>6)g.moved=true; if(g.moved){view.ox=g.ox+dx;view.oy=g.oy+dy;userView();}}
+  else if(g.t==='pinch'&&ptrs.size>=2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    const s=clampS(g.s0*d/g.d0),ix=(g.mx-g.ox)/g.s0,iy=(g.my-g.oy)/g.s0; view.s=s;view.ox=mx-ix*s;view.oy=my-iy*s;userView();}
+});
+ed.addEventListener('pointerleave',()=>{S.hover=null;M.hover();});
+function up(e){
+  if(!ptrs.has(e.pointerId))return; const p=pos(e);
+  if(e.type==='pointerup'&&g&&g.t==='pan'&&!g.moved&&ptrs.size===1) tapScreen(p.x,p.y);
+  ptrs.delete(e.pointerId); if(ptrs.size===0)g=null; else if(g&&g.t==='pinch')g={t:'none'};
+}
+ed.addEventListener('pointerup',up); ed.addEventListener('pointercancel',up);
+ed.addEventListener('wheel',e=>{e.preventDefault();const p=pos(e),s=clampS(view.s*Math.exp(-e.deltaY*.0015)),ix=(p.x-view.ox)/view.s,iy=(p.y-view.oy)/view.s;
+  view.s=s;view.ox=p.x-ix*s;view.oy=p.y-iy*s;userView();},{passive:false});
+
+function tapScreen(x,y){
+  if(!S.img)return; const ix=(x-view.ox)/view.s,iy=(y-view.oy)/view.s;
+  if(ix<0||iy<0||ix>S.imgW||iy>S.imgH)return;
+  if(S.mode==='align'){
+    if(S.align.length%2===0&&S.align.length<4){S.align.push([ix,iy]);}
+    else if(S.align.length%2===1){S.align[S.align.length-1]=[ix,iy];}
+    syncUI();draw();return;
+  }
+  tapImg(ix,iy,view.s);
+}
+/* k = screen pixels per image pixel of whichever view was tapped */
+function tapImg(ix,iy,k){
+  if(S.mode==='draw'){
+    if(S.draft.length>=3){const f=S.draft[0]; if(Math.hypot((f[0]-ix)*k,(f[1]-iy)*k)<18){closeDraft();return;}}
+    S.draft.push([Math.round(ix),Math.round(iy)]);
+  }else if(S.mode==='select'){
+    let hit=null; for(let i=S.buildings.length-1;i>=0;i--) if(inPoly(ix,iy,S.buildings[i].pts)){hit=S.buildings[i];break;}
+    S.selId=hit?hit.id:null; dirty.b=true; M.overlays();
+  }else if(S.mode==='shadow'){
+    if(S.shadow.length>=2)S.shadow=[]; S.shadow.push([ix,iy]); calcShadow();
+  }
+  syncUI();draw();M.draft();
+}
+function calcShadow(){
+  if(S.shadow.length<2){S.shadowH=null;return;}
+  const [a,b]=S.shadow, L=Math.hypot(a[0]-b[0],a[1]-b[1])*mpp();
+  S.shadowL=L; S.shadowH=Math.round(L*Math.tan(S.sunElev*Math.PI/180)*2)/2;
+}
+function closeDraft(){
+  if(S.draft.length<3)return;
+  const b={id:S.nextId++,pts:S.draft,h:S.lastH}; S.buildings.push(b); S.selId=b.id; S.draft=[]; changed();
+}
+function changed(){dirty.b=true;syncUI();draw();M.overlays();M.draft();scheduleSave();}
+
+/* ---------- alignment (2 control points) ---------- */
+function finishAlign(){
+  const [A,A2,B,B2]=S.align, lat0=A2.lat, lng0=A2.lng, c0=Math.cos(lat0*D2R);
+  const enu=ll=>({e:(ll.lng-lng0)*D2R*RE*c0,n:(ll.lat-lat0)*D2R*RE});
+  const vm=enu(B2), vp={x:B[0]-A[0],y:-(B[1]-A[1])}, lp=Math.hypot(vp.x,vp.y), lm=Math.hypot(vm.e,vm.n);
+  if(lp<10||lm<2){S.align=[];M.alignMarks();syncUI();draw();msg('2つの点が近すぎます。写真の離れた2か所を選んでください。');return;}
+  const m=lm/lp, th=Math.atan2(vm.n,vm.e)-Math.atan2(vp.y,vp.x);
+  const cx=S.imgW/2-A[0], cy=-(S.imgH/2-A[1]);
+  const ce=m*(Math.cos(th)*cx-Math.sin(th)*cy), cn=m*(Math.sin(th)*cx+Math.cos(th)*cy);
+  S.geo={lat:lat0+cn/RE*R2D, lng:lng0+ce/(RE*c0)*R2D, rot:Math.round(normDeg(-th*R2D)*100)/100};
+  S.widthM=Math.round(m*S.imgW*10)/10;
+  S.align=[]; S.mode='draw'; dirty.g=true; calcShadow(); fitCamera();
+  msg(`位置を合わせました。写真の横幅はおよそ ${S.widthM} m です。`);
+  M.alignMarks(); M.imageChanged(); M.pushView(true); syncUI(); draw(); scheduleSave();
+}
+
+/* ---------- UI sync ---------- */
+function syncUI(){
+  $('#count').textContent=`建物 ${S.buildings.length} 棟`;
+  $$('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===S.mode));
+  $('#undoBtn').disabled=!S.draft.length; $('#closeBtn').disabled=S.draft.length<3;
+  $('#undoBtn').hidden=$('#closeBtn').hidden=S.mode!=='draw';
+  const steps=['写真の上で、地図でも見つけやすい1点目（交差点の角など）をタップ','地図で同じ1点目をクリック','写真の上で、1点目から離れた2点目をタップ','地図で同じ2点目をクリック'];
+  const hints={
+    align:steps[Math.min(3,S.align.length)],
+    draw:S.draft.length?`${S.draft.length}点。最初の点をタップするか「形を閉じる」で建物になります`:'建物の角を順にタップ。写真でも地図でも描けます',
+    select:'建物をタップして選び、高さを変えます',
+    shadow:'建物の角の根元 → 同じ角の影の先端 の順にタップ'
+  };
+  $('#hint').textContent=hints[S.mode];
+  const mh=$('#mapHint'); mh.hidden=!(S.mode==='align'||(!S.geo&&M.ready)); 
+  mh.textContent=S.mode==='align'?hints.align:'「位置合わせ」で写真を地図に重ねると、写真と地図が連動します';
+  $('#alignBox').hidden=S.mode!=='align';
+  $('#alignText').textContent=`手順 ${Math.min(4,S.align.length+1)}/4：${hints.align}`;
+  const b=selB(); $('#selBox').hidden=!b;
+  if(b){$('#selName').textContent=`建物 ${b.id}`; $('#hRange').value=Math.min(150,b.h); if(document.activeElement!==$('#hNum'))$('#hNum').value=b.h;}
+  $('#shadowBox').hidden=S.mode!=='shadow';
+  $('#shadowText').textContent=S.shadowH!=null?`影の長さ ${S.shadowL.toFixed(1)} m → 高さ およそ ${S.shadowH} m`:'建物の根元をタップしてから、同じ角の影の先端をタップします。太陽の高さは影の向きや撮影時刻から見当をつけます。';
+  $('#applyShadow').disabled=!(S.shadowH!=null&&b);
+  if(document.activeElement!==$('#widthM'))$('#widthM').value=S.widthM;
+  $$('.sunIn').forEach(i=>i.value=S.sunElev); $$('.sunOut').forEach(o=>o.textContent=`${S.sunElev}°`);
+  $('#reliefOn').checked=S.relief.on; $('#reliefStr').value=S.relief.strength; $('#reliefInv').checked=S.relief.invert;
+  $('#reliefRow').hidden=!S.relief.on; $('#showB').checked=S.showB;
+  $('#op').value=S.op; $('#opOut').textContent=S.op+'%'; $('#b3d').checked=S.b3d; $('#syncOn').checked=S.sync;
+  $('#rot').disabled=!S.geo; $('#rot').value=S.geo?S.geo.rot:0; $('#rotOut').textContent=S.geo?S.geo.rot+'°':'—';
+  $('#geoInfo').textContent=S.geo?`横幅 ${S.widthM} m`:'まだ地図に置いていません';
+  M.ui();
+}
+$$('[data-mode]').forEach(b=>b.onclick=()=>{
+  S.mode=b.dataset.mode; if(S.mode!=='draw')S.draft=[]; if(S.mode!=='shadow'){S.shadow=[];S.shadowH=null;}
+  if(S.mode==='align'){S.align=[];msg('');} M.alignMarks(); M.draft(); syncUI();draw();});
+$('#alignReset').onclick=()=>{S.align=[];M.alignMarks();syncUI();draw();};
+$('#undoBtn').onclick=()=>{S.draft.pop();syncUI();draw();M.draft();};
+$('#closeBtn').onclick=closeDraft;
+$('#delBtn').onclick=()=>{S.buildings=S.buildings.filter(b=>b.id!==S.selId);S.selId=null;changed();};
+function setH(v){const b=selB();if(!b||!(v>0))return; b.h=Math.round(v*2)/2; S.lastH=b.h; changed();}
+$('#hRange').oninput=e=>setH(+e.target.value);
+$('#hNum').onchange=e=>setH(+e.target.value);
+$('#applyShadow').onclick=()=>{if(S.shadowH!=null)setH(S.shadowH);};
+$('#widthM').onchange=e=>{const v=+e.target.value; if(v>0){S.widthM=v; dirty.g=true; calcShadow(); fitCamera(); M.imageChanged(); M.pushView(true); syncUI(); scheduleSave();}};
+$$('.sunIn').forEach(i=>i.oninput=()=>{S.sunElev=+i.value; calcShadow(); if(R)setSun(); syncUI(); draw(); scheduleSave();});
+$('#reliefOn').onchange=e=>{S.relief.on=e.target.checked;dirty.g=true;syncUI();scheduleSave();};
+$('#reliefStr').oninput=e=>{S.relief.strength=+e.target.value;dirty.g=true;scheduleSave();};
+$('#reliefInv').onchange=e=>{S.relief.invert=e.target.checked;dirty.g=true;scheduleSave();};
+$('#showB').onchange=e=>{S.showB=e.target.checked;dirty.b=true;};
+$('#resetCam').onclick=()=>fitCamera();
+$('#op').oninput=e=>{S.op=+e.target.value;syncUI();M.redraw();scheduleSave();};
+$('#b3d').onchange=e=>{S.b3d=e.target.checked;M.redraw();scheduleSave();};
+$('#syncOn').onchange=e=>{S.sync=e.target.checked;if(S.sync)M.pushView(true);};
+$('#rot').oninput=e=>{if(!S.geo)return;S.geo.rot=+e.target.value;M.imageChanged();M.pushView(true);syncUI();scheduleSave();};
+$$('[role=tab]').forEach(t=>t.onclick=()=>{
+  document.body.dataset.tab=t.dataset.tab; if(t.dataset.tab!=='edit')document.body.dataset.right=t.dataset.tab;
+  $$('[role=tab]').forEach(x=>x.setAttribute('aria-selected',x===t));});
+$('#sampleBtn').onclick=()=>{msg('');loadSample();M.alignMarks();};
+$('#file').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f)return; const url=URL.createObjectURL(f), im=new Image();
+  im.onload=()=>{const c=imgToCanvas(im);URL.revokeObjectURL(url);let d=null;try{d=c.toDataURL('image/jpeg',.85);}catch(_){}
+    msg(''); S.widthM=300; S.relief.on=false; S.mode='align'; setImage(c,{url:d}); M.alignMarks(); syncUI(); draw();
+    msg('まず「位置合わせ」で、写真と地図の同じ場所を2か所ずつ選んでください。');};
+  im.onerror=()=>{URL.revokeObjectURL(url);msg('この画像は読み込めませんでした。JPEGかPNGの写真を選んでください。');};
+  im.src=url; e.target.value='';
+});
+document.addEventListener('keydown',e=>{
+  if(/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;
+  if(e.key==='Enter')closeDraft();
+  else if(e.key==='Escape'){S.draft=[];S.shadow=[];S.shadowH=null;syncUI();draw();M.draft();}
+  else if(e.key==='Backspace'){if(S.draft.length){S.draft.pop();syncUI();draw();M.draft();}else if(S.selId){$('#delBtn').click();}}
+});
+
+/* ---------- standalone 3D ---------- */
+let R=null,scene,cam,ctrl,sun,bGroup,ground=null,tex=null,roofMat,size=600;
+const dirty={g:true,b:true};
+const c3=$('#c3');
+function dims(){const sx=S.widthM;return {sx,sz:sx*S.imgH/S.imgW};}
+function init3D(){
+  if(!window.THREE||!THREE.OrbitControls){msg('3D表示の部品を読み込めませんでした。通信状況を確認して再読み込みしてください。');return;}
+  R=new THREE.WebGLRenderer({canvas:c3,antialias:true}); R.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  R.outputEncoding=THREE.sRGBEncoding; R.shadowMap.enabled=true; R.shadowMap.type=THREE.PCFSoftShadowMap;
+  scene=new THREE.Scene(); cam=new THREE.PerspectiveCamera(45,1,.5,50000);
+  ctrl=new THREE.OrbitControls(cam,c3); ctrl.enableDamping=true; ctrl.maxPolarAngle=Math.PI/2-.03; ctrl.screenSpacePanning=false;
+  scene.add(new THREE.HemisphereLight(0xdfe8f0,0x3a3428,.55));
+  sun=new THREE.DirectionalLight(0xfff2dc,1); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-.0005; sun.shadow.normalBias=.05;
+  scene.add(sun); scene.add(sun.target);
+  roofMat=new THREE.MeshStandardMaterial({roughness:.95,metalness:0});
+  bGroup=new THREE.Group(); scene.add(bGroup);
+  scene.background=new THREE.Color(cssv('--bg')||'#E4E9EE');
+  new ResizeObserver(resize3).observe($('#v3Stage')); resize3(); loop();
+}
+function resize3(){if(!R)return;const el=$('#v3Stage'),w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+function fitCamera(){if(!R||!S.img)return;const {sx,sz}=dims();size=Math.max(sx,sz);
+  cam.near=size/2000; cam.far=size*20; cam.position.set(size*.12,size*.55,size*.78); ctrl.target.set(0,0,0); cam.updateProjectionMatrix(); ctrl.update(); setSun();}
+function setSun(){const e=S.sunElev*Math.PI/180,d=size*1.5;sun.position.set(-Math.cos(e)*.7071*d,Math.sin(e)*d,-Math.cos(e)*.7071*d);sun.target.position.set(0,0,0);sun.intensity=.55+.6*Math.sin(e);}
+function loop(){
+  requestAnimationFrame(loop);
+  if(!R||!S.img||$('#v3Stage').clientWidth===0)return;
+  if(dirty.g)buildGround(); if(dirty.b)buildBuildings();
+  ctrl.update(); R.render(scene,cam);
+}
+function buildGround(){
+  dirty.g=false; dirty.b=true;
+  if(!tex){tex=new THREE.CanvasTexture(S.img);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=R.capabilities.getMaxAnisotropy();roofMat.map=tex;roofMat.needsUpdate=true;}
+  if(ground){scene.remove(ground);ground.geometry.dispose();ground.material.dispose();}
+  const {sx,sz}=dims(); size=Math.max(sx,sz);
+  const n=S.relief.on?220:1, geo=new THREE.PlaneGeometry(sx,sz,n,Math.max(1,Math.round(n*sz/sx))); geo.rotateX(-Math.PI/2);
+  if(S.relief.on){const p=geo.attributes.position;for(let i=0;i<p.count;i++){p.setY(i,groundY((p.getX(i)/sx+.5)*S.imgW,(p.getZ(i)/sz+.5)*S.imgH));}geo.computeVertexNormals();}
+  ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:tex,roughness:1})); ground.receiveShadow=true; scene.add(ground);
+  const sc=sun.shadow.camera,r=size*.75; sc.left=-r;sc.right=r;sc.top=r;sc.bottom=-r;sc.near=1;sc.far=size*4;sc.updateProjectionMatrix(); setSun();
+}
+function avgRGB(pts){
+  const c=S.col,k=c.w/S.imgW; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const p of pts){x0=Math.min(x0,p[0]);y0=Math.min(y0,p[1]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1]);}
+  x0=Math.max(0,Math.floor(x0*k));y0=Math.max(0,Math.floor(y0*k));x1=Math.min(c.w-1,Math.ceil(x1*k));y1=Math.min(c.h-1,Math.ceil(y1*k));
+  let r=0,g=0,b=0,n=0;for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*c.w+x)*4;r+=c.d[i];g+=c.d[i+1];b+=c.d[i+2];n++;}
+  n=n||1; return [r/n*.78,g/n*.78,b/n*.78].map(v=>Math.round(v));
+}
+function avgColor(pts){const [r,g,b]=avgRGB(pts);return new THREE.Color().setRGB(r/255,g/255,b/255).convertSRGBToLinear();}
+function makeUV(sx,sz){return {
+  generateTopUV:(g,v,a,b,c)=>[a,b,c].map(i=>new THREE.Vector2(v[i*3]/sx+.5,.5+v[i*3+1]/sz)),
+  generateSideWallUV:()=>[0,0,0,0].map(()=>new THREE.Vector2())};}
+function buildingGeo(b,sx,sz){
+  const W=S.imgW,H=S.imgH;
+  const shape=new THREE.Shape(b.pts.map(p=>new THREE.Vector2((p[0]/W-.5)*sx,-((p[1]/H-.5)*sz))));
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:Math.max(.5,b.h),bevelEnabled:false,UVGenerator:makeUV(sx,sz)}); geo.rotateX(-Math.PI/2);
+  return geo;
+}
+function buildBuildings(){
+  dirty.b=false;
+  bGroup.children.slice().forEach(m=>{bGroup.remove(m);m.geometry.dispose();m.material[1].dispose();});
+  if(!S.showB)return;
+  const {sx,sz}=dims(), selColor=new THREE.Color(cssv('--sel')||'#0E7C86');
+  for(const b of S.buildings){
+    if(b.pts.length<3)continue;
+    const base=S.relief.on?Math.min(...b.pts.map(p=>groundY(p[0],p[1]))):0;
+    const wall=new THREE.MeshStandardMaterial({color:avgColor(b.pts),roughness:.9});
+    if(b.id===S.selId){wall.emissive=selColor;wall.emissiveIntensity=.35;}
+    const m=new THREE.Mesh(buildingGeo(b,sx,sz),[roofMat,wall]); m.position.y=base; m.castShadow=m.receiveShadow=true; bGroup.add(m);
+  }
+}
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
+$('#exGlb').onclick=()=>{
+  if(!R||!THREE.GLTFExporter){msg('3Dの書き出し部品を読み込めませんでした。再読み込みしてください。');return;}
+  if(dirty.g)buildGround(); if(dirty.b)buildBuildings();
+  try{new THREE.GLTFExporter().parse([ground,bGroup],glb=>download('old-city.glb',new Blob([glb],{type:'model/gltf-binary'})),{binary:true});}
+  catch(e){msg('3Dモデルを書き出せませんでした。');}
+};
+
+/* ---------- Google Maps link ---------- */
+const M=(function(){
+  let cfg={}; try{cfg=JSON.parse(localStorage.getItem(KEYCFG)||'{}');}catch(e){}
+  let map=null, overlay=null, polys=[], draftLine=null, curMk=null, alignMks=[], lockUntil=0, mapType='roadmap', tilted=false;
+  let oScene,oCam,oRen,oRoot,oInner,oPhotoMat,oB,oTex=null,oDirty=true;
+  const api={ready:false};
+  $('#key').value=cfg.key||''; $('#mapId').value=cfg.mapId||'DEMO_MAP_ID';
+  function saveCfg(){try{localStorage.setItem(KEYCFG,JSON.stringify(cfg));}catch(e){}}
+  function fail(t){$('#setup').hidden=false;$('#keyErr').textContent=t;}
+  $('#keyForm').onsubmit=e=>{e.preventDefault();const k=$('#key').value.trim(); if(!k){fail('APIキーを入力してください。');return;}
+    cfg.key=k; cfg.mapId=$('#mapId').value.trim()||'DEMO_MAP_ID'; saveCfg();
+    if(window.google&&google.maps){location.reload();return;} load();};
+  $('#keyBtn').onclick=()=>{$('#setup').hidden=false;$('#keyErr').textContent='';};
+  function load(){
+    window.gm_authFailure=()=>fail('APIキーが使えませんでした。Maps JavaScript APIが有効か、キーのリファラー制限を確認してください。');
+    window.__aerialMapInit=init;
+    const s=document.createElement('script');
+    s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(cfg.key)+'&v=weekly&libraries=marker&callback=__aerialMapInit';
+    s.async=true; s.onerror=()=>fail('Google Mapsを読み込めませんでした。通信状況を確認してください。');
+    document.head.appendChild(s);
+  }
+  function mk(pos,cls,text){
+    if(google.maps.marker&&google.maps.marker.AdvancedMarkerElement){
+      const d=document.createElement('div'); d.className='mk '+cls; if(text)d.textContent=text;
+      return new google.maps.marker.AdvancedMarkerElement({map,position:pos,content:d,zIndex:10});
+    }
+    return new google.maps.Marker({map,position:pos,label:text||undefined,clickable:false});
+  }
+  function mkSet(m,pos){ if(m.setPosition)m.setPosition(pos); else m.position=pos; }
+  function mkShow(m,on){ if(m.setMap)m.setMap(on?map:null); else m.map=on?map:null; }
+  function init(){
+    $('#setup').hidden=true; api.ready=true;
+    const c=S.geo?{lat:S.geo.lat,lng:S.geo.lng}:{lat:35.6812,lng:139.7671};
+    const o={center:c,zoom:17,tilt:0,heading:S.geo?S.geo.rot:0,mapId:cfg.mapId,gestureHandling:'greedy',mapTypeId:mapType,
+      isFractionalZoomEnabled:true,clickableIcons:false,fullscreenControl:false,streetViewControl:false,mapTypeControl:false};
+    if(google.maps.RenderingType)o.renderingType=google.maps.RenderingType.VECTOR;
+    map=new google.maps.Map($('#gmap'),o);
+    map.addListener('click',e=>onMapClick(e.latLng));
+    map.addListener('mousemove',e=>{ if(!S.geo)return; S.mapHover=llToPx(e.latLng.lat(),e.latLng.lng()); draw(); });
+    map.addListener('mouseout',()=>{S.mapHover=null;draw();});
+    ['center_changed','zoom_changed'].forEach(ev=>map.addListener(ev,schedulePull));
+    setupOverlay(); api.overlays(); api.draft(); api.alignMarks(); syncUI();
+    if(S.geo) api.pushView(true);
+  }
+  let pullQueued=false;
+  function schedulePull(){ if(pullQueued)return; pullQueued=true; requestAnimationFrame(()=>{pullQueued=false;pull();}); }
+  function pull(){
+    if(!map||!S.geo||!S.sync||!S.img||performance.now()<lockUntil)return;
+    const {w,h}=stageSize(); if(!w||!h)return;
+    const c=map.getCenter(), z=map.getZoom(), p=llToPx(c.lat(),c.lng());
+    const s=mpp()/mppAtZoom(c.lat(),z); view.s=s; view.ox=w/2-p[0]*s; view.oy=h/2-p[1]*s; draw();
+  }
+  api.pushView=(force)=>{
+    if(!map||!S.geo||!S.img||!S.sync)return;
+    const {w,h}=stageSize(); if(!w||!h)return;
+    const ll=pxToLL((w/2-view.ox)/view.s,(h/2-view.oy)/view.s);
+    const z=Math.log2(156543.03392*Math.cos(ll.lat*D2R)/(mpp()/view.s));
+    lockUntil=performance.now()+300;
+    map.moveCamera({center:ll,zoom:Math.max(2,Math.min(22,z)),heading:S.geo.rot});
+  };
+  function onMapClick(latLng){
+    const lat=latLng.lat(), lng=latLng.lng();
+    if(S.mode==='align'){
+      if(S.align.length%2===1){S.align.push({lat,lng}); if(S.align.length===4){finishAlign();return;}}
+      else if(S.align.length>0&&S.align.length%2===0&&S.align[S.align.length-1].lat!=null){S.align[S.align.length-1]={lat,lng};}
+      api.alignMarks(); syncUI(); draw(); return;
+    }
+    if(!S.geo){msg('先に「位置合わせ」で写真を地図に重ねてください。');return;}
+    const p=llToPx(lat,lng); if(p[0]<0||p[1]<0||p[0]>S.imgW||p[1]>S.imgH)return;
+    const k=mpp()/mppAtZoom(lat,map.getZoom());
+    tapImg(p[0],p[1],k);
+  }
+  api.alignMarks=()=>{
+    if(!map)return; alignMks.forEach(m=>mkShow(m,false)); alignMks=[];
+    if(S.mode!=='align')return;
+    S.align.forEach((a,i)=>{ if(i%2===1) alignMks.push(mk({lat:a.lat,lng:a.lng},'pin',String((i+1)/2))); });
+  };
+  api.hover=()=>{
+    if(!map||!S.geo)return;
+    if(!S.hover){ if(curMk)mkShow(curMk,false); return; }
+    const ll=pxToLL(S.hover[0],S.hover[1]);
+    if(!curMk)curMk=mk(ll,'cur'); else {mkSet(curMk,ll); mkShow(curMk,true);}
+  };
+  api.overlays=()=>{
+    if(!map)return; polys.forEach(p=>p.setMap(null)); polys=[]; oDirty=true;
+    if(S.geo){
+      const mark=cssv('--mark'), sel=cssv('--sel');
+      for(const b of S.buildings){
+        const isSel=b.id===S.selId;
+        const pg=new google.maps.Polygon({map,paths:b.pts.map(p=>pxToLL(p[0],p[1])),strokeColor:isSel?sel:mark,strokeWeight:isSel?3:1.5,
+          fillColor:isSel?sel:mark,fillOpacity:isSel?.25:.12,zIndex:isSel?3:2});
+        pg.addListener('click',e=>onMapClick(e.latLng));
+        pg.addListener('mousemove',e=>{S.mapHover=llToPx(e.latLng.lat(),e.latLng.lng());draw();});
+        polys.push(pg);
+      }
+    }
+    api.redraw();
+  };
+  api.draft=()=>{
+    if(!map)return;
+    if(!S.geo||!S.draft.length){ if(draftLine)draftLine.setMap(null); return; }
+    const path=S.draft.map(p=>pxToLL(p[0],p[1]));
+    if(!draftLine)draftLine=new google.maps.Polyline({strokeColor:cssv('--mark'),strokeWeight:2,clickable:false,zIndex:4});
+    draftLine.setPath(path); draftLine.setMap(map);
+  };
+  api.imageChanged=()=>{ if(oTex){oTex.dispose();oTex=null;} oDirty=true; api.overlays(); api.draft(); };
+  api.redraw=()=>{ if(overlay)overlay.requestRedraw(); };
+  api.ui=()=>{
+    $('#tiltBtn').textContent=tilted?'真上から見る':'斜めから見る';
+    $('#mtypeBtn').textContent=mapType==='roadmap'?'航空写真にする':'地図にする';
+    $('#placeBtn').disabled=!map;
+  };
+  $('#tiltBtn').onclick=()=>{if(!map)return;tilted=!tilted;map.setTilt(tilted?60:0);api.ui();};
+  $('#mtypeBtn').onclick=()=>{if(!map)return;mapType=mapType==='roadmap'?'satellite':'roadmap';map.setMapTypeId(mapType);api.ui();};
+  $('#placeBtn').onclick=()=>{
+    if(!map||!S.img)return; const c=map.getCenter();
+    S.geo={lat:c.lat(),lng:c.lng(),rot:S.geo?S.geo.rot:Math.round(normDeg(map.getHeading()||0)*100)/100};
+    api.imageChanged(); api.pushView(true); syncUI(); draw(); scheduleSave();
+  };
+  function setupOverlay(){
+    if(!google.maps.WebGLOverlayView||!window.THREE)return;
+    overlay=new google.maps.WebGLOverlayView();
+    overlay.onAdd=()=>{
+      oScene=new THREE.Scene(); oCam=new THREE.PerspectiveCamera();
+      oScene.add(new THREE.AmbientLight(0xffffff,.7));
+      const d=new THREE.DirectionalLight(0xffffff,.55); d.position.set(-1,1,1.4); oScene.add(d);
+      oRoot=new THREE.Group(); oScene.add(oRoot); oInner=new THREE.Group(); oInner.rotation.x=Math.PI/2; oRoot.add(oInner);
+    };
+    overlay.onContextRestored=({gl})=>{
+      oRen=new THREE.WebGLRenderer(Object.assign({canvas:gl.canvas,context:gl},gl.getContextAttributes())); oRen.autoClear=false; oDirty=true;
+    };
+    overlay.onDraw=({transformer})=>{
+      if(!oRen||!S.geo||!S.img)return;
+      if(oDirty)rebuildOverlay();
+      oCam.projectionMatrix=new THREE.Matrix4().fromArray(transformer.fromLatLngAltitude({lat:S.geo.lat,lng:S.geo.lng,altitude:0}));
+      oRoot.rotation.z=-S.geo.rot*D2R;
+      oPhotoMat.opacity=S.op/100; oPhotoMat.visible=S.op>0; oB.visible=S.b3d;
+      oRen.render(oScene,oCam); oRen.resetState();
+    };
+    overlay.setMap(map);
+  }
+  function rebuildOverlay(){
+    oDirty=false;
+    oInner.children.slice().forEach(o=>{oInner.remove(o); o.traverse(m=>{if(m.geometry)m.geometry.dispose();});});
+    if(!oTex){oTex=new THREE.CanvasTexture(S.img);}
+    const {sx,sz}=dims();
+    oPhotoMat=new THREE.MeshBasicMaterial({map:oTex,transparent:true,opacity:S.op/100,depthWrite:false,side:THREE.DoubleSide});
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(sx,sz).rotateX(-Math.PI/2),oPhotoMat); plane.position.y=.3; plane.renderOrder=-1; oInner.add(plane);
+    oB=new THREE.Group(); oInner.add(oB);
+    const roof=new THREE.MeshLambertMaterial({map:oTex}), selC=cssv('--sel');
+    for(const b of S.buildings){
+      if(b.pts.length<3)continue; const [r,g,bl]=avgRGB(b.pts);
+      const wall=new THREE.MeshLambertMaterial({color:b.id===S.selId?new THREE.Color(selC):new THREE.Color(r/255,g/255,bl/255)});
+      oB.add(new THREE.Mesh(buildingGeo(b,sx,sz),[roof,wall]));
+    }
+  }
+  if(cfg.key) load();
+  return api;
+})();
+
+/* ---------- boot ---------- */
+init3D();
+let saved=null; try{saved=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+if(saved&&saved.img){
+  const im=new Image(); im.onload=()=>{applySaved(saved);setImage(imgToCanvas(im),{url:saved.img,keep:true});}; im.onerror=loadSample; im.src=saved.img;
+}else if(saved&&saved.sample&&Array.isArray(saved.buildings)){
+  const smp=makeSample(); applySaved(saved); setImage(smp.canvas,{sample:true,keep:true});
+}else loadSample();
+syncUI();
+})();
+</script>
+</body>
+</html>
