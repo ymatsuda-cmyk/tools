@@ -204,6 +204,40 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-mm .h-se{right:-6px;bottom:-6px;cursor:nwse-resize}
 #panes .host .cm-mm .sz{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;display:none;z-index:7}
 #panes .host .cm-mm .mmbox.resizing .sz{display:block}
+#panes .host .cm-ink{padding:6px 28px;display:flex;align-items:flex-start;outline:none}
+#panes .host .cm-ink .ind{white-space:pre;flex:none}
+#panes .host .cm-ink .inkbox{position:relative;flex:none;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+#panes .host .cm-ink .inkbox.resizing{border-color:var(--accent)}
+#panes .host .cm-ink .inkc{width:100%;height:100%;border-radius:8px;overflow:hidden}
+#panes .host .cm-ink .inkc.loading{display:grid;place-items:center;color:var(--muted);font-size:13px;background:var(--panel)}
+#panes .host .cm-ink .inkerr{color:var(--warn);font-size:12px;margin:10px 12px;line-height:1.6}
+#panes .host .cm-ink .inktools{position:absolute;top:6px;right:6px;display:none;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.1);z-index:6}
+#panes .host .cm-ink .inkbox:hover .inktools{display:flex}
+#panes .host .cm-ink .inktools button{border:0;background:none;font-size:12px;padding:1px 8px;border-radius:4px;line-height:1.7;color:var(--ink)}
+#panes .host .cm-ink .inktools button:hover{background:var(--paper)}
+#panes .host .cm-ink .inktools .danger{color:var(--warn)}
+#panes .host .cm-ink .h{position:absolute;width:12px;height:12px;background:var(--panel);border:2px solid var(--accent);border-radius:3px;opacity:0;z-index:7;touch-action:none}
+#panes .host .cm-ink .inkbox:hover .h,#panes .host .cm-ink .inkbox.resizing .h{opacity:1}
+#panes .host .cm-ink .h-nw{left:-6px;top:-6px;cursor:nwse-resize}
+#panes .host .cm-ink .h-ne{right:-6px;top:-6px;cursor:nesw-resize}
+#panes .host .cm-ink .h-sw{left:-6px;bottom:-6px;cursor:nesw-resize}
+#panes .host .cm-ink .h-se{right:-6px;bottom:-6px;cursor:nwse-resize}
+#panes .host .cm-ink .sz{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:1.5;padding:1px 6px;border-radius:4px;display:none;z-index:7}
+#panes .host .cm-ink .inkbox.resizing .sz{display:block}
+@media (hover:none){
+  #panes .host .cm-ink .inktools{display:flex}
+  #panes .host .cm-ink .inktools button{padding:4px 10px}
+  #panes .host .cm-ink .h{opacity:.9;width:18px;height:18px}
+  #panes .host .cm-ink .h-nw{left:-9px;top:-9px}#panes .host .cm-ink .h-ne{right:-9px;top:-9px}
+  #panes .host .cm-ink .h-sw{left:-9px;bottom:-9px}#panes .host .cm-ink .h-se{right:-9px;bottom:-9px}
+}
+.ib-overlay{--ib-bar:var(--panel);--ib-ink:var(--ink);--ib-accent:var(--accent);--ib-accent-bg:var(--sel);--ib-line:var(--line);--ib-muted:var(--muted)}
+#inkMenu{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:6px;display:grid;gap:2px;min-width:190px}
+#inkMenu[hidden]{display:none}
+#inkMenu .cap{font-size:11px;color:var(--muted);padding:4px 10px 2px}
+#inkMenu button{border:0;background:none;text-align:left;font-size:13px;padding:8px 10px;border-radius:6px;color:var(--ink);display:flex;justify-content:space-between;gap:16px}
+#inkMenu button:hover{background:var(--paper)}
+#inkMenu button small{color:var(--muted)}
 #panes .host .cm-marker{background:var(--mark);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 #panes .host .cm-img{display:inline-block;position:relative;vertical-align:bottom;max-width:100%;line-height:0;margin:3px 0;border-radius:4px}
 #panes .host .cm-img img{max-width:100%;height:auto;display:block;border-radius:4px;user-select:none}
@@ -356,6 +390,16 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
   </div>
 </section>
 
+<div id="inkMenu" role="menu" hidden>
+  <div class="cap">手書きボードを挿入</div>
+  <button type="button" role="menuitem" data-kind="infinite">無限キャンバス<small>どこまでも広げられる</small></button>
+  <button type="button" role="menuitem" data-kind="A4">A4 縦</button>
+  <button type="button" role="menuitem" data-kind="A4L">A4 横</button>
+  <button type="button" role="menuitem" data-kind="B5">B5 縦</button>
+  <button type="button" role="menuitem" data-kind="A5">A5 縦</button>
+  <button type="button" role="menuitem" data-kind="W169">16:9</button>
+</div>
+
 <section id="app" class="hidden">
   <header>
     <button id="back" aria-label="一覧に戻る">一覧</button>
@@ -389,6 +433,7 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
         <button class="ib" id="cmtAdd" title="コメントを追加（⌘⌥M / Ctrl+Alt+M）" aria-label="コメントを追加"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg></button>
         <button class="ib" id="cmtToggle" title="コメント一覧" aria-label="コメント一覧" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg><span id="ccount"></span></button>
         <button class="ib" id="tableBtn" title="表を挿入" aria-label="表を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/></svg></button>
+        <button class="ib" id="inkboardBtn" title="手書きボードを挿入" aria-label="手書きボードを挿入" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15c1.5-3 3-4.5 4-3.5s-1 3 .5 3.5 2.5-3 5-4.5"/></svg></button>
         <button class="ib" id="mindmapBtn" title="マインドマップを挿入" aria-label="マインドマップを挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8.5" y="9.5" width="7" height="5" rx="1.5"/><circle cx="4" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="4" cy="19" r="1.8"/><circle cx="20" cy="19" r="1.8"/><path d="M8.5 11 5.5 6.3M15.5 11l3-4.7M8.5 13l-3 4.7M15.5 13l3 4.7"/></svg></button>
         <button class="ib" id="imageBtn" title="画像を挿入（コピーした画像は ⌘V で貼り付け）" aria-label="画像を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5.5-5 4 3.5 2.5-2 4.5 3.5"/></svg></button>
         <input type="file" id="imageFile" accept="image/*" hidden>
@@ -467,6 +512,11 @@ dialog p{margin:0;font-size:12px;color:var(--muted)}
       <tr><th>マインドマップ：子の枝／同じ階層の枝を追加</th><td>Tab ／ Enter</td></tr>
       <tr><th>マインドマップ：枝を削除</th><td>Delete</td></tr>
       <tr><th>マインドマップ：拡大縮小／マップから出る</th><td>⌘＋ホイール ／ Esc</td></tr>
+      <tr><th>手書きボード：全画面で開く</th><td>ボードをクリック（タップ）</td></tr>
+      <tr><th>手書きボード：ペン／マーカー／消しゴム／範囲／移動</th><td>P ／ M ／ E ／ R ／ H</td></tr>
+      <tr><th>手書きボード：元に戻す／やり直す</th><td>⌘Z ／ ⇧⌘Z</td></tr>
+      <tr><th>手書きボード：移動／拡大縮小／全体を表示</th><td>Space＋ドラッグ ／ ⌘＋ホイール・2本指 ／ 0</td></tr>
+      <tr><th>手書きボード：閉じる</th><td>Esc</td></tr>
       <tr><th>画像ビューア：拡大／縮小／実サイズ／画面に合わせる</th><td>＋ ／ − ／ 0 ／ F（ホイールでも拡大縮小）</td></tr>
       <tr><th>表：表全体を選ぶ</th><td>Esc（または表の左の余白をクリック）</td></tr>
       <tr><th>表を選んだ状態で前に空白／タブ</th><td>Space ／ Tab（⇧Tab・Backspace で戻す）</td></tr>
@@ -2047,11 +2097,224 @@ function insertMindmap(v){
   }
 }
 
+/* ---------- 手書きボード（ymatsuda-cmyk/tools の api/inkboard を利用） ---------- */
+// 書式（2行目はボードの値。inkboard.js が作る1行のJSON）：
+//   ```inkboard{w=640,h=360}
+//   {"v":1,"mode":"infinite",...}
+//   ```
+const IB_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@main/api/inkboard/';
+let ibLib = null;
+function loadInkboardLib(){
+  if (!ibLib){
+    if (!document.querySelector('link[data-ib]')){
+      const l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = IB_BASE + 'inkboard.css'; l.dataset.ib = '1';
+      document.head.prepend(l);   // アプリ側の CSS を優先させる
+    }
+    ibLib = import(IB_BASE + 'inkboard.js').catch(err => { ibLib = null; throw err; });
+  }
+  return ibLib;
+}
+const ibFenceRe = /^([ \t]*)```inkboard(?:[ \t]*\{w=(\d+),h=(\d+)\})?[ \t]*$/;
+function findBoards(doc){
+  const out = [];
+  for (let i = 1; i <= doc.lines; i++){
+    const text = doc.line(i).text;
+    if (!text.includes('```inkboard') || !ibFenceRe.test(text)) continue;
+    for (let j = i + 1; j <= doc.lines; j++){
+      if (fenceEndRe.test(doc.line(j).text)){ out.push({ from:i, to:j }); i = j; break; }
+    }
+  }
+  return out;
+}
+function parseInk(src){
+  const lines = src.split('\n');
+  const m = ibFenceRe.exec(lines[0]);
+  return { indent: m[1], w: m[2] ? +m[2] : 640, h: m[3] ? +m[3] : 360, value: lines.slice(1, -1).map(l => l.trim()).join('') };
+}
+function serializeInk(t){
+  return [`${t.indent}\`\`\`inkboard{w=${t.w},h=${t.h}}`, t.indent + t.value, `${t.indent}\`\`\``].join('\n');
+}
+function ibLocate(view, wrap){
+  const n = view.state.doc.lineAt(view.posAtDOM(wrap)).number;
+  return findBoards(view.state.doc).find(x => n >= x.from && n <= x.to);
+}
+// hist=false：手書きの書き換えはボード側で取り消せるので、メモの ⌘Z の履歴には積まない
+function writeInk(view, wrap, edit, self, hist){
+  holdScroll(view);
+  const b = ibLocate(view, wrap);
+  if (!b) return;
+  const doc = view.state.doc, a = doc.line(b.from).from, z = doc.line(b.to).to;
+  const t = parseInk(doc.sliceString(a, z));
+  if (edit(t) === false) return;
+  if (t.remove){
+    const to = z < doc.length ? z + 1 : z, from = z < doc.length ? a : Math.max(0, a - 1);
+    view.dispatch({ changes:{ from, to }, selection:{ anchor:from } });
+    view.focus();
+    return;
+  }
+  const text = serializeInk(t);
+  if (text === doc.sliceString(a, z)) return;
+  wrap._selfSrc = self ? text : null;
+  view.dispatch({ changes:{ from:a, to:z, insert:text }, annotations: hist ? [] : [ Transaction.addToHistory.of(false) ] });
+}
+function applyInkBox(wrap, t){
+  wrap.querySelector('.ind').textContent = t.indent;
+  const box = wrap.querySelector('.inkbox');
+  box.style.width = t.w + 'px';
+  box.style.height = t.h + 'px';
+}
+// 参照表示の縦横比に枠の高さを合わせる
+function inkFitHeight(lib, t){
+  try{
+    const a = lib.previewArea(t.value);
+    t.h = Math.round(clamp(t.w * a.h / a.w, 120, 2000));
+  }catch{}
+}
+function inkAreaKey(lib, value){
+  try{ const d = lib.parseBoard(value); return JSON.stringify([d.view, d.mode, d.paper, d.orient]); }catch{ return ''; }
+}
+async function drawInk(wrap, view){
+  const c = wrap.querySelector('.inkc');
+  const token = wrap._token = (wrap._token || 0) + 1;
+  c.className = 'inkc loading';
+  c.textContent = '手書きボードを読み込み中…';
+  try{
+    const lib = await loadInkboardLib();
+    if (token !== wrap._token) return;
+    c.className = 'inkc';
+    wrap._ctl?.destroy();
+    wrap._ctl = lib.renderBoard(c, parseInk(wrap._src).value, {
+      clickToOpen: false,
+      title: '手書きボード',
+      onChange: v => writeInk(view, wrap, t => {
+        const resize = inkAreaKey(lib, t.value) !== inkAreaKey(lib, v);
+        t.value = v;
+        if (resize) inkFitHeight(lib, t);
+      }, true, false)
+    });
+  }catch(err){
+    if (token !== wrap._token) return;
+    c.className = 'inkc';
+    c.textContent = '';
+    const p = document.createElement('p'); p.className = 'inkerr';
+    p.textContent = `手書きボードを表示できません（${err.message || err}）。ネットワーク接続を確認してください。`;
+    c.append(p);
+  }
+}
+class InkWidget extends WidgetType {
+  constructor(src){ super(); this.src = src; }
+  eq(o){ return o.src === this.src; }
+  ignoreEvent(){ return true; }
+  updateDOM(dom, view){
+    const next = parseInk(this.src);
+    applyInkBox(dom, next);
+    if (dom._selfSrc === this.src){ dom._selfSrc = null; dom._src = this.src; return true; }
+    const prev = parseInk(dom._src);
+    dom._src = this.src;
+    if (prev.value !== next.value){ if (dom._ctl) dom._ctl.update(next.value); else drawInk(dom, view); }
+    return true;
+  }
+  destroy(dom){ dom._ctl?.destroy(); }
+  toDOM(view){
+    const t = parseInk(this.src);
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-ink';
+    wrap._src = this.src;
+    const ind = document.createElement('span'); ind.className = 'ind';
+    const box = document.createElement('div'); box.className = 'inkbox';
+    const tools = document.createElement('div'); tools.className = 'inktools';
+    for (const [op, label, cls, title] of [['open','全画面'], ['fit','縦横比を合わせる','', '参照表示の範囲の縦横比に枠の高さを合わせる'], ['del','削除','danger','手書きボードを削除']]){
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.op = op; b.textContent = label;
+      if (cls) b.className = cls;
+      if (title) b.title = title;
+      tools.append(b);
+    }
+    const c = document.createElement('div'); c.className = 'inkc';
+    box.append(c, tools);
+    for (const k of ['nw','ne','sw','se']){ const h = document.createElement('span'); h.className = 'h h-' + k; h.dataset.k = k; box.append(h); }
+    const sz = document.createElement('span'); sz.className = 'sz'; box.append(sz);
+    wrap.append(ind, box);
+    applyInkBox(wrap, t);
+    wrap._ready = drawInk(wrap, view);
+
+    tools.addEventListener('mousedown', e => e.preventDefault());
+    tools.addEventListener('click', async e => {
+      const op = e.target.closest('button')?.dataset.op;
+      if (op === 'open') wrap._ctl?.open();
+      if (op === 'fit'){ const lib = await loadInkboardLib().catch(() => null); if (lib) writeInk(view, wrap, t => { const h0 = t.h; inkFitHeight(lib, t); if (t.h === h0) return false; }, false, true); }
+      if (op === 'del' && confirm('この手書きボードを削除しますか？（⌘Z で戻せます）')) writeInk(view, wrap, t => { t.remove = true; }, false, true);
+    });
+    // ボードのクリック（タップ）で全画面表示
+    c.addEventListener('click', () => wrap._ctl?.open());
+
+    // 四隅のドラッグで大きさを変える
+    box.addEventListener('pointerdown', e => {
+      const h = e.target.closest('.h');
+      if (!h || h.parentElement !== box) return;
+      e.preventDefault(); e.stopPropagation();
+      h.setPointerCapture(e.pointerId);
+      box.classList.add('resizing');
+      const k = h.dataset.k, sx = k.endsWith('e') ? 1 : -1, sy = k.startsWith('s') ? 1 : -1;
+      const r0 = box.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+      const host = wrap.closest('.cm-content');
+      const maxW = Math.max(240, (host ? host.clientWidth : 1200) - 60);
+      let w = Math.round(r0.width), hh = Math.round(r0.height);
+      sz.textContent = `${w} × ${hh}`;
+      const move = ev => {
+        w = Math.round(clamp(r0.width + sx * (ev.clientX - x0), 160, maxW));
+        hh = Math.round(clamp(r0.height + sy * (ev.clientY - y0), 100, 2000));
+        box.style.width = w + 'px'; box.style.height = hh + 'px';
+        sz.textContent = `${w} × ${hh}`;
+      };
+      const up = () => {
+        h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+        box.classList.remove('resizing');
+        writeInk(view, wrap, t => { if (t.w === w && t.h === hh) return false; t.w = w; t.h = hh; }, false, true);
+      };
+      h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+    });
+    return wrap;
+  }
+}
+async function insertInkboard(v, kind){
+  let lib;
+  try{ lib = await loadInkboardLib(); }
+  catch(err){ alert(`手書きボードを読み込めませんでした（${err.message || err}）。ネットワーク接続を確認してください。`); return; }
+  const opts = { infinite:{ paper:'infinite' }, A4:{ paper:'A4' }, A4L:{ paper:'A4', orientation:'landscape' }, B5:{ paper:'B5' }, A5:{ paper:'A5' }, W169:{ paper:'W169' } }[kind] || { paper:'infinite' };
+  const value = lib.createBoard(opts);
+  const a = lib.previewArea(value);
+  const maxW = Math.max(200, v.contentDOM.clientWidth - 80);
+  const w = Math.round(Math.min(a.h > a.w ? 420 : 640, maxW));
+  const h = Math.round(clamp(w * a.h / a.w, 120, 2000));
+  const st = v.state, line = st.doc.lineAt(st.selection.main.head);
+  const ind = /^[ \t]*/.exec(line.text)[0];
+  const body = serializeInk({ indent:ind, w, h, value });
+  const blank = line.text.trim() === '';
+  const next = line.number < st.doc.lines ? st.doc.line(line.number + 1).text : '';
+  const insert = (blank ? '' : '\n') + body + (next.trim() ? '\n' : '');
+  const from = blank ? line.from : line.to;
+  const at = from + (blank ? 0 : 1);
+  v.dispatch({ changes:{ from, to:line.to, insert } });
+  for (const w of v.contentDOM.querySelectorAll('.cm-ink')) if (v.posAtDOM(w) === at){
+    Promise.resolve(w._ready).then(() => w._ctl?.open());
+  }
+}
+// 検索の対象からボードの値（線のデータ）を外す
+const stripInk = body => body.includes('```inkboard') ? body.replace(/^[ \t]*\{"v":1,.*$/gm, '') : body;
+
 /* ---------- 表と画像の描画 ---------- */
 function buildBlocks(state){
   const doc = state.doc, decos = [], atoms = [];
   const inTable = new Set();
+  for (const b of findBoards(doc)){
+    const from = doc.line(b.from).from, to = doc.line(b.to).to;
+    const d = Decoration.replace({ widget:new InkWidget(doc.sliceString(from, to)), block:true }).range(from, to);
+    decos.push(d); atoms.push(d);
+    for (let i = b.from; i <= b.to; i++) inTable.add(i);
+  }
   for (const b of findMindmaps(doc)){
+    if (inTable.has(b.from)) continue;
     const from = doc.line(b.from).from, to = doc.line(b.to).to;
     const d = Decoration.replace({ widget:new MindmapWidget(doc.sliceString(from, to)), block:true }).range(from, to);
     decos.push(d); atoms.push(d);
@@ -2451,6 +2714,32 @@ function updateStatusBar(){
 // ツールバーのボタンでエディタのフォーカスを奪わない
 $('#toolbar').addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 $('#mindmapBtn').onclick = () => { const v = curView(); if (v) insertMindmap(v); };
+{
+  const menu = $('#inkMenu'), btn = $('#inkboardBtn');
+  let menuView = null;
+  const closeMenu = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.onclick = () => {
+    if (!menu.hidden) return closeMenu();
+    menuView = curView();
+    if (!menuView) return;
+    const r = btn.getBoundingClientRect();
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    const mw = menu.offsetWidth;
+    menu.style.left = Math.max(8, Math.min(r.left, innerWidth - mw - 8)) + 'px';
+    menu.style.top = (r.bottom + 6) + 'px';
+    loadInkboardLib().catch(() => {});   // 選んでいる間に読み込んでおく
+  };
+  menu.addEventListener('mousedown', e => e.preventDefault());
+  menu.addEventListener('click', e => {
+    const k = e.target.closest('button')?.dataset.kind;
+    if (!k) return;
+    closeMenu();
+    if (menuView) insertInkboard(menuView, k);
+  });
+  document.addEventListener('pointerdown', e => { if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden){ e.preventDefault(); closeMenu(); } }, true);
+}
 $('#tableBtn').onclick = () => { const v = curView(); if (v) insertTable(v); };
 $('#indentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, 1); else { indentCmd(v, 1); v.focus(); } };
 $('#outdentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, -1); else { indentCmd(v, -1); v.focus(); } };
@@ -2482,7 +2771,7 @@ $('#headBtn').onclick = () => {
 
 /* ---------- 一覧・選択 ---------- */
 let renamingId = null;
-const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/\[([^\[\]\n]+)\]\(c:[\w-]+\)/g, '$1').replace(/==([^=\n]+)==/g, '$1').replace(/<br\s*\/?>/gi, ' ').replace(/^\s*```mindmap.*$/, '［マインドマップ］').replace(/^\s*```\s*$/, '').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
+const firstLine = body => (body.split('\n').map(s => s.replace(/^\s*#{1,4} /, '').replace(/!\[[^\]\n]*\]\(img:[\w-]+\)(\{w=\d+\})?/g, '［画像］').replace(/\[([^\[\]\n]+)\]\(c:[\w-]+\)/g, '$1').replace(/==([^=\n]+)==/g, '$1').replace(/<br\s*\/?>/gi, ' ').replace(/^\s*```mindmap.*$/, '［マインドマップ］').replace(/^\s*```inkboard.*$/, '［手書きボード］').replace(/^\s*```\s*$/, '').replace(/^\s*\|[\s:|-]*\d*[\s|-]*\|\s*$/, '').trim()).find(Boolean) || '');
 const nameOf = m => (m.name && m.name.trim()) || firstLine(m.body) || '無題のメモ';
 function nextName(){
   let max = 0;
@@ -2512,7 +2801,7 @@ function renderList(){
     if (!want.every(x => tl.includes(x))) return false;
     if (!tagToks.every(x => tl.some(y => y.includes(x)))) return false;
     if (!words.length) return true;
-    const hay = (nameOf(m) + '\n' + m.body + '\n' + tl.join(' ') + '\n' + Object.values(m.comments || {}).map(c => c.text).join('\n')).toLowerCase();
+    const hay = (nameOf(m) + '\n' + stripInk(m.body) + '\n' + tl.join(' ') + '\n' + Object.values(m.comments || {}).map(c => c.text).join('\n')).toLowerCase();
     return words.every(w => hay.includes(w));
   }).sort((a,b) => b.updatedAt - a.updatedAt);
   if (!items.length){

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>inkboard</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./inkboard.css">
+<style>
+  :root { --accent: #444441; --accent-bg: #e8e6df; --text-muted: #888780; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; background: #f1efe8; color: #2c2c2a; }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: #5f5e5a; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; background: #fff; cursor: pointer; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .card { background: #fff; border-radius: 8px; border: 1px solid rgba(0,0,0,.1); overflow: hidden; }
+  .card .board { height: 200px; }
+  .card footer { display: flex; justify-content: space-between; padding: 6px 10px; font-size: 12px; color: #888780; border-top: 1px solid rgba(0,0,0,.08); }
+  .card footer button { padding: 2px 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>inkboard — 手書きボード</h1>
+<p>ボードを追加してタップすると全画面で描けます。値はこのブラウザの localStorage に保存します（確認用）。</p>
+<div class="row">
+  <button data-new="infinite">＋ 無限キャンバス</button>
+  <button data-new="A4">＋ A4 縦</button>
+  <button data-new="A4L">＋ A4 横</button>
+  <button data-new="W169">＋ 16:9</button>
+</div>
+<div class="grid" id="list"></div>
+
+<script type="module">
+import { createBoard, renderBoard, exportImage } from './inkboard.js'
+
+const KEY = 'inkboard.demo'
+let boards = []
+try { boards = JSON.parse(localStorage.getItem(KEY)) || [] } catch {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(boards)) } catch {} }
+
+function draw() {
+  const list = document.getElementById('list')
+  list.textContent = ''
+  boards.forEach((b, i) => {
+    const card = document.createElement('div')
+    card.className = 'card'
+    card.innerHTML = '<div class="board"></div><footer><span></span><span><button data-op="png">PNG</button> <button data-op="del">削除</button></span></footer>'
+    card.querySelector('span').textContent = `${b.label}（${Math.round(b.value.length / 1024 * 10) / 10} KB）`
+    const ctl = renderBoard(card.querySelector('.board'), b.value, {
+      title: b.label,
+      onChange: (v) => { b.value = v; save(); card.querySelector('span').textContent = `${b.label}（${Math.round(v.length / 1024 * 10) / 10} KB）` },
+    })
+    card.querySelector('[data-op="del"]').onclick = () => { boards.splice(i, 1); save(); draw() }
+    card.querySelector('[data-op="png"]').onclick = async () => {
+      const url = URL.createObjectURL(await exportImage(ctl.value))
+      window.open(url, '_blank')
+    }
+    list.append(card)
+  })
+}
+
+document.querySelectorAll('[data-new]').forEach((btn) => {
+  btn.onclick = () => {
+    const k = btn.dataset.new
+    const value = k === 'A4L' ? createBoard({ paper: 'A4', orientation: 'landscape' }) : createBoard({ paper: k })
+    boards.push({ label: btn.textContent.replace('＋ ', ''), value })
+    save()
+    draw()
+  }
+})
+draw()
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+/* inkboard.css — 手書きボードの表示に必要な分だけ。
+   色は --ib-* で上書きでき、無ければ各アプリの共通の変数、それも無ければ既定値を使う。 */
+
+/* ---- 参照表示 ---- */
+.ib-host { position: relative; overflow: hidden; }
+.ib-host .ib-preview { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ib-host.ib-clickable { cursor: zoom-in; }
+.ib-empty {
+  position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  font-size: 13px; color: var(--ib-muted, var(--text-muted, #888780));
+}
+.ib-empty:empty { display: none; }
+.ib-host.ib-broken .ib-empty { color: var(--text-danger, #a32d2d); padding: 10px; text-align: center; }
+
+/* ---- 全画面 ---- */
+.ib-overlay {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: flex; flex-direction: column;
+  background: var(--ib-desk, #e9e7e1);
+  color: var(--ib-ink, var(--text-primary, #2c2c2a));
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ib-overlay *, .ib-overlay *::before, .ib-overlay *::after { box-sizing: border-box; }
+
+.ib-bar {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; row-gap: 4px; padding: 6px 10px;
+  background: var(--ib-bar, var(--surface-2, #ffffff));
+  border-bottom: 1px solid var(--ib-line, rgba(0, 0, 0, .1));
+}
+.ib-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16em; }
+.ib-title:empty { display: none; }
+.ib-group {
+  display: flex; align-items: center; gap: 2px; flex: none;
+  padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--ib-line, rgba(0, 0, 0, .1));
+}
+.ib-group.ib-dim { opacity: .35; }
+
+.ib-overlay button, .ib-overlay select {
+  font: inherit; color: inherit; border-radius: 8px; touch-action: manipulation;
+}
+.ib-overlay button {
+  border: 0; background: none; cursor: pointer; min-height: 36px;
+}
+.ib-overlay button:disabled { opacity: .3; cursor: default; }
+.ib-done {
+  flex: none; padding: 0 16px; font-weight: 600;
+  background: var(--ib-accent, var(--accent, #444441)) !important; color: #fff !important;
+}
+.ib-ic { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; }
+.ib-ic svg { width: 22px; height: 22px; }
+.ib-ic:hover:not(:disabled), .ib-zoom:hover { background: var(--ib-hover, rgba(0, 0, 0, .06)); }
+.ib-ic.on { background: var(--ib-accent-bg, var(--accent-bg, #e8e6df)); color: var(--ib-accent, var(--accent, #2c2c2a)); box-shadow: inset 0 0 0 1.5px currentColor; }
+.ib-text { padding: 0 10px; white-space: nowrap; font-size: 12.5px; box-shadow: inset 0 0 0 1px var(--ib-line, rgba(0, 0, 0, .15)); }
+.ib-text.on { background: var(--ib-accent, var(--accent, #444441)); color: #fff; box-shadow: none; }
+.ib-danger { color: var(--text-danger, #a32d2d); }
+.ib-zoom { min-width: 50px; padding: 0 4px; font-variant-numeric: tabular-nums; }
+
+.ib-sw { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
+.ib-sw::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px rgba(0, 0, 0, .15); }
+.ib-sw.on::before { box-shadow: 0 0 0 2px var(--ib-bar, #fff), 0 0 0 4px var(--c); }
+
+.ib-w i { display: block; width: var(--d); height: var(--d); border-radius: 50%; background: currentColor; }
+
+.ib-overlay select {
+  height: 34px; padding: 0 6px; border: 1px solid var(--ib-line, rgba(0, 0, 0, .15));
+  background: var(--ib-bar, #fff);
+}
+.ib-overlay select[hidden] { display: none; }
+
+.ib-areabar {
+  flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 12px; font-size: 12.5px;
+  background: var(--ib-accent-bg, var(--accent-bg, #e8e6df));
+  border-bottom: 1px solid var(--ib-line, rgba(0, 0, 0, .1));
+}
+.ib-areabar[hidden] { display: none; }
+.ib-areabar span { margin-right: auto; }
+.ib-areabar button { min-height: 30px; padding: 0 12px; background: var(--ib-bar, #fff); box-shadow: 0 0 0 1px var(--ib-line, rgba(0, 0, 0, .15)); }
+
+.ib-stage {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  touch-action: none; cursor: crosshair;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.ib-stage[data-tool="eraser"] { cursor: none; }
+.ib-stage[data-tool="area"] { cursor: crosshair; }
+.ib-stage.ib-panning { cursor: grab; }
+.ib-stage.ib-grabbing { cursor: grabbing; }
+.ib-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ib-live { pointer-events: none; }
+
+.ib-viewrect {
+  position: absolute; pointer-events: none;
+  border: 2px dashed var(--ib-view, #2f7bd0); border-radius: 2px;
+  opacity: .55;
+}
+.ib-viewrect.ib-active { opacity: 1; background: rgba(47, 123, 208, .06); }
+.ib-viewrect[hidden] { display: none; }
+.ib-viewrect span {
+  position: absolute; left: -2px; top: -22px; white-space: nowrap;
+  font-size: 11px; line-height: 20px; padding: 0 6px; border-radius: 4px 4px 0 0;
+  background: var(--ib-view, #2f7bd0); color: #fff;
+}
+
+.ib-cursor {
+  position: absolute; pointer-events: none; border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, .55); background: rgba(255, 255, 255, .35);
+  transform: translate(-50%, -50%);
+}
+.ib-cursor[hidden] { display: none; }
+
+.ib-toast {
+  position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: rgba(30, 30, 30, .85); color: #fff; padding: 6px 14px; border-radius: 999px;
+  font-size: 12.5px; pointer-events: none; white-space: nowrap;
+}
+.ib-toast[hidden] { display: none; }
+
+@media (prefers-color-scheme: dark) {
+  .ib-overlay { --ib-desk: #2a2a28; }
+}
