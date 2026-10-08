@@ -331,6 +331,7 @@ function renderSettings() {
     '<div class="f"><label for="gHours">自動収集の間隔</label><select id="gHours">' + [2, 4, 6, 8, 12].map(function (h) { return '<option value="' + h + '"' + (Number(g.collectHours) === h ? ' selected' : '') + '>' + h + '時間ごと</option>'; }).join('') + '</select></div>' +
     '<label class="chk" style="align-self:end"><input type="checkbox" id="gAuto"' + (g.autoOn ? ' checked' : '') + '>自動実行（収集と予約投稿）を有効にする</label></div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="saveGlobal">全体の設定を保存</button><button type="button" class="btn" data-act="testAi">AIの接続テスト</button></div><div class="hint">接続テストは保存済みの設定で行います。先に保存してください。</div></section>' +
+    renderSync() +
   '<section class="panel" aria-label="アカウント別の設定"><h2>アカウント別の設定</h2>' +
     '<div class="tabs">' + accts.map(function (x) {
       return '<button type="button" class="' + (a && String(x.id) === String(a.id) && S.editAcct !== 'new' ? 'on' : '') + '" data-edit="' + esc(x.id) + '"><span class="dot" style="background:' + esc(x.color) + '"></span>' + esc(x.name) + '</button>';
@@ -373,6 +374,89 @@ function readAcctForm() {
   return { id: v('aId'), name: v('aName'), badge: v('aBadge'), color: v('aColor'), keywords: v('aKw'), rss: v('aRss'), persona: v('aPersona'),
            target: v('aTarget'), tone: v('aTone'), slots: v('aSlots'), ng: v('aNg'), examples: v('aEx'), approvalMode: v('aMode'),
            picksPerRun: Number(v('aPicks')), includeUrl: $('aUrl').checked, avoidCrossDup: $('aCross').checked, active: $('aActive').checked };
+}
+
+
+// ===== 設定の同期（JSONBin・パスフレーズで暗号化。MemoStockと同じ方式） =====
+const JB = 'https://api.jsonbin.io/v3/b';
+const ITER = 600000;
+const te = new TextEncoder(), td = new TextDecoder();
+const lsx = {
+  get: function (k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } },
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+function jbConn() { return lsx.get('postpilot.jsonbin') || { key: '', keyType: 'master', binId: '', lastSync: '' }; }
+const b2a = function (u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const a2b = function (s) { return Uint8Array.from(atob(String(s).replace(/\s/g, '')), function (c) { return c.charCodeAt(0); }); };
+async function deriveKey(pass, salt, iter) {
+  const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: a2b(salt), iterations: iter, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function seal(obj, pass) {
+  const salt = b2a(crypto.getRandomValues(new Uint8Array(16)));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await deriveKey(pass, salt, ITER);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, k, te.encode(JSON.stringify(obj))));
+  return { format: 'postpilot-settings', version: 2, kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITER, salt: salt },
+           cipher: { name: 'AES-GCM', iv: b2a(iv) }, data: b2a(ct) };
+}
+async function unseal(env, pass) {
+  if (!env || !env.kdf || !env.cipher || !env.data) throw new Error('JSONBinの中身が暗号化された設定の形式ではありません');
+  const k = await deriveKey(pass, env.kdf.salt, env.kdf.iterations);
+  let pt;
+  try { pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: a2b(env.cipher.iv) }, k, a2b(env.data)); }
+  catch (e) { throw new Error('パスフレーズが違います（復号できませんでした）'); }
+  return JSON.parse(td.decode(pt));
+}
+function jbHeaders(c, json) {
+  const h = {};
+  h[c.keyType === 'access' ? 'X-Access-Key' : 'X-Master-Key'] = c.key;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+function jbErr(status) {
+  const m = { 400: 'Bin ID の形式が正しくありません（400）', 401: 'JSONBin のキーが正しくないか、この Bin を操作する権限がありません（401）',
+              403: 'JSONBin のキーにこの操作の権限がありません（403）', 404: 'Bin ID が見つかりません（404）', 429: 'JSONBin の利用上限に達しました（429）' };
+  return new Error(m[status] || 'JSONBin がエラーを返しました（' + status + '）');
+}
+async function jbRead(c) {
+  const r = await fetch(JB + '/' + encodeURIComponent(c.binId) + '/latest?meta=false', { headers: jbHeaders(c), cache: 'no-store' });
+  if (!r.ok) throw jbErr(r.status);
+  return r.json();
+}
+async function jbWrite(c, env) {
+  if (c.binId) {
+    const r = await fetch(JB + '/' + encodeURIComponent(c.binId), { method: 'PUT', headers: jbHeaders(c, true), body: JSON.stringify(env) });
+    if (!r.ok) throw jbErr(r.status);
+    return c.binId;
+  }
+  const h = jbHeaders(c, true); h['X-Bin-Private'] = 'true'; h['X-Bin-Name'] = 'postpilot-settings';
+  const r = await fetch(JB, { method: 'POST', headers: h, body: JSON.stringify(env) });
+  if (!r.ok) throw jbErr(r.status);
+  return (await r.json()).metadata.id;
+}
+function readSyncForm() {
+  const c = { key: $('sKey').value.trim() || jbConn().key, keyType: $('sType').value, binId: $('sBin').value.trim(), lastSync: jbConn().lastSync };
+  const pass = $('sPass').value;
+  if (!c.key) throw new Error('JSONBin のキーを入力してください');
+  if (!/^[\x21-\x7e]+$/.test(c.key)) throw new Error('JSONBin のキーに使えない文字（改行・空白・全角など）が含まれています');
+  if (pass.length < 8) throw new Error('パスフレーズは8文字以上にしてください');
+  return { c: c, pass: pass, remember: $('sRemember').checked };
+}
+function renderSync() {
+  const c = jbConn();
+  return '<section class="panel" aria-label="設定の同期"><h2>設定の同期（JSONBin・暗号化）</h2>' +
+    '<div class="hint">APIのURL・キー、Xの連携情報、アカウント設定をまとめてパスフレーズで暗号化し、JSONBinに保存します。別のPostPilot（別のGoogleアカウントや作り直したデプロイ）でも、同じキー・Bin ID・パスフレーズで読み込めます。パスフレーズはどこにも保存しません。</div>' +
+    '<div class="grid2"><div class="f"><label for="sKey">JSONBin のキー ' + (c.key ? '<span class="tag ok">この端末に記憶済み</span>' : '') + '</label><input id="sKey" type="password" autocomplete="new-password" data-lpignore="true" placeholder="' + (c.key ? '変更するときだけ入力' : '$2a$10$…') + '"></div>' +
+    '<div class="f"><label for="sType">キーの種類</label><select id="sType"><option value="master"' + (c.keyType !== 'access' ? ' selected' : '') + '>Master Key</option><option value="access"' + (c.keyType === 'access' ? ' selected' : '') + '>Access Key</option></select></div>' +
+    '<div class="f"><label for="sBin">Bin ID（初回の保存で自動作成。空欄可）</label><input id="sBin" value="' + esc(c.binId) + '" autocomplete="off"></div>' +
+    '<div class="f"><label for="sPass">パスフレーズ（8文字以上）</label><input id="sPass" type="password" autocomplete="new-password" data-lpignore="true"></div></div>' +
+    '<label class="chk"><input type="checkbox" id="sRemember" checked>この端末に JSONBin のキーと Bin ID を記憶する（パスフレーズは記憶しません）</label>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="syncSave">暗号化して JSONBin に保存</button><button type="button" class="btn" data-act="syncLoad">JSONBin から読み込んで反映</button>' +
+    (c.key ? '<button type="button" class="btn ghost" data-act="syncForget">この端末の記憶を消す</button>' : '') + '</div>' +
+    '<div class="hint">' + (c.lastSync ? '最終同期：' + esc(fmtSlot(c.lastSync)) : 'まだ同期していません') + '</div></section>';
 }
 
 // ===== 編集モーダル =====
@@ -447,6 +531,44 @@ document.addEventListener('click', async function (e) {
                   collectHours: Number($('gHours').value), autoOn: $('gAuto').checked };
       busy(true, '保存しています…');
       try { S.settings = await call('saveGlobal', g); toast('全体の設定を保存しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'syncSave': {
+      let f; try { f = readSyncForm(); } catch (err) { toast(err.message, true); return; }
+      busy(true, '暗号化して保存しています…');
+      try {
+        const data = await call('exportSettings');
+        const env = await seal(data, f.pass);
+        f.c.binId = await jbWrite(f.c, env);
+        f.c.lastSync = new Date().toISOString();
+        if (f.remember) lsx.set('postpilot.jsonbin', f.c);
+        showResult('JSONBin に保存しました', 'Bin ID：' + f.c.binId + '\n\n別の端末やデプロイで読み込むときは、JSONBin のキー・この Bin ID・同じパスフレーズを入力してください。', false);
+        render();
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'syncLoad': {
+      let f; try { f = readSyncForm(); } catch (err) { toast(err.message, true); return; }
+      if (!f.c.binId) { toast('読み込むには Bin ID を入力してください', true); return; }
+      busy(true, '読み込んで復号しています…');
+      try {
+        const env = await jbRead(f.c);
+        const data = await unseal(env, f.pass);
+        busy(false);
+        const n = (data.accounts || []).length;
+        if (!confirm('JSONBin の設定（' + (data.exportedAt ? fmtSlot(data.exportedAt) + ' 保存' : '保存日時不明') + '・アカウント ' + n + '件）をこの PostPilot に反映します。同じアカウントは上書きされます。よろしいですか？')) return;
+        busy(true, '反映しています…');
+        S.settings = await call('importSettings', data);
+        f.c.lastSync = new Date().toISOString();
+        if (f.remember) lsx.set('postpilot.jsonbin', f.c);
+        toast('設定を読み込みました');
+        await load();
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'syncForget': {
+      if (!confirm('この端末に記憶した JSONBin のキーと Bin ID を消しますか？（JSONBin 上のデータは消えません）')) return;
+      lsx.del('postpilot.jsonbin'); render(); toast('この端末の記憶を消しました');
       break;
     }
     case 'testAi': {

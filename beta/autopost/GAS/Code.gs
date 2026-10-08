@@ -958,3 +958,49 @@ function testAI() {
 function testWeighted() {
   Logger.log(weightedLength_('日本語140文字テスト abc'));
 }
+
+// ===== 設定の書き出し・読み込み（JSONBin同期用。暗号化はブラウザ側で行う） =====
+const SYNC_KEYS = ['AI_URL', 'AI_FORMAT', 'AI_API_KEY', 'MODEL', 'X_CONSUMER_KEY', 'X_CONSUMER_SECRET', 'COLLECT_HOURS'];
+
+/** 画面から呼ばれる。平文の設定を返すので、ブラウザで暗号化してからJSONBinに送る */
+function exportSettings() {
+  ensureSheets_();
+  const p = props_();
+  const global = {};
+  SYNC_KEYS.forEach(function (k) { const v = p.getProperty(k); if (v) global[k] = v; });
+  const accounts = readAll_('accounts').map(function (a) {
+    const o = {};
+    SHEETS.accounts.forEach(function (h) { o[h] = a[h]; });
+    return o;
+  });
+  const xTokens = {};
+  accounts.forEach(function (a) {
+    const t = p.getProperty('X_TOKEN_' + a.id), s = p.getProperty('X_SECRET_' + a.id);
+    if (t && s) xTokens[a.id] = { token: t, secret: s };
+  });
+  return { app: 'postpilot', version: 1, exportedAt: nowIso_(), global: global, accounts: accounts, xTokens: xTokens };
+}
+
+/** JSONBinから復号した設定を反映する（同じIDのアカウントは上書き、ないものは追加） */
+function importSettings(obj) {
+  if (!obj || obj.app !== 'postpilot' || !obj.global) throw new Error('PostPilotの設定データではありません');
+  ensureSheets_();
+  const p = props_();
+  SYNC_KEYS.forEach(function (k) {
+    if (Object.prototype.hasOwnProperty.call(obj.global, k)) p.setProperty(k, String(obj.global[k]));
+  });
+  const existing = {};
+  readAll_('accounts').forEach(function (a) { existing[a.id] = true; });
+  (obj.accounts || []).forEach(function (a) {
+    if (!a || !a.id) return;
+    const row = {};
+    SHEETS.accounts.forEach(function (h) { row[h] = a[h] === undefined ? '' : a[h]; });
+    if (existing[a.id]) update_('accounts', a.id, row); else append_('accounts', row);
+  });
+  Object.keys(obj.xTokens || {}).forEach(function (id) {
+    const t = obj.xTokens[id];
+    if (t && t.token && t.secret) { p.setProperty('X_TOKEN_' + id, t.token); p.setProperty('X_SECRET_' + id, t.secret); }
+  });
+  log_('info', '', '設定を読み込みました（' + (obj.exportedAt || '日時不明') + ' に保存されたもの）');
+  return getSettings();
+}
