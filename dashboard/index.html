@@ -503,6 +503,7 @@
   }
   .card-meta{font-size:11px;color:var(--text-muted);}
   .card-updated{font-size:10px;color:var(--text-muted);margin-top:3px;}
+  .card-path{font-size:10px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   .empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty .big{font-size:15px;color:var(--text-secondary);}
@@ -653,7 +654,7 @@
     <div class="field">
       <label>URL</label>
       <input type="text" id="f-url" placeholder="https://example.com">
-      <div class="hint">YouTube / Excel Web / サイトを自動判定します</div>
+      <div class="hint" id="hint-url">YouTube / Excel Web / サイトを自動判定します</div>
       <div class="err" id="err-url">http:// または https:// から始まるURLを入力してください</div>
     </div>
     <div class="field">
@@ -667,6 +668,12 @@
         <option value="download">ダウンロードして使う</option>
         <option value="local">ローカル実行</option>
       </select>
+    </div>
+    <div class="field" id="field-exepath" hidden>
+      <label>exeのパス</label>
+      <input type="text" id="f-exepath" placeholder="C:\Tools\App\App.exe" spellcheck="false" autocomplete="off">
+      <div class="hint">エクスプローラーで Shift+右クリック →「パスとしてコピー」で貼り付け。指定するとカードのクリックでこのexeを起動します（初回のみWindows側で許可が必要）</div>
+      <div class="err" id="err-exepath">C:\ などのドライブから始まる .exe のパスを入力してください（ネットワークパス・引数は不可）</div>
     </div>
     <div class="field">
       <label>アイコン種別</label>
@@ -1126,6 +1133,14 @@
 
     <div class="tab-panel" data-panel="link">
       <div class="field">
+        <label>ローカルアプリの起動方式</label>
+        <select id="s-launchmode">
+          <option value="scheme">URLスキーム（dashrun://）</option>
+          <option value="bridge">local_bridge 経由（準備中）</option>
+        </select>
+        <div class="hint">この端末にのみ保存されます。URLスキーム方式は Windows に dashrun ハンドラの登録が必要です（dashboard/dashrun/README.md）</div>
+      </div>
+      <div class="field">
         <label>GAS の URL</label>
         <input type="text" id="s-gasurl" placeholder="https://script.google.com/macros/s/.../exec">
         <div class="hint">GASを「ウェブアプリとしてデプロイ」して得たURL</div>
@@ -1260,7 +1275,7 @@ const CATEGORY_ICON = {
   ai:'bot', excel:'table', youtube:'video', site:'globe', code:'code',
   doc:'file', db:'database', cloud:'cloud', chat:'chat', calendar:'calendar'
 };
-const TYPE_ICON_NAME = { youtube:'play', excel:'file', site:'globe' };
+const TYPE_ICON_NAME = { youtube:'play', excel:'file', site:'globe', exe:'app' };
 
 /** URLから最も近いカテゴリを推測する。手動で選び直すことも常に可能 */
 function detectCategory(url){
@@ -1542,7 +1557,7 @@ function thumbHTML(r){
       <div class="base-layer${isVideo ? ' always-on' : ''}">${base}</div>
       ${hover ? `<div class="hover-layer">${hover}</div>` : ''}
       <div class="type-badge">${svgIcon(TYPE_ICON_NAME[r.type] || 'globe')}</div>
-      <div class="run-badge mono">${RUN_LABEL[r.runType]||'Web'}</div>
+      <div class="run-badge mono">${isLocalApp(r) ? 'EXE' : (RUN_LABEL[r.runType]||'Web')}</div>
       <div class="card-actions">
         <button class="mini-btn edit" data-edit="${r.id}" title="編集">✎</button>
         <button class="mini-btn" data-card-config="resource:${r.id}" title="カード設定">⚙</button>
@@ -1574,6 +1589,7 @@ function render(){
       <div class="card-body">
         <div class="card-title">${r.title}</div>
         <div class="card-meta mono">${r.category || '未分類'}</div>
+        ${cardPathHTML(r)}
         <div class="card-updated mono">${formatUpdatedAt(r.updatedAt)}</div>
       </div>
     </div>`).join('');
@@ -1589,7 +1605,7 @@ function render(){
     card.addEventListener('click', e=>{
       if(e.target.closest('.card-actions')) return;
       if(suppressClick) return;
-      window.open(card.dataset.url, '_blank');
+      openResource(resources.find(x=>x.id===card.dataset.id));
     });
   });
   grid.querySelectorAll('[data-del]').forEach(b=>{
@@ -1673,6 +1689,66 @@ document.getElementById('sizeGroup').addEventListener('click', async e=>{
   applyConfig(); await persistLocal();
 });
 
+/* ---------- ローカルアプリ起動（ランチャー） ----------
+ * カードには「何を起動するか（path）」だけを保存し、「どう起動するか」はランチャーに任せる。
+ * 将来 local_bridge 方式へ移るときは LAUNCHERS.bridge を実装して設定を切り替えるだけでよい。
+ * launch() は { status: 'started'|'running'|'denied'|'unknown'|'unsupported'|'error', message? } を返す。
+ */
+const EXE_PATH_RE = /^[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]+\.exe$/i;
+function isValidExePath(p){ return EXE_PATH_RE.test(String(p || '').trim()); }
+function isLocalApp(r){ return !!(r && r.runType === 'local' && r.path); }
+function cardPathHTML(r){
+  return isLocalApp(r) ? `<div class="card-path mono" title="${esc(r.path)}">${esc(r.path)}</div>` : '';
+}
+
+const LAUNCHERS = {
+  scheme: {
+    launch(path){
+      // ブラウザがWindowsに登録された dashrun ハンドラへ渡すだけなので、起動結果は戻らない
+      window.location.href = 'dashrun://launch?path=' + encodeURIComponent(path);
+      return Promise.resolve({ status:'unknown' });
+    }
+  },
+  bridge: {
+    launch(){
+      return Promise.resolve({ status:'unsupported', message:'local_bridge 方式はまだ実装されていません。設定の「連携」で URLスキーム に戻してください' });
+    }
+  }
+};
+
+let launcherSettings = { mode:'scheme' };
+async function loadLauncherSettings(){
+  const raw = await store.get('launcherSettings');
+  if(raw){ try{ launcherSettings = { ...launcherSettings, ...JSON.parse(raw) }; }catch(e){} }
+  if(!LAUNCHERS[launcherSettings.mode]) launcherSettings.mode = 'scheme';
+}
+async function saveLauncherSettings(){
+  await store.set('launcherSettings', JSON.stringify(launcherSettings));
+}
+
+const LAUNCH_MESSAGES = {
+  started:  t => `${t} を起動しました`,
+  running:  t => `${t} はすでに起動しています`,
+  denied:   t => `${t} の起動は許可されませんでした`,
+  unknown:  t => `${t} の起動を依頼しました`
+};
+
+async function openResource(r){
+  if(!r) return;
+  if(isLocalApp(r)){
+    const launcher = LAUNCHERS[launcherSettings.mode] || LAUNCHERS.scheme;
+    try{
+      const res = await launcher.launch(r.path) || { status:'unknown' };
+      const msg = LAUNCH_MESSAGES[res.status];
+      toast(msg ? msg(r.title || 'アプリ') : (res.message || '起動できませんでした'));
+    }catch(err){
+      toast('起動できませんでした: ' + (err && err.message ? err.message : err));
+    }
+    return;
+  }
+  if(r.url) window.open(r.url, '_blank');
+}
+
 /* ---------- 追加・編集モーダル ---------- */
 const itemOverlay = document.getElementById('itemOverlay');
 const F = id => document.getElementById(id);
@@ -1686,6 +1762,9 @@ function openItemModal(id){
   F('f-tag').value = r ? (r.category||'') : '';
   F('f-category').value = r ? (r.category_icon||'') : '';
   F('f-runtype').value = r ? (r.runType||'web') : 'web';
+  F('f-exepath').value = r ? (r.path||'') : '';
+  F('err-exepath').style.display='none';
+  syncRunTypeFields();
   F('f-cardsize').value = r ? (r.cardSize||'normal') : 'normal';
   F('f-thumb').value = r ? (r.thumb||'') : '';
   F('f-preview').value = r ? (r.preview||'') : '';
@@ -1694,25 +1773,41 @@ function openItemModal(id){
   itemOverlay.classList.add('show');
 }
 document.getElementById('openAdd').onclick = ()=>openItemModal(null);
+
+/** 実行方法が「ローカル実行」のときだけ exe パス欄を出し、URLを任意にする */
+function syncRunTypeFields(){
+  const local = F('f-runtype').value === 'local';
+  F('field-exepath').hidden = !local;
+  F('hint-url').textContent = local
+    ? 'exeのパスを指定する場合は空欄でかまいません'
+    : 'YouTube / Excel Web / サイトを自動判定します';
+}
+F('f-runtype').addEventListener('change', syncRunTypeFields);
 document.getElementById('cancelItem').onclick = ()=>itemOverlay.classList.remove('show');
 
 document.getElementById('saveItem').onclick = async ()=>{
   const title = F('f-title').value.trim();
   const url = F('f-url').value.trim();
+  const runType = F('f-runtype').value;
+  const exePath = runType === 'local' ? F('f-exepath').value.trim().replace(/^"(.*)"$/, '$1') : '';
   let bad = false;
   if(!title){ F('err-title').style.display='block'; bad=true; } else F('err-title').style.display='none';
-  if(!/^https?:\/\/.+/.test(url)){ F('err-url').style.display='block'; bad=true; } else F('err-url').style.display='none';
+  // exe を指定したときは URL は空欄でもよい。入力されていれば形式をチェックする
+  const urlOk = (exePath && !url) || /^https?:\/\/.+/.test(url);
+  if(!urlOk){ F('err-url').style.display='block'; bad=true; } else F('err-url').style.display='none';
+  if(exePath && !isValidExePath(exePath)){ F('err-exepath').style.display='block'; bad=true; } else F('err-exepath').style.display='none';
   if(bad) return;
 
   const data = {
     title, url,
+    path: exePath || null,
     category: F('f-tag').value.trim(),
     category_icon: F('f-category').value || null,
-    runType: F('f-runtype').value,
+    runType,
     cardSize: F('f-cardsize').value,
     thumb: F('f-thumb').value.trim() || null,
     preview: F('f-preview').value.trim() || null,
-    type: detectType(url),
+    type: exePath ? 'exe' : detectType(url),
     updatedAt: new Date().toISOString()
   };
   if(editingId){
@@ -1751,6 +1846,7 @@ function syncSettingsForm(){
   syncMonitorPicker();
   F('err-monitors').style.display = 'none';
   F('s-gasurl').value = gasSettings.url || '';
+  F('s-launchmode').value = launcherSettings.mode || 'scheme';
   F('s-gassecret').value = gasSettings.secret || '';
   F('s-json').value = JSON.stringify({ config, resources }, null, 2);
   F('err-json').style.display = 'none';
@@ -2080,6 +2176,10 @@ document.getElementById('btn-upthumb').onclick = ()=>
 document.getElementById('btn-uppreview').onclick = ()=>
   uploadAsset('u-preview','f-preview','assets/previews/','hint-preview');
 
+F('s-launchmode').addEventListener('change', async e=>{
+  launcherSettings.mode = e.target.value; await saveLauncherSettings();
+  if(e.target.value === 'bridge') toast('local_bridge 方式は準備中です（現状は起動できません）');
+});
 F('s-gasurl').addEventListener('input', async e=>{
   gasSettings.url = e.target.value.trim(); await saveGasSettings();
 });
@@ -4909,10 +5009,10 @@ function renderCustomTabs(){
     grid.innerHTML = list.map(r=>`
       <div class="card" data-id="${esc(r.id)}" data-url="${esc(r.url)}" data-size="${esc(r.cardSize||'normal')}">
         ${thumbHTML(r)}
-        <div class="card-body"><div class="card-title">${esc(r.title)}</div><div class="card-meta mono">${esc(r.category || '未分類')}</div><div class="card-updated mono">${formatUpdatedAt(r.updatedAt)}</div></div>
+        <div class="card-body"><div class="card-title">${esc(r.title)}</div><div class="card-meta mono">${esc(r.category || '未分類')}</div>${cardPathHTML(r)}<div class="card-updated mono">${formatUpdatedAt(r.updatedAt)}</div></div>
       </div>`).join('');
     grid.querySelectorAll('.card').forEach(card=>card.addEventListener('click', e=>{
-      if(!e.target.closest('.card-actions')) window.open(card.dataset.url, '_blank');
+      if(!e.target.closest('.card-actions')) openResource(resources.find(x=>x.id===card.dataset.id));
     }));
     grid.querySelectorAll('[data-edit]').forEach(button=>button.addEventListener('click', e=>{ e.stopPropagation(); openItemModal(button.dataset.edit); }));
     grid.querySelectorAll('[data-card-config]').forEach(button=>button.addEventListener('click', e=>{ e.stopPropagation(); openCardConfig(button.dataset.cardConfig); }));
@@ -5779,7 +5879,7 @@ F('s-interval').addEventListener('input', async e=>{
 });
 
 initialParams = readUrlParams();
-Promise.all([loadGasSettings(), loadJsonbinSettings()]).then(init);
+Promise.all([loadGasSettings(), loadJsonbinSettings(), loadLauncherSettings()]).then(init);
 </script>
 </body>
 </html>
