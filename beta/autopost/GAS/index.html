@@ -61,6 +61,18 @@ a{color:var(--blue)} a:hover{color:var(--blue-d)}
 .card{background:var(--card);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.65;box-shadow:0 1px 0 rgba(22,24,29,.06)}
 .card .who{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .dot{width:8px;height:8px;border-radius:4px;display:inline-block}
+.card{position:relative}
+.selbox{position:absolute;top:6px;right:6px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:8px}
+.selbox:hover{background:#F0F2F5}
+.selbox input{width:20px;height:20px;accent-color:var(--blue);cursor:pointer}
+.card.picked{outline:2px solid var(--blue)}
+.card .who{padding-right:34px}
+.selall{border:0;background:transparent;color:var(--blue);font-size:12px;font-weight:700;padding:4px 6px;min-height:32px;align-self:flex-start;cursor:pointer}
+.bulkbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9;background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 24px);box-shadow:0 8px 24px rgba(22,24,29,.25)}
+.bulkbar .cnt{font-size:13px;font-weight:700;padding:0 6px}
+.bulkbar .btn{height:40px;font-size:13px;color:var(--ink);background:#fff;border-color:#fff}
+.bulkbar .btn.pri{color:#fff;background:var(--blue);border-color:var(--blue)}
+.bulkbar .btn.ghost{color:#C9CDD4;background:transparent;border-color:transparent}
 .card .txt{white-space:pre-wrap;word-break:break-word}
 .card .src,.big .src{display:block;min-width:0;font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .why{font-size:12px;color:var(--ink2);background:#F6F7F9;border-radius:8px;padding:6px 8px}
@@ -69,6 +81,7 @@ a{color:var(--blue)} a:hover{color:var(--blue-d)}
 .tag.warn{background:#FFF3EA;color:#A63F06}
 .tag.bad{background:#FDECEA;color:var(--bad)}
 .tag.ok{background:#E3F2E8;color:var(--ok)}
+.tag{background:#EEF0F3;color:var(--ink2)}
 .empty{font-size:12px;color:var(--mute);padding:8px 6px;line-height:1.7}
 .sk{height:8px;border-radius:4px;background:#EEF0F3}
 /* 承認（1件ずつ） */
@@ -133,13 +146,19 @@ a{color:var(--blue)} a:hover{color:var(--blue-d)}
 <div id="layer"></div>
 
 <script>
-const S = { board: null, settings: null, filter: 'all', view: window.innerWidth < 820 ? 'approve' : 'board', idx: 0, editAcct: null };
+const S = { sel: {}, board: null, settings: null, filter: 'all', view: window.innerWidth < 820 ? 'approve' : 'board', idx: 0, editAcct: null };
 const COLORS = ['#1D4FBF', '#A63F06', '#0F5E57', '#6D28D9', '#16181D'];
+const RELAY_APP_DEFAULT = 'https://claude.ai/artifact/31ZjikpAS1vEUdc5PTdgYC';
 
 function call(fn) {
   const args = Array.prototype.slice.call(arguments, 1);
   return new Promise(function (res, rej) {
-    google.script.run.withSuccessHandler(res).withFailureHandler(function (e) { rej(e && e.message ? e : new Error(String(e))); })[fn].apply(null, args);
+    const runner = google.script.run.withSuccessHandler(res).withFailureHandler(function (e) { rej(e && e.message ? e : new Error(String(e))); });
+    if (typeof runner[fn] !== 'function') {
+      rej(new Error('サーバー側（Code.gs）に「' + fn + '」がありません。最新のCode.gsを貼り付けて保存し、「デプロイを管理」で新バージョンにしてください。'));
+      return;
+    }
+    runner[fn].apply(null, args);
   });
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -226,15 +245,60 @@ function renderBoard() {
     { key: 'idea', step: '1-2', label: 'ネタ候補', sub: '収集→AIが採点', list: cands, card: candCard },
     { key: 'gen', step: '3', label: '生成中', sub: 'AIが下書きを作成', list: by(['generating']), card: genCard },
     { key: 'pending', step: '4', label: '承認待ち', sub: 'あなたの確認待ち', list: by(['pending']), card: pendCard, hot: true },
-    { key: 'sched', step: '5', label: '予約済み', sub: '時刻になると自動投稿', list: by(['scheduled']), card: schedCard },
+    { key: 'sched', step: '5', label: '予約済み', sub: '時刻になると投稿（手動は通知）', list: by(['due', 'scheduled']), card: schedCard },
     { key: 'posted', step: '✓', label: '投稿済み', sub: '直近36時間', list: by(['posted', 'failed']).reverse(), card: postedCard }
   ];
   const name = S.filter === 'all' ? '全アカウント' : acctOf(S.filter).name;
-  return topBar('投稿ボード：' + name) + setupBanner() +
+  return topBar('投稿ボード：' + name) + setupBanner() + relayBanner() +
     '<div class="lanes-wrap"><div class="lanes">' + lanes.map(function (l) {
+      const selectable = l.list.filter(function (x) { return !!kindOf(l.key, x); });
       return '<section class="lane' + (l.hot ? ' hot' : '') + '" aria-label="' + l.label + '"><div class="lane-h"><div class="row"><b>' + l.step + ' ' + l.label + '</b><span class="num">' + l.list.length + '</span></div><small>' + l.sub + '</small></div>' +
-        (l.list.length ? l.list.map(l.card).join('') : '<div class="empty">' + emptyText(l.key) + '</div>') + '</section>';
-    }).join('') + '</div></div>';
+        (selectable.length > 1 ? '<button type="button" class="selall" data-act="selAll" data-lane="' + l.key + '">' + (selectable.every(function (x) { return S.sel[x.id]; }) ? '選択を外す' : (l.key === 'posted' ? '失敗をすべて選択' : 'すべて選択')) + '</button>' : '') +
+        (l.list.length ? l.list.map(function (x) { return withSel(l.card(x), x.id, kindOf(l.key, x)); }).join('') : '<div class="empty">' + emptyText(l.key) + '</div>') + '</section>';
+    }).join('') + '</div></div><div id="bulkbar"></div>';
+}
+// ===== まとめて実行（選択） =====
+// kind：cand＝ネタ候補（AIで下書き）／pend＝承認待ち（承認・別案）／back＝予約済み・失敗（承認待ちに戻す）
+function kindOf(lane, x) {
+  if (lane === 'idea') return 'cand';
+  if (lane === 'pending') return 'pend';
+  if (lane === 'sched') return 'back';
+  if (lane === 'posted' && x.status === 'failed') return 'back';
+  return '';
+}
+function withSel(html, id, kind) {
+  if (!kind) return html;
+  const on = !!S.sel[id];
+  const box = '<label class="selbox" title="選択"><input type="checkbox" data-sel="' + esc(id) + '" data-kind="' + kind + '"' + (on ? ' checked' : '') + ' aria-label="この項目を選択"></label>';
+  return html.replace('<article class="card"', '<article class="card' + (on ? ' picked' : '') + '"').replace(/>/, '>' + box);
+}
+function laneItems(key) {
+  const b = S.board;
+  const drafts = b.drafts.filter(inFilter);
+  if (key === 'idea') return b.candidates.filter(inFilter).slice(0, 8);
+  if (key === 'pending') return drafts.filter(function (d) { return d.status === 'pending'; });
+  if (key === 'sched') return drafts.filter(function (d) { return d.status === 'scheduled' || d.status === 'due'; });
+  if (key === 'posted') return drafts.filter(function (d) { return d.status === 'failed'; });
+  return [];
+}
+function pruneSel() {
+  const valid = {};
+  ['idea', 'pending', 'sched', 'posted'].forEach(function (k) {
+    laneItems(k).forEach(function (x) { const kd = kindOf(k, x); if (kd) valid[x.id] = kd; });
+  });
+  Object.keys(S.sel).forEach(function (id) { if (valid[id] !== S.sel[id]) delete S.sel[id]; });
+}
+function updateBulkBar() {
+  const bar = $('bulkbar');
+  if (!bar) return;
+  const ids = Object.keys(S.sel);
+  if (!ids.length) { bar.innerHTML = ''; return; }
+  const n = function (k) { return ids.filter(function (id) { return S.sel[id] === k; }).length; };
+  const c = n('cand'), p = n('pend'), k = n('back');
+  const btn = function (op, label, cnt, pri) { return cnt ? '<button type="button" class="btn' + (pri ? ' pri' : '') + '" data-act="bulk" data-op="' + op + '">' + label + '（' + cnt + '）</button>' : ''; };
+  bar.innerHTML = '<div class="bulkbar" role="toolbar" aria-label="まとめて実行"><span class="cnt">' + ids.length + '件選択中</span>' +
+    btn('approve', '承認して予約', p, true) + btn('regen', '別案', p) + btn('fromItem', 'AIで下書き', c, true) + btn('unsched', '承認待ちに戻す', k) +
+    '<button type="button" class="btn ghost" data-act="selClear">選択を解除</button></div>';
 }
 function emptyText(k) {
   return { idea: '「今すぐネタを探す」で収集できます', gen: 'なし', pending: '確認待ちの下書きはありません', sched: '予約はありません', posted: 'まだ投稿はありません' }[k];
@@ -248,21 +312,33 @@ function candCard(c) {
   return '<article class="card">' + who(c.accountId, c.score !== '' ? 'スコア ' + c.score : '未採点') +
     '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.title) + '</a>' +
     (c.reason ? '<div class="why">' + esc(c.reason) + '</div>' : '') +
-    '<div class="acts"><button type="button" class="btn sm pri" data-act="fromItem" data-id="' + esc(c.id) + '">下書きにする</button><button type="button" class="btn sm" data-act="skip" data-id="' + esc(c.id) + '">見送る</button></div></article>';
+    '<div class="acts">' + '<button type="button" class="btn sm pri" data-act="fromItem" data-id="' + esc(c.id) + '">AIで下書き</button>' +
+    '<button type="button" class="btn sm" data-act="fromItemManual" data-id="' + esc(c.id) + '">自分で書く</button>' +
+    '<button type="button" class="btn sm ghost" data-act="skip" data-id="' + esc(c.id) + '">見送る</button></div></article>';
 }
 function genCard(d) { return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + '<span class="sk"></span><span class="sk" style="width:65%"></span><span class="sub" style="font-size:11px">AIが執筆中…</span></article>'; }
 function warnTag(d) { return d.warn ? ' <span class="tag warn">要確認：' + esc(d.warn) + '</span>' : ''; }
 function pendCard(d) {
-  return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + warnTag(d) + '<div class="txt">' + esc(d.text) + '</div>' + srcLine(d) +
+  return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + warnTag(d) + (d.text ? '<div class="txt">' + esc(d.text) + '</div>' : '<span><span class="tag warn">本文が未入力です</span></span>') + srcLine(d) +
     (d.reason ? '<div class="why">選定理由：' + esc(d.reason) + '</div>' : '') +
     '<div class="acts"><button type="button" class="btn sm pri" data-act="approve" data-id="' + esc(d.id) + '">承認して予約</button>' +
     '<button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button>' +
     '<button type="button" class="btn sm" data-act="regen" data-id="' + esc(d.id) + '">別案</button>' +
     '<button type="button" class="btn sm ghost" data-act="reject" data-id="' + esc(d.id) + '">却下</button></div></article>';
 }
+function intentUrl(text) { return 'https://x.com/intent/post?text=' + encodeURIComponent(text); }
+function manualBtns(d) {
+  return '<button type="button" class="btn sm pri" data-act="xIntent" data-id="' + esc(d.id) + '">Xで投稿する</button>' +
+         '<button type="button" class="btn sm" data-act="markPosted" data-id="' + esc(d.id) + '">投稿済みにする</button>';
+}
 function schedCard(d) {
-  return '<article class="card">' + who(d.accountId, fmtSlot(d.slotAt)) + '<div class="txt">' + esc(d.text) + '</div>' +
-    '<div class="acts"><button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button><button type="button" class="btn sm ghost" data-act="unsched" data-id="' + esc(d.id) + '">承認待ちに戻す</button></div></article>';
+  const manual = acctOf(d.accountId).postMode === 'manual';
+  const due = d.status === 'due';
+  return '<article class="card"' + (due ? ' style="outline:2px solid #E8590C"' : '') + '>' + who(d.accountId, fmtSlot(d.slotAt)) +
+    (due ? '<span><span class="tag warn">投稿の時間です</span></span>' : manual ? '<span><span class="tag">手動投稿</span></span>' : '') +
+    '<div class="txt">' + esc(d.text) + '</div>' +
+    '<div class="acts">' + (manual ? manualBtns(d) : '') +
+    '<button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button><button type="button" class="btn sm ghost" data-act="unsched" data-id="' + esc(d.id) + '">承認待ちに戻す</button></div></article>';
 }
 function postedCard(d) {
   const ok = d.status === 'posted';
@@ -271,19 +347,44 @@ function postedCard(d) {
   return '<article class="card">' + who(d.accountId, fmtSlot(d.postedAt || d.slotAt)) +
     (ok ? '<span><span class="tag ok">投稿済み</span></span>' : '<span><span class="tag bad">失敗</span></span><div class="why">' + esc(d.error) + '</div>') +
     '<div class="txt">' + esc(d.text) + '</div>' + link +
-    (ok ? '' : '<div class="acts"><button type="button" class="btn sm" data-act="retry" data-id="' + esc(d.id) + '">今すぐ再投稿</button><button type="button" class="btn sm" data-act="edit" data-id="' + esc(d.id) + '">編集</button></div>') + '</article>';
+    (ok ? '' : '<div class="acts"><button type="button" class="btn sm" data-act="unsched" data-id="' + esc(d.id) + '">承認待ちに戻す</button>' +
+      '<button type="button" class="btn sm" data-act="retry" data-id="' + esc(d.id) + '">今すぐ再投稿</button>' +
+      '<button type="button" class="btn sm ghost" data-act="del" data-id="' + esc(d.id) + '">削除</button></div>') + '</article>';
 }
 function topBar(title) {
   const b = S.board;
   return '<div class="top"><div><div class="sub">最終収集：' + (b.lastRun ? fmtSlot(b.lastRun) : 'まだありません') + ' ・ 自動実行 ' + (b.autoOn ? 'ON' : 'OFF') + '</div><h1>' + esc(title) + '</h1></div>' +
-    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" data-act="reload">再読み込み</button>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' + aiSwitch() + '<button type="button" class="btn" data-act="reload">再読み込み</button>' +
     '<button type="button" class="btn pri" data-act="run"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>今すぐネタを探す</button></div></div>';
+}
+function relayBanner() {
+  const r = S.board.relay || {};
+  if (r.error) return '<div class="banner" style="background:#FDECEA;border-color:#F5B5AE">claude.aiの結果を取り込めませんでした：' + esc(r.error) + '</div>';
+  if (!r.waiting) return '';
+  const parts = [];
+  const drafts = r.waiting - (r.tests || 0) - (r.scores || 0);
+  if (drafts > 0) parts.push('下書き ' + drafts + '件');
+  if (r.scores) parts.push('ネタの採点 ' + r.scores + '件');
+  if (r.tests) parts.push('接続テスト ' + r.tests + '件');
+  return '<div class="banner" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px"><b>claude.aiで生成待ち：' + r.waiting + '件（' + parts.join('・') + '）</b><br>claude.aiのページを開いて「まとめて生成する」を押すと、数分以内にここへ反映されます。</span>' +
+    '<a class="btn pri" href="' + esc(r.pageUrl || RELAY_APP_DEFAULT) + '" target="_blank" rel="noopener" style="text-decoration:none">claude.aiで生成する</a>' +
+    '<button type="button" class="btn" data-act="reload">結果を確認</button></div>';
+}
+function aiSwitch() {
+  const m = S.board.aiMode;
+  const b = function (mode, label) {
+    const on = m === mode;
+    return '<button type="button" data-act="aiMode" data-mode="' + mode + '" aria-pressed="' + on + '" style="min-height:40px;padding:0 14px;border:0;border-radius:8px;font-size:13px;' +
+      (on ? 'background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(22,24,29,.12)' : 'background:transparent;color:var(--mute)') + '">' + label + '</button>';
+  };
+  return '<div role="group" aria-label="使うAI" style="display:flex;gap:2px;background:#E1E4E9;border-radius:10px;padding:2px;align-items:center"><span class="sub" style="padding:0 8px;font-size:12px">AI</span>' +
+    b('claudeai', 'claude.ai') + b('url', '独自AI') + '</div>';
 }
 function setupBanner() {
   const b = S.board;
   if (!b.setupDone) return '<div class="banner">最初に「設定」でAIのAPI URLを登録し、アカウントを追加してください。</div>';
   if (!b.accounts.length) return '<div class="banner">「設定」でアカウントを追加すると、キーワードからネタ探しを始められます。</div>';
-  if (b.accounts.some(function (a) { return !a.xConnected; })) return '<div class="banner">Xと未連携のアカウントがあります。予約した投稿は連携するまで失敗扱いになります（設定から連携できます）。</div>';
+  if (b.accounts.some(function (a) { return a.postMode !== 'manual' && !a.xConnected; })) return '<div class="banner">Xと未連携のアカウントがあります。予約した投稿は連携するまで失敗扱いになります（設定から連携できます）。</div>';
   return '';
 }
 
@@ -291,7 +392,10 @@ function setupBanner() {
 function renderApprove() {
   const list = S.board.drafts.filter(function (d) { return d.status === 'pending' && inFilter(d); }).sort(function (x, y) { return new Date(x.slotAt) - new Date(y.slotAt); });
   if (S.idx >= list.length) S.idx = 0;
-  const head = '<div class="top"><div><div class="sub">承認待ち ' + list.length + '件</div><h1>下書きの確認</h1></div></div>' + setupBanner();
+  const dueList = S.board.drafts.filter(function (d) { return d.status === 'due' && inFilter(d); });
+  const dueHtml = dueList.length ? '<div class="one" style="margin-bottom:8px"><div class="sub" style="font-weight:700;color:#A63F06">投稿の時間です（' + dueList.length + '件）</div>' +
+    dueList.map(function (d) { return '<article class="card" style="outline:2px solid #E8590C">' + who(d.accountId, fmtSlot(d.slotAt)) + '<div class="txt">' + esc(d.text) + '</div><div class="acts">' + manualBtns(d) + '</div></article>'; }).join('') + '</div>' : '';
+  const head = '<div class="top"><div><div class="sub">承認待ち ' + list.length + '件</div><h1>下書きの確認</h1></div>' + aiSwitch() + '</div>' + setupBanner() + relayBanner() + dueHtml;
   if (!list.length) {
     return head + '<div class="one"><div class="big"><div class="body"><p>確認待ちの下書きはありません。</p><button type="button" class="btn pri" data-act="run">今すぐネタを探す</button></div></div></div>';
   }
@@ -329,8 +433,10 @@ function renderSettings() {
     '<div class="f"><label for="gXk">X API Key（Consumer Key） ' + set(g.xKeySet) + '</label><input id="gXk" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力"></div>' +
     '<div class="f"><label for="gXs">X API Key Secret</label><input id="gXs" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力"></div>' +
     '<div class="f"><label for="gHours">自動収集の間隔</label><select id="gHours">' + [2, 4, 6, 8, 12].map(function (h) { return '<option value="' + h + '"' + (Number(g.collectHours) === h ? ' selected' : '') + '>' + h + '時間ごと</option>'; }).join('') + '</select></div>' +
-    '<label class="chk" style="align-self:end"><input type="checkbox" id="gAuto"' + (g.autoOn ? ' checked' : '') + '>自動実行（収集と予約投稿）を有効にする</label></div>' +
+    '<label class="chk" style="align-self:end"><input type="checkbox" id="gAuto"' + (g.autoOn ? ' checked' : '') + '>自動実行（収集と予約投稿）を有効にする</label>' +
+    '<label class="chk"><input type="checkbox" id="gNotify"' + (g.notifyManual ? ' checked' : '') + '>手動投稿の時間になったらメールで知らせる</label></div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="saveGlobal">全体の設定を保存</button><button type="button" class="btn" data-act="testAi">AIの接続テスト</button></div><div class="hint">接続テストは保存済みの設定で行います。先に保存してください。</div></section>' +
+    renderRelay(g) +
     renderSync() +
   '<section class="panel" aria-label="アカウント別の設定"><h2>アカウント別の設定</h2>' +
     '<div class="tabs">' + accts.map(function (x) {
@@ -342,7 +448,7 @@ function accountForm(a) {
   const txt = function (id, label, val, rows, ph) {
     return '<div class="f"><label for="' + id + '">' + label + '</label>' + (rows ? '<textarea id="' + id + '" rows="' + rows + '" placeholder="' + esc(ph || '') + '">' + esc(val) + '</textarea>' : '<input id="' + id + '" value="' + esc(val) + '" placeholder="' + esc(ph || '') + '">') + '</div>';
   };
-  const xPart = !a.id ? '<div class="hint">保存するとXと連携できるようになります。</div>' :
+  const xPart = a.postMode === 'manual' ? '<div class="hint">手動投稿のアカウントなので、Xとの連携は不要です。</div>' : !a.id ? '<div class="hint">保存するとXと連携できるようになります。</div>' :
     a.xConnected ? '<div class="xbox"><span class="tag ok">X連携済み</span><b>@' + esc(a.handle) + '</b><button type="button" class="btn sm ghost" data-act="xOff" data-id="' + esc(a.id) + '">連携を解除</button></div>' :
     '<div class="xbox"><button type="button" class="btn sm pri" data-act="xStart" data-id="' + esc(a.id) + '">Xと連携</button>' +
     '<div class="f" style="flex:1;min-width:160px"><label for="xPin">表示されたPINコード</label><input id="xPin" inputmode="numeric" autocomplete="one-time-code"></div>' +
@@ -361,6 +467,10 @@ function accountForm(a) {
     txt('aSlots', '投稿時刻（カンマ区切り）', a.slots, 0, '08:00,12:30,19:00') + '</div>' +
     txt('aNg', 'NGルール', a.ng, 2) +
     txt('aEx', 'お手本の投稿（反応が良かったもの）', a.examples, 3) +
+    '<div class="f"><label for="aEngine">自動の採点・下書き作成</label><select id="aEngine"><option value="auto"' + (a.aiEngine !== 'none' ? ' selected' : '') + '>する（画面上部のAIスイッチに従う）</option><option value="none"' + (a.aiEngine === 'none' ? ' selected' : '') + '>しない（ネタ集めだけ。必要なときにボタンで作る）</option></select>' +
+    '<div class="hint">使うAI（claude.ai／独自AI）は、画面上部のスイッチで全アカウント共通に切り替えます。「しない」でも「AIで下書き」「別案」ボタンは使えます。</div></div>' +
+    '<div class="f"><label for="aPost">投稿方法</label><select id="aPost"><option value="api"' + (a.postMode !== 'manual' ? ' selected' : '') + '>X APIで自動投稿（API料金がかかります）</option><option value="manual"' + (a.postMode === 'manual' ? ' selected' : '') + '>手動で投稿（Xの投稿画面を開いて自分で投稿・無料）</option></select>' +
+    '<div class="hint">手動の場合、予約時刻になると「投稿の時間です」と表示され、ボタンひとつで本文入りのXの投稿画面が開きます。X連携は不要です。</div></div>' +
     '<div class="grid2"><div class="f"><label for="aMode">承認モード</label><select id="aMode"><option value="manual"' + (a.approvalMode !== 'auto' ? ' selected' : '') + '>毎回承認する</option><option value="auto"' + (a.approvalMode === 'auto' ? ' selected' : '') + '>全自動で投稿</option></select></div>' +
     '<div class="f"><label for="aPicks">1回の収集で作る下書き数</label><select id="aPicks">' + [1, 2, 3, 4, 5].map(function (n) { return '<option' + (Number(a.picksPerRun) === n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div></div>' +
     '<label class="chk"><input type="checkbox" id="aUrl"' + (a.includeUrl ? ' checked' : '') + '>投稿に出典URLを付ける</label>' +
@@ -373,9 +483,21 @@ function readAcctForm() {
   const v = function (id) { return $(id).value; };
   return { id: v('aId'), name: v('aName'), badge: v('aBadge'), color: v('aColor'), keywords: v('aKw'), rss: v('aRss'), persona: v('aPersona'),
            target: v('aTarget'), tone: v('aTone'), slots: v('aSlots'), ng: v('aNg'), examples: v('aEx'), approvalMode: v('aMode'),
-           picksPerRun: Number(v('aPicks')), includeUrl: $('aUrl').checked, avoidCrossDup: $('aCross').checked, active: $('aActive').checked };
+           picksPerRun: Number(v('aPicks')), postMode: v('aPost'), aiEngine: v('aEngine'), includeUrl: $('aUrl').checked, avoidCrossDup: $('aCross').checked, active: $('aActive').checked };
 }
 
+
+// ===== claude.ai 中継の設定 =====
+function renderRelay(g) {
+  return '<section class="panel" aria-label="claude.aiで生成"><h2>claude.aiで生成（Notion経由）</h2>' +
+    '<div class="hint">アカウント設定で「claude.aiで生成」を選んだアカウントは、AIの仕事をNotionに書き出し、claude.aiのページで生成します。Notionで作った連携（インテグレーション）のトークンを入れ、「PostPilot AI待ち」データベースと「PostPilot AI待ち一覧」ページの両方に、その連携を接続してください。</div>' +
+    '<div class="grid2"><div class="f"><label for="nTok">Notionの連携トークン ' + (g.notionTokenSet ? '<span class="tag ok">設定済み</span>' : '<span class="tag warn">未設定</span>') + '</label><input id="nTok" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力（ntn_… / secret_…）"></div>' +
+    '<div class="f"><label for="nApp">claude.aiのページのURL</label><input id="nApp" type="url" value="' + esc(g.relayAppUrl || RELAY_APP_DEFAULT) + '"></div>' +
+    '<div class="f"><label for="nDb">「PostPilot AI待ち」データベースのURLまたはID</label><input id="nDb" value="' + esc(g.notionDbId) + '"></div>' +
+    '<div class="f"><label for="nQ">「PostPilot AI待ち一覧」ページのURLまたはID</label><input id="nQ" value="' + esc(g.notionQueuePage) + '"></div></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="saveRelay">保存</button><button type="button" class="btn" data-act="relayTest">中継テストを登録</button><button type="button" class="btn" data-act="relayCheck">結果を確認</button><button type="button" class="btn ghost" data-act="relayCancel">生成待ちをすべて取り消す</button></div>' +
+    '<div class="hint">中継テスト：「中継テストを登録」→ claude.aiのページで「まとめて生成する」→ ここで「結果を確認」。' + (g.relayTest ? '<br><b>直近のテスト：' + esc(g.relayTest) + '</b>' : '') + '</div></section>';
+}
 
 // ===== 設定の同期（JSONBin・パスフレーズで暗号化。MemoStockと同じ方式） =====
 const JB = 'https://api.jsonbin.io/v3/b';
@@ -473,6 +595,28 @@ function openEdit(id) {
   $('mText').addEventListener('input', upd); upd(); $('mText').focus();
 }
 function closeModal() { $('layer').innerHTML = ''; }
+function relayOn() { return !!(S.board && S.board.relay && S.board.relay.ready); }
+async function doFromItem(id, via) {
+  try {
+    busy(true, '処理しています…');
+    const r = await call('draftFromItem', id, false, via);
+    await load();
+  } catch (e) { toast(e.message, true); } finally { busy(false); }
+}
+async function doRegen(id, via) {
+  try {
+    busy(true, '処理しています…');
+    const r = await call('regenerateDraft', id, via);
+    await load();
+  } catch (e) { toast(e.message, true); } finally { busy(false); }
+}
+function openPostedModal(id, opened) {
+  $('layer').innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="pTitle"><div class="box">' +
+    '<h2 id="pTitle" style="margin:0;font-size:16px">' + (opened ? 'Xで投稿できましたか？' : '投稿済みにしますか？') + '</h2>' +
+    (opened ? '<div class="hint">開いたXの画面で投稿ボタンを押したら、こちらで「投稿済みにする」を押してください。画面が開かなかった場合は、ポップアップのブロックを確認してください。</div>' : '') +
+    '<div class="f"><label for="pUrl">投稿のURL（任意。貼るとボードから投稿を開けます）</label><input id="pUrl" type="url" inputmode="url" placeholder="https://x.com/…/status/…"></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" data-act="closeModal">まだ</button><button type="button" class="btn pri" data-act="confirmPosted" data-id="' + esc(id) + '">投稿済みにする</button></div></div></div>';
+}
 function showResult(title, body, isErr) {
   $('layer').innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="rTitle"><div class="box">' +
     '<h2 id="rTitle" style="margin:0;font-size:16px;color:' + (isErr ? 'var(--bad)' : 'var(--ok)') + '">' + esc(title) + '</h2>' +
@@ -484,7 +628,9 @@ function showResult(title, body, isErr) {
 function render() {
   if (!S.board) return;
   renderSide();
+  if (S.view === 'board') pruneSel();
   $('main').innerHTML = S.view === 'board' ? renderBoard() : S.view === 'approve' ? renderApprove() : renderSettings();
+  updateBulkBar();
 }
 
 document.addEventListener('click', async function (e) {
@@ -506,7 +652,14 @@ document.addEventListener('click', async function (e) {
       try {
         const r = await call('runNow', el.dataset.act === 'run' ? S.filter : id);
         const c = r.reduce(function (s, x) { return s + x.collected; }, 0), d = r.reduce(function (s, x) { return s + x.drafted; }, 0);
-        toast('新しいネタ ' + c + '件・下書き ' + d + '件' + (d ? '（ボードで確認できます）' : '。ネタ候補から手動で下書きにもできます'), !d && !c);
+        const q = r.reduce(function (s, x) { return s + (x.queued || 0); }, 0);
+        const aiErr = r.find(function (x) { return x.aiError; });
+        if (aiErr) {
+          await load();
+          showResult('ネタ集めは完了しました（AIは使えませんでした）', '新しいネタ ' + c + '件をネタ候補に追加しました。\nAIにつながらなかったため、採点と下書き作成はできませんでした。ネタ候補の「自分で書く」で投稿文を作れます。\n\nAIの状態：' + aiErr.aiError, true);
+          break;
+        }
+        toast('新しいネタ ' + c + '件・下書き ' + d + '件' + (q ? '・claude.aiの生成待ち ' + q + '件' : '') + (d ? '（ボードで確認できます）' : q ? '' : '。ネタ候補から手動で下書きにもできます'), !d && !c && !q);
         await load();
       } catch (err) { toast(err.message, true); } finally { busy(false); }
       break;
@@ -514,9 +667,47 @@ document.addEventListener('click', async function (e) {
     case 'approve': await act('approveDraft', [id], '承認して予約しました'); break;
     case 'reject': await act('rejectDraft', [id], '却下しました'); break;
     case 'unsched': await act('unscheduleDraft', [id], '承認待ちに戻しました'); break;
-    case 'regen': await act('regenerateDraft', [id], '別案を作りました', '別案を作っています…'); break;
-    case 'retry': await act('retryDraft', [id], '再投稿を予約しました（5分以内に投稿されます）'); break;
-    case 'fromItem': await act('draftFromItem', [id], '下書きを作りました', '下書きを作っています…'); break;
+    case 'del': {
+      if (!confirm('この下書きをボードから削除しますか？（スプレッドシートには履歴として残ります）')) return;
+      await act('deleteDraft', [id], '削除しました'); break;
+    }
+    case 'selAll': {
+      const key = el.dataset.lane;
+      const items = laneItems(key).filter(function (x) { return !!kindOf(key, x); });
+      const allOn = items.every(function (x) { return S.sel[x.id]; });
+      items.forEach(function (x) { if (allOn) delete S.sel[x.id]; else S.sel[x.id] = kindOf(key, x); });
+      render();
+      break;
+    }
+    case 'selClear': S.sel = {}; render(); break;
+    case 'bulk': {
+      const op = el.dataset.op;
+      const need = { fromItem: 'cand', approve: 'pend', regen: 'pend', unsched: 'back' }[op];
+      const ids = Object.keys(S.sel).filter(function (k) { return S.sel[k] === need; });
+      if (!ids.length) return;
+      busy(true, ids.length + '件を処理しています…');
+      try {
+        const r = await call('bulkAction', op, ids, S.board.aiMode);
+        ids.forEach(function (k) { delete S.sel[k]; });
+        (r.errors || []).forEach(function (er) { if (er.id) S.sel[er.id] = need; }); // 失敗したものは選択したまま残す
+        await load();
+        if (r.errors && r.errors.length) toast(r.errors.length + '件は実行できませんでした：' + r.errors[0].message + (r.errors.length > 1 ? ' ほか' : ''), true);
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'regen': await doRegen(id, S.board.aiMode); break;
+    case 'fromItem': await doFromItem(id, S.board.aiMode); break;
+    case 'aiMode': {
+      if (el.dataset.mode === S.board.aiMode) return;
+      try { await call('setAiMode', el.dataset.mode); await load(); } catch (err) { toast(err.message, true); }
+      break;
+    }
+    case 'fromItemManual': {
+      busy(true, '下書きを用意しています…');
+      try { const r = await call('draftFromItem', id, true); await load(); openEdit(r.id); }
+      catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
     case 'skip': await act('skipItem', [id], '見送りました'); break;
     case 'edit': openEdit(id); break;
     case 'closeModal': closeModal(); break;
@@ -528,7 +719,7 @@ document.addEventListener('click', async function (e) {
     }
     case 'saveGlobal': {
       const g = { aiUrl: $('gUrl').value, aiFormat: $('gFmt').value, aiKey: $('gAk').value, clearAiKey: $('gAkClear').checked, model: $('gModel').value, xConsumerKey: $('gXk').value, xConsumerSecret: $('gXs').value,
-                  collectHours: Number($('gHours').value), autoOn: $('gAuto').checked };
+                  collectHours: Number($('gHours').value), autoOn: $('gAuto').checked, notifyManual: $('gNotify').checked };
       busy(true, '保存しています…');
       try { S.settings = await call('saveGlobal', g); toast('全体の設定を保存しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
       break;
@@ -571,6 +762,34 @@ document.addEventListener('click', async function (e) {
       lsx.del('postpilot.jsonbin'); render(); toast('この端末の記憶を消しました');
       break;
     }
+    case 'xIntent': {
+      const d = S.board.drafts.find(function (x) { return String(x.id) === String(id); });
+      if (!d) return;
+      window.open(intentUrl(d.text), '_blank', 'noopener');
+      openPostedModal(id, true);
+      break;
+    }
+    case 'markPosted': openPostedModal(id, false); break;
+    case 'confirmPosted': {
+      const url = $('pUrl') ? $('pUrl').value.trim() : '';
+      closeModal(); await act('markPosted', [id, url], '投稿済みにしました'); break;
+    }
+    case 'saveRelay': {
+      busy(true, '保存しています…');
+      try { S.settings = await call('saveGlobal', { notionToken: $('nTok').value, notionDbId: $('nDb').value, notionQueuePage: $('nQ').value, relayAppUrl: $('nApp').value }); toast('保存しました'); await load(); }
+      catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'relayTest': case 'relayCheck': case 'relayCancel': {
+      if (el.dataset.act === 'relayCancel' && !confirm('claude.aiの生成待ちをすべて取り消しますか？（作成中の下書きは失敗扱いになります）')) return;
+      busy(true, 'Notionと通信しています…');
+      try {
+        S.settings = await call({ relayTest: 'relayTest', relayCheck: 'relayCheck', relayCancel: 'relayCancelAll' }[el.dataset.act]);
+        toast({ relayTest: 'テストを登録しました。claude.aiのページで「まとめて生成する」を押してください', relayCheck: '結果を確認しました', relayCancel: '取り消しました' }[el.dataset.act]);
+        await load();
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
     case 'testAi': {
       busy(true, 'AIに接続しています…');
       try {
@@ -609,6 +828,13 @@ document.addEventListener('click', async function (e) {
       S.settings = null; await act('xDisconnect', [id], '連携を解除しました'); break;
     }
   }
+});
+document.addEventListener('change', function (e) {
+  const cb = e.target.closest && e.target.closest('input[data-sel]');
+  if (!cb) return;
+  if (cb.checked) S.sel[cb.dataset.sel] = cb.dataset.kind; else delete S.sel[cb.dataset.sel];
+  const card = cb.closest('.card'); if (card) card.classList.toggle('picked', cb.checked);
+  updateBulkBar();
 });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('layer').innerHTML) closeModal(); });
 
