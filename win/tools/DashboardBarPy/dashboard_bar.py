@@ -1,7 +1,7 @@
 """
 DashboardBar（Python版）
 - Edge のアプリモードでダッシュボードを表示し、画面左端に AppBar として固定する
-- 帯クリック: 展開/収納  帯ドラッグ: 幅変更  帯ホバー: 覗き見  Ctrl+Alt+D: 切替  帯右クリック: メニュー
+- つまみクリック: 展開/収納  つまみ・帯ドラッグ: 幅変更  ホバー: 覗き見  Ctrl+Alt+D: 切替  右クリック: メニュー
 - 標準ライブラリのみ（ctypes + tkinter）。pythonw.exe で起動する想定
 """
 import ctypes
@@ -37,6 +37,7 @@ except Exception:
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 shell32 = ctypes.WinDLL("shell32", use_last_error=True)
 dwmapi = ctypes.WinDLL("dwmapi")
+gdi32 = ctypes.WinDLL("gdi32")
 
 
 def _fn(dll, name, res, *args):
@@ -82,6 +83,9 @@ GetAsyncKeyState = _fn(user32, "GetAsyncKeyState", ctypes.c_short, ctypes.c_int)
 RegisterWindowMessageW = _fn(user32, "RegisterWindowMessageW", wt.UINT, wt.LPCWSTR)
 DwmGetWindowAttribute = _fn(dwmapi, "DwmGetWindowAttribute", ctypes.c_long,
                             wt.HWND, wt.DWORD, ctypes.c_void_p, wt.DWORD)
+CreateRoundRectRgn = _fn(gdi32, "CreateRoundRectRgn", wt.HRGN,
+                         ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int)
+SetWindowRgn = _fn(user32, "SetWindowRgn", ctypes.c_int, wt.HWND, wt.HRGN, wt.BOOL)
 PostMessageW = _fn(user32, "PostMessageW", wt.BOOL, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
 
 try:
@@ -110,7 +114,14 @@ DEFAULTS = {
     "Width": 380,
     "MinWidth": 240,
     "MaxWidth": 800,
-    "StripWidth": 12,
+    "StripWidth": 6,          # 細い帯の幅
+    "TabWidth": 22,           # つまみの幅
+    "TabHeight": 56,          # つまみの高さ
+    "TabPosition": 0.5,       # つまみの縦位置（0=上端, 0.5=中央, 1=下端）
+    "StripColor": "#C9C5BC",
+    "TabColor": "#E8E5DE",
+    "TabHoverColor": "#D6D2C8",
+    "ArrowColor": "#5F5E5A",
     "AnimationMs": 260,
     "StartCollapsed": False,
     "HoverPeek": True,
@@ -249,21 +260,31 @@ class DashboardBar:
         self.root.withdraw()
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
-        self.root.configure(bg="#2D2D30", cursor="sb_h_double_arrow")
+        self.root.configure(bg=self.s["StripColor"], cursor="sb_h_double_arrow")
         self.root.report_callback_exception = self._on_tk_error
-        self.label = tk.Label(self.root, text="◀", bg="#2D2D30", fg="#CCCCCC",
-                              font=("Segoe UI", 7), cursor="sb_h_double_arrow")
-        self.label.pack(expand=True, fill="both")
+
+        # つまみ（帯から右に飛び出すタブ）
+        self.tab = tk.Toplevel(self.root)
+        self.tab.withdraw()
+        self.tab.overrideredirect(True)
+        self.tab.attributes("-topmost", True)
+        self.tab.configure(bg=self.s["TabColor"], cursor="hand2")
+        self.tab_label = tk.Label(self.tab, text="◀", bg=self.s["TabColor"], fg=self.s["ArrowColor"],
+                                  font=("Segoe UI", 10), cursor="hand2")
+        self.tab_label.pack(expand=True, fill="both")
+        self.tab.bind("<Enter>", lambda e: self._tab_color(self.s["TabHoverColor"]))
+        self.tab.bind("<Leave>", lambda e: self._tab_color(self.s["TabColor"]))
 
         self.menu = tk.Menu(self.root, tearoff=0)
         self.menu.add_command(label="幅を初期値に戻す", command=self.reset_width)
         self.menu.add_separator()
         self.menu.add_command(label="終了", command=self.quit)
 
-        self.root.bind("<ButtonPress-1>", self.on_press)
-        self.root.bind("<B1-Motion>", self.on_motion)
-        self.root.bind("<ButtonRelease-1>", self.on_release)
-        self.root.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
+        for w in (self.root, self.tab):
+            w.bind("<ButtonPress-1>", self.on_press)
+            w.bind("<B1-Motion>", self.on_motion)
+            w.bind("<ButtonRelease-1>", self.on_release)
+            w.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
 
         # Edge アプリウィンドウを起動
         browser = find_browser(self.s)
@@ -277,8 +298,11 @@ class DashboardBar:
 
         # 帯を表示して AppBar 登録
         self.root.deiconify()
+        self.tab.deiconify()
         self.root.update_idletasks()
         self.strip_hwnd = GetAncestor(self.root.winfo_id(), GA_ROOT)
+        self.tab_hwnd = GetAncestor(self.tab.winfo_id(), GA_ROOT)
+        self._shape_tab()
         abd = self._abd()
         abd.uCallbackMessage = RegisterWindowMessageW("DashboardBarPy_AppBarMsg")
         SHAppBarMessage(ABM_NEW, ctypes.byref(abd))
@@ -359,6 +383,20 @@ class DashboardBar:
         SetWindowPos(self.edge, HWND_TOPMOST, x - wpx - il, self.top - tb,
                      wpx + il + ir, h + tb + ib, SWP_NOACTIVATE)
         self.root.geometry(f"{spx}x{h}+{x}+{self.top}")
+        tw, th = self.px(self.s["TabWidth"]), self.px(self.s["TabHeight"])
+        pos = max(0.0, min(1.0, float(self.s["TabPosition"])))
+        self.tab.geometry(f"{tw}x{th}+{x + spx}+{self.top + int((h - th) * pos)}")
+
+    def _shape_tab(self):
+        """つまみの右側だけ角丸にする"""
+        tw, th = self.px(self.s["TabWidth"]), self.px(self.s["TabHeight"])
+        r = self.px(8)
+        rgn = CreateRoundRectRgn(-r, 0, tw + 1, th + 1, r * 2, r * 2)
+        SetWindowRgn(self.tab_hwnd, rgn, True)
+
+    def _tab_color(self, color):
+        self.tab.configure(bg=color)
+        self.tab_label.configure(bg=color)
 
     # ---- 状態遷移 ----
     def goto(self, target):
@@ -386,7 +424,7 @@ class DashboardBar:
         self.goto(COLLAPSED if self.state == EXPANDED else EXPANDED)
 
     def update_arrow(self):
-        self.label.configure(text="◀" if self.state == EXPANDED else "▶")
+        self.tab_label.configure(text="◀" if self.state == EXPANDED else "▶")
 
     # ---- アニメーション ----
     def cancel_anim(self):
@@ -478,7 +516,7 @@ class DashboardBar:
 
             p = wt.POINT()
             GetCursorPos(ctypes.byref(p))
-            in_strip = inside(p, rect_of(self.strip_hwnd))
+            in_strip = inside(p, rect_of(self.strip_hwnd)) or inside(p, rect_of(self.tab_hwnd))
             now = time.time()
 
             # ホバーで覗き見

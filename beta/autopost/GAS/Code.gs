@@ -232,9 +232,11 @@ function getSettings() {
   return {
     accounts: readAll_('accounts').map(publicAccount_),
     global: {
-      anthropicKeySet: !!p.getProperty('ANTHROPIC_API_KEY'),
+      aiUrl: p.getProperty('AI_URL') || '',
+      aiFormat: p.getProperty('AI_FORMAT') || 'auto',
+      aiKeySet: !!aiConfig_().key,
       xKeySet: !!p.getProperty('X_CONSUMER_KEY') && !!p.getProperty('X_CONSUMER_SECRET'),
-      model: p.getProperty('MODEL') || DEFAULT_MODEL,
+      model: p.getProperty('MODEL') || '',
       collectHours: Number(p.getProperty('COLLECT_HOURS')) || 6,
       autoOn: triggersOn_(),
       sheetUrl: ss_().getUrl()
@@ -244,10 +246,21 @@ function getSettings() {
 
 function saveGlobal(g) {
   const p = props_();
-  if (g.anthropicKey) p.setProperty('ANTHROPIC_API_KEY', g.anthropicKey.trim());
+  if (typeof g.aiUrl === 'string') {
+    const u = g.aiUrl.trim();
+    if (u && !/^https?:\/\//.test(u)) throw new Error('API URLは http:// または https:// から入力してください');
+    if (u) p.setProperty('AI_URL', u); else p.deleteProperty('AI_URL');
+  }
+  if (g.aiFormat) p.setProperty('AI_FORMAT', g.aiFormat);
+  if (g.aiKey) {
+    const k = g.aiKey.trim();
+    if (!/^[\x21-\x7e]+$/.test(k)) throw new Error('APIキーに使えない文字（改行・空白・全角など）が含まれています');
+    p.setProperty('AI_API_KEY', k);
+  }
+  if (g.clearAiKey) { p.deleteProperty('AI_API_KEY'); p.deleteProperty('ANTHROPIC_API_KEY'); }
   if (g.xConsumerKey) p.setProperty('X_CONSUMER_KEY', g.xConsumerKey.trim());
   if (g.xConsumerSecret) p.setProperty('X_CONSUMER_SECRET', g.xConsumerSecret.trim());
-  if (g.model) p.setProperty('MODEL', g.model.trim());
+  if (typeof g.model === 'string') { if (g.model.trim()) p.setProperty('MODEL', g.model.trim()); else p.deleteProperty('MODEL'); }
   if (g.collectHours) p.setProperty('COLLECT_HOURS', String(g.collectHours));
   if (typeof g.autoOn === 'boolean') setupTriggers(g.autoOn);
   return getSettings();
@@ -302,7 +315,7 @@ function normalizeSlots_(s) {
 
 function setupDone_() {
   const p = props_();
-  return !!p.getProperty('ANTHROPIC_API_KEY');
+  return !!(p.getProperty('AI_URL') || p.getProperty('AI_API_KEY') || p.getProperty('ANTHROPIC_API_KEY'));
 }
 
 // ===== 定期実行 =====
@@ -420,10 +433,69 @@ function collect_(a) {
   return added;
 }
 
-function fetchFeed_(url) {
-  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+/** RSS/Atomを読む。普通のWebページなら、RSSを自動で探し、なければページ内の記事リンクを拾う */
+function fetchFeed_(url, depth) {
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PostPilot/1.0)' }
+  });
   if (res.getResponseCode() >= 300) throw new Error('HTTP ' + res.getResponseCode());
-  const doc = XmlService.parse(res.getContentText());
+  const body = res.getContentText();
+  if (/^\s*(<\?xml|<rss|<feed)/i.test(body)) return parseXmlFeed_(body);
+  // HTMLページ：RSSの自動検出
+  if (!depth) {
+    const feedUrl = discoverFeed_(body, url);
+    if (feedUrl) {
+      try { return fetchFeed_(feedUrl, 1); } catch (e) { /* 失敗したらページから拾う */ }
+    }
+  }
+  return linksFromHtml_(body, url);
+}
+
+function discoverFeed_(html, base) {
+  const tags = html.match(/<link\b[^>]*>/gi) || [];
+  for (let i = 0; i < tags.length; i++) {
+    const t = tags[i];
+    if (/rel=["']?alternate/i.test(t) && /type=["']?application\/(rss|atom)\+xml/i.test(t)) {
+      const m = t.match(/href=["']([^"']+)["']/i);
+      if (m) return resolveUrl_(m[1].replace(/&amp;/g, '&'), base);
+    }
+  }
+  return '';
+}
+
+/** RSSのないページ：記事らしいリンク（見出し程度の長さの文字列）を最大20件拾う */
+function linksFromHtml_(html, base) {
+  const titleM = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const siteTitle = titleM ? stripHtml_(titleM[1]).slice(0, 60) : '';
+  const clean = html.replace(/<(script|style|nav|header|footer)[\s\S]*?<\/\1>/gi, ' ');
+  const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const seen = {};
+  const out = [];
+  let m;
+  while ((m = re.exec(clean)) && out.length < 20) {
+    const text = stripHtml_(m[2]).replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    if (text.length < 12 || text.length > 120) continue;
+    if (/ログイン|新規登録|利用規約|プライバシー|お問い合わせ|ランキング|カテゴリ|次へ|前へ|もっと見る|一覧/.test(text)) continue;
+    const href = resolveUrl_(m[1].replace(/&amp;/g, '&'), base);
+    if (!/^https?:\/\//.test(href) || href === base || seen[href]) continue;
+    seen[href] = true;
+    out.push({ title: text, url: href, source: siteTitle, publishedAt: '', summary: '' });
+  }
+  if (!out.length) throw new Error('RSSも記事リンクも見つかりませんでした');
+  return out;
+}
+
+function resolveUrl_(href, base) {
+  if (/^https?:\/\//i.test(href)) return href;
+  const origin = base.match(/^https?:\/\/[^\/]+/i)[0];
+  if (href.indexOf('//') === 0) return base.split(':')[0] + ':' + href;
+  if (href.charAt(0) === '/') return origin + href;
+  return base.replace(/[^\/]*$/, '') + href;
+}
+
+function parseXmlFeed_(xml) {
+  const doc = XmlService.parse(xml);
   const root = doc.getRootElement();
   const out = [];
   const channel = root.getChild('channel');
@@ -483,7 +555,7 @@ function selectItems_(a, n) {
     'JSON形式：{"scores":[{"idx":0,"score":80,"reason":"40字以内の理由"}]}'
   ].join('\n');
 
-  const json = parseJson_(callClaude_(system, user, 2000));
+  const json = parseJson_(callAI_(system, user, 2000));
   const scores = (json && json.scores) || [];
   scores.forEach(function (s) {
     const it = items[s.idx];
@@ -518,29 +590,65 @@ function writePost_(a, item, previous) {
   const pa = publicAccount_(a);
   const urlPart = pa.includeUrl ? 24 : 0; // URLは23文字＋改行扱い
   const maxWeight = 280 - urlPart;
+  const maxChars = Math.floor(maxWeight / 2);
   const system = 'あなたはXの投稿を書くプロのライターです。指定されたペルソナとして、ターゲット読者に届く投稿を日本語で1つ書きます。出力はJSONのみ。';
-  let lastErr = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let lastErr = '', lastRaw = '', best = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
     const user = [
       '## アカウント', accountBrief_(a),
       '## ネタ元', '題名：' + item.title, '媒体：' + (item.source || '不明'), '概要：' + (item.summary || '（なし）'),
       previous ? '## 前回の案（これとは違う切り口で）\n' + previous : '',
       '## ルール',
-      '- 全角' + Math.floor(maxWeight / 2) + '文字以内（ハッシュタグ含む）',
+      '- ' + Math.min(maxChars, 120) + '文字前後、最大でも' + maxChars + '文字（ハッシュタグ含む）',
       '- 記事にない数字・事実を作らない。断定しすぎない',
       '- ハッシュタグは1〜2個まで',
       '- URLは書かない',
-      lastErr ? '- 前回は長すぎました。もっと短く。' : '',
+      lastErr === 'long' ? '- 前回は長すぎました。半分くらいの長さにしてください。' : '',
+      lastErr === 'empty' ? '- 前回はJSONになっていませんでした。{"text":"…"} の形だけを出力してください。' : '',
       'JSON形式：{"text":"投稿文"}'
     ].filter(String).join('\n');
-    const json = parseJson_(callClaude_(system, user, 800));
-    let text = json && json.text ? String(json.text).trim() : '';
+    lastRaw = callAI_(system, user, 800);
+    const text = extractPostText_(lastRaw);
     if (!text) { lastErr = 'empty'; continue; }
-    if (weightedLength_(text) > maxWeight) { lastErr = 'long'; continue; }
-    if (pa.includeUrl && item.url) text += '\n' + item.url;
-    return text;
+    if (weightedLength_(text) > maxWeight) {
+      lastErr = 'long';
+      if (!best || weightedLength_(text) < weightedLength_(best)) best = text;
+      continue;
+    }
+    return withUrl_(text, pa, item);
   }
-  throw new Error('文字数内の投稿文を作れませんでした');
+  // 3回とも長すぎた場合は、文の切れ目で収まるところまで縮める
+  if (best) {
+    const cut = trimToWeight_(best, maxWeight);
+    if (cut) return withUrl_(cut, pa, item);
+  }
+  throw new Error('投稿文を作れませんでした（' + (lastErr === 'long' ? '長すぎる' : 'AIの応答から本文を取り出せない') +
+                  '）。AIの応答：' + String(lastRaw).replace(/\s+/g, ' ').slice(0, 150));
+}
+
+function withUrl_(text, pa, item) {
+  return pa.includeUrl && item.url ? text + '\n' + item.url : text;
+}
+
+/** JSONで返らなかった場合も、本文らしい部分を取り出す */
+function extractPostText_(raw) {
+  const json = parseJson_(raw);
+  if (json && json.text) return String(json.text).trim();
+  let t = String(raw || '').replace(/```[a-z]*|```/g, '').trim();
+  const m = t.match(/"text"\s*:\s*"([\s\S]*?)"\s*}?\s*$/);
+  if (m) return m[1].replace(/\\n/g, '\n').trim();
+  if (t.length < 5 || t.charAt(0) === '{') return '';
+  return t.replace(/^(投稿文|本文)[:：]\s*/, '').replace(/^["「]|["」]$/g, '').trim();
+}
+
+function trimToWeight_(text, maxWeight) {
+  const parts = text.split(/(?<=[。！？!?\n])/);
+  let out = '';
+  for (let i = 0; i < parts.length; i++) {
+    if (weightedLength_(out + parts[i]) > maxWeight) break;
+    out += parts[i];
+  }
+  return out.trim().length >= 20 ? out.trim() : '';
 }
 
 function accountBrief_(a) {
@@ -595,27 +703,147 @@ function nextFreeSlots_(a, n) {
   return out;
 }
 
-// ===== Claude API =====
-function callClaude_(system, user, maxTokens) {
+// ===== AI API（URLを登録して使う） =====
+// 形式：anthropic（/v1/messages）、openai（/v1/chat/completions：vLLM・LM Studio・OpenAI互換など）、ollama（/api/chat）
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+
+function aiConfig_() {
   const p = props_();
-  const key = p.getProperty('ANTHROPIC_API_KEY');
-  if (!key) throw new Error('Claude APIキーが未設定です（設定画面で登録してください）');
-  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    payload: JSON.stringify({
-      model: p.getProperty('MODEL') || DEFAULT_MODEL,
-      max_tokens: maxTokens || 1000,
-      system: system,
-      messages: [{ role: 'user', content: user }]
-    }),
-    muteHttpExceptions: true
+  const url = (p.getProperty('AI_URL') || '').trim();
+  let format = p.getProperty('AI_FORMAT') || 'auto';
+  const finalUrl = url || ANTHROPIC_URL;
+  if (format === 'auto') format = detectFormat_(finalUrl);
+  // 以前のバージョンで保存したAnthropicのキーは、Anthropic形式のときだけ使う（自前サーバーには送らない）
+  const key = p.getProperty('AI_API_KEY') || (format === 'anthropic' ? (p.getProperty('ANTHROPIC_API_KEY') || '') : '');
+  return { url: completeUrl_(finalUrl, format), key: key, format: format, model: p.getProperty('MODEL') || '', custom: !!url };
+}
+
+/** ベースURLだけ登録された場合に、形式に合わせてパスを補う */
+function completeUrl_(url, format) {
+  const u = url.replace(/\/+$/, '');
+  if (format === 'anthropic') return /\/v1\/messages$/.test(u) ? u : (/\/v1$/.test(u) ? u + '/messages' : u + '/v1/messages');
+  if (format === 'ollama') return /\/api\/chat$/.test(u) ? u : u + '/api/chat';
+  if (/\/chat\/completions$/.test(u)) return u;
+  return /\/v1$/.test(u) ? u + '/chat/completions' : u + '/v1/chat/completions';
+}
+
+function detectFormat_(url) {
+  if (/\/v1\/messages\/?$/.test(url) || /anthropic\.com/.test(url)) return 'anthropic';
+  if (/\/api\/chat\/?$/.test(url) || /:11434\/?$/.test(url)) return 'ollama';
+  return 'openai';
+}
+
+function callAI_(system, user, maxTokens) {
+  const c = aiConfig_();
+  if (!c.custom && !c.key) throw new Error('AIのAPI URLが未設定です（設定画面で登録してください）');
+  const headers = { 'ngrok-skip-browser-warning': 'true' };
+  let payload;
+  if (c.format === 'anthropic') {
+    if (c.key) headers['x-api-key'] = c.key;
+    headers['anthropic-version'] = '2023-06-01';
+    payload = { model: c.model || DEFAULT_MODEL, max_tokens: maxTokens || 1000, system: system,
+                messages: [{ role: 'user', content: user }] };
+  } else if (c.format === 'ollama') {
+    if (c.key) headers['Authorization'] = 'Bearer ' + c.key;
+    payload = { model: c.model, stream: false, think: false, options: { num_predict: Math.max(maxTokens || 1000, 1200) },
+                messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+  } else {
+    if (c.key) headers['Authorization'] = 'Bearer ' + c.key;
+    payload = { model: c.model, stream: false, max_tokens: Math.max(maxTokens || 1000, 1200),
+                messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+    // 思考モデル（Qwen3・Gemmaなど）は考える部分だけで上限に達し、本文が空になることがあるのでオフにする
+    // Gemini の互換APIは独自項目を付けると400になるため除外
+    if (!/generativelanguage\.googleapis\.com/i.test(c.url)) payload.think = false;
+  }
+  if (c.format !== 'anthropic' && !c.model) throw new Error('モデル名が未設定です（設定画面で入力してください）');
+
+  const res = UrlFetchApp.fetch(c.url, {
+    method: 'post', contentType: 'application/json', headers: headers,
+    payload: JSON.stringify(payload), muteHttpExceptions: true
   });
   const code = res.getResponseCode();
-  const body = JSON.parse(res.getContentText());
-  if (code >= 300) throw new Error('Claude API ' + code + '：' + ((body.error && body.error.message) || res.getContentText().slice(0, 200)));
-  return (body.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text; }).join('\n');
+  const raw = res.getContentText();
+  let body;
+  if (/^\s*data:/.test(raw)) body = sseToBody_(raw);
+  else try { body = JSON.parse(raw); }
+  catch (e) { throw new Error('AI APIの応答がJSONではありません（' + code + '）。URLが正しいか、サーバーが起動しているか確認してください：' + raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 200)); }
+  if (code >= 300) {
+    const msg = (body.error && (body.error.message || body.error)) || raw.slice(0, 200);
+    throw new Error('AI API ' + code + '：' + msg);
+  }
+  let text = '', finish = '', thought = '';
+  if (c.format === 'anthropic') {
+    text = (body.content || []).filter(function (x) { return x.type === 'text'; }).map(function (x) { return x.text; }).join('\n');
+    finish = body.stop_reason || '';
+  } else if (c.format === 'ollama') {
+    const m = body.message || {};
+    text = m.content || ''; thought = m.thinking || ''; finish = body.done_reason || '';
+  } else {
+    const ch = (body.choices && body.choices[0]) || {};
+    const m = ch.message || ch.delta || {};
+    text = m.content || ch.text || ''; thought = m.reasoning_content || m.reasoning || ''; finish = ch.finish_reason || '';
+  }
+  // 想定と違う形で返すプロキシにも対応（形式の設定に関係なく、OpenAI形式・Ollama形式・generate形式を順に探す）
+  if (!text && body.choices && body.choices[0]) {
+    const ch2 = body.choices[0], m2 = ch2.message || ch2.delta || {};
+    text = m2.content || ch2.text || '';
+    thought = thought || m2.reasoning_content || m2.reasoning || '';
+    finish = finish || ch2.finish_reason || '';
+  }
+  if (!text) {
+    text = (body.message && body.message.content) || body.response || body.output_text ||
+           (typeof body.content === 'string' ? body.content : '') || (typeof body.text === 'string' ? body.text : '') ||
+           (body.data && typeof body.data === 'string' ? body.data : '') || '';
+    thought = thought || (body.message && body.message.thinking) || body.thinking || '';
+    finish = finish || body.done_reason || '';
+  }
+  // 思考モデルの <think>…</think> を除去（閉じ忘れも含む）
+  text = String(text || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/, '').trim();
+  if (!text) {
+    throw new Error('AIの応答が空でした（終了理由：' + (finish || '不明') + '）。' +
+      (thought ? 'AIが考える部分だけで上限に達した可能性があります。思考モードのないモデルにするか、サーバー側で思考をオフにしてください。'
+               : (finish === 'length' ? '出力の上限に達しました。' : 'モデル名が正しいか、サーバーのログを確認してください。')) +
+      '\nサーバーの応答（先頭）：' + raw.replace(/\s+/g, ' ').slice(0, 300));
+  }
+  return text;
+}
+
+/** ストリーミング形式（data: 行）で返ってきた応答を1つにまとめる */
+function sseToBody_(raw) {
+  let content = '', reasoning = '', finish = '';
+  raw.split(/\n/).forEach(function (line) {
+    const m = line.match(/^data:\s*(.*)$/);
+    if (!m || m[1] === '[DONE]') return;
+    try {
+      const j = JSON.parse(m[1]);
+      const ch = (j.choices && j.choices[0]) || {};
+      const d = ch.delta || ch.message || {};
+      content += d.content || (j.message && j.message.content) || j.response || '';
+      reasoning += d.reasoning_content || d.reasoning || '';
+      if (ch.finish_reason) finish = ch.finish_reason;
+    } catch (e) { /* 途中の行は無視 */ }
+  });
+  return { choices: [{ message: { content: content, reasoning: reasoning }, finish_reason: finish }] };
+}
+
+/** 設定画面の「接続テスト」 */
+function testAiConnection() {
+  const c = aiConfig_();
+  const info = '呼び出し先：' + c.url + ' ／ 形式：' + c.format + ' ／ APIキー送信：' + (c.key ? 'あり（末尾 ' + c.key.slice(-4) + '、' + c.key.length + '文字）' : 'なし');
+  try {
+    const reply = callAI_('あなたは動作確認用のアシスタントです。', '「接続OK」とだけ返してください。', 50);
+    return { ok: true, info: info, reply: reply.slice(0, 100) };
+  } catch (e) {
+    return { ok: false, info: info, error: e.message + hint401_(e.message, c) };
+  }
+}
+
+function hint401_(msg, c) {
+  if (!/ 401|（401）/.test(msg)) return '';
+  if (/ERR_NGROK/.test(msg)) return '\n→ ngrok側で認証（Basic認証やOAuth）がかかっています。ngrokの起動オプションを確認してください。';
+  return c.key
+    ? '\n→ 送ったAPIキーがサーバーに拒否されました。キーが違うか、不要なキーを送っています。不要なら「保存済みのAPIキーを削除する」にチェックして保存してください。'
+    : '\n→ サーバーがAPIキーを求めています。サーバー側で設定したキーを入力して保存してください。';
 }
 
 function parseJson_(s) {
@@ -723,8 +951,8 @@ function parseForm_(s) {
 }
 
 // ===== 動作確認用（エディタから実行） =====
-function testClaude() {
-  Logger.log(callClaude_('一言で答えてください。', 'こんにちは', 50));
+function testAI() {
+  Logger.log(callAI_('一言で答えてください。', 'こんにちは', 50));
 }
 
 function testWeighted() {

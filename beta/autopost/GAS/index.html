@@ -107,7 +107,7 @@ a{color:var(--blue)} a:hover{color:var(--blue-d)}
 .counter{font-family:var(--mono);font-size:12px;color:var(--mute);text-align:right}
 .counter.over{color:var(--bad);font-weight:700}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;z-index:20;max-width:90vw}
-.toast.err{background:var(--bad)}
+.toast.err{background:var(--bad);white-space:pre-wrap;word-break:break-all;text-align:left}
 .busy{position:fixed;inset:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;z-index:15;font-weight:700;color:var(--ink2)}
 @media (max-width:820px){
   .app{flex-direction:column}
@@ -146,7 +146,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function $(id) { return document.getElementById(id); }
 function toast(msg, err) {
   const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.setAttribute('role', 'status'); t.textContent = msg;
-  document.body.appendChild(t); setTimeout(function () { t.remove(); }, err ? 6000 : 2600);
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, err ? 15000 : 2600); t.addEventListener('click', function () { t.remove(); });
 }
 function busy(on, msg) {
   const b = $('busyLayer');
@@ -281,7 +281,7 @@ function topBar(title) {
 }
 function setupBanner() {
   const b = S.board;
-  if (!b.setupDone) return '<div class="banner">最初に「設定」で Claude APIキーを登録し、アカウントを追加してください。</div>';
+  if (!b.setupDone) return '<div class="banner">最初に「設定」でAIのAPI URLを登録し、アカウントを追加してください。</div>';
   if (!b.accounts.length) return '<div class="banner">「設定」でアカウントを追加すると、キーワードからネタ探しを始められます。</div>';
   if (b.accounts.some(function (a) { return !a.xConnected; })) return '<div class="banner">Xと未連携のアカウントがあります。予約した投稿は連携するまで失敗扱いになります（設定から連携できます）。</div>';
   return '';
@@ -320,13 +320,17 @@ function renderSettings() {
   const set = function (v) { return v ? '<span class="tag ok">設定済み</span>' : '<span class="tag warn">未設定</span>'; };
   return '<div class="top"><div><div class="sub">データの保存先：<a href="' + esc(g.sheetUrl) + '" target="_blank" rel="noopener">スプレッドシートを開く</a></div><h1>設定</h1></div></div>' +
   '<section class="panel" aria-label="全体の設定"><h2>全体の設定</h2>' +
-    '<div class="grid2"><div class="f"><label for="gAk">Claude APIキー ' + set(g.anthropicKeySet) + '</label><input id="gAk" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
-    '<div class="f"><label for="gModel">使用するモデル</label><input id="gModel" value="' + esc(g.model) + '"></div>' +
-    '<div class="f"><label for="gXk">X API Key（Consumer Key） ' + set(g.xKeySet) + '</label><input id="gXk" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
-    '<div class="f"><label for="gXs">X API Key Secret</label><input id="gXs" type="password" autocomplete="off" placeholder="変更するときだけ入力"></div>' +
+    '<div class="f"><label for="gUrl">AIのAPI URL ' + set(!!g.aiUrl || g.aiKeySet) + '</label><input id="gUrl" type="url" inputmode="url" value="' + esc(g.aiUrl) + '" placeholder="例：https://xxxx.ngrok-free.app/v1/chat/completions"></div>' +
+    '<div class="hint">OpenAI互換（/v1/chat/completions）、Ollama（/api/chat）、Anthropic（/v1/messages）に対応しています。ベースURL（例：https://xxxx.ngrok-free.app）だけでも、形式に合わせてパスを補います。処理はGoogleのサーバーから呼び出すため、localhost では届きません。ngrokなどで外から見えるURLを登録してください。空欄にするとAnthropicの公式APIを使います。</div>' +
+    '<div class="grid2"><div class="f"><label for="gFmt">APIの形式</label><select id="gFmt">' + [['auto', 'URLから自動判定'], ['openai', 'OpenAI互換（vLLM・LM Studioなど）'], ['ollama', 'Ollama'], ['anthropic', 'Anthropic']].map(function (o) { return '<option value="' + o[0] + '"' + (g.aiFormat === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="f"><label for="gModel">モデル名</label><input id="gModel" value="' + esc(g.model) + '" placeholder="例：qwen3:14b"></div>' +
+    '<div class="f"><label for="gAk">APIキー（必要な場合のみ） ' + (g.aiKeySet ? '<span class="tag ok">設定済み</span>' : '') + '</label><input id="gAk" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力"></div>' +
+    '<label class="chk" style="align-self:end"><input type="checkbox" id="gAkClear">保存済みのAPIキーを削除する</label>' +
+    '<div class="f"><label for="gXk">X API Key（Consumer Key） ' + set(g.xKeySet) + '</label><input id="gXk" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力"></div>' +
+    '<div class="f"><label for="gXs">X API Key Secret</label><input id="gXs" type="password" autocomplete="new-password" data-lpignore="true" placeholder="変更するときだけ入力"></div>' +
     '<div class="f"><label for="gHours">自動収集の間隔</label><select id="gHours">' + [2, 4, 6, 8, 12].map(function (h) { return '<option value="' + h + '"' + (Number(g.collectHours) === h ? ' selected' : '') + '>' + h + '時間ごと</option>'; }).join('') + '</select></div>' +
     '<label class="chk" style="align-self:end"><input type="checkbox" id="gAuto"' + (g.autoOn ? ' checked' : '') + '>自動実行（収集と予約投稿）を有効にする</label></div>' +
-    '<div><button type="button" class="btn pri" data-act="saveGlobal">全体の設定を保存</button></div></section>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn pri" data-act="saveGlobal">全体の設定を保存</button><button type="button" class="btn" data-act="testAi">AIの接続テスト</button></div><div class="hint">接続テストは保存済みの設定で行います。先に保存してください。</div></section>' +
   '<section class="panel" aria-label="アカウント別の設定"><h2>アカウント別の設定</h2>' +
     '<div class="tabs">' + accts.map(function (x) {
       return '<button type="button" class="' + (a && String(x.id) === String(a.id) && S.editAcct !== 'new' ? 'on' : '') + '" data-edit="' + esc(x.id) + '"><span class="dot" style="background:' + esc(x.color) + '"></span>' + esc(x.name) + '</button>';
@@ -349,7 +353,7 @@ function accountForm(a) {
       return '<button type="button" role="radio" aria-checked="' + (a.color === c) + '" aria-label="' + c + '" class="' + (a.color === c ? 'on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>';
     }).join('') + '<input type="hidden" id="aColor" value="' + esc(a.color) + '"></div></div>' +
     txt('aKw', '監視キーワード（カンマ区切り）', a.keywords, 0, '例：時短家事, 作り置き, 共働き') +
-    txt('aRss', '追加のRSS（1行に1つ）', a.rss, 2, 'https://example.com/feed') +
+    txt('aRss', '追加のネタ元URL（1行に1つ。RSSのほか、ブログやプロフィールなど普通のページもOK）', a.rss, 3, 'https://example.com/feed') +
     txt('aPersona', 'ペルソナ（誰として書くか）', a.persona, 2) +
     txt('aTarget', 'ターゲット（誰に届けるか）', a.target, 2) +
     '<div class="grid2"><div class="f"><label for="aTone">口調</label><select id="aTone">' + ['です・ます', 'やわらかめ', 'カジュアル', '専門的'].map(function (t) { return '<option' + (a.tone === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
@@ -385,6 +389,12 @@ function openEdit(id) {
   $('mText').addEventListener('input', upd); upd(); $('mText').focus();
 }
 function closeModal() { $('layer').innerHTML = ''; }
+function showResult(title, body, isErr) {
+  $('layer').innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="rTitle"><div class="box">' +
+    '<h2 id="rTitle" style="margin:0;font-size:16px;color:' + (isErr ? 'var(--bad)' : 'var(--ok)') + '">' + esc(title) + '</h2>' +
+    '<div style="white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.7;background:#F6F7F9;border-radius:10px;padding:12px">' + esc(body) + '</div>' +
+    '<div style="display:flex;justify-content:flex-end"><button type="button" class="btn pri" data-act="closeModal">閉じる</button></div></div></div>';
+}
 
 // ===== 描画とイベント =====
 function render() {
@@ -407,8 +417,16 @@ document.addEventListener('click', async function (e) {
   const id = el.dataset.id;
   switch (el.dataset.act) {
     case 'reload': busy(true, '読み込み中…'); try { await load(); } finally { busy(false); } break;
-    case 'run': await act('runNow', [S.filter], 'ネタ探しが完了しました', 'ネタを探して下書きを作っています（1〜2分）…'); break;
-    case 'runOne': await act('runNow', [id], 'テスト生成が完了しました。ボードで確認できます', '下書きを作っています…'); break;
+    case 'run': case 'runOne': {
+      busy(true, 'ネタを探して下書きを作っています（1〜2分）…');
+      try {
+        const r = await call('runNow', el.dataset.act === 'run' ? S.filter : id);
+        const c = r.reduce(function (s, x) { return s + x.collected; }, 0), d = r.reduce(function (s, x) { return s + x.drafted; }, 0);
+        toast('新しいネタ ' + c + '件・下書き ' + d + '件' + (d ? '（ボードで確認できます）' : '。ネタ候補から手動で下書きにもできます'), !d && !c);
+        await load();
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
     case 'approve': await act('approveDraft', [id], '承認して予約しました'); break;
     case 'reject': await act('rejectDraft', [id], '却下しました'); break;
     case 'unsched': await act('unscheduleDraft', [id], '承認待ちに戻しました'); break;
@@ -425,10 +443,18 @@ document.addEventListener('click', async function (e) {
       closeModal(); await act('updateDraft', [id, text, slot], '保存しました'); break;
     }
     case 'saveGlobal': {
-      const g = { anthropicKey: $('gAk').value, model: $('gModel').value, xConsumerKey: $('gXk').value, xConsumerSecret: $('gXs').value,
+      const g = { aiUrl: $('gUrl').value, aiFormat: $('gFmt').value, aiKey: $('gAk').value, clearAiKey: $('gAkClear').checked, model: $('gModel').value, xConsumerKey: $('gXk').value, xConsumerSecret: $('gXs').value,
                   collectHours: Number($('gHours').value), autoOn: $('gAuto').checked };
       busy(true, '保存しています…');
       try { S.settings = await call('saveGlobal', g); toast('全体の設定を保存しました'); await load(); } catch (err) { toast(err.message, true); } finally { busy(false); }
+      break;
+    }
+    case 'testAi': {
+      busy(true, 'AIに接続しています…');
+      try {
+        const r = await call('testAiConnection');
+        showResult(r.ok ? '接続できました' : '接続できませんでした', (r.ok ? '応答：' + r.reply : r.error) + '\n\n' + r.info, !r.ok);
+      } catch (err) { toast(err.message, true); } finally { busy(false); }
       break;
     }
     case 'saveAcct': {
