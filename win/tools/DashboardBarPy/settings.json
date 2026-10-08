@@ -1,0 +1,13 @@
+{
+  "Url": "https://ymatsuda-cmyk.github.io/tools/dashboard/",
+  "Browser": "",
+  "Width": 380,
+  "MinWidth": 240,
+  "MaxWidth": 800,
+  "StripWidth": 12,
+  "AnimationMs": 260,
+  "StartCollapsed": false,
+  "HoverPeek": true,
+  "HideTitleBar": true,
+  "TitleBarHeight": 32
+}

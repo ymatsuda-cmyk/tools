@@ -555,7 +555,13 @@
   }
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
   .status-line{font-size:11px;color:var(--text-muted);margin-bottom:14px;}
+  /* DashboardBar（?sidebar=1）で開いたときは縦スクロールバーを隠す（スクロール自体は可能） */
+  html.is-sidebar{scrollbar-width:none;}
+  html.is-sidebar::-webkit-scrollbar{display:none;}
 </style>
+<script>
+  if(new URLSearchParams(location.search).has('sidebar')) document.documentElement.classList.add('is-sidebar');
+</script>
 </head>
 <body>
 <div class="wrap">
