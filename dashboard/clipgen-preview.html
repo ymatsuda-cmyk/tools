@@ -603,6 +603,7 @@
   </div>
 </div>
 
+<script src="kanban-styles.js?v=rev_20261008_kbs01"></script>
 <script>
 /* ============================================================
    以下の描画関数は index.html の clipgen カードと同じもの。
@@ -2289,8 +2290,15 @@ function kbBody(m, st){
       </div>`;
   }
   if(st.phase === 'error') return `<div class="mon-err">${esc(st.error)}</div>`;
-  const groupIds = [...new Set(KB_ROWS.map(r => r.group))];
-  const groups = groupIds.map(g => {
+  const style = window.KanbanStyles ? window.KanbanStyles.normalize(m.style) : 'bars';
+  // バー（標準）以外は kanban-styles.js（ダッシュボードと共通）が描く
+  const styled = style !== 'bars' && window.KanbanStyles ? window.KanbanStyles.render(style, {
+    rows: st.rows, defs: KB_ROWS, today: st.today, expanded: kbExpanded,
+    rowAttr: key => key,
+    listHtml: (key, label, r) => kbListHtml(m, { key, label }, r, st.today),
+    esc
+  }) : null;
+  const groups = styled || [...new Set(KB_ROWS.map(r => r.group))].map(g => {
     const defs = KB_ROWS.filter(r => r.group === g);
     const scale = Math.max(1, ...defs.map(r => r.total ? st.rows[r.key].total : st.rows[r.key].rest.length));
     return `<div class="kb-group">${defs.map(r => kbRowHtml(m, r, st.rows[r.key], scale, st.today)).join('')}</div>`;
@@ -2300,8 +2308,9 @@ function kbBody(m, st){
   const u = st.updatedAt;
   const when = `${u.getMonth() + 1}/${u.getDate()} ${String(u.getHours()).padStart(2,'0')}:${String(u.getMinutes()).padStart(2,'0')}`;
   const staleNote = stale ? `<div class="kb-stale">データが${staleH}時間以上更新されていません（出力 ${when}）。Macの同期を確認してください</div>` : '';
+  const picker = window.KanbanStyles ? window.KanbanStyles.pickerHtml(style, 'data-kb-style', esc) : '<span></span>';
   return groups + staleNote +
-    `<div style="text-align:right;padding-top:6px;"><button type="button" class="kb-forget" data-kb-forget>パスフレーズを消去</button></div>`;
+    `<div class="kb-foot">${picker}<button type="button" class="kb-forget" data-kb-forget>パスフレーズを消去</button></div>`;
 }
 
 function renderKanbanCard(m, st){
@@ -2325,8 +2334,16 @@ function renderKanbanCard(m, st){
     </div>`;
 }
 
-/** 行の開閉・解除・消去の結線。見本では保存せず、見ている間だけ覚えておく */
+/** 行の開閉・解除・消去の結線。見本では保存せず、見ている間だけ覚えておく。
+    表示スタイルの切り替えは設定JSONの style に書き戻す（そのまま貼り付けて使えるように） */
 function wireKanbanPreview(){
+  F('live').querySelectorAll('[data-kb-style]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const m = drafts.kanban;
+      if(sel.value && sel.value !== 'bars') m.style = sel.value; else delete m.style;
+      paint();
+    });
+  });
   F('live').querySelectorAll('[data-kb-row]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const key = btn.dataset.kbRow;

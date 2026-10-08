@@ -1008,6 +1008,11 @@
       <input type="number" id="mf-kb-stale" value="24" min="1" max="720">
       <div class="hint">データの出力時刻からこの時間（h）を過ぎると、カードに警告を出します。Macの停止や同期の止まりに気づくためです</div>
     </div>
+    <div class="field" data-for="kanban">
+      <label>表示スタイル</label>
+      <select id="mf-kb-style"></select>
+      <div class="hint">件数の見せ方です。カード下の「表示」でも切り替えられます（そちらはこのブラウザだけに保存されます）</div>
+    </div>
 
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelMonitor">キャンセル</button>
@@ -1220,6 +1225,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="dashboard-config.js"></script>
+<script src="kanban-styles.js?v=rev_20261008_kbs01"></script>
 <script>
 const RUN_LABEL = { web:'Web', download:'DL', local:'Local' };
 
@@ -4438,6 +4444,24 @@ function setKanbanPass(id, value){
   }catch{}
 }
 
+/* 表示スタイル。カード上で選んだもの（このブラウザだけ）＞設定の style ＞バー（標準）の順に使う */
+const KANBAN_STYLE_PREFIX = 'dashboard-kanban-style:';
+
+function kanbanStyleOf(m){
+  const norm = v => window.KanbanStyles ? window.KanbanStyles.normalize(v) : 'bars';
+  let local = '';
+  try{ local = localStorage.getItem(KANBAN_STYLE_PREFIX + m.id) || ''; }catch{}
+  return norm(local || m.style || 'bars');
+}
+function setKanbanStyle(m, value){
+  try{
+    // 設定の既定と同じなら上書きを消し、設定側の変更がそのまま効くようにする
+    if(!value || value === (m.style || 'bars')) localStorage.removeItem(KANBAN_STYLE_PREFIX + m.id);
+    else localStorage.setItem(KANBAN_STYLE_PREFIX + m.id, value);
+  }catch{}
+}
+function kanbanToday(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+
 function emptyKanbanCache(){
   return { phase:'loading', data:null, error:'', errorCode:'', loading:false, loadedAt:0 };
 }
@@ -4582,8 +4606,15 @@ function kanbanBodyContent(m, st){
   if(!rows) return `<div class="mon-offline">読み込み中…</div>`;
 
   const api = kanbanApi;
-  const groupIds = [...new Set(api.ROWS.map(r => r.group))];
-  const groups = groupIds.map(g => {
+  const style = kanbanStyleOf(m);
+  // バー（標準）以外は kanban-styles.js が描く。一覧（アコーディオン）の中身はどのスタイルでも同じものを使う
+  const styled = style !== 'bars' && window.KanbanStyles ? window.KanbanStyles.render(style, {
+    rows, defs: api.ROWS, today: kanbanToday(), expanded: st.expanded,
+    rowAttr: key => `${m.id}:${key}`,
+    listHtml: (key, label, r) => kanbanListHtml(m, { key, label }, r, st),
+    esc
+  }) : null;
+  const groups = styled || [...new Set(api.ROWS.map(r => r.group))].map(g => {
     const defs = api.ROWS.filter(r => r.group === g);
     const scale = Math.max(1, ...defs.map(r => r.total ? rows[r.key].total : rows[r.key].rest.length));
     return `<div class="kb-group">${defs.map(r => kanbanRowHtml(m, r, rows[r.key], scale, st)).join('')}</div>`;
@@ -4594,8 +4625,9 @@ function kanbanBodyContent(m, st){
   const stale = updated && !isNaN(updated) && Date.now() - updated.getTime() > staleH * 3600000;
   const staleNote = stale ? `<div class="kb-stale">データが${staleH}時間以上更新されていません（出力 ${esc(formatUpdatedAt(cur.data.updatedAt).replace('更新日時', '').trim())}）。Macの同期を確認してください</div>` : '';
   const err = cur.error ? `<div class="mon-err">${esc(cur.error)}（前回の内容を表示中）</div>` : '';
-  const forget = kanbanPass(m.id) ? `<div style="text-align:right;padding-top:6px;"><button type="button" class="kb-forget" data-kb-forget="${esc(m.id)}">パスフレーズを消去</button></div>` : '';
-  return groups + staleNote + err + forget;
+  const picker = window.KanbanStyles ? window.KanbanStyles.pickerHtml(style, `data-kb-style="${esc(m.id)}"`, esc) : '<span></span>';
+  const forget = kanbanPass(m.id) ? `<button type="button" class="kb-forget" data-kb-forget="${esc(m.id)}">パスフレーズを消去</button>` : '';
+  return groups + staleNote + err + `<div class="kb-foot">${picker}${forget}</div>`;
 }
 
 function kanbanHeadState(m, st){
@@ -4662,6 +4694,16 @@ function wireKanban(card){
     btn.addEventListener('click', e=>{
       e.stopPropagation();
       st.expandedFull.add(btn.dataset.kbMore.split(':').pop());
+      paintKanban(id);
+    });
+  });
+  card.querySelectorAll('[data-kb-style]').forEach(sel=>{
+    ['mousedown','click','dragstart'].forEach(ev => sel.addEventListener(ev, e => e.stopPropagation()));
+    sel.addEventListener('change', e=>{
+      e.stopPropagation();
+      const m = allMonitors().find(x => x.id === id);
+      if(!m) return;
+      setKanbanStyle(m, sel.value);
       paintKanban(id);
     });
   });
@@ -5470,6 +5512,12 @@ function fillMonitorForm(m){
   F('mf-kb-classification').value = m.classification || '';
   F('mf-kb-max').value = m.max || 8;
   F('mf-kb-stale').value = m.staleHours || 24;
+  const styleSel = F('mf-kb-style');
+  if(!styleSel.options.length){
+    (window.KanbanStyles ? window.KanbanStyles.STYLES : [{ key:'bars', label:'バー（標準）' }])
+      .forEach(o => styleSel.add(new Option(o.label, o.key)));
+  }
+  styleSel.value = window.KanbanStyles ? window.KanbanStyles.normalize(m.style) : 'bars';
 }
 
 /** 編集中のID。新規追加のときは null */
@@ -5630,6 +5678,10 @@ function buildMonitor(){
     m.max = Math.max(1, Math.min(30, Number(F('mf-kb-max').value) || 8));
     const stale = Number(F('mf-kb-stale').value);
     if(stale > 0 && stale !== 24) m.staleHours = Math.min(720, Math.round(stale)); else delete m.staleHours;
+    const style = F('mf-kb-style').value;
+    if(style && style !== 'bars') m.style = style; else delete m.style;
+    // 設定で既定を変えたら、このブラウザでの一時的な切り替えは解除して設定を優先する
+    try{ localStorage.removeItem(KANBAN_STYLE_PREFIX + id); }catch{}
 
     // パスフレーズは設定(JSON)には入れず、このブラウザにだけ置く。IDを変えたら持ち越す
     const pass = F('mf-kb-pass').value;
