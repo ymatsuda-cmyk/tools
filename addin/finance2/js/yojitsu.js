@@ -166,7 +166,7 @@
         const x = f.L + step * i + step * 0.14 + bw * bi, y0 = f.y(0), y1 = f.y(v || 0), h = Math.max(1, y0 - y1);
         const fc = i >= o.cur;
         const fill = fc ? "#FFFFFF" : (b.spike[i] ? COL.spike : b.color);
-        s.push(`<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${fill}" ${fc ? `stroke="${b.color}" stroke-width="1" stroke-dasharray="2 1.5"` : ""}><title>${esc(o.labels[i])}月 ${b.name}：${yen(v)}円（計画 ${yen(b.plan[i])}円）</title></rect>`);
+        s.push(`<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${fill}" ${fc ? `stroke="${b.color}" stroke-width="1" stroke-dasharray="2 1.5"` : ""}><title>${esc(o.labels[i])}月 ${b.name}：${yen(v)}円（計画 ${yen(b.plan[i])}円${b.plan[i] ? "、" + Math.round((v || 0) / b.plan[i] * 100) + "%" : ""}）</title></rect>`);
         const py = f.y(b.plan[i] || 0);
         s.push(`<line x1="${(x - 1).toFixed(1)}" x2="${(x + bw + 1).toFixed(1)}" y1="${py.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#1B2430" stroke-width="1.6"/>`);
       });
@@ -288,8 +288,9 @@
     const spG = d.mg.map((v, i) => i < d.cur && isSp(v, d.pG[i], sp.sp));
     const list = [];
     for (let i = 0; i < d.cur; i++) {
-      if (spC[i]) list.push(`${labels[i]}月 原価 ${yen(d.mc[i])}円（計画比 ${sgn(d.mc[i] - d.pC[i])}円）`);
-      if (spG[i]) list.push(`${labels[i]}月 販管費 ${yen(d.mg[i])}円（計画比 ${sgn(d.mg[i] - d.pG[i])}円）`);
+      const pr = (a, b) => (b ? Math.round(a / b * 100) + "%" : "計画0円");
+      if (spC[i]) list.push(`${labels[i]}月 原価 ${yen(d.mc[i])}円（当月計画 ${yen(d.pC[i])}円の${pr(d.mc[i], d.pC[i])}、${sgn(d.mc[i] - d.pC[i])}円）`);
+      if (spG[i]) list.push(`${labels[i]}月 販管費 ${yen(d.mg[i])}円（当月計画 ${yen(d.pG[i])}円の${pr(d.mg[i], d.pG[i])}、${sgn(d.mg[i] - d.pG[i])}円）`);
     }
     const sC = d.cAct, sCP = sum(d.pC.slice(0, d.cur)), sG = d.gAct, sGP = sum(d.pG.slice(0, d.cur));
     const over = (sCP && sC > sCP * 1.05) || (sGP && sG > sGP * 1.05);
@@ -305,7 +306,7 @@
     <div class="yj-spk yj-spk2"><span></span><span>計画比（%超）</span>
     <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
     <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div>
-    <p class="muted small">実績が計画の○%を超えた月を突発として赤で示します（計画が0円の月は、実績があれば突発）。</p></details>
+    <p class="muted small"><b>月ごと</b>に、当月の実績が当月の計画の○%を超えたら突発として赤で示します（累計の計画比とは別。計画が0円の月は、実績があれば突発）。</p></details>
 </section>`;
 
     // ③ 利益率（年度末の着地）
