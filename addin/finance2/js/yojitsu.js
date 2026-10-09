@@ -71,12 +71,16 @@
     const planDiff = months.map((_, i) => pS[i] - planM[i] - planE[i] - planN[i]).map((v, i) => ({ i, v })).filter(x => Math.abs(x.v) >= 1);
     const av = (k, q) => (segAct && segAct[k] && typeof segAct[k][q] === "number" ? segAct[k][q] : null);
     const mv = (key, i) => (key && i < cur ? (M.month(key, months[i]) || 0) : 0);
+    // 見込み月でも月次PLに売上高が入っていれば、その値を見込みとして使う（空いている月だけスライダーで計算）
+    const sheetVal = (key, i) => { if (!key || !M.has(months[i])) return null; const v = M.month(key, months[i]); return v ? v : null; };
+    const sheetFut = months.map((_, i) => i >= cur && sheetVal(K.sales, i) != null);
+    const rb = sheetFut.filter((x, i) => i >= cur && !x).length;
     // 既定値：計画の残り月平均・計画原価率
     const avgRem = (arr) => (r > 0 ? sum(arr.slice(cur)) / r : 0);
     const ex = p.ex == null ? Math.round(avgRem(planE)) : p.ex;
     const nw = p.nw == null ? Math.round(avgRem(planN)) : p.nw;
     const crP = p.cr == null ? (sum(pS) ? sum(pC) / sum(pS) * 100 : 20) : p.cr;
-    const cr = crP / 100, sr = p.sr / 100, bl = r > 0 ? p.bl : 0;
+    const cr = crP / 100, sr = p.sr / 100, bl = rb > 0 ? p.bl : 0;
     const mon = { m: [], e: [], n: [] }, mc = [], mg = [], ms = [], actDiff = [], actMissing = [];
     for (let i = 0; i < 12; i++) {
       if (i < cur) {
@@ -90,8 +94,16 @@
         } else if (hasSeg && s) actMissing.push(i);
         mon.m.push(m); mon.n.push(n); mon.e.push(e);
         mc.push(mv(K.cogs, i)); mg.push(mv(K.sga, i)); ms.push(s);
+      } else if (sheetFut[i]) {
+        const s = sheetVal(K.sales, i), q = months[i];
+        const am = av("m", q), ae = av("e", q), an = av("n", q);
+        let m = 0, e = s, n = 0;
+        if (am != null || ae != null || an != null) { m = am || 0; n = an || 0; e = ae == null ? s - m - n : ae; e += s - m - e - n; }
+        mon.m.push(m); mon.n.push(n); mon.e.push(e);
+        const sc = sheetVal(K.cogs, i), sg = sheetVal(K.sga, i);
+        mc.push(sc != null ? sc : s * cr); mg.push(sg != null ? sg : pG[i] * sr); ms.push(s);
       } else {
-        const m = planM[i], e = bl / r + ex, n = nw;
+        const m = planM[i], e = bl / rb + ex, n = nw;
         mon.m.push(m); mon.e.push(e); mon.n.push(n);
         mc.push((m + e + n) * cr); mg.push(pG[i] * sr); ms.push(m + e + n);
       }
@@ -99,11 +111,15 @@
     const taxK = (10 / 110) * (1 - p.mr / 100), tg = p.tgt / 100;
     const adj = (R, C) => (R > 0 ? (R - C - R * taxK) / (R / 1.1) * 100 : 0);
     const Ract = sum(ms.slice(0, cur)), cAct = sum(mc.slice(0, cur)), gAct = sum(mg.slice(0, cur)), gRem = sum(mg.slice(cur));
-    const maintRem = sum(planM.slice(cur)), firm = maintRem + bl, pipe = (ex + nw) * r, S = gAct + gRem;
-    const R1 = Ract + firm, C1 = cAct + cr * firm, R2 = R1 + pipe, C2 = C1 + cr * pipe;
+    // 受注確定＝空き月の保守＋受注残＋月次PLに入力済みの見込み。営業見込み＝空き月の追加見込み
+    const blankIdx = months.map((_, i) => i).filter(i => i >= cur && !sheetFut[i]);
+    const sheetIdx = months.map((_, i) => i).filter(i => i >= cur && sheetFut[i]);
+    const sheetR = sum(sheetIdx.map(i => ms[i])), sheetC = sum(sheetIdx.map(i => mc[i]));
+    const maintRem = sum(blankIdx.map(i => planM[i])), firm = maintRem + bl + sheetR, pipe = (ex + nw) * rb, S = gAct + gRem;
+    const R1 = Ract + firm, C1 = cAct + cr * (maintRem + bl) + sheetC, R2 = R1 + pipe, C2 = C1 + cr * pipe;
     const PR = sum(pS), PC = sum(pC), PG = sum(pG);
     return {
-      months, cur, r, last, byMark, hasSeg, planDiff, actDiff, actMissing, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
+      months, cur, r, rb, sheetIdx, last, byMark, hasSeg, planDiff, actDiff, actMissing, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
       ex, nw, crP, cr, bl, taxK, tg, adj, Ract, cAct, gAct, gRem, S, maintRem, firm, pipe, R1, C1, R2, C2, PR, PC, PG,
       m1: adj(R1, C1 + S), m2: adj(R2, C2 + S), mP: adj(PR, PC + PG)
     };
@@ -227,10 +243,10 @@
     const y = (v) => yen(v) + "円";
     return `<section class="card yj-ctl">
   <div class="card-head"><h2>見込みの前提</h2><button type="button" class="link" data-yact="reset">既定に戻す</button></div>
-  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。` : "確定した実績はまだありません。12か月すべてを見込みで計算します。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).map(x => x.name + "（" + x.p.slice(0, 4) + "/" + Number(x.p.slice(5)) + "）").join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}</p>
-  ${d.r > 0 ? rng("bl", "受注残（受注済・未計上）", p.bl, 0, Math.max(d.PR, p.bl), step, y) : ""}
-  ${d.r > 0 ? rng("ex", "開発（既存）追加見込み／月", d.ex, 0, Math.max(mx, d.ex), step, y) : ""}
-  ${d.r > 0 ? rng("nw", "開発（新規）見込み／月", d.nw, 0, Math.max(mx, d.nw), step, y) : ""}
+  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。${d.sheetIdx.length ? `<br>月次PLに値が入っている見込み月（${d.sheetIdx.map(i => Number(d.months[i].slice(5)) + "月").join("・")}）はその値を使い、空いている${d.rb}か月を下のスライダーで計算します。` : ""}` : "確定した実績はまだありません。12か月すべてを見込みで計算します。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).map(x => x.name + "（" + x.p.slice(0, 4) + "/" + Number(x.p.slice(5)) + "）").join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}</p>
+  ${d.rb > 0 ? rng("bl", "受注残（受注済・未計上）", p.bl, 0, Math.max(d.PR, p.bl), step, y) : ""}
+  ${d.rb > 0 ? rng("ex", "開発（既存）追加見込み／月", d.ex, 0, Math.max(mx, d.ex), step, y) : ""}
+  ${d.rb > 0 ? rng("nw", "開発（新規）見込み／月", d.nw, 0, Math.max(mx, d.nw), step, y) : ""}
   ${d.r > 0 ? rng("cr", "今後の原価率", Math.round(d.crP * 2) / 2, 0, 60, 0.5, v => Number(v).toFixed(1) + "%") : ""}
   ${d.r > 0 ? rng("sr", "販管費（計画比）", p.sr, 80, 120, 1, v => v + "%") : ""}
 </section>`;
