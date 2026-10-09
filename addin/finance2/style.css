@@ -215,4 +215,5 @@ main { padding: 12px 10px 40px; display: flex; flex-direction: column; gap: 10px
 .yj-kv b { color: var(--ink); }
 .yj-spk { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px 8px; align-items: center; font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
 .yj-spk .inp { height: 30px; }
+.yj-spk.yj-spk2 { grid-template-columns: auto 1fr; }
 @media (min-width: 520px) { .yj-cats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

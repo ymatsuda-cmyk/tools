@@ -4,7 +4,7 @@
  * ①売上   ：累計の積み上げ（実績＝面、見込み＝破線、計画＝点線）。
  *            保守／開発（既存）／開発（新規）はボタンでONにした区分だけ
  *            下から 保守→既存→新規 の順に色分けし、OFFの区分は「その他」として上に積む。
- * ②コスト ：原価・販管費の月別棒グラフ。計画を横線で重ね、突発（計画比○%超かつ○円超）を赤で示す。
+ * ②コスト ：原価・販管費の月別棒グラフ。計画を横線で重ね、突発（計画比○%超）を赤で示す。
  * ③利益率 ：年度末の着地。受注確定ベース（実績＋保守＋受注残）と着地見込み（＋営業見込み）を
  *            計画と並べ、調整後営業利益率（税抜）を目標と比べる。見込み部分は斜線。
  *
@@ -30,13 +30,13 @@
   const COL = { plan: "#A9B3BF", fc: "#C9781A", cogs: "#7B848D", sga: "#D98A6A", spike: "#C0392B", firm: "#8FA9CC", act: "#1F3F6E", planBar: "#C9D5E6", ok: "#2E7D6B", bad: "#8E2A2A", muted: "#56606B", grid: "#E3E6E4" };
 
   /* ---------- 設定（ブックに保存） ---------- */
-  const DEF = { bl: 0, ex: null, nw: null, cr: null, sr: 100, tgt: 15, mr: 50, sp: { cp: 120, ca: 200000, sp: 120, sa: 200000 }, sel: { m: false, e: false, n: false }, open: {} };
+  const DEF = { bl: 0, ex: null, nw: null, cr: null, sr: 100, tgt: 15, mr: 50, sp: { cp: 120, sp: 120 }, sel: { m: false, e: false, n: false }, open: {} };
   function loadParams() {
     let p = null;
     try { const s = Office.context.document.settings.get(SKEY); if (s) p = JSON.parse(s); } catch (e) {}
     if (!p) { try { p = JSON.parse(localStorage.getItem(SKEY) || "null"); } catch (e) {} }
     const o = JSON.parse(JSON.stringify(DEF));
-    if (p) { Object.assign(o, p); o.sp = Object.assign({}, DEF.sp, p.sp || {}); o.sel = Object.assign({}, DEF.sel, p.sel || {}); o.open = Object.assign({}, p.open || {}); }
+    if (p) { Object.assign(o, p); o.sp = { cp: (p.sp && p.sp.cp) || DEF.sp.cp, sp: (p.sp && p.sp.sp) || DEF.sp.sp }; o.sel = Object.assign({}, DEF.sel, p.sel || {}); o.open = Object.assign({}, p.open || {}); }
     return o;
   }
   let saveTimer = null;
@@ -283,9 +283,9 @@
 
     // ② コスト
     const sp = p.sp;
-    const isSp = (v, pl, pc, pa) => v > pl * pc / 100 && v - pl > pa;
-    const spC = d.mc.map((v, i) => i < d.cur && isSp(v, d.pC[i], sp.cp, sp.ca));
-    const spG = d.mg.map((v, i) => i < d.cur && isSp(v, d.pG[i], sp.sp, sp.sa));
+    const isSp = (v, pl, pc) => v > 0 && v > (pl || 0) * pc / 100;
+    const spC = d.mc.map((v, i) => i < d.cur && isSp(v, d.pC[i], sp.cp));
+    const spG = d.mg.map((v, i) => i < d.cur && isSp(v, d.pG[i], sp.sp));
     const list = [];
     for (let i = 0; i < d.cur; i++) {
       if (spC[i]) list.push(`${labels[i]}月 原価 ${yen(d.mc[i])}円（計画比 ${sgn(d.mc[i] - d.pC[i])}円）`);
@@ -302,10 +302,10 @@
   <div class="legend"><span>${lgBox(COL.cogs)}原価</span><span>${lgBox(COL.sga)}販管費</span><span>${lgBox(COL.spike)}突発</span><span><i class="lg" style="border:1px dashed ${COL.cogs};background:#fff"></i>見込み</span><span>${lgLine("#1B2430")}計画</span></div>
   <div class="yj-box yj-${k2}">累計　原価 <b>${yen(sC)}円</b>／計画 ${yen(sCP)}円（${rt(sC, sCP)}）<br>販管費 <b>${yen(sG)}円</b>／計画 ${yen(sGP)}円（${rt(sG, sGP)}）<br>${list.length ? "<b>突発</b>：" + list.map(esc).join("、") : "突発なし"}</div>
   <details data-yjd="spk" ${open("spk")}><summary>突発の条件</summary>
-    <div class="yj-spk"><span></span><span>計画比（%超）</span><span>超過額（円超）</span>
-    <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5"><input type="number" class="inp" data-yjc="ca" value="${sp.ca}" min="0" step="10000">
-    <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"><input type="number" class="inp" data-yjc="sa" value="${sp.sa}" min="0" step="10000"></div>
-    <p class="muted small">両方の条件を満たした実績月を突発として赤で示します。</p></details>
+    <div class="yj-spk yj-spk2"><span></span><span>計画比（%超）</span>
+    <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
+    <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div>
+    <p class="muted small">実績が計画の○%を超えた月を突発として赤で示します（計画が0円の月は、実績があれば突発）。</p></details>
 </section>`;
 
     // ③ 利益率（年度末の着地）
@@ -384,7 +384,7 @@ ${sliders(c, d)}
     if (!id || !last) return;
     const p = last.c.p, v = Number(t.value);
     if (!isFinite(v)) return;
-    if (["cp", "ca", "sp", "sa"].includes(id)) p.sp[id] = v; else p[id] = v;
+    if (["cp", "sp"].includes(id)) p.sp[id] = v; else p[id] = v;
     saveParams(p); refresh();
   });
   document.addEventListener("toggle", (e) => {
