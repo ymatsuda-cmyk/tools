@@ -1,7 +1,8 @@
 """
 DashboardBar（Python版）
 - Edge のアプリモードでダッシュボードを表示し、画面左端に AppBar として固定する
-- つまみクリック: 展開/収納  つまみ・帯ドラッグ: 幅変更  ホバー: 覗き見  Ctrl+Alt+D: 切替  右クリック: メニュー
+- つまみクリック: 展開/収納  つまみ上下ドラッグ: 位置移動  帯左右ドラッグ: 幅変更
+- ホバー: 覗き見  Ctrl+Alt+D: 切替  右クリック: メニュー
 - 標準ライブラリのみ（ctypes + tkinter）。pythonw.exe で起動する想定
 """
 import ctypes
@@ -85,6 +86,8 @@ DwmGetWindowAttribute = _fn(dwmapi, "DwmGetWindowAttribute", ctypes.c_long,
                             wt.HWND, wt.DWORD, ctypes.c_void_p, wt.DWORD)
 CreateRoundRectRgn = _fn(gdi32, "CreateRoundRectRgn", wt.HRGN,
                          ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int)
+CreatePolygonRgn = _fn(gdi32, "CreatePolygonRgn", wt.HRGN,
+                       ctypes.POINTER(wt.POINT), ctypes.c_int, ctypes.c_int)
 SetWindowRgn = _fn(user32, "SetWindowRgn", ctypes.c_int, wt.HWND, wt.HRGN, wt.BOOL)
 PostMessageW = _fn(user32, "PostMessageW", wt.BOOL, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
 
@@ -115,13 +118,14 @@ DEFAULTS = {
     "MinWidth": 240,
     "MaxWidth": 800,
     "StripWidth": 6,          # 細い帯の幅
-    "TabWidth": 22,           # つまみの幅
-    "TabHeight": 56,          # つまみの高さ
+    "TabWidth": 20,           # つまみの幅
+    "TabHeight": 68,          # つまみの高さ
     "TabPosition": 0.5,       # つまみの縦位置（0=上端, 0.5=中央, 1=下端）
     "StripColor": "#C9C5BC",
-    "TabColor": "#E8E5DE",
-    "TabHoverColor": "#D6D2C8",
-    "ArrowColor": "#5F5E5A",
+    "TabColor": "#D3D1C7",
+    "TabHoverColor": "#D3D1C7",
+    "ArrowColor": "#B4B2A9",  # 薄いグレー
+    "TabOpacity": 0.55,       # つまみの不透明度（マウスを乗せると 1.0）
     "AnimationMs": 260,
     "StartCollapsed": False,
     "HoverPeek": True,
@@ -225,6 +229,34 @@ def frame_insets(hwnd):
     return (vis.left - win.left, vis.top - win.top, win.right - vis.right, win.bottom - vis.bottom)
 
 
+def _bezier(p0, p1, p2, p3, n=10):
+    pts = []
+    for i in range(1, n + 1):
+        t = i / n
+        u = 1 - t
+        pts.append((u ** 3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t ** 3 * p3[0],
+                    u ** 3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t ** 3 * p3[1]))
+    return pts
+
+
+def tab_outline(w, h):
+    """角を丸めた台形（左＝帯側が高く、右が低い）の輪郭。20x68 の形を基準に、角の大きさは保ったまま縦に伸ばす"""
+    sx = w / 20.0
+    c = min(20.0, h / 2.0)  # 上下の曲線部分の高さ
+    k = c / 20.0
+
+    def P(x, y):
+        return (x * sx, y)
+
+    pts = [P(0, 0)]
+    pts += _bezier(P(0, 0), P(4, 0), P(8, 3 * k), P(13, 7 * k))
+    pts += _bezier(P(13, 7 * k), P(17, 10 * k), P(20, 14 * k), P(20, c))
+    pts.append(P(20, h - c))
+    pts += _bezier(P(20, h - c), P(20, h - 14 * k), P(17, h - 10 * k), P(13, h - 7 * k))
+    pts += _bezier(P(13, h - 7 * k), P(8, h - 3 * k), P(4, h), P(0, h))
+    return pts
+
+
 def inside(p, r):
     return r.left <= p.x < r.right and r.top <= p.y < r.bottom
 
@@ -251,6 +283,12 @@ class DashboardBar:
         self.dragging = False
         self.drag_x = 0
         self.drag_w = 0
+        self.tab_down = False
+        self.tab_moved = False
+        self.tab_drag_y = 0
+        self.tab_drag_pos = 0.5
+        self.expected = None        # Edge を置いたはずの位置（ずれ検出用）
+        self.fix_ids = []
         self.hover_since = None
         self.out_since = None
         self.hotkey_prev = False
@@ -270,20 +308,26 @@ class DashboardBar:
         self.tab.attributes("-topmost", True)
         self.tab.configure(bg=self.s["TabColor"], cursor="hand2")
         self.tab_label = tk.Label(self.tab, text="◀", bg=self.s["TabColor"], fg=self.s["ArrowColor"],
-                                  font=("Segoe UI", 10), cursor="hand2")
-        self.tab_label.pack(expand=True, fill="both")
-        self.tab.bind("<Enter>", lambda e: self._tab_color(self.s["TabHoverColor"]))
-        self.tab.bind("<Leave>", lambda e: self._tab_color(self.s["TabColor"]))
+                                  font=("Segoe UI", 8), cursor="hand2", padx=0)
+        self.tab_label.pack(expand=True, fill="both", padx=(0, 3))
+        self.tab.attributes("-alpha", float(self.s["TabOpacity"]))
+        self.tab.bind("<Enter>", lambda e: self._tab_hover(True))
+        self.tab.bind("<Leave>", lambda e: self._tab_hover(False))
 
         self.menu = tk.Menu(self.root, tearoff=0)
         self.menu.add_command(label="幅を初期値に戻す", command=self.reset_width)
         self.menu.add_separator()
         self.menu.add_command(label="終了", command=self.quit)
 
+        # 帯：左右ドラッグで幅変更（クリックで切替）
+        self.root.bind("<ButtonPress-1>", self.on_press)
+        self.root.bind("<B1-Motion>", self.on_motion)
+        self.root.bind("<ButtonRelease-1>", self.on_release)
+        # つまみ：上下ドラッグで位置移動（クリックで切替）
+        self.tab.bind("<ButtonPress-1>", self.on_tab_press)
+        self.tab.bind("<B1-Motion>", self.on_tab_motion)
+        self.tab.bind("<ButtonRelease-1>", self.on_tab_release)
         for w in (self.root, self.tab):
-            w.bind("<ButtonPress-1>", self.on_press)
-            w.bind("<B1-Motion>", self.on_motion)
-            w.bind("<ButtonRelease-1>", self.on_release)
             w.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
 
         # Edge アプリウィンドウを起動
@@ -363,6 +407,18 @@ class DashboardBar:
         abd.rc.right = abd.rc.left + self.px(dip)
         SHAppBarMessage(ABM_SETPOS, ctypes.byref(abd))
         self.left = abd.rc.left
+        self._schedule_fix()
+
+    def _schedule_fix(self):
+        """予約変更で作業領域が変わると、Edge が自分で位置を直してしまう。少し後に置き直す"""
+        for i in self.fix_ids:
+            self.root.after_cancel(i)
+        self.fix_ids = [self.root.after(ms, self._fix_position) for ms in (60, 250, 600, 1200)]
+
+    def _fix_position(self):
+        if self.closing or self.anim_id is not None or self.dragging or self.state == COLLAPSED:
+            return
+        self.layout()
 
     def update_insets(self):
         ins = frame_insets(self.edge) if IsWindowVisible(self.edge) else None
@@ -380,23 +436,66 @@ class DashboardBar:
         # 中身は幅を保ったまま、左端から出入りする
         # 見えない枠の分を外側に広げ、見た目の端を帯にぴったり合わせる
         il, _, ir, ib = self.insets
-        SetWindowPos(self.edge, HWND_TOPMOST, x - wpx - il, self.top - tb,
-                     wpx + il + ir, h + tb + ib, SWP_NOACTIVATE)
+        ex = (x - wpx - il, self.top - tb, wpx + il + ir, h + tb + ib)
+        self.expected = ex
+        SetWindowPos(self.edge, HWND_TOPMOST, ex[0], ex[1], ex[2], ex[3], SWP_NOACTIVATE)
         self.root.geometry(f"{spx}x{h}+{x}+{self.top}")
+        self.place_tab()
+
+    def place_tab(self):
+        spx = self.px(self.S)
+        x = self.left + self.px(self.visible)
+        h = self.bottom - self.top
         tw, th = self.px(self.s["TabWidth"]), self.px(self.s["TabHeight"])
         pos = max(0.0, min(1.0, float(self.s["TabPosition"])))
         self.tab.geometry(f"{tw}x{th}+{x + spx}+{self.top + int((h - th) * pos)}")
 
     def _shape_tab(self):
-        """つまみの右側だけ角丸にする"""
+        """つまみを角の丸い台形に切り抜く"""
         tw, th = self.px(self.s["TabWidth"]), self.px(self.s["TabHeight"])
-        r = self.px(8)
-        rgn = CreateRoundRectRgn(-r, 0, tw + 1, th + 1, r * 2, r * 2)
+        pts = [(round(px_), round(py)) for px_, py in tab_outline(tw, th)]
+        arr = (wt.POINT * len(pts))(*[wt.POINT(a, b) for a, b in pts])
+        rgn = CreatePolygonRgn(arr, len(pts), 2)  # WINDING
         SetWindowRgn(self.tab_hwnd, rgn, True)
 
-    def _tab_color(self, color):
-        self.tab.configure(bg=color)
-        self.tab_label.configure(bg=color)
+    def _tab_hover(self, on):
+        if not self.tab_down:
+            self.tab.attributes("-alpha", 1.0 if on else float(self.s["TabOpacity"]))
+
+    # ---- つまみ：クリック / 上下ドラッグ ----
+    def on_tab_press(self, e):
+        self.tab_down = True
+        self.tab_moved = False
+        self.tab_drag_y = e.y_root
+        self.tab_drag_pos = float(self.s["TabPosition"])
+        self.hover_since = None
+        self.tab.attributes("-alpha", 1.0)
+
+    def on_tab_motion(self, e):
+        if not self.tab_down:
+            return
+        dy = e.y_root - self.tab_drag_y
+        if not self.tab_moved and abs(dy) < 4:
+            return
+        self.tab_moved = True
+        span = (self.bottom - self.top) - self.px(self.s["TabHeight"])
+        if span > 0:
+            self.s["TabPosition"] = max(0.0, min(1.0, self.tab_drag_pos + dy / span))
+            self.place_tab()
+
+    def on_tab_release(self, e):
+        if not self.tab_down:
+            return
+        self.tab_down = False
+        if self.tab_moved:
+            save_settings(self.s)
+        elif self.state == PEEK:
+            self.goto(EXPANDED)
+        else:
+            self.toggle()
+        p = wt.POINT()
+        GetCursorPos(ctypes.byref(p))
+        self._tab_hover(inside(p, rect_of(self.tab_hwnd)))
 
     # ---- 状態遷移 ----
     def goto(self, target):
@@ -516,11 +615,13 @@ class DashboardBar:
 
             p = wt.POINT()
             GetCursorPos(ctypes.byref(p))
-            in_strip = inside(p, rect_of(self.strip_hwnd)) or inside(p, rect_of(self.tab_hwnd))
+            in_strip = inside(p, rect_of(self.strip_hwnd))   # 帯だけ（覗き見の開始判定）
+            in_tab = inside(p, rect_of(self.tab_hwnd))
             now = time.time()
 
-            # ホバーで覗き見
-            if self.s["HoverPeek"] and self.state == COLLAPSED and not self.down and in_strip:
+            # 帯へのホバーで覗き見（つまみへのホバーでは開かない）
+            busy = self.down or self.tab_down
+            if self.s["HoverPeek"] and self.state == COLLAPSED and not busy and in_strip:
                 if self.hover_since is None:
                     self.hover_since = now
                 elif now - self.hover_since > 0.25:
@@ -530,8 +631,8 @@ class DashboardBar:
                 self.hover_since = None
 
             # 覗き見中：外に 0.4 秒出たら収納
-            if self.state == PEEK and not self.down:
-                if in_strip or inside(p, rect_of(self.edge)):
+            if self.state == PEEK and not busy:
+                if in_strip or in_tab or inside(p, rect_of(self.edge)):
                     self.out_since = None
                 elif self.out_since is None:
                     self.out_since = now
@@ -553,6 +654,16 @@ class DashboardBar:
             self.update_insets()
             if self.insets != old and self.state != COLLAPSED and self.anim_id is None:
                 self.layout()
+            # Edge が勝手に動いていたら置き直す
+            if (self.state != COLLAPSED and self.anim_id is None and not self.dragging
+                    and self.expected and IsWindowVisible(self.edge)):
+                r = rect_of(self.edge)
+                ex = self.expected
+                if (abs(r.left - ex[0]) > 2 or abs(r.top - ex[1]) > 2
+                        or abs((r.right - r.left) - ex[2]) > 2):
+                    log.info("Edge がずれていたので置き直し: %s -> %s",
+                             (r.left, r.top, r.right - r.left), ex)
+                    self.layout()
             m, w = primary_monitor()
             key = (m.left, m.top, m.right, m.bottom, w.top, w.bottom)
             if key != self.mon_key and self.anim_id is None and not self.dragging:
