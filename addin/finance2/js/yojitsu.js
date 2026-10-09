@@ -4,7 +4,7 @@
  * ①売上   ：累計の積み上げ（実績＝面、見込み＝破線、計画＝点線）。
  *            保守／開発（既存）／開発（新規）はボタンでONにした区分だけ
  *            下から 保守→既存→新規 の順に色分けし、OFFの区分は「その他」として上に積む。
- * ②コスト ：原価・販管費の月別棒グラフ。計画を横線で重ね、突発（計画比○%超）を赤で示す。
+ * ②コスト ：原価・販管費の月別棒グラフ。計画を横線で重ね、突発（その月までの累計が計画累計の○%超）を赤で示す。
  * ③利益率 ：年度末の着地。受注確定ベース（実績＋保守＋受注残）と着地見込み（＋営業見込み）を
  *            計画と並べ、調整後営業利益率（税抜）を目標と比べる。見込み部分は斜線。
  *
@@ -290,14 +290,16 @@
 
     // ② コスト
     const sp = p.sp;
-    const isSp = (v, pl, pc) => v > 0 && v > (pl || 0) * pc / 100;
-    const spC = d.mc.map((v, i) => i < d.cur && isSp(v, d.pC[i], sp.cp));
-    const spG = d.mg.map((v, i) => i < d.cur && isSp(v, d.pG[i], sp.sp));
+    // その月までの累計実績 ÷ 計画の累計 が設定値（%）を超えた実績月を突発とする
+    const cA = { c: cum(d.mc), g: cum(d.mg) }, cP = { c: cum(d.pC), g: cum(d.pG) };
+    const isSp = (a, pl, pc) => a > 0 && a > pl * pc / 100;
+    const spC = d.mc.map((_, i) => i < d.cur && isSp(cA.c[i], cP.c[i], sp.cp));
+    const spG = d.mg.map((_, i) => i < d.cur && isSp(cA.g[i], cP.g[i], sp.sp));
     const list = [];
     for (let i = 0; i < d.cur; i++) {
       const pr = (a, b) => (b ? Math.round(a / b * 100) + "%" : "計画0円");
-      if (spC[i]) list.push(`${labels[i]}月 原価 ${yen(d.mc[i])}円（当月計画 ${yen(d.pC[i])}円の${pr(d.mc[i], d.pC[i])}、${sgn(d.mc[i] - d.pC[i])}円）`);
-      if (spG[i]) list.push(`${labels[i]}月 販管費 ${yen(d.mg[i])}円（当月計画 ${yen(d.pG[i])}円の${pr(d.mg[i], d.pG[i])}、${sgn(d.mg[i] - d.pG[i])}円）`);
+      if (spC[i]) list.push(`${labels[i]}月 原価 累計${yen(cA.c[i])}円（計画累計 ${yen(cP.c[i])}円の${pr(cA.c[i], cP.c[i])}）`);
+      if (spG[i]) list.push(`${labels[i]}月 販管費 累計${yen(cA.g[i])}円（計画累計 ${yen(cP.g[i])}円の${pr(cA.g[i], cP.g[i])}）`);
     }
     const sC = d.cAct, sCP = sum(d.pC.slice(0, d.cur)), sG = d.gAct, sGP = sum(d.pG.slice(0, d.cur));
     const over = (sCP && sC > sCP * 1.05) || (sGP && sG > sGP * 1.05);
@@ -313,7 +315,7 @@
     <div class="yj-spk yj-spk2"><span></span><span>計画比（%超）</span>
     <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
     <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div>
-    <p class="muted small"><b>月ごと</b>に、当月の実績が当月の計画の○%を超えたら突発として赤で示します（累計の計画比とは別。計画が0円の月は、実績があれば突発）。</p></details>
+    <p class="muted small">各月で、<b>その月までの累計実績</b>が<b>計画の累計</b>の○%を超えたら、その月を突発として赤で示します（計画の累計が0円のときは、実績があれば突発）。</p></details>
 </section>`;
 
     // ③ 利益率（年度末の着地）
