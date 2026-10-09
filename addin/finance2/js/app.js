@@ -1,8 +1,8 @@
 /* ============================================================
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
- * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測
+ * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測 ／ 計画 ／ 予実
  * ============================================================ */
-const APP_VERSION = "rev_20260930_7b3d9e0";
+const APP_VERSION = "rev_20261009_yj01";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
@@ -20,13 +20,13 @@ window.APP_VERSION = APP_VERSION;
   const pLabel = (p) => p ? p.slice(0, 4) + "年" + Number(p.slice(5)) + "月" : "期間不明";
   const LS = "finance2-ui";
 
-  const TABS = [["import", "取込"], ["dash", "全体"], ["monthly", "月別"], ["account", "科目"], ["forecast", "予測"], ["plan", "計画"]];
+  const TABS = [["import", "取込"], ["dash", "全体"], ["monthly", "月別"], ["account", "科目"], ["forecast", "予測"], ["plan", "計画"], ["yojitsu", "予実"]];
   const state = {
     tab: "import", led: null, M: null, loadError: "",
     imports: [], seq: 0, diffId: null, diffAll: false, busy: "",
     fy: null, month: null, plMode: "month", showDetail: false,
     account: null, fcKey: null, fcMethod: "yoy", checks: {}, lastChecks: [],
-    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false
+    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false, seg: null, yj: null
   };
   try { Object.assign(state, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
   const persist = () => { try { localStorage.setItem(LS, JSON.stringify({ tab: state.tab, plMode: state.plMode, showDetail: state.showDetail, fcMethod: state.fcMethod, show: state.show, planDetail: state.planDetail })); } catch (e) {} };
@@ -49,6 +49,8 @@ window.APP_VERSION = APP_VERSION;
       if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; }
     } catch (e) { console.warn("readModel", e); }
     try { state.plan = await Plan.read(); } catch (e) { console.warn("plan", e); state.plan = null; }
+    try { state.seg = await Yojitsu.readSegments(); } catch (e) { console.warn("seg", e); state.seg = null; }
+    if (!state.yj) state.yj = Yojitsu.loadParams();
     const M = state.M;
     if (!state.fy || !M.fys.includes(state.fy)) state.fy = M.latest ? M.fyOf(M.latest) : null;
     if (!state.month || !M.has(state.month)) state.month = state.fy ? M.latestIn(state.fy) : null;
@@ -254,7 +256,7 @@ window.APP_VERSION = APP_VERSION;
     let html = "";
     if (state.loadError) html += `<div class="banner err">${esc(state.loadError)}</div>`;
     try {
-      html += ({ import: renderImport, dash: renderDash, monthly: renderMonthly, account: renderAccount, forecast: renderForecast, plan: renderPlan }[state.tab] || renderImport)();
+      html += ({ import: renderImport, dash: renderDash, monthly: renderMonthly, account: renderAccount, forecast: renderForecast, plan: renderPlan, yojitsu: renderYojitsu }[state.tab] || renderImport)();
     } catch (e) {
       console.error(e);
       html += `<div class="banner err">画面の表示中にエラーが発生しました：${esc(e.message)}</div>`;
@@ -822,6 +824,17 @@ ${body}`;
   <p class="muted small">「!」は計画との差が10%以上かつ${yen(minAbs())}円以上の科目です。</p>
 </section>
 ${createCard(true)}`;
+  }
+
+  /* ---------- 予実タブ（js/yojitsu.js） ---------- */
+  function renderYojitsu() {
+    const M = state.M;
+    if (!state.yj) state.yj = Yojitsu.loadParams();
+    return Yojitsu.render({
+      M, fy: state.fy, plan: M.latest ? planFor(state.fy) : null, seg: state.seg, p: state.yj,
+      fySelect: M.latest ? fySelect() : "", empty: emptyData(),
+      toast, reload: load, rerender: render
+    });
   }
 
   /* ---------- イベント ---------- */
