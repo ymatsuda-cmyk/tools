@@ -11,6 +11,8 @@
  * 区分の内訳は 計画シート・月次PL の売上高の下の「保守」「開発(既存)」「開発(新規)」の行から読む
  * （行がない月は売上高をすべて開発（既存）として扱う。内訳の合計と売上高の差は開発（既存）で調整して表示）。
  * 見込みの前提（受注残・追加見込み・原価率など）はブックの設定に保存する。
+ * 実績の確定月：月次PL／月次BSの4行目に印（空でない値）がある月まで実績、それ以降は見込み。
+ *   印がなければ、データのある最新月までを実績とする。
  * ============================================================ */
 (function (global) {
   "use strict";
@@ -51,9 +53,14 @@
 
   /* ---------- 計算 ---------- */
   function compute(c) {
-    const { M, fy, plan, segPlan, segAct, p } = c;
-    const K = M.K, months = M.fyMonths(fy), last = M.latestIn(fy);
-    const cur = last ? months.indexOf(last) + 1 : 0, r = 12 - cur;
+    const { M, fy, plan, segPlan, segAct, p, confirmed } = c;
+    const K = M.K, months = M.fyMonths(fy);
+    let cur, byMark = false;
+    if (confirmed) {
+      byMark = true;
+      cur = confirmed < months[0] ? 0 : confirmed > months[11] ? 12 : months.indexOf(confirmed) + 1;
+    } else { const lt = M.latestIn(fy); cur = lt ? months.indexOf(lt) + 1 : 0; }
+    const last = cur ? months[cur - 1] : null, r = 12 - cur;
     const pv = (key) => (plan && key && plan[key] ? plan[key].values.map(v => v || 0) : Array(12).fill(0));
     const pS = pv(K.sales), pC = pv(K.cogs), pG = pv(K.sga);
     const hasSeg = !!(segPlan && (segPlan.m || segPlan.e || segPlan.n));
@@ -96,7 +103,7 @@
     const R1 = Ract + firm, C1 = cAct + cr * firm, R2 = R1 + pipe, C2 = C1 + cr * pipe;
     const PR = sum(pS), PC = sum(pC), PG = sum(pG);
     return {
-      months, cur, r, last, hasSeg, planDiff, actDiff, actMissing, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
+      months, cur, r, last, byMark, hasSeg, planDiff, actDiff, actMissing, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
       ex, nw, crP, cr, bl, taxK, tg, adj, Ract, cAct, gAct, gRem, S, maintRem, firm, pipe, R1, C1, R2, C2, PR, PC, PG,
       m1: adj(R1, C1 + S), m2: adj(R2, C2 + S), mP: adj(PR, PC + PG)
     };
@@ -220,7 +227,7 @@
     const y = (v) => yen(v) + "円";
     return `<section class="card yj-ctl">
   <div class="card-head"><h2>見込みの前提</h2><button type="button" class="link" data-yact="reset">既定に戻す</button></div>
-  <p class="muted small">${d.cur ? `${Number(d.last.slice(5))}月まで実績（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。` : "実績はまだありません。12か月すべてを見込みで計算します。"}</p>
+  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。` : "確定した実績はまだありません。12か月すべてを見込みで計算します。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}</p>
   ${d.r > 0 ? rng("bl", "受注残（受注済・未計上）", p.bl, 0, Math.max(d.PR, p.bl), step, y) : ""}
   ${d.r > 0 ? rng("ex", "開発（既存）追加見込み／月", d.ex, 0, Math.max(mx, d.ex), step, y) : ""}
   ${d.r > 0 ? rng("nw", "開発（新規）見込み／月", d.nw, 0, Math.max(mx, d.nw), step, y) : ""}

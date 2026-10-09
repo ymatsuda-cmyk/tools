@@ -2,7 +2,7 @@
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
  * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測 ／ 計画 ／ 予実
  * ============================================================ */
-const APP_VERSION = "rev_20261009_yj04";
+const APP_VERSION = "rev_20261009_yj05";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
@@ -26,7 +26,7 @@ window.APP_VERSION = APP_VERSION;
     imports: [], seq: 0, diffId: null, diffAll: false, busy: "",
     fy: null, month: null, plMode: "month", showDetail: false,
     account: null, fcKey: null, fcMethod: "yoy", checks: {}, lastChecks: [],
-    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false, segAct: null, yj: null
+    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false, segAct: null, confirmed: null, yj: null
   };
   try { Object.assign(state, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
   const persist = () => { try { localStorage.setItem(LS, JSON.stringify({ tab: state.tab, plMode: state.plMode, showDetail: state.showDetail, fcMethod: state.fcMethod, show: state.show, planDetail: state.planDetail })); } catch (e) {} };
@@ -46,8 +46,8 @@ window.APP_VERSION = APP_VERSION;
     state.M = state.MT; state.source = "tb"; state.layout = {};
     try {
       const sm = await MonthlySheets.readModel(state.led.tb, state.led.settings.期首月 || 10);
-      state.segAct = null;
-      if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; state.segAct = sm.seg || null; }
+      state.segAct = null; state.confirmed = null;
+      if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; state.segAct = sm.seg || null; state.confirmed = sm.confirmed || null; }
     } catch (e) { console.warn("readModel", e); }
     try { state.plan = await Plan.read(); } catch (e) { console.warn("plan", e); state.plan = null; }
     if (!state.yj) state.yj = Yojitsu.loadParams();
@@ -842,7 +842,8 @@ ${createCard(true)}`;
     if (!state.yj) state.yj = Yojitsu.loadParams();
     return Yojitsu.render({
       M, fy: state.fy, plan: M.latest ? planFor(state.fy) : null,
-      segPlan: M.latest ? planSegFor(state.fy) : null, segAct: state.segAct, p: state.yj,
+      segPlan: M.latest ? planSegFor(state.fy) : null, segAct: state.segAct, confirmed: state.confirmed,
+      confirmedSheets: Object.values(state.layout || {}).filter(l => l && l.confirmed).map(l => l.sheetName), p: state.yj,
       fySelect: M.latest ? fySelect() : "", empty: emptyData(),
       toast, reload: load, rerender: render
     });

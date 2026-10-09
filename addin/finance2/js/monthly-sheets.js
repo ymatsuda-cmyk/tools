@@ -343,6 +343,7 @@
       mapVals.slice(1).forEach(r => { if (r[0] && r[1]) mapping[r[0] + "|" + mkey(r[1])] = String(r[2] || "").split(/[＋+]/).map(x => x.trim()).filter(Boolean); });
 
       const out = [], layout = {}, seg = {};
+      let confirmedAll = null;
       const tbBy = {};
       tb.forEach(r => { ((tbBy[r.period] = tbBy[r.period] || {})[r.sheet] = tbBy[r.period][r.sheet] || []).push(r); });
       for (const sh of ["PL", "BS"]) {
@@ -378,7 +379,12 @@
           else if (checkAlias[s.key]) s.sources = checkAlias[s.key].slice(0, 1);
           else s.sources = [s.raw];
         });
-        layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows, segRows };
+        // 4行目に何か入っている月まで実績が確定（いちばん右の印の月）
+        let confirmed = null;
+        const r4 = vals[3] || [];
+        hdr.cols.forEach((c, i) => { const v = r4[c]; if (v !== "" && v != null && String(v).trim() !== "") confirmed = periods[i]; });
+        if (confirmed && (!confirmedAll || confirmed > confirmedAll)) confirmedAll = confirmed;
+        layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows, segRows, confirmed };
         const items = srows.filter(s => !s.section);
         const key = (s) => sh + ":" + s.key;
         // シートの値
@@ -431,7 +437,7 @@
           });
         });
       }
-      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null };
+      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null, confirmed: confirmedAll };
     });
   }
 
