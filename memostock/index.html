@@ -495,6 +495,13 @@ dialog .extra:empty{display:none}
   #filters{flex-wrap:wrap}
 }
 
+/* 集中モード：上下のバーと一覧を隠して、メモを画面いっぱいに使う */
+#app.focus{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+#app.focus>header,#app.focus>aside,#app.focus #toolbar,#app.focus .tabbar,#app.focus .tagbar,#app.focus .statusbar,#app.focus #cpanel{display:none!important}
+#app.focus main{grid-column:1/-1;grid-row:1/-1}
+#focusExit{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:30;width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.14);color:var(--muted);opacity:.85}
+#focusExit:hover{opacity:1;color:var(--ink)}
+#focusExit svg{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -655,6 +662,7 @@ dialog .extra:empty{display:none}
         <button class="ib" id="lay1" title="分割しない" aria-label="分割しない" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/></svg></button>
         <button class="ib" id="layV" title="縦に2分割（左右に並べる）" aria-label="縦に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/></svg></button>
         <button class="ib" id="layH" title="横に2分割（上下に並べる）" aria-label="横に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 12h17"/></svg></button>
+        <button class="ib" id="focusBtn" title="集中モード：バーと一覧を隠してメモを広く使う（⌘⇧F）" aria-label="集中モード" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
         <span class="sep"></span>
         <button class="ib" id="pinBtn" title="ピン留めする（一覧の上に固定）" aria-label="ピン留めする（一覧の上に固定）" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6l-1 6.5 3.5 3.5v1.5h-11V13.5L10 10z"/><path d="M12 15v6"/></svg></button>
         <button class="ib" id="favBtn" title="お気に入りにする" aria-label="お気に入りにする" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
@@ -683,6 +691,7 @@ dialog .extra:empty{display:none}
     </div>
   </main>
 </section>
+<button id="focusExit" class="hidden" title="集中モードを終える（⌘⇧F）" aria-label="集中モードを終える"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l6-6M4 20l6-6"/></svg></button>
 
 <div id="viewer" class="hidden" role="dialog" aria-label="画像ビューア">
   <div class="vstage"><img id="vimg" alt="画像"></div>
@@ -717,10 +726,15 @@ dialog .extra:empty{display:none}
       <tr><th>マインドマップ：枝を削除</th><td>Delete</td></tr>
       <tr><th>マインドマップ：拡大縮小／マップから出る</th><td>⌘＋ホイール ／ Esc</td></tr>
       <tr><th>手書きボード：全画面で開く</th><td>ボードをクリック（タップ）</td></tr>
-      <tr><th>手書きボード：ペン／マーカー／消しゴム／範囲／移動</th><td>P ／ M ／ E ／ R ／ H</td></tr>
+      <tr><th>手書きボード：ペン／マーカー／消しゴム／選択／図形／文字</th><td>P ／ M ／ E ／ V ／ S ／ T</td></tr>
+      <tr><th>手書きボード：参照表示の範囲／移動ツール／グリッド吸着</th><td>R ／ H ／ G</td></tr>
+      <tr><th>手書きボード：コピー／切り取り／貼り付け／複製</th><td>⌘C ／ ⌘X ／ ⌘V ／ ⌘D</td></tr>
+      <tr><th>手書きボード：グループ化／解除</th><td>⌘G ／ ⇧⌘G</td></tr>
+      <tr><th>手書きボード：図形の文字を編集／グループの中へ</th><td>ダブルタップ（Enter）</td></tr>
+      <tr><th>手書きボード：元に戻す／やり直す（指）</th><td>2本指タップ ／ 3本指タップ</td></tr>
       <tr><th>手書きボード：元に戻す／やり直す</th><td>⌘Z ／ ⇧⌘Z</td></tr>
       <tr><th>手書きボード：移動／拡大縮小／全体を表示</th><td>Space＋ドラッグ ／ ⌘＋ホイール・2本指 ／ 0</td></tr>
-      <tr><th>手書きボード：閉じる</th><td>Esc</td></tr>
+      <tr><th>手書きボード：選択を外す／閉じる</th><td>Esc</td></tr>
       <tr><th>画像ビューア：拡大／縮小／実サイズ／画面に合わせる</th><td>＋ ／ − ／ 0 ／ F（ホイールでも拡大縮小）</td></tr>
       <tr><th>表：表全体を選ぶ</th><td>Esc（または表の左の余白をクリック）</td></tr>
       <tr><th>表を選んだ状態で前に空白／タブ</th><td>Space ／ Tab（⇧Tab・Backspace で戻す）</td></tr>
@@ -732,6 +746,7 @@ dialog .extra:empty{display:none}
       <tr><th>タグに色を付ける</th><td>タグを右クリック</td></tr>
       <tr><th>同期</th><td>⌘S</td></tr>
       <tr><th>一覧を隠す／表示</th><td>⌘B</td></tr>
+      <tr><th>集中モード（バーと一覧を隠す）／終える</th><td>⌘⇧F</td></tr>
     </table>
     <p>Windows では ⌘ を Ctrl、⌥ を Alt に読み替えてください。</p>
     <div class="row"><span></span><button value="close" class="primary">閉じる</button></div>
@@ -952,6 +967,20 @@ function toggleSide(show){
   applyView(true);
 }
 $('#sideBtn').onclick = () => toggleSide();
+/* ---------- 集中モード（iPad／iPhone でメモの欄を広く使う） ---------- */
+let focusPen = false;
+function setFocus(on){
+  on = on ?? !$('#app').classList.contains('focus');
+  $('#app').classList.toggle('focus', on);
+  $('#focusExit').classList.toggle('hidden', !on);
+  $('#focusBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (typeof panes !== 'undefined') for (const p of panes) p.view?.requestMeasure();
+  if (on && typeof curView === 'function') curView()?.focus();
+}
+$('#focusBtn').onclick = () => setFocus(true);
+// ペン先が触れて抜けてしまわないように、終えるのは指・マウス・キーボードだけ
+$('#focusExit').addEventListener('pointerdown', e => { focusPen = e.pointerType === 'pen'; });
+$('#focusExit').onclick = () => { if (focusPen){ focusPen = false; return; } setFocus(false); };
 $('#app').addEventListener('transitionend', e => {
   if (e.target === $('#app') && typeof panes !== 'undefined') for (const p of panes) p.view?.requestMeasure();
 });
@@ -2589,15 +2618,17 @@ function insertMindmap(v){
 //   {"v":1,"mode":"infinite",...}
 //   ```
 const IB_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@main/api/inkboard/';
+// ライブラリを更新したら上げる（オフライン用に保存してある古い版を使わないように）
+const IB_VER = '?v=2';
 let ibLib = null;
 function loadInkboardLib(){
   if (!ibLib){
     if (!document.querySelector('link[data-ib]')){
       const l = document.createElement('link');
-      l.rel = 'stylesheet'; l.href = IB_BASE + 'inkboard.css'; l.dataset.ib = '1';
+      l.rel = 'stylesheet'; l.href = IB_BASE + 'inkboard.css' + IB_VER; l.dataset.ib = '1';
       document.head.prepend(l);   // アプリ側の CSS を優先させる
     }
-    ibLib = import(IB_BASE + 'inkboard.js').catch(err => { ibLib = null; throw err; });
+    ibLib = import(IB_BASE + 'inkboard.js' + IB_VER).catch(err => { ibLib = null; throw err; });
   }
   return ibLib;
 }
@@ -2670,9 +2701,19 @@ async function drawInk(wrap, view){
     if (token !== wrap._token) return;
     c.className = 'inkc';
     wrap._ctl?.destroy();
-    wrap._ctl = lib.renderBoard(c, parseInk(wrap._src).value, {
+    const value = parseInk(wrap._src).value;
+    // 図形のあるボードを古いライブラリで保存すると図形が消えるので、そのときは見るだけにする
+    if (!lib.SHAPES && /"o":\[/.test(value)){
+      wrap._ctl = lib.renderBoard(c, value, { clickToOpen: false, title: '手書きボード' });
+      setStatus('手書きボードの部品が古い版のため、図形のあるボードは見るだけにしています。ページを再読み込みしてください', 'err');
+      return;
+    }
+    wrap._ctl = lib.renderBoard(c, value, {
       clickToOpen: false,
       title: '手書きボード',
+      // パレットの色・グリッド吸着・パレットの出し方などは、設定（JSONBin）に入れて端末間で共有する
+      prefs: () => settings?.inkPrefs,
+      onPrefsChange: p => { if (settings){ settings.inkPrefs = p; saveSettingsSoon(); } },
       onChange: v => writeInk(view, wrap, t => {
         const resize = inkAreaKey(lib, t.value) !== inkAreaKey(lib, v);
         t.value = v;
@@ -3710,6 +3751,7 @@ document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); sync(); }
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k' && pass){ e.preventDefault(); if (viewCfg.side === false) toggleSide(true); $('#app').classList.remove('editing'); $('#q').focus(); $('#q').select(); }
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && pass){ e.preventDefault(); toggleSide(); }
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && pass && !$('#editorWrap').classList.contains('hidden')){ e.preventDefault(); setFocus(); }
 });
 const hasPending = () => dirtyIds.size || pendingDeletes.size || pendingImgs.size;
 window.addEventListener('beforeunload', e => { if (pass && hasPending()){ e.preventDefault(); e.returnValue = ''; } });
@@ -4326,6 +4368,7 @@ $('#forgetBtn').onclick = () => {
 
 async function lock(){
   if (rec.mr){ setStatus('録音中はロックできません。先に録音を停止してください', 'err'); return; }
+  setFocus(false);   // 自動ロックでも集中モードを終える
   closeSyncPop();
   if (cfgTimer) await saveSettings().catch(() => {});
   if (hasPending()) await sync();
