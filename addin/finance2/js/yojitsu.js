@@ -297,14 +297,14 @@
     const spG = d.mg.map((_, i) => i < d.cur && isSp(cA.g[i], cP.g[i], sp.sp));
     const list = [];
     for (let i = 0; i < d.cur; i++) {
-      const pr = (a, b) => (b ? Math.round(a / b * 100) + "%" : "計画0円");
-      if (spC[i]) list.push(`${labels[i]}月 原価 累計${yen(cA.c[i])}円（計画累計 ${yen(cP.c[i])}円の${pr(cA.c[i], cP.c[i])}）`);
-      if (spG[i]) list.push(`${labels[i]}月 販管費 累計${yen(cA.g[i])}円（計画累計 ${yen(cP.g[i])}円の${pr(cA.g[i], cP.g[i])}）`);
+      const pr = (a, b) => (b ? (a / b * 100).toFixed(1) + "%" : "計画0円");
+      if (spC[i]) list.push(`${labels[i]}月 原価 累計${yen(cA.c[i])}円（計画累計 ${yen(cP.c[i])}円の${pr(cA.c[i], cP.c[i])}、${sgn(cA.c[i] - cP.c[i])}円）`);
+      if (spG[i]) list.push(`${labels[i]}月 販管費 累計${yen(cA.g[i])}円（計画累計 ${yen(cP.g[i])}円の${pr(cA.g[i], cP.g[i])}、${sgn(cA.g[i] - cP.g[i])}円）`);
     }
     const sC = d.cAct, sCP = sum(d.pC.slice(0, d.cur)), sG = d.gAct, sGP = sum(d.pG.slice(0, d.cur));
     const over = (sCP && sC > sCP * 1.05) || (sGP && sG > sGP * 1.05);
     const k2 = list.length ? "bad" : over ? "warn" : "ok";
-    const rt = (a, b) => (b ? Math.round(a / b * 100) + "%" : "—");
+    const rt = (a, b) => (b ? (a / b * 100).toFixed(1) + "%" : "—");
     const sec2 = `<section class="card">
   <div class="card-head"><h2>② コスト（原価・販管費）</h2>${badge(k2, list.length ? "突発 " + list.length + "件" : over ? "計画超過" : "計画内")}</div>
   <p class="muted small">目的：費用を計画の範囲内に収める。計画どおりか、突発が発生していないか。</p>
@@ -315,6 +315,7 @@
     <div class="yj-spk yj-spk2"><span></span><span>計画比（%超）</span>
     <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
     <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div>
+    <div class="yj-cumtbl"><div class="yj-ctr yj-cth"><span>月</span><span>原価 累計（計画比）</span><span>販管費 累計（計画比）</span></div>${Array.from({ length: d.cur }, (_, i) => `<div class="yj-ctr"><span>${labels[i]}月</span><span class="${spC[i] ? "t-err" : ""}">${yen(cA.c[i])}円（${cP.c[i] ? (cA.c[i] / cP.c[i] * 100).toFixed(1) + "%" : "—"}）</span><span class="${spG[i] ? "t-err" : ""}">${yen(cA.g[i])}円（${cP.g[i] ? (cA.g[i] / cP.g[i] * 100).toFixed(1) + "%" : "—"}）</span></div>`).join("")}</div>
     <p class="muted small">各月で、<b>その月までの累計実績</b>が<b>計画の累計</b>の○%を超えたら、その月を突発として赤で示します（計画の累計が0円のときは、実績があれば突発）。</p></details>
 </section>`;
 
@@ -389,14 +390,22 @@ ${sliders(c, d)}
     if (lab) lab.textContent = id === "cr" ? v.toFixed(1) + "%" : id === "sr" ? v + "%" : yen(v) + "円";
     saveParams(p); refresh();
   });
-  document.addEventListener("change", (e) => {
-    const t = e.target, id = t.dataset && t.dataset.yjc;
+  // 数値の条件は入力中も反映する（再描画後も入力欄のフォーカスとカーソル位置を保つ）
+  const applyNum = (t) => {
+    const id = t.dataset && t.dataset.yjc;
     if (!id || !last) return;
+    if (t.value === "") return;
     const p = last.c.p, v = Number(t.value);
     if (!isFinite(v)) return;
-    if (["cp", "sp"].includes(id)) p.sp[id] = v; else p[id] = v;
-    saveParams(p); refresh();
-  });
+    if (["cp", "sp"].includes(id)) { if (p.sp[id] === v) return; p.sp[id] = v; } else { if (p[id] === v) return; p[id] = v; }
+    saveParams(p);
+    const pos = t.selectionStart;
+    refresh();
+    const n = document.querySelector(`[data-yjc="${id}"]`);
+    if (n) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (err) {} }
+  };
+  document.addEventListener("input", (e) => applyNum(e.target));
+  document.addEventListener("change", (e) => applyNum(e.target));
   document.addEventListener("toggle", (e) => {
     const t = e.target;
     if (!t || !t.dataset || !t.dataset.yjd || !last) return;
