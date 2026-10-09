@@ -1003,8 +1003,8 @@ class Editor {
     this.snap = !!p.snap
     this.palMode = p.palMode === 'auto' ? 'auto' : 'always'
     this.exitSide = p.exitSide === 'right' ? 'right' : 'left'
-    // 指で描くか。Apple Pencil を一度でも使ったら、指は移動と拡大縮小に回す
-    this.fingerDraw = p.fingerDraw ?? !p.penSeen
+    // 指で描くか（初期はオフ：指は移動・拡大縮小と、図形を動かすのに使う）
+    this.fingerDraw = p.fingerDraw ?? false
     this.sel = new Set()
     this.gpath = [] // 中に入っているグループ（外側から順に）
     this.undoStack = []
@@ -1994,6 +1994,8 @@ class Editor {
         this.changed()
       }
     }
+    // ペンなどの道具のまま文字を書いたときは、選んだ状態を残さない
+    if (!['select', 'shape', 'text'].includes(this.tool)) { this.sel.clear(); this.gpath = [] }
     this.redraw()
     this.stage.focus?.()
   }
@@ -2287,7 +2289,14 @@ class Editor {
     this.menuEl.hidden = true
 
     const kind = this.inputKind(e)
-    if (kind === 'pan') return this.startPan(e)
+    if (kind === 'pan') {
+      // ペンなどの道具のままでも、指で図形・線・文字に触れたら動かせる（何もない所や手書きの線は移動）
+      if (e.pointerType === 'touch' && !this.readOnly && this.tool !== 'hand') {
+        const base = this.parentOf(this.hitItem(this.toWorld(e.clientX, e.clientY)))
+        if (base?.k) return this.startObj(e, true)
+      }
+      return this.startPan(e)
+    }
     const t = this.tool
     if (t === 'pen' || t === 'marker') this.startStroke(e)
     else if (t === 'eraser') this.startErase(e)
@@ -2335,6 +2344,12 @@ class Editor {
     else if (a.type === 'area') this.finishArea()
     else if (a.type !== 'pan') this.upObj(e, cancelled)
     this.action = null
+    // ペンなどの道具で指で動かしたときは、選んだ状態を残さない
+    if (!['select', 'shape', 'text'].includes(this.tool) && !this.editing && (this.sel.size || this.gpath.length)) {
+      this.sel.clear()
+      this.gpath = []
+      this.redraw()
+    }
     this.drawUi()
     this.showMenu()
   }
