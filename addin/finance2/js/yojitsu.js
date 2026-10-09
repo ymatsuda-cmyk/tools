@@ -227,7 +227,7 @@
     const y = (v) => yen(v) + "円";
     return `<section class="card yj-ctl">
   <div class="card-head"><h2>見込みの前提</h2><button type="button" class="link" data-yact="reset">既定に戻す</button></div>
-  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。` : "確定した実績はまだありません。12か月すべてを見込みで計算します。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}</p>
+  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月を見込みで計算します。` : "確定した実績はまだありません。12か月すべてを見込みで計算します。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).map(x => x.name + "（" + x.p.slice(0, 4) + "/" + Number(x.p.slice(5)) + "）").join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}</p>
   ${d.r > 0 ? rng("bl", "受注残（受注済・未計上）", p.bl, 0, Math.max(d.PR, p.bl), step, y) : ""}
   ${d.r > 0 ? rng("ex", "開発（既存）追加見込み／月", d.ex, 0, Math.max(mx, d.ex), step, y) : ""}
   ${d.r > 0 ? rng("nw", "開発（新規）見込み／月", d.nw, 0, Math.max(mx, d.nw), step, y) : ""}

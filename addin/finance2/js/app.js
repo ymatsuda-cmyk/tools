@@ -2,7 +2,7 @@
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
  * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測 ／ 計画 ／ 予実
  * ============================================================ */
-const APP_VERSION = "rev_20261009_yj05";
+const APP_VERSION = "rev_20261009_yj06";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
@@ -843,7 +843,7 @@ ${createCard(true)}`;
     return Yojitsu.render({
       M, fy: state.fy, plan: M.latest ? planFor(state.fy) : null,
       segPlan: M.latest ? planSegFor(state.fy) : null, segAct: state.segAct, confirmed: state.confirmed,
-      confirmedSheets: Object.values(state.layout || {}).filter(l => l && l.confirmed).map(l => l.sheetName), p: state.yj,
+      confirmedSheets: Object.values(state.layout || {}).filter(l => l && l.confirmed).map(l => ({ name: l.sheetName, p: l.confirmed })), p: state.yj,
       fySelect: M.latest ? fySelect() : "", empty: emptyData(),
       toast, reload: load, rerender: render
     });

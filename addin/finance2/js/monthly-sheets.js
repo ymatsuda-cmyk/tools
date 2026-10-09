@@ -380,9 +380,10 @@
           else s.sources = [s.raw];
         });
         // 4行目に何か入っている月まで実績が確定（いちばん右の印の月）
+        // ただし4行目が見出し行（月の行）やそれより下の場合は印として扱わない
         let confirmed = null;
-        const r4 = vals[3] || [];
-        hdr.cols.forEach((c, i) => { const v = r4[c]; if (v !== "" && v != null && String(v).trim() !== "") confirmed = periods[i]; });
+        const r4 = hdr.row > 3 ? (vals[3] || []) : [];
+        hdr.cols.forEach((c, i) => { const v = r4[c]; if (typeof v === "string" && v.trim() !== "" && !isMonthCell(monthText(v))) confirmed = periods[i]; });
         if (confirmed && (!confirmedAll || confirmed > confirmedAll)) confirmedAll = confirmed;
         layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows, segRows, confirmed };
         const items = srows.filter(s => !s.section);
