@@ -72,6 +72,7 @@
     segRows.forEach(s => {
       const pr = MAIN + (s.r - firstR), br = BASE + (s.r - firstR), PR = pr + 1, BR = br + 1;
       grid[pr][0] = s.raw; grid[br][0] = s.raw;
+      if (s.pipe) return;   // パイプラインは計画に載せない（行名だけ）
       grid[pr][1] = grid[br][1] = `=SUM(G${BR}:R${BR})`;
       grid[pr][4] = `=SUM(G${PR}:R${PR})`;
       grid[pr][5] = `=IF(B${PR}=0,"",E${PR}/B${PR}-1)`; fmt[pr][5] = "0.0%";
@@ -124,13 +125,25 @@
       const hdr = MonthlySheets.findHeader(vals);
       if (!hdr) return { exists: true, error: "計画シートの見出し行（2026/10 形式の月）が見つかりません" };
       const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
-      const rows = [], seg = {};
+      const rows = [], seg = {}, seenSeg = new Set();
+      let pipeMode = false, parent = null;
       for (let r = hdr.row + 1; r < vals.length; r++) {
         const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
         if (/^▼/.test(raw)) break;
         if (!raw || /^[【※]/.test(raw)) continue;
+        if (MonthlySheets.segLabelOnly(raw)) { pipeMode = MonthlySheets.segGroup(raw) === "pipe"; continue; }
         const sk = MonthlySheets.segOf(raw);
-        if (sk) { if (!seg[sk]) seg[sk] = hdr.cols.map(c => (typeof vals[r][c] === "number" ? vals[r][c] : null)); continue; }
+        if (sk && parent === "cogs") continue;   // 売上原価の下（パイプラインの原価）は計画に使わない
+        if (sk) {
+          const g = MonthlySheets.segGroup(raw); if (g) pipeMode = g === "pipe";
+          const isPipe = pipeMode || seenSeg.has(sk);
+          if (isPipe) { pipeMode = true; continue; }
+          seenSeg.add(sk);
+          seg[sk] = hdr.cols.map(c => (typeof vals[r][c] === "number" ? vals[r][c] : null));
+          continue;
+        }
+        pipeMode = false;
+        { const mk = MonthlySheets.mkey(raw); parent = ["売上高", "純売上高"].includes(mk) ? "sales" : mk === "売上原価" ? "cogs" : null; }
         const values = hdr.cols.map(c => (typeof vals[r][c] === "number" ? vals[r][c] : null));
         const isF = String(fmls[r][hdr.cols[0]] || "").startsWith("=") && !/ROUND\(/.test(String(fmls[r][hdr.cols[0]] || ""));
         rows.push({ key: "PL:" + MonthlySheets.mkey(raw), name: raw.replace(/[（(]旧[:：][^）)]*[）)]/g, ""), kind: isF ? "集計" : "明細", values });

@@ -20,7 +20,13 @@
   const mkey = (s) => base(s).replace(/[（(][^）)]*[）)]/g, "");
   // 売上高の内訳行（手入力。PDFからは書き込まず、科目としても扱わない）
   const SEG_NAMES = { m: ["保守"], e: ["開発(既存)", "既存開発"], n: ["開発(新規)", "新規開発"] };
-  const segOf = (s) => { const t = base(s).replace(/（/g, "(").replace(/）/g, ")"); return Object.keys(SEG_NAMES).find(k => SEG_NAMES[k].includes(t)) || null; };
+  // 「受注確定」「パイプライン」の見出しが同じセルに入っていても内訳として読む
+  const SEG_GROUP = /^(受注確定|パイプライン)/;
+  const segText = (s) => base(s).replace(/（/g, "(").replace(/）/g, ")");
+  const segOf = (s) => { const t = segText(s).replace(SEG_GROUP, ""); return Object.keys(SEG_NAMES).find(k => SEG_NAMES[k].includes(t)) || null; };
+  const segGroup = (s) => { const m = segText(s).match(SEG_GROUP); return m ? (m[1] === "パイプライン" ? "pipe" : "firm") : null; };
+  // 見出しだけの行（「受注確定」「パイプライン」のみ）
+  const segLabelOnly = (s) => /^(受注確定|パイプライン)$/.test(segText(s));
 
   const CHECKS = {
     PL: [
@@ -168,7 +174,7 @@
           const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
           if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
           if (!raw || /^[【※]/.test(raw)) { srows.push({ r, section: true, raw }); continue; }
-          if (segOf(raw)) continue;   // 売上高の内訳（保守・開発）は手入力のまま
+          if (segOf(raw) || segLabelOnly(raw)) continue;   // 売上高の内訳（保守・開発・パイプライン）は手入力のまま
           const f = String(fmls[r][ci] == null ? "" : fmls[r][ci]);
           srows.push({ r, raw, key: mkey(raw), bkey: base(raw), formula: f.startsWith("="), section: false });
           if (sh === "PL" && ["経常利益", "経常損失"].includes(mkey(raw))) break;
@@ -342,7 +348,7 @@
       const mapping = {};
       mapVals.slice(1).forEach(r => { if (r[0] && r[1]) mapping[r[0] + "|" + mkey(r[1])] = String(r[2] || "").split(/[＋+]/).map(x => x.trim()).filter(Boolean); });
 
-      const out = [], layout = {}, seg = {};
+      const out = [], layout = {}, seg = {}, pipe = {}, pipeCost = {};
       let confirmedAll = null;
       const tbBy = {};
       tb.forEach(r => { ((tbBy[r.period] = tbBy[r.period] || {})[r.sheet] = tbBy[r.period][r.sheet] || []).push(r); });
@@ -351,19 +357,36 @@
         const vals = used.values, fmls = used.formulas;
         const hdr = findHeader(vals); if (!hdr) continue;
         const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
-        const srows = [], segRows = [];
+        const srows = [], segRows = [], seenSeg = new Set();
+        let pipeMode = false, parent = null;
         for (let r = hdr.row + 1; r < vals.length; r++) {
           const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
           if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
           if (!raw || /^[【※]/.test(raw)) { srows.push({ r, section: true, raw }); continue; }
           const sk = sh === "PL" ? segOf(raw) : null;
-          if (sk) {
+          if (sh === "PL" && segLabelOnly(raw)) { pipeMode = segGroup(raw) === "pipe"; continue; }
+          // 売上原価の下の内訳行＝パイプラインの原価
+          if (sk && parent === "cogs") {
             const v = {};
             hdr.cols.forEach((c, i) => { const x = vals[r][c]; if (typeof x === "number") v[periods[i]] = x; });
-            segRows.push({ r, raw, k: sk, vals: v });
-            if (!seg[sk]) seg[sk] = v;
+            segRows.push({ r, raw, k: sk, vals: v, pipe: true, cost: true });
+            if (!pipeCost[sk]) pipeCost[sk] = v;
             continue;
           }
+          if (sk) {
+            const g = segGroup(raw);
+            if (g) pipeMode = g === "pipe";
+            // パイプラインの見出しより下、または同じ区分が2回目に出てきたらパイプライン
+            const isPipe = pipeMode || seenSeg.has(sk);
+            if (isPipe) pipeMode = true; else seenSeg.add(sk);
+            const v = {};
+            hdr.cols.forEach((c, i) => { const x = vals[r][c]; if (typeof x === "number") v[periods[i]] = x; });
+            segRows.push({ r, raw, k: sk, vals: v, pipe: isPipe });
+            const dst = isPipe ? pipe : seg;
+            if (!dst[sk]) dst[sk] = v;
+            continue;
+          }
+          if (sh === "PL") { pipeMode = false; const mk = mkey(raw); parent = ["売上高", "純売上高"].includes(mk) ? "sales" : mk === "売上原価" ? "cogs" : null; }
           const f0 = String(fmls[r][hdr.cols[0]] == null ? "" : fmls[r][hdr.cols[0]]);
           srows.push({ r, raw, key: mkey(raw), bkey: base(raw), formula: f0.startsWith("="), f0 });
           if (sh === "PL" && ["経常利益", "経常損失"].includes(mkey(raw))) break;
@@ -438,7 +461,7 @@
           });
         });
       }
-      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null, confirmed: confirmedAll };
+      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null, pipe: Object.keys(pipe).length ? pipe : null, pipeCost: Object.keys(pipeCost).length ? pipeCost : null, confirmed: confirmedAll };
     });
   }
 
@@ -451,5 +474,5 @@
     });
   }
 
-  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, segOf, moveFormula, findHeader, CHECKS, DEFAULTS };
+  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, segOf, segGroup, segLabelOnly, moveFormula, findHeader, CHECKS, DEFAULTS };
 })(window);
