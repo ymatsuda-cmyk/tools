@@ -2,7 +2,7 @@
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
  * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測 ／ 計画 ／ 予実
  * ============================================================ */
-const APP_VERSION = "rev_20261009_yj01";
+const APP_VERSION = "rev_20261009_yj02";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
@@ -26,7 +26,7 @@ window.APP_VERSION = APP_VERSION;
     imports: [], seq: 0, diffId: null, diffAll: false, busy: "",
     fy: null, month: null, plMode: "month", showDetail: false,
     account: null, fcKey: null, fcMethod: "yoy", checks: {}, lastChecks: [],
-    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false, seg: null, yj: null
+    show: { prev: true, anom: true, fc: false, plan: true }, MT: null, plan: null, layout: {}, source: "tb", planTarget: null, planDetail: false, segAct: null, yj: null
   };
   try { Object.assign(state, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (e) {}
   const persist = () => { try { localStorage.setItem(LS, JSON.stringify({ tab: state.tab, plMode: state.plMode, showDetail: state.showDetail, fcMethod: state.fcMethod, show: state.show, planDetail: state.planDetail })); } catch (e) {} };
@@ -46,10 +46,10 @@ window.APP_VERSION = APP_VERSION;
     state.M = state.MT; state.source = "tb"; state.layout = {};
     try {
       const sm = await MonthlySheets.readModel(state.led.tb, state.led.settings.期首月 || 10);
-      if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; }
+      state.segAct = null;
+      if (sm.found && sm.rows.length) { state.M = FinModel.build(sm.rows, state.led.settings); state.source = "sheet"; state.layout = sm.layout; state.segAct = sm.seg || null; }
     } catch (e) { console.warn("readModel", e); }
     try { state.plan = await Plan.read(); } catch (e) { console.warn("plan", e); state.plan = null; }
-    try { state.seg = await Yojitsu.readSegments(); } catch (e) { console.warn("seg", e); state.seg = null; }
     if (!state.yj) state.yj = Yojitsu.loadParams();
     const M = state.M;
     if (!state.fy || !M.fys.includes(state.fy)) state.fy = M.latest ? M.fyOf(M.latest) : null;
@@ -827,11 +827,22 @@ ${createCard(true)}`;
   }
 
   /* ---------- 予実タブ（js/yojitsu.js） ---------- */
+  // 計画シートの売上内訳（保守・開発(既存)・開発(新規)）を対象期の12か月に並べる
+  function planSegFor(fy) {
+    const pl = state.plan;
+    if (!pl || !pl.exists || !pl.seg) return null;
+    const ms = state.M.fyMonths(fy);
+    if (!ms.every(p => pl.periods.includes(p))) return null;
+    const out = {};
+    ["m", "e", "n"].forEach(k => { out[k] = ms.map(p => (pl.seg[k] ? pl.seg[k][pl.periods.indexOf(p)] : null)); });
+    return out;
+  }
   function renderYojitsu() {
     const M = state.M;
     if (!state.yj) state.yj = Yojitsu.loadParams();
     return Yojitsu.render({
-      M, fy: state.fy, plan: M.latest ? planFor(state.fy) : null, seg: state.seg, p: state.yj,
+      M, fy: state.fy, plan: M.latest ? planFor(state.fy) : null,
+      segPlan: M.latest ? planSegFor(state.fy) : null, segAct: state.segAct, p: state.yj,
       fySelect: M.latest ? fySelect() : "", empty: emptyData(),
       toast, reload: load, rerender: render
     });

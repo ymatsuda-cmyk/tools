@@ -8,12 +8,12 @@
  * ③利益率 ：年度末の着地。受注確定ベース（実績＋保守＋受注残）と着地見込み（＋営業見込み）を
  *            計画と並べ、調整後営業利益率（税抜）を目標と比べる。見込み部分は斜線。
  *
- * 区分の内訳は「売上区分」シートから読む（保守・開発（新規）の実績と計画。既存＝売上高−保守−新規）。
+ * 区分の内訳は 計画シート・月次PL の売上高の下の「保守」「開発(既存)」「開発(新規)」の行から読む
+ * （行がない月は売上高をすべて開発（既存）として扱う。内訳の合計と売上高の差は開発（既存）で調整して表示）。
  * 見込みの前提（受注残・追加見込み・原価率など）はブックの設定に保存する。
  * ============================================================ */
 (function (global) {
   "use strict";
-  const SEG_SHEET = "売上区分";
   const SKEY = "finance2.yojitsu";
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const yen = (n) => (n == null || !isFinite(n) ? "—" : (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toLocaleString());
@@ -49,83 +49,20 @@
     }, 500);
   }
 
-  /* ---------- 売上区分シート ---------- */
-  async function readSegments() {
-    return Excel.run(async (ctx) => {
-      const wss = ctx.workbook.worksheets; wss.load("items/name"); await ctx.sync();
-      const name = wss.items.map(w => w.name).find(n => n.indexOf(SEG_SHEET) === 0);
-      if (!name) return { exists: false };
-      const ws = wss.getItem(name);
-      const used = ws.getUsedRange(true).getBoundingRect(ws.getRange("A1"));
-      used.load("values"); await ctx.sync();
-      const vals = used.values;
-      const hdr = MonthlySheets.findHeader(vals);
-      if (!hdr) return { exists: true, sheet: name, error: "売上区分シートの見出し行（2026/10 形式の月）が見つかりません" };
-      const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
-      const out = { act: { m: {}, n: {} }, plan: { m: {}, n: {} } };
-      let mode = null;
-      for (let r = hdr.row + 1; r < vals.length; r++) {
-        const a = String(vals[r][0] == null ? "" : vals[r][0]).replace(/[\s\u3000]/g, "");
-        if (!a) continue;
-        if (/実績/.test(a) && /^【/.test(a)) { mode = "act"; continue; }
-        if (/計画/.test(a) && /^【/.test(a)) { mode = "plan"; continue; }
-        if (!mode) continue;
-        const k = /保守/.test(a) ? "m" : /新規/.test(a) ? "n" : null;
-        if (!k) continue;
-        hdr.cols.forEach((c, i) => { const v = vals[r][c]; if (typeof v === "number") out[mode][k][periods[i]] = v; });
-      }
-      return { exists: true, sheet: name, periods, ...out };
-    });
-  }
-  async function createSegments(M, fy) {
-    const months = M.fyMonths(fy);
-    const lab = (p) => p.slice(0, 4) + "/" + Number(p.slice(5));
-    const W = 13;
-    const row = (a) => { const r = Array(W).fill(""); a.forEach((v, i) => (r[i] = v)); return r; };
-    const g = [
-      row(["売上区分（保守・開発の内訳）"]),
-      row(["対象期", M.fyLabel(fy)]),
-      row(["保守と開発（新規）の金額を入れてください。開発（既存）は「売上高 − 保守 − 開発（新規）」でfinance2が計算します。"]),
-      row(["区分"].concat(months.map(lab))),
-      row(["【実績】"]),
-      row(["保守"].concat(months.map(() => 0))),
-      row(["開発（新規）"].concat(months.map(() => 0))),
-      row([""]),
-      row(["【計画】"]),
-      row(["保守"].concat(months.map(() => 0))),
-      row(["開発（新規）"].concat(months.map(() => 0)))
-    ];
-    await Excel.run(async (ctx) => {
-      const wss = ctx.workbook.worksheets;
-      const old = wss.getItemOrNullObject(SEG_SHEET); await ctx.sync();
-      if (!old.isNullObject) throw new Error("売上区分シートはすでにあります");
-      const ws = wss.add(SEG_SHEET);
-      const rg = ws.getRangeByIndexes(0, 0, g.length, W);
-      rg.formulas = g;
-      ws.getRangeByIndexes(5, 1, 2, 12).numberFormat = Array(2).fill(Array(12).fill("#,##0"));
-      ws.getRangeByIndexes(9, 1, 2, 12).numberFormat = Array(2).fill(Array(12).fill("#,##0"));
-      ws.getRange("A1").format.font.bold = true;
-      ws.getRangeByIndexes(3, 0, 1, W).format.fill.color = "#E4EAF3";
-      ws.getRangeByIndexes(3, 0, 1, W).format.font.bold = true;
-      [4, 8].forEach(r => { ws.getRangeByIndexes(r, 0, 1, 1).format.font.bold = true; });
-      [5, 6, 9, 10].forEach(r => { const x = ws.getRangeByIndexes(r, 1, 1, 12); x.format.fill.color = "#FFF4D6"; x.format.font.color = "#1F3F6E"; });
-      try { ws.getRange("A:A").format.columnWidth = 120; ws.getRange("B:M").format.columnWidth = 78; } catch (e) {}
-      ws.activate();
-      await ctx.sync();
-    });
-  }
-
   /* ---------- 計算 ---------- */
   function compute(c) {
-    const { M, fy, plan, seg, p } = c;
+    const { M, fy, plan, segPlan, segAct, p } = c;
     const K = M.K, months = M.fyMonths(fy), last = M.latestIn(fy);
     const cur = last ? months.indexOf(last) + 1 : 0, r = 12 - cur;
     const pv = (key) => (plan && key && plan[key] ? plan[key].values.map(v => v || 0) : Array(12).fill(0));
     const pS = pv(K.sales), pC = pv(K.cogs), pG = pv(K.sga);
-    const hasSeg = !!(seg && seg.exists && !seg.error);
-    const sv = (src, k) => months.map(q => (hasSeg && seg[src][k][q]) || 0);
-    const planM = sv("plan", "m"), planN = sv("plan", "n"), planE = pS.map((v, i) => v - planM[i] - planN[i]);
-    const actM = sv("act", "m"), actN = sv("act", "n");
+    const hasSeg = !!(segPlan && (segPlan.m || segPlan.e || segPlan.n));
+    const planM = months.map((_, i) => (hasSeg && segPlan.m ? segPlan.m[i] || 0 : 0));
+    const planN = months.map((_, i) => (hasSeg && segPlan.n ? segPlan.n[i] || 0 : 0));
+    const planE = months.map((_, i) => (hasSeg && segPlan.e && segPlan.e[i] != null ? segPlan.e[i] : pS[i] - planM[i] - planN[i]));
+    // 計画の内訳の合計と売上高の差
+    const planDiff = months.map((_, i) => pS[i] - planM[i] - planE[i] - planN[i]).map((v, i) => ({ i, v })).filter(x => Math.abs(x.v) >= 1);
+    const av = (k, q) => (segAct && segAct[k] && typeof segAct[k][q] === "number" ? segAct[k][q] : null);
     const mv = (key, i) => (key && i < cur ? (M.month(key, months[i]) || 0) : 0);
     // 既定値：計画の残り月平均・計画原価率
     const avgRem = (arr) => (r > 0 ? sum(arr.slice(cur)) / r : 0);
@@ -133,11 +70,18 @@
     const nw = p.nw == null ? Math.round(avgRem(planN)) : p.nw;
     const crP = p.cr == null ? (sum(pS) ? sum(pC) / sum(pS) * 100 : 20) : p.cr;
     const cr = crP / 100, sr = p.sr / 100, bl = r > 0 ? p.bl : 0;
-    const mon = { m: [], e: [], n: [] }, mc = [], mg = [], ms = [];
+    const mon = { m: [], e: [], n: [] }, mc = [], mg = [], ms = [], actDiff = [], actMissing = [];
     for (let i = 0; i < 12; i++) {
       if (i < cur) {
-        const s = mv(K.sales, i);
-        mon.m.push(actM[i]); mon.n.push(actN[i]); mon.e.push(s - actM[i] - actN[i]);
+        const s = mv(K.sales, i), q = months[i];
+        const am = av("m", q), ae = av("e", q), an = av("n", q);
+        let m = 0, e = s, n = 0;
+        if (am != null || ae != null || an != null) {
+          m = am || 0; n = an || 0; e = ae == null ? s - m - n : ae;
+          const df = s - m - e - n;
+          if (Math.abs(df) >= 1) { actDiff.push({ i, v: df }); e += df; }
+        } else if (hasSeg && s) actMissing.push(i);
+        mon.m.push(m); mon.n.push(n); mon.e.push(e);
         mc.push(mv(K.cogs, i)); mg.push(mv(K.sga, i)); ms.push(s);
       } else {
         const m = planM[i], e = bl / r + ex, n = nw;
@@ -152,7 +96,7 @@
     const R1 = Ract + firm, C1 = cAct + cr * firm, R2 = R1 + pipe, C2 = C1 + cr * pipe;
     const PR = sum(pS), PC = sum(pC), PG = sum(pG);
     return {
-      months, cur, r, last, hasSeg, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
+      months, cur, r, last, hasSeg, planDiff, actDiff, actMissing, pS, pC, pG, planM, planN, planE, mon, mc, mg, ms,
       ex, nw, crP, cr, bl, taxK, tg, adj, Ract, cAct, gAct, gRem, S, maintRem, firm, pipe, R1, C1, R2, C2, PR, PC, PG,
       m1: adj(R1, C1 + S), m2: adj(R2, C2 + S), mP: adj(PR, PC + PG)
     };
@@ -309,7 +253,12 @@
     const st1 = gap <= 0 ? badge("ok", "達成見込み") : badge(gap < goal * 0.06 ? "warn" : "bad", "不足 " + yen(gap) + "円");
     const segBtns = d.hasSeg
       ? `<div class="toggles" role="group" aria-label="色分け">${KEYS.map(k => `<button type="button" class="tgl ${p.sel[k] ? "on" : ""}" data-yact="sel" data-k="${k}" aria-pressed="${!!p.sel[k]}">${CAT[k].name}</button>`).join("")}</div>`
-      : `<p class="muted small">保守・開発（既存）・開発（新規）で色分けするには「売上区分」シートが必要です。<button type="button" class="link" data-yact="seg-create">売上区分シートを作成</button></p>`;
+      : `<p class="muted small">保守・開発（既存）・開発（新規）で色分けするには、計画シートと月次PLの売上高の下に「保守」「開発(既存)」「開発(新規)」の行を追加してください。</p>`;
+    const mlab = (i) => labels[i] + "月";
+    const segNotes = [];
+    if (d.hasSeg && d.actMissing.length) segNotes.push(`月次PLに内訳がない月（${d.actMissing.map(mlab).join("・")}）は、売上高をすべて開発（既存）として表示しています。`);
+    if (d.actDiff.length) segNotes.push(`月次PLの内訳の合計が売上高と合わない月があります（${d.actDiff.map(x => mlab(x.i) + " " + sgn(x.v) + "円").join("、")}）。差は開発（既存）に含めて表示しています。`);
+    if (d.planDiff.length) segNotes.push(`計画シートの内訳の合計が売上高と合わない月があります（${d.planDiff.map(x => mlab(x.i) + " " + sgn(x.v) + "円").join("、")}）。`);
     const catCards = d.hasSeg ? KEYS.map(k => {
       const cm = cum(d.mon[k]), a = d.cur ? cm[j] : 0, pn = d.cur ? sum(planOf[k].slice(0, d.cur)) : 0, an = sum(planOf[k]), ef = cm[11];
       const r = pn ? a / pn * 100 : null, need = d.r > 0 ? Math.max(0, (an - a) / d.r) : 0;
@@ -325,10 +274,11 @@
   <div class="card-head"><h2>① 売上</h2>${st1}</div>
   <p class="muted small">目的：売上目標（${yen(goal)}円）を達成する。計画どおり積み上がっているか。</p>
   ${segBtns}
+  ${segNotes.length ? `<p class="small t-amber">${segNotes.map(esc).join("<br>")}</p>` : ""}
   ${areaChart({ label: "売上の累計", labels, layers, lines, marker: d.r > 0 ? j : null })}
   <div class="legend">${layersDef.map(l => `<span>${lgBox(l.col)}${esc(l.name)}</span>`).join("")}${d.r > 0 ? `<span>${lgLine(COL.fc, true)}見込み</span>` : ""}<span>${lgLine(COL.plan, true)}計画</span></div>
   <div class="yj-box yj-${gap > 0 ? "warn" : "ok"}">現時点 <b>${yen(d.cur ? run[j] : 0)}円</b>（同月計画 ${yen(pNow)}円の <b>${pNow ? Math.round((d.cur ? run[j] : 0) / pNow * 100) : "—"}%</b>）<br>年度末見込み <b>${yen(end)}円</b>${gap > 0 ? (d.r > 0 ? `　→ 残り${d.r}か月で <b>あと${yen(gap)}円</b>（月 +${yen(gap / d.r)}円）の追加受注が必要` : `　→ 目標に ${yen(gap)}円 届きませんでした`) : "　→ 目標達成の見込み"}</div>
-  ${d.hasSeg ? `<details data-yjd="cat" ${open("cat")}><summary>区分別の詳細（保守・開発（既存）・開発（新規））</summary><div class="yj-cats">${catCards}</div><p class="muted small">開発（既存）＝売上高−保守−開発（新規）。<button type="button" class="link" data-yact="seg-open">売上区分シートを開く</button></p></details>` : ""}
+  ${d.hasSeg ? `<details data-yjd="cat" ${open("cat")}><summary>区分別の詳細（保守・開発（既存）・開発（新規））</summary><div class="yj-cats">${catCards}</div><p class="muted small">実績は月次PL、計画は計画シートの「保守」「開発(既存)」「開発(新規)」の行から読みます。</p></details>` : ""}
 </section>`;
 
     // ② コスト
@@ -405,11 +355,9 @@
     if (!c.plan || !c.plan[M.K.sales]) {
       return `<div class="toolbar">${c.fySelect}</div><div class="note">${esc(M.fyLabel(c.fy))}の計画シートがありません。予実は計画シートの売上高・売上原価・販管費と比べます。計画タブで計画シートを作成してください。<br><button type="button" class="btn primary" data-act="tab" data-tab="plan" style="margin-top:8px">計画タブを開く</button></div>`;
     }
-    if (c.seg && c.seg.error) c.segError = c.seg.error;
     const d = compute(c);
     last = { c, d };
     return `<div class="toolbar">${c.fySelect}</div>
-${c.segError ? `<div class="banner err">${esc(c.segError)}</div>` : ""}
 ${sliders(c, d)}
 <div id="yj-out" class="yj-out">${body(c, d)}</div>`;
   }
@@ -451,13 +399,8 @@ ${sliders(c, d)}
     switch (b.dataset.yact) {
       case "sel": p.sel[b.dataset.k] = !p.sel[b.dataset.k]; saveParams(p); b.classList.toggle("on", p.sel[b.dataset.k]); b.setAttribute("aria-pressed", p.sel[b.dataset.k]); refresh(); break;
       case "reset": Object.assign(p, { bl: 0, ex: null, nw: null, cr: null, sr: 100 }); saveParams(p); c.rerender(); break;
-      case "seg-open": try { await MonthlySheets.activateByPrefix(SEG_SHEET); } catch (err) { c.toast("シートを開けませんでした", true); } break;
-      case "seg-create":
-        try { await createSegments(c.M, c.fy); c.toast("売上区分シートを作成しました。保守と開発（新規）の金額を入れて再読み込みしてください"); await c.reload(); }
-        catch (err) { console.error(err); c.toast("売上区分シートを作れませんでした：" + (err.message || err), true); }
-        break;
     }
   });
 
-  global.Yojitsu = { render, refresh, readSegments, createSegments, loadParams, saveParams, compute, SEG_SHEET };
+  global.Yojitsu = { render, refresh, loadParams, saveParams, compute };
 })(window);

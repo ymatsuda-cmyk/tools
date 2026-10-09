@@ -21,8 +21,9 @@
   async function create(layout, M, targetFy) {
     const baseFy = targetFy - 1;
     const tMonths = M.fyMonths(targetFy), bMonths = M.fyMonths(baseFy);
-    const rows = layout.rows;
-    const firstR = rows[0].r, span = rows[rows.length - 1].r - firstR + 1;
+    const rows = layout.rows, segRows = layout.segRows || [];
+    const allR = rows.map(x => x.r).concat(segRows.map(x => x.r));
+    const firstR = Math.min(...allR), span = Math.max(...allR) - firstR + 1;
     const fromCol = colLetter(layout.cols[0]);
     const MAIN = 5;                         // 0始まりの行番号（Excel 6行目）
     const BASE_TITLE = MAIN + span + 2, BASE_HDR = BASE_TITLE + 1, BASE = BASE_HDR + 1;
@@ -67,6 +68,22 @@
       if (s.formula) bold.push(pr, br);
       else { grid[pr][2] = 0; grid[pr][3] = 0; fmt[pr][2] = "0.0%"; fmt[pr][3] = "#,##0;-#,##0"; inputs.push(pr); }
     });
+    // 売上高の内訳（保守・開発）：月次PLの前期の値を基準に、同じ式で計画を作る
+    segRows.forEach(s => {
+      const pr = MAIN + (s.r - firstR), br = BASE + (s.r - firstR), PR = pr + 1, BR = br + 1;
+      grid[pr][0] = s.raw; grid[br][0] = s.raw;
+      grid[pr][1] = grid[br][1] = `=SUM(G${BR}:R${BR})`;
+      grid[pr][4] = `=SUM(G${PR}:R${PR})`;
+      grid[pr][5] = `=IF(B${PR}=0,"",E${PR}/B${PR}-1)`; fmt[pr][5] = "0.0%";
+      [1, 3, 4].forEach(c => { fmt[pr][c] = "#,##0;-#,##0"; }); fmt[br][1] = "#,##0;-#,##0";
+      for (let i = 0; i < 12; i++) {
+        const col = colLetter(MC0 + i);
+        fmt[pr][MC0 + i] = fmt[br][MC0 + i] = "#,##0;-#,##0";
+        grid[br][MC0 + i] = Math.round(s.vals[bMonths[i]] || 0);
+        grid[pr][MC0 + i] = `=ROUND(${col}${BR}*(1+$C${PR})+$D${PR}/12,0)`;
+      }
+      grid[pr][2] = 0; grid[pr][3] = 0; fmt[pr][2] = "0.0%"; fmt[pr][3] = "#,##0;-#,##0"; inputs.push(pr);
+    });
 
     await Excel.run(async (ctx) => {
       const wss = ctx.workbook.worksheets;
@@ -107,16 +124,18 @@
       const hdr = MonthlySheets.findHeader(vals);
       if (!hdr) return { exists: true, error: "計画シートの見出し行（2026/10 形式の月）が見つかりません" };
       const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
-      const rows = [];
+      const rows = [], seg = {};
       for (let r = hdr.row + 1; r < vals.length; r++) {
         const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
         if (/^▼/.test(raw)) break;
         if (!raw || /^[【※]/.test(raw)) continue;
+        const sk = MonthlySheets.segOf(raw);
+        if (sk) { if (!seg[sk]) seg[sk] = hdr.cols.map(c => (typeof vals[r][c] === "number" ? vals[r][c] : null)); continue; }
         const values = hdr.cols.map(c => (typeof vals[r][c] === "number" ? vals[r][c] : null));
         const isF = String(fmls[r][hdr.cols[0]] || "").startsWith("=") && !/ROUND\(/.test(String(fmls[r][hdr.cols[0]] || ""));
         rows.push({ key: "PL:" + MonthlySheets.mkey(raw), name: raw.replace(/[（(]旧[:：][^）)]*[）)]/g, ""), kind: isF ? "集計" : "明細", values });
       }
-      return { exists: true, sheet: name, fyLabel: String(vals[1] && vals[1][1] || ""), periods, rows };
+      return { exists: true, sheet: name, fyLabel: String(vals[1] && vals[1][1] || ""), periods, rows, seg: Object.keys(seg).length ? seg : null };
     });
   }
 

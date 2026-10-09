@@ -18,6 +18,9 @@
   // 照合キー：（旧:〜）注記と空白を除き、残りの括弧書きも除く
   const base = (s) => String(s == null ? "" : s).replace(/[（(]旧[:：][^）)]*[）)]/g, "").replace(/[\s\u3000]/g, "");
   const mkey = (s) => base(s).replace(/[（(][^）)]*[）)]/g, "");
+  // 売上高の内訳行（手入力。PDFからは書き込まず、科目としても扱わない）
+  const SEG_NAMES = { m: ["保守"], e: ["開発(既存)", "既存開発"], n: ["開発(新規)", "新規開発"] };
+  const segOf = (s) => { const t = base(s).replace(/（/g, "(").replace(/）/g, ")"); return Object.keys(SEG_NAMES).find(k => SEG_NAMES[k].includes(t)) || null; };
 
   const CHECKS = {
     PL: [
@@ -165,6 +168,7 @@
           const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
           if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
           if (!raw || /^[【※]/.test(raw)) { srows.push({ r, section: true, raw }); continue; }
+          if (segOf(raw)) continue;   // 売上高の内訳（保守・開発）は手入力のまま
           const f = String(fmls[r][ci] == null ? "" : fmls[r][ci]);
           srows.push({ r, raw, key: mkey(raw), bkey: base(raw), formula: f.startsWith("="), section: false });
           if (sh === "PL" && ["経常利益", "経常損失"].includes(mkey(raw))) break;
@@ -338,7 +342,7 @@
       const mapping = {};
       mapVals.slice(1).forEach(r => { if (r[0] && r[1]) mapping[r[0] + "|" + mkey(r[1])] = String(r[2] || "").split(/[＋+]/).map(x => x.trim()).filter(Boolean); });
 
-      const out = [], layout = {};
+      const out = [], layout = {}, seg = {};
       const tbBy = {};
       tb.forEach(r => { ((tbBy[r.period] = tbBy[r.period] || {})[r.sheet] = tbBy[r.period][r.sheet] || []).push(r); });
       for (const sh of ["PL", "BS"]) {
@@ -346,11 +350,19 @@
         const vals = used.values, fmls = used.formulas;
         const hdr = findHeader(vals); if (!hdr) continue;
         const periods = hdr.labels.map(l => { const [y, m] = l.split("/").map(Number); return y + "-" + String(m).padStart(2, "0"); });
-        const srows = [];
+        const srows = [], segRows = [];
         for (let r = hdr.row + 1; r < vals.length; r++) {
           const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
           if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
           if (!raw || /^[【※]/.test(raw)) { srows.push({ r, section: true, raw }); continue; }
+          const sk = sh === "PL" ? segOf(raw) : null;
+          if (sk) {
+            const v = {};
+            hdr.cols.forEach((c, i) => { const x = vals[r][c]; if (typeof x === "number") v[periods[i]] = x; });
+            segRows.push({ r, raw, k: sk, vals: v });
+            if (!seg[sk]) seg[sk] = v;
+            continue;
+          }
           const f0 = String(fmls[r][hdr.cols[0]] == null ? "" : fmls[r][hdr.cols[0]]);
           srows.push({ r, raw, key: mkey(raw), bkey: base(raw), formula: f0.startsWith("="), f0 });
           if (sh === "PL" && ["経常利益", "経常損失"].includes(mkey(raw))) break;
@@ -366,7 +378,7 @@
           else if (checkAlias[s.key]) s.sources = checkAlias[s.key].slice(0, 1);
           else s.sources = [s.raw];
         });
-        layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows };
+        layout[sh] = { sheetName: target[sh], hdrRow: hdr.row, cols: hdr.cols, periods, rows: srows, segRows };
         const items = srows.filter(s => !s.section);
         const key = (s) => sh + ":" + s.key;
         // シートの値
@@ -419,7 +431,7 @@
           });
         });
       }
-      return { found: true, rows: out, layout };
+      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null };
     });
   }
 
@@ -432,5 +444,5 @@
     });
   }
 
-  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, moveFormula, findHeader, CHECKS, DEFAULTS };
+  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, segOf, moveFormula, findHeader, CHECKS, DEFAULTS };
 })(window);
