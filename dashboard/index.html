@@ -3852,7 +3852,7 @@ function mailRow(e){
         <button class="mail-star${e.starred ? ' on' : ''}" data-mail-star="${esc(e.key)}" title="優先">${e.starred ? '★' : '☆'}</button>
       </span>
       <span class="sch-text">
-        <span class="sch-title" data-mail-open="${esc(e.key)}" data-mail-url="${esc(e.url || '')}" title="${esc(e.subject)}">${esc(e.subject)}</span>
+        <span class="sch-title" data-mail-open="${esc(e.key)}" data-mail-url="${esc(e.url || '')}" title="${esc(e.subject)}" data-mail-account="${esc(e.accountId)}">${esc(e.subject)}</span>
         ${e.from ? `<span class="sch-sub">${esc(e.from)}</span>` : ''}
       </span>
       <span class="mail-actions">
@@ -3968,8 +3968,12 @@ function wireMail(card){
     el.addEventListener('click', e=>{
       e.stopPropagation();
       const url = el.dataset.mailUrl;
-      if(url) window.open(url, '_blank', 'noopener,noreferrer');
-      else toast('このメールには開き先のURLがありません');
+      if(!url){ toast('このメールには開き先のURLがありません'); return; }
+      if(el.dataset.mailAccount === 'work2'){
+        window.location.href = 'dashrun://openmail?account=work2&url=' + encodeURIComponent(url);
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
     });
   });
   card.querySelectorAll('[data-mail-view]').forEach(btn=>{
