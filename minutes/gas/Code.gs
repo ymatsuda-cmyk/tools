@@ -42,6 +42,12 @@ var RULES_DB_ID = '463313495202442fb7dfcd611a9334d8'; // 要約ルールDB
 var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
 var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
 var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
+var MINUTES_DB_ID  = '28b0e7a535dc805697c6d4b9f8032d18'; // 議事録DB(テキストからの新規登録先)
+var PROP_MEETING_AT = '日時';     // 会議の開始日時 (date)
+var PROP_DURATION  = '会議時間';  // 会議時間 (rich_text、「1時間 12分 36秒」形式)
+var STATUS_TRANSCRIBED = '文字起こし'; // テキスト登録時にセットする値(要約はしない)
+var BLOCK_TEXT_MAX = 2000;        // Notion rich_text 1要素あたりの上限
+var BLOCKS_PER_REQUEST = 40;      // 1リクエストのペイロード上限(約500KB)に収めるための件数
 
 // ============ エントリーポイント ============
 
@@ -115,6 +121,9 @@ function doPost(e) {
         break;
       case 'writeSidecar':
         result = writeSidecar_(body);
+        break;
+      case 'createFromText':
+        result = createFromText_(body);
         break;
       default:
         throw new Error('unknown action: ' + body.action);
@@ -760,4 +769,100 @@ function writeSidecar_(body) {
     throw new Error('JSON登録に失敗 (' + res.getResponseCode() + '): ' + res.getContentText());
   }
   return JSON.parse(res.getContentText());
+}
+
+// ============ テキストから議事録を新規登録 ============
+
+/**
+ * タイトル・タグ・開始日時・会議時間・原文から議事録ページを新規作成する。
+ * 原文はページ本文の paragraph ブロックとして書き込む(fetchTranscript_ が読む場所と同じ)。
+ * 状態は「文字起こし」にし、要約は作らない。
+ * 権限は upload と同じく、検証済み role が管理者以外ならその role を付与する。
+ */
+function createFromText_(body) {
+  var title = String(body.title || '').trim();
+  var text = String(body.text || '').replace(/\r\n?/g, '\n');
+  if (!title) throw new Error('タイトルが空です');
+  if (!text.trim()) throw new Error('原文が空です');
+
+  var tags = (Array.isArray(body.tags) ? body.tags : [])
+    .map(function (t) { return String(t || '').trim(); })
+    .filter(Boolean);
+
+  var props = {};
+  props[PROP_TITLE] = { title: [{ text: { content: title.slice(0, 2000) } }] };
+  props[PROP_CATEGORY] = { multi_select: tags.map(function (name) { return { name: name }; }) };
+  props[PROP_STATUS] = { select: { name: STATUS_TRANSCRIBED } };
+  props[PROP_RAW_COUNT] = { number: text.length };
+  if (body.meetingAt) {
+    props[PROP_MEETING_AT] = { date: { start: String(body.meetingAt) } };
+  }
+  if (body.durationSec != null && body.durationSec !== '') {
+    props[PROP_DURATION] = richTextProp_(formatDuration_(body.durationSec));
+  }
+  if (body.role && body.role !== ADMIN_ROLE && body.role !== 'err') {
+    props[PROP_PERMISSION] = { multi_select: [{ name: String(body.role) }] };
+  }
+
+  var blocks = textToBlocks_(text);
+  var page = notionFetch_('pages', 'post', {
+    parent: { database_id: MINUTES_DB_ID },
+    properties: props,
+    children: blocks.slice(0, BLOCKS_PER_REQUEST),
+  });
+
+  for (var i = BLOCKS_PER_REQUEST; i < blocks.length; i += BLOCKS_PER_REQUEST) {
+    notionFetch_('blocks/' + page.id + '/children', 'patch', {
+      children: blocks.slice(i, i + BLOCKS_PER_REQUEST),
+    });
+  }
+
+  return { saved: true, pageId: page.id, url: page.url, blocks: blocks.length };
+}
+
+/** 秒数を「1時間 12分 36秒」形式にする。0時間のときは「12分 36秒」 */
+function formatDuration_(totalSec) {
+  var sec = Math.max(0, Math.floor(Number(totalSec) || 0));
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  var s = sec % 60;
+  return (h > 0 ? h + '時間 ' : '') + m + '分 ' + s + '秒';
+}
+
+/**
+ * 原文を paragraph ブロックの配列にする。
+ * 行単位で 2000 文字以内に詰め、ブロック内の改行はそのまま残す
+ * (fetchTranscript_ はブロック同士を改行で連結するので、行の区切りが保たれる)。
+ * 1行が 2000 文字を超える場合だけ途中で切る。
+ */
+function textToBlocks_(text) {
+  var chunks = [];
+  var cur = [];
+  var curLen = -1; // 改行分を含む長さ。空のときは -1
+
+  function flush() {
+    if (cur.length) chunks.push(cur.join('\n'));
+    cur = [];
+    curLen = -1;
+  }
+
+  text.split('\n').forEach(function (line) {
+    while (line.length > BLOCK_TEXT_MAX) {
+      flush();
+      chunks.push(line.slice(0, BLOCK_TEXT_MAX));
+      line = line.slice(BLOCK_TEXT_MAX);
+    }
+    if (curLen + 1 + line.length > BLOCK_TEXT_MAX) flush();
+    cur.push(line);
+    curLen += 1 + line.length;
+  });
+  flush();
+
+  return chunks.map(function (c) {
+    return {
+      object: 'block',
+      type: 'paragraph',
+      paragraph: { rich_text: c ? [{ type: 'text', text: { content: c } }] : [] },
+    };
+  });
 }
