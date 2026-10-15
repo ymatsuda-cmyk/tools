@@ -86,6 +86,8 @@ body {
   color: var(--text-secondary);
 }
 .btn-ghost:hover { background: var(--surface-2); }
+.topbar .btn-ghost { transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.topbar .btn-ghost:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .btn-ghost.active { background: var(--bg-accent); color: var(--text-accent); border: 0.5px solid var(--border-accent); }
 
 .cc-space-item {
@@ -152,18 +154,6 @@ body {
 }
 
 .topbar .search-box { flex-shrink: 0; width: clamp(5ch, 30vw, 180px); min-width: 5ch; }
-.status-filter { display: flex; gap: 5px; flex-shrink: 0; }
-.status-filter-chip {
-  font-size: 11px;
-  padding: 3px 9px;
-  border-radius: 99px;
-  border: 0.5px solid var(--border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.status-filter-chip.selected { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); }
 .topbar .show-tags-toggle { flex-shrink: 0; }
 
 .agenda-list { margin-bottom: 16px; }
@@ -953,3 +943,38 @@ body {
 .btn.tr-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn.tr-primary:hover { background: var(--text-primary); }
 .btn.tr-primary:disabled { opacity: 0.5; cursor: default; }
+
+/* --- ヘッダーボタンのツールチップ(header-tooltip.js) ---
+   .topbar は overflow:hidden のため、body 直下に fixed で出して切れないようにする */
+.hdr-tip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--text-primary);
+  color: var(--surface-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.hdr-tip.show { opacity: 1; transform: translateY(0); }
+.hdr-tip::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: var(--arrow-x, 50%);
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+/* --- テキスト登録: 権限 --- */
+.tag-chip.tr-perm-locked { opacity: 0.85; }
+.tag-chip.tr-perm-locked .ti { font-size: 11px; margin-right: 2px; }

@@ -777,7 +777,7 @@ function writeSidecar_(body) {
  * タイトル・タグ・開始日時・会議時間・原文から議事録ページを新規作成する。
  * 原文はページ本文の paragraph ブロックとして書き込む(fetchTranscript_ が読む場所と同じ)。
  * 状態は「文字起こし」にし、要約は作らない。
- * 権限は upload と同じく、検証済み role が管理者以外ならその role を付与する。
+ * 権限: 管理者は body.permissions をそのまま付与。管理者以外は検証済み role のみ付与(upload と同じ)。
  */
 function createFromText_(body) {
   var title = String(body.title || '').trim();
@@ -800,7 +800,16 @@ function createFromText_(body) {
   if (body.durationSec != null && body.durationSec !== '') {
     props[PROP_DURATION] = richTextProp_(formatDuration_(body.durationSec));
   }
-  if (body.role && body.role !== ADMIN_ROLE && body.role !== 'err') {
+  // 権限: 管理者は画面で選んだ権限をそのまま付ける(空なら付けない=管理者のみ閲覧)。
+  // 管理者以外は送られてきた permissions を無視し、検証済み role だけを付ける。
+  if (body.role === ADMIN_ROLE) {
+    var perms = (Array.isArray(body.permissions) ? body.permissions : [])
+      .map(function (p) { return String(p || '').trim(); })
+      .filter(function (p, i, arr) { return p && arr.indexOf(p) === i; });
+    if (perms.length) {
+      props[PROP_PERMISSION] = { multi_select: perms.map(function (name) { return { name: name }; }) };
+    }
+  } else if (body.role && body.role !== 'err') {
     props[PROP_PERMISSION] = { multi_select: [{ name: String(body.role) }] };
   }
 

@@ -7,7 +7,7 @@ import { loadSettings, saveSettings, newConnection, connectionOf, activeConnecti
 import { applyMarkerRange, eraseMarkerRange, plainTextOf, reconcileMarkers } from './lib/markers.js'
 import { renderMarkdown } from './lib/markdown.js'
 import { mergeTodos } from './lib/todos.js'
-import { filterByMonth, filterBySearch, filterByTags, filterByStatus, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
+import { filterByMonth, filterBySearch, filterByTags, filterByPermission, filterByPermissionTags, buildTagOptions, buildPermissionOptions, allKnownTags, excludeDeleted } from './lib/filters.js'
 import { estimateItemChars, GEMMA_WARN_CHARS, MAX_CROSS_CHAT_ITEMS, loadSpaces, saveSpaces, newSpace } from './lib/cross-chat.js'
 import { renderMindmapTab, buildMarkdownFromSummary, generateMarkdownWithAI } from './lib/mindmap-view.js'
 import { streamChat } from './lib/llm-client.js'
@@ -35,7 +35,6 @@ let currentMonthKey = monthKeyOf(new Date()) // "YYYY-MM"
 let searchQuery = ''
 const selectedTags = new Set()
 const selectedPermissionFilters = new Set() // 管理者専用の権限フィルタ(タグの前段)
-const selectedStatuses = new Set() // 空 = 全ステータス表示
 let assignMode = false // 管理者の権限一括割り当てモード
 let assignAllPeriod = true // 割り当てモード中、月で絞らず全期間を対象にするか
 const selectedIds = new Set() // 一括割り当ての選択中キー(全期間をまたいで保持する)
@@ -87,8 +86,7 @@ function visibleItems() {
 function currentFilteredItems() {
   const byMonth = (assignMode && assignAllPeriod) ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(byMonth, searchQuery)
-  const byStatus = filterByStatus(byMonthAndSearch, selectedStatuses)
-  const byPerm = filterByPermissionTags(byStatus, selectedPermissionFilters)
+  const byPerm = filterByPermissionTags(byMonthAndSearch, selectedPermissionFilters)
   return filterByTags(byPerm, selectedTags)
 }
 
@@ -166,7 +164,7 @@ function refresh() {
   // 割り当てモードでは、既定で全期間対象にしつつ月で絞り込むこともできるようにする
   const scoped = (assignMode && assignAllPeriod) ? visibleItems() : filterByMonth(visibleItems(), currentMonthKey)
   const byMonthAndSearch = filterBySearch(scoped, searchQuery)
-  const baseItems = filterByStatus(byMonthAndSearch, selectedStatuses) // タグ絞り込み前(タグ候補の母集団)
+  const baseItems = byMonthAndSearch // タグ絞り込み前(タグ候補の母集団)
   const byPerm = admin ? filterByPermissionTags(baseItems, selectedPermissionFilters) : baseItems
   const filteredItems = filterByTags(byPerm, selectedTags)
   const tagOptions = buildTagOptions(byPerm, selectedTags)
@@ -233,7 +231,6 @@ function refresh() {
 
   document.getElementById('bulk-summarize').style.display = admin ? '' : 'none'
   document.getElementById('assign-permission').style.display = admin ? '' : 'none'
-  document.getElementById('status-filter').style.display = admin ? '' : 'none'
 
   syncStatusEl.textContent = `${filteredItems.length}件`
 }
@@ -252,7 +249,6 @@ function renderDenied() {
   syncStatusEl.textContent = ''
   document.getElementById('bulk-summarize').style.display = 'none'
   document.getElementById('assign-permission').style.display = 'none'
-  document.getElementById('status-filter').style.display = 'none'
 }
 
 /**
@@ -2064,14 +2060,6 @@ document.getElementById('assign-permission').addEventListener('click', toggleAss
 document.getElementById('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value
   refresh()
-})
-document.querySelectorAll('.status-filter-chip').forEach((el) => {
-  el.addEventListener('click', () => {
-    const status = el.dataset.status
-    selectedStatuses.has(status) ? selectedStatuses.delete(status) : selectedStatuses.add(status)
-    el.classList.toggle('selected')
-    refresh()
-  })
 })
 
 // --- 一覧の幅リサイズ ---
