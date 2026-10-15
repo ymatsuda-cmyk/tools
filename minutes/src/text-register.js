@@ -5,6 +5,8 @@
 //   タイトル → ミーティング名 / タグ → カテゴリー / 開始日時 → 日時
 //   会議時間 → 会議時間(「1時間 12分 36秒」形式) / 原文 → ページ本文
 // 状態は「文字起こし」にし、要約は作らない。
+// 権限 → 権限: 管理者は自由に選べる(空なら管理者のみ閲覧)。管理者以外は
+// 自分の検証済み role で固定(GAS 側でも role 以外は受け付けない)。
 //
 // upload.js と同じく main.js の内部には依存せず、localStorage の
 // "minutes:config"(GAS URL・トークン・検証済み role)をそのまま使う。
@@ -12,7 +14,9 @@
 // 「一覧への反映待ち」として出し、index.json 反映後に自動で消す。
 
 import { addPending } from './upload.js'
-import { allKnownTags, filterByPermission, excludeDeleted } from './lib/filters.js'
+import { filterByPermission, excludeDeleted } from './lib/filters.js'
+
+const ADMIN_ROLE = 'xYz'
 
 const MAIN_CFG_KEY = 'minutes:config'
 const INDEX_URL = 'https://ymatsuda-cmyk.github.io/tools/data/minutes/index.json'
@@ -56,17 +60,28 @@ function nowLocalValue() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** この利用者が見てよい議事録に付いているタグを、使用回数の多い順で返す */
-async function loadTagSuggestions(role) {
+/** 使用回数の多い順に並べる */
+function byFrequency(items, pick) {
+  const count = new Map()
+  items.forEach((i) => (pick(i) || []).forEach((v) => count.set(v, (count.get(v) || 0) + 1)))
+  return [...count.keys()].sort((a, b) => (count.get(b) - count.get(a)) || a.localeCompare(b))
+}
+
+/**
+ * この利用者が見てよい議事録から、タグと権限の候補を使用回数の多い順で返す。
+ * 権限の候補は管理者のときだけ使う(管理者は全件見えるので全権限が集まる)。
+ */
+async function loadSuggestions(role) {
   try {
     const res = await fetch(INDEX_URL, { cache: 'no-store' })
-    if (!res.ok) return []
+    if (!res.ok) return { tags: [], perms: [] }
     const items = filterByPermission(excludeDeleted(await res.json()), role)
-    const count = new Map()
-    items.forEach((i) => (i.tags || []).forEach((t) => count.set(t, (count.get(t) || 0) + 1)))
-    return allKnownTags(items).sort((a, b) => (count.get(b) || 0) - (count.get(a) || 0))
+    return {
+      tags: byFrequency(items, (i) => i.tags),
+      perms: byFrequency(items, (i) => i.permissions).filter((p) => p !== ADMIN_ROLE),
+    }
   } catch {
-    return []
+    return { tags: [], perms: [] }
   }
 }
 
@@ -95,6 +110,16 @@ function openModal() {
           <input type="text" id="tr-tag" placeholder="入力して Enter で追加" list="tr-tag-list">
           <datalist id="tr-tag-list"></datalist>
           <div class="tr-sugs" id="tr-sugs"></div>
+        </div>
+        <div class="upload-field">
+          <label for="tr-perm"><span>権限</span><span class="tr-col">権限</span></label>
+          <div class="tr-chips" id="tr-perm-chips"></div>
+          <div id="tr-perm-edit">
+            <input type="text" id="tr-perm" placeholder="入力して Enter で追加" list="tr-perm-list">
+            <datalist id="tr-perm-list"></datalist>
+            <div class="tr-sugs" id="tr-perm-sugs"></div>
+          </div>
+          <div class="tr-hint" id="tr-perm-hint"></div>
         </div>
         <div class="tr-row">
           <div class="upload-field">
@@ -136,8 +161,15 @@ function openModal() {
   const msg = $('#tr-msg')
   const go = $('#tr-go')
 
+  const role = loadMainConfig().role || ''
+  const admin = role === ADMIN_ROLE
+  const permInput = $('#tr-perm')
+
   let tags = []
   let suggestions = []
+  // 管理者以外は自分の role で固定。管理者は空から選ぶ
+  let perms = !admin && role && role !== 'err' ? [role] : []
+  let permSuggestions = []
   let busy = false
 
   atInput.value = nowLocalValue()
@@ -184,7 +216,55 @@ function openModal() {
     if (suggestions.includes(tagInput.value)) { addTag(tagInput.value); tagInput.value = '' }
   }
   drawTags()
-  loadTagSuggestions(loadMainConfig().role).then((list) => { suggestions = list; drawTags() })
+
+  // ---- 権限
+  function drawPerms() {
+    $('#tr-perm-chips').innerHTML = perms.map((p, i) => admin
+      ? `<span class="tag-chip">${escapeHtml(p)}<span class="tag-remove" data-i="${i}" role="button" tabindex="0" aria-label="${escapeHtml(p)}を外す">×</span></span>`
+      : `<span class="tag-chip tr-perm-locked"><i class="ti ti-lock" aria-hidden="true"></i>${escapeHtml(p)}</span>`
+    ).join('')
+    $('#tr-perm-chips').querySelectorAll('.tag-remove').forEach((el) => {
+      const remove = () => { perms.splice(Number(el.dataset.i), 1); drawPerms() }
+      el.onclick = remove
+      el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); remove() } }
+    })
+    $('#tr-perm-hint').textContent = admin
+      ? (perms.length ? `「${perms.join('」「')}」の権限を持つ人と管理者が閲覧できます。` : '未指定の場合は管理者のみ閲覧できます。')
+      : 'あなたの権限で登録されます(変更できません)。'
+    if (!admin) return
+    const rest = permSuggestions.filter((p) => !perms.includes(p))
+    $('#tr-perm-sugs').innerHTML = rest.length
+      ? `<span class="tr-hint">既存:</span>${rest.slice(0, MAX_SUGGESTIONS).map((p) => `<button type="button" class="tr-sug">${escapeHtml(p)}</button>`).join('')}`
+      : ''
+    $('#tr-perm-sugs').querySelectorAll('.tr-sug').forEach((b) => { b.onclick = () => addPerm(b.textContent) })
+    $('#tr-perm-list').innerHTML = rest.map((p) => `<option value="${escapeHtml(p)}"></option>`).join('')
+  }
+  function addPerm(v) {
+    const p = String(v || '').trim()
+    if (p && p !== ADMIN_ROLE && !perms.includes(p)) { perms.push(p); drawPerms() }
+  }
+  if (admin) {
+    permInput.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault()
+        addPerm(permInput.value)
+        permInput.value = ''
+      }
+    }
+    permInput.oninput = () => {
+      if (permSuggestions.includes(permInput.value)) { addPerm(permInput.value); permInput.value = '' }
+    }
+  } else {
+    $('#tr-perm-edit').hidden = true
+  }
+  drawPerms()
+
+  loadSuggestions(role).then((s) => {
+    suggestions = s.tags
+    permSuggestions = s.perms
+    drawTags()
+    drawPerms()
+  })
 
   // ---- 会議時間
   function durationSec() {
@@ -235,6 +315,7 @@ function openModal() {
 
     // Enter を押さずに残っているタグ入力も拾う
     if (tagInput.value.trim()) { addTag(tagInput.value); tagInput.value = '' }
+    if (admin && permInput.value.trim()) { addPerm(permInput.value); permInput.value = '' }
 
     const meetingAt = `${atInput.value}:00+09:00`
     busy = true
@@ -250,6 +331,7 @@ function openModal() {
         durationSec: durationSec(),
         text: raw.value,
         role: cfg.role || '',
+        permissions: admin ? perms : [], // 管理者以外は GAS 側で role に固定される
       })
       addPending({ id: `t${Date.now()}`, title, meetingAt, status: 'registered', createdAt: Date.now() })
       say('登録しました。一覧には index.json の更新後に反映されます。', 'ok')

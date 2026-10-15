@@ -27,12 +27,6 @@ export function filterByPermissionTags(items, selectedPermissions) {
   return items.filter((i) => [...selectedPermissions].every((p) => (i.permissions || []).includes(p)))
 }
 
-/** 選択した状態のいずれかに一致するものだけ(未選択なら全件通す) */
-export function filterByStatus(items, selectedStatuses) {
-  if (!selectedStatuses.size) return items
-  return items.filter((i) => selectedStatuses.has(i.status))
-}
-
 /**
  * 閲覧権限による絞り込み。管理者(xYz)は全件通す。
  * 表示上の出し分けであり、セキュリティ境界ではない点に注意。

@@ -1,5 +1,28 @@
 # Change Log
 
+## 1.6.0 - 2026-10-15
+
+### Release Title
+
+Remove status filter, permissions on text registration, header button tooltips
+
+### Release Changes
+
+- Removed the 文字起こし / 再取得 / 要約 status filter chips from the top bar (and the unused `filterByStatus`).
+- 「テキストから議事録を登録」now has a 権限 field. Admins (xYz) pick any permissions with suggestions from existing items (empty = admin only); other users see their own role as a locked chip.
+- `createFromText` in `gas/Code.gs` accepts `permissions` only when the role is admin; for other roles it still forces the verified role. **Redeploy the GAS web app** for admin-selected permissions to take effect.
+- Top bar icon buttons now highlight on hover and show their label in a tooltip (`src/header-tooltip.js`). The tooltip is rendered as a fixed element on body so the overflow-hidden top bar doesn't clip it; not shown for touch input.
+
+### Release Affected Files
+
+- `minutes/index.html`
+- `minutes/src/main.js`
+- `minutes/src/lib/filters.js`
+- `minutes/src/text-register.js`
+- `minutes/src/header-tooltip.js` (new)
+- `minutes/gas/Code.gs`
+- `minutes/css/styles.css`
+
 ## 1.5.0 - 2026-10-15
 
 ### Release Title
