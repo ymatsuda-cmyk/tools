@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """dashrun:// URL スキームのハンドラ
 
-ブラウザから  dashrun://launch?path=<URLエンコードした exe パス>  を受け取り、
-launch_core で検証・許可確認をしてから exe を起動する。
-受け付けるのは launch と path だけ。それ以外のパラメータが付いていたら起動しない。
+launch と openmail の2種類の操作を受け付ける。
 """
 import os
 import sys
@@ -14,35 +12,46 @@ import launch_core as core  # noqa: E402
 
 
 def parse_dashrun_url(url):
-    """exe パスを返す。形式が違えば ValueError"""
     parts = urlsplit(url.strip())
     if parts.scheme.lower() != "dashrun":
         raise ValueError("dashrun:// 以外の URL です")
-    if parts.netloc.lower() != "launch" or parts.path not in ("", "/"):
-        raise ValueError("未対応の操作です")
     if parts.fragment:
         raise ValueError("URL の形式が正しくありません")
+    if parts.path not in ("", "/"):
+        raise ValueError("未対応の操作です")
+    action = parts.netloc.lower()
     query = parse_qs(parts.query, keep_blank_values=True)
-    if set(query) != {"path"} or len(query["path"]) != 1:
-        raise ValueError("path 以外のパラメータは受け付けません")
-    return query["path"][0]
+
+    if action == "launch":
+        if set(query) != {"path"} or len(query["path"]) != 1:
+            raise ValueError("path 以外のパラメータは受け付けません")
+        return ("launch", query["path"][0])
+    if action == "openmail":
+        if set(query) != {"account", "url"} or len(query["account"]) != 1 or len(query["url"]) != 1:
+            raise ValueError("account と url 以外のパラメータは受け付けません")
+        return ("openmail", query["account"][0], query["url"][0])
+    raise ValueError("未対応の操作です")
 
 
 def main(argv):
-    # ブラウザからは "dashrun://..." が 1 つだけ渡される。2つ目以降は使わない
     if len(argv) < 2:
         core.show_error("dashrun はブラウザのリンクから呼び出して使います。")
         return 2
     url = argv[1]
     try:
-        path = parse_dashrun_url(url)
+        parsed = parse_dashrun_url(url)
     except ValueError as e:
         core.log(f"BADURL {url!r}: {e}")
         core.show_error(f"起動できません: {e}")
         return 2
-    result = core.handle_launch_request(path)
+
+    if parsed[0] == "launch":
+        result = core.handle_launch_request(parsed[1])
+    else:
+        result = core.handle_openmail_request(parsed[1], parsed[2])
+
     if result["status"] in ("invalid", "error"):
-        core.show_error(f"{result['message']}\n\n{result['path']}")
+        core.show_error(result["message"])
         return 1
     return 0
 
