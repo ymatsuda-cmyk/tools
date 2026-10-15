@@ -1791,6 +1791,27 @@ function syncRunTypeFields(){
 F('f-runtype').addEventListener('change', syncRunTypeFields);
 document.getElementById('cancelItem').onclick = ()=>itemOverlay.classList.remove('show');
 
+/**
+ * DashboardBar から exe をドロップしたとき
+ *   ?add=exe&title=...&path=...  … 「リンクを追加」をローカル実行・exeパス入りで開く
+ * 受け取ったパラメータはURLから消して、再読み込みで二重に開かないようにする
+ */
+function handleAddParams(){
+  const q = new URLSearchParams(location.search);
+  if(q.get('add') !== 'exe') return;
+  const title = q.get('title') || '';
+  const path = q.get('path') || '';
+  ['add','title','path'].forEach(k=>q.delete(k));
+  const qs = q.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  openItemModal(null);
+  F('f-title').value = title;
+  F('f-runtype').value = 'local';
+  syncRunTypeFields();
+  F('f-exepath').value = path;
+}
+window.addEventListener('load', ()=>setTimeout(handleAddParams, 300));
+
 document.getElementById('saveItem').onclick = async ()=>{
   const title = F('f-title').value.trim();
   const url = F('f-url').value.trim();
