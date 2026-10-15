@@ -142,8 +142,9 @@ function renderPending() {
       <div class="list-item-body">
         <div class="list-item-title">${escapeHtml(p.title)}</div>
         <div class="list-item-meta">
-          <span class="badge status-新規">新規</span>
-          ${p.status === 'uploading' ? ` 送信中 ${p.progress ?? 0}%` : ' 文字起こし待ち'}
+          ${p.status === 'registered'
+            ? '<span class="badge status-文字起こし">文字起こし</span> 一覧への反映待ち'
+            : `<span class="badge status-新規">新規</span>${p.status === 'uploading' ? ` 送信中 ${p.progress ?? 0}%` : ' 文字起こし待ち'}`}
         </div>
       </div>
     </div>
@@ -157,7 +158,8 @@ function countLiveTitle(host, title) {
     .filter((el) => el.textContent.trim() === title).length;
 }
 
-function addPending(entry) {
+// text-register.js(テキストから登録)からも仮カードを出すために export する
+export function addPending(entry) {
   const host = document.getElementById('list-items');
   // アップロード時点で同名の項目が何件あったかを記録しておく。「存在するか」
   // ではなく「その数より増えたか」で判定しないと、毎週同じ議題名の会議（例:

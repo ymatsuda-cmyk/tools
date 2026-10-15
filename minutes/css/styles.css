@@ -918,3 +918,38 @@ body {
 .todo-card.selected { border: 1.5px solid var(--border-accent); background: var(--bg-accent); }
 .todo-card.selected .todo-log-list { border-left-color: var(--border-accent); }
 .todo-log-target { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ==================================================================
+   テキストから登録 (src/text-register.js)
+   upload.js のモーダル(.upload-field 等)に乗せ、足りない部品だけ定義する。
+   ================================================================== */
+.upload-field label .tr-col { float: right; font-size: 10px; color: var(--text-muted); font-family: var(--font-content); }
+.tr-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 520px) { .tr-row { grid-template-columns: minmax(0, 1fr); } }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.tr-chips:empty { display: none; }
+.tr-sugs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tr-sug {
+  font-size: 11px; padding: 2px 8px; border-radius: 99px; cursor: pointer;
+  border: 0.5px dashed var(--border-strong); background: transparent; color: var(--text-secondary);
+}
+.tr-sug:hover { background: var(--surface-1); color: var(--text-primary); }
+.tr-dur { display: flex; align-items: center; gap: 5px; }
+.tr-dur span { font-size: 12px; color: var(--text-secondary); }
+.tr-dur input {
+  width: 52px; font-size: 13px; padding: 6px 6px; text-align: right;
+  border: 0.5px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-primary);
+}
+.tr-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.tr-raw {
+  width: 100%; resize: vertical; min-height: 140px;
+  font-family: var(--font-content); font-size: 12px; line-height: 1.6; padding: 8px 9px;
+  border: 0.5px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-primary);
+}
+.tr-raw.drag-over { border-color: var(--accent); background: var(--accent-bg); }
+.tr-raw-foot { display: flex; justify-content: space-between; gap: 8px; }
+.tr-dur input:focus-visible, .tr-raw:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tr-note { font-size: 11px; color: var(--text-secondary); background: var(--surface-1); border-radius: var(--radius); padding: 7px 10px; }
+.btn.tr-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.tr-primary:hover { background: var(--text-primary); }
+.btn.tr-primary:disabled { opacity: 0.5; cursor: default; }

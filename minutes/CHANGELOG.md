@@ -1,5 +1,27 @@
 # Change Log
 
+## 1.5.0 - 2026-10-15
+
+### Release Title
+
+Register minutes from text (title, tags, start time, duration, transcript)
+
+### Release Changes
+
+- Added a「テキストから登録」button to the top bar that opens a modal for title, tags, start date/time, duration (hours/minutes/seconds) and the raw transcript.
+- Writes to existing Notion columns: ミーティング名, カテゴリー, 日時, 会議時間 (as「1時間 12分 36秒」, hours omitted when zero) and the page body; also sets 原文文字数 and 状態 = 文字起こし. No summary is generated.
+- Added `createFromText` action to `gas/Code.gs`. The transcript is packed line by line into paragraph blocks of up to 2000 characters and sent 40 blocks per request to stay under Notion's payload limit.
+- Tag suggestions come from tags used in index.json items the viewer is allowed to see; the verified role is attached as 権限 for non-admin users, same as the audio upload.
+- Reused the upload pending card with a new `registered` status (「一覧への反映待ち」) until index.json picks up the page.
+
+### Release Affected Files
+
+- `minutes/index.html`
+- `minutes/src/text-register.js` (new)
+- `minutes/src/upload.js`
+- `minutes/gas/Code.gs`
+- `minutes/css/styles.css`
+
 ## 1.4.0 - 2026-10-01
 
 ### Release Title
