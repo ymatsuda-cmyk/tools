@@ -6,24 +6,24 @@
   - 許可済みリスト（%APPDATA%\\dashrun\\approved.json）の読み書き
   - 初回起動時の許可ダイアログ
   - exe の起動
-
-戻り値は dashboard 側のランチャーと同じ形の dict:
-  { "status": "started" | "denied" | "invalid" | "error", "message": str, "path": str }
-local_bridge へ移行するときは handle_launch_request() をそのまま呼べばよい。
+  - メールを指定したEdgeプロファイルで開く（openmail）
 """
 import datetime
 import json
 import ntpath
 import os
 import re
+import subprocess
 
 APP_DIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "dashrun")
 APPROVED_FILE = os.path.join(APP_DIR, "approved.json")
 LOG_FILE = os.path.join(APP_DIR, "dashrun.log")
+MAIL_PROFILES_FILE = os.path.join(APP_DIR, "mail_profiles.json")
 
 MAX_PATH_LEN = 1024
-# ドライブ文字:\ で始まり、Windows で使えない文字を含まず、.exe で終わる
 _EXE_PATH_RE = re.compile(r'^[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n\x00]+\\)*[^\\/:*?"<>|\r\n\x00]+\.exe$', re.IGNORECASE)
+_PROFILE_RE = re.compile(r'^[A-Za-z0-9 _.-]{1,64}$')
+_HTTPS_URL_RE = re.compile(r'^https://[^\s<>"\'\x00-\x1f]{1,2000}$')
 
 IS_WINDOWS = os.name == "nt"
 
@@ -39,9 +39,8 @@ def log(message):
         pass
 
 
-# ---------------------------------------------------------------- 検証
+# ---------------------------------------------------------------- 検証（exe）
 def _resolve(path):
-    """'..' を畳み、Windows ではシンボリックリンクも解決する。UNC になったら None"""
     p = ntpath.normpath(path)
     if IS_WINDOWS:
         p = os.path.realpath(p)
@@ -53,7 +52,6 @@ def _resolve(path):
 
 
 def validate_exe_path(raw, exists=None):
-    """(True, 正規化済みパス) または (False, 理由) を返す"""
     if not isinstance(raw, str):
         return False, "パスが文字列ではありません"
     path = raw.strip()
@@ -76,6 +74,28 @@ def validate_exe_path(raw, exists=None):
 
 def _key(path):
     return ntpath.normcase(path)
+
+
+# ---------------------------------------------------------------- 検証（メール関連）
+def validate_profile_name(raw):
+    if not isinstance(raw, str) or not _PROFILE_RE.match(raw):
+        return False, "プロファイル名が不正です"
+    return True, raw
+
+
+def validate_https_url(raw):
+    if not isinstance(raw, str) or not _HTTPS_URL_RE.match(raw.strip()):
+        return False, "https:// で始まる正しいURLのみ開けます"
+    return True, raw.strip()
+
+
+def load_mail_profiles():
+    try:
+        with open(MAIL_PROFILES_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
 
 
 # ---------------------------------------------------------------- 許可済みリスト
@@ -142,13 +162,12 @@ def show_error(text):
     message_box(text, "dashrun", MB_OK | MB_ICONERROR)
 
 
-# ---------------------------------------------------------------- 起動
+# ---------------------------------------------------------------- 起動（exe・引数なし）
 def launch_exe(path):
-    """引数なしで exe を起動する。ShellExecute 経由なので管理者権限が必要な exe も UAC が出る"""
     workdir = ntpath.dirname(path)
     if IS_WINDOWS:
         try:
-            os.startfile(path, "open", cwd=workdir)  # Python 3.10+
+            os.startfile(path, "open", cwd=workdir)
         except TypeError:
             os.startfile(path)
     else:
@@ -174,3 +193,46 @@ def handle_launch_request(raw_path, ask=ask_approval, launcher=launch_exe, exist
         return {"status": "error", "message": f"起動に失敗しました: {e}", "path": path}
     log(f"STARTED {path}")
     return {"status": "started", "message": "起動しました", "path": path}
+
+
+# ---------------------------------------------------------------- 起動（メール：指定プロファイルで開く）
+def launch_url_in_profile(exe_path, profile, url):
+    # outlook.office.com はドメイン移行中で不安定なため、新ドメインに固定してから開く
+    fixed_url = url.replace("https://outlook.office.com/", "https://outlook.cloud.microsoft/", 1)
+    workdir = ntpath.dirname(exe_path)
+    subprocess.Popen([exe_path, f"--profile-directory={profile}", fixed_url], cwd=workdir or None)
+
+
+def handle_openmail_request(account_id, raw_url, ask=ask_approval):
+    entry = load_mail_profiles().get(account_id)
+    if not isinstance(entry, dict):
+        log(f"NOPROFILE {account_id!r}")
+        return {"status": "invalid", "message": f"mail_profiles.json に {account_id} の設定がありません"}
+
+    ok, exe = validate_exe_path(entry.get("exe", ""))
+    if not ok:
+        return {"status": "invalid", "message": exe}
+    ok, profile = validate_profile_name(entry.get("profile", ""))
+    if not ok:
+        return {"status": "invalid", "message": profile}
+    ok, url = validate_https_url(raw_url)
+    if not ok:
+        return {"status": "invalid", "message": url}
+
+    mkey = f"{ntpath.normcase(exe)}|{profile.lower()}"
+    if not any(_key(x.get("path", "")) == mkey for x in load_approved()):
+        if not ask(f"{exe}\n（プロファイル: {profile}）"):
+            log(f"DENIED {mkey}")
+            return {"status": "denied", "message": "起動は許可されませんでした"}
+        items = load_approved()
+        items.append({"path": mkey, "approvedAt": datetime.datetime.now().isoformat(timespec="seconds")})
+        save_approved(items)
+        log(f"APPROVED {mkey}")
+
+    try:
+        launch_url_in_profile(exe, profile, url)
+    except OSError as e:
+        log(f"ERROR {mkey}: {e}")
+        return {"status": "error", "message": f"起動に失敗しました: {e}"}
+    log(f"STARTED {mkey} -> {url}")
+    return {"status": "started", "message": "開きました"}
