@@ -872,7 +872,9 @@ function mergeCases(base,items){
     if(!it||!it.id)return;
     var ex=byId[it.id]||(it.url?byUrl[normUrl(it.url)]:null);
     if(ex){
-      var ch=false;   /* Excelで直した内容は上書きせず、空欄だけ補う */
+      var ch=false;
+      if(isMetaOnly(ex)&&it.method==='AI'){['sec_summary','sources','method'].forEach(function(k){if(it[k])ex[k]=it[k]});ch=true}
+      /* Excelで直した内容は上書きせず、空欄だけ補う */
       CASE_COLS.forEach(function(col){var k=col[1],cur=ex[k],empty=(cur==null||cur===''||cur===0);if(empty&&it[k]!=null&&it[k]!==''&&it[k]!==0){ex[k]=it[k];ch=true}});
       if(ch)filled++;
       return;
@@ -908,8 +910,17 @@ function gasTargets(n){
   return CASES.filter(function(c){return c.url&&!c.title&&!(skip[c.url]&&skip[c.url]>since)})
     .sort(function(a,b){return String(b.pub).localeCompare(String(a.pub))}).slice(0,n);
 }
+/* 機械が入れた「紹介文だけ」の行か（旧版が入れた途中で切れた紹介文も含む。手で書いた概要は含まない） */
+function isMetaOnly(c){
+  return !c.title&&!!c.sec_summary&&c.method!=='AI'&&(c.method==='紹介文'||/^元記事\|/.test(c.sources||''))&&
+    !['sec_date','sec_discovery','sec_risk','sec_cause','sec_response','sec_vendor'].some(function(k){return c[k]});
+}
 function applyEnrich(c,r){
   var ch=false;
+  if(isMetaOnly(c)){   /* 機械が入れた紹介文は、AIの整理・より完全な紹介文で置き換える */
+    if(r.method==='AI'){c.sec_summary=r.sec_summary||c.sec_summary;c.sources=r.sources||c.sources;c.method='AI';ch=true}
+    else if(r.method==='紹介文'&&r.sec_summary&&r.sec_summary!==c.sec_summary){c.sec_summary=r.sec_summary;c.method='紹介文';ch=true}
+  }
   ['co','svc','title','sub','nt','facts','sources','method'].concat(SEC_FIELDS).forEach(function(k){if(!c[k]&&r[k]){c[k]=r[k];ch=true}});
   if(!c.n&&r.n){c.n=r.n;ch=true}
   if((!c.cat||c.cat==='other')&&r.cat&&r.cat!=='other'){c.cat=r.cat;ch=true}
@@ -919,7 +930,7 @@ function applyEnrich(c,r){
 /* 保存はしない（呼び出し側でまとめて保存する） */
 function casesEnrichRun(){
   var cfg=gasCfg();if(!cfg)return Promise.resolve(null);
-  var t=gasTargets(cfg.n||5),res={done:0,failed:0,none:!t.length,stop:'',total:t.length,err:''};
+  var t=gasTargets(cfg.n||5),res={done:0,failed:0,meta:0,metaReason:'',none:!t.length,stop:'',total:t.length,err:''};
   var p=Promise.resolve();
   t.forEach(function(c,i){
     p=p.then(function(){
@@ -927,7 +938,7 @@ function casesEnrichRun(){
       casesSetMsg('元記事を整理しています… '+(i+1)+' / '+t.length);
       return gasCall(cfg,{action:'article',url:c.url}).then(function(j){
         var r=j.result||{};
-        if(applyEnrich(c,r))res.done++;else res.failed++;
+        if(applyEnrich(c,r)){res.done++;if(j.mode!=='ai'){res.meta++;res.metaReason=j.reason||j.warn||''}}else res.failed++;
         if(j.mode!=='ai'||!c.title)gasMark(c.url);   /* 紹介文だけだった記事は、しばらく再試行しない */
       }).catch(function(e){
         res.failed++;res.err=e.message;gasMark(c.url);
@@ -941,7 +952,8 @@ function casesSaveNow(){return IN_EXCEL?xlQueue(function(){return xlWriteCases(C
 function casesEnrichMsg(en){
   if(!en)return '';
   if(en.none)return '整理する記事はありません';
-  return '元記事から '+en.done+'件を整理'+(en.failed?'（失敗 '+en.failed+'件'+(en.err?'：'+en.err:'')+'）':'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
+  var ai=en.done-en.meta;
+  return '元記事から '+en.done+'件を取得（AIで整理 '+ai+'件'+(en.meta?'、紹介文のみ '+en.meta+'件［'+(en.metaReason||'AIを使えませんでした')+'］':'')+'）'+(en.failed?'。失敗 '+en.failed+'件'+(en.err?'：'+en.err:''):'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
 }
 function casesEnrich(){
   if(CS.busy)return Promise.resolve();
@@ -991,6 +1003,7 @@ function vGas(){
     '<label class="field" style="margin-top:8px"><span>トークン</span><input id="gasToken" type="password" value="'+esc(c.token)+'" autocomplete="off"></label>'+
     '<label class="field" style="margin-top:8px"><span>1回の「情報取得」で整理する記事数</span><select id="gasN">'+[3,5,10,20].map(function(n){return '<option'+(n===(c.n||5)?' selected':'')+'>'+n+'</option>'}).join('')+'</select></label>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary" data-act="gas-save">保存</button><button class="btn" data-act="gas-test">接続テスト</button><button class="btn" data-act="gas-clear">設定を消す</button></div>'+
+    '<div style="margin-top:8px"><button class="btn small" data-act="gas-reset-skip">失敗・紹介文のみの記事を再試行の対象に戻す</button></div>'+
     '<p class="stline" id="gasInfo" style="margin-top:8px">'+esc(GAS_INFO)+'</p>'+
     '<p class="hint" style="margin:6px 0 0">URLとトークンは、このPCのアドインの保存領域にだけ保存します（ブックには保存しません）。</p></section>';
 }
@@ -1107,8 +1120,9 @@ root.addEventListener('click',function(e){
   else if(a==='lacc'){UI.lacc=UI.lacc||{};UI.lacc[id]=(UI.lacc[id]===false);render()}
   else if(a==='cases-fetch'){casesFetch()}
   else if(a==='cases-enrich'){casesEnrich()}
-  else if(a==='gas-save'){var f=gasReadForm();if(!f.url&&!f.token){gasInfo('URLとトークンを入力してください');return}if(!gasValidUrl(f.url)){gasInfo('URLは https://script.google.com/…/exec の形式で入力してください');return}if(f.token.length<12){gasInfo('トークンは12文字以上にしてください');return}gasInfo(gasSave(f)?'保存しました。「接続テスト」で確認できます':'保存できませんでした（このブラウザの保存領域が使えません）')}
+  else if(a==='gas-save'){var f=gasReadForm();if(!f.url&&!f.token){gasInfo('URLとトークンを入力してください');return}if(!gasValidUrl(f.url)){gasInfo('URLは https://script.google.com/…/exec の形式で入力してください');return}if(f.token.length<12){gasInfo('トークンは12文字以上にしてください');return}try{localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo(gasSave(f)?'保存しました（再試行の記録もリセットしました）。「接続テスト」で確認できます':'保存できませんでした（このブラウザの保存領域が使えません）')}
   else if(a==='gas-test'){var g=gasReadForm();if(!gasValidUrl(g.url)||!g.token){gasInfo('URLとトークンを入力して「保存」してから試してください');return}gasInfo('接続を確認しています…');gasCall(g,{action:'ping'}).then(function(j){gasInfo('接続できました（GASバージョン '+j.version+'／AI整理：'+(j.ai?'使えます':'未設定のため紹介文のみ')+'／取得できるサイト：'+(j.hosts||[]).join(', ')+'）')}).catch(function(e){gasInfo('接続できませんでした：'+e.message)})}
+  else if(a==='gas-reset-skip'){try{localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo('次の「情報取得」で、失敗・紹介文のみの記事も再試行します')}
   else if(a==='gas-clear'){try{localStorage.removeItem(GAS_LS);localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo('設定を消しました');render()}
   else if(a==='cases-reload'){casesReload(false)}
   else if(a==='add-target'){var inp=document.getElementById('newTarget');var n=inp.value.trim();if(!n)return;if(S.targets.find(function(t){return t.name===n})){notify('同じ名前の取引先があります',true);return}S.targets.push({name:n,inScope:true});changed();render()}

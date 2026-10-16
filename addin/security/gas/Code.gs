@@ -116,14 +116,42 @@ function fetchPage_(url) {
   throw new Error('リダイレクトが多すぎます');
 }
 
+var TAIL_MARKERS = ['関連コラム', 'SNSでもご購読', 'この記事を書いた人', '関連記事', 'おすすめ記事'];
+
+function toText_(h) {
+  var t = String(h).replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr|td)>/gi, '\n').replace(/<[^>]+>/g, '');
+  t = unescape_(t);
+  return t.split('\n').map(function (l) { return l.replace(/[ \t\u3000]+/g, ' ').trim(); }).filter(Boolean).join('\n');
+}
+
+/** article → main → ページ全体の順に、十分な長さ（200字以上）のものを使う。関連記事・広告の末尾は切る */
 function htmlToText_(html, limit) {
   var t = String(html).replace(/<(script|style|noscript|nav|header|footer|aside|form|svg)[^>]*>[\s\S]*?<\/\1>/gi, '');
-  var m = t.match(/<article[^>]*>([\s\S]*?)<\/article>/i) || t.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
-  if (m) t = m[1];
-  t = t.replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr|td)>/gi, '\n').replace(/<[^>]+>/g, '');
-  t = unescape_(t);
-  var lines = t.split('\n').map(function (l) { return l.replace(/[ \t\u3000]+/g, ' ').trim(); }).filter(Boolean);
-  return lines.join('\n').slice(0, limit || 14000);
+  var text = '';
+  var rxs = [/<article[^>]*>([\s\S]*?)<\/article>/i, /<main[^>]*>([\s\S]*?)<\/main>/i];
+  for (var i = 0; i < rxs.length && !text; i++) {
+    var m = t.match(rxs[i]);
+    if (m) { var x = toText_(m[1]); if (x.length >= 200) text = x; }
+  }
+  if (!text) text = toText_(t);
+  var cuts = TAIL_MARKERS.map(function (k) { return text.indexOf(k, 200); }).filter(function (n) { return n >= 0; });
+  if (cuts.length) text = text.slice(0, Math.min.apply(null, cuts));
+  return text.slice(0, limit || 14000);
+}
+
+/** 紹介文（desc）で始まる記事冒頭の段落を、文の途中で切れない形で返す（サイトの紹介文は途中で切れていることが多いため） */
+function leadParagraph_(text, desc, maxlen) {
+  maxlen = maxlen || 300;
+  if (!desc) return '';
+  var key = desc.slice(0, 30), lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].indexOf(key) >= 0) {
+      if (lines[i].length <= maxlen) return lines[i];
+      var cut = lines[i].slice(0, maxlen), k = cut.lastIndexOf('。');
+      return k >= 20 ? cut.slice(0, k + 1) : cut;
+    }
+  }
+  return '';
 }
 
 function unescape_(s) {
@@ -142,7 +170,7 @@ function metaDescription_(html) {
             /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i];
   for (var i = 0; i < rx.length; i++) {
     var m = html.match(rx[i]);
-    if (m) return unescape_(m[1]).replace(/\s+/g, ' ').trim().slice(0, 220);
+    if (m) return unescape_(m[1]).replace(/\s+/g, ' ').trim();
   }
   return '';
 }
@@ -214,20 +242,22 @@ function handleArticle_(req) {
   countToday_();
   var page = fetchPage_(url);
   var desc = metaDescription_(page.html);
+  var body = htmlToText_(page.html);
   var key = props_().getProperty('ANTHROPIC_API_KEY');
-  var warn = '';
+  var reason = key ? '' : 'GASに ANTHROPIC_API_KEY が未設定です';
   if (key && req.mode !== 'meta') {
     try {
-      var body = htmlToText_(page.html);
       if (body.length < 80) throw new Error('記事本文を取り出せませんでした');
       var tm = page.html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       var title = tm ? unescape_(tm[1]).replace(/\s+/g, ' ').trim() : '';
       var out = callClaude_(key, userPrompt_(page.url, title, body));
       return { ok: true, mode: 'ai', result: normalize_(parseJson_(out), page.url) };
     } catch (err) {
-      warn = String((err && err.message) || err);
+      reason = 'AIの整理に失敗（' + String((err && err.message) || err) + '）';
     }
   }
-  if (!desc) return { ok: false, error: warn || '記事の紹介文を取り出せませんでした' };
-  return { ok: true, mode: 'meta', warn: warn, result: { sec_summary: desc, sources: '元記事|' + page.url, method: '' } };
+  var lead = leadParagraph_(body, desc);
+  if (!lead && !desc) return { ok: false, error: reason || '記事の紹介文を取り出せませんでした' };
+  // AIが使えないとき：記事冒頭の紹介（短い）だけを概要に入れる
+  return { ok: true, mode: 'meta', reason: reason, warn: reason, result: { sec_summary: lead || desc, sources: '元記事|' + page.url, method: '紹介文' } };
 }
