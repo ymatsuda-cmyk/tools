@@ -182,6 +182,8 @@ dialog::backdrop{background:rgba(10,14,20,.55)}
   .acchead .scope{border-left:none;padding-left:20px;flex:1 1 100%;min-height:40px}
   .acchead>button{padding:0 14px}
 }
+.casebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.caseframe{display:block;width:100%;height:560px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 </style>
 </head>
 <body><div id="root"><p style="padding:24px;font-family:sans-serif">読み込み中…</p></div><script id="seed" type="application/json">{"version":1,"updated":"2026-10-16T02:09:57.088Z","freqs":["月次","四半期","半期","年次","作業ごと","変更時"],"causes":[{"id":"ext","name":"外部攻撃（脆弱性悪用）","severity":"高","likelihood":"高","owner":"構築業者","summary":"VPN機器・Webアプリ・ミドルウェアの既知の脆弱性や弱い認証を突かれ、侵入・情報窃取される。近年の大規模漏えいで最も多い入口。","reasons":["VPN機器・ミドルウェアの修正プログラムが未適用","管理画面やリモート接続ポートがインターネットに公開","Webアプリの入力チェック不備（SQLインジェクション等）","推測しやすい・使い回しのパスワード"],"measures":{"予防":["脆弱性情報を定期収集し、修正プログラムの適用期限を決める","外部公開を最小限にし、管理系はアクセス元を制限する","管理者アカウントに多要素認証を必須化する"],"検知":["不審なログイン・通信をログで監視し、アラートを出す"],"事後対応":["侵入時の切り離し手順とログ保全手順を整備する"]},"checks":[{"id":"ext-1","text":"機器・ソフトのバージョン台帳と最新の修正版を突合し、未適用がないか","freq":"月次"},{"id":"ext-2","text":"外部からのポートスキャン結果で、不要な公開ポート・管理画面がないか","freq":"四半期"},{"id":"ext-3","text":"管理者アカウントに多要素認証が設定されているか","freq":"四半期"},{"id":"ext-4","text":"認証ログに不審なログイン試行がないか","freq":"月次"}],"refs":[{"label":"IPA 注意喚起（2026-10-09）","url":""},{"label":"情報漏洩事例ファイル：[該当事例]","url":""}],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"ext-q1","text":"インターネットに公開しているサーバ・Webサイト・Webアプリがあるか"},{"id":"ext-q2","text":"VPN・リモートデスクトップなど、外部から社内に接続する仕組みがあるか"},{"id":"ext-q3","text":"管理画面に社外からアクセスできるか"}]},{"id":"ransom","name":"ランサムウェア","severity":"高","likelihood":"中","owner":"構築業者＋顧客","summary":"侵入後にデータを暗号化し、窃取したデータの公開を盾に脅迫される（二重恐喝）。業務停止と漏えいが同時に起こる。","reasons":["VPN等からの侵入（外部攻撃と同じ経路）","バックアップが同じネットワーク上にあり、一緒に暗号化される","権限の付与が過大で、被害が全体に広がる"],"measures":{"予防":["権限を最小化し、管理者権限を日常利用のアカウントと分ける"],"検知":["EDR等で端末の不審な挙動を検知する"],"事後対応":["オフライン／書き換え不可のバックアップを確保する","復旧手順書と緊急連絡体制を整備する"]},"checks":[{"id":"ransom-1","text":"バックアップがネットワークから切り離された場所、または書き換え不可の領域にあるか","freq":"四半期"},{"id":"ransom-2","text":"直近1年以内に復元テストを実施した記録があるか","freq":"年次"},{"id":"ransom-3","text":"管理者権限を持つアカウントが必要最小限か","freq":"四半期"},{"id":"ransom-4","text":"インシデント時の連絡先一覧が最新か","freq":"半期"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"ransom-q1","text":"業務データを保存するサーバ・NAS・PCがあるか"},{"id":"ransom-q2","text":"VPN・リモート接続など、外部からの接続経路があるか"}]},{"id":"phish","name":"フィッシング・マルウェア","severity":"中","likelihood":"高","owner":"顧客","summary":"なりすましメールや偽サイトで認証情報を盗まれたり、マルウェアに感染して情報が流出する。","reasons":["添付ファイル・リンクを不用意に開く","偽のログイン画面に認証情報を入力してしまう","端末のOS・ソフトの更新漏れ"],"measures":{"予防":["多要素認証で、盗まれたパスワードだけでは入れないようにする","不審メールの注意喚起・訓練を行う"],"検知":["メールフィルタとウイルス対策を導入し、定義を最新に保つ"],"事後対応":["感染に気づいたらすぐ報告するルールを決め、報告者を責めない"]},"checks":[{"id":"phish-1","text":"ウイルス対策ソフトが全端末で有効・最新か","freq":"月次"},{"id":"phish-2","text":"業務システム・メールに多要素認証が設定されているか","freq":"四半期"},{"id":"phish-3","text":"不審メールの報告窓口が周知されているか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"phish-q1","text":"従業員が業務でメールを使っているか"},{"id":"phish-q2","text":"業務システムにID・パスワードでログインしているか"}]},{"id":"cloud","name":"クラウド設定不備","severity":"高","likelihood":"中","owner":"構築業者","summary":"ストレージや管理画面の公開範囲・認証設定の誤りにより、外部から情報が閲覧可能になる。攻撃がなくても漏えいが成立する。","reasons":["ストレージの公開範囲を「誰でも閲覧可」にしたまま運用","管理画面が初期設定のままインターネットに公開","設定変更のレビューがなく、担当者に属人化"],"measures":{"予防":["公開設定の既定を非公開にし、変更は二者確認とする","構成をテンプレート化し、手作業の設定を減らす"],"検知":["設定診断ツールで定期スキャンし、公開時にアラートを出す"],"事後対応":["公開停止とアクセスログ確認の手順を整備する"]},"checks":[{"id":"cloud-1","text":"公開設定の一覧を出力し、意図しない公開がないか","freq":"四半期"},{"id":"cloud-2","text":"管理画面のIP制限・多要素認証が有効か","freq":"四半期"},{"id":"cloud-3","text":"直近の設定変更に承認記録があるか","freq":"四半期"},{"id":"cloud-4","text":"設定診断の重大な指摘が未対応のまま残っていないか","freq":"月次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"cloud-q1","text":"クラウドサービス（AWS・Azure・Google Cloud・Microsoft 365 等）にデータを保管しているか"},{"id":"cloud-q2","text":"クラウド上でサーバや管理画面を運用しているか"}]},{"id":"human","name":"誤送信・誤操作","severity":"中","likelihood":"高","owner":"顧客","summary":"メールの宛先・添付の誤り、共有設定ミス、誤った公開などの人的ミスで情報が外部に出る。","reasons":["宛先の自動補完による誤選択","個人情報を含むファイルをそのまま添付","共有リンクを「リンクを知っている全員」に設定"],"measures":{"予防":["送信前確認・送信保留の機能を導入する","個人情報ファイルは期限付きの共有リンクで送る"],"検知":["外部共有中のファイル一覧を定期的に確認する"],"事後対応":["誤送信時の削除依頼・社内報告の手順を決める"]},"checks":[{"id":"human-1","text":"メールの送信保留・宛先確認機能が有効か","freq":"年次"},{"id":"human-2","text":"外部共有中のファイル・リンクに不要なものがないか","freq":"月次"},{"id":"human-3","text":"誤送信時の対応手順が周知されているか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"human-q1","text":"個人情報・機密情報をメールやファイル共有で社外とやり取りするか"}]},{"id":"insider","name":"内部不正・退職者","severity":"中","likelihood":"低","owner":"顧客","summary":"従業員や退職者が権限を悪用し、顧客情報などを持ち出す。","reasons":["退職・異動者のアカウント削除漏れ","業務に不要なデータへのアクセス権","大量ダウンロードや持ち出しの記録・監視がない"],"measures":{"予防":["入退社・異動の手続きとアカウント管理を連動させる","アクセス権を定期的に棚卸しする"],"検知":["大量ダウンロード・外部送信を操作ログで監視する"],"事後対応":["持ち出し発覚時の証拠保全手順を決める"]},"checks":[{"id":"insider-1","text":"アカウント一覧と在籍者名簿を突合し、退職者が残っていないか","freq":"月次"},{"id":"insider-2","text":"管理者・特権IDの付与先が妥当か","freq":"四半期"},{"id":"insider-3","text":"操作ログが取得・保管されているか","freq":"四半期"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"insider-q1","text":"個人情報・機密情報を扱うシステムを複数の従業員が利用しているか"},{"id":"insider-q2","text":"従業員の退職・異動があり、アカウントの追加・削除が発生するか"}]},{"id":"vendor","name":"委託先・再委託","severity":"高","likelihood":"中","owner":"構築業者","summary":"保守ベンダーや再委託先の管理不備・侵害を経由して漏えいする。システム導入業者である自社自身が経路になりうる。","reasons":["保守用リモート接続の常時開放・共有アカウント","再委託先の把握・管理が不十分","作業用に持ち出したデータの削除漏れ"],"measures":{"予防":["リモート接続は作業時のみ許可し、個人別アカウントにする","委託先・再委託先の一覧と契約上のセキュリティ要件を整える"],"検知":["委託先の作業の操作ログを取得する"],"事後対応":["作業終了時にデータ削除の記録を残す"]},"checks":[{"id":"vendor-1","text":"保守用リモート接続が常時開放になっていないか","freq":"四半期"},{"id":"vendor-2","text":"保守アカウントが個人別で、共有IDがないか","freq":"四半期"},{"id":"vendor-3","text":"委託先・再委託先の一覧が最新か","freq":"年次"},{"id":"vendor-4","text":"作業用データの削除記録があるか","freq":"作業ごと"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"vendor-q1","text":"自社や他社が保守・運用のためにシステムへ接続するか"},{"id":"vendor-q2","text":"開発・運用の一部を再委託しているか"}]},{"id":"lost","name":"紛失・盗難","severity":"低","likelihood":"中","owner":"顧客","summary":"ノートPC・スマートフォン・USBメモリ・書類の紛失や盗難で情報が流出する。","reasons":["端末・媒体が暗号化されていない","持ち出しのルール・台帳がない","紛失時に遠隔で使えなくする手段がない"],"measures":{"予防":["ディスク暗号化とUSB書き込み制限を行う","持ち出し台帳で管理する"],"検知":["端末管理ツールで所在・状態を把握する"],"事後対応":["遠隔ロック・データ消去を実行できるようにする"]},"checks":[{"id":"lost-1","text":"全ノートPCでディスク暗号化が有効か","freq":"四半期"},{"id":"lost-2","text":"持ち出し媒体の台帳があるか","freq":"年次"},{"id":"lost-3","text":"遠隔ロック・データ消去の手段があるか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"lost-q1","text":"業務データを入れたノートPC・スマホ・USBメモリを持ち出すか"},{"id":"lost-q2","text":"紙の書類で個人情報を扱うか"}]}],"targets":[{"name":"kakimoto arms","inScope":true},{"name":"koch","inScope":true},{"name":"桜楓会","inScope":true},{"name":"アサヒグラント","inScope":true},{"name":"ハンター製菓","inScope":true},{"name":"SPC商事(キャスト)","inScope":true},{"name":"一広","inScope":true},{"name":"エキスプレス","inScope":true},{"name":"東京アドワイズ","inScope":true},{"name":"エーエムプロダクツ","inScope":true},{"name":"ハウント","inScope":true},{"name":"ライフメイト","inScope":true},{"name":"城西個人タクシー","inScope":true},{"name":"オフィスワイズ","inScope":true},{"name":"フイ・フラ・オ・レイアロハ","inScope":true},{"name":"朝日興建","inScope":true},{"name":"エビス","inScope":true},{"name":"フラ＆タヒチ","inScope":true},{"name":"モガインターナショナル","inScope":true},{"name":"アナップ","inScope":true},{"name":"コンピューターテクノス","inScope":true},{"name":"グロリアアーツ","inScope":true}],"results":{},"off":{},"scopeA":{"kakimoto arms":{}}}</script>
@@ -206,6 +208,51 @@ var DEFQ={
   lost:['業務データを入れたノートPC・スマホ・USBメモリを持ち出すか','紙の書類で個人情報を扱うか']
 };
 S.causes.forEach(function(c){if(!c.scopeQs)c.scopeQs=(DEFQ[c.id]||[]).map(function(t,i){return{id:c.id+'-q'+(i+1),text:t}})});
+/* ---------- 対策集の更新（外部攻撃の点検項目の追加）：保存済みデータにも1回だけ適用する ---------- */
+var SEED_VERSION=2;
+var NEW_FREQ='随時（注意喚起時）';
+var EXT_CHECKS=[
+  {id:'ext-3',text:'すべての管理者アカウントに多要素認証が設定されているか',freq:'四半期'},
+  {id:'ext-4',text:'認証ログに不審なログイン成功（海外IP・深夜・未使用アカウントなど）がないか',freq:'月次'},
+  {id:'ext-5',text:'ログイン失敗が急増したときにアラートが出る設定になっているか',freq:'四半期'},
+  {id:'ext-6',text:'機器・管理画面・DBに初期パスワードや共通パスワードが残っていないか',freq:'四半期'},
+  {id:'ext-7',text:'外部公開のログイン画面に、アカウントロックまたは試行回数の制限があるか',freq:'四半期'},
+  {id:'ext-8',text:'VPN・リモート接続のすべてのユーザーに多要素認証が設定されているか',freq:'四半期'},
+  {id:'ext-9',text:'外部公開Webアプリの脆弱性診断を直近1年以内に実施し、指摘が未対応で残っていないか',freq:'年次'},
+  {id:'ext-10',text:'保守期限が切れたOS・機器・ミドルウェアが外部公開されていないか',freq:'半期'},
+  {id:'ext-11',text:'IPA・JPCERT/CCの緊急注意喚起に対し、期限内に対応状況を確認した記録があるか',freq:NEW_FREQ},
+  {id:'ext-12',text:'ソースコードや設定ファイル（GitHub等）にパスワード・APIキーが含まれていないか',freq:'変更時'},
+  {id:'ext-13',text:'VPN・FW・認証ログが一定期間（例：1年）保管されているか',freq:'半期'},
+  {id:'ext-14',text:'侵入時の切り離し・ログ保全手順が文書化されているか',freq:'年次'}
+];
+var EXT_MEASURES={
+  '予防':['初期パスワード・共通パスワードを廃止し、ログイン試行回数を制限する（アカウントロック）','VPN・リモート接続のすべてのユーザーに多要素認証を必須化する','外部公開Webアプリの脆弱性診断を定期的に実施し、指摘を是正する','保守期限切れの製品を外部公開しない（更新または廃止する）','ソースコード・設定ファイルに認証情報を含めない（秘密情報を別管理にする）','IPA・JPCERT/CCの緊急注意喚起を受けたら、期限を決めて対応状況を確認する'],
+  '検知':['ログイン失敗の急増や、海外IPからのログイン成功をアラートにする','VPN・FW・認証ログを1年程度保管する'],
+  '事後対応':[]
+};
+function migrate(d){
+  if((d.version||1)>=SEED_VERSION)return d;
+  var c=d.causes.find(function(x){return x.id==='ext'});
+  if(c){
+    EXT_CHECKS.forEach(function(k){
+      var f=c.checks.find(function(x){return x.id===k.id});
+      if(f){f.text=k.text;f.freq=k.freq}else c.checks.push({id:k.id,text:k.text,freq:k.freq});
+    });
+    c.measures=c.measures||{};
+    Object.keys(EXT_MEASURES).forEach(function(t){
+      var a=c.measures[t]=c.measures[t]||[];
+      EXT_MEASURES[t].forEach(function(m){if(a.indexOf(m)<0)a.push(m)});
+    });
+    c.history=c.history||[];
+    c.history.push({date:today(),note:'外部からの不正アクセスの点検項目を追加（認証強化・ログイン制限・脆弱性診断・ログ保管など12項目）'});
+  }
+  d.freqs=d.freqs||[];
+  if(d.freqs.indexOf(NEW_FREQ)<0)d.freqs.push(NEW_FREQ);
+  d.version=SEED_VERSION;
+  return d;
+}
+migrate(S);
+
 
 var UI={tab:'learn',cause:S.causes[0]&&S.causes[0].id,target:null,open:{},q:''};
 var firstIn=S.targets.find(function(t){return t.inScope});UI.target=firstIn?firstIn.name:(S.targets[0]&&S.targets[0].name);
@@ -660,7 +707,7 @@ function vData(){
       '<button class="btn" data-act="reload-xl">Excelから再読み込み</button></div>'+
       '<label class="switch" style="margin-top:8px"><input type="checkbox" data-startup="1"'+(XL.startup?' checked':'')+'><span>ブックを開いたときに、自動でこの画面を開く</span></label>'+
       '<label class="switch"><input type="checkbox" data-auto="1"'+(S.settings&&S.settings.autoReport?' checked':'')+'><span>変更の12秒後に表も自動で更新する</span></label>'+
-      '<p class="hint" style="margin:6px 0 0">自動更新中は、表のシートが作り直されるため、見ているシートが切り替わることがあります。「漏洩_」で始まるシートは編集しても反映されません。自分用の計算は別のシートに書いてください。</p></section>';
+      '<p class="hint" style="margin:6px 0 0">自動更新中は、表のシートが作り直されるため、見ているシートが切り替わることがあります。「漏洩_」で始まるシートは編集しても反映されません。自分用の計算は別のシートに書いてください。ただし「漏洩事例」シートは事例の保管場所で、ここで編集した内容が「事例」タブに反映されます。</p></section>';
   }else{
     store='<section class="panel"><h2>保存について</h2><p class="meta" style="margin:0">いまはExcelの外（ブラウザ）で開いています。変更はこのブラウザに保存されます。Excelのブックに保存するには、このページをExcelのアドインとして開いてください。<br>最終更新：'+esc(new Date(S.updated).toLocaleString('ja-JP'))+'</p></section>';
   }
@@ -673,12 +720,186 @@ function vData(){
   return '<div class="grid2">'+tg+'<div style="display:flex;flex-direction:column;gap:16px">'+store+bk+rs+'</div></div>';
 }
 
+/* ---------- 事例（Excelの「漏洩事例」シートに蓄積し、そこから読み込む） ---------- */
+var CASE_SHEET='漏洩事例',CASE_LS='leak-cases-v1',FEED_URL='cases-feed.json';
+var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先・クラウド経由'],['ransom','ランサムウェア・マルウェア'],['acct','メール・アカウント乗っ取り'],['human','誤送信・設定ミス・人的'],['other','改ざん・その他']];
+var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources']];
+var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
+function catLabel(code){for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][0]===code)return CASE_CATS[i][1];return CASE_CATS[5][1]}
+function catCode(label){label=String(label==null?'':label).trim();for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][1]===label||CASE_CATS[i][0]===label)return CASE_CATS[i][0];return 'other'}
+var IMP_LAB={2:'最優先',1:'次点',0:''};
+function impCode(v){v=String(v==null?'':v).trim();return (v==='最優先'||v==='2')?2:(v==='次点'||v==='1')?1:0}
+function xlDate(v){
+  if(typeof v==='number'&&v>20000)return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);
+  var s=String(v==null?'':v).trim().replace(/\//g,'-');
+  var m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return m?m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2):s;
+}
+function h32(s){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function caseToRow(c){return CASE_COLS.map(function(col){var k=col[1],v=c[k];if(k==='cat')return catLabel(v);if(k==='imp')return IMP_LAB[v]||'';return v==null?'':String(v).slice(0,32000)})}
+function rowToCase(idx,row){
+  var c={};
+  CASE_COLS.forEach(function(col){
+    var k=col[1],i=idx[col[0]],v=i==null?'':row[i];
+    if(v==null)v='';
+    if(k==='pub'||k==='base'||k==='got')v=xlDate(v);
+    else if(k==='n')v=Number(String(v).replace(/,/g,''))||0;
+    else if(k==='cat')v=catCode(v);
+    else if(k==='imp')v=impCode(v);
+    else v=String(v).trim();
+    c[k]=v;
+  });
+  if(!c.base)c.base=c.pub;
+  if(!c.baseType)c.baseType='公表';
+  return c;
+}
+function parseCaseRows(values){
+  if(!values||!values.length)return [];
+  var idx={};values[0].forEach(function(h,i){idx[String(h==null?'':h).trim()]=i});
+  if(idx['ID']==null&&idx['企業・団体']==null)throw new Error('「'+CASE_SHEET+'」シートの1行目の見出しが見つかりません（見出しは変更しないでください）');
+  var seen={},out=[];
+  values.slice(1).forEach(function(row,r){
+    var c=rowToCase(idx,row);
+    if(!c.id&&!c.co&&!c.summary&&!c.url&&!c.title&&!c.svc)return;
+    if(!c.id)c.id=c.url?('u'+h32(c.url)):('m'+(r+2));
+    var base=c.id,n=2;while(seen[c.id])c.id=base+'-'+(n++);
+    seen[c.id]=1;out.push(c);
+  });
+  return out;
+}
+function xlLoadCases(){
+  return Excel.run(function(ctx){
+    var ws=ctx.workbook.worksheets.getItemOrNullObject(CASE_SHEET);
+    return xlStep('事例シートの確認',ctx.sync()).then(function(){
+      if(ws.isNullObject)return null;
+      var rg=ws.getUsedRangeOrNullObject();rg.load('values');
+      return xlStep('事例の読み込み',ctx.sync()).then(function(){return rg.isNullObject?[]:parseCaseRows(rg.values)});
+    });
+  });
+}
+function xlWriteCases(list){
+  var rows=[CASE_COLS.map(function(c){return c[0]})].concat(list.map(caseToRow));
+  XL.warn=[];XL.deco=[];
+  return Excel.run(function(ctx){
+    var wss=ctx.workbook.worksheets,ws=wss.getItemOrNullObject(CASE_SHEET);
+    return xlStep('事例シートの確認',ctx.sync()).then(function(){
+      if(ws.isNullObject){ws=wss.add(CASE_SHEET);return xlStep('事例シートの追加',ctx.sync())}
+      ws.tables.load('items/name');
+      return xlStep('事例シートの確認',ctx.sync()).then(function(){
+        ws.tables.items.forEach(function(t){t.convertToRange()});
+        return ctx.sync().catch(function(){XL.warn.push('既存の表の解除')});
+      }).then(function(){
+        ws.getRange().clear(Excel.ClearApplyTo.all);
+        return xlStep('事例シートの初期化',ctx.sync());
+      });
+    }).then(function(){
+      xtable(ws,rows,'tblLeakCases','事例');
+      return xlStep('事例の書き込み',ctx.sync());
+    }).then(function(){
+      xwidths(ws,'事例',[70,90,90,70,160,160,80,100,160,70,200,280,100,220,120,90,200,160,200,240,240,240,240,240,240,240,240]);
+      xdeco('原因タイプの選択リスト',function(){
+        var rg=ws.getRangeByIndexes(1,8,Math.max(list.length,1)+300,1);
+        rg.dataValidation.clear();
+        rg.dataValidation.rule={list:{inCellDropDown:true,source:CASE_CATS.map(function(c){return c[1]}).join(',')}};
+      });
+      xdeco('重要度の選択リスト',function(){
+        var rg=ws.getRangeByIndexes(1,9,Math.max(list.length,1)+300,1);
+        rg.dataValidation.clear();
+        rg.dataValidation.rule={list:{inCellDropDown:true,source:'最優先,次点'}};
+      });
+      return xrunDeco(ctx);
+    });
+  });
+}
+function casesLoadLocal(){try{var a=JSON.parse(localStorage.getItem(CASE_LS)||'null');return Array.isArray(a)?a:null}catch(e){return null}}
+function casesSaveLocal(){try{localStorage.setItem(CASE_LS,JSON.stringify(CASES))}catch(e){notify('ブラウザに保存できませんでした（容量不足の可能性）',true)}}
+function casesInfo(){return CASES.length+'件'+(CS.msg?'　'+CS.msg:'')}
+function casesSetMsg(m){CS.msg=m;var el=document.getElementById('caseMsg');if(el)el.textContent=casesInfo()}
+function postCases(){
+  var f=document.getElementById('casesFrame');if(!f||!f.contentWindow)return;
+  var o=(location.origin&&location.origin!=='null')?location.origin:'*';
+  try{f.contentWindow.postMessage({type:'leak-cases',cases:CASES,sel:CS.sel,sec:CS.sec},o)}catch(e){}
+}
+function casesFit(){var f=document.getElementById('casesFrame');if(!f)return;f.style.height=Math.max(420,window.innerHeight-f.getBoundingClientRect().top-12)+'px'}
+function casesAfterRender(){casesFit();var f=document.getElementById('casesFrame');if(f)f.addEventListener('load',function(){postCases()})}
+window.addEventListener('resize',casesFit);
+window.addEventListener('message',function(e){
+  var f=document.getElementById('casesFrame');
+  if(!f||e.source!==f.contentWindow)return;
+  var m=e.data;if(!m)return;
+  if(m.type==='leak-cases-ready')postCases();
+  else if(m.type==='leak-cases-select'){CS.sel=m.id;CS.sec=m.sec}
+});
+function casesReload(silent){
+  var p=IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal());
+  return p.then(function(l){
+    CASES=l||[];
+    casesSetMsg(l?(IN_EXCEL?'Excelの「'+CASE_SHEET+'」シートから読み込みました':'ブラウザから読み込みました'):(IN_EXCEL?'「'+CASE_SHEET+'」シートがまだありません。「情報取得」を押してください':'まだ事例がありません。「情報取得」を押してください'));
+    postCases();
+  }).catch(function(err){
+    var m='読み込めませんでした：'+(err&&err.message?err.message:err);
+    casesSetMsg(m);if(!silent)notify(m,true);
+  });
+}
+function fetchFeed(){
+  return fetch(FEED_URL+'?_='+Date.now(),{cache:'no-store'}).then(function(r){
+    if(!r.ok)throw new Error(FEED_URL+' を取得できませんでした（HTTP '+r.status+'）。公開先に '+FEED_URL+' を置いてください');
+    return r.json();
+  }).then(function(j){
+    if(!j||!Array.isArray(j.items))throw new Error(FEED_URL+' の形式が正しくありません');
+    return j;
+  });
+}
+function normUrl(u){return String(u==null?'':u).trim().replace(/[#?].*$/,'').replace(/\/$/,'')}
+function mergeCases(base,items){
+  var byId={},byUrl={},added=0,filled=0,list=base.slice();
+  base.forEach(function(c){byId[c.id]=c;if(c.url)byUrl[normUrl(c.url)]=c});
+  (items||[]).forEach(function(it){
+    if(!it||!it.id)return;
+    var ex=byId[it.id]||(it.url?byUrl[normUrl(it.url)]:null);
+    if(ex){
+      var ch=false;   /* Excelで直した内容は上書きせず、空欄だけ補う */
+      CASE_COLS.forEach(function(col){var k=col[1],cur=ex[k],empty=(cur==null||cur===''||cur===0);if(empty&&it[k]!=null&&it[k]!==''&&it[k]!==0){ex[k]=it[k];ch=true}});
+      if(ch)filled++;
+      return;
+    }
+    var n=JSON.parse(JSON.stringify(it));n.got=today();
+    list.push(n);byId[n.id]=n;if(n.url)byUrl[normUrl(n.url)]=n;added++;
+  });
+  return {list:list,added:added,filled:filled};
+}
+function casesFetch(){
+  if(CS.busy)return Promise.resolve();
+  CS.busy=true;casesSetMsg('情報を取得しています…');
+  var cur=[],had=true;
+  return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
+    had=!!l;cur=l||[];return fetchFeed();
+  }).then(function(feed){
+    var r=mergeCases(cur,feed.items);CASES=r.list;
+    var need=r.added||r.filled||!had;
+    var save=!need?Promise.resolve():(IN_EXCEL?xlQueue(function(){return xlWriteCases(CASES)}):Promise.resolve(casesSaveLocal()));
+    return save.then(function(){
+      var when=feed.generatedAt?'（フィード更新 '+String(feed.generatedAt).replace('T',' ').slice(0,16)+'）':'';
+      casesSetMsg((r.added?'新規 '+r.added+'件を取り込みました。':r.filled?'既存の '+r.filled+'件の空欄を補いました。':'すでに最新です。')+when+(IN_EXCEL?warnTail():''));
+      postCases();
+    });
+  }).catch(function(err){
+    var m='取得できませんでした：'+(err&&err.message?err.message:err);
+    casesSetMsg(m);notify(m,true);
+  }).then(function(){CS.busy=false});
+}
+function vCases(){
+  return '<div class="casebar no-print"><button class="btn primary" data-act="cases-fetch">情報取得</button><button class="btn" data-act="cases-reload">'+(IN_EXCEL?'Excelから再読み込み':'再読み込み')+'</button><span class="stline" id="caseMsg">'+esc(casesInfo())+'</span></div>'+
+    '<iframe id="casesFrame" class="caseframe" src="cases.html" title="情報漏洩 事例ファイル" referrerpolicy="no-referrer"></iframe>';
+}
+
 function render(){
-  var tabs=[['learn','対策を見る'],['inspect','点検する'],['viz','可視化'],['data','データ管理']];
-  var v=UI.tab==='learn'?vLearn():UI.tab==='inspect'?vInspect():UI.tab==='viz'?vViz():vData();
+  var tabs=[['learn','対策を見る'],['cases','事例'],['inspect','点検する'],['viz','可視化'],['data','データ管理']];
+  var v=UI.tab==='learn'?vLearn():UI.tab==='cases'?vCases():UI.tab==='inspect'?vInspect():UI.tab==='viz'?vViz():vData();
   document.getElementById('root').innerHTML='<header class="top"><div class="brand">情報漏洩対策集</div><div class="tabs" role="tablist">'+
     tabs.map(function(t){return '<button role="tab" data-act="tab" data-id="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+'</button>'}).join('')+
     '</div><div class="status" id="status" aria-live="polite">'+esc(saveState)+'</div></header><div class="wrap">'+v+'</div>';
+  if(UI.tab==='cases')casesAfterRender();
 }
 
 /* ---------- editor ---------- */
@@ -754,7 +975,7 @@ var root=document.getElementById('root');
 root.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el)return;
   var a=el.getAttribute('data-act'),id=el.getAttribute('data-id');
-  if(a==='tab'){UI.tab=id;render();window.scrollTo(0,0)}
+  if(a==='tab'){UI.tab=id;render();window.scrollTo(0,0);if(id==='cases')casesReload(true)}
   else if(a==='cause'){UI.cause=id;render()}
   else if(a==='add-cause')openEditor(null);
   else if(a==='edit-cause')openEditor(id);
@@ -770,6 +991,8 @@ root.addEventListener('click',function(e){
   }
   else if(a==='ans'){var qa=S.scopeA[UI.target]=S.scopeA[UI.target]||{};var qid=el.getAttribute('data-q'),qv=el.getAttribute('data-v');if(qa[qid]===qv)delete qa[qid];else qa[qid]=qv;changed();render()}
   else if(a==='jump'){UI.target=el.getAttribute('data-t');UI.tab='inspect';UI.open={};UI.open[id]=true;render();window.scrollTo(0,0)}
+  else if(a==='cases-fetch'){casesFetch()}
+  else if(a==='cases-reload'){casesReload(false)}
   else if(a==='add-target'){var inp=document.getElementById('newTarget');var n=inp.value.trim();if(!n)return;if(S.targets.find(function(t){return t.name===n})){notify('同じ名前の取引先があります',true);return}S.targets.push({name:n,inScope:true});changed();render()}
   else if(a==='del-target'){var i=+el.getAttribute('data-i');var t=S.targets[i];askConfirm('「'+t.name+'」と、その点検結果を削除します。よろしいですか？',function(){S.targets.splice(i,1);delete S.results[t.name];delete S.off[t.name];delete S.scopeA[t.name];if(UI.target===t.name)UI.target=S.targets[0]&&S.targets[0].name;changed();render()})}
   else if(a==='export-json')saveFile('情報漏洩対策集_'+today()+'.json',JSON.stringify(S,null,2),'application/json');
@@ -818,7 +1041,7 @@ function normalizeS(d){
     c.checks=c.checks||[];c.reasons=c.reasons||[];c.measures=c.measures||{};c.refs=c.refs||[];c.history=c.history||[];
     if(!c.scopeQs)c.scopeQs=(DEFQ[c.id]||[]).map(function(t,i){return{id:c.id+'-q'+(i+1),text:t}});
   });
-  return d;
+  return migrate(d);
 }
 function bootBrowser(){
   try{var local=JSON.parse(localStorage.getItem(LS_KEY)||'null');if(local&&Array.isArray(local.causes)&&local.updated>S.updated)S=normalizeS(local)}catch(e){}
@@ -828,7 +1051,7 @@ function bootExcel(){
   IN_EXCEL=true;XL.loadFailed=false;saveState='Excelから読み込み中…';render();
   xlStartupInit();
   return xlLoad().then(function(d){
-    if(d){S=normalizeS(d);saveState='Excelから読み込みました（'+hhmm()+'）'}
+    if(d){var was=d.version||1;S=normalizeS(d);saveState='Excelから読み込みました（'+hhmm()+'）';if(was<SEED_VERSION)setTimeout(changed,0)}
     else saveState='このブックにはまだ保存されていません。変更すると自動で保存されます。';
     fixUI();render();
   }).catch(function(err){
