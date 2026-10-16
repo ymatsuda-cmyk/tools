@@ -9,7 +9,7 @@
   <Version>1.1.0.0</Version>
   <ProviderName>Writerm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
-  <DisplayName DefaultValue="情報漏洩対策集"/>
+  <DisplayName DefaultValue="セキュリティ"/>
   <Description DefaultValue="情報漏洩対策集（Webページ）のJSONを読み込み、対策一覧・対象判定・点検結果・サマリをExcelに保存します。Excelで入力した結果をJSONに戻すこともできます。"/>
   <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-64.png"/>
@@ -82,8 +82,8 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="情報漏洩対策"/>
-        <bt:String id="Button.Label" DefaultValue="対策集 連携"/>
+        <bt:String id="Group.Label" DefaultValue="セキュリティ"/>
+        <bt:String id="Button.Label" DefaultValue="点検"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="Button.Tooltip" DefaultValue="情報漏洩対策集のデータをExcelに保存・更新し、Excelで入力した点検結果をJSONに書き出します。"/>
