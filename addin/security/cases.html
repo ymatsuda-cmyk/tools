@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>情報漏洩 事例ファイル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1C2430; --muted:#5A6577; --line:#D5DBE3; --hover:#E6EBF2;
+  --accent:#23477A; --accent-soft:#E3EAF4; --warn:#9C2A1F; --warn-soft:#F7E6E3; --ok:#2C6B4F; --ok-soft:#E3F1EA;
+  --c-ext:#3C5F95; --c-chain:#B0612A; --c-ransom:#8E2F3A; --c-acct:#6B5A9A; --c-human:#3E7F6E; --c-other:#8A8F99;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141922; --surface:#1C2330; --ink:#E6EAF0; --muted:#9AA5B5; --line:#2E3747; --hover:#242D3C;
+    --accent:#8DB2E6; --accent-soft:#22324A; --warn:#F0A397; --warn-soft:#3A2522; --ok:#8FCCAE; --ok-soft:#1F3329;
+    --c-ext:#7FA2DA; --c-chain:#E0A06E; --c-ransom:#E0838E; --c-acct:#AE9EDB; --c-human:#7CC4AE; --c-other:#A3A8B2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141922; --surface:#1C2330; --ink:#E6EAF0; --muted:#9AA5B5; --line:#2E3747; --hover:#242D3C;
+  --accent:#8DB2E6; --accent-soft:#22324A; --warn:#F0A397; --warn-soft:#3A2522; --ok:#8FCCAE; --ok-soft:#1F3329;
+  --c-ext:#7FA2DA; --c-chain:#E0A06E; --c-ransom:#E0838E; --c-acct:#AE9EDB; --c-human:#7CC4AE; --c-other:#A3A8B2;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;font-size:15px;line-height:1.75;display:flex;flex-direction:column}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+a{color:var(--accent)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{padding:16px 22px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
+.titlerow{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.titlerow h1{margin:0;font-size:17px}
+.titlerow span{color:var(--muted);font-size:13px}
+.mix{margin-top:12px}
+.mixbar{display:flex;height:30px;border-radius:6px;overflow:hidden;background:var(--line)}
+.mixbar button{border:none;cursor:pointer;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:clip;padding:0 8px;min-width:0;transition:opacity .15s}
+.mixbar button.dim{opacity:.28}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:7px;font-size:12.5px;color:var(--muted)}
+.legend button{background:none;border:none;padding:2px 0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.legend button[aria-pressed="true"]{color:var(--ink);font-weight:700}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.legend b{color:var(--ink)}
+
+.app{flex:1;display:grid;grid-template-columns:360px minmax(0,1fr);min-height:0}
+aside.list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.tools{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:8px}
+.tools input{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--surface);border:none;padding:4px 10px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.count{margin-left:auto;color:var(--muted)}
+.seg select{border:none;background:var(--surface);color:var(--ink);padding:4px 8px;font:inherit;font-size:12.5px}
+.mh{position:sticky;top:0;z-index:1;background:var(--bg);padding:6px 14px;font-size:12.5px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line)}
+.mh small{font-weight:400;margin-left:8px}
+.dt{color:var(--ink)}
+.ot{font-style:normal;font-size:11px;color:var(--muted);margin-left:3px}
+ul.cases{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1}
+ul.cases li button{display:grid;grid-template-columns:4px 1fr auto;gap:0 12px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--line);padding:11px 14px 11px 0;cursor:pointer}
+ul.cases li button:hover{background:var(--hover)}
+ul.cases li button[aria-current="true"]{background:var(--surface)}
+.stripe{grid-row:1/3;border-radius:0 2px 2px 0}
+.co{font-weight:700;font-size:14px;line-height:1.4}
+.co small{font-weight:400;color:var(--muted);margin-left:4px}
+.meta{grid-column:2/4;font-size:12px;color:var(--muted);line-height:1.5}
+.num{font-size:13px;font-weight:700;white-space:nowrap;align-self:start;line-height:1.4}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:5px;vertical-align:1px}
+.empty{padding:28px 18px;color:var(--muted);font-size:14px}
+
+main.detail{overflow-y:auto;min-height:0}
+.back{display:none}
+body.embedded .titlerow h1{display:none}
+body.embedded header.top{padding:10px 14px}
+.dh{padding:24px 30px 0}
+.star{color:#c98500;margin-right:4px}
+.star.s2{color:#eda100}
+.why{margin:6px 0 10px;font-size:13px;color:var(--muted);max-width:44em}
+.dh .kicker{font-size:13px;color:var(--muted)}
+.dh h2{font-family:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;font-weight:800;font-size:27px;line-height:1.3;margin:4px 0 8px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted)}
+.facts strong{color:var(--ink);font-size:15px;margin-left:6px}
+.tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;color:#fff;margin-left:8px;vertical-align:2px}
+.sectabs{position:sticky;top:0;z-index:3;background:var(--bg);display:flex;gap:2px;overflow-x:auto;padding:16px 30px 0;border-bottom:1px solid var(--line)}
+.sectabs button{flex:0 0 auto;background:none;border:none;border-bottom:3px solid transparent;padding:8px 12px;cursor:pointer;color:var(--muted);font-size:14px;white-space:nowrap}
+.sectabs button:hover{color:var(--ink)}
+.sectabs button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--accent)}
+.panel{padding:22px 30px 40px;max-width:900px}
+.panel h3{font-size:19px;margin:0 0 12px}
+.panel h4{font-size:15px;margin:20px 0 8px;color:var(--accent)}
+.panel p{margin:0 0 12px;max-width:44em}
+.panel ul{margin:0 0 12px;padding-left:1.3em;max-width:46em}
+.panel li{margin-bottom:4px}
+.lead{font-size:16px;font-weight:700}
+.note{font-size:13px;color:var(--muted)}
+.scroll{overflow-x:auto;margin:6px 0 14px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:700;font-size:13px;background:var(--surface)}
+td:first-child{white-space:nowrap;font-weight:700}
+.badge{display:inline-block;font-size:12px;border-radius:4px;padding:1px 7px;margin-right:4px}
+.b-gap{background:var(--warn-soft);color:var(--warn)}
+.b-ok{background:var(--ok-soft);color:var(--ok)}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:22px;padding-top:14px;border-top:1px solid var(--line)}
+.pager button{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:7px 14px;border-radius:6px;cursor:pointer}
+.pager button:disabled{visibility:hidden}
+.sources{margin-top:16px;font-size:12.5px;color:var(--muted)}
+.sources a{margin-right:12px;display:inline-block}
+.stub{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px 20px;max-width:44em}
+.stub dl{display:grid;grid-template-columns:7em 1fr;gap:6px 14px;margin:0 0 14px;font-size:14px}
+.stub dt{color:var(--muted)}
+.stub dd{margin:0}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  aside.list{border-right:none}
+  main.detail{display:none}
+  body.show-detail aside.list{display:none}
+  body.show-detail main.detail{display:block}
+  .back{display:inline-block;margin:14px 16px 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .dh{padding:12px 16px 0}
+  .dh h2{font-size:22px}
+  .sectabs{padding:12px 12px 0}
+  .panel{padding:18px 16px 32px}
+  header.top{padding:12px 14px}
+  .mixbar button{font-size:0}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="titlerow"><h1>情報漏洩 事例ファイル</h1><span id="asof"></span></div>
+  <div class="mix">
+    <div class="mixbar" id="mixbar" aria-hidden="true"></div>
+    <div class="legend" id="legend" role="group" aria-label="原因タイプで絞り込み"></div>
+  </div>
+</header>
+<div class="app">
+  <aside class="list" aria-label="事例一覧">
+    <div class="tools">
+      <input id="q" type="search" placeholder="企業名・サービス名で検索" aria-label="企業名・サービス名で検索">
+      <div class="row2">
+        <div class="seg" role="group" aria-label="期間">
+          <select id="month" aria-label="時期で絞り込み"></select>
+        </div>
+        <div class="seg" role="group" aria-label="並び順">
+          <button data-sort="date" aria-pressed="true">新しい順</button><button data-sort="n" aria-pressed="false">件数順</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="seg"><button data-imp aria-pressed="false">★ 重要のみ</button></div><label title="発生日から導入業者としての対策まで7項目を整理してある事例（青い点）だけを表示"><input type="checkbox" id="onlyDetail"> 詳細ありのみ（青い点）</label>
+        <span class="count" id="count"></span>
+      </div>
+    </div>
+    <ul class="cases" id="cases"></ul>
+  </aside>
+  <main class="detail" id="detail" aria-live="polite"></main>
+</div>
+
+<script>
+const CATS={
+  ext:{label:"外部からの不正アクセス",color:"var(--c-ext)"},
+  chain:{label:"委託先・クラウド経由",color:"var(--c-chain)"},
+  ransom:{label:"ランサムウェア・マルウェア",color:"var(--c-ransom)"},
+  acct:{label:"メール・アカウント乗っ取り",color:"var(--c-acct)"},
+  human:{label:"誤送信・設定ミス・人的",color:"var(--c-human)"},
+  other:{label:"改ざん・その他",color:"var(--c-other)"}
+};
+const SECTIONS=[
+  {id:"date",label:"発生日"},{id:"summary",label:"概要"},{id:"discovery",label:"発覚の経緯"},
+  {id:"risk",label:"リスク・影響範囲"},{id:"cause",label:"原因"},{id:"response",label:"対処（暫定・恒久）"},{id:"vendor",label:"導入業者としての対策"}
+];
+const EMBEDDED=window.parent!==window;
+if(EMBEDDED)document.body.classList.add('embedded');
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
+const isDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'');
+
+/* ---- Excel等から来た文章を安全なHTMLにする ---- */
+function sanitize(html){
+  const doc=new DOMParser().parseFromString('<body>'+html,'text/html');
+  doc.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,input,button,textarea,select,svg,math,img,video,audio,source').forEach(n=>n.remove());
+  doc.querySelectorAll('*').forEach(el=>{
+    [...el.attributes].forEach(a=>{
+      const n=a.name.toLowerCase(),v=a.value.trim();
+      if(n.startsWith('on')||n==='style'||n==='srcdoc'||n==='src'||n==='formaction'||(n==='href'&&!/^(https?:|#|mailto:)/i.test(v))) el.removeAttribute(a.name);
+    });
+    if(el.tagName==='A'){el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer');}
+  });
+  return doc.body.innerHTML;
+}
+function plain(v){
+  const lines=String(v).split(/\r?\n/);let out='',list=false;
+  lines.forEach(l=>{
+    const m=l.match(/^\s*[・\-－●]\s*(.*)$/);
+    if(m){ if(!list){out+='<ul>';list=true;} out+='<li>'+esc(m[1])+'</li>'; }
+    else{ if(list){out+='</ul>';list=false;} if(l.trim()) out+='<p>'+esc(l)+'</p>'; }
+  });
+  if(list)out+='</ul>';
+  return out;
+}
+function secHtml(v){
+  v=v==null?'':String(v);
+  if(!v.trim()) return '<p class="note">この項目はまだ整理されていません。Excelの「漏洩事例」シートに入力すると、ここに表示されます。</p>';
+  return /^\s*</.test(v)?sanitize(v):plain(v);
+}
+
+/* ---- データ（1行=1事例の平らな形式）を画面用に変換 ---- */
+let INDEX=[],D={};
+const SEC_KEYS=SECTIONS.map(s=>s.id);
+function load(cases){
+  INDEX=[];D={};
+  (cases||[]).forEach(c=>{
+    if(!c||!c.id) return;
+    const pub=isDate(c.pub)?c.pub:(isDate(c.got)?c.got:'1970-01-01');
+    const hasDetail=!!(c.title||SEC_KEYS.some(k=>c['sec_'+k]));
+    const x={id:String(c.id),d:pub,co:c.co||'',svc:c.svc||'',n:Number(c.n)||0,nt:c.nt||'',
+      cat:CATS[c.cat]?c.cat:'other',s:c.summary||'',url:safeUrl(c.url),rel:c.rel||'',
+      detail:hasDetail?String(c.id):null,
+      o:isDate(c.base)?c.base:pub,ot:c.baseType||'公表',imp:Number(c.imp)||0,why:c.impWhy||'',got:c.got||''};
+    INDEX.push(x);
+    if(hasDetail){
+      const facts=String(c.facts||'').split('|').map(f=>{const i=f.indexOf('=');return i>0?[f.slice(0,i),f.slice(i+1)]:null}).filter(Boolean);
+      const sources=String(c.sources||'').split(/\r?\n/).map(l=>{const i=l.indexOf('|');return i>0?[l.slice(0,i),l.slice(i+1)]:null}).filter(z=>z&&safeUrl(z[1]));
+      if(!sources.length&&x.url) sources.push(['元記事',x.url]);
+      const sec={};SEC_KEYS.forEach(k=>sec[k]=c['sec_'+k]||'');
+      D[x.id]={title:c.title||x.svc||x.s||x.co,sub:c.sub||x.co,facts,sections:sec,sources};
+    }
+  });
+}
+const st={cat:null,q:"",month:"",sort:"date",only:false,imp:false,sel:null,sec:"date"};
+const fmtDate=d=>{const [y,m,dd]=d.split('-');return y+'年'+(+m)+'月'+(+dd)+'日'};
+const shortDate=d=>{const [,m,dd]=d.split('-');return (+m)+'月'+(+dd)+'日'};
+const inPeriod=x=>!st.month||x.o.slice(0,7)===st.month;
+
+function filtered(ignoreCat){
+  const q=st.q.trim().toLowerCase();
+  const a=INDEX.filter(x=>inPeriod(x)&&(ignoreCat||!st.cat||x.cat===st.cat)&&(!st.only||x.detail)&&(!st.imp||x.imp)&&(!q||(x.co+x.svc+x.s).toLowerCase().includes(q)));
+  a.sort(st.sort==='n'?(p,r)=>(r.n||0)-(p.n||0)||r.o.localeCompare(p.o):(p,r)=>r.o.localeCompare(p.o)||r.d.localeCompare(p.d));
+  return a;
+}
+function renderMix(){
+  const base=filtered(true);
+  const counts=Object.keys(CATS).map(k=>[k,base.filter(x=>x.cat===k).length]);
+  $('mixbar').innerHTML=counts.filter(c=>c[1]).map(([k,n])=>'<button style="flex:'+n+';background:'+CATS[k].color+'" class="'+(st.cat&&st.cat!==k?'dim':'')+'" data-cat="'+k+'" tabindex="-1">'+n+'</button>').join('');
+  $('legend').innerHTML=counts.map(([k,n])=>'<button data-cat="'+k+'" aria-pressed="'+(st.cat===k)+'"><i style="background:'+CATS[k].color+'"></i>'+CATS[k].label+' <b>'+n+'</b></button>').join('')+(st.cat?'<button data-cat="">絞り込み解除</button>':'');
+}
+function renderList(){
+  const a=filtered(false);
+  $('count').textContent=a.length+'件';
+  let lastM='';
+  $('cases').innerHTML=a.length?a.map(x=>{
+    const m=x.o.slice(0,7);let h='';
+    if(st.sort==='date'&&m!==lastM){lastM=m;h='<li class="mh">'+(+m.slice(5))+'月<small>'+a.filter(z=>z.o.slice(0,7)===m).length+'件</small></li>';}
+    return h+'<li><button data-id="'+esc(x.id)+'" aria-current="'+(x.id===st.sel)+'"><span class="stripe" style="background:'+CATS[x.cat].color+'"></span><span class="co">'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'" title="'+(x.imp===2?'最優先':'次点')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+(x.detail?'<span class="dot" title="詳細あり"></span>':'')+esc(x.co||x.svc||'（企業名は元記事を確認）')+(x.co&&x.svc?'<small>'+esc(x.svc)+'</small>':'')+'</span><span class="num">'+esc(x.nt||'')+'</span><span class="meta"><b class="dt">'+shortDate(x.o)+'</b><i class="ot">'+esc(x.ot)+'</i>　'+esc(x.s)+'</span></button></li>';
+  }).join(''):'<li class="empty">'+(INDEX.length?'条件に合う事例がありません。検索語や絞り込みを外してください。':'事例がありません。アドインの「情報取得」を押してください。')+'</li>';
+}
+function renderDetail(){
+  const x=INDEX.find(i=>i.id===st.sel);
+  if(!x){ $('detail').innerHTML='<div class="panel"><p class="lead">左の一覧から事例を選んでください。</p><p class="note">青い点のついた事例は、発生日・概要・発覚の経緯・リスク・原因・対処・導入業者としての対策の7項目を整理済みです。★は特に重要な事例（最優先）、☆は次点です。</p></div>'; return; }
+  const c=CATS[x.cat];
+  const backBtn='<button class="back" data-back>一覧に戻る</button>';
+  if(x.detail&&D[x.detail]){
+    const d=D[x.detail], si=SECTIONS.findIndex(s=>s.id===st.sec), s=SECTIONS[si<0?0:si], idx=si<0?0:si, prev=SECTIONS[idx-1], next=SECTIONS[idx+1];
+    $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+fmtDate(x.o)+' '+esc(x.ot)+(x.ot!=='公表'?'（公表 '+fmtDate(x.d)+'）':'')+'　'+esc(d.sub)+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+esc(d.title)+'</h2>'+(x.imp&&x.why?'<p class="why">'+(x.imp===2?'最優先':'次点')+'：'+esc(x.why)+'</p>':'')+'<div class="facts">'+d.facts.map(f=>'<div>'+esc(f[0])+'<strong>'+esc(f[1])+'</strong></div>').join('')+'</div></div>'+
+      '<div class="sectabs" role="tablist" aria-label="項目">'+SECTIONS.map(z=>'<button role="tab" data-sec="'+z.id+'" aria-selected="'+(z.id===s.id)+'">'+z.label+'</button>').join('')+'</div>'+
+      '<div class="panel" role="tabpanel"><h3>'+s.label+'</h3>'+secHtml(d.sections[s.id])+
+      '<div class="pager"><button data-sec="'+(prev?prev.id:'')+'"'+(prev?'':' disabled')+'>'+(prev?'前へ：'+prev.label:'')+'</button><button data-sec="'+(next?next.id:'')+'"'+(next?'':' disabled')+'>'+(next?'次へ：'+next.label:'')+'</button></div>'+
+      '<div class="sources">出典：'+d.sources.map(z=>'<a href="'+esc(z[1])+'" target="_blank" rel="noopener noreferrer">'+esc(z[0])+'</a>').join('')+'</div></div>';
+  }else{
+    $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+esc(x.co||'企業名は元記事を確認')+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+esc(x.svc||x.s||x.co)+'</h2></div>'+
+      '<div class="panel"><div class="stub"><dl>'+(x.ot!=='公表'?'<dt>'+esc(x.ot)+'日</dt><dd>'+fmtDate(x.o)+'</dd>':'')+'<dt>公表日</dt><dd>'+fmtDate(x.d)+'</dd><dt>規模</dt><dd>'+esc(x.nt||'未公表・調査中')+'</dd><dt>概要</dt><dd>'+esc(x.s)+'</dd>'+(x.rel?'<dt>関連</dt><dd>'+esc(x.rel)+'</dd>':'')+(x.got?'<dt>取得日</dt><dd>'+esc(x.got)+'</dd>':'')+'</dl>'+
+      '<p class="note">この事例は一覧情報のみです。Excelの「漏洩事例」シートの詳細列（発生日〜導入業者としての対策）に入力すると、7項目の詳細が表示されます。</p>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事を開く</a>':'')+'</div></div>';
+  }
+}
+function notifyParent(){ if(EMBEDDED) try{parent.postMessage({type:'leak-cases-select',id:st.sel,sec:st.sec},'*')}catch(e){} }
+function render(){ renderMix(); renderList(); renderDetail(); }
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.cat!==undefined){ st.cat=(b.dataset.cat&&st.cat!==b.dataset.cat)?b.dataset.cat:null; render(); return; }
+  if(b.dataset.sort){ st.sort=b.dataset.sort; document.querySelectorAll('[data-sort]').forEach(z=>z.setAttribute('aria-pressed',z===b)); render(); return; }
+  if(b.dataset.id){ st.sel=b.dataset.id; st.sec='date'; document.body.classList.add('show-detail'); render(); $('detail').scrollTop=0; window.scrollTo(0,0); notifyParent(); return; }
+  if(b.dataset.sec){ st.sec=b.dataset.sec; render(); $('detail').scrollTop=0; notifyParent(); return; }
+  if(b.hasAttribute('data-imp')){ st.imp=!st.imp; b.setAttribute('aria-pressed',st.imp); render(); return; }
+  if(b.hasAttribute('data-back')){ document.body.classList.remove('show-detail'); return; }
+});
+$('q').addEventListener('input',e=>{st.q=e.target.value; render();});
+function buildMonths(){
+  const c={};INDEX.forEach(x=>{const m=x.o.slice(0,7);c[m]=(c[m]||0)+1});
+  const keep=st.month;
+  $('month').innerHTML='<option value="">すべての時期</option>'+Object.keys(c).sort().reverse().map(m=>'<option value="'+m+'">'+m.slice(0,4)+'年'+(+m.slice(5))+'月（'+c[m]+'件）</option>').join('');
+  $('month').value=c[keep]?keep:'';st.month=$('month').value;
+}
+$('month').addEventListener('change',e=>{st.month=e.target.value;render();});
+$('onlyDetail').addEventListener('change',e=>{st.only=e.target.checked; render();});
+function asof(){
+  const got=INDEX.map(x=>x.got).filter(isDate).sort().pop();
+  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）';
+}
+function apply(cases,sel,sec){
+  load(cases);
+  if(sel&&INDEX.some(x=>x.id===sel)){st.sel=sel;if(SEC_KEYS.includes(sec))st.sec=sec;}
+  else if(!INDEX.some(x=>x.id===st.sel)){
+    st.sel=null;
+    const top=filtered(false).find(x=>x.detail);
+    if(top&&window.innerWidth>860) st.sel=top.id;
+  }
+  buildMonths();asof();render();
+}
+window.addEventListener('message',e=>{
+  if(e.source!==window.parent) return;
+  const m=e.data; if(!m||m.type!=='leak-cases') return;
+  apply(m.cases,m.sel,m.sec);
+});
+/* 初期表示：アドインに埋め込まれているときは親からデータを受け取る。単体で開いたときは cases-feed.json を読む */
+if(EMBEDDED){
+  try{parent.postMessage({type:'leak-cases-ready'},'*')}catch(e){}
+  apply([]);
+}else{
+  apply([]);
+  fetch('cases-feed.json',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(j=>apply(j.items||[])).catch(()=>{});
+}
+</script>
+</body>
+</html>
