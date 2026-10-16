@@ -215,6 +215,36 @@ function plain(v){
   if(list)out+='</ul>';
   return out;
 }
+/* ---- サイトの本文から、広告・案内・画像クレジット・空の見出しなどを除く（本文の内容は変えない） ---- */
+const NOISE=[
+  /^[\s*＊\-–—■□●・→←>＞»›|｜]+$/,
+  /メルマガ登録|無料メルマガ|メルマガ会員登録/,
+  /無料会員登録|会員登録はこちら/,
+  /詳細はこちら|お申し込みはこちら|お申込みはこちら|資料請求はこちら|資料請求する|まとめて資料請求|お問い合わせはこちら|無料ダウンロード/,
+  /セキュリティ対策無料相談窓口|無料相談はこちら/,
+  /プレゼント[！!]/,
+  /情シス部門の方必見/,
+  /セキュリティ対策の基礎知識/,
+  /セキュリティ対策で何をして良いかわからない/,
+  /^(画像|写真|イラスト|図)[:：]/,
+  /^(運営サービス|ユーザー様向け情報|ベンダー様向け情報|おすすめサービス|その他お知らせ|運営会社関連サービス|SNSでもご購読できます。?)$/,
+  /^(関連コラム|関連記事)/,
+  /→\s*$/
+];
+function cleanBody(text){
+  const lines=String(text==null?'':text).split(/\r?\n/),out=[];
+  const noisy=s=>NOISE.some(r=>r.test(s));
+  for(let k=0;k<lines.length;k++){
+    const t=lines[k].trim();
+    if(!t) continue;
+    if(/^(この記事の|このページの)?目次$/.test(t)){ while(k+1<lines.length&&lines[k+1].trim()&&/^\s*(\d+[\.．)）]|[・*\-])\s*\S/.test(lines[k+1])) k++; continue; }
+    const hd=t.match(/^■\s*(.*)$/);
+    if(hd){ const h=hd[1].trim(); if(!h||noisy(h)) continue; out.push('■ '+h); continue; }
+    if(noisy(t)) continue;
+    out.push(t);
+  }
+  return out.filter((l,i)=>!(/^■ /.test(l)&&(i===out.length-1||/^■ /.test(out[i+1])))).join('\n');
+}
 function secHtml(v){
   v=v==null?'':String(v);
   if(!v.trim()) return '<p class="note">この項目はまだ整理されていません。Excelの「漏洩事例」シートに入力すると、ここに表示されます。</p>';
@@ -275,7 +305,7 @@ function renderList(){
 const BODY_TAB={id:"body",label:"サイトの記載"};
 const BODY_NOTE='<p class="note" style="margin-top:10px">サイトの記事本文を、そのまま取り込んだものです（AIによる整理はしていません）。著作権は元サイトにあります。社内での参照用としてお使いください。</p>';
 const LEAD_NOTE='<p class="note" style="margin-top:10px">元記事の冒頭の紹介だけです（AIによる整理は未実施）。全文は元記事で確認してください。</p>';
-const bodyPanel=x=>'<h3>'+(x.lead?'記事の冒頭（サイトの記載）':'記事の内容（サイトの記載）')+'</h3>'+plain(x.body)+'<div class="sources">出典：'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事</a>':'元記事')+'</div>'+(x.lead?LEAD_NOTE:BODY_NOTE);
+const bodyPanel=x=>plain(cleanBody(x.body))+'<div class="sources">出典：'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事</a>':'元記事')+'</div>'+(x.lead?LEAD_NOTE:BODY_NOTE);
 function renderDetail(){
   const x=INDEX.find(i=>i.id===st.sel);
   if(!x){ $('detail').innerHTML='<div class="panel"><p class="lead">左の一覧から事例を選んでください。</p><p class="note">青い点のついた事例は、発生日・概要・発覚の経緯・リスク・原因・対処・導入業者としての対策の7項目を整理済みです。白抜きの点は、サイトの記事本文をそのまま取り込んだ事例です。★は特に重要な事例（最優先）、☆は次点です。</p></div>'; return; }
@@ -285,7 +315,7 @@ function renderDetail(){
     const d=D[x.detail], tabs=SECTIONS.concat(x.body?[BODY_TAB]:[]);
     let si=tabs.findIndex(s=>s.id===st.sec); if(si<0) si=0;
     const s=tabs[si], prev=tabs[si-1], next=tabs[si+1];
-    const content=s.id==='body'?plain(x.body)+BODY_NOTE:secHtml(d.sections[s.id]);
+    const content=s.id==='body'?plain(cleanBody(x.body))+BODY_NOTE:secHtml(d.sections[s.id]);
     $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+fmtDate(x.o)+' '+esc(x.ot)+(x.ot!=='公表'?'（公表 '+fmtDate(x.d)+'）':'')+'　'+esc(d.sub)+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+esc(d.title)+'</h2>'+(x.imp&&x.why?'<p class="why">'+(x.imp===2?'最優先':'次点')+'：'+esc(x.why)+'</p>':'')+'<div class="facts">'+d.facts.map(f=>'<div>'+esc(f[0])+'<strong>'+esc(f[1])+'</strong></div>').join('')+'</div></div>'+
       '<div class="sectabs" role="tablist" aria-label="項目">'+tabs.map(z=>'<button role="tab" data-sec="'+z.id+'" aria-selected="'+(z.id===s.id)+'">'+z.label+'</button>').join('')+'</div>'+
       '<div class="panel" role="tabpanel"><h3>'+s.label+'</h3>'+content+

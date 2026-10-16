@@ -116,10 +116,44 @@ function fetchPage_(url) {
   throw new Error('リダイレクトが多すぎます');
 }
 
+/** サイトの本文から、広告・案内・画像クレジット・目次・空の見出しなどを除く（本文の内容は変えない） */
+var NOISE_ = [
+  /^[\s*＊\-–—■□●・→←>＞»›|｜]+$/,
+  /メルマガ登録|無料メルマガ|メルマガ会員登録/,
+  /無料会員登録|会員登録はこちら/,
+  /詳細はこちら|お申し込みはこちら|お申込みはこちら|資料請求はこちら|資料請求する|まとめて資料請求|お問い合わせはこちら|無料ダウンロード/,
+  /セキュリティ対策無料相談窓口|無料相談はこちら/,
+  /プレゼント[！!]/,
+  /情シス部門の方必見/,
+  /セキュリティ対策の基礎知識/,
+  /セキュリティ対策で何をして良いかわからない/,
+  /^(画像|写真|イラスト|図)[:：]/,
+  /^(運営サービス|ユーザー様向け情報|ベンダー様向け情報|おすすめサービス|その他お知らせ|運営会社関連サービス|SNSでもご購読できます。?)$/,
+  /^(関連コラム|関連記事)/,
+  /→\s*$/
+];
+function cleanLines_(text) {
+  var lines = String(text == null ? '' : text).split(/\r?\n/), out = [];
+  function noisy(t) { return NOISE_.some(function (r) { return r.test(t); }); }
+  for (var k = 0; k < lines.length; k++) {
+    var t = lines[k].trim();
+    if (!t) continue;
+    if (/^(この記事の|このページの)?目次$/.test(t)) {
+      while (k + 1 < lines.length && lines[k + 1].trim() && /^\s*(\d+[\.．)）]|[・*\-])\s*\S/.test(lines[k + 1])) k++;
+      continue;
+    }
+    var hd = t.match(/^■\s*(.*)$/);
+    if (hd) { var h = hd[1].trim(); if (!h || noisy(h)) continue; out.push('■ ' + h); continue; }
+    if (noisy(t)) continue;
+    out.push(t);
+  }
+  return out.filter(function (l, i) { return !(/^■ /.test(l) && (i === out.length - 1 || /^■ /.test(out[i + 1]))); }).join('\n');
+}
+
 var TAIL_MARKERS = ['関連コラム', 'SNSでもご購読', 'この記事を書いた人', '関連記事', 'おすすめ記事'];
 
 function toText_(h) {
-  var t = String(h).replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr|td)>/gi, '\n').replace(/<[^>]+>/g, '');
+  var t = String(h).replace(/<br\s*\/?>|<\/?(p|div|li|ul|ol|h[1-6]|tr|td|section)\b[^>]*>/gi, '\n').replace(/<[^>]+>/g, '');
   t = unescape_(t);
   return t.split('\n').map(function (l) { return l.replace(/[ \t\u3000]+/g, ' ').trim(); }).filter(Boolean).join('\n');
 }
@@ -250,7 +284,7 @@ function handleArticle_(req) {
   countToday_();
   var page = fetchPage_(url);
   var desc = metaDescription_(page.html);
-  var body = htmlToText_(page.html);
+  var body = cleanLines_(htmlToText_(page.html));
   var key = props_().getProperty('ANTHROPIC_API_KEY');
   var reason = key ? '' : 'GASに ANTHROPIC_API_KEY が未設定です';
   if (key && req.mode !== 'meta') {
