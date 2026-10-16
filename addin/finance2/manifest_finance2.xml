@@ -6,11 +6,11 @@
   xsi:type="TaskPaneApp">
 
   <Id>5b6e2f41-9c7d-4a38-b1e5-0f2d8c93a6e7</Id>
-  <Version>1.0.0.0</Version>
-  <ProviderName>RightArm</ProviderName>
+  <Version>1.0.2.0</Version>
+  <ProviderName>JapanBusinessAssist</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
-  <DisplayName DefaultValue="finance2"/>
+  <DisplayName DefaultValue="finance"/>
   <Description DefaultValue="合計残高試算表PDFの取込と、BS・PLのダッシュボード"/>
 
   <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/finance2/icons/icon-32.png"/>
@@ -85,8 +85,8 @@
         <bt:Url id="Commands.Html" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/finance2/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Finance2GroupLabel" DefaultValue="財務"/>
-        <bt:String id="ShowFinance2ButtonLabel" DefaultValue="finance2"/>
+        <bt:String id="Finance2GroupLabel" DefaultValue="finance"/>
+        <bt:String id="ShowFinance2ButtonLabel" DefaultValue="BS/PL"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="ShowFinance2ButtonTooltip" DefaultValue="試算表PDFの取込とBS・PLダッシュボードを表示します"/>
