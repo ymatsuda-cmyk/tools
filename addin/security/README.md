@@ -5,7 +5,7 @@ Webページ「情報漏洩対策集」のデータ（JSON）をExcelに保存�
 ## ファイル構成
 
 ```
-manifest.xml      アドインの定義（Excelに読み込ませるファイル）
+manifest._securityxml      アドインの定義（Excelに読み込ませるファイル）
 taskpane.html     作業ウィンドウの画面
 taskpane.js       Excelへの書き込み・読み取り処理
 taskpane.css      画面の見た目
@@ -18,15 +18,15 @@ Officeアドインは HTTPS で配信されている必要があります。
 
 1. このフォルダは `ymatsuda-cmyk/tools` リポジトリの `addin/security/` に置いてある（GitHub Pages で公開される）
 2. 公開URL：`https://ymatsuda-cmyk.github.io/tools/addin/security/`
-3. `manifest.xml` のURLはこの公開URLに合わせて設定済みなので、置き換えは不要
+3. `manifest._securityxml` のURLはこの公開URLに合わせて設定済みなので、置き換えは不要
 
-公開先を変える場合は、`manifest.xml` 内の `https://ymatsuda-cmyk.github.io/tools/addin/security` をすべて置き換えてください。
+公開先を変える場合は、`manifest._securityxml` 内の `https://ymatsuda-cmyk.github.io/tools/addin/security` をすべて置き換えてください。
 
 ## 2. Excelへの追加（サイドロード）
 
-- **Excel on the web**：挿入 › アドイン › 個人用アドインのアップロード › `manifest.xml` を選択
-- **Windows版Excel**：manifest.xml を置いたフォルダを共有フォルダにし、ファイル › オプション › トラストセンター › 信頼できるアドインカタログ に共有パスを登録 › Excelを再起動 › 挿入 › 個人用アドイン › 共有フォルダー
-- **Mac版Excel**：`~/Library/Containers/com.microsoft.Excel/Data/Documents/wef/` に manifest.xml をコピー › Excelを再起動 › 挿入 › 個人用アドイン
+- **Excel on the web**：挿入 › アドイン › 個人用アドインのアップロード › `manifest._securityxml` を選択
+- **Windows版Excel**：manifest._securityxml を置いたフォルダを共有フォルダにし、ファイル › オプション › トラストセンター › 信頼できるアドインカタログ に共有パスを登録 › Excelを再起動 › 挿入 › 個人用アドイン › 共有フォルダー
+- **Mac版Excel**：`~/Library/Containers/com.microsoft.Excel/Data/Documents/wef/` に manifest._securityxml をコピー › Excelを再起動 › 挿入 › 個人用アドイン
 - **社内配布**：Microsoft 365 管理センター › 統合アプリ からマニフェストを展開
 
 追加すると「ホーム」タブに「情報漏洩対策 › 対策集 連携」ボタンが出ます。
