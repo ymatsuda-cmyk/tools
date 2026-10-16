@@ -137,6 +137,7 @@ td:first-child{white-space:nowrap;font-weight:700}
   header.top{padding:12px 14px}
   .mixbar button{font-size:0}
 }
+.dot2{background:transparent;border:1.5px solid var(--accent);box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -204,11 +205,13 @@ function sanitize(html){
 }
 function plain(v){
   const lines=String(v).split(/\r?\n/);let out='',list=false;
-  lines.forEach(l=>{
+  for(const l of lines){
+    const hd=l.match(/^\s*■\s*(.+)$/);
+    if(hd){ if(list){out+='</ul>';list=false;} out+='<h4>'+esc(hd[1])+'</h4>'; continue; }
     const m=l.match(/^\s*[・\-－●]\s*(.*)$/);
     if(m){ if(!list){out+='<ul>';list=true;} out+='<li>'+esc(m[1])+'</li>'; }
     else{ if(list){out+='</ul>';list=false;} if(l.trim()) out+='<p>'+esc(l)+'</p>'; }
-  });
+  }
   if(list)out+='</ul>';
   return out;
 }
@@ -226,10 +229,11 @@ function load(cases){
   (cases||[]).forEach(c=>{
     if(!c||!c.id) return;
     const pub=isDate(c.pub)?c.pub:(isDate(c.got)?c.got:'1970-01-01');
-    const hasDetail=!!(c.title||SEC_KEYS.some(k=>c['sec_'+k]));
+    const onlyLead=!c.title&&!!c.sec_summary&&!c.body&&c.method!=='AI'&&(c.method==='紹介文'||/^元記事\|/.test(c.sources||''))&&!SEC_KEYS.some(k=>k!=='summary'&&c['sec_'+k]);
+    const hasDetail=!onlyLead&&!!(c.title||SEC_KEYS.some(k=>c['sec_'+k]));
     const x={id:String(c.id),d:pub,co:c.co||'',svc:c.svc||'',n:Number(c.n)||0,nt:c.nt||'',
       cat:CATS[c.cat]?c.cat:'other',s:c.summary||'',url:safeUrl(c.url),rel:c.rel||'',
-      detail:hasDetail?String(c.id):null,method:c.method||'',
+      detail:hasDetail?String(c.id):null,method:c.method||'',body:onlyLead?String(c.sec_summary):(c.body||''),lead:onlyLead,
       o:isDate(c.base)?c.base:pub,ot:c.baseType||'公表',imp:Number(c.imp)||0,why:c.impWhy||'',got:c.got||''};
     INDEX.push(x);
     if(hasDetail){
@@ -265,25 +269,35 @@ function renderList(){
   $('cases').innerHTML=a.length?a.map(x=>{
     const m=x.o.slice(0,7);let h='';
     if(st.sort==='date'&&m!==lastM){lastM=m;h='<li class="mh">'+(+m.slice(5))+'月<small>'+a.filter(z=>z.o.slice(0,7)===m).length+'件</small></li>';}
-    return h+'<li><button data-id="'+esc(x.id)+'" aria-current="'+(x.id===st.sel)+'"><span class="stripe" style="background:'+CATS[x.cat].color+'"></span><span class="co">'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'" title="'+(x.imp===2?'最優先':'次点')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+(x.detail?'<span class="dot" title="詳細あり"></span>':'')+esc(x.co||x.svc||'（企業名は元記事を確認）')+(x.co&&x.svc?'<small>'+esc(x.svc)+'</small>':'')+'</span><span class="num">'+esc(x.nt||'')+'</span><span class="meta"><b class="dt">'+shortDate(x.o)+'</b><i class="ot">'+esc(x.ot)+'</i>　'+esc(x.s)+'</span></button></li>';
+    return h+'<li><button data-id="'+esc(x.id)+'" aria-current="'+(x.id===st.sel)+'"><span class="stripe" style="background:'+CATS[x.cat].color+'"></span><span class="co">'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'" title="'+(x.imp===2?'最優先':'次点')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+(x.detail?'<span class="dot" title="詳細あり"></span>':x.body?'<span class="dot dot2" title="サイトの本文を取り込み済み"></span>':'')+esc(x.co||x.svc||'（企業名は元記事を確認）')+(x.co&&x.svc?'<small>'+esc(x.svc)+'</small>':'')+'</span><span class="num">'+esc(x.nt||'')+'</span><span class="meta"><b class="dt">'+shortDate(x.o)+'</b><i class="ot">'+esc(x.ot)+'</i>　'+esc(x.s)+'</span></button></li>';
   }).join(''):'<li class="empty">'+(INDEX.length?'条件に合う事例がありません。検索語や絞り込みを外してください。':'事例がありません。アドインの「情報取得」を押してください。')+'</li>';
 }
+const BODY_TAB={id:"body",label:"サイトの記載"};
+const BODY_NOTE='<p class="note" style="margin-top:10px">サイトの記事本文を、そのまま取り込んだものです（AIによる整理はしていません）。著作権は元サイトにあります。社内での参照用としてお使いください。</p>';
+const LEAD_NOTE='<p class="note" style="margin-top:10px">元記事の冒頭の紹介だけです（AIによる整理は未実施）。全文は元記事で確認してください。</p>';
+const bodyPanel=x=>'<h3>'+(x.lead?'記事の冒頭（サイトの記載）':'記事の内容（サイトの記載）')+'</h3>'+plain(x.body)+'<div class="sources">出典：'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事</a>':'元記事')+'</div>'+(x.lead?LEAD_NOTE:BODY_NOTE);
 function renderDetail(){
   const x=INDEX.find(i=>i.id===st.sel);
-  if(!x){ $('detail').innerHTML='<div class="panel"><p class="lead">左の一覧から事例を選んでください。</p><p class="note">青い点のついた事例は、発生日・概要・発覚の経緯・リスク・原因・対処・導入業者としての対策の7項目を整理済みです。★は特に重要な事例（最優先）、☆は次点です。</p></div>'; return; }
+  if(!x){ $('detail').innerHTML='<div class="panel"><p class="lead">左の一覧から事例を選んでください。</p><p class="note">青い点のついた事例は、発生日・概要・発覚の経緯・リスク・原因・対処・導入業者としての対策の7項目を整理済みです。白抜きの点は、サイトの記事本文をそのまま取り込んだ事例です。★は特に重要な事例（最優先）、☆は次点です。</p></div>'; return; }
   const c=CATS[x.cat];
   const backBtn='<button class="back" data-back>一覧に戻る</button>';
   if(x.detail&&D[x.detail]){
-    const d=D[x.detail], si=SECTIONS.findIndex(s=>s.id===st.sec), s=SECTIONS[si<0?0:si], idx=si<0?0:si, prev=SECTIONS[idx-1], next=SECTIONS[idx+1];
+    const d=D[x.detail], tabs=SECTIONS.concat(x.body?[BODY_TAB]:[]);
+    let si=tabs.findIndex(s=>s.id===st.sec); if(si<0) si=0;
+    const s=tabs[si], prev=tabs[si-1], next=tabs[si+1];
+    const content=s.id==='body'?plain(x.body)+BODY_NOTE:secHtml(d.sections[s.id]);
     $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+fmtDate(x.o)+' '+esc(x.ot)+(x.ot!=='公表'?'（公表 '+fmtDate(x.d)+'）':'')+'　'+esc(d.sub)+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+esc(d.title)+'</h2>'+(x.imp&&x.why?'<p class="why">'+(x.imp===2?'最優先':'次点')+'：'+esc(x.why)+'</p>':'')+'<div class="facts">'+d.facts.map(f=>'<div>'+esc(f[0])+'<strong>'+esc(f[1])+'</strong></div>').join('')+'</div></div>'+
-      '<div class="sectabs" role="tablist" aria-label="項目">'+SECTIONS.map(z=>'<button role="tab" data-sec="'+z.id+'" aria-selected="'+(z.id===s.id)+'">'+z.label+'</button>').join('')+'</div>'+
-      '<div class="panel" role="tabpanel"><h3>'+s.label+'</h3>'+secHtml(d.sections[s.id])+
+      '<div class="sectabs" role="tablist" aria-label="項目">'+tabs.map(z=>'<button role="tab" data-sec="'+z.id+'" aria-selected="'+(z.id===s.id)+'">'+z.label+'</button>').join('')+'</div>'+
+      '<div class="panel" role="tabpanel"><h3>'+s.label+'</h3>'+content+
       '<div class="pager"><button data-sec="'+(prev?prev.id:'')+'"'+(prev?'':' disabled')+'>'+(prev?'前へ：'+prev.label:'')+'</button><button data-sec="'+(next?next.id:'')+'"'+(next?'':' disabled')+'>'+(next?'次へ：'+next.label:'')+'</button></div>'+
       '<div class="sources">出典：'+d.sources.map(z=>'<a href="'+esc(z[1])+'" target="_blank" rel="noopener noreferrer">'+esc(z[0])+'</a>').join('')+'</div>'+(x.method==='AI'?'<p class="note" style="margin-top:10px">この詳細は、元記事をもとにAIが整理した内容です。誤りや抜けがあるかもしれません。必ず元記事で確認してください（修正はExcelの「漏洩事例」シートで行えます）。</p>':'')+(x.method==='紹介文'?'<p class="note" style="margin-top:10px">この概要は元記事の冒頭の紹介だけです。発覚の経緯・リスク・原因・対処などは、AIによる整理を行うと入ります（アドインの「元記事から詳細を整理」。設定はREADMEを参照）。</p>':'')+'</div>';
+  }else if(x.body){
+    $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+esc(x.co||'企業名は元記事を確認')+'　'+fmtDate(x.o)+' '+esc(x.ot)+(x.ot!=='公表'?'（公表 '+fmtDate(x.d)+'）':'')+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+esc(x.svc||x.s||x.co)+'</h2>'+(x.nt?'<div class="facts"><div>規模<strong>'+esc(x.nt)+'</strong></div></div>':'')+'</div>'+
+      '<div class="panel">'+bodyPanel(x)+'</div>';
   }else{
     $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+esc(x.co||'企業名は元記事を確認')+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+esc(x.svc||x.s||x.co)+'</h2></div>'+
       '<div class="panel"><div class="stub"><dl>'+(x.ot!=='公表'?'<dt>'+esc(x.ot)+'日</dt><dd>'+fmtDate(x.o)+'</dd>':'')+'<dt>公表日</dt><dd>'+fmtDate(x.d)+'</dd><dt>規模</dt><dd>'+esc(x.nt||'未公表・調査中')+'</dd><dt>概要</dt><dd>'+esc(x.s)+'</dd>'+(x.rel?'<dt>関連</dt><dd>'+esc(x.rel)+'</dd>':'')+(x.got?'<dt>取得日</dt><dd>'+esc(x.got)+'</dd>':'')+'</dl>'+
-      '<p class="note">この事例は一覧情報のみです。自動更新で元記事から詳細が整理されると、アドインの「情報取得」で補われます。Excelの「漏洩事例」シートの詳細列（発生日〜導入業者としての対策）に直接入力することもできます。</p>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事を開く</a>':'')+'</div></div>';
+      '<p class="note">この事例は一覧情報のみです。アドインの「情報取得」で元記事の内容が取り込まれます。Excelの「漏洩事例」シートに直接入力することもできます。</p>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事を開く</a>':'')+'</div></div>';
   }
 }
 function notifyParent(){ if(EMBEDDED) try{parent.postMessage({type:'leak-cases-select',id:st.sel,sec:st.sec},'*')}catch(e){} }
@@ -309,7 +323,7 @@ $('month').addEventListener('change',e=>{st.month=e.target.value;render();});
 $('onlyDetail').addEventListener('change',e=>{st.only=e.target.checked; render();});
 function asof(){
   const got=INDEX.map(x=>x.got).filter(isDate).sort().pop();
-  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）';
+  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、本文のみ '+INDEX.filter(x=>!x.detail&&x.body).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）';
 }
 function apply(cases,sel,sec){
   load(cases);

@@ -737,7 +737,7 @@ function vData(){
 /* ---------- 事例（Excelの「漏洩事例」シートに蓄積し、そこから読み込む） ---------- */
 var CASE_SHEET='漏洩事例',CASE_LS='leak-cases-v1',FEED_URL='cases-feed.json';
 var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先・クラウド経由'],['ransom','ランサムウェア・マルウェア'],['acct','メール・アカウント乗っ取り'],['human','誤送信・設定ミス・人的'],['other','改ざん・その他']];
-var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method']];
+var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method'],['記事本文','body']];
 var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
 function catLabel(code){for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][0]===code)return CASE_CATS[i][1];return CASE_CATS[5][1]}
 function catCode(label){label=String(label==null?'':label).trim();for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][1]===label||CASE_CATS[i][0]===label)return CASE_CATS[i][0];return 'other'}
@@ -810,7 +810,7 @@ function xlWriteCases(list){
       xtable(ws,rows,'tblLeakCases','事例');
       return xlStep('事例の書き込み',ctx.sync());
     }).then(function(){
-      xwidths(ws,'事例',[70,90,90,70,160,160,80,100,160,70,200,280,100,220,120,90,200,160,200,240,240,240,240,240,240,240,240,80]);
+      xwidths(ws,'事例',[70,90,90,70,160,160,80,100,160,70,200,280,100,220,120,90,200,160,200,240,240,240,240,240,240,240,240,80,400]);
       xdeco('原因タイプの選択リスト',function(){
         var rg=ws.getRangeByIndexes(1,8,Math.max(list.length,1)+300,1);
         rg.dataValidation.clear();
@@ -912,16 +912,16 @@ function gasTargets(n){
 }
 /* 機械が入れた「紹介文だけ」の行か（旧版が入れた途中で切れた紹介文も含む。手で書いた概要は含まない） */
 function isMetaOnly(c){
-  return !c.title&&!!c.sec_summary&&c.method!=='AI'&&(c.method==='紹介文'||/^元記事\|/.test(c.sources||''))&&
+  return !c.title&&!!(c.sec_summary||c.body)&&c.method!=='AI'&&(c.method==='紹介文'||c.method==='本文'||/^元記事\|/.test(c.sources||''))&&
     !['sec_date','sec_discovery','sec_risk','sec_cause','sec_response','sec_vendor'].some(function(k){return c[k]});
 }
 function applyEnrich(c,r){
   var ch=false;
-  if(isMetaOnly(c)){   /* 機械が入れた紹介文は、AIの整理・より完全な紹介文で置き換える */
+  if(isMetaOnly(c)){   /* 機械が入れた紹介文・本文は、AIの整理や、より完全な本文で置き換える */
     if(r.method==='AI'){c.sec_summary=r.sec_summary||c.sec_summary;c.sources=r.sources||c.sources;c.method='AI';ch=true}
-    else if(r.method==='紹介文'&&r.sec_summary&&r.sec_summary!==c.sec_summary){c.sec_summary=r.sec_summary;c.method='紹介文';ch=true}
+    else if(r.method==='本文'&&r.body&&(r.body!==c.body||c.sec_summary)){c.body=r.body;c.sec_summary='';c.method='本文';c.sources=r.sources||c.sources;ch=true}
   }
-  ['co','svc','title','sub','nt','facts','sources','method'].concat(SEC_FIELDS).forEach(function(k){if(!c[k]&&r[k]){c[k]=r[k];ch=true}});
+  ['co','svc','title','sub','nt','facts','sources','method','body'].concat(SEC_FIELDS).forEach(function(k){if(!c[k]&&r[k]){c[k]=r[k];ch=true}});
   if(!c.n&&r.n){c.n=r.n;ch=true}
   if((!c.cat||c.cat==='other')&&r.cat&&r.cat!=='other'){c.cat=r.cat;ch=true}
   if(/^\d{4}-\d{2}-\d{2}$/.test(r.base||'')&&(!c.base||c.base===c.pub)){c.base=r.base;if(r.baseType)c.baseType=r.baseType;ch=true}
@@ -953,7 +953,7 @@ function casesEnrichMsg(en){
   if(!en)return '';
   if(en.none)return '整理する記事はありません';
   var ai=en.done-en.meta;
-  return '元記事から '+en.done+'件を取得（AIで整理 '+ai+'件'+(en.meta?'、紹介文のみ '+en.meta+'件［'+(en.metaReason||'AIを使えませんでした')+'］':'')+'）'+(en.failed?'。失敗 '+en.failed+'件'+(en.err?'：'+en.err:''):'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
+  return '元記事から '+en.done+'件を取得（AIで整理 '+ai+'件'+(en.meta?'、サイトの本文のまま '+en.meta+'件［'+(en.metaReason||'AIを使えませんでした')+'］':'')+'）'+(en.failed?'。失敗 '+en.failed+'件'+(en.err?'：'+en.err:''):'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
 }
 function casesEnrich(){
   if(CS.busy)return Promise.resolve();

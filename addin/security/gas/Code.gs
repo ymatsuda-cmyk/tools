@@ -127,6 +127,7 @@ function toText_(h) {
 /** article → main → ページ全体の順に、十分な長さ（200字以上）のものを使う。関連記事・広告の末尾は切る */
 function htmlToText_(html, limit) {
   var t = String(html).replace(/<(script|style|noscript|nav|header|footer|aside|form|svg)[^>]*>[\s\S]*?<\/\1>/gi, '');
+  t = t.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, function (m, inner) { return '\n■ ' + inner.replace(/<[^>]+>/g, '') + '\n'; });
   var text = '';
   var rxs = [/<article[^>]*>([\s\S]*?)<\/article>/i, /<main[^>]*>([\s\S]*?)<\/main>/i];
   for (var i = 0; i < rxs.length && !text; i++) {
@@ -236,6 +237,13 @@ function parseJson_(text) {
   return JSON.parse(m ? m[0] : t);
 }
 
+/** AIが使えないときに、サイトの記載をそのまま見せるための本文（冒頭の段落から。上限あり） */
+function displayBody_(text, lead) {
+  var t = text;
+  if (lead) { var i = t.indexOf(lead.slice(0, 30)); if (i > 0) t = t.slice(i); }
+  return t.slice(0, 20000);
+}
+
 function handleArticle_(req) {
   var url = String(req.url || '').trim();
   checkUrl_(url);
@@ -257,7 +265,9 @@ function handleArticle_(req) {
     }
   }
   var lead = leadParagraph_(body, desc);
-  if (!lead && !desc) return { ok: false, error: reason || '記事の紹介文を取り出せませんでした' };
-  // AIが使えないとき：記事冒頭の紹介（短い）だけを概要に入れる
-  return { ok: true, mode: 'meta', reason: reason, warn: reason, result: { sec_summary: lead || desc, sources: '元記事|' + page.url, method: '紹介文' } };
+  var disp = displayBody_(body, lead);
+  var text = disp.length >= 80 ? disp : (lead || desc);
+  if (!text) return { ok: false, error: reason || '記事の本文を取り出せませんでした' };
+  // AIが使えないとき：7項目に無理に分けず、サイトの記載をそのまま本文として返す
+  return { ok: true, mode: 'text', reason: reason, warn: reason, result: { body: text, sources: '元記事|' + page.url, method: '本文' } };
 }
