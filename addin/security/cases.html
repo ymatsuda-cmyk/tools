@@ -229,7 +229,7 @@ function load(cases){
     const hasDetail=!!(c.title||SEC_KEYS.some(k=>c['sec_'+k]));
     const x={id:String(c.id),d:pub,co:c.co||'',svc:c.svc||'',n:Number(c.n)||0,nt:c.nt||'',
       cat:CATS[c.cat]?c.cat:'other',s:c.summary||'',url:safeUrl(c.url),rel:c.rel||'',
-      detail:hasDetail?String(c.id):null,
+      detail:hasDetail?String(c.id):null,method:c.method||'',
       o:isDate(c.base)?c.base:pub,ot:c.baseType||'公表',imp:Number(c.imp)||0,why:c.impWhy||'',got:c.got||''};
     INDEX.push(x);
     if(hasDetail){
@@ -279,11 +279,11 @@ function renderDetail(){
       '<div class="sectabs" role="tablist" aria-label="項目">'+SECTIONS.map(z=>'<button role="tab" data-sec="'+z.id+'" aria-selected="'+(z.id===s.id)+'">'+z.label+'</button>').join('')+'</div>'+
       '<div class="panel" role="tabpanel"><h3>'+s.label+'</h3>'+secHtml(d.sections[s.id])+
       '<div class="pager"><button data-sec="'+(prev?prev.id:'')+'"'+(prev?'':' disabled')+'>'+(prev?'前へ：'+prev.label:'')+'</button><button data-sec="'+(next?next.id:'')+'"'+(next?'':' disabled')+'>'+(next?'次へ：'+next.label:'')+'</button></div>'+
-      '<div class="sources">出典：'+d.sources.map(z=>'<a href="'+esc(z[1])+'" target="_blank" rel="noopener noreferrer">'+esc(z[0])+'</a>').join('')+'</div></div>';
+      '<div class="sources">出典：'+d.sources.map(z=>'<a href="'+esc(z[1])+'" target="_blank" rel="noopener noreferrer">'+esc(z[0])+'</a>').join('')+'</div>'+(x.method==='AI'?'<p class="note" style="margin-top:10px">この詳細は、元記事をもとにAIが整理した内容です。誤りや抜けがあるかもしれません。必ず元記事で確認してください（修正はExcelの「漏洩事例」シートで行えます）。</p>':'')+'</div>';
   }else{
     $('detail').innerHTML=backBtn+'<div class="dh"><div class="kicker">'+esc(x.co||'企業名は元記事を確認')+'<span class="tag" style="background:'+c.color+'">'+c.label+'</span></div><h2>'+esc(x.svc||x.s||x.co)+'</h2></div>'+
       '<div class="panel"><div class="stub"><dl>'+(x.ot!=='公表'?'<dt>'+esc(x.ot)+'日</dt><dd>'+fmtDate(x.o)+'</dd>':'')+'<dt>公表日</dt><dd>'+fmtDate(x.d)+'</dd><dt>規模</dt><dd>'+esc(x.nt||'未公表・調査中')+'</dd><dt>概要</dt><dd>'+esc(x.s)+'</dd>'+(x.rel?'<dt>関連</dt><dd>'+esc(x.rel)+'</dd>':'')+(x.got?'<dt>取得日</dt><dd>'+esc(x.got)+'</dd>':'')+'</dl>'+
-      '<p class="note">この事例は一覧情報のみです。Excelの「漏洩事例」シートの詳細列（発生日〜導入業者としての対策）に入力すると、7項目の詳細が表示されます。</p>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事を開く</a>':'')+'</div></div>';
+      '<p class="note">この事例は一覧情報のみです。自動更新で元記事から詳細が整理されると、アドインの「情報取得」で補われます。Excelの「漏洩事例」シートの詳細列（発生日〜導入業者としての対策）に直接入力することもできます。</p>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">元記事を開く</a>':'')+'</div></div>';
   }
 }
 function notifyParent(){ if(EMBEDDED) try{parent.postMessage({type:'leak-cases-select',id:st.sel,sec:st.sec},'*')}catch(e){} }

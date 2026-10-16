@@ -182,6 +182,10 @@ dialog::backdrop{background:rgba(10,14,20,.55)}
   .acchead .scope{border-left:none;padding-left:20px;flex:1 1 100%;min-height:40px}
   .acchead>button{padding:0 14px}
 }
+.lacc>button{width:100%;min-height:52px;display:flex;align-items:center;gap:12px;padding:0 20px;border:none;background:transparent;text-align:left;cursor:pointer;color:inherit}
+.lacc>button .t{flex:1;font-weight:700;font-size:16px}
+.lacc>button .c{font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
+.laccbody{padding:12px 20px 18px;border-top:1px solid var(--line2)}
 .casebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .caseframe{display:block;width:100%;height:560px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 </style>
@@ -607,6 +611,13 @@ function stackBar(o){
 var LEGEND='<div class="legend"><span><span class="sw" style="background:var(--ok)"></span>OK</span><span><span class="sw" style="background:var(--ng)"></span>要対応</span><span><span class="sw" style="background:var(--na)"></span>対象外</span><span><span class="sw" style="background:var(--none);border:1px solid var(--line)"></span>未点検</span></div>';
 
 /* ---------- views ---------- */
+function lacc(key,title,count,body){
+  UI.lacc=UI.lacc||{};
+  var open=UI.lacc[key]!==false;
+  return '<section class="acc lacc"><button data-act="lacc" data-id="'+key+'" aria-expanded="'+open+'"><span class="t">'+title+'</span><span class="c">'+count+'</span>'+
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="'+(open?'M6 15l6-6 6 6':'M6 9l6 6 6-6')+'"></path></svg></button>'+
+    (open?'<div class="laccbody">'+body+'</div>':'')+'</section>';
+}
 function vLearn(){
   var q=UI.q.trim().toLowerCase();
   function hit(c){if(!q)return true;var t=[c.name,c.summary].concat(c.reasons,c.measures['予防'],c.measures['検知'],c.measures['事後対応'],c.checks.map(function(k){return k.text})).join('\n').toLowerCase();return t.indexOf(q)>=0}
@@ -623,9 +634,11 @@ function vLearn(){
     main='<section class="panel"><div class="toolbar"><div class="pills"><span class="pill '+sevCls(c.severity)+'">重要度 '+esc(c.severity)+'</span><span class="pill">発生しやすさ '+esc(c.likelihood)+'</span><span class="pill">責任：'+esc(c.owner)+'</span></div>'+
       '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="go-inspect" data-id="'+c.id+'">この起因を点検する</button><button class="btn small primary" data-act="edit-cause" data-id="'+c.id+'">編集</button></div></div>'+
       '<h1 class="h1">'+hl(c.name)+'</h1><p class="lead">'+hl(c.summary)+'</p></section>'+
-      '<div class="grid3"><section class="panel"><h2>原因</h2><ul class="plain">'+c.reasons.map(function(r){return '<li>'+hl(r)+'</li>'}).join('')+'</ul></section>'+
-      '<section class="panel"><h2>対策</h2>'+(meas||'<div class="meta">未登録</div>')+'</section>'+
-      '<section class="panel"><h2>点検方法</h2><ol class="plain">'+c.checks.map(function(k){return '<li>'+hl(k.text)+'<div class="meta">頻度：'+esc(k.freq)+'</div></li>'}).join('')+'</ol></section></div>'+
+      '<div class="laccs" style="display:flex;flex-direction:column;gap:12px">'+
+      lacc('reasons','原因',c.reasons.length+'件','<ul class="plain">'+c.reasons.map(function(r){return '<li>'+hl(r)+'</li>'}).join('')+'</ul>')+
+      lacc('measures','対策',MTYPES.reduce(function(n,t){return n+(c.measures[t]||[]).length},0)+'件',meas||'<div class="meta">未登録</div>')+
+      lacc('checks','点検方法',c.checks.length+'項目','<ol class="plain">'+c.checks.map(function(k){return '<li>'+hl(k.text)+'<div class="meta">頻度：'+esc(k.freq)+'</div></li>'}).join('')+'</ol>')+
+      '</div>'+
       ((c.scopeQs||[]).length?'<section class="panel"><h2>対象判定の設問</h2><p class="meta" style="margin:0 0 6px">どれか1つでも「はい」なら、この起因の点検対象です。</p><ul class="plain">'+c.scopeQs.map(function(q){return '<li>'+hl(q.text)+'</li>'}).join('')+'</ul></section>':'')+
       '<div class="grid2"><section class="panel"><h2>関連事例・参考資料</h2>'+(c.refs.length?'<ul class="plain">'+c.refs.map(function(r){return '<li>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+esc(r.label||r.url)+'</a>':esc(r.label))+'</li>'}).join('')+'</ul>':'<div class="meta">未登録</div>')+'</section>'+
       '<section class="panel hist"><h2>更新履歴</h2>'+c.history.slice().reverse().map(function(h){return '<div><span class="d">'+esc(h.date)+'</span>'+esc(h.note)+'</div>'}).join('')+'</section></div>';
@@ -716,14 +729,15 @@ function vData(){
     (IN_EXCEL?'':'<button class="btn" data-act="export-json">JSONファイルで保存</button><label class="btn" style="display:inline-flex;align-items:center;cursor:pointer">JSONファイルを統合<input type="file" id="importFile" accept="application/json,.json" style="display:none"></label>')+'</div>'+
     '<label class="field"><span>JSON</span><textarea id="pasteBox" rows="4" placeholder="ここにJSONを貼り付け"></textarea></label>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" data-act="paste-replace">置き換えて読み込む</button><button class="btn" data-act="paste-merge">統合して読み込む</button></div></section>';
+  var gas=vGas();
   var rs='<section class="panel"><h2>点検結果のリセット</h2><p class="meta" style="margin:0 0 12px">次の点検サイクルを始めるときに使います。リセット前にJSONを控えておくと記録が残せます。</p><button class="btn danger" data-act="reset-results">点検結果をすべて消す</button></section>';
-  return '<div class="grid2">'+tg+'<div style="display:flex;flex-direction:column;gap:16px">'+store+bk+rs+'</div></div>';
+  return '<div class="grid2">'+tg+'<div style="display:flex;flex-direction:column;gap:16px">'+store+gas+bk+rs+'</div></div>';
 }
 
 /* ---------- 事例（Excelの「漏洩事例」シートに蓄積し、そこから読み込む） ---------- */
 var CASE_SHEET='漏洩事例',CASE_LS='leak-cases-v1',FEED_URL='cases-feed.json';
 var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先・クラウド経由'],['ransom','ランサムウェア・マルウェア'],['acct','メール・アカウント乗っ取り'],['human','誤送信・設定ミス・人的'],['other','改ざん・その他']];
-var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources']];
+var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method']];
 var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
 function catLabel(code){for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][0]===code)return CASE_CATS[i][1];return CASE_CATS[5][1]}
 function catCode(label){label=String(label==null?'':label).trim();for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][1]===label||CASE_CATS[i][0]===label)return CASE_CATS[i][0];return 'other'}
@@ -796,7 +810,7 @@ function xlWriteCases(list){
       xtable(ws,rows,'tblLeakCases','事例');
       return xlStep('事例の書き込み',ctx.sync());
     }).then(function(){
-      xwidths(ws,'事例',[70,90,90,70,160,160,80,100,160,70,200,280,100,220,120,90,200,160,200,240,240,240,240,240,240,240,240]);
+      xwidths(ws,'事例',[70,90,90,70,160,160,80,100,160,70,200,280,100,220,120,90,200,160,200,240,240,240,240,240,240,240,240,80]);
       xdeco('原因タイプの選択リスト',function(){
         var rg=ws.getRangeByIndexes(1,8,Math.max(list.length,1)+300,1);
         rg.dataValidation.clear();
@@ -868,28 +882,127 @@ function mergeCases(base,items){
   });
   return {list:list,added:added,filled:filled};
 }
+/* ---------- 元記事の取得（GAS中継）：情報取得のときに、元記事から詳細（7項目）を整理する ---------- */
+var GAS_LS='leak-gas-v1',GAS_SKIP_LS='leak-gas-skip-v1',GAS_INFO='';
+var SEC_FIELDS=['sec_date','sec_summary','sec_discovery','sec_risk','sec_cause','sec_response','sec_vendor'];
+function gasCfg(){try{var c=JSON.parse(localStorage.getItem(GAS_LS)||'null');return c&&c.url&&c.token?c:null}catch(e){return null}}
+function gasSave(c){try{localStorage.setItem(GAS_LS,JSON.stringify(c));return true}catch(e){return false}}
+function gasValidUrl(u){return /^https:\/\/script\.google\.com\/.+\/exec$/.test(String(u||'').trim())}
+function gasSkipLoad(){try{return JSON.parse(localStorage.getItem(GAS_SKIP_LS)||'{}')||{}}catch(e){return {}}}
+function gasMark(url){var m=gasSkipLoad();m[url]=Date.now();try{localStorage.setItem(GAS_SKIP_LS,JSON.stringify(m))}catch(e){}}
+function gasCall(cfg,payload){
+  payload.token=cfg.token;
+  return fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow',cache:'no-store'}).then(function(r){
+    if(!r.ok)throw new Error('GASから応答がありません（HTTP '+r.status+'）');
+    return r.text();
+  },function(){
+    throw new Error('GASに接続できません。URL（…/exec）と、公開設定（アクセスできるユーザー：全員）を確認してください');
+  }).then(function(t){
+    var j;try{j=JSON.parse(t)}catch(e){throw new Error('GASの応答を読み取れません。ウェブアプリのURLか、公開設定を確認してください')}
+    if(!j.ok)throw new Error(j.error==='unauthorized'?'トークンが違います':(j.error||'GASでエラーが発生しました'));
+    return j;
+  });
+}
+function gasTargets(n){
+  var skip=gasSkipLoad(),since=Date.now()-7*864e5;
+  return CASES.filter(function(c){return c.url&&!c.title&&!(skip[c.url]&&skip[c.url]>since)})
+    .sort(function(a,b){return String(b.pub).localeCompare(String(a.pub))}).slice(0,n);
+}
+function applyEnrich(c,r){
+  var ch=false;
+  ['co','svc','title','sub','nt','facts','sources','method'].concat(SEC_FIELDS).forEach(function(k){if(!c[k]&&r[k]){c[k]=r[k];ch=true}});
+  if(!c.n&&r.n){c.n=r.n;ch=true}
+  if((!c.cat||c.cat==='other')&&r.cat&&r.cat!=='other'){c.cat=r.cat;ch=true}
+  if(/^\d{4}-\d{2}-\d{2}$/.test(r.base||'')&&(!c.base||c.base===c.pub)){c.base=r.base;if(r.baseType)c.baseType=r.baseType;ch=true}
+  return ch;
+}
+/* 保存はしない（呼び出し側でまとめて保存する） */
+function casesEnrichRun(){
+  var cfg=gasCfg();if(!cfg)return Promise.resolve(null);
+  var t=gasTargets(cfg.n||5),res={done:0,failed:0,none:!t.length,stop:'',total:t.length,err:''};
+  var p=Promise.resolve();
+  t.forEach(function(c,i){
+    p=p.then(function(){
+      if(res.stop)return;
+      casesSetMsg('元記事を整理しています… '+(i+1)+' / '+t.length);
+      return gasCall(cfg,{action:'article',url:c.url}).then(function(j){
+        var r=j.result||{};
+        if(applyEnrich(c,r))res.done++;else res.failed++;
+        if(j.mode!=='ai'||!c.title)gasMark(c.url);   /* 紹介文だけだった記事は、しばらく再試行しない */
+      }).catch(function(e){
+        res.failed++;res.err=e.message;gasMark(c.url);
+        if(/トークン|接続できません|上限/.test(e.message))res.stop=e.message;
+      });
+    });
+  });
+  return p.then(function(){return res});
+}
+function casesSaveNow(){return IN_EXCEL?xlQueue(function(){return xlWriteCases(CASES)}):Promise.resolve(casesSaveLocal())}
+function casesEnrichMsg(en){
+  if(!en)return '';
+  if(en.none)return '整理する記事はありません';
+  return '元記事から '+en.done+'件を整理'+(en.failed?'（失敗 '+en.failed+'件'+(en.err?'：'+en.err:'')+'）':'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
+}
+function casesEnrich(){
+  if(CS.busy)return Promise.resolve();
+  if(!gasCfg()){notify('「データ管理」でGASのURLとトークンを設定してください',true);return Promise.resolve()}
+  CS.busy=true;casesSetMsg('元記事を整理しています…');
+  var en=null;
+  return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
+    CASES=l||[];return casesEnrichRun();
+  }).then(function(e){
+    en=e;return en&&en.done?casesSaveNow():null;
+  }).then(function(){
+    casesSetMsg(casesEnrichMsg(en)+(IN_EXCEL?warnTail():''));postCases();
+  }).catch(function(err){
+    var m='整理できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
+  }).then(function(){CS.busy=false});
+}
 function casesFetch(){
   if(CS.busy)return Promise.resolve();
   CS.busy=true;casesSetMsg('情報を取得しています…');
-  var cur=[],had=true;
+  var cur=[],had=true,feed=null,feedErr='',r={added:0,filled:0},en=null;
   return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
-    had=!!l;cur=l||[];return fetchFeed();
-  }).then(function(feed){
-    var r=mergeCases(cur,feed.items);CASES=r.list;
-    var need=r.added||r.filled||!had;
-    var save=!need?Promise.resolve():(IN_EXCEL?xlQueue(function(){return xlWriteCases(CASES)}):Promise.resolve(casesSaveLocal()));
-    return save.then(function(){
-      var when=feed.generatedAt?'（フィード更新 '+String(feed.generatedAt).replace('T',' ').slice(0,16)+'）':'';
-      casesSetMsg((r.added?'新規 '+r.added+'件を取り込みました。':r.filled?'既存の '+r.filled+'件の空欄を補いました。':'すでに最新です。')+when+(IN_EXCEL?warnTail():''));
-      postCases();
-    });
+    had=!!l;cur=l||[];CASES=cur;
+    return fetchFeed().then(function(f){feed=f},function(e){feedErr=e&&e.message?e.message:String(e)});
+  }).then(function(){
+    if(!feed&&!gasCfg())throw new Error(feedErr);
+    if(feed){r=mergeCases(cur,feed.items);CASES=r.list}
+    return gasCfg()?casesEnrichRun():null;
+  }).then(function(e){
+    en=e;
+    var need=r.added||r.filled||!had||(en&&en.done);
+    return need?casesSaveNow():null;
+  }).then(function(){
+    var parts=[];
+    if(feed){var when=feed.generatedAt?'（フィード更新 '+String(feed.generatedAt).replace('T',' ').slice(0,16)+'）':'';parts.push((r.added?'新規 '+r.added+'件を取り込みました':r.filled?'既存の '+r.filled+'件の空欄を補いました':'すでに最新です')+when)}
+    else parts.push('フィードを取得できませんでした（'+feedErr+'）');
+    if(en)parts.push(casesEnrichMsg(en));
+    casesSetMsg(parts.join('。')+(IN_EXCEL?warnTail():''));postCases();
   }).catch(function(err){
-    var m='取得できませんでした：'+(err&&err.message?err.message:err);
-    casesSetMsg(m);notify(m,true);
+    var m='取得できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
   }).then(function(){CS.busy=false});
 }
+function vGas(){
+  var c=gasCfg()||{url:'',token:'',n:5};
+  return '<section class="panel"><h2>元記事の取得（GAS）</h2>'+
+    '<p class="meta" style="margin:0 0 10px">「情報取得」のときに、元記事の内容を読んで詳細（7項目）を整理するための設定です。Google Apps Script（GAS）を中継に使います。設定の手順はREADMEを参照してください。</p>'+
+    '<label class="field"><span>GASウェブアプリのURL（…/exec）</span><input id="gasUrl" value="'+esc(c.url)+'" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>'+
+    '<label class="field" style="margin-top:8px"><span>トークン</span><input id="gasToken" type="password" value="'+esc(c.token)+'" autocomplete="off"></label>'+
+    '<label class="field" style="margin-top:8px"><span>1回の「情報取得」で整理する記事数</span><select id="gasN">'+[3,5,10,20].map(function(n){return '<option'+(n===(c.n||5)?' selected':'')+'>'+n+'</option>'}).join('')+'</select></label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary" data-act="gas-save">保存</button><button class="btn" data-act="gas-test">接続テスト</button><button class="btn" data-act="gas-clear">設定を消す</button></div>'+
+    '<p class="stline" id="gasInfo" style="margin-top:8px">'+esc(GAS_INFO)+'</p>'+
+    '<p class="hint" style="margin:6px 0 0">URLとトークンは、このPCのアドインの保存領域にだけ保存します（ブックには保存しません）。</p></section>';
+}
+function gasReadForm(){
+  var u=(document.getElementById('gasUrl').value||'').trim(),t=(document.getElementById('gasToken').value||'').trim(),n=parseInt(document.getElementById('gasN').value,10)||5;
+  return {url:u,token:t,n:n};
+}
+function gasInfo(m){GAS_INFO=m;var el=document.getElementById('gasInfo');if(el)el.textContent=m}
 function vCases(){
-  return '<div class="casebar no-print"><button class="btn primary" data-act="cases-fetch">情報取得</button><button class="btn" data-act="cases-reload">'+(IN_EXCEL?'Excelから再読み込み':'再読み込み')+'</button><span class="stline" id="caseMsg">'+esc(casesInfo())+'</span></div>'+
+  return '<div class="casebar no-print"><button class="btn primary" data-act="cases-fetch">情報取得</button>'+
+    (gasCfg()?'<button class="btn" data-act="cases-enrich">元記事から詳細を整理</button>':'')+
+    '<button class="btn" data-act="cases-reload">'+(IN_EXCEL?'Excelから再読み込み':'再読み込み')+'</button><span class="stline" id="caseMsg">'+esc(casesInfo())+'</span></div>'+
     '<iframe id="casesFrame" class="caseframe" src="cases.html" title="情報漏洩 事例ファイル" referrerpolicy="no-referrer"></iframe>';
 }
 
@@ -991,7 +1104,12 @@ root.addEventListener('click',function(e){
   }
   else if(a==='ans'){var qa=S.scopeA[UI.target]=S.scopeA[UI.target]||{};var qid=el.getAttribute('data-q'),qv=el.getAttribute('data-v');if(qa[qid]===qv)delete qa[qid];else qa[qid]=qv;changed();render()}
   else if(a==='jump'){UI.target=el.getAttribute('data-t');UI.tab='inspect';UI.open={};UI.open[id]=true;render();window.scrollTo(0,0)}
+  else if(a==='lacc'){UI.lacc=UI.lacc||{};UI.lacc[id]=(UI.lacc[id]===false);render()}
   else if(a==='cases-fetch'){casesFetch()}
+  else if(a==='cases-enrich'){casesEnrich()}
+  else if(a==='gas-save'){var f=gasReadForm();if(!f.url&&!f.token){gasInfo('URLとトークンを入力してください');return}if(!gasValidUrl(f.url)){gasInfo('URLは https://script.google.com/…/exec の形式で入力してください');return}if(f.token.length<12){gasInfo('トークンは12文字以上にしてください');return}gasInfo(gasSave(f)?'保存しました。「接続テスト」で確認できます':'保存できませんでした（このブラウザの保存領域が使えません）')}
+  else if(a==='gas-test'){var g=gasReadForm();if(!gasValidUrl(g.url)||!g.token){gasInfo('URLとトークンを入力して「保存」してから試してください');return}gasInfo('接続を確認しています…');gasCall(g,{action:'ping'}).then(function(j){gasInfo('接続できました（GASバージョン '+j.version+'／AI整理：'+(j.ai?'使えます':'未設定のため紹介文のみ')+'／取得できるサイト：'+(j.hosts||[]).join(', ')+'）')}).catch(function(e){gasInfo('接続できませんでした：'+e.message)})}
+  else if(a==='gas-clear'){try{localStorage.removeItem(GAS_LS);localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo('設定を消しました');render()}
   else if(a==='cases-reload'){casesReload(false)}
   else if(a==='add-target'){var inp=document.getElementById('newTarget');var n=inp.value.trim();if(!n)return;if(S.targets.find(function(t){return t.name===n})){notify('同じ名前の取引先があります',true);return}S.targets.push({name:n,inScope:true});changed();render()}
   else if(a==='del-target'){var i=+el.getAttribute('data-i');var t=S.targets[i];askConfirm('「'+t.name+'」と、その点検結果を削除します。よろしいですか？',function(){S.targets.splice(i,1);delete S.results[t.name];delete S.off[t.name];delete S.scopeA[t.name];if(UI.target===t.name)UI.target=S.targets[0]&&S.targets[0].name;changed();render()})}
