@@ -274,10 +274,51 @@ USER_TEMPLATE = """次の記事を整理し、下記のキーを持つJSONで答
 {body}
 """
 
+# ---------- サイトの本文から、広告・案内・画像クレジット・目次・空の見出しなどを除く（本文の内容は変えない） ----------
+NOISE = [re.compile(r) for r in (
+    r"^[\s*＊\-–—■□●・→←>＞»›|｜]+$",
+    r"メルマガ登録|無料メルマガ|メルマガ会員登録",
+    r"無料会員登録|会員登録はこちら",
+    r"詳細はこちら|お申し込みはこちら|お申込みはこちら|資料請求はこちら|資料請求する|まとめて資料請求|お問い合わせはこちら|無料ダウンロード",
+    r"セキュリティ対策無料相談窓口|無料相談はこちら",
+    r"プレゼント[！!]",
+    r"情シス部門の方必見",
+    r"セキュリティ対策の基礎知識",
+    r"セキュリティ対策で何をして良いかわからない",
+    r"^(画像|写真|イラスト|図)[:：]",
+    r"^(運営サービス|ユーザー様向け情報|ベンダー様向け情報|おすすめサービス|その他お知らせ|運営会社関連サービス|SNSでもご購読できます。?)$",
+    r"^(関連コラム|関連記事)",
+    r"→\s*$",
+)]
+
+def clean_lines(text):
+    lines = text.split("\n")
+    out, k = [], 0
+    noisy = lambda t: any(r.search(t) for r in NOISE)
+    while k < len(lines):
+        t = lines[k].strip()
+        k += 1
+        if not t:
+            continue
+        if re.fullmatch(r"(この記事の|このページの)?目次", t):
+            while k < len(lines) and lines[k].strip() and re.match(r"\s*(\d+[\.．)）]|[・*\-])\s*\S", lines[k]):
+                k += 1
+            continue
+        m = re.match(r"^■\s*(.*)$", t)
+        if m:
+            h = m.group(1).strip()
+            if h and not noisy(h):
+                out.append("■ " + h)
+            continue
+        if noisy(t):
+            continue
+        out.append(t)
+    return "\n".join(l for i, l in enumerate(out) if not (l.startswith("■ ") and (i == len(out) - 1 or out[i + 1].startswith("■ "))))
+
 TAIL_MARKERS = ("関連コラム", "SNSでもご購読", "この記事を書いた人", "関連記事", "おすすめ記事")
 
 def _to_text(h):
-    h = re.sub(r"(?i)<br\s*/?>|</(p|div|li|h[1-6]|tr|td)>", "\n", h)
+    h = re.sub(r"(?i)<br\s*/?>|</?(p|div|li|ul|ol|h[1-6]|tr|td|section)\b[^>]*>", "\n", h)
     h = htmllib.unescape(re.sub(r"<[^>]+>", "", h))
     lines = [re.sub(r"[ \t\u3000]+", " ", l).strip() for l in h.split("\n")]
     return "\n".join(l for l in lines if l)
@@ -398,7 +439,7 @@ def enrich(it, api_key, log, today):
         log(f"  ! 元記事を読めませんでした: {it['url']} ({e})")
         return False
     desc = meta_description(page)
-    body = html_to_text(page)
+    body = clean_lines(html_to_text(page))
     reason = "ANTHROPIC_API_KEY が未設定"
     if api_key:
         try:
