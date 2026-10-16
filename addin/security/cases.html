@@ -353,7 +353,7 @@ $('month').addEventListener('change',e=>{st.month=e.target.value;render();});
 $('onlyDetail').addEventListener('change',e=>{st.only=e.target.checked; render();});
 function asof(){
   const got=INDEX.map(x=>x.got).filter(isDate).sort().pop();
-  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、本文のみ '+INDEX.filter(x=>!x.detail&&x.body).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）';
+  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、本文のみ '+INDEX.filter(x=>!x.detail&&x.body).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）'+'　[表示 v7]';
 }
 function apply(cases,sel,sec){
   load(cases);

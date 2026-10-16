@@ -739,6 +739,39 @@ var CASE_SHEET='漏洩事例',CASE_LS='leak-cases-v1',FEED_URL='cases-feed.json'
 var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先・クラウド経由'],['ransom','ランサムウェア・マルウェア'],['acct','メール・アカウント乗っ取り'],['human','誤送信・設定ミス・人的'],['other','改ざん・その他']];
 var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method'],['記事本文','body']];
 var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
+/* ---------- サイトの本文から、広告・案内・画像クレジット・目次・空の見出しを除く（保存済みの本文も整える） ---------- */
+var BUILD='2026-10-16 r7';
+var NOISE=[
+  /^[\s*＊\-–—■□●・→←>＞»›|｜]+$/,
+  /メルマガ登録|無料メルマガ|メルマガ会員登録/,
+  /無料会員登録|会員登録はこちら/,
+  /詳細はこちら|お申し込みはこちら|お申込みはこちら|資料請求はこちら|資料請求する|まとめて資料請求|お問い合わせはこちら|無料ダウンロード/,
+  /セキュリティ対策無料相談窓口|無料相談はこちら/,
+  /プレゼント[！!]/,
+  /情シス部門の方必見/,
+  /セキュリティ対策の基礎知識/,
+  /セキュリティ対策で何をして良いかわからない/,
+  /^(画像|写真|イラスト|図)[:：]/,
+  /^(運営サービス|ユーザー様向け情報|ベンダー様向け情報|おすすめサービス|その他お知らせ|運営会社関連サービス|SNSでもご購読できます。?)$/,
+  /^(関連コラム|関連記事)/,
+  /→\s*$/
+];
+function cleanBody(text){
+  var lines=String(text==null?'':text).split(/\r?\n/),out=[];
+  function noisy(t){return NOISE.some(function(r){return r.test(t)})}
+  for(var k=0;k<lines.length;k++){
+    var t=lines[k].trim();
+    if(!t)continue;
+    if(/^(この記事の|このページの)?目次$/.test(t)){while(k+1<lines.length&&lines[k+1].trim()&&/^\s*(\d+[\.．)）]|[・*\-])\s*\S/.test(lines[k+1]))k++;continue}
+    var hd=t.match(/^■\s*(.*)$/);
+    if(hd){var h=hd[1].trim();if(!h||noisy(h))continue;out.push('■ '+h);continue}
+    if(noisy(t))continue;
+    out.push(t);
+  }
+  return out.filter(function(l,i){return !(/^■ /.test(l)&&(i===out.length-1||/^■ /.test(out[i+1])))}).join('\n');
+}
+function casesCleanBodies(){var n=0;CASES.forEach(function(c){if(c.body){var b=cleanBody(c.body);if(b!==c.body){c.body=b;n++}}});return n}
+
 function catLabel(code){for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][0]===code)return CASE_CATS[i][1];return CASE_CATS[5][1]}
 function catCode(label){label=String(label==null?'':label).trim();for(var i=0;i<CASE_CATS.length;i++)if(CASE_CATS[i][1]===label||CASE_CATS[i][0]===label)return CASE_CATS[i][0];return 'other'}
 var IMP_LAB={2:'最優先',1:'次点',0:''};
@@ -847,7 +880,7 @@ window.addEventListener('message',function(e){
 function casesReload(silent){
   var p=IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal());
   return p.then(function(l){
-    CASES=l||[];
+    CASES=l||[];casesCleanBodies();
     casesSetMsg(l?(IN_EXCEL?'Excelの「'+CASE_SHEET+'」シートから読み込みました':'ブラウザから読み込みました'):(IN_EXCEL?'「'+CASE_SHEET+'」シートがまだありません。「情報取得」を押してください':'まだ事例がありません。「情報取得」を押してください'));
     postCases();
   }).catch(function(err){
@@ -959,13 +992,13 @@ function casesEnrich(){
   if(CS.busy)return Promise.resolve();
   if(!gasCfg()){notify('「データ管理」でGASのURLとトークンを設定してください',true);return Promise.resolve()}
   CS.busy=true;casesSetMsg('元記事を整理しています…');
-  var en=null;
+  var en=null,cleaned=0;
   return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
     CASES=l||[];return casesEnrichRun();
   }).then(function(e){
-    en=e;return en&&en.done?casesSaveNow():null;
+    en=e;cleaned=casesCleanBodies();return (en&&en.done)||cleaned?casesSaveNow():null;
   }).then(function(){
-    casesSetMsg(casesEnrichMsg(en)+(IN_EXCEL?warnTail():''));postCases();
+    casesSetMsg(casesEnrichMsg(en)+(cleaned?'。保存済みの本文 '+cleaned+'件から、広告・案内などを除きました':'')+(IN_EXCEL?warnTail():''));postCases();
   }).catch(function(err){
     var m='整理できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
   }).then(function(){CS.busy=false});
@@ -973,7 +1006,7 @@ function casesEnrich(){
 function casesFetch(){
   if(CS.busy)return Promise.resolve();
   CS.busy=true;casesSetMsg('情報を取得しています…');
-  var cur=[],had=true,feed=null,feedErr='',r={added:0,filled:0},en=null;
+  var cur=[],had=true,feed=null,feedErr='',r={added:0,filled:0},en=null,cleaned=0;
   return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
     had=!!l;cur=l||[];CASES=cur;
     return fetchFeed().then(function(f){feed=f},function(e){feedErr=e&&e.message?e.message:String(e)});
@@ -982,14 +1015,15 @@ function casesFetch(){
     if(feed){r=mergeCases(cur,feed.items);CASES=r.list}
     return gasCfg()?casesEnrichRun():null;
   }).then(function(e){
-    en=e;
-    var need=r.added||r.filled||!had||(en&&en.done);
+    en=e;cleaned=casesCleanBodies();
+    var need=r.added||r.filled||!had||(en&&en.done)||cleaned;
     return need?casesSaveNow():null;
   }).then(function(){
     var parts=[];
     if(feed){var when=feed.generatedAt?'（フィード更新 '+String(feed.generatedAt).replace('T',' ').slice(0,16)+'）':'';parts.push((r.added?'新規 '+r.added+'件を取り込みました':r.filled?'既存の '+r.filled+'件の空欄を補いました':'すでに最新です')+when)}
     else parts.push('フィードを取得できませんでした（'+feedErr+'）');
     if(en)parts.push(casesEnrichMsg(en));
+    if(cleaned)parts.push('保存済みの本文 '+cleaned+'件から、広告・案内などを除きました');
     casesSetMsg(parts.join('。')+(IN_EXCEL?warnTail():''));postCases();
   }).catch(function(err){
     var m='取得できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
@@ -1005,7 +1039,8 @@ function vGas(){
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary" data-act="gas-save">保存</button><button class="btn" data-act="gas-test">接続テスト</button><button class="btn" data-act="gas-clear">設定を消す</button></div>'+
     '<div style="margin-top:8px"><button class="btn small" data-act="gas-reset-skip">失敗・紹介文のみの記事を再試行の対象に戻す</button></div>'+
     '<p class="stline" id="gasInfo" style="margin-top:8px">'+esc(GAS_INFO)+'</p>'+
-    '<p class="hint" style="margin:6px 0 0">URLとトークンは、このPCのアドインの保存領域にだけ保存します（ブックには保存しません）。</p></section>';
+    '<p class="hint" style="margin:6px 0 0">URLとトークンは、このPCのアドインの保存領域にだけ保存します（ブックには保存しません）。</p>'+
+    '<p class="hint" style="margin:6px 0 0">画面のバージョン：'+BUILD+'（事例の画面は、上部の「全N件…」の行の末尾に「表示 v7」と出ます。古い場合は、アドインを開き直すか、キャッシュを削除してください）</p></section>';
 }
 function gasReadForm(){
   var u=(document.getElementById('gasUrl').value||'').trim(),t=(document.getElementById('gasToken').value||'').trim(),n=parseInt(document.getElementById('gasN').value,10)||5;
