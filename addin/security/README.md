@@ -16,17 +16,11 @@ assets/           リボン用アイコン
 
 Officeアドインは HTTPS で配信されている必要があります。
 
-1. GitHub に `leak-measures-addin` リポジトリを作り、このフォルダの中身をすべてアップロードする
-2. Settings › Pages で `main` ブランチ / root を公開する
-3. 公開URL（例：`https://<アカウント名>.github.io/leak-measures-addin/`）を確認する
-4. `manifest.xml` の `YOUR-ACCOUNT` を実際のアカウント名に置き換える
+1. このフォルダは `ymatsuda-cmyk/tools` リポジトリの `addin/security/` に置いてある（GitHub Pages で公開される）
+2. 公開URL：`https://ymatsuda-cmyk.github.io/tools/addin/security/`
+3. `manifest.xml` のURLはこの公開URLに合わせて設定済みなので、置き換えは不要
 
-```bash
-sed -i '' 's/YOUR-ACCOUNT/<アカウント名>/g' manifest.xml   # Mac
-sed -i 's/YOUR-ACCOUNT/<アカウント名>/g' manifest.xml      # Linux / Git Bash
-```
-
-リポジトリ名を変える場合は、`leak-measures-addin` の部分も合わせて置き換えてください。
+公開先を変える場合は、`manifest.xml` 内の `https://ymatsuda-cmyk.github.io/tools/addin/security` をすべて置き換えてください。
 
 ## 2. Excelへの追加（サイドロード）
 

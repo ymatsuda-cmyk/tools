@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- https://YOUR-ACCOUNT.github.io/leak-measures-addin を、実際の公開先URLに置き換えてください（README参照） -->
+<!-- 公開先：https://ymatsuda-cmyk.github.io/tools/addin/security/ -->
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
-  <Id>cf7c379f-305f-4ccc-a8fc-c5afad445ddc</Id>
+  <Id>cf7c379f-305f-4ccc-a8fc-c5afad445ddd</Id>
   <Version>1.1.0.0</Version>
   <ProviderName>Writerm</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="情報漏洩対策集"/>
   <Description DefaultValue="情報漏洩対策集（Webページ）のJSONを読み込み、対策一覧・対象判定・点検結果・サマリをExcelに保存します。Excelで入力した結果をJSONに戻すこともできます。"/>
-  <IconUrl DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/"/>
+  <IconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/"/>
   <AppDomains>
-    <AppDomain>https://YOUR-ACCOUNT.github.io</AppDomain>
+    <AppDomain>ymatsuda-cmyk.github.io</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Workbook"/>
@@ -28,7 +28,7 @@
     </Sets>
   </Requirements>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/taskpane.html"/>
+    <SourceLocation DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/taskpane.html"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -74,12 +74,12 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/assets/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://YOUR-ACCOUNT.github.io/leak-measures-addin/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/security/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Group.Label" DefaultValue="情報漏洩対策"/>
