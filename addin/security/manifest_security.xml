@@ -6,8 +6,8 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
   <Id>cf7c379f-305f-4ccc-a8fc-c5afad445dde</Id>
-  <Version>1.1.0.0</Version>
-  <ProviderName>Writerm</ProviderName>
+  <Version>1.2.0.0</Version>
+  <ProviderName>JapanBusinessAssist</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="セキュリティ"/>
   <Description DefaultValue="情報漏洩対策集（Webページ）のJSONを読み込み、対策一覧・対象判定・点検結果・サマリをExcelに保存します。Excelで入力した結果をJSONに戻すこともできます。"/>
