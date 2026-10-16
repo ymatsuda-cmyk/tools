@@ -6,8 +6,8 @@
   xsi:type="TaskPaneApp">
 
   <Id>7e0526e2-a329-4f21-9808-8f98535c599a</Id>
-  <Version>1.0.1.0</Version>
-  <ProviderName>RightArm</ProviderName>
+  <Version>1.0.3.0</Version>
+  <ProviderName>JapanBusinessAssist</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
 
   <DisplayName DefaultValue="Excel Kanban"/>
@@ -99,8 +99,8 @@
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/kanban/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="KanbanGroupLabel" DefaultValue="カンバン"/>
-        <bt:String id="ShowKanbanButtonLabel" DefaultValue="カンバン表示"/>
+        <bt:String id="KanbanGroupLabel" DefaultValue="schedule"/>
+        <bt:String id="ShowKanbanButtonLabel" DefaultValue="カンバン"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="ShowKanbanButtonTooltip" DefaultValue="タスクをカンバンボード形式で表示します"/>
