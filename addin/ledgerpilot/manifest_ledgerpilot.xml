@@ -6,8 +6,8 @@
   xsi:type="TaskPaneApp">
 
   <Id>dad4b7a6-0a58-46ce-aa64-2f31e8f6c9eb</Id>
-  <Version>1.0.1.0</Version>
-  <ProviderName>RightArm</ProviderName>
+  <Version>1.0.2.0</Version>
+  <ProviderName>JapanBusinessAssist</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="LedgerPilot"/>
   <Description DefaultValue="勘定奉行の仕訳を月別に台帳化し、損益ダッシュボードで確認します"/>
@@ -82,8 +82,8 @@
         <bt:Url id="Commands.Url" DefaultValue="https://ymatsuda-cmyk.github.io/tools/addin/ledgerpilot/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GroupLabel" DefaultValue="仕訳"/>
-        <bt:String id="ButtonLabel" DefaultValue="LedgerPilot"/>
+        <bt:String id="GroupLabel" DefaultValue="finance"/>
+        <bt:String id="ButtonLabel" DefaultValue="仕訳"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="ButtonTooltip" DefaultValue="仕訳の取込と損益ダッシュボードを開きます"/>
