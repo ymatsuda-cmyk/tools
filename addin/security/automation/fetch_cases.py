@@ -274,15 +274,43 @@ USER_TEMPLATE = """次の記事を整理し、下記のキーを持つJSONで答
 {body}
 """
 
+TAIL_MARKERS = ("関連コラム", "SNSでもご購読", "この記事を書いた人", "関連記事", "おすすめ記事")
+
+def _to_text(h):
+    h = re.sub(r"(?i)<br\s*/?>|</(p|div|li|h[1-6]|tr|td)>", "\n", h)
+    h = htmllib.unescape(re.sub(r"<[^>]+>", "", h))
+    lines = [re.sub(r"[ \t\u3000]+", " ", l).strip() for l in h.split("\n")]
+    return "\n".join(l for l in lines if l)
+
 def html_to_text(html_text, limit=14000):
     t = re.sub(r"(?is)<(script|style|noscript|nav|header|footer|aside|form|svg)[^>]*>.*?</\1>", "", html_text)
-    m = re.search(r"(?is)<article[^>]*>(.*?)</article>", t) or re.search(r"(?is)<main[^>]*>(.*?)</main>", t)
-    if m:
-        t = m.group(1)
-    t = re.sub(r"(?i)<br\s*/?>|</(p|div|li|h[1-6]|tr|td)>", "\n", t)
-    t = htmllib.unescape(re.sub(r"<[^>]+>", "", t))
-    lines = [re.sub(r"[ \t\u3000]+", " ", l).strip() for l in t.split("\n")]
-    return "\n".join(l for l in lines if l)[:limit]
+    text = ""
+    for rx in (r"(?is)<article[^>]*>(.*?)</article>", r"(?is)<main[^>]*>(.*?)</main>"):
+        m = re.search(rx, t)
+        if m and len(_to_text(m.group(1))) >= 200:
+            text = _to_text(m.group(1))
+            break
+    if not text:
+        text = _to_text(t)            # article / main が無い・短すぎるときは、ページ全体から
+    cuts = [text.find(k, 200) for k in TAIL_MARKERS if text.find(k, 200) >= 0]
+    if cuts:
+        text = text[: min(cuts)]
+    return text[:limit]
+
+def lead_paragraph(text, desc, maxlen=300):
+    """紹介文（desc）で始まる記事冒頭の段落を、文の途中で切れない形で返す。
+    サイトの紹介文は途中で切れていることが多いので、本文側の同じ段落を使う（短い冒頭だけ）。"""
+    if not desc:
+        return ""
+    key = desc[:30]
+    for line in text.split("\n"):
+        if key in line:
+            if len(line) <= maxlen:
+                return line
+            cut = line[:maxlen]
+            i = cut.rfind("。")
+            return cut[: i + 1] if i >= 20 else cut
+    return ""
 
 def meta_description(html_text):
     for rx in (r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)',
@@ -290,7 +318,7 @@ def meta_description(html_text):
                r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)'):
         m = re.search(rx, html_text, re.I)
         if m:
-            return re.sub(r"\s+", " ", htmllib.unescape(m.group(1))).strip()[:220]
+            return re.sub(r"\s+", " ", htmllib.unescape(m.group(1))).strip()
     return ""
 
 def call_claude(api_key, prompt, timeout=90):
@@ -353,7 +381,7 @@ def needs_enrich(it, have_key, today):
     if res == "ok":
         return False
     if res == "meta":
-        return have_key            # キーが使えるようになったら整理し直す（紹介文だけが入っている状態）
+        return have_key or it.get("method") != "紹介文"   # キーが使えるようになったら整理し直す。旧版の（途中で切れた）紹介文は、キーが無くても直す
     if any(it.get(k) for k in SEC_KEYS):
         return False               # すでに手元で詳細が入っているものには触れない
     if res == "fail":
@@ -370,9 +398,10 @@ def enrich(it, api_key, log, today):
         log(f"  ! 元記事を読めませんでした: {it['url']} ({e})")
         return False
     desc = meta_description(page)
+    body = html_to_text(page)
+    reason = "ANTHROPIC_API_KEY が未設定"
     if api_key:
         try:
-            body = html_to_text(page)
             if len(body) < 80:
                 raise ValueError("記事本文を取り出せませんでした")
             out = call_claude(api_key, USER_TEMPLATE.format(url=it["url"], title=it.get("summary", ""), body=body))
@@ -381,11 +410,15 @@ def enrich(it, api_key, log, today):
             it["method"] = "AI"
             return True
         except Exception as e:  # noqa
+            reason = f"AIの整理に失敗（{e}）"
             log(f"  ! 整理に失敗: {it['url']} ({e})")
-    if desc:                        # キーが無い・失敗したとき：記事の紹介文（短い）だけを概要にする
-        it["sec_summary"] = desc
+    lead = lead_paragraph(body, desc)
+    if lead or desc:               # AIが使えないとき：記事冒頭の紹介（短い）だけを概要に入れる
+        it["sec_summary"] = lead or desc
         it["sources"] = "元記事|" + it["url"]
+        it["method"] = "紹介文"
         it["enrichResult"] = "meta"
+        log(f"  △ 紹介文のみ（{reason}）: {it['url']}")
         return True
     it["enrichResult"] = "fail"
     return False
