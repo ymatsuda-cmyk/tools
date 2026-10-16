@@ -1020,7 +1020,7 @@ function vCases(){
 }
 
 function render(){
-  var tabs=[['learn','対策を見る'],['cases','事例'],['inspect','点検する'],['viz','可視化'],['data','データ管理']];
+  var tabs=[['cases','事例'],['learn','対策を見る'],['inspect','点検する'],['viz','可視化'],['data','データ管理']];
   var v=UI.tab==='learn'?vLearn():UI.tab==='cases'?vCases():UI.tab==='inspect'?vInspect():UI.tab==='viz'?vViz():vData();
   document.getElementById('root').innerHTML='<header class="top"><div class="brand">情報漏洩対策集</div><div class="tabs" role="tablist">'+
     tabs.map(function(t){return '<button role="tab" data-act="tab" data-id="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+'</button>'}).join('')+
