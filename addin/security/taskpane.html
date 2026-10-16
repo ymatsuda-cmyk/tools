@@ -2,45 +2,864 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>情報漏洩対策集 連携</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+<title>情報漏洩対策集</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-<link rel="stylesheet" href="taskpane.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style id="css">
+:root{
+  --bg:#F4F5F7;--surface:#FFFFFF;--ink:#161B26;--sub:#4A5263;--line:#DCE0E6;--line2:#E9ECF0;
+  --bar:#161B26;--bar-ink:#FFFFFF;--bar-sub:#C9D1DE;--bar-2:#262D3B;
+  --accent:#1D4E89;--accent-weak:#E6EEF8;--on-accent:#FFFFFF;
+  --ok:#1D4E89;--ok-weak:#D6E3F3;--ng:#C2501A;--ng-weak:#FBEADF;--ng-ink:#9A3A0E;--na:#8D96A6;--none:#E6E9EE;
+  --mid-weak:#FBF1D6;--mid-ink:#6E4D00;--low-weak:#EEF0F3;--low-ink:#3A4252;
+  color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12151B;--surface:#1B2029;--ink:#E8EBF0;--sub:#A9B1BF;--line:#2E3542;--line2:#262C37;
+  --bar:#0B0E13;--bar-ink:#FFFFFF;--bar-sub:#A9B1BF;--bar-2:#232A36;
+  --accent:#7FB0EC;--accent-weak:#1E2C40;--on-accent:#0B1626;
+  --ok:#5B93D6;--ok-weak:#21324A;--ng:#E07A47;--ng-weak:#3A2519;--ng-ink:#F0A57E;--na:#6B7484;--none:#2A303B;
+  --mid-weak:#352C14;--mid-ink:#E3C46F;--low-weak:#262C37;--low-ink:#C3CAD5;color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#12151B;--surface:#1B2029;--ink:#E8EBF0;--sub:#A9B1BF;--line:#2E3542;--line2:#262C37;
+  --bar:#0B0E13;--bar-ink:#FFFFFF;--bar-sub:#A9B1BF;--bar-2:#232A36;
+  --accent:#7FB0EC;--accent-weak:#1E2C40;--on-accent:#0B1626;
+  --ok:#5B93D6;--ok-weak:#21324A;--ng:#E07A47;--ng-weak:#3A2519;--ng-ink:#F0A57E;--na:#6B7484;--none:#2A303B;
+  --mid-weak:#352C14;--mid-ink:#E3C46F;--low-weak:#262C37;--low-ink:#C3CAD5;color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'BIZ UDPGothic','Hiragino Sans','Yu Gothic','Meiryo',sans-serif;font-size:15px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bar)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bar);color:var(--bar-ink);padding:10px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+.brand{font-weight:700;font-size:18px}
+.tabs{display:flex;gap:4px;background:var(--bar-2);border-radius:8px;padding:4px;flex-wrap:wrap}
+.tabs button{min-height:38px;padding:0 16px;border:none;border-radius:6px;background:transparent;color:var(--bar-sub);cursor:pointer}
+.tabs button[aria-selected="true"]{background:#FFFFFF;color:#161B26;font-weight:700}
+.status{margin-left:auto;font-size:13px;color:var(--bar-sub)}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 24px 48px}
+.btn{min-height:44px;padding:0 16px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.btn.ghost{background:transparent;border:1px dashed var(--na);color:var(--sub)}
+.btn.small{min-height:34px;padding:0 12px;font-size:13px}
+.btn.danger{color:var(--ng-ink);border-color:var(--ng)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px}
+.panel h2{margin:0 0 10px;font-size:16px}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.side{flex:1 1 230px;max-width:290px;display:flex;flex-direction:column;gap:2px}
+.side .cap{font-size:12px;font-weight:700;color:var(--sub);padding:0 12px 6px}
+.side button.item{display:flex;justify-content:space-between;gap:8px;text-align:left;min-height:44px;padding:8px 12px;border:none;border-radius:6px;background:transparent;cursor:pointer}
+.side button.item[aria-current="true"]{background:var(--surface);box-shadow:0 0 0 1px var(--line);color:var(--accent);font-weight:700}
+.side .n{color:var(--sub);font-variant-numeric:tabular-nums}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{font-size:12px;padding:2px 10px;border-radius:999px;background:var(--low-weak);color:var(--low-ink)}
+.pill.high{background:var(--ng-weak);color:var(--ng-ink);font-weight:700}
+.pill.mid{background:var(--mid-weak);color:var(--mid-ink);font-weight:700}
+.h1{margin:4px 0 6px;font-size:26px;line-height:1.35}
+.lead{margin:0;color:var(--sub);max-width:70ch}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.grid3,.grid2{grid-template-columns:minmax(0,1fr)}}
+ul.plain,ol.plain{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
+.mtype{font-size:12px;font-weight:700;color:var(--accent);margin-top:6px}
+.mtype:first-child{margin-top:0}
+.meta{font-size:13px;color:var(--sub)}
+.hist div{font-size:14px}
+.hist .d{color:var(--sub);margin-right:10px;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0 12px;min-height:44px;flex:1 1 240px;max-width:380px}
+.search input{border:none;background:transparent;outline:none;flex:1;min-width:0}
+mark{background:var(--mid-weak);color:inherit}
+/* inspect */
+.targetbar{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px}
+.field>span{font-size:12px;font-weight:700;color:var(--sub)}
+.field select,.field input,.field textarea{min-height:44px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.field textarea{resize:vertical;line-height:1.6}
+.switch{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer}
+.switch input{width:20px;height:20px}
+.prog{flex:2 1 340px;display:flex;flex-direction:column;gap:6px}
+.stack{height:12px;background:var(--none);border-radius:999px;overflow:hidden;display:flex}
+.stack span{display:block;height:100%}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--sub)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.acc{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.acchead{display:flex;align-items:center;padding-right:16px;flex-wrap:wrap}
+.acchead>button{flex:1 1 300px;min-width:0;min-height:56px;display:flex;align-items:center;gap:12px;padding:0 20px;border:none;background:transparent;text-align:left;cursor:pointer;color:inherit}
+.acchead>button .t{flex:1;font-weight:700;font-size:16px}
+.acchead>button .c{font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
+.acchead .scope{border-left:1px solid var(--line2);padding-left:14px;font-size:14px}
+.acc.off .t{color:var(--sub)}
+.h-off{background:transparent;color:var(--sub);border:1px dashed var(--na)!important}
+.judge{padding:14px 20px;border-top:1px solid var(--line2);background:var(--accent-weak);display:flex;flex-direction:column;gap:10px}
+.judge .jt{font-weight:700;font-size:14px}
+.jq{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.jq>span{flex:1 1 320px}
+.jq .seg{flex:0 0 180px}
+.jr{font-size:14px}
+.chk{padding:16px 20px;display:flex;flex-wrap:wrap;gap:14px 24px;border-top:1px solid var(--line2)}
+.chk .q{flex:2 1 380px;display:flex;flex-direction:column;gap:2px}
+.chk .q b{font-size:15px}
+.chk .a{flex:1 1 280px;display:flex;flex-direction:column;gap:8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;min-height:42px;border:none;background:var(--surface);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on-ok{background:var(--ok);color:#FFFFFF;font-weight:700}
+.seg button.on-ng{background:var(--ng);color:#FFFFFF;font-weight:700}
+.seg button.on-na{background:var(--na);color:#FFFFFF;font-weight:700}
+.memo{min-height:38px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);width:100%}
+.empty{padding:28px;text-align:center;color:var(--sub)}
+/* viz */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi .v{font-size:32px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:13px;color:var(--sub)}
+.kpi.warn .v{color:var(--ng-ink)}
+.bars{display:flex;flex-direction:column;gap:10px}
+.bars .r{display:grid;grid-template-columns:200px minmax(0,1fr) 70px;gap:12px;align-items:center;font-size:14px}
+@media (max-width:700px){.bars .r{grid-template-columns:minmax(0,1fr)}}
+.bars .p{font-size:13px;color:var(--sub);text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+table.heat{border-collapse:separate;border-spacing:3px;font-size:13px;min-width:100%}
+table.heat th{font-weight:700;text-align:left;padding:6px 8px;white-space:nowrap}
+table.heat thead th{font-size:12px;color:var(--sub);text-align:center;white-space:normal;min-width:84px;vertical-align:bottom}
+table.heat td button{width:100%;min-height:34px;border:none;border-radius:4px;cursor:pointer;font-variant-numeric:tabular-nums}
+.h-none{background:var(--none);color:var(--sub)}
+.h-part{background:var(--ok-weak);color:var(--ink)}
+.h-done{background:var(--ok);color:#FFFFFF}
+.h-ng{background:var(--ng);color:#FFFFFF;font-weight:700}
+table.list{width:100%;border-collapse:collapse;font-size:14px}
+table.list th{text-align:left;background:var(--low-weak);padding:8px 10px}
+table.list td{padding:8px 10px;border-top:1px solid var(--line2);vertical-align:top}
+/* data */
+.tlist{display:flex;flex-direction:column}
+.tlist .tr{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line2)}
+.tlist .tr .nm{flex:1 1 200px}
+/* dialog */
+dialog{border:none;border-radius:12px;padding:0;width:min(880px,calc(100vw - 24px));max-height:calc(100vh - 40px);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(10,14,20,.55)}
+.dlg{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.dlg h2{margin:0;font-size:20px}
+.dlg .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.dlg .g3{grid-template-columns:minmax(0,1fr)}}
+.ckrow{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.ckrow input{flex:1 1 300px;min-height:40px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.ckrow select{min-height:40px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0 8px}
+.dlgfoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line2);padding-top:14px}
+.hint{font-size:12px;color:var(--sub)}
+@media print{.top,.no-print{display:none!important}body{background:#fff}}
+
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;max-width:calc(100vw - 24px);background:var(--bar);color:var(--bar-ink);padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#toast.err{background:#9A3A0E;color:#FFFFFF}
+#toast[hidden]{display:none}
+#cdlg{width:min(420px,calc(100vw - 24px))}
+.stline{font-size:13px;color:var(--sub);margin:0}
+@media (max-width:700px){
+  body{font-size:14px}
+  .top{padding:8px 12px;gap:8px 12px}
+  .brand{font-size:16px}
+  .tabs{width:100%}
+  .tabs button{flex:1;padding:0 6px;min-height:40px}
+  .status{margin-left:0;width:100%;font-size:12px}
+  .wrap{padding:12px 12px 40px}
+  .panel{padding:14px}
+  .h1{font-size:22px}
+  .side{max-width:none;flex:1 1 100%;flex-direction:row;flex-wrap:wrap;gap:6px}
+  .side .cap{width:100%;padding:0 2px 2px}
+  .side button.item{border:1px solid var(--line);background:var(--surface);min-height:40px;padding:6px 10px;gap:6px}
+  .side button.item[aria-current="true"]{border-color:var(--accent)}
+  .main{flex:1 1 100%}
+  .kpi .v{font-size:26px}
+  .chk{padding:12px 14px}
+  .acchead .scope{border-left:none;padding-left:20px;flex:1 1 100%;min-height:40px}
+  .acchead>button{padding:0 14px}
+}
+</style>
 </head>
-<body>
-<header>
-  <h1>情報漏洩対策集 連携</h1>
-  <p>Webページの「データ管理 › Excelと連携」とJSONでやり取りします。</p>
-</header>
+<body><div id="root"><p style="padding:24px;font-family:sans-serif">読み込み中…</p></div><script id="seed" type="application/json">{"version":1,"updated":"2026-10-16T02:09:57.088Z","freqs":["月次","四半期","半期","年次","作業ごと","変更時"],"causes":[{"id":"ext","name":"外部攻撃（脆弱性悪用）","severity":"高","likelihood":"高","owner":"構築業者","summary":"VPN機器・Webアプリ・ミドルウェアの既知の脆弱性や弱い認証を突かれ、侵入・情報窃取される。近年の大規模漏えいで最も多い入口。","reasons":["VPN機器・ミドルウェアの修正プログラムが未適用","管理画面やリモート接続ポートがインターネットに公開","Webアプリの入力チェック不備（SQLインジェクション等）","推測しやすい・使い回しのパスワード"],"measures":{"予防":["脆弱性情報を定期収集し、修正プログラムの適用期限を決める","外部公開を最小限にし、管理系はアクセス元を制限する","管理者アカウントに多要素認証を必須化する"],"検知":["不審なログイン・通信をログで監視し、アラートを出す"],"事後対応":["侵入時の切り離し手順とログ保全手順を整備する"]},"checks":[{"id":"ext-1","text":"機器・ソフトのバージョン台帳と最新の修正版を突合し、未適用がないか","freq":"月次"},{"id":"ext-2","text":"外部からのポートスキャン結果で、不要な公開ポート・管理画面がないか","freq":"四半期"},{"id":"ext-3","text":"管理者アカウントに多要素認証が設定されているか","freq":"四半期"},{"id":"ext-4","text":"認証ログに不審なログイン試行がないか","freq":"月次"}],"refs":[{"label":"IPA 注意喚起（2026-10-09）","url":""},{"label":"情報漏洩事例ファイル：[該当事例]","url":""}],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"ext-q1","text":"インターネットに公開しているサーバ・Webサイト・Webアプリがあるか"},{"id":"ext-q2","text":"VPN・リモートデスクトップなど、外部から社内に接続する仕組みがあるか"},{"id":"ext-q3","text":"管理画面に社外からアクセスできるか"}]},{"id":"ransom","name":"ランサムウェア","severity":"高","likelihood":"中","owner":"構築業者＋顧客","summary":"侵入後にデータを暗号化し、窃取したデータの公開を盾に脅迫される（二重恐喝）。業務停止と漏えいが同時に起こる。","reasons":["VPN等からの侵入（外部攻撃と同じ経路）","バックアップが同じネットワーク上にあり、一緒に暗号化される","権限の付与が過大で、被害が全体に広がる"],"measures":{"予防":["権限を最小化し、管理者権限を日常利用のアカウントと分ける"],"検知":["EDR等で端末の不審な挙動を検知する"],"事後対応":["オフライン／書き換え不可のバックアップを確保する","復旧手順書と緊急連絡体制を整備する"]},"checks":[{"id":"ransom-1","text":"バックアップがネットワークから切り離された場所、または書き換え不可の領域にあるか","freq":"四半期"},{"id":"ransom-2","text":"直近1年以内に復元テストを実施した記録があるか","freq":"年次"},{"id":"ransom-3","text":"管理者権限を持つアカウントが必要最小限か","freq":"四半期"},{"id":"ransom-4","text":"インシデント時の連絡先一覧が最新か","freq":"半期"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"ransom-q1","text":"業務データを保存するサーバ・NAS・PCがあるか"},{"id":"ransom-q2","text":"VPN・リモート接続など、外部からの接続経路があるか"}]},{"id":"phish","name":"フィッシング・マルウェア","severity":"中","likelihood":"高","owner":"顧客","summary":"なりすましメールや偽サイトで認証情報を盗まれたり、マルウェアに感染して情報が流出する。","reasons":["添付ファイル・リンクを不用意に開く","偽のログイン画面に認証情報を入力してしまう","端末のOS・ソフトの更新漏れ"],"measures":{"予防":["多要素認証で、盗まれたパスワードだけでは入れないようにする","不審メールの注意喚起・訓練を行う"],"検知":["メールフィルタとウイルス対策を導入し、定義を最新に保つ"],"事後対応":["感染に気づいたらすぐ報告するルールを決め、報告者を責めない"]},"checks":[{"id":"phish-1","text":"ウイルス対策ソフトが全端末で有効・最新か","freq":"月次"},{"id":"phish-2","text":"業務システム・メールに多要素認証が設定されているか","freq":"四半期"},{"id":"phish-3","text":"不審メールの報告窓口が周知されているか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"phish-q1","text":"従業員が業務でメールを使っているか"},{"id":"phish-q2","text":"業務システムにID・パスワードでログインしているか"}]},{"id":"cloud","name":"クラウド設定不備","severity":"高","likelihood":"中","owner":"構築業者","summary":"ストレージや管理画面の公開範囲・認証設定の誤りにより、外部から情報が閲覧可能になる。攻撃がなくても漏えいが成立する。","reasons":["ストレージの公開範囲を「誰でも閲覧可」にしたまま運用","管理画面が初期設定のままインターネットに公開","設定変更のレビューがなく、担当者に属人化"],"measures":{"予防":["公開設定の既定を非公開にし、変更は二者確認とする","構成をテンプレート化し、手作業の設定を減らす"],"検知":["設定診断ツールで定期スキャンし、公開時にアラートを出す"],"事後対応":["公開停止とアクセスログ確認の手順を整備する"]},"checks":[{"id":"cloud-1","text":"公開設定の一覧を出力し、意図しない公開がないか","freq":"四半期"},{"id":"cloud-2","text":"管理画面のIP制限・多要素認証が有効か","freq":"四半期"},{"id":"cloud-3","text":"直近の設定変更に承認記録があるか","freq":"四半期"},{"id":"cloud-4","text":"設定診断の重大な指摘が未対応のまま残っていないか","freq":"月次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"cloud-q1","text":"クラウドサービス（AWS・Azure・Google Cloud・Microsoft 365 等）にデータを保管しているか"},{"id":"cloud-q2","text":"クラウド上でサーバや管理画面を運用しているか"}]},{"id":"human","name":"誤送信・誤操作","severity":"中","likelihood":"高","owner":"顧客","summary":"メールの宛先・添付の誤り、共有設定ミス、誤った公開などの人的ミスで情報が外部に出る。","reasons":["宛先の自動補完による誤選択","個人情報を含むファイルをそのまま添付","共有リンクを「リンクを知っている全員」に設定"],"measures":{"予防":["送信前確認・送信保留の機能を導入する","個人情報ファイルは期限付きの共有リンクで送る"],"検知":["外部共有中のファイル一覧を定期的に確認する"],"事後対応":["誤送信時の削除依頼・社内報告の手順を決める"]},"checks":[{"id":"human-1","text":"メールの送信保留・宛先確認機能が有効か","freq":"年次"},{"id":"human-2","text":"外部共有中のファイル・リンクに不要なものがないか","freq":"月次"},{"id":"human-3","text":"誤送信時の対応手順が周知されているか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"human-q1","text":"個人情報・機密情報をメールやファイル共有で社外とやり取りするか"}]},{"id":"insider","name":"内部不正・退職者","severity":"中","likelihood":"低","owner":"顧客","summary":"従業員や退職者が権限を悪用し、顧客情報などを持ち出す。","reasons":["退職・異動者のアカウント削除漏れ","業務に不要なデータへのアクセス権","大量ダウンロードや持ち出しの記録・監視がない"],"measures":{"予防":["入退社・異動の手続きとアカウント管理を連動させる","アクセス権を定期的に棚卸しする"],"検知":["大量ダウンロード・外部送信を操作ログで監視する"],"事後対応":["持ち出し発覚時の証拠保全手順を決める"]},"checks":[{"id":"insider-1","text":"アカウント一覧と在籍者名簿を突合し、退職者が残っていないか","freq":"月次"},{"id":"insider-2","text":"管理者・特権IDの付与先が妥当か","freq":"四半期"},{"id":"insider-3","text":"操作ログが取得・保管されているか","freq":"四半期"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"insider-q1","text":"個人情報・機密情報を扱うシステムを複数の従業員が利用しているか"},{"id":"insider-q2","text":"従業員の退職・異動があり、アカウントの追加・削除が発生するか"}]},{"id":"vendor","name":"委託先・再委託","severity":"高","likelihood":"中","owner":"構築業者","summary":"保守ベンダーや再委託先の管理不備・侵害を経由して漏えいする。システム導入業者である自社自身が経路になりうる。","reasons":["保守用リモート接続の常時開放・共有アカウント","再委託先の把握・管理が不十分","作業用に持ち出したデータの削除漏れ"],"measures":{"予防":["リモート接続は作業時のみ許可し、個人別アカウントにする","委託先・再委託先の一覧と契約上のセキュリティ要件を整える"],"検知":["委託先の作業の操作ログを取得する"],"事後対応":["作業終了時にデータ削除の記録を残す"]},"checks":[{"id":"vendor-1","text":"保守用リモート接続が常時開放になっていないか","freq":"四半期"},{"id":"vendor-2","text":"保守アカウントが個人別で、共有IDがないか","freq":"四半期"},{"id":"vendor-3","text":"委託先・再委託先の一覧が最新か","freq":"年次"},{"id":"vendor-4","text":"作業用データの削除記録があるか","freq":"作業ごと"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"vendor-q1","text":"自社や他社が保守・運用のためにシステムへ接続するか"},{"id":"vendor-q2","text":"開発・運用の一部を再委託しているか"}]},{"id":"lost","name":"紛失・盗難","severity":"低","likelihood":"中","owner":"顧客","summary":"ノートPC・スマートフォン・USBメモリ・書類の紛失や盗難で情報が流出する。","reasons":["端末・媒体が暗号化されていない","持ち出しのルール・台帳がない","紛失時に遠隔で使えなくする手段がない"],"measures":{"予防":["ディスク暗号化とUSB書き込み制限を行う","持ち出し台帳で管理する"],"検知":["端末管理ツールで所在・状態を把握する"],"事後対応":["遠隔ロック・データ消去を実行できるようにする"]},"checks":[{"id":"lost-1","text":"全ノートPCでディスク暗号化が有効か","freq":"四半期"},{"id":"lost-2","text":"持ち出し媒体の台帳があるか","freq":"年次"},{"id":"lost-3","text":"遠隔ロック・データ消去の手段があるか","freq":"年次"}],"refs":[],"history":[{"date":"2026-10-16","note":"新規作成"}],"scopeQs":[{"id":"lost-q1","text":"業務データを入れたノートPC・スマホ・USBメモリを持ち出すか"},{"id":"lost-q2","text":"紙の書類で個人情報を扱うか"}]}],"targets":[{"name":"kakimoto arms","inScope":true},{"name":"koch","inScope":true},{"name":"桜楓会","inScope":true},{"name":"アサヒグラント","inScope":true},{"name":"ハンター製菓","inScope":true},{"name":"SPC商事(キャスト)","inScope":true},{"name":"一広","inScope":true},{"name":"エキスプレス","inScope":true},{"name":"東京アドワイズ","inScope":true},{"name":"エーエムプロダクツ","inScope":true},{"name":"ハウント","inScope":true},{"name":"ライフメイト","inScope":true},{"name":"城西個人タクシー","inScope":true},{"name":"オフィスワイズ","inScope":true},{"name":"フイ・フラ・オ・レイアロハ","inScope":true},{"name":"朝日興建","inScope":true},{"name":"エビス","inScope":true},{"name":"フラ＆タヒチ","inScope":true},{"name":"モガインターナショナル","inScope":true},{"name":"アナップ","inScope":true},{"name":"コンピューターテクノス","inScope":true},{"name":"グロリアアーツ","inScope":true}],"results":{},"off":{},"scopeA":{"kakimoto arms":{}}}</script>
+<script id="app">
+(function(){
+'use strict';
+var MTYPES=['予防','検知','事後対応'];
 
-<main>
-  <section>
-    <h2>1. Excelに保存する</h2>
-    <p class="hint">ページで「JSONをコピー」したものを貼り付けるか、書き出したJSONファイルを選びます。同じ名前のシートは作り直されます。</p>
-    <label class="field"><span>JSONを貼り付け</span><textarea id="pasteIn" rows="5" placeholder="ここにJSONを貼り付け"></textarea></label>
-    <button id="btnPaste" class="primary" disabled>貼り付けたJSONをExcelに保存</button>
-    <label class="filebtn"><span>JSONファイルを選んで保存</span><input type="file" id="fileIn" accept=".json,application/json" disabled></label>
-  </section>
+var S=JSON.parse(document.getElementById('seed').textContent);
+if(!S.results)S.results={};
+if(!S.off)S.off={};
+if(!S.scopeA)S.scopeA={};
+if(!S.settings)S.settings={};
+var DEFQ={
+  ext:['インターネットに公開しているサーバ・Webサイト・Webアプリがあるか','VPN・リモートデスクトップなど、外部から社内に接続する仕組みがあるか','管理画面に社外からアクセスできるか'],
+  ransom:['業務データを保存するサーバ・NAS・PCがあるか','VPN・リモート接続など、外部からの接続経路があるか'],
+  phish:['従業員が業務でメールを使っているか','業務システムにID・パスワードでログインしているか'],
+  cloud:['クラウドサービス（AWS・Azure・Google Cloud・Microsoft 365 等）にデータを保管しているか','クラウド上でサーバや管理画面を運用しているか'],
+  human:['個人情報・機密情報をメールやファイル共有で社外とやり取りするか'],
+  insider:['個人情報・機密情報を扱うシステムを複数の従業員が利用しているか','従業員の退職・異動があり、アカウントの追加・削除が発生するか'],
+  vendor:['自社や他社が保守・運用のためにシステムへ接続するか','開発・運用の一部を再委託しているか'],
+  lost:['業務データを入れたノートPC・スマホ・USBメモリを持ち出すか','紙の書類で個人情報を扱うか']
+};
+S.causes.forEach(function(c){if(!c.scopeQs)c.scopeQs=(DEFQ[c.id]||[]).map(function(t,i){return{id:c.id+'-q'+(i+1),text:t}})});
 
-  <section>
-    <h2>2. Excelで入力した内容を集計に反映</h2>
-    <p class="hint">「取引先」「対象判定」「点検結果」シートの入力（プルダウン・メモ・点検日）を読み取り、サマリ・要対応シートを作り直します。</p>
-    <button id="btnRefresh" disabled>集計を更新</button>
-  </section>
+var UI={tab:'learn',cause:S.causes[0]&&S.causes[0].id,target:null,open:{},q:''};
+var firstIn=S.targets.find(function(t){return t.inScope});UI.target=firstIn?firstIn.name:(S.targets[0]&&S.targets[0].name);
+var IN_EXCEL=false;
+var saveState='';
 
-  <section>
-    <h2>3. Webページに戻す</h2>
-    <p class="hint">Excelの内容をJSONにします。ページの「JSONを貼り付け」に貼り、「置き換えて読み込む」を押してください。</p>
-    <button id="btnExport" disabled>JSONに書き出す</button>
-    <div id="outWrap" hidden>
-      <label class="field"><span>書き出したJSON</span><textarea id="out" rows="5" readonly></textarea></label>
-      <div class="row"><button id="btnCopy">コピー</button><button id="btnDownload">ファイルで保存</button></div>
-    </div>
-  </section>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function cause(id){return S.causes.find(function(c){return c.id===id})}
+function sevCls(v){return v==='高'?'high':v==='中'?'mid':''}
+function inTargets(){return S.targets.filter(function(t){return t.inScope})}
+function res(t,id){return (S.results[t]||{})[id]}
+function manOff(t,cid){var o=S.off[t];return o&&Object.prototype.hasOwnProperty.call(o,cid)?o[cid]:null}
+function judge(t,cid){
+  var c=cause(cid);if(!c)return{s:'in'};
+  var qs=c.scopeQs||[];
+  if(!qs.length){var m=manOff(t,cid);return m!==null?{s:'out',r:m}:{s:'in'}}
+  var a=S.scopeA[t]||{},y=0,n=0;qs.forEach(function(q){if(a[q.id]==='y')y++;else if(a[q.id]==='n')n++});
+  if(y)return{s:'in'};
+  if(n===qs.length){var m2=manOff(t,cid);return{s:'out',r:m2?m2:'設問の回答がすべて「いいえ」'}}
+  return{s:'pending'};
+}
+function offR(t,cid){var j=judge(t,cid);return j.s==='out'?j.r:null}
+function ckMap(){var m={};S.causes.forEach(function(c){c.checks.forEach(function(k){m[k.id]=c.id})});return m}
+function hl(s){s=esc(s);if(!UI.q)return s;var q=esc(UI.q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return s.replace(new RegExp(q,'gi'),function(m){return '<mark>'+m+'</mark>'})}
 
-  <div id="status" class="status" role="status" aria-live="polite">Excelに接続しています…</div>
-</main>
+/* ---------- messages ---------- */
+var toastTimer=null;
+function notify(msg,err){
+  var t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.appendChild(t)}
+  t.className=err?'err':'';t.textContent=msg;t.hidden=false;
+  clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true},err?7000:3500);
+}
+function askConfirm(msg,onYes){
+  var d=document.getElementById('cdlg');
+  if(!d){d=document.createElement('dialog');d.id='cdlg';document.body.appendChild(d)}
+  d.innerHTML='<div class="dlg"><p style="margin:0">'+esc(msg)+'</p><div class="dlgfoot" style="justify-content:flex-end"><button type="button" class="btn" id="cNo">キャンセル</button><button type="button" class="btn danger" id="cYes">実行する</button></div></div>';
+  d.querySelector('#cNo').onclick=function(){d.close()};
+  d.querySelector('#cYes').onclick=function(){d.close();onYes()};
+  d.showModal();d.querySelector('#cNo').focus();
+}
 
-<script src="taskpane.js"></script>
+/* ---------- storage: ブラウザ(localStorage) / Excel(ブック) ---------- */
+var LS_KEY='leak-measures-v1';
+var DATA_SHEET='_data',DATA_CHUNK=30000,DATA_ROWS=200,DATA_PREFIX='J:';
+var RP={summary:'漏洩_サマリ',measures:'漏洩_対策一覧',targets:'漏洩_取引先',judge:'漏洩_対象判定',results:'漏洩_点検結果',ng:'漏洩_要対応'};
+var RP_ORDER=[RP.summary,RP.measures,RP.targets,RP.judge,RP.results,RP.ng];
+var XL={chain:Promise.resolve(),dataTimer:null,repTimer:null,reportAt:'',dirty:false,loadFailed:false,warn:[],deco:[]};
+var XC={head:'#1D4E89',white:'#FFFFFF',ok:'#1D4E89',okWeak:'#D6E3F3',ng:'#C2501A',ngWeak:'#FBEADF',ngInk:'#9A3A0E',na:'#8D96A6',none:'#E6E9EE',sub:'#4A5263'};
+
+function hhmm(){var d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function repInfo(){return XL.reportAt?('Excelの表の最終更新：'+XL.reportAt+(XL.dirty?'（その後の変更は未反映）':'')):'Excelの表（「漏洩_」シート）はまだ作られていません。'}
+function paintStatus(){
+  var el=document.getElementById('status');if(el)el.textContent=saveState;
+  var r=document.getElementById('repInfo');if(r)r.textContent=repInfo();
+}
+function changed(){
+  S.updated=new Date().toISOString();
+  if(!IN_EXCEL){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){}saveState='このブラウザに保存しました';paintStatus();return}
+  XL.dirty=true;
+  if(XL.loadFailed){saveState='Excelの保存データを読み込めていないため、自動保存を止めています（データ管理 › 今すぐExcelに保存）';paintStatus();return}
+  saveState='保存待ち…';paintStatus();
+  clearTimeout(XL.dataTimer);XL.dataTimer=setTimeout(function(){xlSave()},1200);
+  clearTimeout(XL.repTimer);
+  if(S.settings&&S.settings.autoReport)XL.repTimer=setTimeout(function(){xlReports(false)},12000);
+}
+function saveFile(name,text,type){
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+}
+
+/* ---------- Excel: 共通 ---------- */
+function xlStep(label,p){
+  return p.catch(function(e){
+    var loc=e&&e.debugInfo&&e.debugInfo.errorLocation?'（'+e.debugInfo.errorLocation+'）':'';
+    throw new Error(label+'でエラー：'+(e&&e.message?e.message:String(e))+loc);
+  });
+}
+function xlQueue(fn){var p=XL.chain.then(fn);XL.chain=p.catch(function(){});return p}
+function warnTail(){return XL.warn.length?' ※一部の書式は適用できませんでした：'+XL.warn.join('、'):''}
+
+/* ---------- Excel: データの保存・読み込み（非表示シート _data） ---------- */
+function xlLoad(){
+  return Excel.run(function(ctx){
+    var ws=ctx.workbook.worksheets.getItemOrNullObject(DATA_SHEET);
+    return xlStep('保存先シートの確認',ctx.sync()).then(function(){
+      if(ws.isNullObject)return null;
+      var rg=ws.getRange('A1:A'+DATA_ROWS);rg.load('values');
+      return xlStep('保存データの読み込み',ctx.sync()).then(function(){
+        var txt=rg.values.map(function(r){
+          var v=r[0]==null?'':String(r[0]);
+          return v.indexOf(DATA_PREFIX)===0?v.slice(DATA_PREFIX.length):v;
+        }).join('');
+        if(!txt.trim())return null;
+        try{return JSON.parse(txt)}catch(e){throw new Error('保存データが壊れています。「今すぐExcelに保存」で上書きするか、JSONバックアップから戻してください')}
+      });
+    });
+  });
+}
+function xlWriteData(){
+  var json=JSON.stringify(S),rows=[];
+  for(var i=0;i<json.length;i+=DATA_CHUNK)rows.push([DATA_PREFIX+json.slice(i,i+DATA_CHUNK)]);
+  if(rows.length>DATA_ROWS)return Promise.reject(new Error('データが大きすぎて保存できません'));
+  return Excel.run(function(ctx){
+    var wss=ctx.workbook.worksheets,ws=wss.getItemOrNullObject(DATA_SHEET),created=false;
+    return xlStep('保存先シートの確認',ctx.sync()).then(function(){
+      if(ws.isNullObject){ws=wss.add(DATA_SHEET);created=true}
+      else ws.getRange('A1:A'+DATA_ROWS).clear(Excel.ClearApplyTo.contents);
+      return xlStep('保存先シートの準備',ctx.sync());
+    }).then(function(){
+      var rg=ws.getRangeByIndexes(0,0,rows.length,1);
+      rg.numberFormat=rows.map(function(){return ['@']});
+      rg.values=rows;
+      return xlStep('データの書き込み',ctx.sync());
+    }).then(function(){
+      if(!created)return;
+      ws.visibility=Excel.SheetVisibility.hidden;
+      return ctx.sync().catch(function(){});
+    });
+  });
+}
+function xlSave(){
+  saveState='Excelに保存中…';paintStatus();
+  return xlQueue(xlWriteData).then(function(){
+    saveState='Excelに保存しました（'+hhmm()+'）';paintStatus();
+  }).catch(function(err){
+    saveState='Excelに保存できませんでした：'+(err&&err.message?err.message:err);paintStatus();notify(saveState,true);
+  });
+}
+function xlReports(activate){
+  saveState='Excelの表を更新中…';paintStatus();
+  return xlQueue(function(){return xlWriteReports(activate)}).then(function(){
+    XL.reportAt=hhmm();XL.dirty=false;
+    saveState='Excelの表を更新しました（'+hhmm()+'）'+warnTail();paintStatus();
+  }).catch(function(err){
+    saveState='Excelの表を更新できませんでした：'+(err&&err.message?err.message:err);paintStatus();notify(saveState,true);
+  });
+}
+
+/* ---------- Excel: 見やすい表（「漏洩_」シート。アドインが作り直す一方向の出力） ---------- */
+/* 値の書き込みは必ず行い、書式は1つずつ別に実行する。書式が失敗してもデータは残り、警告として表示する。 */
+function xdeco(label,fn){XL.deco.push({label:label,fn:fn})}
+function xrunDeco(ctx){
+  var p=Promise.resolve();
+  XL.deco.forEach(function(d){
+    p=p.then(function(){
+      try{d.fn()}catch(e){XL.warn.push(d.label);return}
+      return ctx.sync().catch(function(e){XL.warn.push(d.label+(e&&e.code?'['+e.code+']':''))});
+    });
+  });
+  return p;
+}
+function xgrid(ws,rows,r0,c0){
+  var rg=ws.getRangeByIndexes(r0||0,c0||0,rows.length,rows[0].length);
+  rg.numberFormat=rows.map(function(r){return r.map(function(){return '@'})});
+  rg.values=rows;
+  return rg;
+}
+function xhead(rg){rg.format.fill.color=XC.head;rg.format.font.color=XC.white;rg.format.font.bold=true}
+function xtable(ws,rows,name,label){
+  var rg=xgrid(ws,rows,0,0);
+  xhead(ws.getRangeByIndexes(0,0,1,rows[0].length));
+  xdeco('表（'+label+'）',function(){if(rows.length>1){var t=ws.tables.add(rg,true);t.name=name;t.style='TableStyleLight9'}});
+  xdeco('見出し行の固定（'+label+'）',function(){ws.freezePanes.freezeRows(1)});
+  return rg;
+}
+function xwidths(ws,label,list){xdeco('列幅（'+label+'）',function(){list.forEach(function(w,i){ws.getRangeByIndexes(0,i,1,1).getEntireColumn().format.columnWidth=w})})}
+function xwrap(label,rg){xdeco('折り返し（'+label+'）',function(){rg.format.wrapText=true;rg.format.verticalAlignment='Top'})}
+function xcf(label,rg,defs){
+  xdeco('色分け（'+label+'）',function(){
+    defs.forEach(function(d){
+      var cf=rg.conditionalFormats.add(Excel.ConditionalFormatType.containsText);
+      cf.textComparison.format.fill.color=d[1];
+      if(d[2])cf.textComparison.format.font.color=d[2];
+      cf.textComparison.rule={operator:Excel.ConditionalTextOperator.contains,text:d[0]};
+    });
+  });
+}
+var JLAB={'in':'点検対象',out:'対象外',pending:'判定待ち'};
+var RLAB={ok:'OK',ng:'要対応',na:'対象外'};
+var OUT_LABEL='対象外（起因）';
+
+function rpMeasures(ws){
+  var L='対策一覧';
+  var rows=[['起因','重要度','発生しやすさ','責任分界','概要','対象判定の設問','原因','対策：予防','対策：検知','対策：事後対応','点検方法（頻度）','関連事例・参考資料','最終更新']];
+  S.causes.forEach(function(c){
+    var h=c.history[c.history.length-1];
+    rows.push([c.name,c.severity||'',c.likelihood||'',c.owner||'',c.summary||'',
+      (c.scopeQs||[]).map(function(q){return '・'+q.text}).join('\n'),
+      c.reasons.map(function(r){return '・'+r}).join('\n')]
+      .concat(MTYPES.map(function(t){return (c.measures[t]||[]).map(function(m){return '・'+m}).join('\n')}))
+      .concat([c.checks.map(function(k,i){return (i+1)+'. '+k.text+'（'+k.freq+'）'}).join('\n'),
+        c.refs.map(function(r){return r.url?r.label+' '+r.url:r.label}).join('\n'),
+        h?h.date+' '+h.note:'']));
+  });
+  var rg=xtable(ws,rows,'tblLeakMeasures',L);
+  xwrap(L,rg);
+  xwidths(ws,L,[150,50,70,90,240,240,240,220,200,200,280,200,140]);
+}
+function rpTargets(ws){
+  var L='取引先';
+  var rows=[['取引先','点検対象']];
+  S.targets.forEach(function(t){rows.push([t.name,t.inScope?'はい':'いいえ'])});
+  xtable(ws,rows,'tblLeakTargets',L);
+  xwidths(ws,L,[200,100]);
+}
+function rpJudge(ws){
+  var L='対象判定';
+  var rows=[['取引先','起因','設問','回答','判定']];
+  inTargets().forEach(function(t){
+    var a=S.scopeA[t.name]||{};
+    S.causes.forEach(function(c){
+      var j=JLAB[judge(t.name,c.id).s],qs=c.scopeQs||[];
+      if(qs.length)qs.forEach(function(q){rows.push([t.name,c.name,q.text,a[q.id]==='y'?'はい':a[q.id]==='n'?'いいえ':'',j])});
+      else rows.push([t.name,c.name,'（設問なし）この起因を点検するか',offR(t.name,c.id)!==null?'いいえ':'はい',j]);
+    });
+  });
+  var rg=xtable(ws,rows,'tblLeakJudge',L);
+  xwrap(L,rg);
+  if(rows.length>1)xcf(L,ws.getRangeByIndexes(1,4,rows.length-1,1),[['判定待ち','#FBF1D6','#6E4D00'],['対象外',XC.none,XC.sub]]);
+  xwidths(ws,L,[160,150,340,70,90]);
+}
+function rpResults(ws){
+  var L='点検結果';
+  var rows=[['取引先','起因','判定','点検項目','頻度','結果','メモ・証跡・期限','点検日']];
+  inTargets().forEach(function(t){
+    S.causes.forEach(function(c){
+      var j=judge(t.name,c.id);
+      c.checks.forEach(function(k){
+        var r=res(t.name,k.id)||{};
+        if(j.s==='out')rows.push([t.name,c.name,'対象外',k.text,k.freq,OUT_LABEL,j.r||'','']);
+        else rows.push([t.name,c.name,JLAB[j.s],k.text,k.freq,RLAB[r.s]||'未点検',r.m||'',r.d||'']);
+      });
+    });
+  });
+  var rg=xtable(ws,rows,'tblLeakResults',L);
+  xwrap(L,rg);
+  if(rows.length>1)xcf(L,ws.getRangeByIndexes(1,5,rows.length-1,1),[['要対応',XC.ngWeak,XC.ngInk],['OK',XC.okWeak,'#123459'],['対象外',XC.none,XC.sub]]);
+  xwidths(ws,L,[160,150,70,340,60,90,240,90]);
+}
+function rpNg(ws){
+  var L='要対応';
+  var rows=[['取引先','起因','点検項目','メモ・証跡・期限','点検日']];
+  inTargets().forEach(function(t){
+    S.causes.forEach(function(c){
+      if(judge(t.name,c.id).s==='out')return;
+      c.checks.forEach(function(k){var r=res(t.name,k.id);if(r&&r.s==='ng')rows.push([t.name,c.name,k.text,r.m||'',r.d||''])});
+    });
+  });
+  if(rows.length===1)rows.push(['要対応の項目はありません','','','','']);
+  var rg=xtable(ws,rows,'tblLeakNg',L);
+  xwrap(L,rg);
+  xwidths(ws,L,[160,150,340,260,90]);
+}
+function rpSummary(ws){
+  var L='サマリ';
+  var T=inTargets(),all=allChecks(),o=stat(T,all),done=0;
+  T.forEach(function(t){if(stat([t],all).none===0)done++});
+  var pct=o.total?Math.round((o.total-o.none)/o.total*100):0;
+  xgrid(ws,[['情報漏洩対策集 サマリ'],['作成日時：'+new Date().toLocaleString('ja-JP')+'　※「漏洩_」シートはアドインが作り直します。編集しても反映されません。']],0,0);
+  xgrid(ws,[['点検対象の取引先',T.length+' / '+S.targets.length+' 社'],['点検実施率',pct+'%（完了 '+done+' 社）'],['要対応の項目',String(o.ng)],['未点検の項目',String(o.none)]],3,0);
+  var r0=8;
+  var rows=[['起因','OK','要対応','対象外','未点検']].concat(S.causes.map(function(c){var a=stat(T,c.checks);return [c.name,a.ok,a.ng,a.na,a.none]}));
+  ws.getRangeByIndexes(r0,0,rows.length,1).numberFormat=rows.map(function(){return ['@']});
+  var cr=ws.getRangeByIndexes(r0,0,rows.length,5);
+  cr.values=rows;
+  xhead(ws.getRangeByIndexes(r0,0,1,5));
+  var m0=r0+rows.length+3;
+  xgrid(ws,[['取引先 × 起因（セルは 点検済み／項目数、要対応があれば「要 n」）']],m0,0);
+  var head=['取引先'].concat(S.causes.map(function(c){return c.name}),['要対応計']);
+  var mrows=[head],fills=[];
+  T.forEach(function(t){
+    var row=[t.name],fr=[null],tot=0;
+    S.causes.forEach(function(c){
+      var j=judge(t.name,c.id).s,s=stat([t],c.checks),d=s.total-s.none;tot+=s.ng;
+      if(j==='pending'){row.push('判定待ち');fr.push([XC.none,XC.sub])}
+      else if(j==='out'){row.push('対象外');fr.push(['#FFFFFF',XC.sub])}
+      else if(s.ng){row.push('要 '+s.ng);fr.push([XC.ng,XC.white])}
+      else if(d===0){row.push('0/'+s.total);fr.push([XC.none,XC.sub])}
+      else if(d===s.total){row.push(d+'/'+s.total);fr.push([XC.ok,XC.white])}
+      else{row.push(d+'/'+s.total);fr.push([XC.okWeak,'#161B26'])}
+    });
+    row.push(tot?String(tot):'');fr.push(null);
+    mrows.push(row);fills.push(fr);
+  });
+  if(mrows.length===1)mrows.push(['点検対象の取引先がありません'].concat(head.slice(1).map(function(){return ''})));
+  xgrid(ws,mrows,m0+1,0);
+  xhead(ws.getRangeByIndexes(m0+1,0,1,head.length));
+  xdeco('書式（'+L+'）',function(){
+    var t=ws.getRange('A1');t.format.font.size=16;t.format.font.bold=true;
+    ws.getRange('A2').format.font.color=XC.sub;
+    ws.getRange('A4:A7').format.font.bold=true;
+    ws.getRange('B6').format.font.color=XC.ngInk;ws.getRange('B6').format.font.bold=true;
+    ws.getRange('A'+(m0+1)).format.font.bold=true;
+    ws.getRangeByIndexes(m0+1,1,1,head.length-1).format.wrapText=true;
+    ws.getRangeByIndexes(m0+2,1,mrows.length-1,head.length-1).format.horizontalAlignment='Center';
+  });
+  xwidths(ws,L,[180].concat(S.causes.map(function(){return 86}),[70]));
+  xdeco('マトリクスの色分け',function(){
+    fills.forEach(function(fr,i){fr.forEach(function(f,j){if(!f)return;var cell=ws.getCell(m0+2+i,j);cell.format.fill.color=f[0];cell.format.font.color=f[1]})});
+  });
+  if(rows.length>1)xdeco('グラフ',function(){
+    var ch=ws.charts.add(Excel.ChartType.barStacked,cr,Excel.ChartSeriesBy.columns);
+    ch.title.text='起因別の点検状況（点検対象の全取引先）';
+    ch.setPosition('G2','O'+(r0+rows.length+2));
+    [XC.ok,XC.ng,XC.na,XC.none].forEach(function(color,i){ch.series.getItemAt(i).format.fill.setSolidColor(color)});
+  });
+}
+function xlWriteReports(activate){
+  XL.warn=[];XL.deco=[];
+  return Excel.run(function(ctx){
+    var wss=ctx.workbook.worksheets,tmp=null,ws={};
+    wss.load('items/name');
+    return xlStep('シート一覧の取得',ctx.sync()).then(function(){
+      var names=wss.items.map(function(x){return x.name});
+      tmp=wss.add('_tmp'+(Date.now()%1000000));
+      var drop=names.filter(function(n){return RP_ORDER.indexOf(n)>=0||n.indexOf('_tmp')===0});
+      drop.forEach(function(n){wss.getItem(n).visibility=Excel.SheetVisibility.visible});
+      return xlStep('既存シートの準備',ctx.sync()).then(function(){
+        drop.forEach(function(n){wss.getItem(n).delete()});
+        return xlStep('既存シートの削除',ctx.sync());
+      });
+    }).then(function(){
+      RP_ORDER.forEach(function(n){ws[n]=wss.add(n)});
+      return xlStep('シートの追加',ctx.sync());
+    }).then(function(){
+      var jobs=[[RP.measures,rpMeasures],[RP.targets,rpTargets],[RP.judge,rpJudge],[RP.results,rpResults],[RP.ng,rpNg],[RP.summary,rpSummary]];
+      var p=Promise.resolve();
+      jobs.forEach(function(j){p=p.then(function(){j[1](ws[j[0]]);return xlStep('「'+j[0]+'」シートへの書き込み',ctx.sync())})});
+      return p;
+    }).then(function(){
+      return xrunDeco(ctx);
+    }).then(function(){
+      tmp.delete();if(activate)ws[RP.summary].activate();
+      return ctx.sync().catch(function(){XL.warn.push('作業用シートの整理')});
+    });
+  });
+}
+
+/* ---------- stats ---------- */
+function stat(targets,checks){
+  var o={ok:0,ng:0,na:0,none:0,total:0};
+  var cm=ckMap();targets.forEach(function(t){checks.forEach(function(k){var r=res(t.name,k.id);o.total++;if(offR(t.name,cm[k.id])!==null)o.na++;else if(!r||!r.s)o.none++;else o[r.s]++})});
+  return o;
+}
+function allChecks(){var a=[];S.causes.forEach(function(c){c.checks.forEach(function(k){a.push(k)})});return a}
+function stackBar(o){
+  if(!o.total)return '<div class="stack"></div>';
+  function w(n){return (n/o.total*100).toFixed(2)+'%'}
+  return '<div class="stack" role="img" aria-label="OK '+o.ok+'、要対応 '+o.ng+'、対象外 '+o.na+'、未点検 '+o.none+'"><span style="width:'+w(o.ok)+';background:var(--ok)"></span><span style="width:'+w(o.ng)+';background:var(--ng)"></span><span style="width:'+w(o.na)+';background:var(--na)"></span></div>';
+}
+var LEGEND='<div class="legend"><span><span class="sw" style="background:var(--ok)"></span>OK</span><span><span class="sw" style="background:var(--ng)"></span>要対応</span><span><span class="sw" style="background:var(--na)"></span>対象外</span><span><span class="sw" style="background:var(--none);border:1px solid var(--line)"></span>未点検</span></div>';
+
+/* ---------- views ---------- */
+function vLearn(){
+  var q=UI.q.trim().toLowerCase();
+  function hit(c){if(!q)return true;var t=[c.name,c.summary].concat(c.reasons,c.measures['予防'],c.measures['検知'],c.measures['事後対応'],c.checks.map(function(k){return k.text})).join('\n').toLowerCase();return t.indexOf(q)>=0}
+  var list=S.causes.filter(hit);
+  if(list.length&&!list.find(function(c){return c.id===UI.cause}))UI.cause=list[0].id;
+  var c=cause(UI.cause);
+  var side='<nav class="side" aria-label="起因"><div class="cap">起因</div>'+list.map(function(x){
+    return '<button class="item" data-act="cause" data-id="'+x.id+'" aria-current="'+(x.id===UI.cause)+'"><span>'+esc(x.name)+'</span><span class="n">'+x.checks.length+'</span></button>'}).join('')+
+    (list.length?'':'<div class="meta" style="padding:8px 12px">該当なし</div>')+
+    '<button class="btn ghost no-print" style="margin-top:8px" data-act="add-cause">＋ 起因を追加</button></nav>';
+  var main='';
+  if(c&&list.length){
+    var meas=MTYPES.map(function(t){var a=c.measures[t]||[];if(!a.length)return '';return '<div class="mtype">'+t+'</div><ul class="plain">'+a.map(function(m){return '<li>'+hl(m)+'</li>'}).join('')+'</ul>'}).join('');
+    main='<section class="panel"><div class="toolbar"><div class="pills"><span class="pill '+sevCls(c.severity)+'">重要度 '+esc(c.severity)+'</span><span class="pill">発生しやすさ '+esc(c.likelihood)+'</span><span class="pill">責任：'+esc(c.owner)+'</span></div>'+
+      '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="go-inspect" data-id="'+c.id+'">この起因を点検する</button><button class="btn small primary" data-act="edit-cause" data-id="'+c.id+'">編集</button></div></div>'+
+      '<h1 class="h1">'+hl(c.name)+'</h1><p class="lead">'+hl(c.summary)+'</p></section>'+
+      '<div class="grid3"><section class="panel"><h2>原因</h2><ul class="plain">'+c.reasons.map(function(r){return '<li>'+hl(r)+'</li>'}).join('')+'</ul></section>'+
+      '<section class="panel"><h2>対策</h2>'+(meas||'<div class="meta">未登録</div>')+'</section>'+
+      '<section class="panel"><h2>点検方法</h2><ol class="plain">'+c.checks.map(function(k){return '<li>'+hl(k.text)+'<div class="meta">頻度：'+esc(k.freq)+'</div></li>'}).join('')+'</ol></section></div>'+
+      ((c.scopeQs||[]).length?'<section class="panel"><h2>対象判定の設問</h2><p class="meta" style="margin:0 0 6px">どれか1つでも「はい」なら、この起因の点検対象です。</p><ul class="plain">'+c.scopeQs.map(function(q){return '<li>'+hl(q.text)+'</li>'}).join('')+'</ul></section>':'')+
+      '<div class="grid2"><section class="panel"><h2>関連事例・参考資料</h2>'+(c.refs.length?'<ul class="plain">'+c.refs.map(function(r){return '<li>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+esc(r.label||r.url)+'</a>':esc(r.label))+'</li>'}).join('')+'</ul>':'<div class="meta">未登録</div>')+'</section>'+
+      '<section class="panel hist"><h2>更新履歴</h2>'+c.history.slice().reverse().map(function(h){return '<div><span class="d">'+esc(h.date)+'</span>'+esc(h.note)+'</div>'}).join('')+'</section></div>';
+  }else main='<div class="panel empty">該当する対策がありません。</div>';
+  return '<div class="toolbar no-print" style="margin-bottom:16px"><label class="search"><span class="meta">検索</span><input id="q" type="search" placeholder="原因・対策・点検方法を検索" value="'+esc(UI.q)+'"></label>'+(IN_EXCEL?'':'<button class="btn" data-act="print">印刷</button>')+'</div>'+
+    '<div class="row">'+side+'<main class="main">'+main+'</main></div>';
+}
+
+function vInspect(){
+  var t=S.targets.find(function(x){return x.name===UI.target});
+  if(!t)return '<div class="panel empty">取引先が登録されていません。「データ管理」から追加してください。</div>';
+  var all=allChecks();var o=stat([t],all);var done=o.ok+o.ng+o.na;
+  var head='<section class="panel targetbar"><label class="field" style="flex:1 1 260px"><span>点検対象システム（取引先）</span><select id="target">'+
+    S.targets.map(function(x){return '<option'+(x.name===UI.target?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></label>'+
+    '<label class="switch"><input type="checkbox" id="scope"'+(t.inScope?' checked':'')+'><span>点検の対象にする</span></label>'+
+    (t.inScope?'<div class="prog"><div style="display:flex;justify-content:space-between;font-size:13px;flex-wrap:wrap;gap:8px"><b>点検済み '+done+' / '+o.total+' 項目</b><span class="meta">要対応 '+o.ng+'・対象外 '+o.na+'</span></div>'+stackBar(o)+LEGEND+'</div>':'')+'</section>';
+  if(!t.inScope)return head+'<div class="panel empty" style="margin-top:16px">この取引先は点検の対象外です。対象にする場合は上のチェックを入れてください。</div>';
+  var body=S.causes.map(function(c){
+    var oc=stat([t],c.checks);var open=!!UI.open[c.id];var off=offR(t.name,c.id);var j=judge(t.name,c.id);var hasQ=(c.scopeQs||[]).length>0;
+    var h='<section class="acc'+(off!==null?' off':'')+'"><div class="acchead"><button data-act="toggle" data-id="'+c.id+'" aria-expanded="'+open+'"><span class="t">'+esc(c.name)+'</span>'+
+      (off!==null?'<span class="pill">対象外</span>':j.s==='pending'?'<span class="pill mid">対象判定待ち</span>':(oc.ng?'<span class="pill high">要対応 '+oc.ng+'</span>':'')+'<span class="pill '+sevCls(c.severity)+'">重要度 '+esc(c.severity)+'</span><span class="c">'+(oc.total-oc.none)+' / '+oc.total+'</span>')+
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="'+(open?'M6 15l6-6 6 6':'M6 9l6 6 6-6')+'"></path></svg></button>'+(hasQ?'':'<label class="switch scope"><input type="checkbox" data-cscope="'+c.id+'"'+(off===null?' checked':'')+'><span>この起因を点検する</span></label>')+'</div>';
+    if(open&&hasQ){var qa=S.scopeA[t.name]||{};h+='<div class="judge"><div class="jt">対象判定　<span class="hint">どれか1つでも「はい」なら点検対象になります</span></div>'+c.scopeQs.map(function(q){
+      function b(v,l){return '<button data-act="ans" data-q="'+esc(q.id)+'" data-v="'+v+'" class="'+(qa[q.id]===v?(v==='y'?'on-ok':'on-na'):'')+'" aria-pressed="'+(qa[q.id]===v)+'">'+l+'</button>'}
+      return '<div class="jq"><span>'+esc(q.text)+'</span><div class="seg" role="group" aria-label="回答">'+b('y','はい')+b('n','いいえ')+'</div></div>'}).join('')+
+      '<div class="jr">判定：<b>'+(j.s==='in'?'点検対象':j.s==='out'?'対象外':'未判定（設問に答えてください）')+'</b></div></div>'}
+    if(open&&off!==null)h+='<div class="chk"><label style="flex:1 1 100%"><span class="hint">対象外とした理由（例：クラウドサービスを利用していない）</span><input class="memo" data-offr="'+c.id+'" value="'+esc(manOff(t.name,c.id)||'')+'" placeholder="'+esc(off)+'"></label></div>';
+    else if(open&&j.s==='pending')h+='<div class="chk"><span class="meta">対象判定の設問に答えると、点検項目が表示されます。</span></div>';
+    else if(open)h+=c.checks.map(function(k){
+      var r=res(t.name,k.id)||{};
+      function b(v,l){return '<button data-act="set" data-k="'+k.id+'" data-v="'+v+'" class="'+(r.s===v?'on-'+v:'')+'" aria-pressed="'+(r.s===v)+'">'+l+'</button>'}
+      return '<div class="chk"><div class="q"><b>'+esc(k.text)+'</b><span class="meta">頻度：'+esc(k.freq)+(r.d?'　最終点検：'+esc(r.d):'')+'</span></div>'+
+        '<div class="a"><div class="seg" role="group" aria-label="結果">'+b('ok','OK')+b('ng','要対応')+b('na','対象外')+'</div>'+
+        '<label><span class="hint">メモ・証跡・対応期限</span><input class="memo" data-memo="'+k.id+'" value="'+esc(r.m||'')+'"></label></div></div>';
+    }).join('');
+    return h+'</section>';
+  }).join('');
+  return head+'<div class="toolbar no-print" style="margin:16px 0 10px"><span class="meta">起因を開いて、項目ごとに結果を記録します。</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="open-all">すべて開く</button><button class="btn small" data-act="close-all">すべて閉じる</button></div></div><div style="display:flex;flex-direction:column;gap:10px">'+body+'</div>';
+}
+
+function vViz(){
+  var T=inTargets();var all=allChecks();var o=stat(T,all);
+  var pct=o.total?Math.round((o.total-o.none)/o.total*100):0;
+  var finished=T.filter(function(t){return stat([t],all).none===0}).length;
+  var kpi='<div class="kpis"><div class="panel kpi"><div class="v">'+T.length+'<span style="font-size:16px"> / '+S.targets.length+'</span></div><div class="l">点検対象の取引先</div></div>'+
+    '<div class="panel kpi"><div class="v">'+pct+'%</div><div class="l">点検実施率（完了 '+finished+' 社）</div></div>'+
+    '<div class="panel kpi warn"><div class="v">'+o.ng+'</div><div class="l">要対応の項目</div></div>'+
+    '<div class="panel kpi"><div class="v">'+o.none+'</div><div class="l">未点検の項目</div></div></div>';
+  var bars='<section class="panel"><h2>起因別の点検状況</h2><div class="bars">'+S.causes.map(function(c){var s=stat(T,c.checks);var d=s.total?Math.round((s.total-s.none)/s.total*100):0;
+    return '<div class="r"><span>'+esc(c.name)+'</span>'+stackBar(s)+'<span class="p">'+d+'%</span></div>'}).join('')+'</div><div style="margin-top:12px">'+LEGEND+'</div></section>';
+  var heat='<section class="panel"><h2>取引先 × 起因</h2><p class="meta" style="margin:0 0 10px">セルは「点検済み／項目数」。要対応がある組み合わせは濃い橙。クリックで点検画面へ移動します。</p><div class="scroll"><table class="heat"><thead><tr><th></th>'+
+    S.causes.map(function(c){return '<th scope="col">'+esc(c.name)+'</th>'}).join('')+'<th scope="col">要対応</th></tr></thead><tbody>'+
+    (T.length?T.map(function(t){var tot=0;return '<tr><th scope="row">'+esc(t.name)+'</th>'+S.causes.map(function(c){var s=stat([t],c.checks);tot+=s.ng;var d=s.total-s.none;
+      if(judge(t.name,c.id).s==='pending')return '<td><button class="h-none" data-act="jump" data-t="'+esc(t.name)+'" data-id="'+c.id+'" aria-label="'+esc(t.name)+' '+esc(c.name)+' 対象判定待ち">判定待ち</button></td>';
+      if(offR(t.name,c.id)!==null)return '<td><button class="h-off" data-act="jump" data-t="'+esc(t.name)+'" data-id="'+c.id+'" aria-label="'+esc(t.name)+' '+esc(c.name)+' 対象外">対象外</button></td>';
+      var cls=s.ng?'h-ng':d===0?'h-none':d===s.total?'h-done':'h-part';
+      return '<td><button class="'+cls+'" data-act="jump" data-t="'+esc(t.name)+'" data-id="'+c.id+'" aria-label="'+esc(t.name)+' '+esc(c.name)+' '+d+'/'+s.total+(s.ng?' 要対応'+s.ng:'')+'">'+(s.ng?'要 '+s.ng:d+'/'+s.total)+'</button></td>'}).join('')+'<td style="text-align:center;font-weight:700;color:var(--ng-ink)">'+(tot||'')+'</td></tr>'}).join('')
+     :'<tr><td colspan="'+(S.causes.length+2)+'" class="empty">点検対象の取引先がありません。</td></tr>')+
+    '</tbody></table></div><div class="legend" style="margin-top:10px"><span><span class="sw" style="background:var(--ok)"></span>完了（要対応なし）</span><span><span class="sw" style="background:var(--ok-weak)"></span>点検中</span><span><span class="sw" style="background:var(--ng)"></span>要対応あり</span><span><span class="sw" style="background:var(--none);border:1px solid var(--line)"></span>未着手</span><span><span class="sw" style="border:1px dashed var(--na)"></span>起因ごと対象外</span></div></section>';
+  var ng=[];T.forEach(function(t){S.causes.forEach(function(c){c.checks.forEach(function(k){var r=res(t.name,k.id);if(r&&r.s==='ng')ng.push({t:t.name,c:c,k:k,r:r})})})});
+  var ngl='<section class="panel"><div class="toolbar"><h2 style="margin:0">要対応の一覧</h2>'+(IN_EXCEL?'':'<button class="btn small no-print" data-act="export-csv">CSVで書き出し</button>')+'</div><div class="scroll" style="margin-top:10px">'+
+    (ng.length?'<table class="list"><thead><tr><th>取引先</th><th>起因</th><th>点検項目</th><th>メモ・期限</th><th>点検日</th></tr></thead><tbody>'+ng.map(function(x){
+      return '<tr><td>'+esc(x.t)+'</td><td>'+esc(x.c.name)+'</td><td>'+esc(x.k.text)+'</td><td>'+esc(x.r.m||'')+'</td><td>'+esc(x.r.d||'')+'</td></tr>'}).join('')+'</tbody></table>':'<div class="empty">要対応の項目はありません。</div>')+'</div></section>';
+  return '<div style="display:flex;flex-direction:column;gap:16px">'+kpi+bars+heat+ngl+'</div>';
+}
+
+function vData(){
+  var tg='<section class="panel"><h2>取引先（点検対象システム）</h2><p class="meta" style="margin:0 0 10px">点検の対象かどうかをここで切り替えられます。</p>'+
+    '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><input id="newTarget" class="memo" style="flex:1 1 160px;min-height:44px" placeholder="取引先名" aria-label="追加する取引先名"><button class="btn primary" data-act="add-target">追加</button></div>'+
+    '<div class="tlist">'+S.targets.map(function(t,i){return '<div class="tr"><span class="nm">'+esc(t.name)+'</span><label class="switch"><input type="checkbox" data-scope="'+i+'"'+(t.inScope?' checked':'')+'><span>対象</span></label><button class="btn small danger" data-act="del-target" data-i="'+i+'">削除</button></div>'}).join('')+'</div></section>';
+  var store;
+  if(IN_EXCEL){
+    store='<section class="panel"><h2>Excelへの保存</h2>'+
+      '<p class="meta" style="margin:0 0 10px">この画面の変更は、ブックの非表示シート「_data」に自動で保存されます。ブックを保存すれば（Excel on the web は自動保存）、データもブックと一緒に残ります。</p>'+
+      '<p class="stline" id="repInfo" style="margin-bottom:10px">'+esc(repInfo())+'</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn primary" data-act="update-reports">Excelの表を更新（「漏洩_」シートを作り直す）</button>'+
+      '<button class="btn" data-act="save-now">今すぐExcelに保存</button>'+
+      '<button class="btn" data-act="reload-xl">Excelから再読み込み</button></div>'+
+      '<label class="switch" style="margin-top:8px"><input type="checkbox" data-startup="1"'+(XL.startup?' checked':'')+'><span>ブックを開いたときに、自動でこの画面を開く</span></label>'+
+      '<label class="switch"><input type="checkbox" data-auto="1"'+(S.settings&&S.settings.autoReport?' checked':'')+'><span>変更の12秒後に表も自動で更新する</span></label>'+
+      '<p class="hint" style="margin:6px 0 0">自動更新中は、表のシートが作り直されるため、見ているシートが切り替わることがあります。「漏洩_」で始まるシートは編集しても反映されません。自分用の計算は別のシートに書いてください。</p></section>';
+  }else{
+    store='<section class="panel"><h2>保存について</h2><p class="meta" style="margin:0">いまはExcelの外（ブラウザ）で開いています。変更はこのブラウザに保存されます。Excelのブックに保存するには、このページをExcelのアドインとして開いてください。<br>最終更新：'+esc(new Date(S.updated).toLocaleString('ja-JP'))+'</p></section>';
+  }
+  var bk='<section class="panel"><h2>バックアップ（JSON）</h2><p class="meta" style="margin:0 0 10px">データをJSONで表示・貼り付けできます。読み込むと、置き換えは画面の内容をすべて入れ替え、統合は起因と取引先を追加・上書きして点検結果は新しい日付を優先します。</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn" data-act="show-json">JSONを表示してコピー</button>'+
+    (IN_EXCEL?'':'<button class="btn" data-act="export-json">JSONファイルで保存</button><label class="btn" style="display:inline-flex;align-items:center;cursor:pointer">JSONファイルを統合<input type="file" id="importFile" accept="application/json,.json" style="display:none"></label>')+'</div>'+
+    '<label class="field"><span>JSON</span><textarea id="pasteBox" rows="4" placeholder="ここにJSONを貼り付け"></textarea></label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" data-act="paste-replace">置き換えて読み込む</button><button class="btn" data-act="paste-merge">統合して読み込む</button></div></section>';
+  var rs='<section class="panel"><h2>点検結果のリセット</h2><p class="meta" style="margin:0 0 12px">次の点検サイクルを始めるときに使います。リセット前にJSONを控えておくと記録が残せます。</p><button class="btn danger" data-act="reset-results">点検結果をすべて消す</button></section>';
+  return '<div class="grid2">'+tg+'<div style="display:flex;flex-direction:column;gap:16px">'+store+bk+rs+'</div></div>';
+}
+
+function render(){
+  var tabs=[['learn','対策を見る'],['inspect','点検する'],['viz','可視化'],['data','データ管理']];
+  var v=UI.tab==='learn'?vLearn():UI.tab==='inspect'?vInspect():UI.tab==='viz'?vViz():vData();
+  document.getElementById('root').innerHTML='<header class="top"><div class="brand">情報漏洩対策集</div><div class="tabs" role="tablist">'+
+    tabs.map(function(t){return '<button role="tab" data-act="tab" data-id="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+'</button>'}).join('')+
+    '</div><div class="status" id="status" aria-live="polite">'+esc(saveState)+'</div></header><div class="wrap">'+v+'</div>';
+}
+
+/* ---------- editor ---------- */
+var dlg=null;
+function openEditor(id){
+  var isNew=!id;
+  var c=isNew?{id:'c'+Date.now().toString(36),name:'',severity:'中',likelihood:'中',owner:'構築業者',summary:'',reasons:[],measures:{'予防':[],'検知':[],'事後対応':[]},checks:[],refs:[],history:[],scopeQs:[]}:JSON.parse(JSON.stringify(cause(id)));
+  if(!dlg){dlg=document.createElement('dialog');dlg.setAttribute('aria-labelledby','dlgTitle');document.body.appendChild(dlg)}
+  function sel(name,val,opts){return '<select id="'+name+'">'+opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>'}
+  function ckRow(k){return '<div class="ckrow" data-ck="'+esc(k.id)+'"><input value="'+esc(k.text)+'" placeholder="点検する内容" aria-label="点検項目">'+
+    '<select aria-label="頻度">'+S.freqs.map(function(f){return '<option'+(f===k.freq?' selected':'')+'>'+esc(f)+'</option>'}).join('')+'</select><button type="button" class="btn small" data-rm aria-label="この項目を削除">削除</button></div>'}
+  dlg.innerHTML='<form class="dlg" method="dialog"><h2 id="dlgTitle">'+(isNew?'起因を追加':'「'+esc(c.name)+'」を編集')+'</h2>'+
+    '<label class="field"><span>起因の名前</span><input id="e_name" required value="'+esc(c.name)+'"></label>'+
+    '<div class="g3"><label class="field"><span>重要度</span>'+sel('e_sev',c.severity,['高','中','低'])+'</label><label class="field"><span>発生しやすさ</span>'+sel('e_lik',c.likelihood,['高','中','低'])+'</label><label class="field"><span>責任分界</span>'+sel('e_own',c.owner,['構築業者','顧客','構築業者＋顧客','委託先'])+'</label></div>'+
+    '<label class="field"><span>概要</span><textarea id="e_sum" rows="2">'+esc(c.summary)+'</textarea></label>'+
+    '<label class="field"><span>対象判定の設問（1行に1つ。どれかに「はい」と答えた取引先が点検対象。空欄なら手動で対象／対象外を切り替え）</span><textarea id="e_sq" rows="3">'+esc((c.scopeQs||[]).map(function(q){return q.text}).join('\n'))+'</textarea></label>'+
+    '<label class="field"><span>原因（1行に1つ）</span><textarea id="e_rea" rows="3">'+esc(c.reasons.join('\n'))+'</textarea></label>'+
+    '<div class="g3">'+MTYPES.map(function(t,i){return '<label class="field"><span>対策：'+t+'（1行に1つ）</span><textarea id="e_m'+i+'" rows="4">'+esc((c.measures[t]||[]).join('\n'))+'</textarea></label>'}).join('')+'</div>'+
+    '<div class="field"><span>点検方法</span><div id="e_cks">'+c.checks.map(ckRow).join('')+'</div><button type="button" class="btn small" id="e_addck" style="align-self:flex-start">＋ 点検項目を追加</button><span class="hint">項目を削除すると、その項目の点検結果も消えます。</span></div>'+
+    '<label class="field"><span>関連事例・参考資料（1行に1つ。「表示名 | URL」の形式、URLは省略可）</span><textarea id="e_refs" rows="3">'+esc(c.refs.map(function(r){return r.url?r.label+' | '+r.url:r.label}).join('\n'))+'</textarea></label>'+
+    '<label class="field"><span>更新メモ（更新履歴に残ります）</span><input id="e_note" placeholder="'+(isNew?'新規作成':'例：IPA注意喚起を受けて点検項目を追加')+'"></label>'+
+    '<div class="dlgfoot"><div>'+(isNew?'':'<button type="button" class="btn danger" id="e_del">この起因を削除</button>')+'</div><div style="display:flex;gap:8px"><button type="button" class="btn" id="e_cancel">キャンセル</button><button type="submit" class="btn primary">保存</button></div></div></form>';
+  var cks=dlg.querySelector('#e_cks');
+  dlg.querySelector('#e_addck').onclick=function(){var d=document.createElement('div');d.innerHTML=ckRow({id:c.id+'-'+Date.now().toString(36),text:'',freq:'四半期'});cks.appendChild(d.firstChild);cks.lastChild.querySelector('input').focus()};
+  cks.addEventListener('click',function(e){if(e.target.closest('[data-rm]'))e.target.closest('.ckrow').remove()});
+  dlg.querySelector('#e_cancel').onclick=function(){dlg.close()};
+  if(!isNew)dlg.querySelector('#e_del').onclick=function(){
+    askConfirm('「'+c.name+'」と、その点検結果を削除します。よろしいですか？',function(){
+      S.causes=S.causes.filter(function(x){return x.id!==c.id});
+      Object.keys(S.results).forEach(function(t){c.checks.forEach(function(k){delete S.results[t][k.id]})});
+      Object.keys(S.off).forEach(function(t){delete S.off[t][c.id]});
+      UI.cause=S.causes[0]&&S.causes[0].id;dlg.close();changed();render();
+    });
+  };
+  dlg.querySelector('form').onsubmit=function(e){
+    e.preventDefault();
+    function lines(id){return dlg.querySelector(id).value.split('\n').map(function(s){return s.trim()}).filter(Boolean)}
+    c.name=dlg.querySelector('#e_name').value.trim();if(!c.name){dlg.querySelector('#e_name').focus();return}
+    c.severity=dlg.querySelector('#e_sev').value;c.likelihood=dlg.querySelector('#e_lik').value;c.owner=dlg.querySelector('#e_own').value;
+    c.summary=dlg.querySelector('#e_sum').value.trim();c.reasons=lines('#e_rea');
+    var oldQ=c.scopeQs||[];c.scopeQs=lines('#e_sq').map(function(tx,i){var f=oldQ.find(function(q){return q.text===tx});return f||{id:c.id+'-q'+Date.now().toString(36)+i,text:tx}});
+    MTYPES.forEach(function(t,i){c.measures[t]=lines('#e_m'+i)});
+    var before=c.checks.map(function(k){return k.id});
+    c.checks=[].slice.call(cks.querySelectorAll('.ckrow')).map(function(r){return{id:r.getAttribute('data-ck'),text:r.querySelector('input').value.trim(),freq:r.querySelector('select').value}}).filter(function(k){return k.text});
+    var kept=c.checks.map(function(k){return k.id});
+    before.forEach(function(id){if(kept.indexOf(id)<0)Object.keys(S.results).forEach(function(t){delete S.results[t][id]})});
+    c.refs=lines('#e_refs').map(function(l){var p=l.split('|');return{label:p[0].trim(),url:(p[1]||'').trim()}});
+    c.history.push({date:today(),note:dlg.querySelector('#e_note').value.trim()||(isNew?'新規作成':'更新')});
+    if(isNew)S.causes.push(c);else S.causes[S.causes.findIndex(function(x){return x.id===c.id})]=c;
+    UI.cause=c.id;dlg.close();changed();render();
+  };
+  dlg.showModal();dlg.querySelector('#e_name').focus();
+}
+
+/* ---------- import / export ---------- */
+function mergeImport(d){
+  if(!d||!Array.isArray(d.causes)||!Array.isArray(d.targets))throw new Error('形式が違います');
+  d.causes.forEach(function(c){var i=S.causes.findIndex(function(x){return x.id===c.id});if(i>=0)S.causes[i]=c;else S.causes.push(c)});
+  d.targets.forEach(function(t){var x=S.targets.find(function(y){return y.name===t.name});if(x)x.inScope=t.inScope;else S.targets.push(t)});
+  Object.keys(d.scopeA||{}).forEach(function(t){S.scopeA[t]=Object.assign(S.scopeA[t]||{},d.scopeA[t])});
+  Object.keys(d.off||{}).forEach(function(t){S.off[t]=Object.assign(S.off[t]||{},d.off[t])});
+  Object.keys(d.results||{}).forEach(function(t){S.results[t]=S.results[t]||{};Object.keys(d.results[t]).forEach(function(k){var a=S.results[t][k],b=d.results[t][k];if(!a||(b.d||'')>=(a.d||''))S.results[t][k]=b})});
+}
+function csv(){
+  var rows=[['取引先','起因','点検項目','頻度','結果','メモ','点検日']];
+  var L={ok:'OK',ng:'要対応',na:'対象外'};
+  inTargets().forEach(function(t){S.causes.forEach(function(c){c.checks.forEach(function(k){var r=res(t.name,k.id)||{};var off=offR(t.name,c.id);rows.push([t.name,c.name,k.text,k.freq,off!==null?'対象外（起因）':(L[r.s]||'未点検'),off!==null?off:(r.m||''),off!==null?'':(r.d||'')])})})});
+  return '\ufeff'+rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
+}
+
+/* ---------- events ---------- */
+var root=document.getElementById('root');
+root.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var a=el.getAttribute('data-act'),id=el.getAttribute('data-id');
+  if(a==='tab'){UI.tab=id;render();window.scrollTo(0,0)}
+  else if(a==='cause'){UI.cause=id;render()}
+  else if(a==='add-cause')openEditor(null);
+  else if(a==='edit-cause')openEditor(id);
+  else if(a==='print')window.print();
+  else if(a==='go-inspect'){UI.tab='inspect';UI.open={};UI.open[id]=true;render();window.scrollTo(0,0)}
+  else if(a==='toggle'){UI.open[id]=!UI.open[id];render()}
+  else if(a==='open-all'){S.causes.forEach(function(c){UI.open[c.id]=true});render()}
+  else if(a==='close-all'){UI.open={};render()}
+  else if(a==='set'){
+    var k=el.getAttribute('data-k'),v=el.getAttribute('data-v');var m=S.results[UI.target]=S.results[UI.target]||{};
+    var cur=m[k]||{};if(cur.s===v){delete cur.s;delete cur.d}else{cur.s=v;cur.d=today()}
+    if(!cur.s&&!cur.m)delete m[k];else m[k]=cur;changed();render();
+  }
+  else if(a==='ans'){var qa=S.scopeA[UI.target]=S.scopeA[UI.target]||{};var qid=el.getAttribute('data-q'),qv=el.getAttribute('data-v');if(qa[qid]===qv)delete qa[qid];else qa[qid]=qv;changed();render()}
+  else if(a==='jump'){UI.target=el.getAttribute('data-t');UI.tab='inspect';UI.open={};UI.open[id]=true;render();window.scrollTo(0,0)}
+  else if(a==='add-target'){var inp=document.getElementById('newTarget');var n=inp.value.trim();if(!n)return;if(S.targets.find(function(t){return t.name===n})){notify('同じ名前の取引先があります',true);return}S.targets.push({name:n,inScope:true});changed();render()}
+  else if(a==='del-target'){var i=+el.getAttribute('data-i');var t=S.targets[i];askConfirm('「'+t.name+'」と、その点検結果を削除します。よろしいですか？',function(){S.targets.splice(i,1);delete S.results[t.name];delete S.off[t.name];delete S.scopeA[t.name];if(UI.target===t.name)UI.target=S.targets[0]&&S.targets[0].name;changed();render()})}
+  else if(a==='export-json')saveFile('情報漏洩対策集_'+today()+'.json',JSON.stringify(S,null,2),'application/json');
+  else if(a==='export-csv')saveFile('点検結果_'+today()+'.csv',csv(),'text/csv');
+  else if(a==='show-json'){var box=document.getElementById('pasteBox');box.value=JSON.stringify(S);box.focus();box.select();var ok=false;try{ok=document.execCommand('copy')}catch(_){}notify(ok?'JSONをコピーしました':'JSONを欄に表示しました。選択してコピーしてください')}
+  else if(a==='paste-replace'||a==='paste-merge'){
+    var raw=(document.getElementById('pasteBox').value||'').trim();
+    if(!raw){notify('JSONを貼り付けてください',true);return}
+    var d;try{d=JSON.parse(raw);if(!d||!Array.isArray(d.causes)||!Array.isArray(d.targets))throw new Error('情報漏洩対策集のJSONではありません')}catch(err){notify('読み込めませんでした：'+(err instanceof SyntaxError?'JSONとして読み取れません':err.message),true);return}
+    if(a==='paste-replace'){askConfirm('いまの内容を、貼り付けたJSONで置き換えます。よろしいですか？',function(){S=normalizeS(d);fixUI();changed();render();notify('読み込みました')})}
+    else{mergeImport(d);changed();render();notify('読み込みました')}
+  }
+  else if(a==='reset-results'){askConfirm('全取引先の点検結果を消します。よろしいですか？',function(){S.results={};changed();render()})}
+  else if(a==='save-now'){XL.loadFailed=false;xlSave()}
+  else if(a==='reload-xl'){askConfirm('Excelに保存されている内容で、いまの画面を置き換えます。保存前の変更は失われます。よろしいですか？',function(){bootExcel()})}
+  else if(a==='update-reports'){XL.loadFailed=false;xlSave().then(function(){return xlReports(true)})}
+});
+root.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='target'){UI.target=t.value;render()}
+  else if(t.id==='scope'){var x=S.targets.find(function(y){return y.name===UI.target});x.inScope=t.checked;changed();render()}
+  else if(t.hasAttribute('data-cscope')){var cid=t.getAttribute('data-cscope');var o=S.off[UI.target]=S.off[UI.target]||{};if(t.checked)delete o[cid];else{o[cid]='';UI.open[cid]=true}changed();render()}
+  else if(t.hasAttribute('data-offr')){var o2=S.off[UI.target]=S.off[UI.target]||{};o2[t.getAttribute('data-offr')]=t.value.trim();changed()}
+  else if(t.hasAttribute('data-scope')){S.targets[+t.getAttribute('data-scope')].inScope=t.checked;changed()}
+  else if(t.hasAttribute('data-memo')){var k=t.getAttribute('data-memo');var m=S.results[UI.target]=S.results[UI.target]||{};var cur=m[k]||{};cur.m=t.value.trim();if(!cur.s&&!cur.m)delete m[k];else m[k]=cur;changed()}
+  else if(t.hasAttribute('data-startup')){xlSetStartup(t.checked)}
+  else if(t.hasAttribute('data-auto')){S.settings=S.settings||{};S.settings.autoReport=t.checked;changed()}
+  else if(t.id==='importFile'&&t.files[0]){var f=new FileReader();f.onload=function(){try{mergeImport(JSON.parse(f.result));changed();render();notify('読み込みました')}catch(err){notify('読み込めませんでした：'+err.message,true)}};f.readAsText(t.files[0])}
+});
+root.addEventListener('input',function(e){
+  if(e.target.id==='q'){UI.q=e.target.value;var pos=e.target.selectionStart;render();var q=document.getElementById('q');q.focus();try{q.setSelectionRange(pos,pos)}catch(_){}}
+});
+root.addEventListener('keydown',function(e){if(e.target.id==='newTarget'&&e.key==='Enter'){e.preventDefault();var b=root.querySelector('[data-act="add-target"]');if(b)b.click()}});
+
+/* ---------- 起動 ---------- */
+function fixUI(){
+  if(!cause(UI.cause))UI.cause=S.causes[0]&&S.causes[0].id;
+  if(!S.targets.find(function(t){return t.name===UI.target})){var f=S.targets.find(function(t){return t.inScope});UI.target=f?f.name:(S.targets[0]&&S.targets[0].name)}
+}
+function normalizeS(d){
+  if(!d||!Array.isArray(d.causes)||!Array.isArray(d.targets))throw new Error('情報漏洩対策集のデータではありません');
+  d.results=d.results||{};d.off=d.off||{};d.scopeA=d.scopeA||{};d.settings=d.settings||{};
+  d.freqs=d.freqs||['月次','四半期','半期','年次','作業ごと','変更時'];
+  d.updated=d.updated||new Date().toISOString();
+  d.causes.forEach(function(c){
+    c.checks=c.checks||[];c.reasons=c.reasons||[];c.measures=c.measures||{};c.refs=c.refs||[];c.history=c.history||[];
+    if(!c.scopeQs)c.scopeQs=(DEFQ[c.id]||[]).map(function(t,i){return{id:c.id+'-q'+(i+1),text:t}});
+  });
+  return d;
+}
+function bootBrowser(){
+  try{var local=JSON.parse(localStorage.getItem(LS_KEY)||'null');if(local&&Array.isArray(local.causes)&&local.updated>S.updated)S=normalizeS(local)}catch(e){}
+  fixUI();render();
+}
+function bootExcel(){
+  IN_EXCEL=true;XL.loadFailed=false;saveState='Excelから読み込み中…';render();
+  xlStartupInit();
+  return xlLoad().then(function(d){
+    if(d){S=normalizeS(d);saveState='Excelから読み込みました（'+hhmm()+'）'}
+    else saveState='このブックにはまだ保存されていません。変更すると自動で保存されます。';
+    fixUI();render();
+  }).catch(function(err){
+    XL.loadFailed=true;saveState='Excelから読み込めませんでした：'+(err&&err.message?err.message:err);render();notify(saveState,true);
+  });
+}
+/* 共有ランタイム：ブックを開いたときに自動で起動・表示する設定 */
+function xlStartupInit(){
+  try{
+    if(Office.addin&&Office.addin.getStartupBehavior){
+      Office.addin.getStartupBehavior().then(function(b){
+        XL.startup=(b===Office.StartupBehavior.load);
+        if(XL.startup&&Office.addin.showAsTaskpane)return Office.addin.showAsTaskpane();
+      }).then(function(){if(UI.tab==='data'&&!document.activeElement.id)render()}).catch(function(){});
+    }
+  }catch(e){}
+}
+function xlSetStartup(on){
+  if(!(typeof Office!=='undefined'&&Office.addin&&Office.addin.setStartupBehavior)){notify('この環境では自動起動の設定ができません',true);XL.startup=false;render();return}
+  Office.addin.setStartupBehavior(on?Office.StartupBehavior.load:Office.StartupBehavior.none).then(function(){
+    XL.startup=on;notify(on?'次回からブックを開くと、自動でこの画面が開きます':'自動で開く設定を解除しました');
+  }).catch(function(e){notify('設定できませんでした：'+(e&&e.message?e.message:e),true);XL.startup=!on;render()});
+}
+var booted=false;
+function boot(excel){if(booted)return;booted=true;if(excel)bootExcel();else bootBrowser()}
+var HOSTHINT=/[?&]_host_Info=Excel/i.test((typeof location!=='undefined'&&location.search)||'');
+if(typeof Office!=='undefined'&&Office.onReady){
+  Office.onReady(function(info){boot(!!(info&&Office.HostType&&info.host===Office.HostType.Excel))});
+  if(!HOSTHINT)setTimeout(function(){boot(false)},3000);
+}else boot(false);
+})();
+</script>
 </body>
 </html>
