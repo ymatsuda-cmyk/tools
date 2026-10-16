@@ -1,7 +1,7 @@
 {
   "id": "minutes-data",
   "description": "議事録データフォルダ",
-  "enabled": true,
+  "enabled": false,
   "source_folder": "/Users/yuya/scripts/data/minutes",
   "repository_root": "/Users/yuya/tools",
   "repo_subfolder": "data/minutes",
