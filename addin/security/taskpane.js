@@ -53,37 +53,77 @@
   }
   function inTargets(S) { return S.targets.filter(function (t) { return t.inScope; }); }
 
-  /* ---------- 書き込みヘルパー ---------- */
-  function grid(ws, rows, r0, c0, asText) {
+  /* ---------- 書き込みヘルパー ----------
+   * 「値の書き込み」は必ず行い、書式（表・列幅・色・入力規則・グラフなど）は
+   * 1つずつ別に実行します。書式が失敗してもデータは残り、警告として表示します。 */
+  var WARN = [], DECO = [];
+  function deco(label, fn) { DECO.push({ label: label, fn: fn }); }
+  function runDecos(ctx) {
+    var p = Promise.resolve();
+    DECO.forEach(function (d) {
+      p = p.then(function () {
+        try { d.fn(); } catch (e) { WARN.push(d.label); return; }
+        return ctx.sync().catch(function (e) { WARN.push(d.label + (e && e.code ? '[' + e.code + ']' : '')); });
+      });
+    });
+    return p;
+  }
+  function step(label, p) {
+    return p.catch(function (e) {
+      var loc = e && e.debugInfo && e.debugInfo.errorLocation ? '（' + e.debugInfo.errorLocation + '）' : '';
+      var err = new Error(label + 'でエラー：' + (e && e.message ? e.message : String(e)) + loc);
+      err.cause = e; throw err;
+    });
+  }
+  function warnTail() { return WARN.length ? ' ※一部の書式は適用できませんでした：' + WARN.join('、') : ''; }
+
+  function grid(ws, rows, r0, c0) {
     var rg = ws.getRangeByIndexes(r0 || 0, c0 || 0, rows.length, rows[0].length);
-    if (asText !== false) rg.numberFormat = rows.map(function (r) { return r.map(function () { return '@'; }); });
+    rg.numberFormat = rows.map(function (r) { return r.map(function () { return '@'; }); });
     rg.values = rows;
     return rg;
   }
   function headStyle(rg) { rg.format.fill.color = COL.head; rg.format.font.color = COL.white; rg.format.font.bold = true; }
-  function widths(ws, list) { list.forEach(function (w, i) { ws.getRangeByIndexes(0, i, 1, 1).getEntireColumn().format.columnWidth = w; }); }
-  function table(ws, rows, name) {
+  function table(ws, rows, name, label) {
     var rg = grid(ws, rows, 0, 0);
-    if (rows.length > 1) { var t = ws.tables.add(rg, true); t.name = name; t.style = 'TableStyleLight9'; }
-    else headStyle(rg);
-    ws.freezePanes.freezeRows(1);
+    headStyle(ws.getRangeByIndexes(0, 0, 1, rows[0].length));
+    deco('表（' + label + '）', function () {
+      if (rows.length > 1) { var t = ws.tables.add(rg, true); t.name = name; t.style = 'TableStyleLight9'; }
+    });
+    deco('見出し行の固定（' + label + '）', function () { ws.freezePanes.freezeRows(1); });
     return rg;
   }
-  function listRule(ws, col, n, source) {
-    if (n < 1) return;
-    var rg = ws.getRangeByIndexes(1, col, n, 1);
-    rg.dataValidation.clear();
-    rg.dataValidation.rule = { list: { inCellDropDown: true, source: source } };
+  function widthsDeco(ws, label, list) {
+    deco('列幅（' + label + '）', function () { list.forEach(function (w, i) { ws.getRangeByIndexes(0, i, 1, 1).getEntireColumn().format.columnWidth = w; }); });
   }
-  function textCF(rg, text, fill, font) {
-    var cf = rg.conditionalFormats.add(Excel.ConditionalFormatType.containsText);
-    cf.textComparison.format.fill.color = fill;
-    if (font) cf.textComparison.format.font.color = font;
-    cf.textComparison.rule = { operator: Excel.ConditionalTextOperator.contains, text: text };
+  function wrapDeco(label, rg) {
+    deco('折り返し（' + label + '）', function () { rg.format.wrapText = true; rg.format.verticalAlignment = 'Top'; });
+  }
+  function hideDeco(ws, label, col) {
+    deco('ID列の非表示（' + label + '）', function () { ws.getRangeByIndexes(0, col, 1, 1).getEntireColumn().columnHidden = true; });
+  }
+  function listDeco(ws, label, col, n, source) {
+    if (n < 1) return;
+    deco('プルダウン（' + label + '）', function () {
+      var rg = ws.getRangeByIndexes(1, col, n, 1);
+      rg.dataValidation.clear();
+      rg.dataValidation.rule = { list: { inCellDropDown: true, source: source } };
+    });
+  }
+  function cfDeco(label, rg, defs) {
+    deco('色分け（' + label + '）', function () {
+      defs.forEach(function (d) {
+        var cf = rg.conditionalFormats.add(Excel.ConditionalFormatType.containsText);
+        cf.textComparison.format.fill.color = d[1];
+        if (d[2]) cf.textComparison.format.font.color = d[2];
+        cf.textComparison.rule = { operator: Excel.ConditionalTextOperator.contains, text: d[0] };
+      });
+    });
   }
 
   /* ---------- 各シート ---------- */
   function sheetMeasures(ws, S) {
+    var L = '対策一覧';
     var rows = [['起因ID', '起因', '重要度', '発生しやすさ', '責任分界', '概要', '対象判定の設問', '原因', '対策：予防', '対策：検知', '対策：事後対応', '点検方法（頻度）', '関連事例・参考資料', '最終更新']];
     S.causes.forEach(function (c) {
       var h = c.history[c.history.length - 1];
@@ -95,20 +135,22 @@
           c.refs.map(function (r) { return r.url ? r.label + ' ' + r.url : r.label; }).join('\n'),
           h ? h.date + ' ' + h.note : '']));
     });
-    var rg = table(ws, rows, 'tblMeasures');
-    rg.format.wrapText = true; rg.format.verticalAlignment = 'Top';
-    widths(ws, [70, 150, 50, 70, 90, 240, 240, 240, 220, 200, 200, 280, 200, 140]);
+    var rg = table(ws, rows, 'tblMeasures', L);
+    wrapDeco(L, rg);
+    widthsDeco(ws, L, [70, 150, 50, 70, 90, 240, 240, 240, 220, 200, 200, 280, 200, 140]);
   }
 
   function sheetTargets(ws, S) {
+    var L = '取引先';
     var rows = [['取引先', '点検対象（はい／いいえ）']];
     S.targets.forEach(function (t) { rows.push([t.name, t.inScope ? 'はい' : 'いいえ']); });
-    table(ws, rows, 'tblTargets');
-    listRule(ws, 1, rows.length - 1, 'はい,いいえ');
-    widths(ws, [200, 150]);
+    table(ws, rows, 'tblTargets', L);
+    listDeco(ws, L, 1, rows.length - 1, 'はい,いいえ');
+    widthsDeco(ws, L, [200, 150]);
   }
 
   function sheetJudge(ws, S) {
+    var L = '対象判定';
     var rows = [['取引先', '起因ID', '起因', '設問ID', '設問', '回答（はい／いいえ）', '判定（集計更新時）']];
     inTargets(S).forEach(function (t) {
       var a = S.scopeA[t.name] || {};
@@ -120,15 +162,16 @@
         else rows.push([t.name, c.id, c.name, 'manual', '（設問なし）この起因を点検するか', manOff(S, t.name, c.id) !== null ? 'いいえ' : 'はい', j]);
       });
     });
-    var rg = table(ws, rows, 'tblJudge');
-    rg.format.wrapText = true; rg.format.verticalAlignment = 'Top';
-    listRule(ws, 5, rows.length - 1, 'はい,いいえ');
-    if (rows.length > 1) { var jr = ws.getRangeByIndexes(1, 6, rows.length - 1, 1); textCF(jr, '判定待ち', '#FBF1D6', '#6E4D00'); textCF(jr, '対象外', COL.none, COL.sub); }
-    widths(ws, [160, 60, 150, 90, 340, 120, 110]);
-    ws.getRangeByIndexes(0, 3, 1, 1).getEntireColumn().columnHidden = true;
+    var rg = table(ws, rows, 'tblJudge', L);
+    wrapDeco(L, rg);
+    listDeco(ws, L, 5, rows.length - 1, 'はい,いいえ');
+    if (rows.length > 1) cfDeco(L, ws.getRangeByIndexes(1, 6, rows.length - 1, 1), [['判定待ち', '#FBF1D6', '#6E4D00'], ['対象外', COL.none, COL.sub]]);
+    widthsDeco(ws, L, [160, 60, 150, 90, 340, 120, 110]);
+    hideDeco(ws, L, 3);
   }
 
   function sheetResults(ws, S) {
+    var L = '点検結果';
     var rows = [['取引先', '起因ID', '起因', '判定', '点検項目ID', '点検項目', '頻度', '結果', 'メモ・証跡・期限', '点検日']];
     inTargets(S).forEach(function (t) {
       var m = S.results[t.name] || {};
@@ -141,18 +184,16 @@
         });
       });
     });
-    var rg = table(ws, rows, 'tblResults');
-    rg.format.wrapText = true; rg.format.verticalAlignment = 'Top';
-    listRule(ws, 7, rows.length - 1, 'OK,要対応,対象外,未点検');
-    if (rows.length > 1) {
-      var rr = ws.getRangeByIndexes(1, 7, rows.length - 1, 1);
-      textCF(rr, '要対応', COL.ngWeak, COL.ngInk); textCF(rr, 'OK', COL.okWeak, '#123459'); textCF(rr, '対象外', COL.none, COL.sub);
-    }
-    widths(ws, [160, 60, 150, 70, 80, 340, 60, 80, 240, 90]);
-    ws.getRangeByIndexes(0, 4, 1, 1).getEntireColumn().columnHidden = true;
+    var rg = table(ws, rows, 'tblResults', L);
+    wrapDeco(L, rg);
+    listDeco(ws, L, 7, rows.length - 1, 'OK,要対応,対象外,未点検');
+    if (rows.length > 1) cfDeco(L, ws.getRangeByIndexes(1, 7, rows.length - 1, 1), [['要対応', COL.ngWeak, COL.ngInk], ['OK', COL.okWeak, '#123459'], ['対象外', COL.none, COL.sub]]);
+    widthsDeco(ws, L, [160, 60, 150, 70, 80, 340, 60, 80, 240, 90]);
+    hideDeco(ws, L, 4);
   }
 
   function sheetNg(ws, S) {
+    var L = '要対応';
     var rows = [['取引先', '起因', '点検項目', 'メモ・証跡・期限', '点検日']];
     inTargets(S).forEach(function (t) {
       S.causes.forEach(function (c) {
@@ -161,12 +202,13 @@
       });
     });
     if (rows.length === 1) rows.push(['要対応の項目はありません', '', '', '', '']);
-    var rg = table(ws, rows, 'tblNg');
-    rg.format.wrapText = true; rg.format.verticalAlignment = 'Top';
-    widths(ws, [160, 150, 340, 260, 90]);
+    var rg = table(ws, rows, 'tblNg', L);
+    wrapDeco(L, rg);
+    widthsDeco(ws, L, [160, 150, 340, 260, 90]);
   }
 
   function sheetSummary(ws, S) {
+    var L = 'サマリ';
     var T = inTargets(S), o = { ok: 0, ng: 0, na: 0, none: 0, total: 0 }, done = 0;
     var per = S.causes.map(function (c) {
       var a = { ok: 0, ng: 0, na: 0, none: 0 };
@@ -177,29 +219,18 @@
     T.forEach(function (t) { if (S.causes.every(function (c) { return stat(S, t.name, c).none === 0; })) done++; });
     var pct = o.total ? Math.round((o.total - o.none) / o.total * 100) : 0;
 
-    var title = ws.getRange('A1'); title.values = [['情報漏洩対策集 サマリ']]; title.format.font.size = 16; title.format.font.bold = true;
-    grid(ws, [['集計日時：' + new Date().toLocaleString('ja-JP') + '（「集計を更新」で最新化）']], 1, 0).format.font.color = COL.sub;
-
-    var k = grid(ws, [['点検対象の取引先', T.length + ' / ' + S.targets.length + ' 社'], ['点検実施率', pct + '%（完了 ' + done + ' 社）'], ['要対応の項目', String(o.ng)], ['未点検の項目', String(o.none)]], 3, 0);
-    k.format.font.size = 12;
-    ws.getRange('A4:A7').format.font.bold = true;
-    ws.getRange('B6').format.font.color = COL.ngInk; ws.getRange('B6').format.font.bold = true;
+    grid(ws, [['情報漏洩対策集 サマリ'], ['集計日時：' + new Date().toLocaleString('ja-JP') + '（「集計を更新」で最新化）']], 0, 0);
+    grid(ws, [['点検対象の取引先', T.length + ' / ' + S.targets.length + ' 社'], ['点検実施率', pct + '%（完了 ' + done + ' 社）'], ['要対応の項目', String(o.ng)], ['未点検の項目', String(o.none)]], 3, 0);
 
     var r0 = 8;
     var rows = [['起因', 'OK', '要対応', '対象外', '未点検']].concat(S.causes.map(function (c, i) { return [c.name, per[i].ok, per[i].ng, per[i].na, per[i].none]; }));
-    var cr = ws.getRangeByIndexes(r0, 0, rows.length, 5);
     ws.getRangeByIndexes(r0, 0, rows.length, 1).numberFormat = rows.map(function () { return ['@']; });
+    var cr = ws.getRangeByIndexes(r0, 0, rows.length, 5);
     cr.values = rows;
     headStyle(ws.getRangeByIndexes(r0, 0, 1, 5));
-    if (rows.length > 1) {
-      var ch = ws.charts.add(Excel.ChartType.barStacked, cr, Excel.ChartSeriesBy.columns);
-      ch.title.text = '起因別の点検状況（点検対象の全取引先）';
-      ch.setPosition('G2', 'O' + (r0 + rows.length + 2));
-      [COL.ok, COL.ng, COL.na, COL.none].forEach(function (color, i) { ch.series.getItemAt(i).format.fill.setSolidColor(color); });
-    }
 
     var m0 = r0 + rows.length + 3;
-    grid(ws, [['取引先 × 起因（セルは 点検済み／項目数、要対応があれば「要 n」）']], m0, 0).format.font.bold = true;
+    grid(ws, [['取引先 × 起因（セルは 点検済み／項目数、要対応があれば「要 n」）']], m0, 0);
     var head = ['取引先'].concat(S.causes.map(function (c) { return c.name; }), ['要対応計']);
     var mrows = [head], fills = [];
     T.forEach(function (t) {
@@ -216,53 +247,74 @@
       row.push(tot ? String(tot) : ''); fr.push(null);
       mrows.push(row); fills.push(fr);
     });
-    if (mrows.length === 1) mrows.push([ '点検対象の取引先がありません' ].concat(head.slice(1).map(function () { return ''; })));
-    var mr = grid(ws, mrows, m0 + 1, 0);
+    if (mrows.length === 1) mrows.push(['点検対象の取引先がありません'].concat(head.slice(1).map(function () { return ''; })));
+    grid(ws, mrows, m0 + 1, 0);
     headStyle(ws.getRangeByIndexes(m0 + 1, 0, 1, head.length));
-    ws.getRangeByIndexes(m0 + 1, 1, 1, head.length - 1).format.wrapText = true;
-    ws.getRangeByIndexes(m0 + 2, 1, mrows.length - 1, head.length - 1).format.horizontalAlignment = 'Center';
-    fills.forEach(function (fr, i) {
-      fr.forEach(function (f, j) {
-        if (!f) return;
-        var cell = ws.getCell(m0 + 2 + i, j);
-        cell.format.fill.color = f[0]; cell.format.font.color = f[1];
+
+    deco('書式（' + L + '）', function () {
+      var t = ws.getRange('A1'); t.format.font.size = 16; t.format.font.bold = true;
+      ws.getRange('A2').format.font.color = COL.sub;
+      ws.getRange('A4:A7').format.font.bold = true;
+      ws.getRange('B6').format.font.color = COL.ngInk; ws.getRange('B6').format.font.bold = true;
+      ws.getRange('A' + (m0 + 1)).format.font.bold = true;
+      ws.getRangeByIndexes(m0 + 1, 1, 1, head.length - 1).format.wrapText = true;
+      ws.getRangeByIndexes(m0 + 2, 1, mrows.length - 1, head.length - 1).format.horizontalAlignment = 'Center';
+    });
+    widthsDeco(ws, L, [180].concat(S.causes.map(function () { return 86; }), [70]));
+    deco('マトリクスの色分け', function () {
+      fills.forEach(function (fr, i) {
+        fr.forEach(function (f, j) {
+          if (!f) return;
+          var cell = ws.getCell(m0 + 2 + i, j);
+          cell.format.fill.color = f[0]; cell.format.font.color = f[1];
+        });
       });
     });
-    mr.format.borders.getItem('InsideHorizontal').color = '#FFFFFF';
-    mr.format.borders.getItem('InsideVertical').color = '#FFFFFF';
-    widths(ws, [180].concat(S.causes.map(function () { return 86; }), [70]));
-    ws.getRange('A1:A7').format.wrapText = false;
+    if (rows.length > 1) deco('グラフ', function () {
+      var ch = ws.charts.add(Excel.ChartType.barStacked, cr, Excel.ChartSeriesBy.columns);
+      ch.title.text = '起因別の点検状況（点検対象の全取引先）';
+      ch.setPosition('G2', 'O' + (r0 + rows.length + 2));
+      [COL.ok, COL.ng, COL.na, COL.none].forEach(function (color, i) { ch.series.getItemAt(i).format.fill.setSolidColor(color); });
+    });
   }
 
   function sheetData(ws, S) {
     var json = JSON.stringify(S), rows = [];
     for (var i = 0; i < json.length; i += CHUNK) rows.push([json.slice(i, i + CHUNK)]);
     grid(ws, rows, 0, 0);
-    ws.visibility = Excel.SheetVisibility.veryHidden;
+    deco('データシートの非表示', function () { ws.visibility = Excel.SheetVisibility.hidden; });
   }
 
   /* ---------- ブック全体を作り直す ---------- */
   function writeAll(S) {
+    WARN = []; DECO = [];
     return Excel.run(function (ctx) {
-      var wss = ctx.workbook.worksheets;
-      var tmp = wss.add('_tmp' + (Date.now() % 1000000));
-      var olds = ORDER.map(function (n) { return wss.getItemOrNullObject(n); });
-      return ctx.sync().then(function () {
-        olds.forEach(function (w) { if (!w.isNullObject) w.delete(); });
-        return ctx.sync();
+      var wss = ctx.workbook.worksheets, tmp = null, ws = {};
+      wss.load('items/name');
+      return step('シート一覧の取得', ctx.sync()).then(function () {
+        var names = wss.items.map(function (x) { return x.name; });
+        tmp = wss.add('_tmp' + (Date.now() % 1000000));
+        var drop = names.filter(function (n) { return ORDER.indexOf(n) >= 0 || n.indexOf('_tmp') === 0; });
+        drop.forEach(function (n) { wss.getItem(n).visibility = Excel.SheetVisibility.visible; });
+        return step('既存シートの準備', ctx.sync()).then(function () {
+          drop.forEach(function (n) { wss.getItem(n).delete(); });
+          return step('既存シートの削除', ctx.sync());
+        });
       }).then(function () {
-        var ws = {};
         ORDER.forEach(function (n) { ws[n] = wss.add(n); });
-        tmp.delete();
-        sheetMeasures(ws[SH.measures], S);
-        sheetTargets(ws[SH.targets], S);
-        sheetJudge(ws[SH.judge], S);
-        sheetResults(ws[SH.results], S);
-        sheetNg(ws[SH.ng], S);
-        sheetSummary(ws[SH.summary], S);
-        sheetData(ws[SH.data], S);
-        ws[SH.summary].activate();
-        return ctx.sync();
+        return step('シートの追加', ctx.sync());
+      }).then(function () {
+        var jobs = [[SH.measures, sheetMeasures], [SH.targets, sheetTargets], [SH.judge, sheetJudge], [SH.results, sheetResults], [SH.ng, sheetNg], [SH.summary, sheetSummary], [SH.data, sheetData]];
+        var p = Promise.resolve();
+        jobs.forEach(function (j) {
+          p = p.then(function () { j[1](ws[j[0]], S); return step('「' + j[0] + '」シートへの書き込み', ctx.sync()); });
+        });
+        return p;
+      }).then(function () {
+        return runDecos(ctx);
+      }).then(function () {
+        tmp.delete(); ws[SH.summary].activate();
+        return ctx.sync().catch(function () { WARN.push('作業用シートの整理'); });
       });
     });
   }
@@ -278,10 +330,10 @@
       var sheets = {};
       [SH.data, SH.targets, SH.judge, SH.results].forEach(function (n) { sheets[n] = wss.getItemOrNullObject(n); });
       var used = {};
-      return ctx.sync().then(function () {
+      return step('シートの確認', ctx.sync()).then(function () {
         if (sheets[SH.data].isNullObject) throw new Error('このブックにはまだデータがありません。先に「1. Excelに保存する」を行ってください。');
         Object.keys(sheets).forEach(function (n) { if (!sheets[n].isNullObject) { used[n] = sheets[n].getUsedRange(); used[n].load('values'); } });
-        return ctx.sync();
+        return step('Excelの入力内容の読み取り', ctx.sync());
       }).then(function () {
         var S = normalize(JSON.parse(used[SH.data].values.map(function (r) { return r[0] == null ? '' : String(r[0]); }).join('')));
 
@@ -341,7 +393,7 @@
     try { S = normalize(JSON.parse(text)); } catch (e) { return Promise.reject(e instanceof SyntaxError ? new Error('JSONとして読み取れません。コピーした内容を確認してください。') : e); }
     setStatus('Excelに書き込んでいます…');
     return writeAll(S).then(function () {
-      setStatus('保存しました：起因 ' + S.causes.length + ' 件、取引先 ' + S.targets.length + ' 社。', 'ok');
+      setStatus('保存しました：起因 ' + S.causes.length + ' 件、取引先 ' + S.targets.length + ' 社。' + warnTail(), 'ok');
     });
   }
   function copyText(text) {
@@ -357,32 +409,9 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
-  /* Excel起動時の自動読み込み（共有ランタイム）。
-     一度手動で開くと「ブックを開いた時に読み込む」設定が登録され、次回以降は自動で起動する。
-     このアドインのシート（対策一覧）があるブックでのみ作業ウィンドウを表示する。 */
-  function isSharedRuntime() {
-    try { return Office.context.requirements.isSetSupported('SharedRuntime', '1.1'); } catch (e) { return false; }
-  }
-  function registerStartupLoad() {
-    if (!isSharedRuntime()) return Promise.resolve();
-    return Promise.resolve().then(function () { return Office.addin.setStartupBehavior(Office.StartupBehavior.load); })
-      .catch(function (e) { console.warn('setStartupBehavior failed:', e); });
-  }
-  function showPaneIfHasSheet() {
-    if (!isSharedRuntime()) return Promise.resolve();
-    var exists = false;
-    return Excel.run(function (ctx) {
-      var sh = ctx.workbook.worksheets.getItemOrNullObject(SH.measures);
-      return ctx.sync().then(function () { exists = !sh.isNullObject; });
-    }).then(function () { if (exists) return Office.addin.showAsTaskpane(); })
-      .catch(function (e) { console.warn('showAsTaskpane failed:', e); });
-  }
-
   Office.onReady(function (info) {
     if (info.host !== Office.HostType.Excel) { setStatus('このアドインはExcelで使います。', 'error'); return; }
     if (!Office.context.requirements.isSetSupported('ExcelApi', '1.8')) { setStatus('このExcelでは一部の機能が使えません（ExcelApi 1.8 以上が必要です）。Microsoft 365 版のExcelを使ってください。', 'error'); return; }
-    registerStartupLoad();
-    showPaneIfHasSheet();
     ['btnPaste', 'btnRefresh', 'btnExport', 'fileIn'].forEach(function (id) { $(id).disabled = false; });
     setStatus('準備ができました。');
 
@@ -400,7 +429,7 @@
     $('btnRefresh').onclick = function () {
       setStatus('入力内容を読み取っています…');
       readBack().then(function (S) { setStatus('集計を作り直しています…'); return writeAll(S); })
-        .then(function () { setStatus('集計を更新しました。', 'ok'); }).catch(fail);
+        .then(function () { setStatus('集計を更新しました。' + warnTail(), 'ok'); }).catch(fail);
     };
     $('btnExport').onclick = function () {
       setStatus('JSONを作っています…');
@@ -408,7 +437,7 @@
         var text = JSON.stringify(S);
         $('out').value = text; $('outWrap').hidden = false;
         return writeAll(S).then(function () { return copyText(text); })
-          .then(function () { setStatus('JSONをコピーしました。Webページの「JSONを貼り付け」に貼り、「置き換えて読み込む」を押してください。', 'ok'); })
+          .then(function () { setStatus('JSONをコピーしました。Webページの「JSONを貼り付け」に貼り、「置き換えて読み込む」を押してください。' + warnTail(), 'ok'); })
           .catch(function () { setStatus('JSONを作りました。下の欄の内容をコピーしてWebページに貼り付けてください。', 'ok'); });
       }).catch(fail);
     };
