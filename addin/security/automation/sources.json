@@ -1,0 +1,19 @@
+{
+  "sources": [
+    {
+      "name": "サイバーセキュリティ.com",
+      "type": "html-list",
+      "url": "https://cybersecurity-jp.com/news",
+      "link_regex": "^https://cybersecurity-jp\\.com/news/\\d+/?$",
+      "max_articles": 40,
+      "delay_sec": 1.0,
+      "enabled": true
+    },
+    {
+      "name": "（例）RSSを使う情報源",
+      "type": "rss",
+      "url": "https://example.com/feed",
+      "enabled": false
+    }
+  ]
+}
