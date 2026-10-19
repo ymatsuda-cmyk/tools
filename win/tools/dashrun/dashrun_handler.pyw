@@ -30,6 +30,10 @@ def parse_dashrun_url(url):
         if set(query) != {"account", "url"} or len(query["account"]) != 1 or len(query["url"]) != 1:
             raise ValueError("account と url 以外のパラメータは受け付けません")
         return ("openmail", query["account"][0], query["url"][0])
+    if action == "openurl":
+        if set(query) - {"exe", "profile", "url"} or {"exe", "url"} - set(query) or any(len(v) != 1 for v in query.values()):
+            raise ValueError("exe / profile / url 以外のパラメータは受け付けません")
+        return ("openurl", query["exe"][0], query.get("profile", [""])[0], query["url"][0])
     raise ValueError("未対応の操作です")
 
 
@@ -47,6 +51,8 @@ def main(argv):
 
     if parsed[0] == "launch":
         result = core.handle_launch_request(parsed[1])
+    elif parsed[0] == "openurl":
+        result = core.handle_openurl_request(parsed[1], parsed[2], parsed[3])
     else:
         result = core.handle_openmail_request(parsed[1], parsed[2])
 
