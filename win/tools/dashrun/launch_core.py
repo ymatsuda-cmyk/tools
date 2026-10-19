@@ -200,7 +200,11 @@ def launch_url_in_profile(exe_path, profile, url):
     # outlook.office.com はドメイン移行中で不安定なため、新ドメインに固定してから開く
     fixed_url = url.replace("https://outlook.office.com/", "https://outlook.cloud.microsoft/", 1)
     workdir = ntpath.dirname(exe_path)
-    subprocess.Popen([exe_path, f"--profile-directory={profile}", fixed_url], cwd=workdir or None)
+    args = [exe_path]
+    if profile:
+        args.append(f"--profile-directory={profile}")
+    args.append(fixed_url)
+    subprocess.Popen(args, cwd=workdir or None)
 
 
 def handle_openmail_request(account_id, raw_url, ask=ask_approval):
@@ -208,20 +212,26 @@ def handle_openmail_request(account_id, raw_url, ask=ask_approval):
     if not isinstance(entry, dict):
         log(f"NOPROFILE {account_id!r}")
         return {"status": "invalid", "message": f"mail_profiles.json に {account_id} の設定がありません"}
+    return handle_openurl_request(entry.get("exe", ""), entry.get("profile", ""), raw_url, ask=ask)
 
-    ok, exe = validate_exe_path(entry.get("exe", ""))
+
+def handle_openurl_request(raw_exe, raw_profile, raw_url, ask=ask_approval):
+    """指定したブラウザ exe（とプロファイル）で URL を開く。profile が空ならプロファイル指定なし"""
+    ok, exe = validate_exe_path(raw_exe)
     if not ok:
         return {"status": "invalid", "message": exe}
-    ok, profile = validate_profile_name(entry.get("profile", ""))
-    if not ok:
-        return {"status": "invalid", "message": profile}
+    profile = ""
+    if raw_profile:
+        ok, profile = validate_profile_name(raw_profile)
+        if not ok:
+            return {"status": "invalid", "message": profile}
     ok, url = validate_https_url(raw_url)
     if not ok:
         return {"status": "invalid", "message": url}
 
     mkey = f"{ntpath.normcase(exe)}|{profile.lower()}"
     if not any(_key(x.get("path", "")) == mkey for x in load_approved()):
-        if not ask(f"{exe}\n（プロファイル: {profile}）"):
+        if not ask(f"{exe}\n（プロファイル: {profile or '指定なし'}）"):
             log(f"DENIED {mkey}")
             return {"status": "denied", "message": "起動は許可されませんでした"}
         items = load_approved()

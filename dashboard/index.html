@@ -675,6 +675,11 @@
         <option value="local">ローカル実行</option>
       </select>
     </div>
+    <div class="field" id="field-browser">
+      <label>開くブラウザ</label>
+      <select id="f-browser"></select>
+      <div class="hint">ブラウザとプロファイルは 設定 →連携 の「ブラウザ／プロファイル」で登録します。https のURLのみ対象です</div>
+    </div>
     <div class="field" id="field-exepath" hidden>
       <label>exeのパス</label>
       <input type="text" id="f-exepath" placeholder="C:\Tools\App\App.exe" spellcheck="false" autocomplete="off">
@@ -1145,6 +1150,12 @@
           <option value="bridge">local_bridge 経由（準備中）</option>
         </select>
         <div class="hint">この端末にのみ保存されます。URLスキーム方式は Windows に dashrun ハンドラの登録が必要です（dashboard/dashrun/README.md）</div>
+      </div>
+      <div class="field">
+        <label>ブラウザ／プロファイル</label>
+        <textarea id="s-browsers" spellcheck="false" style="min-height:90px;" placeholder="仕事 Edge | C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe | Profile 1&#10;個人 Chrome | C:\Program Files\Google\Chrome\Application\chrome.exe | Default"></textarea>
+        <div class="err" id="err-browsers"></div>
+        <div class="hint">1行に1件「表示名 | exeのパス | プロファイル名」。プロファイル名は Chrome/Edge の <code>--profile-directory</code> の値（Default, Profile 1 など）で、省略可。リンクの編集で選ぶと、そのブラウザで開きます。この端末にのみ保存されます（dashrun の登録が必要）</div>
       </div>
       <div class="field">
         <label>GAS の URL</label>
@@ -1722,11 +1733,40 @@ const LAUNCHERS = {
   }
 };
 
-let launcherSettings = { mode:'scheme' };
+let launcherSettings = { mode:'scheme', browsers:[] };
 async function loadLauncherSettings(){
   const raw = await store.get('launcherSettings');
   if(raw){ try{ launcherSettings = { ...launcherSettings, ...JSON.parse(raw) }; }catch(e){} }
   if(!LAUNCHERS[launcherSettings.mode]) launcherSettings.mode = 'scheme';
+  if(!Array.isArray(launcherSettings.browsers)) launcherSettings.browsers = [];
+}
+
+/* ブラウザ／プロファイル（1行 = 表示名 | exeのパス | プロファイル名）。リンクにはインデックスでなく表示名で紐づける */
+function parseBrowsers(text){
+  const list = [], errors = [];
+  String(text || '').split(/\r?\n/).forEach((line, i)=>{
+    if(!line.trim()) return;
+    const [name, exe, profile] = line.split('|').map(s=>s.trim());
+    const path = (exe || '').replace(/^"(.*)"$/, '$1');
+    if(!name || !isValidExePath(path)) errors.push(`${i+1}行目: 表示名と、C:\\ から始まる .exe のパスが必要です`);
+    else if(profile && !/^[A-Za-z0-9 _.-]{1,64}$/.test(profile)) errors.push(`${i+1}行目: プロファイル名は英数字・空白・._- のみです`);
+    else list.push({ name, exe:path, profile:profile || '' });
+  });
+  return { list, errors };
+}
+function browsersToText(list){
+  return (list || []).map(b=>[b.name, b.exe, b.profile].join(' | ')).join('\n');
+}
+function findBrowser(name){
+  return name ? launcherSettings.browsers.find(b=>b.name === name) : null;
+}
+function syncBrowserSelect(selected){
+  const sel = F('f-browser');
+  sel.innerHTML = '<option value="">既定のブラウザ</option>' +
+    launcherSettings.browsers.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+  // 設定から消えたブラウザが紐づいたままでも、選択肢に残して値を失わない
+  if(selected && !findBrowser(selected)) sel.insertAdjacentHTML('beforeend', `<option value="${esc(selected)}">${esc(selected)}（未登録）</option>`);
+  sel.value = selected || '';
 }
 async function saveLauncherSettings(){
   await store.set('launcherSettings', JSON.stringify(launcherSettings));
@@ -1752,6 +1792,12 @@ async function openResource(r){
     }
     return;
   }
+  const b = findBrowser(r.browser);
+  if(r.url && b && /^https:\/\//.test(r.url)){
+    window.location.href = 'dashrun://openurl?exe=' + encodeURIComponent(b.exe) +
+      (b.profile ? '&profile=' + encodeURIComponent(b.profile) : '') + '&url=' + encodeURIComponent(r.url);
+    return;
+  }
   if(r.url) window.open(r.url, '_blank');
 }
 
@@ -1770,6 +1816,7 @@ function openItemModal(id){
   F('f-runtype').value = r ? (r.runType||'web') : 'web';
   F('f-exepath').value = r ? (r.path||'') : '';
   F('err-exepath').style.display='none';
+  syncBrowserSelect(r ? r.browser : '');
   syncRunTypeFields();
   F('f-cardsize').value = r ? (r.cardSize||'normal') : 'normal';
   F('f-thumb').value = r ? (r.thumb||'') : '';
@@ -1784,6 +1831,7 @@ document.getElementById('openAdd').onclick = ()=>openItemModal(null);
 function syncRunTypeFields(){
   const local = F('f-runtype').value === 'local';
   F('field-exepath').hidden = !local;
+  F('field-browser').hidden = local;
   F('hint-url').textContent = local
     ? 'exeのパスを指定する場合は空欄でかまいません'
     : 'YouTube / Excel Web / サイトを自動判定します';
@@ -1828,6 +1876,7 @@ document.getElementById('saveItem').onclick = async ()=>{
   const data = {
     title, url,
     path: exePath || null,
+    browser: runType === 'local' ? null : (F('f-browser').value || null),
     category: F('f-tag').value.trim(),
     category_icon: F('f-category').value || null,
     runType,
@@ -1874,6 +1923,8 @@ function syncSettingsForm(){
   F('err-monitors').style.display = 'none';
   F('s-gasurl').value = gasSettings.url || '';
   F('s-launchmode').value = launcherSettings.mode || 'scheme';
+  F('s-browsers').value = browsersToText(launcherSettings.browsers);
+  F('err-browsers').style.display = 'none';
   F('s-gassecret').value = gasSettings.secret || '';
   F('s-json').value = JSON.stringify({ config, resources }, null, 2);
   F('err-json').style.display = 'none';
@@ -2206,6 +2257,14 @@ document.getElementById('btn-uppreview').onclick = ()=>
 F('s-launchmode').addEventListener('change', async e=>{
   launcherSettings.mode = e.target.value; await saveLauncherSettings();
   if(e.target.value === 'bridge') toast('local_bridge 方式は準備中です（現状は起動できません）');
+});
+F('s-browsers').addEventListener('input', async e=>{
+  const { list, errors } = parseBrowsers(e.target.value);
+  const err = F('err-browsers');
+  err.textContent = errors.join(' / ');
+  err.style.display = errors.length ? 'block' : 'none';
+  if(errors.length) return;
+  launcherSettings.browsers = list; await saveLauncherSettings();
 });
 F('s-gasurl').addEventListener('input', async e=>{
   gasSettings.url = e.target.value.trim(); await saveGasSettings();
