@@ -1733,7 +1733,7 @@ const LAUNCHERS = {
   }
 };
 
-let launcherSettings = { mode:'scheme', browsers:[] };
+let launcherSettings = { mode:'scheme', browsers:[], mailBrowsers:{} };
 async function loadLauncherSettings(){
   const raw = await store.get('launcherSettings');
   if(raw){ try{ launcherSettings = { ...launcherSettings, ...JSON.parse(raw) }; }catch(e){} }
@@ -3950,6 +3950,16 @@ function mailSwitch(m, st){
     </div>`;
 }
 
+/** メールを開くブラウザ（アカウントごと）。ブラウザ未登録なら出さない */
+function mailBrowserSelect(accountId){
+  if(!launcherSettings.browsers.length) return '';
+  const cur = (launcherSettings.mailBrowsers || {})[accountId] || '';
+  const opts = launcherSettings.browsers.map(b=>`<option value="${esc(b.name)}"${b.name === cur ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
+  const stale = cur && !findBrowser(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}（未登録）</option>` : '';
+  return `<select class="mail-browser" data-mail-browser="${esc(accountId)}" title="メールを開くブラウザ">
+      <option value=""${cur ? '' : ' selected'}>既定</option>${opts}${stale}</select>`;
+}
+
 /** アカウントごとのサインイン状態と、その場でサインインするボタン。schedule と共通のスタイルを使う */
 function mailAccountRows(m, st, cur){
   const list = (cur.result && cur.result.accounts) || st.accounts;
@@ -3959,6 +3969,7 @@ function mailAccountRows(m, st, cur){
         <div class="sch-acc">
           <span class="dot" style="background:${esc(a.color)}"></span>
           <span class="who" title="${esc(a.username || a.label)}">${esc(a.label)}${a.signedIn && a.username ? ' / ' + esc(a.username) : ''}</span>
+          ${mailBrowserSelect(a.id)}
           ${a.signedIn
             ? `<button data-mail-out="${esc(m.id)}" data-account="${esc(a.id)}">サインアウト</button>`
             : `<button class="use" data-mail-in="${esc(m.id)}" data-account="${esc(a.id)}">サインイン</button>`}
@@ -4049,11 +4060,24 @@ function wireMail(card){
       e.stopPropagation();
       const url = el.dataset.mailUrl;
       if(!url){ toast('このメールには開き先のURLがありません'); return; }
-      if(el.dataset.mailAccount === 'work2'){
+      const b = findBrowser((launcherSettings.mailBrowsers || {})[el.dataset.mailAccount]);
+      if(b && /^https:\/\//.test(url)){
+        window.location.href = 'dashrun://openurl?exe=' + encodeURIComponent(b.exe) +
+          (b.profile ? '&profile=' + encodeURIComponent(b.profile) : '') + '&url=' + encodeURIComponent(url);
+      } else if(el.dataset.mailAccount === 'work2'){
         window.location.href = 'dashrun://openmail?account=work2&url=' + encodeURIComponent(url);
       } else {
         window.open(url, '_blank', 'noopener,noreferrer');
       }
+    });
+  });
+  card.querySelectorAll('[data-mail-browser]').forEach(sel=>{
+    sel.addEventListener('click', e=>e.stopPropagation());
+    sel.addEventListener('change', async ()=>{
+      launcherSettings.mailBrowsers = { ...(launcherSettings.mailBrowsers || {}) };
+      if(sel.value) launcherSettings.mailBrowsers[sel.dataset.mailBrowser] = sel.value;
+      else delete launcherSettings.mailBrowsers[sel.dataset.mailBrowser];
+      await saveLauncherSettings();
     });
   });
   card.querySelectorAll('[data-mail-view]').forEach(btn=>{
