@@ -692,7 +692,12 @@ const pts = new Map();
 let cur = null, pinch = null, penDown = false, spaceDown = false;
 const pressureOf = e => e.pointerType === 'pen' ? Math.round(Math.max(0.08, e.pressure || 0.5) * 100) / 100 : 0.5;
 const eraserR = () => SIZES.eraser[ui.size] / view.s;
-const touchList = () => [...pts.entries()].filter(([, p]) => p.type === 'touch');
+const ignored = new Set();     // 無視する指（手のひら）。離れるまで無視する
+let lastPenT = -1e9, lastType = 'mouse';
+const touchList = () => [...pts.entries()].filter(([id, p]) => p.type === 'touch' && !ignored.has(id));
+const penSeen = () => !!store.get('penSeen', false);
+/** 手のひららしい接触（接触面が大きい、ペン使用中・直後） */
+const palmLike = e => (e.width > 40 || e.height > 40) || penDown || (penSeen() && performance.now() - lastPenT < 600);
 
 function segDist(px, py, ax, ay, bx, by){
   const dx = bx-ax, dy = by-ay, l = dx*dx + dy*dy;
@@ -741,17 +746,30 @@ function endFor(w, exclude, e){
 
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => {
-  if (editing){ closeText(); return; }
+  lastType = e.pointerType;
+  if (e.pointerType === 'pen') e.preventDefault();
+  if (e.pointerType === 'touch' && palmLike(e)){ ignored.add(e.pointerId); return; }   // 手のひらを無視
+  if (editing){
+    closeText();
+    // ペン・マーカー・消しゴムなら、入力を確定したうえでそのまま書き始める
+    if (!['pen','marker','eraser'].includes(ui.tool)) return;
+  }
   hideMenu();
   if (e.pointerType === 'mouse' && e.button === 2) return;
   if (e.pointerType === 'pen'){
-    penDown = true;
-    if (cfg.fingerDraw && !store.get('penSeen', false)){
+    penDown = true; lastPenT = performance.now();
+    if (cfg.fingerDraw && !penSeen()){
       store.set('penSeen', true); cfg.fingerDraw = false; saveCfg(); syncMenu();
       toast('ペンを検出しました。指は移動と拡大に使います');
     }
+    // ペンを最優先：画面に置かれている指（手のひら）の操作は打ち切り、離れるまで無視
+    if (pinch){ pinch = null; saveView(); }
+    for (const [id, p] of pts) if (p.type === 'touch') ignored.add(id);
+    if (cur && cur.ptype === 'touch') cancelCur();
+    // 前の線の「離す」を取りこぼしていたら、捨てずに確定する
+    if (cur && cur.kind === 'stroke') { finishStroke(); cur = null; }
+    else if (cur && cur.kind === 'pan') { cur = null; cv.classList.remove('grabbing'); }
   }
-  if (e.pointerType === 'touch' && penDown) return;   // 手のひらを無視
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
   pts.set(e.pointerId, { x:e.clientX, y:e.clientY, type:e.pointerType });
   if (e.pointerType === 'touch' && touchList().length >= 2){ cancelCur(); startPinch(); return; }
@@ -763,7 +781,7 @@ cv.addEventListener('pointerdown', e => {
 
   switch (ui.tool){
     case 'pen': case 'marker':
-      cur = { kind:'stroke', id:e.pointerId, sent:0, el:{ id:rid(), t:'stroke', k:ui.tool, c:ui.color, w:SIZES[ui.tool][ui.size],
+      cur = { kind:'stroke', id:e.pointerId, ptype:e.pointerType, sent:0, el:{ id:rid(), t:'stroke', k:ui.tool, c:ui.color, w:SIZES[ui.tool][ui.size],
         p:[r1(w.x), r1(w.y), pressureOf(e)], by:me() } };
       break;
     case 'eraser':
@@ -815,6 +833,8 @@ let lastLive = 0, lastTmp = 0;
 cv.addEventListener('pointermove', e => {
   if (pts.has(e.pointerId)){ const p = pts.get(e.pointerId); p.x = e.clientX; p.y = e.clientY; }
   sendCursor(e);
+  if (ignored.has(e.pointerId)) return;
+  if (e.pointerType === 'pen') lastPenT = performance.now();
   if (pinch && e.pointerType === 'touch'){ movePinch(); return; }
   if (!cur || cur.id !== e.pointerId){
     if (ui.tool === 'eraser' && e.pointerType !== 'touch'){ hover = toWorld(e.clientX, e.clientY); requestRender(); }
@@ -835,7 +855,7 @@ cv.addEventListener('pointermove', e => {
       if (now - lastLive > 40){ lastLive = now; sendLive(cur); }
       if (p.length >= 3 * 2500){
         const last = p.slice(-3), base = cur.el; finishStroke();
-        cur = { kind:'stroke', id:e.pointerId, sent:0, el:{ ...base, id:rid(), p:last } };
+        cur = { kind:'stroke', id:e.pointerId, ptype:e.pointerType, sent:0, el:{ ...base, id:rid(), p:last } };
       }
       break;
     }
@@ -892,7 +912,8 @@ cv.addEventListener('pointermove', e => {
 
 function endPointer(e){
   pts.delete(e.pointerId);
-  if (e.pointerType === 'pen') penDown = false;
+  if (ignored.delete(e.pointerId)) return;
+  if (e.pointerType === 'pen'){ penDown = false; lastPenT = performance.now(); }
   if (pinch){ if (touchList().length < 2){ pinch = null; saveView(); } return; }
   if (!cur || cur.id !== e.pointerId) return;
   const c = cur; cur = null; snapTarget = null;
@@ -952,11 +973,18 @@ function endPointer(e){
 }
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', endPointer);
+// ツールバーの上や画面の外でペンを離したときも、確実に線を確定する
+['pointerup', 'pointercancel'].forEach(t => addEventListener(t, e => { if (e.target !== cv) endPointer(e); }, true));
+// iPad の Safari が書いている途中でスクロールや選択の操作に切り替えないようにする
+['touchstart', 'touchmove'].forEach(t => cv.addEventListener(t, e => e.preventDefault(), { passive:false }));
+cv.addEventListener('selectstart', e => e.preventDefault());
 cv.addEventListener('pointerleave', e => {
   if (e.pointerType !== 'touch' && !cur){ hover = null; requestRender(); }
   if (e.pointerType === 'mouse') broadcast({ k:'cur', hide:true });
 });
 cv.addEventListener('dblclick', e => {
+  // ペンで素早く2画書いたときに文字入力が開かないよう、マウス操作の選択・テキスト系ツールだけに限る
+  if (lastType !== 'mouse' || !['select', 'text', 'shape', 'link'].includes(ui.tool)) return;
   const w = toWorld(e.clientX, e.clientY), hit = topAt(w);
   if (!hit) return;
   if (hit.t === 'shape') openShapeText(hit.id, false);
@@ -966,8 +994,8 @@ cv.addEventListener('dblclick', e => {
 function finishStroke(){
   if (!cur || cur.kind !== 'stroke') return;
   const el = cur.el;
+  commit({ t:'add', el });                 // 先に確定版を送り、その後に描画途中の表示を消す
   broadcast({ k:'le', id:el.id });
-  commit({ t:'add', el });
   pushUndo([{ t:'del', el:{ id:el.id } }]);
 }
 function cancelCur(){
@@ -1671,6 +1699,9 @@ function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
+
+/* 動作確認用（読み取りのみ） */
+window.__board = { count: t => [...els.values()].filter(e => !t || e.t === t).length, pending: () => pending.length };
 
 /* ================= 起動 ================= */
 readTheme(); resize(); syncTray(); syncMenu(); updateUndo();
