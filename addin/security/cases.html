@@ -151,6 +151,11 @@ ul.cases li.pk>button{flex:1;min-width:0;width:auto}
 .pick input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
 ul.cases li.picked .pick,ul.cases li.picked>button{background:var(--hover)}
 .copyone{font:inherit;font-size:12.5px;padding:4px 10px;margin:0 0 8px 8px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer}
+.pickbtn2{font:inherit;font-size:12.5px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);cursor:pointer}
+.pickbtn2:disabled{opacity:.5;cursor:default}
+.pickhint{margin:2px 0 0;font-size:11.5px;color:var(--muted)}
+#cases{user-select:none;-webkit-user-select:none}
+.pk.picked>button{background:rgba(29,78,137,.16);box-shadow:inset 0 0 0 1px var(--accent)}
 </style>
 </head>
 <body>
@@ -178,10 +183,11 @@ ul.cases li.picked .pick,ul.cases li.picked>button{background:var(--hover)}
         <span class="count" id="count"></span>
       </div>
       <div class="row2 pickbar">
-        <label><input type="checkbox" id="pickAll"> 表示中を全て選択</label>
+        <button id="pickAllBtn" class="pickbtn2" type="button">表示中を全て選択</button><button id="pickClear" class="pickbtn2" type="button" disabled>選択解除</button>
         <span id="pickCount" class="pickcount" role="status" aria-live="polite"></span>
         <span class="pickctl"><select id="pickFmt" aria-label="コピーの形式"><option value="list">箇条書き</option><option value="table">表</option></select><button id="pickCopy" class="pickbtn" disabled>Teams用にコピー</button></span>
       </div>
+      <p class="pickhint">クリック＝詳細表示　Ctrl（⌘）＋クリック＝追加・解除　Shift＋クリック＝範囲選択　Ctrl＋C＝Teams用にコピー</p>
       <textarea id="pickFallback" class="pickfb" rows="6" readonly hidden aria-label="コピー用の文章"></textarea>
     </div>
     <ul class="cases" id="cases"></ul>
@@ -294,7 +300,7 @@ function load(cases){
     }
   });
 }
-const st={cat:null,q:"",month:"",sort:"date",only:false,imp:false,sel:null,sec:"date",pick:new Set(),fmt:"list",pickMsg:""};
+const st={cat:null,q:"",month:"",sort:"date",only:false,imp:false,sel:null,sec:"date",pick:new Set(),anchor:null,fmt:"list",pickMsg:""};
 const fmtDate=d=>{const [y,m,dd]=d.split('-');return y+'年'+(+m)+'月'+(+dd)+'日'};
 const shortDate=d=>{const [,m,dd]=d.split('-');return (+m)+'月'+(+dd)+'日'};
 const inPeriod=x=>!st.month||x.o.slice(0,7)===st.month;
@@ -318,7 +324,7 @@ function renderList(){
   $('cases').innerHTML=a.length?a.map(x=>{
     const m=x.o.slice(0,7);let h='';
     if(st.sort==='date'&&m!==lastM){lastM=m;h='<li class="mh">'+(+m.slice(5))+'月<small>'+a.filter(z=>z.o.slice(0,7)===m).length+'件</small></li>';}
-    return h+'<li class="pk'+(st.pick.has(x.id)?' picked':'')+'"><label class="pick" title="選択して、Teams用にコピー"><input type="checkbox" data-pick="'+esc(x.id)+'"'+(st.pick.has(x.id)?' checked':'')+' aria-label="'+esc((x.co||x.svc||'事例')+'を選択')+'"></label><button data-id="'+esc(x.id)+'" aria-current="'+(x.id===st.sel)+'"><span class="stripe" style="background:'+CATS[x.cat].color+'"></span><span class="co">'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'" title="'+(x.imp===2?'最優先':'次点')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+(x.detail?'<span class="dot" title="詳細あり"></span>':x.body?'<span class="dot dot2" title="サイトの本文を取り込み済み"></span>':'')+esc(x.co||x.svc||'（企業名未取得）')+(x.co&&x.svc?'<small>'+esc(x.svc)+'</small>':'')+'</span><span class="num">'+esc(x.nt||'')+'</span><span class="meta"><b class="dt">'+shortDate(x.o)+'</b><i class="ot">'+esc(x.ot)+'</i>　'+esc(x.s)+'</span></button></li>';
+    return h+'<li class="pk'+(st.pick.has(x.id)?' picked':'')+'" data-rid="'+esc(x.id)+'"><button data-id="'+esc(x.id)+'" aria-current="'+(x.id===st.sel)+'"><span class="stripe" style="background:'+CATS[x.cat].color+'"></span><span class="co">'+(x.imp?'<span class="star'+(x.imp===2?' s2':'')+'" title="'+(x.imp===2?'最優先':'次点')+'">'+(x.imp===2?'★':'☆')+'</span>':'')+(x.detail?'<span class="dot" title="詳細あり"></span>':x.body?'<span class="dot dot2" title="サイトの本文を取り込み済み"></span>':'')+esc(x.co||x.svc||'（企業名未取得）')+(x.co&&x.svc?'<small>'+esc(x.svc)+'</small>':'')+'</span><span class="num">'+esc(x.nt||'')+'</span><span class="meta"><b class="dt">'+shortDate(x.o)+'</b><i class="ot">'+esc(x.ot)+'</i>　'+esc(x.s)+'</span></button></li>';
   }).join(''):'<li class="empty">'+(INDEX.length?'条件に合う事例がありません。検索語や絞り込みを外してください。':'事例がありません。アドインの「情報取得」を押してください。')+'</li>';
 }
 const BODY_TAB={id:"body",label:"サイトの記載"};
@@ -331,7 +337,11 @@ function renderDetail(){
   const c=CATS[x.cat];
   const backBtn='<button class="back" data-back>一覧に戻る</button><button class="copyone" data-copy="'+esc(x.id)+'" title="この事例を、Teamsに貼れる形でコピー">この事例をTeams用にコピー</button>';
   if(x.detail&&D[x.detail]){
-    const d=D[x.detail], tabs=SECTIONS.concat(x.body?[BODY_TAB]:[]);
+    const d=D[x.detail];
+    /* 記載のない項目（空欄、または「記事に記載なし」だけ）のタブは出さない */
+    const has=id=>{const t=stripTags(d.sections[id]).replace(/\s+/g,' ').trim();return !!t&&!/^記事に記載なし[。.]?$/.test(t)};
+    let tabs=SECTIONS.filter(z=>has(z.id)).concat(x.body?[BODY_TAB]:[]);
+    if(!tabs.length) tabs=[SECTIONS[1]];
     let si=tabs.findIndex(s=>s.id===st.sec); if(si<0) si=0;
     const s=tabs[si], prev=tabs[si-1], next=tabs[si+1];
     const content=s.id==='body'?plain(cleanBody(x.body))+BODY_NOTE:secHtml(d.sections[s.id]);
@@ -404,19 +414,42 @@ async function copyItems(items){
   flash('自動でコピーできませんでした。下の文章を選択してコピーしてください');
 }
 function renderPick(){
-  const vis=filtered(false),n=st.pick.size,vp=vis.filter(x=>st.pick.has(x.id)).length,all=$('pickAll');
-  all.checked=vis.length>0&&vp===vis.length;all.indeterminate=vp>0&&vp<vis.length;all.disabled=!vis.length;
+  const n=st.pick.size;
   $('pickCount').textContent=st.pickMsg||(n?n+'件選択中':'');
   $('pickCopy').disabled=!n;$('pickFmt').value=st.fmt;
+  $('pickClear').disabled=!n;$('pickAllBtn').disabled=!filtered(false).length;
 }
-document.addEventListener('change',e=>{
-  const t=e.target;
-  if(t.matches&&t.matches('input[data-pick]')){
-    const id=t.getAttribute('data-pick');if(t.checked)st.pick.add(id);else st.pick.delete(id);
-    const li=t.closest('li');if(li)li.classList.toggle('picked',t.checked);renderPick();
-  }else if(t.id==='pickAll'){
-    filtered(false).forEach(x=>{if(t.checked)st.pick.add(x.id);else st.pick.delete(x.id)});renderList();renderPick();
-  }else if(t.id==='pickFmt'){st.fmt=t.value}
+/* 選択の見た目だけを更新（一覧を作り直さないので、スクロール位置が動かない） */
+function paintPicks(){document.querySelectorAll('#cases li[data-rid]').forEach(li=>li.classList.toggle('picked',st.pick.has(li.getAttribute('data-rid'))))}
+const visibleIds=()=>filtered(false).map(x=>x.id);
+/* Explorerと同じ操作：クリック＝詳細表示（その1件だけ選択）／Ctrl(⌘)+クリック＝追加・解除／Shift+クリック＝範囲選択。選択だけの操作なら true を返す */
+function rowClick(id,e){
+  const ids=visibleIds(),add=e.ctrlKey||e.metaKey;
+  if(e.shiftKey&&st.anchor&&ids.includes(st.anchor)&&ids.includes(id)){
+    const a=ids.indexOf(st.anchor),b=ids.indexOf(id),lo=Math.min(a,b),hi=Math.max(a,b);
+    if(!add) st.pick.clear();
+    ids.slice(lo,hi+1).forEach(i=>st.pick.add(i));
+    st.pickMsg='';paintPicks();renderPick();return true;
+  }
+  if(add){
+    if(st.pick.has(id)) st.pick.delete(id); else st.pick.add(id);
+    st.anchor=id;st.pickMsg='';paintPicks();renderPick();return true;
+  }
+  st.pick.clear();st.pick.add(id);st.anchor=id;st.pickMsg='';
+  return false;
+}
+function selectAllVisible(){visibleIds().forEach(i=>st.pick.add(i));st.pickMsg='';paintPicks();renderPick()}
+function clearPicks(){st.pick.clear();st.anchor=null;st.pickMsg='';paintPicks();renderPick()}
+document.addEventListener('change',e=>{const t=e.target;if(t.id==='pickFmt')st.fmt=t.value});
+$('pickAllBtn').addEventListener('click',selectAllVisible);
+$('pickClear').addEventListener('click',clearPicks);
+document.addEventListener('keydown',e=>{
+  const tg=e.target,tag=(tg&&tg.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  const mod=e.ctrlKey||e.metaKey,k=(e.key||'').toLowerCase();
+  if(mod&&k==='c'&&st.pick.size&&!String(window.getSelection&&window.getSelection()).trim()){e.preventDefault();copyPicked();}
+  else if(mod&&k==='a'&&tg&&tg.closest&&tg.closest('#cases')){e.preventDefault();selectAllVisible();}
+  else if(k==='escape'&&st.pick.size){clearPicks();}
 });
 const copyPicked=()=>copyItems(pickedItems());
 $('pickCopy').addEventListener('click',copyPicked);
@@ -425,7 +458,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   if(b.dataset.cat!==undefined){ st.cat=(b.dataset.cat&&st.cat!==b.dataset.cat)?b.dataset.cat:null; render(); return; }
   if(b.dataset.sort){ st.sort=b.dataset.sort; document.querySelectorAll('[data-sort]').forEach(z=>z.setAttribute('aria-pressed',z===b)); render(); return; }
-  if(b.dataset.id){ st.sel=b.dataset.id; st.sec='date'; document.body.classList.add('show-detail'); render(); $('detail').scrollTop=0; window.scrollTo(0,0); notifyParent(); return; }
+  if(b.dataset.id){ if(rowClick(b.dataset.id,e)) return; st.sel=b.dataset.id; st.sec='date'; document.body.classList.add('show-detail'); render(); $('detail').scrollTop=0; window.scrollTo(0,0); notifyParent(); return; }
   if(b.dataset.sec){ st.sec=b.dataset.sec; render(); $('detail').scrollTop=0; notifyParent(); return; }
   if(b.hasAttribute('data-imp')){ st.imp=!st.imp; b.setAttribute('aria-pressed',st.imp); render(); return; }
   if(b.hasAttribute('data-back')){ document.body.classList.remove('show-detail'); return; }
@@ -442,7 +475,7 @@ $('month').addEventListener('change',e=>{st.month=e.target.value;render();});
 $('onlyDetail').addEventListener('change',e=>{st.only=e.target.checked; render();});
 function asof(){
   const got=INDEX.map(x=>x.got).filter(isDate).sort().pop();
-  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、本文のみ '+INDEX.filter(x=>!x.detail&&x.body).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）'+'　[表示 v8]';
+  $('asof').textContent='全'+INDEX.length+'件（詳細あり '+INDEX.filter(x=>x.detail).length+'件、本文のみ '+INDEX.filter(x=>!x.detail&&x.body).length+'件、重要 '+INDEX.filter(x=>x.imp).length+'件）'+(got?'　最終取得 '+fmtDate(got):'')+'　日付は発生日基準（非公表のものは検知日→公表日）'+'　[表示 v10]';
 }
 function apply(cases,sel,sec){
   load(cases);
