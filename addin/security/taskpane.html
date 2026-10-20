@@ -720,7 +720,7 @@ function vData(){
       '<button class="btn" data-act="reload-xl">Excelから再読み込み</button></div>'+
       '<label class="switch" style="margin-top:8px"><input type="checkbox" data-startup="1"'+(XL.startup?' checked':'')+'><span>ブックを開いたときに、自動でこの画面を開く</span></label>'+
       '<label class="switch"><input type="checkbox" data-auto="1"'+(S.settings&&S.settings.autoReport?' checked':'')+'><span>変更の12秒後に表も自動で更新する</span></label>'+
-      '<p class="hint" style="margin:6px 0 0">自動更新中は、表のシートが作り直されるため、見ているシートが切り替わることがあります。「漏洩_」で始まるシートは編集しても反映されません。自分用の計算は別のシートに書いてください。ただし「漏洩事例」シートは事例の保管場所で、ここで編集した内容が「事例」タブに反映されます。</p></section>';
+      '<p class="hint" style="margin:6px 0 0">自動で開く設定は、このブックを初めて開いたときに自動でオンになります（オフにすると、そのブックでは再びオンにしません）。自動更新中は、表のシートが作り直されるため、見ているシートが切り替わることがあります。「漏洩_」で始まるシートは編集しても反映されません。自分用の計算は別のシートに書いてください。ただし「漏洩事例」シートは事例の保管場所で、ここで編集した内容が「事例」タブに反映されます。</p></section>';
   }else{
     store='<section class="panel"><h2>保存について</h2><p class="meta" style="margin:0">いまはExcelの外（ブラウザ）で開いています。変更はこのブラウザに保存されます。Excelのブックに保存するには、このページをExcelのアドインとして開いてください。<br>最終更新：'+esc(new Date(S.updated).toLocaleString('ja-JP'))+'</p></section>';
   }
@@ -740,7 +740,7 @@ var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先�
 var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method'],['記事本文','body']];
 var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
 /* ---------- サイトの本文から、広告・案内・画像クレジット・目次・空の見出しを除く（保存済みの本文も整える） ---------- */
-var BUILD='2026-10-20 r8';
+var BUILD='2026-10-20 r9';
 var NOISE=[
   /^[\s*＊\-–—■□●・→←>＞»›|｜]+$/,
   /メルマガ登録|無料メルマガ|メルマガ会員登録/,
@@ -1223,21 +1223,28 @@ function bootBrowser(){
 }
 function bootExcel(){
   IN_EXCEL=true;XL.loadFailed=false;saveState='Excelから読み込み中…';render();
-  xlStartupInit();
   return xlLoad().then(function(d){
     if(d){var was=d.version||1;S=normalizeS(d);saveState='Excelから読み込みました（'+hhmm()+'）';if(was<SEED_VERSION)setTimeout(changed,0)}
     else saveState='このブックにはまだ保存されていません。変更すると自動で保存されます。';
-    fixUI();render();
+    fixUI();render();xlStartupInit(true);
   }).catch(function(err){
-    XL.loadFailed=true;saveState='Excelから読み込めませんでした：'+(err&&err.message?err.message:err);render();notify(saveState,true);
+    xlStartupInit(false);XL.loadFailed=true;saveState='Excelから読み込めませんでした：'+(err&&err.message?err.message:err);render();notify(saveState,true);
   });
 }
 /* 共有ランタイム：ブックを開いたときに自動で起動・表示する設定 */
-function xlStartupInit(){
+function xlStartupInit(canEnable){
   try{
     if(Office.addin&&Office.addin.getStartupBehavior){
       Office.addin.getStartupBehavior().then(function(b){
         XL.startup=(b===Office.StartupBehavior.load);
+        S.settings=S.settings||{};
+        /* このブックを初めて開いたとき：自動で「開いたときに起動」をオンにする（オフにした後は、再びオンにしない） */
+        if(!XL.startup&&canEnable&&!S.settings.startupAsked&&Office.addin.setStartupBehavior){
+          S.settings.startupAsked=true;
+          return Office.addin.setStartupBehavior(Office.StartupBehavior.load).then(function(){
+            XL.startup=true;notify('次回からこのブックを開くと、自動でこの画面が開きます（「データ管理」でオフにできます）');
+          });
+        }
         if(XL.startup&&Office.addin.showAsTaskpane)return Office.addin.showAsTaskpane();
       }).then(function(){if(UI.tab==='data'&&!document.activeElement.id)render()}).catch(function(){});
     }
@@ -1246,7 +1253,7 @@ function xlStartupInit(){
 function xlSetStartup(on){
   if(!(typeof Office!=='undefined'&&Office.addin&&Office.addin.setStartupBehavior)){notify('この環境では自動起動の設定ができません',true);XL.startup=false;render();return}
   Office.addin.setStartupBehavior(on?Office.StartupBehavior.load:Office.StartupBehavior.none).then(function(){
-    XL.startup=on;notify(on?'次回からブックを開くと、自動でこの画面が開きます':'自動で開く設定を解除しました');
+    XL.startup=on;S.settings=S.settings||{};S.settings.startupAsked=true;changed();notify(on?'次回からブックを開くと、自動でこの画面が開きます':'自動で開く設定を解除しました');
   }).catch(function(e){notify('設定できませんでした：'+(e&&e.message?e.message:e),true);XL.startup=!on;render()});
 }
 var booted=false;
