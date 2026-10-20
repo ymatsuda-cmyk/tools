@@ -740,7 +740,7 @@ var CASE_CATS=[['ext','外部からの不正アクセス'],['chain','委託先�
 var CASE_COLS=[['ID','id'],['公表日','pub'],['基準日','base'],['日付の種別','baseType'],['企業・団体','co'],['サービス・システム','svc'],['件数','n'],['件数の表記','nt'],['原因タイプ','cat'],['重要度','imp'],['重要の理由','impWhy'],['一覧用の概要','summary'],['関連','rel'],['出典URL','url'],['取得元','src'],['取得日','got'],['詳細タイトル','title'],['詳細サブタイトル','sub'],['主な数字','facts'],['発生日（詳細）','sec_date'],['概要（詳細）','sec_summary'],['発覚の経緯','sec_discovery'],['リスク・影響範囲','sec_risk'],['原因','sec_cause'],['対処（暫定・恒久）','sec_response'],['導入業者としての対策','sec_vendor'],['出典一覧','sources'],['整理方法','method'],['記事本文','body']];
 var CASES=[],CS={msg:'',sel:null,sec:null,busy:false};
 /* ---------- サイトの本文から、広告・案内・画像クレジット・目次・空の見出しを除く（保存済みの本文も整える） ---------- */
-var BUILD='2026-10-16 r7';
+var BUILD='2026-10-20 r8';
 var NOISE=[
   /^[\s*＊\-–—■□●・→←>＞»›|｜]+$/,
   /メルマガ登録|無料メルマガ|メルマガ会員登録/,
@@ -941,7 +941,7 @@ function gasCall(cfg,payload){
 function gasTargets(n){
   var skip=gasSkipLoad(),since=Date.now()-7*864e5;
   return CASES.filter(function(c){return c.url&&!c.title&&!(skip[c.url]&&skip[c.url]>since)})
-    .sort(function(a,b){return String(b.pub).localeCompare(String(a.pub))}).slice(0,n);
+    .sort(function(a,b){return String(b.pub).localeCompare(String(a.pub))}).slice(0,n||200);   /* n が 0 のときは全件（上限200） */
 }
 /* 機械が入れた「紹介文だけ」の行か（旧版が入れた途中で切れた紹介文も含む。手で書いた概要は含まない） */
 function isMetaOnly(c){
@@ -963,35 +963,40 @@ function applyEnrich(c,r){
 /* 保存はしない（呼び出し側でまとめて保存する） */
 function casesEnrichRun(){
   var cfg=gasCfg();if(!cfg)return Promise.resolve(null);
-  var t=gasTargets(cfg.n||5),res={done:0,failed:0,meta:0,metaReason:'',none:!t.length,stop:'',total:t.length,err:''};
+  var t=gasTargets(cfg.n===0?0:(cfg.n||5)),res={done:0,failed:0,meta:0,metaReason:'',none:!t.length,stop:'',total:t.length,err:'',canceled:false,remaining:0};
   var p=Promise.resolve();
   t.forEach(function(c,i){
     p=p.then(function(){
-      if(res.stop)return;
-      casesSetMsg('元記事を整理しています… '+(i+1)+' / '+t.length);
+      if(res.stop||CS.cancel){res.canceled=!!CS.cancel;return}
+      casesSetMsg('元記事の本文を取り込んでいます… '+(i+1)+' / '+t.length+'（途中でも「中止」できます）');
       return gasCall(cfg,{action:'article',url:c.url}).then(function(j){
         var r=j.result||{};
         if(applyEnrich(c,r)){res.done++;if(j.mode!=='ai'){res.meta++;res.metaReason=j.reason||j.warn||''}}else res.failed++;
         if(j.mode!=='ai'||!c.title)gasMark(c.url);   /* 紹介文だけだった記事は、しばらく再試行しない */
+        if(res.done&&res.done%10===0)return casesSaveNow().catch(function(){});   /* 10件ごとに保存（途中で閉じても残る） */
       }).catch(function(e){
         res.failed++;res.err=e.message;gasMark(c.url);
         if(/トークン|接続できません|上限/.test(e.message))res.stop=e.message;
       });
     });
   });
-  return p.then(function(){return res});
+  return p.then(function(){res.remaining=gasTargets(1000).length;return res});
+}
+function casesSetBusy(on){
+  var b=document.getElementById('caseCancel');if(b)b.hidden=!on;
+  ['cases-fetch','cases-enrich','cases-reload'].forEach(function(a){var e=document.querySelector('[data-act="'+a+'"]');if(e)e.disabled=!!on});
 }
 function casesSaveNow(){return IN_EXCEL?xlQueue(function(){return xlWriteCases(CASES)}):Promise.resolve(casesSaveLocal())}
 function casesEnrichMsg(en){
   if(!en)return '';
   if(en.none)return '整理する記事はありません';
   var ai=en.done-en.meta;
-  return '元記事から '+en.done+'件を取得（AIで整理 '+ai+'件'+(en.meta?'、サイトの本文のまま '+en.meta+'件［'+(en.metaReason||'AIを使えませんでした')+'］':'')+'）'+(en.failed?'。失敗 '+en.failed+'件'+(en.err?'：'+en.err:''):'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'');
+  return '元記事から '+en.done+'件を取得（AIで整理 '+ai+'件'+(en.meta?'、サイトの本文のまま '+en.meta+'件［'+(en.metaReason||'AIを使えませんでした')+'］':'')+'）'+(en.failed?'。失敗 '+en.failed+'件'+(en.err?'：'+en.err:''):'')+(en.stop&&en.stop!==en.err?'。'+en.stop:'')+(en.canceled?'。中止しました':'')+(en.remaining?'。残り '+en.remaining+'件（もう一度押すと続きを取り込みます）':'');
 }
 function casesEnrich(){
   if(CS.busy)return Promise.resolve();
   if(!gasCfg()){notify('「データ管理」でGASのURLとトークンを設定してください',true);return Promise.resolve()}
-  CS.busy=true;casesSetMsg('元記事を整理しています…');
+  CS.busy=true;CS.cancel=false;casesSetBusy(true);casesSetMsg('元記事の本文を取り込んでいます…');
   var en=null,cleaned=0;
   return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
     CASES=l||[];return casesEnrichRun();
@@ -1001,11 +1006,11 @@ function casesEnrich(){
     casesSetMsg(casesEnrichMsg(en)+(cleaned?'。保存済みの本文 '+cleaned+'件から、広告・案内などを除きました':'')+(IN_EXCEL?warnTail():''));postCases();
   }).catch(function(err){
     var m='整理できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
-  }).then(function(){CS.busy=false});
+  }).then(function(){CS.busy=false;casesSetBusy(false)});
 }
 function casesFetch(){
   if(CS.busy)return Promise.resolve();
-  CS.busy=true;casesSetMsg('情報を取得しています…');
+  CS.busy=true;CS.cancel=false;casesSetBusy(true);casesSetMsg('情報を取得しています…');
   var cur=[],had=true,feed=null,feedErr='',r={added:0,filled:0},en=null,cleaned=0;
   return (IN_EXCEL?xlQueue(function(){return xlLoadCases()}):Promise.resolve(casesLoadLocal())).then(function(l){
     had=!!l;cur=l||[];CASES=cur;
@@ -1023,19 +1028,20 @@ function casesFetch(){
     if(feed){var when=feed.generatedAt?'（フィード更新 '+String(feed.generatedAt).replace('T',' ').slice(0,16)+'）':'';parts.push((r.added?'新規 '+r.added+'件を取り込みました':r.filled?'既存の '+r.filled+'件の空欄を補いました':'すでに最新です')+when)}
     else parts.push('フィードを取得できませんでした（'+feedErr+'）');
     if(en)parts.push(casesEnrichMsg(en));
+    else{var stubs=CASES.filter(function(c){return c.url&&!c.title&&!c.body&&!c.sec_summary}).length;if(stubs)parts.push('本文が未取得の事例が '+stubs+'件あります。本文を取り込むには、「データ管理」でGASを設定してください')}
     if(cleaned)parts.push('保存済みの本文 '+cleaned+'件から、広告・案内などを除きました');
     casesSetMsg(parts.join('。')+(IN_EXCEL?warnTail():''));postCases();
   }).catch(function(err){
     var m='取得できませんでした：'+(err&&err.message?err.message:err);casesSetMsg(m);notify(m,true);
-  }).then(function(){CS.busy=false});
+  }).then(function(){CS.busy=false;casesSetBusy(false)});
 }
 function vGas(){
-  var c=gasCfg()||{url:'',token:'',n:5};
+  var c=gasCfg()||{url:'',token:'',n:0};
   return '<section class="panel"><h2>元記事の取得（GAS）</h2>'+
     '<p class="meta" style="margin:0 0 10px">「情報取得」のときに、元記事の内容を読んで詳細（7項目）を整理するための設定です。Google Apps Script（GAS）を中継に使います。設定の手順はREADMEを参照してください。</p>'+
     '<label class="field"><span>GASウェブアプリのURL（…/exec）</span><input id="gasUrl" value="'+esc(c.url)+'" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>'+
     '<label class="field" style="margin-top:8px"><span>トークン</span><input id="gasToken" type="password" value="'+esc(c.token)+'" autocomplete="off"></label>'+
-    '<label class="field" style="margin-top:8px"><span>1回の「情報取得」で整理する記事数</span><select id="gasN">'+[3,5,10,20].map(function(n){return '<option'+(n===(c.n||5)?' selected':'')+'>'+n+'</option>'}).join('')+'</select></label>'+
+    '<label class="field" style="margin-top:8px"><span>1回の「情報取得」で本文を取り込む記事数（AIで整理する場合は、件数に応じて費用がかかります）</span><select id="gasN">'+[[3,'3件'],[5,'5件'],[10,'10件'],[20,'20件'],[50,'50件'],[0,'全件（最大200件）']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===(c.n==null?0:c.n)?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></label>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary" data-act="gas-save">保存</button><button class="btn" data-act="gas-test">接続テスト</button><button class="btn" data-act="gas-clear">設定を消す</button></div>'+
     '<div style="margin-top:8px"><button class="btn small" data-act="gas-reset-skip">失敗・紹介文のみの記事を再試行の対象に戻す</button></div>'+
     '<p class="stline" id="gasInfo" style="margin-top:8px">'+esc(GAS_INFO)+'</p>'+
@@ -1043,15 +1049,15 @@ function vGas(){
     '<p class="hint" style="margin:6px 0 0">画面のバージョン：'+BUILD+'（事例の画面は、上部の「全N件…」の行の末尾に「表示 v7」と出ます。古い場合は、アドインを開き直すか、キャッシュを削除してください）</p></section>';
 }
 function gasReadForm(){
-  var u=(document.getElementById('gasUrl').value||'').trim(),t=(document.getElementById('gasToken').value||'').trim(),n=parseInt(document.getElementById('gasN').value,10)||5;
+  var u=(document.getElementById('gasUrl').value||'').trim(),t=(document.getElementById('gasToken').value||'').trim(),n=parseInt(document.getElementById('gasN').value,10);if(isNaN(n))n=0;
   return {url:u,token:t,n:n};
 }
 function gasInfo(m){GAS_INFO=m;var el=document.getElementById('gasInfo');if(el)el.textContent=m}
 function vCases(){
   return '<div class="casebar no-print"><button class="btn primary" data-act="cases-fetch">情報取得</button>'+
-    (gasCfg()?'<button class="btn" data-act="cases-enrich">元記事から詳細を整理</button>':'')+
+    (gasCfg()?'<button class="btn" data-act="cases-enrich">本文を取り込む</button>':'')+'<button class="btn danger" id="caseCancel" data-act="cases-cancel" hidden>中止</button>'+
     '<button class="btn" data-act="cases-reload">'+(IN_EXCEL?'Excelから再読み込み':'再読み込み')+'</button><span class="stline" id="caseMsg">'+esc(casesInfo())+'</span></div>'+
-    '<iframe id="casesFrame" class="caseframe" src="cases.html" title="情報漏洩 事例ファイル" referrerpolicy="no-referrer"></iframe>';
+    '<iframe id="casesFrame" class="caseframe" src="cases.html" allow="clipboard-write" title="情報漏洩 事例ファイル" referrerpolicy="no-referrer"></iframe>';
 }
 
 function render(){
@@ -1155,6 +1161,7 @@ root.addEventListener('click',function(e){
   else if(a==='lacc'){UI.lacc=UI.lacc||{};UI.lacc[id]=(UI.lacc[id]===false);render()}
   else if(a==='cases-fetch'){casesFetch()}
   else if(a==='cases-enrich'){casesEnrich()}
+  else if(a==='cases-cancel'){CS.cancel=true;casesSetMsg('中止しています…（処理中の1件が終わるまでお待ちください）')}
   else if(a==='gas-save'){var f=gasReadForm();if(!f.url&&!f.token){gasInfo('URLとトークンを入力してください');return}if(!gasValidUrl(f.url)){gasInfo('URLは https://script.google.com/…/exec の形式で入力してください');return}if(f.token.length<12){gasInfo('トークンは12文字以上にしてください');return}try{localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo(gasSave(f)?'保存しました（再試行の記録もリセットしました）。「接続テスト」で確認できます':'保存できませんでした（このブラウザの保存領域が使えません）')}
   else if(a==='gas-test'){var g=gasReadForm();if(!gasValidUrl(g.url)||!g.token){gasInfo('URLとトークンを入力して「保存」してから試してください');return}gasInfo('接続を確認しています…');gasCall(g,{action:'ping'}).then(function(j){gasInfo('接続できました（GASバージョン '+j.version+'／AI整理：'+(j.ai?'使えます':'未設定のため紹介文のみ')+'／取得できるサイト：'+(j.hosts||[]).join(', ')+'）')}).catch(function(e){gasInfo('接続できませんでした：'+e.message)})}
   else if(a==='gas-reset-skip'){try{localStorage.removeItem(GAS_SKIP_LS)}catch(_){}gasInfo('次の「情報取得」で、失敗・紹介文のみの記事も再試行します')}
