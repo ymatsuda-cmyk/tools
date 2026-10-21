@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-10-20T10:11:28+09:00",
+ "generatedAt": "2026-10-21T09:25:22+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -1600,7 +1600,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117416",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "Astemo株式会社は2026年10月16日、同社が利用するデータ共有クラウド環境への不正アクセスにより、従業員や仕入先関係者など約350人分の個人情報が流出したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117416",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117414",
@@ -1618,7 +1623,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117414",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "和歌山県は2026年10月16日、「WAKAYAMA外国人材雇用サポートデスク」を利用した事業者や個人の情報が漏洩した可能性があると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117414",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117400",
@@ -1636,7 +1646,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117400",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "NTTソルマーレは2026年10月16日、電子書籍ストア「コミックシーモア」への不正アクセスにより、一部の会員情報が外部へ流出したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117400",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117398",
@@ -1654,7 +1669,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117398",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "株式会社ACCESSは2026年10月15日、台湾子会社のACCESS AP TAIWANが提供するEC事業者向け業務支援サービス「CROS」で不正アクセスが発生し、通販利用者の個人情報などが流出したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117398",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117395",
@@ -1672,7 +1692,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117395",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "株式会社Eストアーは2026年10月16日、ECサイト構築・運営支援サービス「ショップサーブ」への不正アクセスについて、調査結果の最終報告を公表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117395",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117393",
@@ -1763,6 +1788,75 @@
    "url": "https://cybersecurity-jp.com/news/117340",
    "src": "サイバーセキュリティ.com",
    "got": "2026-10-20"
+  },
+  {
+   "id": "cs117573",
+   "pub": "2026-10-21",
+   "base": "2026-10-21",
+   "baseType": "公表",
+   "co": "ニフティ",
+   "svc": "",
+   "n": 542513,
+   "nt": "最大54万2,513件",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "ニフティに不正アクセス、最大54万2,513件の個人情報が漏洩した可能性 光回線の申込者情報が対象",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117573",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-21",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "ニフティ株式会社は2026年10月19日、回線申込・受付管理システムへの不正アクセスにより、最大54万2,513件の個人情報が漏洩した可能性があると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117573",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs117571",
+   "pub": "2026-10-21",
+   "base": "2026-10-21",
+   "baseType": "公表",
+   "co": "ふるさとチョイス",
+   "svc": "",
+   "n": 4450000,
+   "nt": "445万件",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "ふるさとチョイス、不正アクセスで445万件超の個人情報が流出 寄附控除試算額やパスワード情報も対象",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117571",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-21",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "株式会社トラストバンクは2026年10月20日、ふるさと納税サイト「ふるさとチョイス」への不正アクセスにより、会員登録している寄附者の個人情報445万4,097件が外部に流出したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117571",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs117564",
+   "pub": "2026-10-21",
+   "base": "2026-10-21",
+   "baseType": "公表",
+   "co": "足利市の斎場予約システム",
+   "svc": "",
+   "n": 8800,
+   "nt": "約8,800人",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "足利市の斎場予約システムに不正アクセス、約8,800人分の個人情報漏えいのおそれ│株式会社ビジネステック",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117564",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-21",
+   "enrichedAt": "2026-10-21",
+   "sec_summary": "画像：株式会社ビジネステックより引用 株式会社ビジネステックは2026年10月18日、足利市に提供する斎場予約システムが外部から不正アクセスを受け、一部の個人情報が漏えいしたおそれがあると発表しました。 同社によると、不正アクセ",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117564",
+   "method": "紹介文",
+   "enrichResult": "meta"
   }
  ]
 }
