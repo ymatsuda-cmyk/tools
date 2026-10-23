@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-10-22T09:29:04+09:00",
+ "generatedAt": "2026-10-23T09:27:18+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -79,7 +79,12 @@
    "rel": "アルカディア（SpeeCAN RAIDEN）",
    "url": "https://cybersecurity-jp.com/news/117274",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "神奈川県横須賀市は2026年10月13日、防災・防犯情報の配信に利用する「SpeeCAN RAIDEN（スピーキャン ライデン）」への不正アクセスにより、登録者の個人情報が漏洩した可能性があると発表した。市は防災情報メール、FAX、電話、防犯あんしんメールの4サービスを停止している。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117274",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "oita",
@@ -97,7 +102,12 @@
    "rel": "アルカディア（SpeeCAN RAIDEN）",
    "url": "https://cybersecurity-jp.com/news/117277",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "大分県は2026年10月13日、「県民安全・安心メール」などの配信システムを提供する事業者への不正アクセスにより、登録者のメールアドレス2万7,667件が漏洩した可能性があると公表した。県は新規登録、登録内容の変更、配信解除を停止したが、登録済みの利用者への気象警報などの配信は継続している。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117277",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "ginnosara",
@@ -115,7 +125,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117258",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "株式会社ライドオンエクスプレスホールディングスは2026年10月13日、「銀のさら」「釜寅」「すし上等」の公式サイト・公式アプリに登録された個人情報が、最大約650万件漏洩した可能性があると発表した。登録情報を保管していたサーバーがサイバー攻撃を受けたという。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117258",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "yamaha",
@@ -133,7 +148,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117204",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "ヤマハ発動機株式会社は2026年10月12日、コミュニティーサイト「YAMAHA PAS Life」の登録者約1,600人の会員情報が、第三者に閲覧・取得された可能性があると発表した。基盤システムを提供するコミューン株式会社のサーバーへの不正アクセスが原因で、ヤマハ発動機のシステムへの不正アクセスは確認されていない。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117204",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "chitose",
@@ -1807,7 +1827,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117340",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-20"
+   "got": "2026-10-20",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "画像：ディップ株式会社より引用 ディップ株式会社は2026年10月9日、同社が運営する「バイトル」「バイトルNEXT」が不正アクセスを受け、会員のメールアドレスの一部、最大388万5,771件が漏えいした可能性があると発表しました。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117340",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117573",
@@ -1969,6 +1994,93 @@
    "sources": "元記事|https://cybersecurity-jp.com/news/117566",
    "method": "紹介文",
    "enrichResult": "meta"
+  },
+  {
+   "id": "cs117597",
+   "pub": "2026-10-22",
+   "base": "2026-10-22",
+   "baseType": "公表",
+   "co": "",
+   "svc": "",
+   "n": 0,
+   "nt": "",
+   "cat": "chain",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "委託先へのサイバー攻撃で顧客のシステム障害と情報漏えい―NEC",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117597",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-23",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "画像：日本電気株式会社より引用 日本電気株式会社（NEC）は2026年10月20日、システム開発や保守業務の委託先に対するサイバー攻撃により、複数の顧客でシステム障害や個人情報を含む情報漏えいが発生したと発表しました。 同社によ",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117597",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs117593",
+   "pub": "2026-10-22",
+   "base": "2026-10-22",
+   "baseType": "公表",
+   "co": "社内システム",
+   "svc": "",
+   "n": 50000,
+   "nt": "最大約5万件",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "社内システムへの不正アクセスで国内最大約5万件の個人情報漏えい―PingCAP",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117593",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-23",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "画像：PingCAP株式会社より引用 PingCAP株式会社はこのほど、社内システムへの不正アクセスにより、日本国内で最大約5万件の個人情報が漏えいしたと発表しました。 同社によると、第三者は不正取得した認証情報を使い、2026",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117593",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs117595",
+   "pub": "2026-10-22",
+   "base": "2026-10-22",
+   "baseType": "公表",
+   "co": "",
+   "svc": "",
+   "n": 0,
+   "nt": "",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "他社サービスの流出情報を悪用か―『FF14』公式サイトで不正アクセスへの注意喚起",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117595",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-23",
+   "enrichedAt": "2026-10-23",
+   "sec_summary": "画像：スクウェア・エニックスより引用 スクウェア・エニックスは2026年10月19日、MMORPG『ファイナルファンタジーXIV』の公式情報サイト「The Lodestone」にて、外部から漏えいしたと見られる情報を用いた不正アクセス",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117595",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs53914",
+   "pub": "2021-06-18",
+   "base": "2021-06-18",
+   "baseType": "公表",
+   "co": "マクドナルド",
+   "svc": "",
+   "n": 0,
+   "nt": "",
+   "cat": "ext",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "マクドナルドが不正アクセス被害、韓国法人などで顧客情報流出",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/53914",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-23"
   }
  ]
 }
