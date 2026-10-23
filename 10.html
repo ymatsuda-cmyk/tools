@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10/24 自由行動 プラン別（松田祐弥）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>[hidden]{display:none!important}
+:root{--paper:#F2F5F3;--surface:#FFFFFF;--ink:#16263A;--sub:#4F5F70;--line:#D3DCDA;--indigo:#1F3A5F;--sea:#1E7F7A;--sun:#E3A81E;--hibiscus:#B8323A;--sea-soft:#DCEFEC;--sun-soft:#FBF0D2;--red-soft:#F7E1E2;--indigo-soft:#E2E8F1;--sky:#2F6FA8;--grass:#4A7524;--violet:#7A4E9E;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0F1A24;--surface:#16232F;--ink:#E6EDF0;--sub:#A3B2BD;--line:#2A3A47;--indigo:#8FB0DA;--sea:#5CC2B9;--sun:#F0C350;--hibiscus:#F0868C;--sea-soft:#163B3A;--sun-soft:#3A3117;--red-soft:#3D1E22;--indigo-soft:#1D2B3D;--sky:#7FB6E6;--grass:#A6D06A;--violet:#C9A2E8;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0F1A24;--surface:#16232F;--ink:#E6EDF0;--sub:#A3B2BD;--line:#2A3A47;--indigo:#8FB0DA;--sea:#5CC2B9;--sun:#F0C350;--hibiscus:#F0868C;--sea-soft:#163B3A;--sun-soft:#3A3117;--red-soft:#3D1E22;--indigo-soft:#1D2B3D;--sky:#7FB6E6;--grass:#A6D06A;--violet:#C9A2E8;color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 150px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+a{color:var(--sea)}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 0 8px}
+.tt{display:flex;align-items:baseline;gap:10px;padding:0 16px}
+.tt h1{margin:0;font-family:"Zen Antique Soft",serif;font-weight:400;font-size:1.35rem;color:var(--indigo)}
+.date{font-size:.8rem;color:var(--sub)}
+.chips,.subs{display:flex;gap:8px;overflow-x:auto;padding:8px 16px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar,.subs::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;min-height:44px;font:inherit;font-size:.9rem;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:4px 14px 4px 6px;cursor:pointer}
+.chip b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;font-family:"Zen Antique Soft",serif;font-weight:400;font-size:1.1rem;color:#fff}
+.p-A b,.ck.p-A{background:var(--sea)} .p-B b,.ck.p-B{background:var(--indigo)} .p-C b,.ck.p-C{background:var(--hibiscus)} .p-D b,.ck.p-D{background:var(--sky)} .p-E b,.ck.p-E{background:var(--grass)} .p-F b,.ck.p-F{background:var(--violet)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip b,:root:not([data-theme="light"]) .ck{color:#0F1A24}}
+:root[data-theme="dark"] .chip b,:root[data-theme="dark"] .ck{color:#0F1A24}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--surface);box-shadow:inset 0 -4px 0 var(--sun);font-weight:700}
+.sub{flex:0 0 auto;min-height:40px;min-width:64px;font:inherit;font-weight:700;font-size:.92rem;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:4px 14px;cursor:pointer}
+.sub[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.wrap{max-width:640px;margin:0 auto;padding:14px 16px 48px}
+.alert{margin:0 0 14px;font-size:.86rem;background:var(--red-soft);border-left:5px solid var(--hibiscus);border-radius:4px 12px 12px 4px;padding:10px 12px}
+.chead{display:flex;gap:12px;align-items:center;margin:4px 0 10px}
+.ck{flex:0 0 auto;display:grid;place-items:center;min-width:52px;height:52px;padding:0 6px;border-radius:14px;color:#fff;font-family:"Zen Antique Soft",serif;font-size:1.4rem}
+.chead h2{margin:0;font-size:1.15rem;line-height:1.3}
+.chead p{margin:2px 0 0;font-size:.84rem;color:var(--sub)}
+.cond{font-size:.88rem;background:var(--indigo-soft);border-radius:12px;padding:10px 12px;margin:10px 0}
+.cond.red{background:var(--red-soft)} .cond.green{background:var(--sea-soft)}
+ol.tl{list-style:none;margin:12px 0 0;padding:0;position:relative}
+ol.tl::before{content:"";position:absolute;left:5.1em;top:8px;bottom:8px;width:2px;background:var(--line)}
+ol.tl li{position:relative;display:grid;grid-template-columns:4.4em 1fr;gap:0 18px;padding:10px 0}
+ol.tl li::before{content:"";position:absolute;left:calc(5.1em - 5px);top:17px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--sub)}
+ol.tl li.mine::before{background:var(--sea);border-color:var(--sea)}
+.t{font-variant-numeric:tabular-nums;font-weight:700;color:var(--indigo);font-size:.95rem;text-align:right;padding-top:1px}
+.what{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+.what b{display:block;line-height:1.45}
+.what .note{display:block;font-size:.85rem;color:var(--sub);margin-top:3px}
+.tag{display:inline-block;font-size:.7rem;font-weight:700;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:2px}
+.tag.self{background:var(--sea);color:var(--surface)} .tag.warn{background:var(--hibiscus);color:#fff} .tag.cafe{background:var(--sun);color:#16263A}
+li:has(.tag.cafe) .what{border-color:var(--sun);background:linear-gradient(var(--sun-soft),var(--sun-soft))}
+.mapbox{margin-top:22px;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:4px 12px 12px}
+.mapbox summary{cursor:pointer;list-style:none;display:flex;gap:10px;align-items:baseline;padding:10px 0;font-weight:700}
+.mapbox summary::-webkit-details-marker{display:none}
+.mapbox summary::after{content:"▾";margin-left:auto;color:var(--sub)}
+.mapbox:not([open]) summary::after{content:"▸"}
+.cap{font-weight:400;font-size:.84rem;color:var(--sub)}
+.map{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line);margin-top:8px}
+.map .sea{fill:var(--sea-soft)} .map .land{fill:var(--surface);stroke:var(--sea);stroke-width:1.5}
+.map .isle{fill:var(--surface);stroke:var(--sea);stroke-width:1.5}
+.map text{font-family:"Zen Kaku Gothic New","Hiragino Sans",sans-serif;fill:var(--sub);font-size:13px}
+.map .lbl-sea{font-size:14px;fill:var(--sea);letter-spacing:.25em} .map .lbl{fill:var(--ink);font-size:12px;font-weight:700}
+.map .road{fill:none;stroke:var(--sun);stroke-width:5;stroke-linecap:round} .map .rail{fill:none;stroke:var(--sub);stroke-width:2;stroke-dasharray:6 4}
+.map .box{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}
+.map .far{fill:var(--grass);font-size:12px;font-weight:700}
+.mk circle,.mk rect{stroke:var(--surface);stroke-width:2}
+.map .mk text{fill:var(--paper);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.mk-b circle{fill:var(--indigo)} .mk-c circle{fill:var(--hibiscus)} .mk-d circle,.mk-d rect{fill:var(--sky)} .mk-e circle{fill:var(--grass)} .mk-f circle,.mk-f rect{fill:var(--violet)}
+.mk-base circle{fill:var(--sun)} .map .mk-base text{fill:#16263A}
+.map .route{fill:none;stroke-width:2.5;stroke-dasharray:6 5;stroke-linejoin:round;opacity:0}
+.map .route.on{opacity:.9} .r-b{stroke:var(--indigo)} .r-d{stroke:var(--sky)} .r-e{stroke:var(--grass)} .r-f{stroke:var(--violet)}
+.dim{opacity:.15} ol.places li.dim{display:none}
+ol.places{list-style:none;margin:12px 0 0;padding:0;font-size:.9rem}
+ol.places li{display:grid;grid-template-columns:1.8em 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+ol.places .no{width:1.6em;height:1.6em;border-radius:50%;display:grid;place-items:center;font-size:.76rem;font-weight:700;color:var(--paper)}
+ol.places .no.base{background:var(--sun);color:#16263A} .no.b{background:var(--indigo)} .no.c{background:var(--hibiscus)} .no.d{background:var(--sky)} .no.e{background:var(--grass)} .no.f{background:var(--violet)}
+ol.places small{display:block;color:var(--sub)}
+.decide{margin-top:18px;background:var(--sun-soft);border-radius:14px;padding:14px 16px;font-size:.92rem}
+.decide h3{margin:0 0 .4em;font-size:1rem} .decide ol{margin:0;padding-left:1.3em} .decide li{margin:.3em 0}
+.box{margin-top:16px;border:1.5px solid var(--line);border-radius:14px;padding:12px 16px;background:var(--surface)}
+.box h3{margin:0 0 .4em;font-size:1rem}
+.contacts{display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:.92rem}
+.contacts a{font-weight:700;text-decoration:none;font-variant-numeric:tabular-nums;padding:4px 0}
+.foot{margin-top:20px;font-size:.88rem;text-align:center}
+.rents{list-style:none;margin:8px 0 0;padding:0}
+.rents li{border-bottom:1px dashed var(--line);padding:10px 0}
+.rents .rh{display:flex;gap:8px;align-items:baseline;justify-content:space-between}
+.rents .walk{flex:0 0 auto;font-size:.8rem;font-weight:700;color:var(--sea)}
+.rents small{display:block;color:var(--sub);font-size:.84rem}
+.rents .ra{display:flex;gap:10px;margin-top:6px}
+.rents .ra a{display:inline-flex;align-items:center;min-height:36px;padding:4px 12px;border:1.5px solid var(--line);border-radius:999px;text-decoration:none;font-size:.86rem;font-weight:700}
+.rentpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:.82rem;color:var(--sub);align-items:center}
+.rentpick a,.rentpick button{display:inline-flex;align-items:center;min-height:32px;padding:2px 10px;border:1.5px solid var(--line);border-radius:999px;text-decoration:none;font:inherit;font-size:.8rem;font-weight:700;color:var(--sea);background:transparent;cursor:pointer}
+.rentpick button{border-color:var(--sea)}
+@media (prefers-reduced-motion:no-preference){.course:not([hidden]){animation:fade .2s ease-out}.map .route,.mk{transition:opacity .2s}}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style></head><body>
+<header class="top">
+  <div class="tt"><span class="date">10/24 土</span><h1>自由行動 プラン別</h1></div>
+  <div class="chips" role="group" aria-label="プラン"><button type="button" class="chip p-A" data-p="A" aria-pressed="false"><b>A</b><span>ダイビング</span></button><button type="button" class="chip p-B" data-p="B" aria-pressed="false"><b>B</b><span>ドライブ</span></button><button type="button" class="chip p-C" data-p="C" aria-pressed="false"><b>C</b><span>館内＋徒歩圏</span></button><button type="button" class="chip p-D" data-p="D" aria-pressed="false"><b>D</b><span>海を眺める</span></button><button type="button" class="chip p-E" data-p="E" aria-pressed="false"><b>E</b><span>島めぐり</span></button><button type="button" class="chip p-F" data-p="F" aria-pressed="false"><b>F</b><span>船で島へ</span></button></div>
+  <div class="subs" data-for="D" hidden><button type="button" class="sub" data-k="D-1" aria-pressed="false">D-1</button><button type="button" class="sub" data-k="D-2" aria-pressed="false">D-2</button></div><div class="subs" data-for="E" hidden><button type="button" class="sub" data-k="E-1" aria-pressed="false">E-1</button><button type="button" class="sub" data-k="E-2" aria-pressed="false">E-2</button><button type="button" class="sub" data-k="E-3" aria-pressed="false">E-3</button></div><div class="subs" data-for="F" hidden><button type="button" class="sub" data-k="F-1" aria-pressed="false">F-1</button><button type="button" class="sub" data-k="F-2" aria-pressed="false">F-2</button><button type="button" class="sub" data-k="F-3" aria-pressed="false">F-3</button><button type="button" class="sub" data-k="F-4" aria-pressed="false">F-4</button></div>
+</header>
+<main class="wrap">
+  <p class="alert">台風30号の影響で、Aのダイビングは中止の可能性が高い見込みです（10/22時点）。暴風警報中はC、解除後はB・D、波も落ち着いたらE、船が運航していればF。</p>
+  <section class="course" data-k="A" hidden><div class="chead"><span class="ck p-A">A</span><div><h2>ダイビング</h2><p>通常天候なら</p></div></div><p class="cond green">海況が穏やかで、ショップが開催を決めた場合の予定です。ダイビングの時刻は目安なので、予約確認の内容に合わせて書き換えてください。</p><ol class="tl">
+<li><span class="t">7:00</span><span class="what"><b>朝食（2階 sakurazaka）</b><span class="note">8:30〜9:30は混雑。早めがおすすめ。</span></span></li>
+<li class="mine"><span class="t">8:00頃</span><span class="what"><b>ダイビングショップの送迎・集合<span class="tag self">要確認</span></b><span class="note"><a href="https://aquamarine.okinawa/" rel="noopener" target="_blank">aquamarine.okinawa</a>。水着・タオル・サンダル・酔い止め。モバイルバッテリーは防水袋へ。</span></span></li>
+<li class="mine"><span class="t">9:00〜</span><span class="what"><b>ダイビング</b><span class="note">ダイビング後は搭乗まで一般に18時間以上空けるのが目安です。帰りの便は翌25日なので収まる見込みですが、直帰組（11:15発）の場合はショップに最終潜水の時刻を確認してください。</span></span></li>
+<li><span class="t">16:30頃</span><span class="what"><b>ホテル帰着・シャワー</b><span class="note">3階ジェットバス（最終受付19:00）も使えます。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>ホテル出発 → ぱやお 栄町店へ</b><span class="note">那覇市安里、栄町市場そば。徒歩約15分／タクシー約5分が目安。</span></span></li>
+<li class="mine"><span class="t">18:00</span><span class="what"><b>ぱやお 栄町店で飲食</b><span class="note"><a href="https://payao.okinawa/store/" rel="noopener" target="_blank">店舗情報</a>。営業17:00〜24:00（L.O.23:00）と案内あり。</span></span></li>
+<li><span class="t">夜</span><span class="what"><b>ホテルへ戻る</b><span class="note">3日目の集合は観光組8:25、直帰組9:25。</span></span></li>
+</ol></section><section class="course" data-k="B" hidden><div class="chead"><span class="ck p-B">B</span><div><h2>ドライブ</h2><p>警報解除後なら</p></div></div><p class="cond">暴風警報が解除され、台風の吹き返しが落ち着いてきた場合の予定です。警報中の運転はしないこと。海沿いの道や橋（ニライ・カナイ橋、海中道路、古宇利大橋など）は高波が残るので避け、屋内施設を目的地にします。</p><ol class="tl">
+<li><span class="t">7:30</span><span class="what"><b>朝食・警報の確認</b><span class="note">解除の見込みが立つまではホテルで待機（C案の過ごし方）。</span></span></li>
+<li class="mine"><span class="t">11:00</span><span class="what"><b>レンタカー受け取り（那覇市内）<span class="tag self">要予約</span></b><span class="note">当日キャンセル無料のプランで仮予約しておく。台風で店舗が臨時休業・受付時間変更になることがあるので前夜に確認。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">11:30</span><span class="what"><b>沖縄アウトレットモール あしびなー（豊見城）</b><span class="note">那覇から車で約20分。屋内中心でショッピングと昼食。</span></span></li>
+<li class="mine"><span class="t">13:30</span><span class="what"><b>イオンモール沖縄ライカム（北中城）へ移動</b><span class="note">あしびなーから約50分。大型屋内モールで雨風を気にせず過ごせます。道路の冠水・倒木・信号停止に注意。</span></span></li>
+<li class="mine"><span class="t">16:30</span><span class="what"><b>那覇へ戻り レンタカー返却</b><span class="note">飲酒予定があるので、夕食前に必ず返却。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>ホテル出発 → ぱやお 栄町店</b><span class="note">営業しているか、16時頃に電話で確認してから。</span></span></li>
+<li class="mine"><span class="t">18:00</span><span class="what"><b>ぱやお 栄町店で飲食</b></span></li>
+</ol><p class="cond">短縮版：時間が遅くなったら、あしびなーかライカムのどちらか一方だけにします。</p></section><section class="course" data-k="C" hidden><div class="chead"><span class="ck p-C">C</span><div><h2>館内＋徒歩圏</h2><p>暴風警報中でも</p></div></div><p class="cond red">沖縄本島に暴風警報が出ている間は、外出しないことが前提です。警報中はバス・ゆいレール・タクシーが止まり、多くの店や施設も休業します。小康状態や解除後になったら、ホテルから歩ける屋根のある場所へ。</p><ol class="tl">
+<li><span class="t">8:00</span><span class="what"><b>ゆっくり朝食（2階 sakurazaka）</b><span class="note">L.O.10:00。混雑ピークの8:30〜9:30を外すなら9:30以降も。</span></span></li>
+<li><span class="t">10:00</span><span class="what"><b>3階 フィットネス・ジェットバス</b><span class="note">7:00〜20:00（最終受付19:00）。プールは屋外のため休止の可能性大。</span></span></li>
+<li><span class="t">12:00</span><span class="what"><b>昼食：2階 sakurazaka ランチ／ルームサービス</b><span class="note">ランチ12:00〜15:00（L.O.14:30）。前夜のコンビニ買い置きも活躍。</span></span></li>
+<li><span class="t">14:00</span><span class="what"><b>1階 カフェ the lounge でのんびり</b><span class="note">9:00〜21:00。持ち込みの本や仕事の整理、同僚とカードゲームなど。</span></span></li>
+<li class="mine"><span class="t">15:00</span><span class="what"><b>小康・解除後なら：牧志のアーケード街へ</b><span class="note">ホテルから近い平和通り・市場本通りなどの屋根付き商店街、第一牧志公設市場、国際通りのドン・キホーテでお土産探し。営業状況はその場で確認。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>ぱやお 栄町店（営業・移動が安全な場合）</b><span class="note">店へ電話で営業確認。歩くのが危ない風ならタクシーも使わず予約を取り消す判断を。</span></span></li>
+<li class="mine"><span class="t">18:00</span><span class="what"><b>夕食の代わり：18階 Milano Grill／ルームサービス</b><span class="note">Milano Grill 17:30〜23:00、ルームサービス17:30〜23:00。食後は18階 the bar（19:30〜翌1:00）。</span></span></li>
+</ol></section><section class="course" data-k="D-1" hidden><div class="chead"><span class="ck p-D">D-1</span><div><h2>車で南部の高台へ（半日）</h2><p>警報解除後なら</p></div></div><p class="cond">暴風警報が解除された後に、海辺には降りず高台や建物の中から海を眺める案です。波浪警報や高潮警報が残っているうちは海岸線に近づかないこと。瀬長島（ウミカジテラス）は海上の道路が高波で通行止めになりやすいので外しています。</p><ol class="tl">
+<li><span class="t">7:30</span><span class="what"><b>朝食・警報の確認</b><span class="note">解除まではホテルで待機（C案の過ごし方）。</span></span></li>
+<li class="mine"><span class="t">12:00</span><span class="what"><b>レンタカーで那覇を出発<span class="tag self">要予約</span></b><span class="note">当日キャンセル無料のプランで。倒木・冠水・信号停止に注意。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">12:45</span><span class="what"><b>⑨ 山の茶屋 楽水（昼食）<span class="tag cafe">カフェ</span></b><span class="note">南城市玉城、崖の上の店で窓から海を眺めながら食事。ランチ11:00〜15:00（L.O.14:00）、水・木曜休み。営業は当日電話で確認（098-948-1227）。休みなら、同じ玉城で海が見える Cafe やぶさち やカフェ ロッジも候補に。</span></span></li>
+<li class="mine"><span class="t">14:00</span><span class="what"><b>⑧ 知念岬公園</b><span class="note">高台から太平洋と久高島を一望。風が強く残っている日は柵の内側だけにし、先端の遊歩道には進まない。</span></span></li>
+<li class="mine"><span class="t">15:00</span><span class="what"><b>Tenku terrace OOLOO<span class="tag cafe">カフェ</span></b><span class="note">知念岬から北へ約20分、南城市つきしろの高台から中城湾を一望。営業時間は曜日で異なるので事前に確認（098-943-9058）。途中の ⑩ ニライ・カナイ橋は、風が強いときは避けて一般道で。</span></span></li>
+<li class="mine"><span class="t">16:00</span><span class="what"><b>那覇へ戻る（約40分）</b></span></li>
+<li class="mine"><span class="t">16:45</span><span class="what"><b>レンタカー返却 → ホテル</b></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b><span class="note">16時ごろに電話で営業確認。</span></span></li>
+</ol></section><section class="course" data-k="D-2" hidden><div class="chead"><span class="ck p-D">D-2</span><div><h2>車なしで那覇市内（2〜3時間）</h2><p>警報解除後なら</p></div></div><p class="cond">暴風警報が解除された後に、海辺には降りず高台や建物の中から海を眺める案です。波浪警報や高潮警報が残っているうちは海岸線に近づかないこと。瀬長島（ウミカジテラス）は海上の道路が高波で通行止めになりやすいので外しています。</p><ol class="tl">
+<li><span class="t">午前</span><span class="what"><b>ホテルで待機・警報と交通の確認</b><span class="note">ゆいレールや路線バスは警報解除後に順次運転再開。</span></span></li>
+<li class="mine"><span class="t">14:00</span><span class="what"><b>① ホテル → ④ 波上宮（タクシー約10分）</b><span class="note">境内から海を見下ろす。崖下の波の上ビーチには降りない。</span></span></li>
+<li class="mine"><span class="t">15:00</span><span class="what"><b>⑤ 那覇空港 展望デッキ</b><span class="note">海と滑走路が一緒に見えます。台風後は振替客で混雑したりデッキが閉鎖されたりするので事前に確認。</span></span></li>
+<li class="mine"><span class="t">15:45</span><span class="what"><b>那覇空港ターミナル内のカフェで休憩<span class="tag cafe">カフェ</span></b><span class="note">窓際の席なら滑走路と海が見えます。台風後で混んでいたら無理せずホテルへ。</span></span></li>
+<li class="mine"><span class="t">16:30</span><span class="what"><b>ホテルに戻る（ゆいレールで牧志駅へ）</b></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b></span></li>
+</ol></section><section class="course" data-k="E-1" hidden><div class="chead"><span class="ck p-E">E-1</span><div><h2>南部で短く2島（半日）</h2><p>波が落ち着いたら　台風の翌日でもいちばん現実的</p></div></div><p class="cond red">島へ渡る橋や海上の道路は、高波や強風で通行止めになりやすい場所です。暴風警報だけでなく波浪警報も解除され、通行止め情報が出ていない場合だけにしてください。橋の上では停車せず、島でも護岸や浜には降りず展望所や店内から眺めます。どのコースも夕食前にレンタカーを返却します。</p><ol class="tl">
+<li class="mine"><span class="t">12:00</span><span class="what"><b>レンタカーで那覇を出発<span class="tag self">要予約</span></b><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">12:20</span><span class="what"><b>⑪ 瀬長島（ウミカジテラス）で昼食</b><span class="note">海上の道路を渡るので、通行止めなら飛ばして奥武島へ直行。</span></span></li>
+<li class="mine"><span class="t">13:00</span><span class="what"><b>ハンモックカフェ ラ・イスラ（ウミカジテラス内）<span class="tag cafe">カフェ</span></b><span class="note">ハンモックに揺られながら海を眺められるカフェ。屋外席なので、風が強い日はテラス内の屋内の店で。</span></span></li>
+<li class="mine"><span class="t">13:30</span><span class="what"><b>奥武島へ移動（約40分）</b></span></li>
+<li class="mine"><span class="t">14:10</span><span class="what"><b>⑫ 奥武島</b><span class="note">短い橋で渡る小さな島。名物の天ぷらを買って車内で。海沿いの護岸には出ない。</span></span></li>
+<li class="mine"><span class="t">14:50</span><span class="what"><b>浜辺の茶屋<span class="tag cafe">カフェ</span></b><span class="note">奥武島から車で約10分、窓の外がすぐ海の木造カフェ。土日は8:00〜18:00。波が高い日は浜に降りず、店内から眺めるだけに。</span></span></li>
+<li class="mine"><span class="t">15:40</span><span class="what"><b>那覇へ戻る → 16:30 返却</b></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b></span></li>
+</ol></section><section class="course" data-k="E-2" hidden><div class="chead"><span class="ck p-E">E-2</span><div><h2>海中道路と4島（半日強）</h2><p>波が落ち着いたら</p></div></div><p class="cond red">島へ渡る橋や海上の道路は、高波や強風で通行止めになりやすい場所です。暴風警報だけでなく波浪警報も解除され、通行止め情報が出ていない場合だけにしてください。橋の上では停車せず、島でも護岸や浜には降りず展望所や店内から眺めます。どのコースも夕食前にレンタカーを返却します。</p><ol class="tl">
+<li class="mine"><span class="t">11:00</span><span class="what"><b>レンタカーで那覇を出発</b><span class="note">沖縄自動車道の沖縄北IC経由で約1時間。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">12:00</span><span class="what"><b>⑬ 海中道路（海の駅 あやはし館で昼食）</b><span class="note">海の上をまっすぐ走る約5kmの道路。低い位置を通るので、台風の翌日はいちばん止まりやすいコースです。</span></span></li>
+<li class="mine"><span class="t">13:00</span><span class="what"><b>平安座島 → 宮城島（果報バンタ）</b><span class="note">高台の展望スポット。海に降りずに絶景を見られます。</span></span></li>
+<li class="mine"><span class="t">13:30</span><span class="what"><b>ぬちまーす「ぬちまーすレストラン たかはなり」<span class="tag cafe">カフェ</span></b><span class="note">果報バンタと同じ製塩工場の敷地内、2階のレストラン・カフェ。高台から海を眺めながら名物の塩ソフトを。</span></span></li>
+<li class="mine"><span class="t">14:15</span><span class="what"><b>伊計島 または 浜比嘉島</b><span class="note">どちらか1島に絞って時間に余裕を。</span></span></li>
+<li class="mine"><span class="t">15:00</span><span class="what"><b>那覇へ戻る → 16:30 返却</b><span class="note">土曜夕方の渋滞で1時間半かかることも。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b></span></li>
+</ol></section><section class="course" data-k="E-3" hidden><div class="chead"><span class="ck p-E">E-3</span><div><h2>北部の瀬底島・古宇利島（1日）</h2><p>波が落ち着いたら　台風が早く抜けた場合のみ</p></div></div><p class="cond red">島へ渡る橋や海上の道路は、高波や強風で通行止めになりやすい場所です。暴風警報だけでなく波浪警報も解除され、通行止め情報が出ていない場合だけにしてください。橋の上では停車せず、島でも護岸や浜には降りず展望所や店内から眺めます。どのコースも夕食前にレンタカーを返却します。</p><ol class="tl">
+<li class="mine"><span class="t">8:00</span><span class="what"><b>レンタカーで那覇を出発</b><span class="note">許田IC経由で約2時間。朝の時点で警報がすべて解除されていることが条件です。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">9:30</span><span class="what"><b>スターバックス 名護21世紀の森公園あけみおてらす店<span class="tag cafe">カフェ</span></b><span class="note">名護湾沿いの店で朝のコーヒー休憩。2026年4月開業。ここから瀬底島まで約30分。</span></span></li>
+<li class="mine"><span class="t">10:15</span><span class="what"><b>⑭ 瀬底大橋 → 瀬底島</b></span></li>
+<li class="mine"><span class="t">11:30</span><span class="what"><b>⑭ 古宇利大橋 → 古宇利島で昼食</b></span></li>
+<li class="mine"><span class="t">13:00</span><span class="what"><b>古宇利オーシャンタワー2階「オーシャンブルー」<span class="tag cafe">カフェ</span></b><span class="note">高台のタワー内にあるカフェで、古宇利大橋と海を真上から眺められます。展望台と合わせて屋内中心に過ごせます。</span></span></li>
+<li class="mine"><span class="t">14:30</span><span class="what"><b>那覇へ戻る → 16:30〜17:00 返却</b><span class="note">往復4時間以上の運転になるので、運転を交代できる同行者がいると安心。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b><span class="note">渋滞で遅れそうなら、店に先に連絡を。</span></span></li>
+</ol></section><section class="course" data-k="F-1" hidden><div class="chead"><span class="ck p-F">F-1</span><div><h2>久高島（半日）</h2><p>船が運航していれば　車＋船、いちばん短い船旅</p></div></div><p class="cond red">台風が過ぎた直後は、うねりが残って船は欠航しやすく、24日は全便欠航の可能性が高いと考えてください。行けるのは、当日朝の時点で行きと帰りの両方が運航予定になっている場合だけです。帰りの便が欠航すると島に泊まることになり、25日の帰りの飛行機に響きます。時刻はすべて目安なので、運航会社のサイトか電話で当日朝に確認してください。</p><ol class="tl">
+<li class="mine"><span class="t">11:00</span><span class="what"><b>レンタカーで那覇を出発<span class="tag self">要予約</span></b><span class="note">南城市つきしろまで約35分。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">11:40</span><span class="what"><b>Tenku terrace OOLOO（昼食）<span class="tag cafe">カフェ</span></b><span class="note">南城市つきしろの高台にあり、中城湾を一望できます。安座真港まで車で約20分。営業時間は曜日で異なるので事前に確認（098-943-9058）。</span></span></li>
+<li class="mine"><span class="t">12:30頃</span><span class="what"><b>⑮ 安座真港から久高島へ</b><span class="note">高速船約15分・フェリー約25分。定員が少ないので早めに港へ。問い合わせは久高島フェリー安座真事務所（098-948-7785）。</span></span></li>
+<li class="mine"><span class="t">13:00</span><span class="what"><b>久高島を散策</b><span class="note">「神の島」と呼ばれ、立ち入りが禁じられた場所があります。案内板のルールを守って。港近くでレンタサイクルを借りると回りやすいです。</span></span></li>
+<li class="mine"><span class="t">15:30頃</span><span class="what"><b>船で安座真港へ戻る → 那覇へ</b><span class="note">帰りの便の時刻は島に着いたらすぐ確認。</span></span></li>
+<li class="mine"><span class="t">16:45</span><span class="what"><b>レンタカー返却 → ホテル</b></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b></span></li>
+</ol></section><section class="course" data-k="F-2" hidden><div class="chead"><span class="ck p-F">F-2</span><div><h2>渡嘉敷島（半日〜1日）</h2><p>船が運航していれば　車なしで行ける</p></div></div><p class="cond red">台風が過ぎた直後は、うねりが残って船は欠航しやすく、24日は全便欠航の可能性が高いと考えてください。行けるのは、当日朝の時点で行きと帰りの両方が運航予定になっている場合だけです。帰りの便が欠航すると島に泊まることになり、25日の帰りの飛行機に響きます。時刻はすべて目安なので、運航会社のサイトか電話で当日朝に確認してください。</p><ol class="tl">
+<li class="mine"><span class="t">午前</span><span class="what"><b>ホテル → ⑯ 泊港（タクシー約10分）</b><span class="note">渡嘉敷村の船は高速船「マリンライナーとかしき」とフェリー。乗船券は泊港ターミナル「とまりん」で。</span></span></li>
+<li class="mine"><span class="t">午前</span><span class="what"><b>⑰ 渡嘉敷島へ（高速船約30分・フェリー約70分）</b></span></li>
+<li class="mine"><span class="t">昼〜午後</span><span class="what"><b>渡嘉敷島で過ごす</b><span class="note">台風後は海に入らず、展望台や集落の散策が中心。島内の食堂・カフェは少なく臨時休業もあるので、泊港「とまりん」で軽食を用意しておくと安心。</span></span></li>
+<li class="mine"><span class="t">夕方</span><span class="what"><b>船で泊港へ → ホテル</b><span class="note">17時台までに泊港へ戻れる便を選ぶ。</span></span></li>
+<li class="mine"><span class="t">17:40</span><span class="what"><b>② ぱやお 栄町店へ → 18:00 飲食</b></span></li>
+</ol></section><section class="course" data-k="F-3" hidden><div class="chead"><span class="ck p-F">F-3</span><div><h2>座間味島・阿嘉島（1日）</h2><p>船が運航していれば　車なし</p></div></div><p class="cond red">台風が過ぎた直後は、うねりが残って船は欠航しやすく、24日は全便欠航の可能性が高いと考えてください。行けるのは、当日朝の時点で行きと帰りの両方が運航予定になっている場合だけです。帰りの便が欠航すると島に泊まることになり、25日の帰りの飛行機に響きます。時刻はすべて目安なので、運航会社のサイトか電話で当日朝に確認してください。</p><ol class="tl">
+<li class="mine"><span class="t">朝</span><span class="what"><b>⑯ 泊港ターミナル「とまりん」で軽食を調達<span class="tag cafe">カフェ</span></b><span class="note">島で店が開いていない場合に備えて、飲み物と軽食を買ってから乗船。</span></span></li>
+<li class="mine"><span class="t">朝</span><span class="what"><b>⑯ 泊港から ⑱ 座間味島・阿嘉島へ</b><span class="note">座間味村の高速船「クイーンざまみ」とフェリー。便数が少ないので、行きと帰りの便を先に決めておく。座間味と阿嘉の間は村内船で行き来できます。</span></span></li>
+<li class="mine"><span class="t">昼</span><span class="what"><b>島で過ごす</b><span class="note">高台の展望台から慶良間の海を眺めるのが台風後には安全。島の食堂・カフェは数が少なく、台風の後は休むこともあります。</span></span></li>
+<li class="mine"><span class="t">夕方</span><span class="what"><b>船で泊港へ → ホテル → 18:00 ぱやお</b><span class="note">最終便を逃すと那覇に戻れません。</span></span></li>
+</ol></section><section class="course" data-k="F-4" hidden><div class="chead"><span class="ck p-F">F-4</span><div><h2>伊江島・水納島（1日）</h2><p>船が運航していれば　北部、台風が早く抜けた場合のみ</p></div></div><p class="cond red">台風が過ぎた直後は、うねりが残って船は欠航しやすく、24日は全便欠航の可能性が高いと考えてください。行けるのは、当日朝の時点で行きと帰りの両方が運航予定になっている場合だけです。帰りの便が欠航すると島に泊まることになり、25日の帰りの飛行機に響きます。時刻はすべて目安なので、運航会社のサイトか電話で当日朝に確認してください。</p><ol class="tl">
+<li class="mine"><span class="t">7:30</span><span class="what"><b>レンタカーで那覇を出発（本部半島まで約2時間）</b><span class="note">8:00前に借りられるのは24時間の無人拠点「タナークレンタカー 牧志1号」（徒歩1〜2分）だけです。ほかの店なら前日の夜に借りておく方法も。</span><span class="rentpick">近くの店：<a href="tel:0989963566">ゆい（徒歩3分）</a><a href="tel:0988690543">オリックス（4分）</a><a href="tel:0989275024">まちなか（4〜5分）</a><button type="button" class="torent">店の一覧へ</button></span></span></li>
+<li class="mine"><span class="t">10:00</span><span class="what"><b>⑲ 本部港から伊江島へ（フェリー約30分）</b><span class="note">または渡久地港から水納島へ。どちらか1島に絞ります。</span></span></li>
+<li class="mine"><span class="t">14:00頃</span><span class="what"><b>船で本島へ戻る</b></span></li>
+<li class="mine"><span class="t">14:45</span><span class="what"><b>スターバックス 名護21世紀の森公園あけみおてらす店<span class="tag cafe">カフェ</span></b><span class="note">2026年4月に開業した名護湾沿いの店。海を眺めて休憩してから那覇へ（許田ICまで約10分）。</span></span></li>
+<li class="mine"><span class="t">15:15</span><span class="what"><b>那覇へ戻る</b><span class="note">運転が往復4時間以上。運転を交代できる人がいると安心です。</span></span></li>
+<li class="mine"><span class="t">17:00</span><span class="what"><b>レンタカー返却 → 17:40 ② ぱやおへ</b><span class="note">遅れそうなら店に先に連絡を。</span></span></li>
+</ol></section>
+  <details class="mapbox rent" id="rentlist"><summary><span>ホテル近くのレンタカー</span><span class="cap">7店</span></summary><p class="cond">B・D-1・E・F-1・F-4で使います。台風の日は臨時休業や受付時間の変更があるので、当日キャンセル無料のプランで予約し、前夜に営業を確認してください。徒歩はホテルからの目安、営業時間はGoogleマップの掲載情報（10/23時点）です。</p><ul class="rents"><li><div class="rh"><b>ゆいレンタカー 国際通り店</b><span class="walk">徒歩約3分</span></div><small>8:00〜19:00・那覇市牧志2-16-19</small><div class="ra"><a href="tel:0989963566">📞 098-996-3566</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%82%86%E3%81%84%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E5%9B%BD%E9%9A%9B%E9%80%9A%E3%82%8A%E5%BA%97&query_place_id=ChIJ__9zx3tp5TQRO7YEcgbAD2s" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>タナークレンタカー 牧志1号（無人配車拠点）</b><span class="walk">徒歩約1〜2分</span></div><small>24時間・那覇市牧志1-3-47</small><small>スタッフ不在の無人拠点。手続きはネットで完結。</small><div class="ra"><a href="tel:09090525492">📞 090-9052-5492</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%82%BF%E3%83%8A%E3%83%BC%E3%82%AF%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E7%89%A7%E5%BF%971%E5%8F%B7%EF%BC%88%E7%84%A1%E4%BA%BA%E9%85%8D%E8%BB%8A%E6%8B%A0%E7%82%B9%EF%BC%89&query_place_id=ChIJHQB53Axp5TQRtbyVDIKbIv4" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>オリックスレンタカー 美栄橋駅前店</b><span class="walk">徒歩約4分</span></div><small>8:00〜19:00・那覇市牧志2-17-12 いとみね会館1F</small><div class="ra"><a href="tel:0988690543">📞 098-869-0543</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%82%AA%E3%83%AA%E3%83%83%E3%82%AF%E3%82%B9%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E7%BE%8E%E6%A0%84%E6%A9%8B%E9%A7%85%E5%89%8D%E5%BA%97&query_place_id=ChIJz5tkfXlp5TQR_Sh9ku3ZzjI" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>まちなかレンタカー 沖縄国際通り店</b><span class="walk">徒歩約4〜5分</span></div><small>9:00〜19:00・那覇市牧志3-8-30</small><small>ハイアットの向かい側との口コミあり。</small><div class="ra"><a href="tel:0989275024">📞 098-927-5024</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%81%BE%E3%81%A1%E3%81%AA%E3%81%8B%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E6%B2%96%E7%B8%84%E5%9B%BD%E9%9A%9B%E9%80%9A%E3%82%8A%E5%BA%97&query_place_id=ChIJAfxLX2lp5TQRlL-XzX2RRJs" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>どこでもレンタカー 国際通り店</b><span class="walk">徒歩約4分</span></div><small>掲載なし（要確認）・那覇市牧志3-12-10</small><small>ホテルまで車を届けてくれるとの口コミあり。</small><div class="ra"><a href="tel:09022830351">📞 090-2283-0351</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%81%A9%E3%81%93%E3%81%A7%E3%82%82%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E5%9B%BD%E9%9A%9B%E9%80%9A%E3%82%8A%E5%BA%97&query_place_id=ChIJLXBCquRp5TQRG5WW9xF4aRI" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>ニッポンレンタカー 県庁前営業所</b><span class="walk">徒歩約12分</span></div><small>8:00〜20:00・那覇市久茂地1-1-1</small><small>返却は地下駐車場。入口が混みやすい。</small><div class="ra"><a href="tel:05017122416">📞 050-1712-2416</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%83%8B%E3%83%83%E3%83%9D%E3%83%B3%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E7%9C%8C%E5%BA%81%E5%89%8D%E5%96%B6%E6%A5%AD%E6%89%80&query_place_id=ChIJ8SoBz51p5TQRRCUEc0na13I" target="_blank" rel="noopener">地図</a></div></li><li><div class="rh"><b>ニコニコレンタカー 那覇おもろまち駅店</b><span class="walk">徒歩約15分</span></div><small>8:00〜21:00・那覇市大道75-1</small><small>おもろまち駅のそば。ゆいレールでも行ける。</small><div class="ra"><a href="tel:0988866028">📞 098-886-6028</a><a href="https://www.google.com/maps/search/?api=1&query=%E3%83%8B%E3%82%B3%E3%83%8B%E3%82%B3%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC%20%E9%82%A3%E8%A6%87%E3%81%8A%E3%82%82%E3%82%8D%E3%81%BE%E3%81%A1%E9%A7%85%E5%BA%97&query_place_id=ChIJr36YMupp5TQRz_6fXSHT7dE" target="_blank" rel="noopener">地図</a></div></li></ul></details>
+  <details class="mapbox" open>
+    <summary><span>地図</span><span class="cap" id="cap"></span></summary>
+    <svg aria-label="自由行動で使う場所の略図。選んだプランの場所と回る順番を強調表示" class="map" id="daymap" role="img" viewbox="0 0 440 577">
+<rect class="sea" height="577" width="440"></rect>
+<polygon class="land" points="344,0 336,27 320,40 292,36 264,18 220,27 208,53 220,75 248,98 280,115 300,129 280,147 240,164 208,195 176,222 144,244 112,266 92,258 96,293 116,320 122,355 108,391 80,417 58,448 54,460 44,460 32,457 30,472 42,480 40,499 36,511 48,528 52,542 56,568 64,577 96,559 132,526 156,515 172,506 184,497 180,487 164,481 148,475 132,466 140,448 152,426 160,404 172,382 184,364 208,355 240,373 280,364 264,342 224,320 192,293 184,271 216,258 264,244 296,231 336,204 352,186 384,160 416,115 440,89 440,0"></polygon>
+<ellipse class="isle" cx="284" cy="336" rx="9" ry="5"></ellipse>
+<ellipse class="isle" cx="302" cy="318" rx="8" ry="6"></ellipse>
+<ellipse class="isle" cx="316" cy="300" rx="6" ry="5"></ellipse>
+<ellipse class="isle" cx="292" cy="358" rx="5" ry="4"></ellipse>
+<ellipse class="isle" cx="202" cy="73" rx="7" ry="6"></ellipse>
+<ellipse class="isle" cx="298" cy="14" rx="7" ry="5"></ellipse>
+<ellipse class="isle" cx="29" cy="493" rx="4" ry="3"></ellipse>
+<ellipse class="isle" cx="144" cy="533" rx="4" ry="3"></ellipse>
+<line stroke="var(--sea)" stroke-width="2" x1="252" x2="282" y1="351" y2="337"></line>
+<text class="lbl-sea" x="16" y="160">東シナ海</text>
+<text class="lbl-sea" x="336" y="471">太平洋</text>
+<text class="lbl-sea" x="250" y="455">中城湾</text>
+<text class="lbl-sea" x="240" y="284">金武湾</text>
+<text class="" x="80" y="471">那覇</text>
+<text class="" x="308" y="115">名護</text>
+<text class="" x="228" y="49">本部</text>
+<text class="" x="184" y="235">恩納</text>
+<text class="" x="208" y="329">うるま</text>
+<text class="" x="128" y="502">南城</text>
+<text class="" x="160" y="391">北中城</text>
+<polyline class="route r-b" data-k="B" points="70,456 45,506 154,369 70,456"></polyline>
+<polyline class="route r-d" data-k="D-1" points="70,456 181,496 174,499 168,503 70,456"></polyline>
+<polyline class="route r-d" data-k="D-2" points="70,456 57,452 37,465 70,456"></polyline>
+<polyline class="route r-e" data-k="E-1" points="70,456 29,493 144,533 70,456"></polyline>
+<polyline class="route r-e" data-k="E-2" points="70,456 268,345 302,318 70,456"></polyline>
+<polyline class="route r-e" data-k="E-3" points="70,456 202,73 298,14 70,456"></polyline>
+<g class="mk mk-base" data-k="*"><circle cx="70" cy="456" r="7"></circle><text x="70" y="456">1</text></g>
+<g class="mk mk-b" data-k="B"><circle cx="45" cy="506" r="7"></circle><text x="45" y="506">6</text></g>
+<g class="mk mk-b" data-k="B"><circle cx="154" cy="369" r="7"></circle><text x="154" y="369">7</text></g>
+<g class="mk mk-d" data-k="D-2"><circle cx="53" cy="445" r="7"></circle><text x="53" y="445">4</text></g>
+<g class="mk mk-d" data-k="D-2"><circle cx="37" cy="465" r="7"></circle><text x="37" y="465">5</text></g>
+<g class="mk mk-d" data-k="D-1 E-1"><rect height="18" rx="9" width="34" x="150" y="478"></rect><text x="167" y="487">8-10</text></g>
+<g class="mk mk-e" data-k="E-1"><circle cx="29" cy="493" r="8"></circle><text x="29" y="493">11</text></g>
+<g class="mk mk-e" data-k="E-1"><circle cx="144" cy="533" r="8"></circle><text x="144" y="533">12</text></g>
+<g class="mk mk-e" data-k="E-2"><circle cx="268" cy="345" r="8"></circle><text x="268" y="345">13</text></g>
+<g class="mk mk-e" data-k="E-2"><circle cx="302" cy="318" r="8"></circle><text x="302" y="318">13</text></g>
+<g class="mk mk-e" data-k="E-3"><circle cx="202" cy="73" r="8"></circle><text x="202" y="73">14</text></g>
+<g class="mk mk-e" data-k="E-3"><circle cx="298" cy="14" r="8"></circle><text x="298" y="14">14</text></g>
+<ellipse class="isle" cx="160" cy="13" rx="15" ry="6"></ellipse>
+<ellipse class="isle" cx="178" cy="73" rx="5" ry="3"></ellipse>
+<ellipse class="isle" cx="230" cy="506" rx="4" ry="8" transform="rotate(35 230 506)"></ellipse>
+<polyline class="route r-f" data-k="F-1" points="70,456 181,482 230,506"></polyline>
+<polyline class="route r-f" data-k="F-2 F-3" points="70,456 40,470 8,493"></polyline>
+<polyline class="route r-f" data-k="F-4" points="70,456 220,67 160,13"></polyline>
+<g class="mk mk-f" data-k="F-1"><circle cx="244" cy="500" r="8"></circle><text x="244" y="500">15</text></g>
+<g class="mk mk-f" data-k="F-4"><circle cx="184" cy="17" r="8"></circle><text x="184" y="17">19</text></g>
+<g class="mk mk-f" data-k="F-4"><circle cx="190" cy="79" r="8"></circle><text x="190" y="79">19</text></g>
+<g class="mk mk-f" data-k="F-2 F-3"><rect height="18" rx="9" width="78" x="2" y="484"></rect><text x="41" y="493">← 17·18 慶良間</text></g>
+<line stroke="var(--ink)" stroke-width="2" x1="20" x2="100" y1="559" y2="559"></line><text x="20" y="551">10km</text>
+<text class="lbl" text-anchor="middle" x="410" y="24">N</text><path d="M410 30 L404 50 L410 45 L416 50 Z" fill="var(--ink)"></path>
+<rect class="box" height="28" rx="6" width="40" x="44" y="436"></rect>
+<text class="lbl" x="90" y="440">①〜④・⑯ 那覇中心部は拡大図へ</text>
+</svg>
+    <svg aria-label="那覇中心部の拡大略図。ホテル、ぱやお、牧志のアーケード、波上宮の位置" class="map" role="img" viewbox="0 0 480 233">
+<rect class="land" height="233" stroke="none" width="480"></rect>
+<path class="sea" d="M0 0 L60 0 Q38 80 22 233 L0 233 Z"></path>
+<path class="road" d="M172 225 L382 125"></path>
+<text transform="rotate(-25 230 218)" x="230" y="218">国際通り</text>
+<path class="rail" d="M300 233 Q340 170 358 137 L412 108 L470 80"></path>
+<text x="425" y="132">安里駅</text>
+<text text-anchor="end" x="318" y="150">牧志駅</text>
+<text x="440" y="70">ゆいレール</text>
+<g class="mk mk-base" data-k="*"><circle cx="300" cy="168" r="11"></circle><text x="300" y="168">1</text></g>
+<g class="mk mk-base" data-k="*"><circle cx="405" cy="104" r="11"></circle><text x="405" y="104">2</text></g>
+<g class="mk mk-c" data-k="C"><circle cx="280" cy="205" r="11"></circle><text x="280" y="205">3</text></g>
+<g class="mk mk-d" data-k="D-2"><circle cx="51" cy="75" r="11"></circle><text x="51" y="75">4</text></g>
+<line stroke="var(--ink)" stroke-width="2" x1="350" x2="470" y1="222" y2="222"></line>
+<text x="350" y="214">800m</text>
+<g class="mk mk-f" data-k="F-2 F-3"><circle cx="150" cy="16" r="11"></circle><text x="150" y="16">16</text></g>
+<text x="166" y="20">泊港 ↑</text>
+</svg>
+    <ol class="places"><li data-k="*"><span class="no base">1</span><span><b>ハイアットリージェンシー那覇</b><small>拠点。牧志駅から徒歩圏。</small></span></li><li data-k="*"><span class="no base">2</span><span><b>ぱやお 栄町店</b><small>全案共通18:00。安里駅そば、ホテルから徒歩約15分／タクシー約5分。</small></span></li><li data-k="C"><span class="no c">3</span><span><b>牧志のアーケード街・第一牧志公設市場</b><small>C案。ホテルから徒歩数分。国際通りのドン・キホーテも近く。</small></span></li><li data-k="D-2"><span class="no d">4</span><span><b>波上宮</b><small>D-2。崖の上の神社。ホテルからタクシー約10分。</small></span></li><li data-k="D-2"><span class="no d">5</span><span><b>那覇空港 展望デッキ</b><small>D-2。タクシーまたはゆいレール。</small></span></li><li data-k="B"><span class="no b">6</span><span><b>沖縄アウトレットモール あしびなー</b><small>B案。那覇から車で約20分。</small></span></li><li data-k="B"><span class="no b">7</span><span><b>イオンモール沖縄ライカム</b><small>B案。那覇から車で約40分。</small></span></li><li data-k="D-1 E-1"><span class="no d">8</span><span><b>知念岬公園</b><small>D-1。E-1の帰りに寄り道も可。那覇から車で約50分。</small></span></li><li data-k="D-1"><span class="no d">9</span><span><b>山の茶屋 楽水</b><small>D-1。南城市玉城、崖の上のお店。窓から海を眺めながら昼食。</small></span></li><li data-k="D-1"><span class="no d">10</span><span><b>ニライ・カナイ橋</b><small>D-1の帰り道候補。風が強いときは通らない。</small></span></li><li data-k="E-1"><span class="no e">11</span><span><b>瀬長島（ウミカジテラス）</b><small>E-1。海上の道路で渡る島。ホテルから車で約20分。</small></span></li><li data-k="E-1"><span class="no e">12</span><span><b>奥武島</b><small>E-1。短い橋で渡る小さな島。那覇から車で約40分。</small></span></li><li data-k="E-2"><span class="no e">13</span><span><b>海中道路と平安座島・宮城島・伊計島・浜比嘉島</b><small>E-2。うるま市、那覇から車で約1時間。</small></span></li><li data-k="E-3"><span class="no e">14</span><span><b>瀬底島・古宇利島</b><small>E-3。本部町・今帰仁村、那覇から車で約2時間。</small></span></li><li data-k="F-1"><span class="no f">15</span><span><b>久高島（安座真港から）</b><small>F-1。南城市、知念岬の東の島。安座真港まで那覇から車で約50分、船は高速船約15分・フェリー約25分。</small></span></li><li data-k="F-2 F-3"><span class="no f">16</span><span><b>泊港（とまりん）</b><small>F-2・F-3の乗り場。ホテルからタクシー約10分。</small></span></li><li data-k="F-2"><span class="no f">17</span><span><b>渡嘉敷島</b><small>F-2。泊港から高速船約30分・フェリー約70分。地図の西側、範囲外。</small></span></li><li data-k="F-3"><span class="no f">18</span><span><b>座間味島・阿嘉島</b><small>F-3。泊港から高速船・フェリー。地図の西側、範囲外。</small></span></li><li data-k="F-4"><span class="no f">19</span><span><b>伊江島・水納島</b><small>F-4。本部半島の港から船。那覇から港まで車で約2時間。</small></span></li></ol>
+    <p class="cond">位置は略図の目安で、点線は回る順番です。カフェは地図に載せていません。</p>
+  </details>
+  <div class="decide">
+<h3>どの案にするかの決め方</h3>
+<ol>
+<li><b>23日夜（ホテル着後）</b>：ショップから中止連絡が来たらAは消滅。暴風警報が24日昼まで続く予報ならCを基本に、レンタカーの仮予約をどうするか決める。</li>
+<li><b>24日 7:00</b>：沖縄本島の暴風警報を確認。警報中ならC、解除済み・午前中に解除見込みならBかD。波浪警報が残っていれば、Dは高台・屋内だけに絞る。Eの島めぐりは、波浪警報も解除されて渡る道路が通れる場合だけ。Fの船は、当日朝に行き帰りとも運航予定のときだけ。</li>
+<li><b>24日 16:00頃</b>：ぱやおに電話して営業と予約を確認。休業ならホテル館内の夕食へ。</li>
+</ol>
+</div>
+  <div class="box"><h3>連絡先</h3><div class="contacts"><span>ライターム 佐々木</span><a href="tel:09085037089">090-8503-7089</a><span>JTB 佐藤</span><a href="tel:07040222396">070-4022-2396</a><span>ハイアットリージェンシー那覇</span><a href="tel:0988668888">098-866-8888</a></div></div>
+  <p class="foot"><a href="https://claude.ai/artifact/95hvUxB8botJmfa9nC8xRL">3日間の予定表（全体版）を開く</a></p>
+</main>
+<script>var CAPS={"A": "ダイビングはショップの送迎。夜は①ホテルから②ぱやおへ。", "B": "①ホテル → ⑥あしびなー → ⑦ライカム → ①ホテル → ②ぱやお", "C": "ホテル周辺だけ。拡大図の③アーケード・公設市場と②ぱやお", "D-1": "⑨山の茶屋 楽水 → ⑧知念岬 → OOLOO（つきしろ） → 那覇", "D-2": "①ホテル → ④波上宮 → ⑤空港展望デッキ → ①ホテル", "E-1": "⑪瀬長島 → ⑫奥武島 → 浜辺の茶屋 → 那覇", "E-2": "⑬海中道路 → 宮城島（果報バンタ・ぬちまーす） → 伊計島か浜比嘉島", "E-3": "名護 → ⑭瀬底島 → ⑭古宇利島 → 那覇", "F-1": "OOLOO → 安座真港 → ⑮久高島 → 那覇", "F-2": "⑯泊港 → ⑰渡嘉敷島 → 泊港", "F-3": "⑯泊港 → ⑱座間味島・阿嘉島 → 泊港", "F-4": "本部半島 → ⑲伊江島か水納島 → 名護 → 那覇"};
+(function(){
+  var st={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+  var first={D:'D-1',E:'E-1',F:'F-1'}, lastSub={};
+  try{lastSub=JSON.parse(st.get('d2-subs')||'{}')||{}}catch(e){lastSub={}}
+  function valid(k){return !!document.querySelector('.course[data-k="'+k+'"]')}
+  function show(k,push){
+    if(!valid(k)) k='A';
+    var p=k.charAt(0);
+    document.querySelectorAll('.chip').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.p===p))});
+    document.querySelectorAll('.subs').forEach(function(r){r.hidden=r.dataset.for!==p});
+    document.querySelectorAll('.sub').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.k===k))});
+    document.querySelectorAll('.course').forEach(function(s){s.hidden=s.dataset.k!==k});
+    document.querySelectorAll('.mapbox [data-k]').forEach(function(el){
+      var ks=el.dataset.k.split(' '); var on=ks.indexOf('*')>=0||ks.indexOf(k)>=0;
+      if(el.classList.contains('route')) el.classList.toggle('on',on); else el.classList.toggle('dim',!on);
+    });
+    document.getElementById('cap').textContent=CAPS[k]||'';
+    if(k.length>1){lastSub[p]=k;st.set('d2-subs',JSON.stringify(lastSub))}
+    st.set('d2-k',k);
+    if(push){try{history.replaceState(null,'','#'+k)}catch(e){}}
+    var c=document.querySelector('.chip[data-p="'+p+'"]'); if(c){var row=c.parentNode; row.scrollLeft=Math.max(0,c.offsetLeft-row.clientWidth/2+c.offsetWidth/2);}
+  }
+  document.querySelector('.chips').addEventListener('click',function(e){
+    var b=e.target.closest('.chip'); if(!b) return; var p=b.dataset.p;
+    show(first[p]?(lastSub[p]||first[p]):p,true); window.scrollTo({top:0});
+  });
+  document.querySelectorAll('.subs').forEach(function(r){r.addEventListener('click',function(e){
+    var b=e.target.closest('.sub'); if(b) {show(b.dataset.k,true); window.scrollTo({top:0});}
+  })});
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1),false)});
+  show(location.hash.slice(1)||st.get('d2-k')||'A',false);
+})();
+document.addEventListener('click',function(e){var b=e.target.closest('.torent');if(!b)return;var d=document.getElementById('rentlist');if(!d)return;if(d.tagName==='DETAILS')d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});});
+</script></body></html>
