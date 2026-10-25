@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-10-24T09:21:28+09:00",
+ "generatedAt": "2026-10-25T09:04:26+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -309,7 +309,12 @@
    "rel": "IDCフロンティア",
    "url": "https://cybersecurity-jp.com/news/117188",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "九州旅客鉄道株式会社（JR九州）は2026年10月9日、IDCフロンティアで発生した不正アクセスに伴い、「JR九州 Web会員」のメールアドレスが漏洩した可能性があると発表した。対象件数は最大約130万件。同日付の発表では、会員向けメールマガジンも配信できない状態となっている。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117188",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "temairazu",
@@ -327,7 +332,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117185",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "手間いらず株式会社は2026年10月9日、宿泊施設向け予約管理システム「TEMAIRAZU」への不正アクセスに関する調査状況を公表した。予約者の氏名や連絡先、宿泊日程などが第三者に閲覧または取得された可能性があり、対象者数は最大約445万人に上る。同社は外部のセキュリティ専門機関と連携し、調査を継続している。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117185",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "baitoru",
@@ -345,7 +355,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117182",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "ディップ株式会社は2026年10月9日、同社が運営する求人情報サイト「バイトル」「バイトルNEXT」で不正アクセスが発生し、会員のメールアドレスの一部が漏洩したと発表した。漏洩した可能性のある件数は、最大388万5,771件に上る。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117182",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "bookoff",
@@ -363,7 +378,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117179",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "ブックオフグループホールディングス株式会社は2026年10月9日、子会社の会員管理システムが第三者による不正アクセスを受け、会員情報が外部に流出したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117179",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "skyticket",
@@ -381,7 +401,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117170",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "旅行予約サイト「skyticket（スカイチケット）」を運営する株式会社アドベンチャーは2026年10月9日、第三者による不正アクセスで顧客情報が流出した、または流出したおそれがあると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117170",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "jreast",
@@ -399,7 +424,12 @@
    "rel": "IDCフロンティア",
    "url": "https://cybersecurity-jp.com/news/117167",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "東日本旅客鉄道株式会社（JR東日本）は2026年10月9日、「えきねっと」と「大人の休日倶楽部」の会員情報について、最大で延べ約206万件が漏洩した可能性があると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117167",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "82bank",
@@ -417,7 +447,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117175",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "画像：株式会社八十二長野銀行より引用 株式会社八十二長野銀行は2026年10月8日、職員のメールアカウントが不正アクセスを受け、顧客らの個人情報が流出した可能性があると発表しました。 発表によると、不正アクセスは2026年10月",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117175",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "orix",
@@ -2155,6 +2190,29 @@
    "enrichedAt": "2026-10-24",
    "sec_summary": "画像：IPAより引用 独立行政法人情報処理推進機構（IPA）は2026年10月16日、不正アクセスによる情報漏えいが相次いでいることを受け、企業や組織の初動対応を支援する「不正アクセス特別相談窓口」を開設しました。 国内では金融",
    "sources": "元記事|https://cybersecurity-jp.com/news/117650",
+   "method": "紹介文",
+   "enrichResult": "meta"
+  },
+  {
+   "id": "cs117680",
+   "pub": "2026-10-24",
+   "base": "2026-10-24",
+   "baseType": "公表",
+   "co": "佐川急便",
+   "svc": "",
+   "n": 53230000,
+   "nt": "最大約5,323万件",
+   "cat": "other",
+   "imp": 0,
+   "impWhy": "",
+   "summary": "佐川急便、最大約5,323万件の個人情報流出の可能性「お荷物問い合わせサービス」を再開",
+   "rel": "",
+   "url": "https://cybersecurity-jp.com/news/117680",
+   "src": "サイバーセキュリティ.com",
+   "got": "2026-10-25",
+   "enrichedAt": "2026-10-25",
+   "sec_summary": "佐川急便は2026年10月23日、「お荷物問い合わせサービス」への不正アクセスについて第5報を公表し、最大約5,323万件の個人情報が流出した可能性があると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117680",
    "method": "紹介文",
    "enrichResult": "meta"
   }
