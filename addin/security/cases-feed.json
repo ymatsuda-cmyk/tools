@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-10-25T09:04:26+09:00",
+ "generatedAt": "2026-10-26T08:55:00+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -470,7 +470,12 @@
    "rel": "スカラコミュニケーションズ（i-ask）",
    "url": "https://cybersecurity-jp.com/news/117197",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "オリックス生命保険株式会社は2026年10月8日、業務委託先のスカラコミュニケーションズへの不正アクセスにより、顧客情報が漏洩した可能性があると発表した。対象は約2万6,500件で、氏名や連絡先のほか、証券番号、問い合わせ時に顧客が申告した医療情報などが含まれる。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117197",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "daiichikosho",
@@ -488,7 +493,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117121",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "株式会社第一興商は2026年10月8日、個人情報の取扱いを委託する日本コロムビアグループ株式会社でマルウェア感染が判明し、顧客・従業員の個人情報約872万4,000件が漏洩したおそれがあると発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117121",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "lawson",
@@ -506,7 +516,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117118",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "株式会社ローソンは2026年10月8日、同社が運営する「ローソンID」と「ローソンアプリ予約」に第三者による不正アクセスがあり、利用者の個人情報が漏洩したと発表した。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117118",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "his",
@@ -524,7 +539,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117191",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "株式会社エイチ・アイ・エス（HIS）は2026年10月7日、タイ現地法人「H.I.S. TOURS CO., LTD.」への不正アクセスにより、最大627人のパスポート情報などが流出した可能性があると発表した。対象は、同社を利用してタイへ渡航した一部の顧客。電話番号、住所、メールアドレス、クレジットカード情報は含まれていない。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117191",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "idcf",
@@ -571,7 +591,12 @@
    "rel": "IDCフロンティア",
    "url": "https://cybersecurity-jp.com/news/117045",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "日水物流では、委託先への不正アクセスが原因とみられるシステム障害で、商品の入出荷が停止しています。個人情報・顧客データの漏洩については調査中で、現時点では確定していません。 ニッスイの公式発表と報道をもとにまとめます。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117045",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "sompo",
@@ -589,7 +614,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117112",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "画像：損害保険ジャパン株式会社より引用 損害保険ジャパンは2026年10月7日、事業者向け通信機能付きドライブレコーダー「SMILING ROAD」の問い合わせ対応で利用する外部委託先のシステムが不正アクセスを受け、顧客情報が漏えいし",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117112",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "toda",
@@ -607,7 +637,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117114",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "画像：戸田建設株式会社より引用 戸田建設株式会社は2026年10月7日、同社が管理するシステムの一部に外部から不正アクセスがあり、取引先の登録情報と従業員の個人情報の一部が漏えいしたと発表しました。 同社は2026年10月5日、",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117114",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "scala",
@@ -780,7 +815,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117021",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-10-26",
+   "sec_summary": "画像：独立行政法人 エネルギー・金属鉱物資源機構より引用 独立行政法人エネルギー・金属鉱物資源機構（JOGMEC）は2026年10月2日、外部からの不正アクセスにより、個人情報が漏えいした可能性があると発表しました。 JOGME",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117021",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "abahouse",
