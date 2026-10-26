@@ -2617,9 +2617,9 @@ function insertMindmap(v){
 //   ```inkboard{w=640,h=360}
 //   {"v":1,"mode":"infinite",...}
 //   ```
-const IB_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@main/api/inkboard/';
-// ライブラリを更新したら上げる（オフライン用に保存してある古い版を使わないように）
-const IB_VER = '?v=4';
+const IB_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@c0318b5f/api/inkboard/';   // @main はCDNのキャッシュが長く残るので、コミットで固定する
+// ライブラリを更新したら、上のコミットと ?v= を上げる（オフライン用に保存してある古い版を使わないように）
+const IB_VER = '?v=5';
 let ibLib = null;
 function loadInkboardLib(){
   if (!ibLib){
