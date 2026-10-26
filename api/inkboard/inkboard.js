@@ -274,10 +274,10 @@ function packEnd(e, idx) {
 function packObj(o, idx) {
   const out = { k: o.k, id: o.id }
   if (o.k === 'r') Object.assign(out, { t: o.t, x: r1(o.x), y: r1(o.y), w: r1(o.w), h: r1(o.h), c: o.c, f: o.f, lw: o.lw })
-  if (o.t === 'image') out.src = o.src
   else if (o.k === 't') Object.assign(out, { x: r1(o.x), y: r1(o.y), w: r1(o.w), h: r1(o.h), c: o.c, fs: o.fs })
   else Object.assign(out, { a: packEnd(o.a, idx), b: packEnd(o.b, idx), sh: o.sh, hd: o.hd, c: o.c, lw: o.lw })
   if (o.d) out.d = 1
+  if (o.t === 'image') out.src = o.src
   if (o.k !== 'l' && o.tx) out.tx = o.tx
   if (o.k === 'r' && (o.tx || o.tc !== '#1f1f1f')) { out.tc = o.tc; out.fs = o.fs }
   if (o.g?.length) out.g = o.g
