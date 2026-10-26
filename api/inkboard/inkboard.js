@@ -161,6 +161,9 @@ function normEnd(e) {
   return out
 }
 
+/** 画像・HTML（t:'image'）を置ける版であることの目印。呼び出し側が旧版かどうかの判断に使う */
+export const IMAGES = true
+
 /** 保存されている図形・線・文字を、扱える形にそろえる（知らない種類は捨てる） */
 function normObj(o) {
   if (!o || typeof o !== 'object' || !o.id) return null
@@ -169,6 +172,11 @@ function normObj(o) {
   if (g) base.g = g
   if (o.lk) base.lk = 1
   if (o.k === 'r') {
+    if (o.t === 'image') {
+      const src = str(o.src)
+      if (!/^(data:image\/|https?:\/\/)/i.test(src)) return null
+      return { ...base, k: 'r', t: 'image', src, x: num(o.x), y: num(o.y), w: Math.max(8, num(o.w, 240)), h: Math.max(8, num(o.h, 160)), c: '#1f1f1f', f: '', lw: 0, d: 0, tx: '', tc: '#1f1f1f', fs: 15 }
+    }
     if (!SHAPES[o.t]) return null
     return {
       ...base, k: 'r', t: o.t,
@@ -266,6 +274,7 @@ function packEnd(e, idx) {
 function packObj(o, idx) {
   const out = { k: o.k, id: o.id }
   if (o.k === 'r') Object.assign(out, { t: o.t, x: r1(o.x), y: r1(o.y), w: r1(o.w), h: r1(o.h), c: o.c, f: o.f, lw: o.lw })
+  if (o.t === 'image') out.src = o.src
   else if (o.k === 't') Object.assign(out, { x: r1(o.x), y: r1(o.y), w: r1(o.w), h: r1(o.h), c: o.c, fs: o.fs })
   else Object.assign(out, { a: packEnd(o.a, idx), b: packEnd(o.b, idx), sh: o.sh, hd: o.hd, c: o.c, lw: o.lw })
   if (o.d) out.d = 1
@@ -456,6 +465,7 @@ function shapePath(ctx, o) {
   const { x, y, w, h } = o
   ctx.beginPath()
   switch (o.t) {
+    case 'image': ctx.rect(x, y, w, h); break
     case 'rect': roundRectPath(ctx, x, y, w, h, Math.min(8, w / 4, h / 4)); break
     case 'round': roundRectPath(ctx, x, y, w, h, h / 2); break
     case 'frame': roundRectPath(ctx, x, y, w, h, 8); break
@@ -551,7 +561,42 @@ function drawTextBlock(ctx, text, area, fs, color, align, valign) {
   ctx.restore()
 }
 
+const imageCache = new Map()
+const imageWaiters = new Set()
+/** 画像を読み込む。読み込めたら待っている描画を呼び直す */
+function imageOf(src) {
+  let e = imageCache.get(src)
+  if (!e) {
+    const img = new Image()
+    e = { img, ok: false, err: false }
+    imageCache.set(src, e)
+    img.onload = () => { e.ok = true; for (const f of [...imageWaiters]) f() }
+    img.onerror = () => { e.err = true; for (const f of [...imageWaiters]) f() }
+    if (!src.startsWith('data:')) img.crossOrigin = 'anonymous'
+    img.src = src
+  }
+  return e
+}
+
+function drawImageObj(ctx, o, colors) {
+  const e = imageOf(o.src)
+  ctx.save()
+  if (e.ok) ctx.drawImage(e.img, o.x, o.y, o.w, o.h)
+  else {
+    ctx.fillStyle = colors.paper
+    ctx.fillRect(o.x, o.y, o.w, o.h)
+    ctx.strokeStyle = colors.rule
+    ctx.strokeRect(o.x, o.y, o.w, o.h)
+    ctx.fillStyle = colors.rule
+    ctx.font = `13px ${FONT}`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(e.err ? '画像を表示できません' : '読み込み中…', o.x + o.w / 2, o.y + o.h / 2)
+  }
+  ctx.restore()
+}
+
 function drawShape(ctx, o, colors, hideText) {
+  if (o.t === 'image') return drawImageObj(ctx, o, colors)
   ctx.save()
   ctx.lineJoin = 'round'
   shapePath(ctx, o)
@@ -623,9 +668,9 @@ function drawObjects(ctx, d, rect, colors, phase, hide) {
   const vis = (b) => !(b.x1 < rect.x || b.y1 < rect.y || b.x0 > rect.x + rect.w || b.y0 > rect.y + rect.h)
   for (const o of objs) {
     if (phase === 'under') {
-      if (o.k === 'r' && o.t === 'frame' && vis(itemBox(o, idx))) drawShape(ctx, o, colors, hide === o.id)
+      if (o.k === 'r' && (o.t === 'frame' || o.t === 'image') && vis(itemBox(o, idx))) drawShape(ctx, o, colors, hide === o.id)
     } else if (phase === 'shapes') {
-      if (o.k === 'r' && o.t !== 'frame' && vis(itemBox(o, idx))) drawShape(ctx, o, colors, hide === o.id)
+      if (o.k === 'r' && o.t !== 'frame' && o.t !== 'image' && vis(itemBox(o, idx))) drawShape(ctx, o, colors, hide === o.id)
     } else if (phase === 'over') {
       if (o.k === 'l' && vis(itemBox(o, idx))) drawLine(ctx, o, idx)
     } else if (phase === 'text') {
@@ -728,8 +773,9 @@ function sceneColors(el) {
  * @param {{ area?: {x:number,y:number,w:number,h:number}, scale?: number, type?: string }} [opts]
  * @returns {Promise<Blob>}
  */
-export function exportImage(value, opts = {}) {
+export async function exportImage(value, opts = {}) {
   const d = parseBoard(value)
+  await Promise.all(d.objs.filter((o) => o.t === 'image').map((o) => new Promise((r) => { const e = imageOf(o.src); if (e.ok || e.err) r(); else { const f = () => { if (e.ok || e.err) { imageWaiters.delete(f); r() } }; imageWaiters.add(f) } })))
   const area = opts.area || previewArea(d)
   const scale = opts.scale || 2
   const c = document.createElement('canvas')
@@ -784,6 +830,7 @@ export function renderBoard(container, value, options = {}) {
     }
   }
 
+  function onImage() { if (data?.objs.some((o) => o.t === 'image')) draw() }
   function draw() {
     const w = container.clientWidth, h = container.clientHeight
     if (!w || !h) return
@@ -806,6 +853,7 @@ export function renderBoard(container, value, options = {}) {
   }
 
   parse()
+  imageWaiters.add(onImage)
   let raf = 0
   const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw) })
   ro.observe(container)
@@ -843,6 +891,7 @@ export function renderBoard(container, value, options = {}) {
       return opened
     },
     destroy() {
+      imageWaiters.delete(onImage)
       ro.disconnect()
       container.innerHTML = ''
       container.classList.remove('ib-host', 'ib-clickable', 'ib-broken')
@@ -857,6 +906,56 @@ export function renderBoard(container, value, options = {}) {
 }
 
 // ---------------------------------------------------------------- 全画面の編集画面
+
+const MEDIA_MAX_PX = 1280
+const MEDIA_MAX_CHARS = 600000
+
+/** 画像ファイルを、長辺 MEDIA_MAX_PX までに縮めたデータURLにする（写真は JPEG、透過がありうるものは PNG） */
+async function fileToImage(file) {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const k = Math.min(1, MEDIA_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight))
+    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k))
+    const c = document.createElement('canvas')
+    c.width = w; c.height = h
+    const ctx = c.getContext('2d')
+    const png = /png|gif|webp|svg/.test(file.type)
+    if (!png) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h) }
+    ctx.drawImage(img, 0, 0, w, h)
+    let src = c.toDataURL(png ? 'image/png' : 'image/jpeg', 0.85)
+    if (src.length > MEDIA_MAX_CHARS) src = c.toDataURL('image/jpeg', 0.7)
+    return { src, w: Math.round(img.naturalWidth), h: Math.round(img.naturalHeight) }
+  } finally { URL.revokeObjectURL(url) }
+}
+
+/** HTML を、SVG の foreignObject に包んだ画像（データURL）にする。スクリプト・外部ファイルは使えない */
+async function htmlToImage(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  doc.querySelectorAll('script,link,iframe,object,embed,base,meta').forEach((n) => n.remove())
+  for (const n of doc.querySelectorAll('*')) for (const a of [...n.attributes]) if (/^on/i.test(a.name)) n.removeAttribute(a.name)
+  const styles = [...doc.querySelectorAll('style')].map((n) => n.outerHTML).join('')
+  doc.querySelectorAll('style').forEach((n) => n.remove())
+  const W = 640
+  const body = doc.body
+  // 高さは実際に並べて測る
+  const probe = document.createElement('div')
+  probe.style.cssText = `position:fixed;left:-99999px;top:0;width:${W}px;visibility:hidden;font:14px/1.5 ${FONT}`
+  probe.innerHTML = styles + body.innerHTML
+  document.body.append(probe)
+  const H = Math.max(40, Math.ceil(probe.scrollHeight))
+  probe.remove()
+  const inner = new XMLSerializer().serializeToString(Object.assign(doc.createElement('div'), { innerHTML: styles + body.innerHTML })).replace(/^<div[^>]*>|<\/div>$/g, '')
+  const xhtml = `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;height:${H}px;box-sizing:border-box;background:#fff;color:#1f1f1f;font:14px/1.5 ${FONT.replace(/"/g, "'")};overflow:hidden">${inner}</div>`
+  const svgText = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`
+  const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText)
+  const img = new Image()
+  img.src = src
+  try { await img.decode() } catch { throw new Error('HTMLを画像にできませんでした') }
+  return { src, w: W, h: H }
+}
 
 const ICON = {
   pen: '<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>',
@@ -877,6 +976,8 @@ const ICON = {
   grip: '<circle cx="9" cy="6" r=".9"/><circle cx="15" cy="6" r=".9"/><circle cx="9" cy="12" r=".9"/><circle cx="15" cy="12" r=".9"/><circle cx="9" cy="18" r=".9"/><circle cx="15" cy="18" r=".9"/>',
   exit: '<path d="M4 14h6v6M20 10h-6V4M14 10l6-6M4 20l6-6"/>',
   dash: '<path d="M3 12h3M10.5 12h3M18 12h3"/>',
+  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>',
+  code: '<path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/>',
 }
 const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`
 
@@ -1087,6 +1188,8 @@ class Editor {
         </div></div>
         ${ro ? '' : `
         <div class="ib-sec ib-wide">
+          <button type="button" class="ib-line" data-op="insertFile">${svg('image')}画像・HTMLファイルを挿入</button>
+          <button type="button" class="ib-line" data-op="insertHtml">${svg('code')}HTMLを貼り付けて挿入</button>
           <button type="button" class="ib-line" data-tool="area">${svg('area')}参照表示の範囲を指定</button>
           <button type="button" class="ib-line" data-tool="hand">${svg('hand')}移動ツール</button>
           <button type="button" class="ib-line ib-danger" data-op="clear">${svg('trash')}すべて消す</button>
@@ -1174,6 +1277,8 @@ class Editor {
     window.addEventListener('keyup', this.onKeyUp, true)
     this.onVis = () => { if (document.visibilityState === 'hidden') this.flush() }
     document.addEventListener('visibilitychange', this.onVis)
+    this.onImage = () => this.requestRedraw()
+    imageWaiters.add(this.onImage)
     this.ro = new ResizeObserver(() => { this.resize(); this.placePalette() })
     this.ro.observe(stage)
 
@@ -1523,6 +1628,8 @@ class Editor {
         this.savePrefs()
         this.toast(this.fingerDraw ? '指1本で描けます（2本指で移動・拡大縮小）' : '指は移動・拡大縮小に使います')
         return this.syncUi()
+      case 'insertFile': this.closePops(); return this.pickMedia()
+      case 'insertHtml': this.closePops(); return this.askHtml()
       case 'clear':
         this.closePops()
         if ((!this.data.strokes.length && !this.data.objs.length) || !confirm('このボードの線と図形をすべて消しますか？（元に戻すで戻せます）')) return
@@ -1608,12 +1715,63 @@ class Editor {
     window.removeEventListener('keydown', this.onKey, true)
     window.removeEventListener('keyup', this.onKeyUp, true)
     document.removeEventListener('visibilitychange', this.onVis)
+    imageWaiters.delete(this.onImage)
     this.ro.disconnect()
     this.root.remove()
     openCount--
     if (!openCount) document.documentElement.style.overflow = this.prevOverflow
     try { this.prevFocus?.focus?.({ preventScroll: true }) } catch { /* 無視 */ }
     this.resolve(this.lastValue)
+  }
+
+  // ---- 画像・HTMLの挿入
+  pickMedia() {
+    const inp = document.createElement('input')
+    inp.type = 'file'
+    inp.accept = 'image/*,.html,.htm,text/html'
+    inp.multiple = true
+    inp.onchange = async () => {
+      for (const f of inp.files) {
+        try {
+          if (/\.html?$/i.test(f.name) || f.type === 'text/html') await this.placeMedia(await htmlToImage(await f.text()))
+          else if (f.type.startsWith('image/')) await this.placeMedia(await fileToImage(f))
+        } catch (err) { this.toast(`挿入できませんでした（${err.message || err}）`) }
+      }
+    }
+    inp.click()
+  }
+  askHtml() {
+    const box = document.createElement('div')
+    box.className = 'ib-htmlask'
+    box.innerHTML = '<div><p>挿入するHTMLを貼り付けてください（スクリプトと外部ファイルは使えません）</p><textarea spellcheck="false"></textarea><div class="ib-poprow"><button type="button" data-a="cancel">キャンセル</button><button type="button" data-a="ok">挿入</button></div></div>'
+    this.root.append(box)
+    const ta = box.querySelector('textarea')
+    ta.focus()
+    box.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') box.remove() })
+    box.addEventListener('click', async (e) => {
+      const a = e.target.closest('[data-a]')?.dataset.a
+      if (e.target === box || a === 'cancel') return box.remove()
+      if (a !== 'ok' || !ta.value.trim()) return
+      try { const m = await htmlToImage(ta.value); box.remove(); await this.placeMedia(m) }
+      catch (err) { this.toast(`挿入できませんでした（${err.message || err}）`) }
+    })
+  }
+  /** 画面の中央に、画面に収まる大きさで置く */
+  async placeMedia(m) {
+    const sr = this.screenRect()
+    const k = Math.min(1, (sr.w * 0.8) / m.w, (sr.h * 0.8) / m.h)
+    const w = Math.max(16, Math.round(m.w * k)), h = Math.max(16, Math.round(m.h * k))
+    const x = this.snapV(sr.x + (sr.w - w) / 2), y = this.snapV(sr.y + (sr.h - h) / 2)
+    const o = { k: 'r', id: uid(), t: 'image', src: m.src, x, y, w, h, c: '#1f1f1f', f: '', lw: 0, d: 0, tx: '', tc: '#1f1f1f', fs: 15 }
+    this.pushUndo()
+    this.data.objs.unshift(o)
+    this.changed()
+    if (this.tool !== 'select') this.setTool('select')
+    this.gpath = []
+    this.setSel([o.id])
+    this.redraw()
+    this.showMenu()
+    this.toast('挿入しました。ペンで上から書き込めます（書いた線は画像と一緒に動きます）')
   }
 
   // ---- データの出し入れ
@@ -1900,8 +2058,8 @@ class Editor {
       if (this.selUnits() >= 2) out.push(b('group', 'グループ化'))
       if (this.isGroupSel()) out.push(b('ungroup', 'グループ解除'))
       const single = items.length === 1 ? items[0] : null
-      if (single && (single.k === 'r' || single.k === 't')) out.push(b('text', '文字'))
-      if (items.some((it) => it.k === 'r')) out.push(b('fill', '塗り'))
+      if (single && (single.k === 't' || (single.k === 'r' && single.t !== 'image'))) out.push(b('text', '文字'))
+      if (items.some((it) => it.k === 'r' && it.t !== 'image')) out.push(b('fill', '塗り'))
       out.push(b('front', '前面へ'), b('back', '背面へ'), b('lock', 'ロック'), b('del', '削除', 'ib-danger'))
     }
     m.innerHTML = out.join('')
@@ -1935,6 +2093,7 @@ class Editor {
   editText(o, before) {
     if (this.editing) this.commitText()
     if (o.lk) return this.toast('ロック中は編集できません')
+    if (o.t === 'image') return
     this.editing = { id: o.id, before: before || this.snapshot(), isNew: !!before }
     this.setSel([o.id])
     const ta = this.editEl
@@ -2541,7 +2700,7 @@ class Editor {
       const ids = this.expandIds(this.sel)
       const box = this.selBox()
       const single = items.length === 1 && items[0].k ? items[0] : null
-      this.action = { ...base, type: 'resize', corner: h.corner, ids, box, single, uniform: [...ids].some((id) => isStroke(this.idx.get(id))) || (items.length > 1 && items.some((it) => it.k === 't')), orig: new Map([...ids].map((id) => [id, this.idx.get(id)])), before: this.snapshot() }
+      this.action = { ...base, type: 'resize', corner: h.corner, ids, box, single, uniform: [...ids].some((id) => isStroke(this.idx.get(id))) || single?.t === 'image' || (items.length > 1 && items.some((it) => it.k === 't')), orig: new Map([...ids].map((id) => [id, this.idx.get(id)])), before: this.snapshot() }
       return
     }
     const hit = this.hitItem(wp)

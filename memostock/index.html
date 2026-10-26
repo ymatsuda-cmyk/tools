@@ -2619,7 +2619,7 @@ function insertMindmap(v){
 //   ```
 const IB_BASE = 'https://cdn.jsdelivr.net/gh/ymatsuda-cmyk/tools@main/api/inkboard/';
 // ライブラリを更新したら上げる（オフライン用に保存してある古い版を使わないように）
-const IB_VER = '?v=3';
+const IB_VER = '?v=4';
 let ibLib = null;
 function loadInkboardLib(){
   if (!ibLib){
@@ -2703,7 +2703,7 @@ async function drawInk(wrap, view){
     wrap._ctl?.destroy();
     const value = parseInk(wrap._src).value;
     // 図形のあるボードを古いライブラリで保存すると図形が消えるので、そのときは見るだけにする
-    if (!lib.SHAPES && /"o":\[/.test(value)){
+    if ((!lib.SHAPES && /"o":\[/.test(value)) || (!lib.IMAGES && /"t":"image"/.test(value))){
       wrap._ctl = lib.renderBoard(c, value, { clickToOpen: false, title: '手書きボード' });
       setStatus('手書きボードの部品が古い版のため、図形のあるボードは見るだけにしています。ページを再読み込みしてください', 'err');
       return;
