@@ -165,6 +165,10 @@ export function renderDetailHtml(item, state) {
       ? `<button class="btn-ghost btn-edit" data-field="${field}" aria-label="${label}を編集"><i class="ti ti-edit" aria-hidden="true"></i></button>`
       : ''
 
+  const importBtn = state.canEditContent
+    ? '<button class="btn-ghost btn-agenda-import" aria-label="要約テキストから議事を登録" title="要約テキストから登録"><i class="ti ti-clipboard-text" aria-hidden="true"></i></button>'
+    : ''
+
   const header = `
     <div class="detail-header">
       <span class="detail-title">${escapeHtml(item.title)}</span>
@@ -242,7 +246,7 @@ export function renderDetailHtml(item, state) {
       : ''
 
   const agendaHtml = agenda.length ? `
-    <div class="section-label">議事${editBtn('agenda', '議事')}</div>
+    <div class="section-label">議事${editBtn('agenda', '議事')}${importBtn}</div>
     <div class="agenda-list">
       ${agenda.map((a, i) => `
         <div class="agenda-item">
@@ -252,7 +256,7 @@ export function renderDetailHtml(item, state) {
         </div>
       `).join('')}
     </div>
-  ` : `<div class="section-label">議事${editBtn('agenda', '議事')}</div>
+  ` : `<div class="section-label">議事${editBtn('agenda', '議事')}${importBtn}</div>
        <p class="empty-section">未登録</p>`
 
   const doneCount = todos.filter((t) => t.done).length

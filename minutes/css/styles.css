@@ -939,11 +939,9 @@ body {
 .tr-raw.drag-over { border-color: var(--accent); background: var(--accent-bg); }
 .tr-raw-foot { display: flex; justify-content: space-between; gap: 8px; }
 .tr-dur input:focus-visible, .tr-raw:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.tr-modes { display: flex; flex-wrap: wrap; gap: 6px; }
-.tr-mode { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; cursor: pointer; color: var(--text-secondary); }
-.tr-mode input { margin: 0; }
-.tr-mode:has(input:checked) { background: var(--accent-bg); border-color: var(--accent); color: var(--text-primary); }
-.tr-mode:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tr-req, .tr-opt { font-style: normal; font-size: 10px; margin-left: 4px; padding: 1px 6px; border-radius: 999px; }
+.tr-req { background: var(--accent-bg); color: var(--accent); }
+.tr-opt { background: var(--surface-1); color: var(--text-muted); }
 .tr-parse-error { color: var(--danger, #c0392b); }
 .tr-note { font-size: 11px; color: var(--text-secondary); background: var(--surface-1); border-radius: var(--radius); padding: 7px 10px; }
 .btn.tr-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
