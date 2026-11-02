@@ -5,6 +5,9 @@
 //   タイトル → ミーティング名 / タグ → カテゴリー / 開始日時 → 日時
 //   会議時間 → 会議時間(「1時間 12分 36秒」形式) / 原文 → ページ本文
 // 状態は「文字起こし」にし、要約は作らない。
+// 「要約テキスト」モードでは、すでにある要約(タイプ1: ## 議事メモ 形式 / タイプ2: 会議のメモ:
+// 形式)を summary-text.js で議事・決定事項・ToDo・論点に分けて一緒に送り、状態は「要約」で
+// 登録する。貼り付けた全文はページ本文にも残す。
 // 権限 → 権限: 管理者は自由に選べる(空なら管理者のみ閲覧)。管理者以外は
 // 自分の検証済み role で固定(GAS 側でも role 以外は受け付けない)。
 //
@@ -15,6 +18,7 @@
 
 import { addPending } from './upload.js'
 import { filterByPermission, excludeDeleted } from './lib/filters.js'
+import { parseSummaryText } from './lib/summary-text.js'
 
 const ADMIN_ROLE = 'xYz'
 
@@ -137,11 +141,19 @@ function openModal() {
           </div>
         </div>
         <div class="upload-field">
-          <label for="tr-raw"><span>原文</span><span class="tr-col">ページ本文</span></label>
-          <textarea id="tr-raw" class="tr-raw" rows="9" placeholder="[00:00:05] 松田：では定例を始めます"></textarea>
-          <div class="tr-hint tr-raw-foot"><span id="tr-count">0 文字</span><span>.txt をドロップしても読み込めます</span></div>
+          <label><span>登録する内容</span></label>
+          <div class="tr-modes" role="radiogroup" aria-label="登録する内容">
+            <label class="tr-mode"><input type="radio" name="tr-mode" value="raw" checked><span>原文(文字起こし)</span></label>
+            <label class="tr-mode"><input type="radio" name="tr-mode" value="summary"><span>要約テキスト</span></label>
+          </div>
         </div>
-        <div class="tr-note">状態は「文字起こし」で登録します。要約は作りません。</div>
+        <div class="upload-field">
+          <label for="tr-raw"><span id="tr-raw-label">原文</span><span class="tr-col">ページ本文</span></label>
+          <textarea id="tr-raw" class="tr-raw" rows="9"></textarea>
+          <div class="tr-hint tr-raw-foot"><span id="tr-count">0 文字</span><span>.txt をドロップしても読み込めます</span></div>
+          <div class="tr-hint" id="tr-parse"></div>
+        </div>
+        <div class="tr-note" id="tr-note"></div>
         <div class="upload-msg" id="tr-msg" role="status" aria-live="polite"></div>
       </div>
       <div class="raw-modal-footer">
@@ -283,9 +295,47 @@ function openModal() {
   ;[atInput, hIn, mIn, sIn].forEach((el) => el.addEventListener('input', paintDuration))
   paintDuration()
 
+  // ---- 登録モード(原文 / 要約テキスト)
+  const RAW_PH = '[00:00:05] 松田：では定例を始めます'
+  const SUM_PH = '## 議事メモ(タイプ1) または 会議のメモ:(タイプ2) の要約を貼り付け'
+  let mode = 'raw'
+  let autoAt = '' // 要約から自動で入れた開始日時(手で直した値は上書きしない)
+  function paintMode() {
+    const sum = mode === 'summary'
+    $('#tr-raw-label').textContent = sum ? '要約テキスト' : '原文'
+    raw.placeholder = sum ? SUM_PH : RAW_PH
+    $('#tr-note').textContent = sum
+      ? '状態は「要約」で登録します。議事・決定事項・ToDo・論点に分けて保存し、貼り付けた全文はページ本文にも残します。タイプ1・2は自動で判別します。'
+      : '状態は「文字起こし」で登録します。要約は作りません。'
+    go.textContent = 'Notionに登録'
+    paintParse()
+  }
+  /** 要約テキストを読み取れるか、貼り付けた時点で確認できるようにする */
+  function paintParse() {
+    const el = $('#tr-parse')
+    el.className = 'tr-hint'
+    if (mode !== 'summary' || !raw.value.trim()) { el.textContent = ''; return }
+    try {
+      const r = parseSummaryText(raw.value)
+      el.textContent = `${r.type === 'type1' ? 'タイプ1' : 'タイプ2'}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
+      if (r.meetingAt && (!atInput.value || atInput.value === autoAt || atInput.dataset.touched !== '1')) {
+        atInput.value = r.meetingAt
+        autoAt = r.meetingAt
+        paintDuration()
+      }
+    } catch (err) {
+      el.textContent = err.message
+      el.className = 'tr-hint tr-parse-error'
+    }
+  }
+  atInput.addEventListener('input', () => { if (atInput.value !== autoAt) atInput.dataset.touched = '1' })
+  overlay.querySelectorAll('input[name="tr-mode"]').forEach((r) => {
+    r.onchange = () => { mode = r.value; paintMode() }
+  })
+
   // ---- 原文
   function paintCount() { $('#tr-count').textContent = `${raw.value.length.toLocaleString()} 文字` }
-  raw.addEventListener('input', paintCount)
+  raw.addEventListener('input', () => { paintCount(); paintParse() })
   raw.ondragover = (e) => { e.preventDefault(); raw.classList.add('drag-over') }
   raw.ondragleave = () => raw.classList.remove('drag-over')
   raw.ondrop = async (e) => {
@@ -299,8 +349,11 @@ function openModal() {
     raw.value = await file.text()
     if (!titleInput.value.trim()) titleInput.value = file.name.replace(/\.[^.]+$/, '')
     paintCount()
+    paintParse()
     say('')
   }
+
+  paintMode()
 
   // ---- 登録
   go.onclick = async () => {
@@ -311,7 +364,14 @@ function openModal() {
     const title = titleInput.value.trim()
     if (!title) { titleInput.focus(); return say('タイトルを入力してください。', 'error') }
     if (!atInput.value) { atInput.focus(); return say('開始日時を入れてください。', 'error') }
-    if (!raw.value.trim()) { raw.focus(); return say('原文を貼り付けてください。', 'error') }
+    if (!raw.value.trim()) { raw.focus(); return say(mode === 'summary' ? '要約テキストを貼り付けてください。' : '原文を貼り付けてください。', 'error') }
+    let summary = null
+    if (mode === 'summary') {
+      try {
+        const r = parseSummaryText(raw.value)
+        summary = { cardSummary: r.cardSummary, agenda: r.agenda, decisions: r.decisions, todos: r.todos, topics: r.topics }
+      } catch (err) { raw.focus(); return say(err.message, 'error') }
+    }
 
     // Enter を押さずに残っているタグ入力も拾う
     if (tagInput.value.trim()) { addTag(tagInput.value); tagInput.value = '' }
@@ -328,8 +388,9 @@ function openModal() {
         title,
         tags,
         meetingAt,
-        durationSec: durationSec(),
+        durationSec: summary && !durationSec() ? null : durationSec(), // 要約では不明な会議時間は空のまま
         text: raw.value,
+        summary,
         role: cfg.role || '',
         permissions: admin ? perms : [], // 管理者以外は GAS 側で role に固定される
       })

@@ -777,6 +777,8 @@ function writeSidecar_(body) {
  * タイトル・タグ・開始日時・会議時間・原文から議事録ページを新規作成する。
  * 原文はページ本文の paragraph ブロックとして書き込む(fetchTranscript_ が読む場所と同じ)。
  * 状態は「文字起こし」にし、要約は作らない。
+ * body.summary(要約済みテキストを画面側で分解したもの)が付いているときは、その要約を
+ * 専用プロパティに書き、状態は「要約」にする(要約モデルは「テキスト取り込み」)。
  * 権限: 管理者は body.permissions をそのまま付与。管理者以外は検証済み role のみ付与(upload と同じ)。
  */
 function createFromText_(body) {
@@ -794,6 +796,17 @@ function createFromText_(body) {
   props[PROP_CATEGORY] = { multi_select: tags.map(function (name) { return { name: name }; }) };
   props[PROP_STATUS] = { select: { name: STATUS_TRANSCRIBED } };
   props[PROP_RAW_COUNT] = { number: text.length };
+  if (body.summary && typeof body.summary === 'object') {
+    var sm = body.summary;
+    props[PROP_STATUS]    = { select: { name: STATUS_SUMMARIZED } };
+    props[PROP_SUMMARY]   = richTextProp_(sm.cardSummary);
+    props[PROP_DECISIONS] = richTextProp_(joinLines_(sm.decisions));
+    props[PROP_TODOS]     = richTextProp_(serializeTodos_(sm.todos));
+    props[PROP_TOPICS]    = richTextProp_(joinLines_(sm.topics));
+    props[PROP_AGENDA]    = richTextProp_(Array.isArray(sm.agenda) && sm.agenda.length ? JSON.stringify(sm.agenda) : '');
+    props[PROP_MODEL]     = richTextProp_('テキスト取り込み');
+    props[PROP_GENERATED] = { date: { start: new Date().toISOString() } };
+  }
   if (body.meetingAt) {
     props[PROP_MEETING_AT] = { date: { start: String(body.meetingAt) } };
   }
