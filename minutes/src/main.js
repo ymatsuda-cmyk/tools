@@ -1,5 +1,6 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
 import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, saveMindmap, deleteItem, updateRawContextCount, saveRule, fetchRules, deleteRule, setRuleEnabled } from './lib/gas.js'
+import { parseSummaryText } from './lib/summary-text.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -352,6 +353,8 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-mm-save')?.addEventListener('click', () => saveMindmapField(target, item))
   setupMarkerUI(target, item, renderState)
 
+  target.querySelector('.btn-summary-import')?.addEventListener('click', () => openSummaryImport(target, item, renderState))
+  target.querySelector('.btn-agenda-import')?.addEventListener('click', () => openSummaryImport(target, item, renderState))
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, renderState, el.dataset.field))
   })
@@ -552,6 +555,113 @@ async function commitLineEdit(target, item, state, index, sub, value) {
     paintDetail(target, item, { ...state, summary })
     alert('保存に失敗しました: ' + (err.message || err))
   }
+}
+
+/**
+ * 議事タブ: 要約テキスト(タイプ1/タイプ2)を貼り付けて、この議事録の要約として登録する。
+ * 議事は置き換え、決定事項・ToDo・論点は要約テキストに含まれるときだけ置き換える
+ * (ToDoは文言の近さで突き合わせ、チェック状態と経過ログを引き継ぐ)。
+ * サマリは空のときだけ補う(すでにあるサマリは上書きしない)。
+ * 要約が未生成の議事録でも使える(その場合は状態「要約」・モデル「テキスト取り込み」で新規に保存する)。
+ */
+function openSummaryImport(target, item, state) {
+  const summary = state.summary || null
+  const root = document.getElementById('modal-root')
+  root.innerHTML = `
+    <div class="raw-modal-overlay">
+      <div class="raw-modal" style="width:min(560px,100%)">
+        <div class="raw-modal-header">
+          <span>要約テキストから登録</span>
+          <button id="imp-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="raw-modal-body">
+          <p class="edit-hint">タイプ1(## 議事メモ 形式)またはタイプ2(会議のメモ: 形式)の要約を貼り付けてください。議事は置き換わります。決定事項・ToDo・論点は、貼り付けた要約に含まれる場合だけ置き換わります。</p>
+          <textarea id="imp-textarea" class="edit-textarea" rows="14" placeholder="## 議事メモ&#10;- トピック: ..."></textarea>
+          <p id="imp-parse" class="edit-hint"></p>
+          <p id="imp-error" class="error-text" style="display:none"></p>
+        </div>
+        <div class="raw-modal-footer">
+          <button id="imp-cancel" class="btn">キャンセル</button>
+          <button id="imp-save" class="btn">登録</button>
+        </div>
+      </div>
+    </div>
+  `
+  const close = () => (root.innerHTML = '')
+  root.querySelector('#imp-close').addEventListener('click', close)
+  root.querySelector('#imp-cancel').addEventListener('click', close)
+  const ta = root.querySelector('#imp-textarea')
+  const parseEl = root.querySelector('#imp-parse')
+  const errorEl = root.querySelector('#imp-error')
+
+  ta.addEventListener('input', () => {
+    errorEl.style.display = 'none'
+    if (!ta.value.trim()) { parseEl.textContent = ''; return }
+    try {
+      const r = parseSummaryText(ta.value)
+      parseEl.textContent = `${r.type === 'type1' ? 'タイプ1' : 'タイプ2'}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
+    } catch (err) {
+      parseEl.textContent = err.message
+    }
+  })
+
+  root.querySelector('#imp-save').addEventListener('click', async () => {
+    let parsed
+    try {
+      parsed = parseSummaryText(ta.value)
+    } catch (err) {
+      errorEl.textContent = err.message
+      errorEl.style.display = 'block'
+      return
+    }
+    if ((summary?.detail?.agenda || []).length && !confirm('いまの議事は、貼り付けた内容に置き換わります。よろしいですか?')) return
+
+    const prev = summary?.detail || {}
+    const detail = {
+      agenda: parsed.agenda,
+      decisions: parsed.decisions.length ? parsed.decisions : (prev.decisions || []),
+      topics: parsed.topics.length ? parsed.topics : (prev.topics || []),
+      todos: parsed.todos.length
+        ? mergeTodos(prev.todos || [], parsed.todos, { keepOrphans: true }).todos
+        : (prev.todos || []),
+    }
+    const now = new Date().toISOString()
+    const cardSummary = summary?.cardSummary || parsed.cardSummary
+
+    if (!summary) {
+      // 未生成: 要約日時・モデル・状態「要約」もあわせて保存する(保存に成功してから画面を切り替える)
+      const saveBtn = root.querySelector('#imp-save')
+      saveBtn.disabled = true
+      try {
+        await saveSummary(item.notionPageId, cardSummary, detail, 'テキスト取り込み')
+      } catch (err) {
+        saveBtn.disabled = false
+        errorEl.textContent = '保存に失敗しました: ' + (err.message || err)
+        errorEl.style.display = 'block'
+        return
+      }
+      item.status = '要約'
+      const saved = setDetailCache(item.key, {
+        cardSummary, detail, model: 'テキスト取り込み', generatedAt: now, updatedAt: now,
+      })
+      close()
+      paintDetail(target, item, { phase: 'ready', summary: saved })
+      return
+    }
+
+    const updated = { ...summary, cardSummary, detail, updatedAt: now }
+    close()
+    setDetailCache(item.key, updated)
+    paintDetail(target, item, { ...state, summary: updated })
+    try {
+      await saveDetail(item.notionPageId, updated.cardSummary, updated.detail)
+    } catch (err) {
+      setDetailCache(item.key, summary)
+      paintDetail(target, item, { ...state, summary })
+      alert('保存に失敗しました: ' + (err.message || err))
+    }
+  })
+  ta.focus()
 }
 
 /**

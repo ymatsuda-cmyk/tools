@@ -1,5 +1,26 @@
 # Change Log
 
+## 1.8.0 - 2026-11-02
+
+### Release Title
+
+Text registration takes raw text (required) and a summary text (optional); register a summary text from the agenda tab or for items without a summary
+
+### Release Changes
+
+- 「テキストから議事録を登録」を、原文(必須)と要約テキスト(任意)の2欄にした(1.7.0 の切替ボタンは廃止)。要約テキストを入れると、タイプ1・2を自動判別して議事・決定事項・ToDo・論点に分け、状態「要約」で登録する。空なら従来どおり状態「文字起こし」。原文はどちらの場合もページ本文に入る。
+- 議事タブの見出しに「要約テキストから登録」ボタンを追加。貼り付けた要約で議事を置き換え、決定事項・ToDo・論点は要約に含まれるときだけ置き換える(ToDoは文言の近さで突き合わせ、チェック状態と経過ログを引き継ぐ)。サマリは空のときだけ補う。
+- 要約が未生成の議事録にも対応。未生成の画面の下部に「要約テキストから登録」ボタンを出し、貼り付けた要約を状態「要約」・要約モデル「テキスト取り込み」で保存する。
+- GAS の変更なし(1.7.0 の `createFromText` の `summary` をそのまま使用)。
+
+### Release Affected Files
+
+- `minutes/src/text-register.js`
+- `minutes/src/main.js`
+- `minutes/src/ui/render.js`
+- `minutes/css/styles.css`
+- `minutes/CHANGELOG.md`
+
 ## 1.7.0 - 2026-11-02
 
 ### Release Title
