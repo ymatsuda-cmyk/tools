@@ -626,6 +626,7 @@ body {
 }
 .btn-edit { padding: 1px 4px; font-size: 11px; opacity: 0; transition: opacity 0.15s; }
 .section-label:hover .btn-edit { opacity: 1; }
+.btn-agenda-import { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 11px; margin-left: 4px; }
 
 .empty-section { font-size: 12px; color: var(--text-muted); margin: 0 0 16px; }
 
