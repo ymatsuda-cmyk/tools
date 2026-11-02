@@ -166,7 +166,7 @@ export function renderDetailHtml(item, state) {
       : ''
 
   const importBtn = state.canEditContent
-    ? '<button class="btn-ghost btn-agenda-import" aria-label="要約テキストから議事を登録" title="要約テキストから登録"><i class="ti ti-clipboard-text" aria-hidden="true"></i></button>'
+    ? '<button class="btn btn-agenda-import" title="要約テキスト(タイプ1/2)から議事などを登録"><i class="ti ti-clipboard-text" aria-hidden="true"></i>要約テキストから登録</button>'
     : ''
 
   const header = `
