@@ -353,6 +353,7 @@ function paintDetail(target, item, state) {
   target.querySelector('.btn-mm-save')?.addEventListener('click', () => saveMindmapField(target, item))
   setupMarkerUI(target, item, renderState)
 
+  target.querySelector('.btn-summary-import')?.addEventListener('click', () => openSummaryImport(target, item, renderState))
   target.querySelector('.btn-agenda-import')?.addEventListener('click', () => openSummaryImport(target, item, renderState))
   target.querySelectorAll('.btn-edit').forEach((el) => {
     el.addEventListener('click', () => openFieldEditor(target, item, renderState, el.dataset.field))
@@ -561,9 +562,10 @@ async function commitLineEdit(target, item, state, index, sub, value) {
  * 議事は置き換え、決定事項・ToDo・論点は要約テキストに含まれるときだけ置き換える
  * (ToDoは文言の近さで突き合わせ、チェック状態と経過ログを引き継ぐ)。
  * サマリは空のときだけ補う(すでにあるサマリは上書きしない)。
+ * 要約が未生成の議事録でも使える(その場合は状態「要約」・モデル「テキスト取り込み」で新規に保存する)。
  */
 function openSummaryImport(target, item, state) {
-  const summary = state.summary
+  const summary = state.summary || null
   const root = document.getElementById('modal-root')
   root.innerHTML = `
     <div class="raw-modal-overlay">
@@ -612,9 +614,9 @@ function openSummaryImport(target, item, state) {
       errorEl.style.display = 'block'
       return
     }
-    if ((summary.detail.agenda || []).length && !confirm('いまの議事は、貼り付けた内容に置き換わります。よろしいですか?')) return
+    if ((summary?.detail?.agenda || []).length && !confirm('いまの議事は、貼り付けた内容に置き換わります。よろしいですか?')) return
 
-    const prev = summary.detail
+    const prev = summary?.detail || {}
     const detail = {
       agenda: parsed.agenda,
       decisions: parsed.decisions.length ? parsed.decisions : (prev.decisions || []),
@@ -623,12 +625,31 @@ function openSummaryImport(target, item, state) {
         ? mergeTodos(prev.todos || [], parsed.todos, { keepOrphans: true }).todos
         : (prev.todos || []),
     }
-    const updated = {
-      ...summary,
-      cardSummary: summary.cardSummary || parsed.cardSummary,
-      detail,
-      updatedAt: new Date().toISOString(),
+    const now = new Date().toISOString()
+    const cardSummary = summary?.cardSummary || parsed.cardSummary
+
+    if (!summary) {
+      // 未生成: 要約日時・モデル・状態「要約」もあわせて保存する(保存に成功してから画面を切り替える)
+      const saveBtn = root.querySelector('#imp-save')
+      saveBtn.disabled = true
+      try {
+        await saveSummary(item.notionPageId, cardSummary, detail, 'テキスト取り込み')
+      } catch (err) {
+        saveBtn.disabled = false
+        errorEl.textContent = '保存に失敗しました: ' + (err.message || err)
+        errorEl.style.display = 'block'
+        return
+      }
+      item.status = '要約'
+      const saved = setDetailCache(item.key, {
+        cardSummary, detail, model: 'テキスト取り込み', generatedAt: now, updatedAt: now,
+      })
+      close()
+      paintDetail(target, item, { phase: 'ready', summary: saved })
+      return
     }
+
+    const updated = { ...summary, cardSummary, detail, updatedAt: now }
     close()
     setDetailCache(item.key, updated)
     paintDetail(target, item, { ...state, summary: updated })
