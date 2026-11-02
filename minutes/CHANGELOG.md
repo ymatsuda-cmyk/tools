@@ -1,5 +1,27 @@
 # Change Log
 
+## 1.7.0 - 2026-11-02
+
+### Release Title
+
+Register minutes from an existing summary text (type 1 / type 2)
+
+### Release Changes
+
+- 「テキストから議事録を登録」に「原文(文字起こし)／要約テキスト」の切替を追加。要約テキストでは、すでにある要約を貼り付けてそのまま登録できる(要約の再生成は不要)。
+- タイプ1(`## 会議情報 / ## 議事メモ / ## 次の段取り / ## AIからの提案`)とタイプ2(`会議のメモ:` ～ `フォローアップ タスク:`)を自動判別する(`src/lib/summary-text.js`)。貼り付けた時点で読み取り件数を表示し、読み取れない場合は理由を出す。
+- 変換: 議題 → 議事(トピック/要点/結論)、タイプ1の「結論」→ 決定事項、「次の段取り」/「フォローアップ」→ ToDo、「AIからの提案」→ 論点。一覧カードの要約は議題名の並びから作る。タイプ1は日付を開始日時に自動入力する(タイプ2は日付が無いので手入力)。
+- 状態は「要約」、要約モデルは「テキスト取り込み」で登録し、貼り付けた全文はページ本文にも残す。
+- `createFromText` in `gas/Code.gs` accepts `summary`. **Redeploy the GAS web app.**
+
+### Release Affected Files
+
+- `minutes/src/lib/summary-text.js` (new)
+- `minutes/src/text-register.js`
+- `minutes/gas/Code.gs`
+- `minutes/css/styles.css`
+- `minutes/CHANGELOG.md`
+
 ## 1.6.0 - 2026-10-15
 
 ### Release Title
