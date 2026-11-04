@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20260929_9d4e731";
+const APP_VERSION = "rev_20261104_7a2c4f8";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -343,6 +343,7 @@ async function init() {
   if (si) si.value = filters.q || "";
   renderFilters();
   updateWeekBtns();
+  if (window.shinkiReset) window.shinkiReset();   // 再読み込み時は新規営業シートも読み直す
   renderCurrentPane();
 }
 
@@ -2332,6 +2333,11 @@ function renderAgg() {
   if (currentAgg === "hoshu") { fixed.innerHTML = ""; cont.innerHTML = termBarHtml() + renderHoshuAgg(); }
   else if (currentAgg === "mitsu") { fixed.innerHTML = ""; cont.innerHTML = renderMitsuAgg(); }
   else if (currentAgg === "uriage") { fixed.innerHTML = ""; cont.innerHTML = termBarHtml() + renderJuchuAgg(); }
+  else if (currentAgg === "shinki") {   // 新規営業（営業代行 月次報告。描画は shinki.js）
+    fixed.innerHTML = "";
+    cont.innerHTML = `<div id="shinki-container"></div>`;
+    if (window.renderShinki) window.renderShinki();
+  }
   else { fixed.innerHTML = renderKadoFixed(); cont.innerHTML = renderKadoContent(); }   // 稼働状況：期セレクタ＋タブは #agg-subfixed（固定表示）、本体は #agg-container（スクロール）
 }
 

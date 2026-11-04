@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.css?v=20260807g">
   <script src="https://ymatsuda-cmyk.github.io/tools/addin/kanban/api.js?v=20260807g"></script>
 
-  <link rel="stylesheet" href="style.css?v=20260929d">
+  <link rel="stylesheet" href="style.css?v=20261104b">
 </head>
 <body>
 
@@ -88,11 +88,31 @@
     <button class="seg active" data-agg="hoshu" onclick="switchAgg('hoshu')">保守状況</button>
     <button class="seg" data-agg="mitsu" onclick="switchAgg('mitsu')">見積状況</button>
     <button class="seg" data-agg="uriage" onclick="switchAgg('uriage')">受注状況</button>
+    <button class="seg" data-agg="shinki" onclick="switchAgg('shinki')">新規営業</button>
     <button class="seg" data-agg="kado" onclick="switchAgg('kado')">稼働状況</button>
   </div>
   <div id="agg-subfixed"></div>
   <div class="agg-scroll" id="agg-scroll">
     <div id="agg-container"></div>
+  </div>
+</div>
+
+<!-- ===== 新規営業（集計タブ内。営業代行 月次報告。shinki.js が描画）：報告書ファイル選択 ===== -->
+<input type="file" id="sk-file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="shinkiOnFile(this)">
+
+<!-- ===== 新規営業：報告書取込プレビュー ===== -->
+<div class="modal-back" id="sk-preview" style="display:none" onclick="if(event.target===this)shinkiClosePreview()">
+  <div class="modal small">
+    <div class="modal-head">
+      <span class="modal-title">報告書の取込内容を確認</span>
+      <button class="icon-btn" onclick="shinkiClosePreview()">✕</button>
+    </div>
+    <div class="modal-body" id="sk-pv-body"></div>
+    <div class="modal-foot">
+      <button class="btn-primary" id="sk-pv-ok" onclick="shinkiCommit()">シートに書き込む</button>
+      <button class="btn-ghost" onclick="shinkiClosePreview()">キャンセル</button>
+      <span class="save-msg" id="sk-pv-msg"></span>
+    </div>
   </div>
 </div>
 
@@ -260,6 +280,7 @@
 
 <script src="../proposal/roi-core.js?v=20260906g"></script>
 <script src="../proposal/eigyo-roi-panel.js?v=20260906g"></script>
-<script src="app.js?v=20260929d"></script>
+<script src="app.js?v=20261104b"></script>
+<script src="shinki.js?v=20261104b"></script>
 </body>
 </html>

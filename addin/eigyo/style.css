@@ -974,3 +974,59 @@ body {
 /* 保守費未設定の取引先セクション見出し／タグ */
 .section-h { font-size: 11.5px; color: #8a97a0; font-weight: bold; margin: 14px 0 4px; padding-top: 8px; border-top: 1px dashed #dde3e7; }
 .unset-tag { font-size: 10px; background: #eef1f3; color: #8a97a0; border-radius: 3px; padding: 1px 5px; margin-left: 5px; }
+
+/* ============================================================
+   新規営業タブ（shinki.js）
+   ============================================================ */
+.sk-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.sk-toolbar .spacer { flex: 1; }
+.sk-vendor { font-size: 11px; color: #8a97a0; }
+.sk-unit { font-size: 12px; margin-left: 1px; }
+.sk-delta { font-size: 10px; color: #8a97a0; margin-top: 2px; }
+.sk-delta.up { color: #0e7a5f; }
+.sk-delta.down { color: #c0392b; }
+.sk-h-sub { font-size: 11px; font-weight: normal; color: #8a97a0; }
+.sk-late-cnt { color: #c0392b; font-weight: bold; }
+.sk-bar { display: flex; gap: 2px; height: 20px; border-radius: 4px; overflow: hidden; background: #eef1f3; }
+.sk-seg { min-width: 3px; }
+.sk-legend { margin-top: 8px; gap: 6px 12px; }
+.sk-legend b { color: #1f2933; margin-left: 2px; }
+.sk-pct { color: #8a97a0; margin-left: 3px; font-size: 10px; }
+.sk-termbar { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: normal; }
+.sk-sub-ttl { font-size: 11px; color: #52616b; font-weight: bold; margin: 8px 0 4px; }
+.sk-fgroup { margin-bottom: 10px; }
+.sk-fhead { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.sk-cnt { font-size: 11px; color: #8a97a0; }
+.sk-pill { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid; }
+.sk-pill-pros { background: #e4f1ec; color: #0b6650; border-color: #b8dcd0; }
+.sk-pill-cb { background: #fdf6e3; color: #8a5a12; border-color: #ecd59c; }
+.sk-pill-rc { background: #eaf2f8; color: #2c6e9b; border-color: #bcd5e8; }
+.sk-frow { padding: 6px 4px; border-bottom: 1px solid #eef1f3; cursor: pointer; }
+.sk-frow:hover { background: #f2f8f5; }
+.sk-fline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.sk-fline .spacer { flex: 1; }
+.sk-co { font-weight: bold; color: #1f2933; }
+.sk-person { color: #52616b; font-size: 11px; }
+.sk-since { font-size: 10px; color: #7b4baf; background: #f3edfa; padding: 0 5px; border-radius: 3px; }
+.sk-next { font-size: 11px; color: #52616b; }
+.sk-next.late { color: #c0392b; font-weight: bold; }
+.sk-own { font-size: 10px; color: #0b6650; background: #e4f1ec; padding: 0 5px; border-radius: 3px; }
+.sk-memo { font-size: 11px; color: #52616b; line-height: 1.5; margin-top: 3px; padding-left: 8px; border-left: 2px solid #dde3e7; }
+.sk-mail { color: #2c6e9b; }
+.sk-foot { font-size: 10px; color: #8a97a0; margin-top: 6px; }
+.sk-ng-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.sk-ng { background: #f7f8f9; border: 1px solid #eef1f3; border-radius: 5px; padding: 6px 8px; }
+.sk-ng-t { font-size: 12px; font-weight: bold; color: #1f2933; margin-bottom: 2px; }
+.sk-ng-b { font-size: 11px; color: #52616b; line-height: 1.5; }
+.sk-para { font-size: 12px; color: #1f2933; line-height: 1.6; margin: 0 0 4px; }
+.sk-plan { font-size: 12px; line-height: 1.6; padding-left: 18px; }
+.sk-empty { font-size: 12px; color: #8a97a0; padding: 8px 0; }
+.sk-emptybox { text-align: center; background: #fff; border: 1px dashed #b8dcd0; border-radius: 6px; padding: 28px 16px; }
+.sk-empty-ttl { font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+.sk-empty-txt { font-size: 12px; color: #52616b; margin-bottom: 14px; line-height: 1.6; }
+.sk-pv-file { font-size: 11px; color: #8a97a0; margin-bottom: 6px; word-break: break-all; }
+.sk-pv-table td.r { text-align: right; }
+.sk-pv-bd { font-size: 11px; line-height: 1.5; }
+.sk-warn { margin-top: 8px; padding: 6px 8px; background: #fdf6e3; color: #8a5a12; border: 1px solid #ecd59c; border-radius: 4px; font-size: 11px; line-height: 1.6; }
+.sk-over { margin-top: 8px; padding: 6px 8px; background: #fdecea; color: #a5321f; border: 1px solid #f0b7b0; border-radius: 4px; font-size: 11px; line-height: 1.6; }
+.sk-pv-table td.l { white-space: nowrap; color: #52616b; }
