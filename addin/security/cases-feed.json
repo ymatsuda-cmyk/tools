@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-06T10:52:12+09:00",
+ "generatedAt": "2026-11-07T10:22:19+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -919,7 +919,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116957",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：株式会社サミーネットワークスより引用 株式会社サミーネットワークスは2026年10月2日、「777CON-PASS」に関し、同社が管理するサーバーが第三者による不正アクセスを受け、個人情報が外部に流出した可能性があると発表しまし",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116957",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "saferinternet",
@@ -937,7 +942,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116955",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：一般社団法人セーファーインターネット協会より引用 一般社団法人セーファーインターネット協会は2026年10月2日、利用するさくらインターネットの「さくらのレンタルサーバ」で不正アクセスが発生したとの報告を受け、保存していた個人情",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116955",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "rashinban",
@@ -955,7 +965,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116904",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：株式会社らしんばんより引用 株式会社らしんばんは2026年10月1日、同社が運営するサービスへの第三者による不正アクセスにより、顧客情報の一部が外部に漏えいした可能性があると発表しました。 同社によると、不正アクセスの対象",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116904",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "benefitone",
@@ -973,7 +988,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116906",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：株式会社ベネフィット・ワンより引用 株式会社ベネフィット・ワンは2026年9月30日、福利厚生サービスの担当者向けシステム「ベネワン・プラットフォーム」で、2,322企業・団体の1万3,460人分の個人情報が漏えいしたと発表しま",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116906",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "toyobo",
@@ -991,7 +1011,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116973",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：東洋紡エムシー株式会社より引用 東洋紡エムシー株式会社は2026年9月30日、従業員2人がフィッシング被害に遭い、メールアカウントへの第三者による不正アクセスが確認されたと発表しました。 発端は、東洋紡のグループ会社である",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116973",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "kiu",
@@ -1009,7 +1034,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/117034",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：関西国際大学より引用 関西国際大学は2026年9月30日、学内システムの一部で第三者による不正アクセスを確認したと発表しました。 説明によると、同大は不正アクセス確認後、学内システムのインターネット接続を停止する、緊急措置",
+   "sources": "元記事|https://cybersecurity-jp.com/news/117034",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "eplus",
@@ -1027,7 +1057,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116881",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：株式会社イープラスより引用 株式会社イープラスは2026年9月29日、電子チケット「スマチケ」の払戻し情報を管理するシステムが不正アクセスを受け、個人情報1,463件が漏えいしたと発表しました。 同社によると、不正アクセス",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116881",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "sanpo",
@@ -1045,7 +1080,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116879",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-07",
+   "sec_summary": "画像：サンポー食品株式会社より引用 サンポー食品株式会社は2026年9月28日、同社ウェブサイトに対するサイバー攻撃を発表しました。 同社によると2026年8月25日、第三者による不正アクセスが確認されました。同社がサイトを停止",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116879",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "metro",
