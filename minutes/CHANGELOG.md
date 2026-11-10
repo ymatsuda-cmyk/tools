@@ -1,5 +1,21 @@
 # Change Log
 
+## 1.8.1 - 2026-11-02
+
+### Release Title
+
+Make the agenda-tab「要約テキストから登録」button visible
+
+### Release Changes
+
+- 議事タブの「要約テキストから登録」を、アイコンだけのボタンから、文字付きで常時表示のボタンに変更(編集の鉛筆は見出しにマウスを載せたときだけ出るため、並んだアイコンが見つけにくかった)。
+
+### Release Affected Files
+
+- `minutes/src/ui/render.js`
+- `minutes/css/styles.css`
+- `minutes/CHANGELOG.md`
+
 ## 1.8.0 - 2026-11-02
 
 ### Release Title
