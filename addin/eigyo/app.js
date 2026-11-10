@@ -3482,11 +3482,15 @@ function renderKadoUketaku() {
     const st = burn == null ? "" : burn > 100 ? "over" : burn >= 80 ? "warn" : "ok";
     const stLabel = st === "over" ? "見積超過" : st === "warn" ? "要注意" : st === "ok" ? "順調" : "見積未確定";
     const open = kadoUketakuOpen === g.client;
+    const barMax = Math.max(g.est, g.act, 1);  // 見積(▼)と実績のどちらも収まる尺度
     return `
     <div class="kado-row kado-row-click${open ? " open" : ""}" onclick="toggleKadoClient('${esc(g.client)}')">
       <div class="kado-name"><b>${esc(g.client)}</b><div class="kado-sub">受注 ${Math.round(g.amt / 10000).toLocaleString()}万 / ${g.n}件</div></div>
       <div class="kado-chart">
-        <div class="pbar"><i style="width:${Math.min(burn || 0, 100)}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
+        <div class="kado-bar">
+          ${g.est > 0 ? `<span class="kado-mark" style="left:${g.est / barMax * 100}%" title="見積 ${Math.round(g.est * 10) / 10}人日">▼</span>` : ""}
+          <div class="pbar"><i style="width:${g.act / barMax * 100}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
+        </div>
         <div class="kado-t">消化 ${burn == null ? "－" : burn + "%"}（${Math.round(g.act * 10) / 10}人日） / 見積 ${Math.round(g.est * 10) / 10}人日</div>
       </div>
       <div class="kado-stat">
@@ -3527,36 +3531,42 @@ function renderKadoUketaku() {
       ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。状態フィルタで絞り込めます。<br>
-        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。行をクリックすると案件別の予実一覧を展開します。
+        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。棒グラフの▼が見積位置で、棒が▼を越えると見積超過です。行をクリックすると案件別の予実一覧を展開します。<br>
+        案件別明細: 限度＝受注額÷60,000円（小数切り捨て）、消化率＝実績÷限度、残工数＝限度－実績。
       </p>
     </div>`;
 }
+const KADO_LIMIT_UNIT = 60000;  // 限度工数＝受注額÷6万円（小数切り捨て）
 function kadoUketakuDetail(recs) {
   const rowsHtml = recs.map(r => {
     const est = r.finalHours, act = r.acceptHours;
-    const burn = (est != null && est > 0) ? Math.round((act || 0) / est * 100) : null;
+    const amt = ((r.finalAmount ?? r.amount)) || 0;
+    const limit = Math.floor(amt / KADO_LIMIT_UNIT);
+    const burn = limit > 0 ? Math.round((act || 0) / limit * 100) : null;
     return `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}"
         onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
       <td>${esc(r.id)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
-      <td class="r">${(((r.finalAmount ?? r.amount)) || 0).toLocaleString()}円</td>
+      <td class="r">${amt.toLocaleString()}円</td>
       <td class="r">${est != null ? est : '<span class="muted">－</span>'}</td>
       <td class="r">${act != null ? act : '<span class="muted">－</span>'}</td>
+      <td class="r">${limit}</td>
       <td class="r">${burn != null ? burn + "%" : "－"}</td>
-      <td class="r">${est != null && act != null ? (Math.round((est - act) * 10) / 10) : "－"}</td>
+      <td class="r">${limit > 0 ? (Math.round((limit - (act || 0)) * 10) / 10) : "－"}</td>
       <td><span class="status-pill st-${esc(effectiveStatus(r))}">${esc(statusLabel(r))}</span></td>
     </tr>`;
   }).join("");
   const t = recs.reduce((a, r) => ({
     amt: a.amt + (((r.finalAmount ?? r.amount)) || 0),
     est: a.est + (Number(r.finalHours) || 0), act: a.act + (Number(r.acceptHours) || 0),
-  }), { amt: 0, est: 0, act: 0 });
+    limit: a.limit + Math.floor((((r.finalAmount ?? r.amount)) || 0) / KADO_LIMIT_UNIT),
+  }), { amt: 0, est: 0, act: 0, limit: 0 });
   return `<div class="kado-detail">
     <table class="agg-table drill-table">
-      <tr><th>ID</th><th>内容</th><th>受注額</th><th>見積</th><th>実績</th><th>消化率</th><th>見積残</th><th>状態</th></tr>
+      <tr><th>ID</th><th>内容</th><th>受注額</th><th>見積</th><th>実績</th><th>限度</th><th>消化率</th><th>残工数</th><th>状態</th></tr>
       ${rowsHtml}
       <tr class="total"><td colspan="2">合計</td><td class="r">${t.amt.toLocaleString()}円</td>
         <td class="r">${Math.round(t.est * 10) / 10}</td><td class="r">${Math.round(t.act * 10) / 10}</td>
-        <td colspan="3"></td></tr>
+        <td class="r">${t.limit}</td><td colspan="3"></td></tr>
     </table>
     <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
   </div>`;
