@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20261104_7a2c4f8";
+const APP_VERSION = "rev_20261111_3e8b6d1";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -597,13 +597,58 @@ async function ensureStaffSheet() {
       ns.getRange("A1:C1").format.font.color = "#FFFFFF";
       await ctx.sync();
     }
-    const rng = ctx.workbook.worksheets.getItem(STAFF_SHEET).getRange("A2:C300");
+    /* 見出し行から列を判定（既定は A:氏名 B:稼働開始日 C:稼働終了日）。
+       見出しが2行目以降にある表にも対応する。 */
+    const rng = ctx.workbook.worksheets.getItem(STAFF_SHEET).getRange("A1:H300");
     rng.load("values");
     await ctx.sync();
-    staff = rng.values
-      .map((r, i) => ({ row: i + 2, name: str(r[0]), start: toDate(r[1]), end: toDate(r[2]) }))
+    const vals = rng.values;
+    let hdrRow = 0, cName = 0, cStart = 1, cEnd = 2;
+    for (let i = 0; i < Math.min(5, vals.length); i++) {
+      const h = vals[i].map(v => str(v).replace(/\s/g, ""));
+      const n = h.findIndex(v => /^(氏名|名前|担当者|メンバー|要員)/.test(v));
+      const st = h.findIndex(v => /開始|参画|着任/.test(v));
+      if (n >= 0 && st >= 0) {
+        hdrRow = i; cName = n; cStart = st;
+        const en = h.findIndex(v => /終了|離任|退任|離脱/.test(v));
+        cEnd = en >= 0 ? en : -1;
+        break;
+      }
+    }
+    staff = vals.slice(hdrRow + 1)
+      .map((r, i) => {
+        const sRaw = r[cStart], eRaw = cEnd >= 0 ? r[cEnd] : "";
+        const start = parseStaffDate(sRaw), end = parseStaffDate(eRaw);
+        return {
+          row: hdrRow + i + 2, name: str(r[cName]), start, end,
+          startRaw: str(sRaw), endRaw: str(eRaw),
+          startBad: !start && str(sRaw) !== "", endBad: !end && str(eRaw) !== "",
+        };
+      })
       .filter(s => s.name);
   });
+}
+
+/* 体制シートの日付を寛容に解釈する：
+   シリアル値（数値・文字列）、2026/4/1、2026-04-01、2026年4月1日、R8.4.1／令和8年4月1日、
+   年月のみ（2026/4 → 1日）。解釈できない場合は null（＝期限なし扱い）。 */
+function parseStaffDate(v) {
+  if (v === "" || v == null) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number") return v > 0 ? toDate(v) : null;
+  const s0 = String(v).trim().replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  if (!s0 || /^[-－―ー—]+$/.test(s0)) return null;
+  if (/^\d+(\.\d+)?$/.test(s0)) {
+    const n = Number(s0);
+    if (n > 20000 && n < 80000) return toDate(n);   // 文字列で入ったシリアル値
+    return null;
+  }
+  let m = s0.match(/^(?:R|令和)\s*(\d{1,2})\s*[年.\/\-]\s*(\d{1,2})(?:\s*[月.\/\-]\s*(\d{1,2}))?/i);
+  if (m) return new Date(2018 + Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3]) : 1);
+  m = s0.match(/^(\d{4})\s*[年.\/\-]\s*(\d{1,2})(?:\s*[月.\/\-]\s*(\d{1,2}))?/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3]) : 1);
+  const d = new Date(s0);
+  return isNaN(d) ? null : d;
 }
 
 /* ---------- 祝日シート ----------
@@ -2345,7 +2390,6 @@ function renderAgg() {
 function renderHoshuAgg() {
   const months = fiscalMonths(currentTerm);
   const target = activeRecords().filter(r => r.type === "保守対応" || r.type === "瑕疵対応");
-  const open = target.filter(r => !isTerminal(r)).length;
 
   /* 発生は「保守（問合せ）／保守（改修）／瑕疵」の3区分に分解して積み上げる */
   const hoshu = target.filter(r => r.type === "保守対応");
@@ -2363,11 +2407,14 @@ function renderHoshuAgg() {
     "保守（区分未設定）": "#b9c2c9",
   };
   const doneSeries = countByMonth(target, "done", months);
+  /* サマリは表示中の期で集計し直す（発生日が期内の案件。発生日未入力は対象外） */
+  const termTarget = target.filter(r => r.occur && months.includes(monthKey(r.occur)));
+  const termOpen = termTarget.filter(r => !isTerminal(r)).length;
 
   return `
     <div class="kpi-row">
-      <div class="kpi"><div class="kv">${target.length}</div><div class="kl">保守・瑕疵 総件数</div></div>
-      <div class="kpi"><div class="kv">${open}</div><div class="kl">未完了件数</div></div>
+      <div class="kpi"><div class="kv">${termTarget.length}</div><div class="kl">保守・瑕疵 総件数</div></div>
+      <div class="kpi"><div class="kv">${termOpen}</div><div class="kl">未完了件数</div></div>
     </div>
     <div class="agg-card">
       <h3>保守・瑕疵 月次推移（発生の内訳・完了）</h3>
@@ -2709,7 +2756,10 @@ function clearJuchuChips(which) {
 }
 function renderJuchuAgg() {
   const months = fiscalMonths(currentTerm);
-  const won = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status));
+  const wonAll = activeRecords().filter(r => QUOTE_TYPES.includes(r.type) && ORDER_CONFIRMED_STATUSES.includes(r.status));
+  /* 期ごとに集計し直す：計上日が期内の案件＋計上日未入力でこの期に属する案件
+     （未入力は受注確定日→発生日の順で期を判定。日付が何も無い案件はどの期にも表示） */
+  const won = wonAll.filter(r => juchuInTerm(r, months));
   const map = Object.fromEntries(months.map(m => [m, 0]));
   let noBook = 0;
   won.forEach(r => {
@@ -2792,6 +2842,12 @@ function renderJuchuAgg() {
       </table>
       <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
     </div>`;
+}
+
+function juchuInTerm(r, months) {
+  if (r.book) return months.includes(monthKey(r.book));
+  const alt = r.orderDone || r.occur;
+  return alt ? months.includes(monthKey(alt)) : true;
 }
 
 /* --- SVG グループ棒グラフ --- */
@@ -3117,6 +3173,27 @@ function kadoUketakuMonthly(months) {
     QUOTE_TYPES.includes(r.type) && ["受託中", "完了"].includes(r.status) && r.workStart);
   return sumByMonth(target, "acceptHours", "workStart", months);
 }
+/* ベース稼働が0人日になった経過月があるときの原因表示（体制シートの読み取り結果） */
+function kadoCapaDiagHtml(monthKeys) {
+  const reasons = monthKeys.map(k => {
+    const { y, m } = ymOfKey(k);
+    const bd = businessDaysInMonth(y, m), sc = staffCountInMonth(y, m);
+    return `${m}月：${bd === 0 ? "営業日が0日（祝日シートを確認）" : ""}${sc === 0 ? "要員数が0人" : ""}`;
+  }).join("　");
+  const ref = (() => { const { y, m } = ymOfKey(monthKeys[0]); return { s: new Date(y, m - 1, 1), e: new Date(y, m, 0) }; })();
+  const rowsHtml = staff.map(p => {
+    const inMonth = (!p.start || p.start <= ref.e) && (!p.end || p.end >= ref.s);
+    const why = inMonth ? "対象" : (p.start && p.start > ref.e ? "開始前" : "終了済み");
+    const cell = (d, raw, bad) => bad ? `<span style="color:#c0392b">${esc(raw)}（日付として読めません）</span>` : (d ? fmtDate(d) : '<span class="muted">空欄</span>');
+    return `<tr><td class="l">${esc(p.name)}</td><td>${cell(p.start, p.startRaw, p.startBad)}</td><td>${cell(p.end, p.endRaw, p.endBad)}</td>
+      <td style="color:${inMonth ? "#0e7a5f" : "#c0392b"}">${why}</td></tr>`;
+  }).join("");
+  return `<div class="agg-card kado-warn">
+    <b>ベース稼働が0人日の月があります。</b> ${esc(reasons)}<br>
+    「体制」シートの読み取り結果（${staff.length}名、${ref.s.getMonth() + 1}月時点の判定）：
+    <table class="agg-table" style="margin-top:6px"><tr><th>氏名</th><th>稼働開始日</th><th>稼働終了日</th><th>判定</th></tr>${rowsHtml}</table>
+  </div>`;
+}
 function renderKadoCapacity() {
   const months = fiscalMonths(currentTerm);
   const hoshuSeries = kadoHoshuMonthly(months, []);
@@ -3138,10 +3215,12 @@ function renderKadoCapacity() {
   const totalActual = Math.round(rows.filter(r => r.elap).reduce((a, r) => a + r.total, 0) * 10) / 10;
   const totalCapa = Math.round(rows.filter(r => r.elap).reduce((a, r) => a + r.capa, 0) * 10) / 10;
 
-  const warn = noStaff ? `<div class="agg-card kado-warn">
+  const zeroElapsed = rows.filter(r => r.elap && r.capa === 0);
+  const diag = (!noStaff && zeroElapsed.length) ? kadoCapaDiagHtml(zeroElapsed.map(r => r.m)) : "";
+  const warn = diag + (noStaff ? `<div class="agg-card kado-warn">
       <b>「体制」シートに要員データがありません。</b> 氏名・稼働開始日（・稼働終了日）を入力すると、
       基本稼働（営業日数×要員数）が算出されます。現在は要員数0人として扱われるため、基本稼働は0人日と表示されています。
-    </div>` : "";
+    </div>` : "");
 
   return `
     ${warn}
@@ -3488,15 +3567,11 @@ function renderKadoUketaku() {
     const st = burn == null ? "" : burn > 100 ? "over" : burn >= 80 ? "warn" : "ok";
     const stLabel = st === "over" ? "見積超過" : st === "warn" ? "要注意" : st === "ok" ? "順調" : "見積未確定";
     const open = kadoUketakuOpen === g.client;
-    const barMax = Math.max(g.est, g.act, 1);  // 見積(▼)と実績のどちらも収まる尺度
     return `
     <div class="kado-row kado-row-click${open ? " open" : ""}" onclick="toggleKadoClient('${esc(g.client)}')">
       <div class="kado-name"><b>${esc(g.client)}</b><div class="kado-sub">受注 ${Math.round(g.amt / 10000).toLocaleString()}万 / ${g.n}件</div></div>
       <div class="kado-chart">
-        <div class="kado-bar">
-          ${g.est > 0 ? `<span class="kado-mark" style="left:${g.est / barMax * 100}%" title="見積 ${Math.round(g.est * 10) / 10}人日">▼</span>` : ""}
-          <div class="pbar"><i style="width:${g.act / barMax * 100}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
-        </div>
+        <div class="pbar"><i style="width:${Math.min(burn || 0, 100)}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
         <div class="kado-t">消化 ${burn == null ? "－" : burn + "%"}（${Math.round(g.act * 10) / 10}人日） / 見積 ${Math.round(g.est * 10) / 10}人日</div>
       </div>
       <div class="kado-stat">
@@ -3537,42 +3612,36 @@ function renderKadoUketaku() {
       ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。状態フィルタで絞り込めます。<br>
-        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。棒グラフの▼が見積位置で、棒が▼を越えると見積超過です。行をクリックすると案件別の予実一覧を展開します。<br>
-        案件別明細: 限度＝受注額÷60,000円（小数切り捨て）、消化率＝実績÷限度、残工数＝限度－実績。
+        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。行をクリックすると案件別の予実一覧を展開します。
       </p>
     </div>`;
 }
-const KADO_LIMIT_UNIT = 60000;  // 限度工数＝受注額÷6万円（小数切り捨て）
 function kadoUketakuDetail(recs) {
   const rowsHtml = recs.map(r => {
     const est = r.finalHours, act = r.acceptHours;
-    const amt = ((r.finalAmount ?? r.amount)) || 0;
-    const limit = Math.floor(amt / KADO_LIMIT_UNIT);
-    const burn = limit > 0 ? Math.round((act || 0) / limit * 100) : null;
+    const burn = (est != null && est > 0) ? Math.round((act || 0) / est * 100) : null;
     return `<tr class="drill-row${r.id === selectedId ? " row-selected" : ""}" data-id="${esc(r.id)}"
         onclick="onDrillRowClick('${esc(r.id)}')" oncontextmenu="onDrillContext(event,'${esc(r.id)}')">
       <td>${esc(r.id)}</td><td class="l">${esc(shorten(r.content, 22))}</td>
-      <td class="r">${amt.toLocaleString()}円</td>
+      <td class="r">${(((r.finalAmount ?? r.amount)) || 0).toLocaleString()}円</td>
       <td class="r">${est != null ? est : '<span class="muted">－</span>'}</td>
       <td class="r">${act != null ? act : '<span class="muted">－</span>'}</td>
-      <td class="r">${limit}</td>
       <td class="r">${burn != null ? burn + "%" : "－"}</td>
-      <td class="r">${limit > 0 ? (Math.round((limit - (act || 0)) * 10) / 10) : "－"}</td>
+      <td class="r">${est != null && act != null ? (Math.round((est - act) * 10) / 10) : "－"}</td>
       <td><span class="status-pill st-${esc(effectiveStatus(r))}">${esc(statusLabel(r))}</span></td>
     </tr>`;
   }).join("");
   const t = recs.reduce((a, r) => ({
     amt: a.amt + (((r.finalAmount ?? r.amount)) || 0),
     est: a.est + (Number(r.finalHours) || 0), act: a.act + (Number(r.acceptHours) || 0),
-    limit: a.limit + Math.floor((((r.finalAmount ?? r.amount)) || 0) / KADO_LIMIT_UNIT),
-  }), { amt: 0, est: 0, act: 0, limit: 0 });
+  }), { amt: 0, est: 0, act: 0 });
   return `<div class="kado-detail">
     <table class="agg-table drill-table">
-      <tr><th>ID</th><th>内容</th><th>受注額</th><th>見積</th><th>実績</th><th>限度</th><th>消化率</th><th>残工数</th><th>状態</th></tr>
+      <tr><th>ID</th><th>内容</th><th>受注額</th><th>見積</th><th>実績</th><th>消化率</th><th>見積残</th><th>状態</th></tr>
       ${rowsHtml}
       <tr class="total"><td colspan="2">合計</td><td class="r">${t.amt.toLocaleString()}円</td>
         <td class="r">${Math.round(t.est * 10) / 10}</td><td class="r">${Math.round(t.act * 10) / 10}</td>
-        <td class="r">${t.limit}</td><td colspan="3"></td></tr>
+        <td colspan="3"></td></tr>
     </table>
     <p style="font-size:11px;color:#999;margin-top:6px">左クリック：Excelの該当行へジャンプ＆選択　／　右クリック：案件の編集画面を開く</p>
   </div>`;
