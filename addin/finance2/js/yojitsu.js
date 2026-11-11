@@ -1,10 +1,10 @@
 /* ============================================================
  * yojitsu.js — 予実タブ（①売上 ②コスト ③利益率）
  * ------------------------------------------------------------
- * ①売上   ：累計の積み上げ（実績＝面、見込み＝破線、計画＝点線）。
- *            保守／開発（既存）／開発（新規）はボタンでONにした区分だけ
- *            下から 保守→既存→新規 の順に色分けし、OFFの区分は「その他」として上に積む。
- * ②コスト ：原価・販管費の月別棒グラフ。計画を横線で重ね、突発（その月までの累計が計画累計の○%超）を赤で示す。
+ * ①売上   ：累計の積み上げ。全体・保守・開発（既存）・開発（新規）のタイルで区分を切り替え、
+ *            選んだ区分の実績（濃い面）・受注確定（薄い面）・パイプライン込み（点線）・計画（破線）を比べる。
+ * ②コスト ：原価＋販管費の月別積み上げ棒。計画を横線で重ね、突発（その月までの累計が計画累計の○%超）を赤で示す。
+ * どのグラフもカーソルを当てる（タッチはタップ）と、その月・その棒の内訳（実績／計画／差）を表示する。
  * ③利益率 ：年度末の着地。受注確定ベース（実績＋月次PLの見込み月の売上）と着地見込み（＋パイプライン）を
  *            計画と並べ、調整後営業利益率（税抜）を目標と比べる。見込み部分は斜線。
  *
@@ -25,21 +25,21 @@
   const cum = (a) => { let s = 0; return a.map(v => (s += v || 0)); };
 
   const CAT = {
-    m: { name: "保守", col: "#2E8B6E", fill: "rgba(46,139,110,0.75)" },
-    e: { name: "開発（既存）", col: "#1F3F6E", fill: "rgba(31,63,110,0.75)" },
-    n: { name: "開発（新規）", col: "#6A5BB8", fill: "rgba(106,91,184,0.75)" }
+    m: { name: "保守", short: "保守", col: "#2E8B6E", fill: "rgba(46,139,110,0.75)" },
+    e: { name: "開発（既存）", short: "開発既存", col: "#1F3F6E", fill: "rgba(31,63,110,0.75)" },
+    n: { name: "開発（新規）", short: "開発新規", col: "#6A5BB8", fill: "rgba(106,91,184,0.75)" }
   };
   const KEYS = ["m", "e", "n"];
-  const COL = { plan: "#A9B3BF", fc: "#C9781A", pipe: "#8E44AD", cogs: "#7B848D", sga: "#D98A6A", spike: "#C0392B", firm: "#8FA9CC", act: "#1F3F6E", planBar: "#C9D5E6", ok: "#2E7D6B", bad: "#8E2A2A", muted: "#56606B", grid: "#E3E6E4" };
+  const COL = { ink: "#1B2430", plan: "#A9B3BF", fc: "#C9781A", pipe: "#8E44AD", cogs: "#7B848D", sga: "#D98A6A", spike: "#C0392B", firm: "#8FA9CC", act: "#1F3F6E", planBar: "#C9D5E6", ok: "#2E7D6B", bad: "#8E2A2A", muted: "#56606B", grid: "#E3E6E4" };
 
   /* ---------- 設定（ブックに保存） ---------- */
-  const DEF = { tgt: 15, mr: 50, sp: { cp: 120, sp: 120 }, sel: { m: false, e: false, n: false }, open: {} };
+  const DEF = { tgt: 15, mr: 50, sp: { cp: 120, sp: 120 }, seg: "all", open: {} };
   function loadParams() {
     let p = null;
     try { const s = Office.context.document.settings.get(SKEY); if (s) p = JSON.parse(s); } catch (e) {}
     if (!p) { try { p = JSON.parse(localStorage.getItem(SKEY) || "null"); } catch (e) {} }
     const o = JSON.parse(JSON.stringify(DEF));
-    if (p) { Object.assign(o, p); o.sp = { cp: (p.sp && p.sp.cp) || DEF.sp.cp, sp: (p.sp && p.sp.sp) || DEF.sp.sp }; o.sel = Object.assign({}, DEF.sel, p.sel || {}); o.open = Object.assign({}, p.open || {}); }
+    if (p) { Object.assign(o, p); o.sp = { cp: (p.sp && p.sp.cp) || DEF.sp.cp, sp: (p.sp && p.sp.sp) || DEF.sp.sp }; o.seg = ["all", "m", "e", "n"].includes(p.seg) ? p.seg : "all"; delete o.sel; o.open = Object.assign({}, p.open || {}); }
     return o;
   }
   let saveTimer = null;
@@ -130,8 +130,10 @@
     return { lo: Math.floor(min / step) * step, hi: Math.ceil(max / step) * step, step };
   }
   const tick = (v) => (Math.abs(v) >= 1e4 ? (v / 1e4).toLocaleString() + "万" : Math.round(v).toLocaleString());
+  const man = (n) => (n == null || !isFinite(n) ? "—" : (n < 0 ? "−" : "") + Math.round(Math.abs(n) / 1e4).toLocaleString() + "万");
+  const sman = (n) => (n == null || !isFinite(n) ? "—" : (Math.round(n / 1e4) > 0 ? "+" : Math.round(n / 1e4) < 0 ? "−" : "±") + Math.abs(Math.round(n / 1e4)).toLocaleString() + "万");
   function frame(H, mx, mn) {
-    const W = 360, L = 46, R = 6, T = 12, B = 22;
+    const W = 360, L = 40, R = 6, T = 12, B = 22;
     const sc = niceScale(Math.min(0, mn || 0), mx);
     const y = (v) => T + (H - T - B) * (1 - (v - sc.lo) / (sc.hi - sc.lo));
     const s = [];
@@ -143,84 +145,94 @@
   }
   const marker = (f, x) => `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${f.T}" y2="${f.H - f.B}" stroke="${COL.muted}" stroke-dasharray="2 2"/><text x="${(x + 3).toFixed(1)}" y="${f.T + 8}" font-size="9" fill="${COL.muted}">見込み →</text>`;
 
-  // 累計の積み上げ面＋線
-  function areaChart(o) {
-    const all = [];
-    o.layers.forEach(l => l.top.forEach(v => v != null && all.push(v)));
-    o.lines.forEach(l => l.values.forEach(v => v != null && all.push(v)));
-    const f = frame(o.height || 200, Math.max(1, ...all));
-    const n = o.labels.length, step = (f.W - f.L - f.R) / n, cx = (i) => f.L + step * i + step / 2;
-    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="${esc(o.label)}">`, ...f.s];
-    let prev = Array(n).fill(0);
-    o.layers.forEach(l => {
-      const idx = l.top.map((v, i) => (v != null ? i : -1)).filter(i => i >= 0);
-      if (idx.length >= 2) {
-        const pts = idx.map(i => cx(i).toFixed(1) + "," + f.y(l.top[i]).toFixed(1)).concat(idx.slice().reverse().map(i => cx(i).toFixed(1) + "," + f.y(prev[i]).toFixed(1)));
-        s.push(`<polygon points="${pts.join(" ")}" fill="${l.fill}" stroke="${l.col}" stroke-width="0.8"/>`);
-      } else if (idx.length === 1) {
-        const i = idx[0]; s.push(`<rect x="${(cx(i) - 3).toFixed(1)}" y="${f.y(l.top[i]).toFixed(1)}" width="6" height="${(f.y(prev[i]) - f.y(l.top[i])).toFixed(1)}" fill="${l.fill}"/>`);
-      }
-      prev = prev.map((v, i) => (l.top[i] != null ? l.top[i] : v));
-    });
-    o.lines.forEach(l => {
-      let seg = [];
-      const flush = () => { if (seg.length > 1) s.push(`<polyline points="${seg.join(" ")}" fill="none" stroke="${l.color}" stroke-width="${l.width || 1.5}" ${l.dash ? `stroke-dasharray="${l.dash}"` : ""} stroke-linejoin="round"/>`); seg = []; };
-      l.values.forEach((v, i) => { if (v == null) flush(); else seg.push(cx(i).toFixed(1) + "," + f.y(v).toFixed(1)); });
-      flush();
-    });
-    if (o.marker != null && o.marker >= 0 && o.marker < n - 1) s.push(marker(f, f.L + step * (o.marker + 1)));
-    o.labels.forEach((t, i) => s.push(`<text x="${cx(i).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(t)}</text>`));
+  /* ---------- ホバーの内訳（ツールチップ） ---------- */
+  let TIPS = [], gid = 0;
+  const tipId = (html) => (TIPS.push(html), TIPS.length - 1);
+  const sw = (c, hatch) => `<i class="yj-sw" style="${hatch ? `border:1px solid ${c};background:repeating-linear-gradient(135deg,${c} 0 1.5px,#fff 1.5px 4px)` : `background:${c}`}"></i>`;
+  const trow = (lab, a, b, d) => `<div class="r"><span>${lab}</span><span>${a}</span><span>${b == null ? "" : b}</span>${d === undefined ? "<span></span>" : `<span class="${d < 0 ? "t-err" : "t-ok"}">${sman(d)}</span>`}</div>`;
+  const tsep = `<hr>`;
+  // 透明な当たり判定（data-yjh：内訳の番号、data-g / data-gx：縦ガイド）
+  const hit = (x, y, w, h, id, g, gx) => `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(1, w).toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" fill="transparent" data-yjh="${id}"${g ? ` data-g="${g}" data-gx="${gx.toFixed(1)}"` : ""}/>`;
+
+  // ① 売上の累計（区分ごとの積み上げ面＋計画線）
+  function salesChart(o) {
+    const { d, keys, plan, pipe, labels } = o;
+    const n = 12, cur = d.cur;
+    const tops = [];
+    let base = Array(n).fill(0);
+    keys.forEach(k => { const t = base.map((v, i) => v + o.act[k][i]); tops.push({ k, bot: base, top: t }); base = t; });
+    const withPipe = base.map((v, i) => v + pipe[i]);
+    const f = frame(o.height || 200, Math.max(1, ...withPipe, ...plan) * 1.05);
+    const step = (f.W - f.L - f.R) / n, cx = (i) => f.L + step * i + step / 2;
+    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="売上の累計">`, ...f.s];
+    const poly = (top, bot, col, op, a, b) => {
+      if (b - a < 1) return;
+      const idx = []; for (let i = a; i < b; i++) idx.push(i);
+      if (idx.length === 1) { const i = idx[0]; s.push(`<rect x="${(cx(i) - 3).toFixed(1)}" y="${f.y(top[i]).toFixed(1)}" width="6" height="${Math.max(0, f.y(bot[i]) - f.y(top[i])).toFixed(1)}" fill="${col}" fill-opacity="${op}"/>`); return; }
+      const pts = idx.map(i => cx(i).toFixed(1) + "," + f.y(top[i]).toFixed(1)).concat(idx.slice().reverse().map(i => cx(i).toFixed(1) + "," + f.y(bot[i]).toFixed(1)));
+      s.push(`<polygon points="${pts.join(" ")}" fill="${col}" fill-opacity="${op}"/>`);
+    };
+    tops.forEach(t => { poly(t.top, t.bot, CAT[t.k].col, 0.85, 0, cur); poly(t.top, t.bot, CAT[t.k].col, 0.25, Math.max(0, cur - 1), n); });
+    const pc = o.lineColor;
+    s.push(`<polyline points="${plan.map((v, i) => cx(i).toFixed(1) + "," + f.y(v).toFixed(1)).join(" ")}" fill="none" stroke="${pc}" stroke-width="1.6" stroke-dasharray="4 3"/>`);
+    if (cur < n && pipe[n - 1]) s.push(`<polyline points="${withPipe.map((v, i) => cx(i).toFixed(1) + "," + f.y(v).toFixed(1)).slice(Math.max(0, cur - 1)).join(" ")}" fill="none" stroke="${pc}" stroke-width="1.6" stroke-dasharray="1.5 2.5"/>`);
+    if (cur > 0 && cur < n) s.push(marker(f, f.L + step * cur));
+    labels.forEach((t, i) => s.push(`<text x="${cx(i).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(t)}</text>`));
+    const g = "yjg" + (++gid);
+    s.push(`<line id="${g}" x1="0" x2="0" y1="${f.T}" y2="${f.H - f.B}" stroke="${COL.ink}" stroke-opacity="0.45" visibility="hidden" pointer-events="none"/>`);
+    for (let i = 0; i < n; i++) s.push(hit(f.L + step * i, 0, step, f.H - f.B, o.tip(i), g, cx(i)));
     s.push("</svg>");
     return s.join("");
   }
 
-  // 月別の棒（原価・販管費）＋計画の横線
+  // ② 月別の原価＋販管費（積み上げ）と計画の横線
   function costChart(o) {
-    const all = [];
-    o.bars.forEach(b => { b.values.forEach(v => all.push(v || 0)); b.plan.forEach(v => all.push(v || 0)); });
-    const f = frame(o.height || 190, Math.max(1, ...all));
-    const n = o.labels.length, step = (f.W - f.L - f.R) / n, bw = step * 0.36;
-    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="${esc(o.label)}">`, ...f.s];
-    o.bars.forEach((b, bi) => {
-      b.values.forEach((v, i) => {
-        const x = f.L + step * i + step * 0.14 + bw * bi, y0 = f.y(0), y1 = f.y(v || 0), h = Math.max(1, y0 - y1);
-        const fc = i >= o.cur;
-        const fill = fc ? "#FFFFFF" : (b.spike[i] ? COL.spike : b.color);
-        s.push(`<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${fill}" ${fc ? `stroke="${b.color}" stroke-width="1" stroke-dasharray="2 1.5"` : ""}><title>${esc(o.labels[i])}月 ${b.name}：${yen(v)}円（計画 ${yen(b.plan[i])}円${b.plan[i] ? "、" + Math.round((v || 0) / b.plan[i] * 100) + "%" : ""}）</title></rect>`);
-        const py = f.y(b.plan[i] || 0);
-        s.push(`<line x1="${(x - 1).toFixed(1)}" x2="${(x + bw + 1).toFixed(1)}" y1="${py.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#1B2430" stroke-width="1.6"/>`);
-      });
-    });
-    if (o.cur > 0 && o.cur < n) s.push(marker(f, f.L + step * o.cur));
-    o.labels.forEach((t, i) => s.push(`<text x="${(f.L + step * i + step / 2).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(t)}</text>`));
+    const { d, labels } = o, n = 12;
+    const tot = d.mc.map((v, i) => (v || 0) + (d.mg[i] || 0)), pt = d.pC.map((v, i) => (v || 0) + (d.pG[i] || 0));
+    const f = frame(o.height || 180, Math.max(1, ...tot, ...pt) * 1.05);
+    const step = (f.W - f.L - f.R) / n, bw = Math.min(16, step * 0.55);
+    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="原価・販管費の月別">`, ...f.s];
+    for (let i = 0; i < n; i++) {
+      const x = f.L + step * i + (step - bw) / 2, fc = i >= d.cur, op = fc ? 0.3 : 1;
+      const c = d.mc[i] || 0, g = d.mg[i] || 0, y0 = f.y(0), y1 = f.y(c), y2 = f.y(c + g);
+      if (c) s.push(`<rect x="${x.toFixed(1)}" y="${(y1 + 0.5).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 0.5).toFixed(1)}" rx="1.5" fill="${o.spC[i] ? COL.spike : COL.cogs}" fill-opacity="${op}"/>`);
+      if (g) s.push(`<rect x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y1 - y2 - 1).toFixed(1)}" rx="1.5" fill="${o.spG[i] ? COL.spike : COL.sga}" fill-opacity="${op}"/>`);
+      const py = f.y(pt[i]);
+      s.push(`<line x1="${(x - 2).toFixed(1)}" x2="${(x + bw + 2).toFixed(1)}" y1="${py.toFixed(1)}" y2="${py.toFixed(1)}" stroke="${COL.ink}" stroke-width="1.6"/>`);
+      s.push(`<text x="${(x + bw / 2).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(labels[i])}</text>`);
+      s.push(hit(f.L + step * i, 0, step, f.H - f.B, o.tip(i)));
+    }
+    if (d.cur > 0 && d.cur < n) s.push(marker(f, f.L + step * d.cur));
     s.push("</svg>");
     return s.join("");
   }
 
-  // 年度末の着地（計画／受注確定ベース／着地見込み × 売上・コスト）
+  // ③ 年度末の着地（計画／受注確定ベース／着地見込み × 売上・コスト）
   function landingChart(o) {
     const groups = o.groups, all = [];
     groups.forEach(g => { all.push(sum(g.rev.map(x => x.v)), sum(g.cost.map(x => x.v))); });
-    const f = frame(o.height || 220, Math.max(1, ...all) * 1.12);
+    const f = frame(o.height || 200, Math.max(1, ...all) * 1.15);
     const n = groups.length, step = (f.W - f.L - f.R) / n, bw = step * 0.3;
     const pat = (id, c) => `<pattern id="${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#FFFFFF"/><line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="2.2"/></pattern>`;
-    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="${esc(o.label)}">`,
+    const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="年度末の着地">`,
       `<defs>${pat("yjHf", COL.firm)}${pat("yjHc", COL.cogs)}${pat("yjHg", COL.sga)}</defs>`, ...f.s];
     groups.forEach((g, gi) => {
-      [["rev", 0.12], ["cost", 0.12 + 0.3 + 0.04]].forEach(([k, off]) => {
+      [["rev", 0.12, "売上"], ["cost", 0.12 + 0.3 + 0.04, "コスト"]].forEach(([k, off, nm]) => {
         let base = 0;
         const x = f.L + step * gi + step * off;
         g[k].forEach(seg => {
           if (!seg.v) return;
           const y1 = f.y(base + seg.v), y0 = f.y(base);
-          s.push(`<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1).toFixed(1)}" fill="${seg.hatch ? `url(#${seg.hatch})` : seg.color}" ${seg.hatch ? `stroke="${seg.color}" stroke-width="0.8"` : ""}><title>${esc(seg.name)}：${yen(seg.v)}円</title></rect>`);
+          s.push(`<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 0.5).toFixed(1)}" fill="${seg.hatch ? `url(#${seg.hatch})` : seg.color}" ${seg.hatch ? `stroke="${seg.color}" stroke-width="0.8"` : ""}/>`);
           base += seg.v;
         });
+        const rows = g[k].filter(x => x.v).slice().reverse().map(x => trow(sw(x.color, !!x.hatch) + esc(x.name), man(x.v))).join("");
+        const id = tipId(`<div class="t">${esc(g.label)}・${nm}</div>${rows}${tsep}${trow("<b>合計</b>", "<b>" + man(base) + "</b>")}`);
+        s.push(hit(x, f.y(base), bw, f.y(0) - f.y(base), id));
       });
       const top = f.y(Math.max(sum(g.rev.map(x => x.v)), sum(g.cost.map(x => x.v))));
       const cx = f.L + step * gi + step / 2;
-      s.push(`<text x="${cx.toFixed(1)}" y="${(top - 14).toFixed(1)}" font-size="10.5" font-weight="700" text-anchor="middle" fill="${g.ok ? COL.ok : COL.bad}">${g.m.toFixed(1)}%</text>`);
-      s.push(`<text x="${cx.toFixed(1)}" y="${(top - 3).toFixed(1)}" font-size="8" text-anchor="middle" fill="${COL.muted}">営業利益 ${tick(g.op)}</text>`);
+      s.push(`<text x="${cx.toFixed(1)}" y="${(top - 5).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="${g.ok ? COL.ok : COL.bad}">${g.m.toFixed(1)}%</text>`);
       s.push(`<text x="${cx.toFixed(1)}" y="${f.H - 7}" font-size="10" text-anchor="middle" fill="${COL.muted}">${esc(g.label)}</text>`);
     });
     s.push("</svg>");
@@ -230,145 +242,136 @@
   /* ---------- 画面 ---------- */
   let last = null; // 最後に描いた文脈（条件変更時の再描画用）
   const lgBox = (c) => `<i class="lg" style="background:${c}"></i>`;
-  const lgLine = (c, dash) => `<i class="lg lg-line" style="border-top:2px ${dash ? "dashed" : "solid"} ${c}"></i>`;
+  const lgLine = (c, style) => `<i class="lg lg-line" style="border-top:2px ${style || "solid"} ${c}"></i>`;
   const lgHatch = (c) => `<i class="lg" style="border:1px solid ${c};background:repeating-linear-gradient(135deg,${c} 0 1.5px,#fff 1.5px 4px)"></i>`;
   const badge = (kind, t) => `<span class="yj-st yj-${kind}">${esc(t)}</span>`;
+  const rateCls = (r) => (r == null ? "" : r >= 97 ? "yj-ok" : r >= 90 ? "yj-warn" : "yj-bad");
 
+  // 実績・見込みの範囲（1行）と、データの注意だけを出す
   function info(c, d) {
-    return `<section class="card yj-ctl">
-  <div class="card-head"><h2>実績と見込み</h2></div>
-  <p class="muted small">${d.cur ? `${d.last.slice(0, 4)}年${Number(d.last.slice(5))}月まで実績確定（${d.cur}/12か月）。残り${d.r}か月は見込みです。` : "確定した実績はまだありません。12か月すべてが見込みです。"}<br>${d.byMark ? `確定月は ${esc((c.confirmedSheets || []).map(x => x.name + "（" + x.p.slice(0, 4) + "/" + Number(x.p.slice(5)) + "）").join("・"))} の4行目の印から判定しています。` : "月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。確定した月の4行目に印（●など）を入れてください。"}<br>見込み月の売上は月次PLの「売上高」（受注確定）と「パイプライン」の行、原価・販管費は月次PLの値（空欄なら計画シートの値）を使います。パイプラインの原価は売上原価の下の「パイプライン」の行（開発(既存)・開発(新規)）を使います${d.pipe ? `（パイプライン ${yen(d.pipe)}円に対して原価 ${yen(d.cPipe)}円、原価率 ${(d.cPipe / d.pipe * 100).toFixed(1)}%）` : ""}。</p>
-  ${d.pipeNoCost.length ? `<p class="small t-amber">パイプラインの売上があるのに原価が入っていない月があります（${d.pipeNoCost.map(i => Number(d.months[i].slice(5)) + "月").join("・")}）。外注などがなければこのままで構いません。</p>` : ""}
-</section>`;
+    const notes = [];
+    if (!d.byMark) notes.push("月次PL／月次BSの4行目に印がないため、データのある最新月までを実績にしています。");
+    if (d.pipeNoCost.length) notes.push(`パイプラインの原価が未入力の月：${d.pipeNoCost.map(i => Number(d.months[i].slice(5)) + "月").join("・")}`);
+    return `<p class="yj-line">${d.cur ? `${Number(d.last.slice(5))}月まで実績（${d.cur}/12）・残り${d.r}か月は見込み` : "実績はまだありません（12か月すべて見込み）"}</p>
+${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")}</p>` : ""}`;
   }
 
   function body(c, d) {
-    const p = c.p, M = c.M, labels = d.months.map(q => String(Number(q.slice(5)))), j = d.cur - 1;
-    const open = (k) => (p.open[k] ? "open" : "");
-    const A = (arr, act) => arr.map((v, i) => (act ? (i < d.cur ? v : null) : (i >= Math.max(0, d.cur - 1) ? v : null)));
-    // ① 売上
-    const on = KEYS.filter(k => p.sel[k] && d.hasSeg), off = KEYS.filter(k => !on.includes(k));
-    const planOf = { m: d.planM, e: d.planE, n: d.planN };
-    const layersDef = on.map(k => ({ name: CAT[k].name, keys: [k], col: CAT[k].col, fill: CAT[k].fill }));
-    if (off.length) layersDef.push({ name: on.length ? "その他（" + off.map(k => CAT[k].name).join("・") + "）" : "売上高", keys: off, col: on.length ? "#8A939C" : CAT.e.col, fill: on.length ? "rgba(138,147,156,0.5)" : "rgba(31,63,110,0.55)" });
-    let run = Array(12).fill(0), runP = Array(12).fill(0);
-    const layers = [], lines = [];
-    layersDef.forEach((ly, li) => {
-      const c1 = cum(d.mon.m.map((_, i) => ly.keys.reduce((t, k) => t + d.mon[k][i], 0)));
-      const cp = cum(d.mon.m.map((_, i) => ly.keys.reduce((t, k) => t + planOf[k][i], 0)));
-      run = run.map((v, i) => v + c1[i]); runP = runP.map((v, i) => v + cp[i]);
-      const top = run.slice(), topP = runP.slice(), lastL = li === layersDef.length - 1;
-      layers.push({ top: A(top, true), col: ly.col, fill: ly.fill });
-      if (d.r > 0) lines.push({ values: A(top, false), color: lastL ? COL.fc : ly.col, width: lastL ? 2.2 : 1.3, dash: "5 3" });
-      lines.push({ values: topP, color: COL.plan, width: lastL ? 1.5 : 1, dash: "2 2" });
-    });
-    // 着地見込み（受注確定＋パイプライン）の線
-    const pipeMon = d.mon.m.map((_, i) => d.pmon.m[i] + d.pmon.e[i] + d.pmon.n[i]);
-    const land = run.map((v, i) => v + cum(pipeMon)[i]);
-    if (d.r > 0 && d.pipe) lines.push({ values: A(land, false), color: COL.pipe, width: 2.2, dash: "1.5 2.5" });
-    const endF = run[11], end = land[11], goal = d.PR, gap = goal - end, gapF = goal - endF, pNow = d.cur ? runP[j] : 0;
-    const st1 = gap <= 0 ? badge(gapF <= 0 ? "ok" : "warn", gapF <= 0 ? "受注確定で達成" : "パイプライン込みで達成") : badge(gap < goal * 0.06 ? "warn" : "bad", "不足 " + yen(gap) + "円");
-    const segBtns = d.hasSeg
-      ? `<div class="toggles" role="group" aria-label="色分け">${KEYS.map(k => `<button type="button" class="tgl ${p.sel[k] ? "on" : ""}" data-yact="sel" data-k="${k}" aria-pressed="${!!p.sel[k]}">${CAT[k].name}</button>`).join("")}</div>`
-      : `<p class="muted small">保守・開発（既存）・開発（新規）で色分けするには、計画シートと月次PLの売上高の下に「保守」「開発(既存)」「開発(新規)」の行を追加してください。</p>`;
+    TIPS = [];
+    const p = c.p, labels = d.months.map(q => String(Number(q.slice(5)))), j = d.cur - 1;
     const mlab = (i) => labels[i] + "月";
+    const when = (i) => (i < d.cur ? "実績" : "見込み");
+    const open = (k) => (p.open[k] ? "open" : "");
+
+    // ① 売上（全体・保守・開発（既存）・開発（新規）それぞれの予実）
+    const planOf = { m: d.planM, e: d.planE, n: d.planN };
+    const act = {}, pip = {}, pln = {};
+    KEYS.forEach(k => { act[k] = cum(d.mon[k]); pip[k] = cum(d.pmon[k]); pln[k] = cum(planOf[k]); });
+    const sumK = (o, i) => KEYS.reduce((t, k) => t + o[k][i], 0);
+    act.all = act.m.map((_, i) => sumK(act, i)); pip.all = pip.m.map((_, i) => sumK(pip, i)); pln.all = cum(d.pS);
+    const seg = d.hasSeg && ["all", "m", "e", "n"].includes(p.seg) ? p.seg : "all";
+    const nameOf = (k) => (k === "all" ? (d.hasSeg ? "全体" : "売上高") : CAT[k].name);
+    const stat = (k) => {
+      const a = d.cur ? act[k][j] : 0, pn = d.cur ? pln[k][j] : 0, endF = act[k][11], end = endF + pip[k][11], plan = pln[k][11];
+      return { a, pn, r: pn ? a / pn * 100 : null, endF, end, plan, gap: plan - end, gapF: plan - endF };
+    };
+    const st = stat(seg);
+    const st1 = st.gap <= 0 ? badge(st.gapF <= 0 ? "ok" : "warn", st.gapF <= 0 ? "受注確定で達成" : "パイプライン込みで達成") : badge(st.gap < st.plan * 0.06 ? "warn" : "bad", "不足 " + man(st.gap));
+    const tiles = d.hasSeg ? `<div class="yj-tiles" role="group" aria-label="区分">${["all", ...KEYS].map(k => {
+      const x = stat(k), rc = rateCls(x.r);
+      return `<button type="button" class="yj-tile ${seg === k ? "on" : ""}" data-yact="seg" data-k="${k}" aria-pressed="${seg === k}">
+        <span class="yj-tn">${k === "all" ? "" : lgBox(CAT[k].col)}${esc(k === "all" ? "全体" : CAT[k].short)}</span>
+        <span class="yj-tv">${d.cur ? man(x.a) : man(x.end)}</span>
+        <span class="yj-tr ${rc}">${x.r == null ? (d.cur ? "—" : "計画比 " + (x.plan ? Math.round(x.end / x.plan * 100) + "%" : "—")) : Math.round(x.r) + "%"}</span>
+        <span class="yj-bar"><b class="${rc}" style="width:${x.r == null ? 0 : Math.min(100, x.r).toFixed(0)}%"></b></span></button>`;
+    }).join("")}</div>` : "";
+    const keys = seg === "all" ? KEYS : [seg];
+    const lineColor = seg === "all" ? COL.muted : CAT[seg].col;
+    const rowsOf = seg === "all" && d.hasSeg ? ["n", "e", "m"] : [];
+    const tip1 = (i) => {
+      const rw = (k) => { const a = act[k][i] + pip[k][i], pl = pln[k][i]; return trow(k === "all" ? "<b>" + esc(nameOf(k)) + "</b>" : sw(CAT[k].col) + esc(CAT[k].name), man(a), man(pl), a - pl); };
+      const pp = pip[seg][i];
+      return tipId(`<div class="t">${mlab(i)} 累計（${when(i)}）<span class="yj-th">実績 / 計画　差</span></div>${rowsOf.map(rw).join("")}${rowsOf.length ? tsep : ""}${rw(seg)}${pp ? `<div class="yj-tn2">うちパイプライン ${man(pp)}</div>` : ""}`);
+    };
     const segNotes = [];
-    if (d.hasSeg && d.actMissing.length) segNotes.push(`月次PLに内訳がない月（${d.actMissing.map(mlab).join("・")}）は、売上高をすべて開発（既存）として表示しています。`);
-    if (d.actDiff.length) segNotes.push(`月次PLの内訳の合計が売上高と合わない月があります（${d.actDiff.map(x => mlab(x.i) + " " + sgn(x.v) + "円").join("、")}）。差は開発（既存）に含めて表示しています。`);
-    if (d.planDiff.length) segNotes.push(`計画シートの内訳の合計が売上高と合わない月があります（${d.planDiff.map(x => mlab(x.i) + " " + sgn(x.v) + "円").join("、")}）。`);
-    const catCards = d.hasSeg ? KEYS.map(k => {
-      const cm = cum(d.mon[k]), a = d.cur ? cm[j] : 0, pn = d.cur ? sum(planOf[k].slice(0, d.cur)) : 0, an = sum(planOf[k]), ef = cm[11];
-      const r = pn ? a / pn * 100 : null, pp = sum(d.pmon[k]), need = d.r > 0 ? Math.max(0, (an - ef - pp) / d.r) : 0;
-      return `<div class="yj-cat"><div class="strong">${lgBox(CAT[k].col)} ${CAT[k].name}</div>
-        <div class="yj-kv"><span>実績累計</span><b>${yen(a)}円</b></div>
-        <div class="yj-kv"><span>同月計画</span><b>${yen(pn)}円</b></div>
-        <div class="yj-kv"><span>計画比</span><b class="${r == null ? "" : r >= 97 ? "up-good" : "up-bad"}">${r == null ? "—" : r.toFixed(1) + "%"}</b></div>
-        <div class="yj-kv"><span>年度末（受注確定）</span><b>${yen(ef)}円</b></div>
-        <div class="yj-kv"><span>パイプライン</span><b>${yen(pp)}円</b></div>
-        <div class="yj-kv"><span>年間計画</span><b>${yen(an)}円</b></div>
-        <div class="yj-kv"><span>不足（上積み必要）／月</span><b>${yen(need)}円</b></div></div>`;
-    }).join("") : "";
-    const sec1 = `<section class="card">
+    if (d.hasSeg && d.actMissing.length) segNotes.push(`内訳がない月（${d.actMissing.map(mlab).join("・")}）は開発（既存）に含めています。`);
+    if (d.actDiff.length) segNotes.push(`月次PLの内訳と売上高の差（${d.actDiff.map(x => mlab(x.i) + " " + sman(x.v)).join("、")}）は開発（既存）に含めています。`);
+    if (d.planDiff.length) segNotes.push(`計画シートの内訳と売上高に差があります（${d.planDiff.map(x => mlab(x.i) + " " + sman(x.v)).join("、")}）。`);
+    const lg1 = (seg === "all" ? (d.hasSeg ? KEYS.map(k => `<span>${lgBox(CAT[k].col)}${CAT[k].name}</span>`).join("") : `<span>${lgBox(CAT.e.col)}実績</span>`) : `<span>${lgBox(CAT[seg].col)}実績</span>`)
+      + (d.r > 0 ? `<span><i class="lg" style="background:${seg === "all" ? CAT.e.col : CAT[seg].col};opacity:.3"></i>受注確定</span>` : "")
+      + (d.r > 0 && pip[seg][11] ? `<span>${lgLine(lineColor, "dotted")}パイプライン込み</span>` : "")
+      + `<span>${lgLine(lineColor, "dashed")}計画</span>`;
+    const sec1 = `<section class="card yj-sec">
   <div class="card-head"><h2>① 売上</h2>${st1}</div>
-  <p class="muted small">目的：売上目標（${yen(goal)}円）を達成する。計画どおり積み上がっているか。</p>
-  ${segBtns}
+  ${tiles}
+  <div class="yj-sum"><span>${d.cur ? `${mlab(j)}まで ${man(st.a)} / 計画 ${man(st.pn)}` : "実績なし"}</span><span>年度末 ${man(st.end)} / ${man(st.plan)}</span></div>
+  ${salesChart({ d, keys, act, plan: pln[seg], pipe: pip[seg], labels, lineColor, tip: tip1 })}
+  <div class="legend">${lg1}</div>
+  ${!d.hasSeg ? `<p class="muted small">区分（保守・開発(既存)・開発(新規)）で見るには、計画シートと月次PLの売上高の下にその行を追加してください。</p>` : ""}
   ${segNotes.length ? `<p class="small t-amber">${segNotes.map(esc).join("<br>")}</p>` : ""}
-  ${areaChart({ label: "売上の累計", labels, layers, lines, marker: d.r > 0 ? j : null })}
-  <div class="legend">${layersDef.map(l => `<span>${lgBox(l.col)}${esc(l.name)}</span>`).join("")}${d.r > 0 ? `<span>${lgLine(COL.fc, true)}受注確定（見込み）</span>` : ""}${d.r > 0 && d.pipe ? `<span><i class="lg lg-line" style="border-top:2px dotted ${COL.pipe}"></i>パイプライン込み</span>` : ""}<span>${lgLine(COL.plan, true)}計画</span></div>
-  <div class="yj-box yj-${gap > 0 ? "warn" : "ok"}">現時点 <b>${yen(d.cur ? run[j] : 0)}円</b>（同月計画 ${yen(pNow)}円の <b>${pNow ? Math.round((d.cur ? run[j] : 0) / pNow * 100) : "—"}%</b>）<br>年度末　受注確定 <b>${yen(endF)}円</b>／パイプライン込み <b>${yen(end)}円</b>${gap > 0 ? (d.r > 0 ? `<br>→ パイプラインを含めても <b>あと${yen(gap)}円</b>（残り${d.r}か月、月 +${yen(gap / d.r)}円）の上積みが必要` : `<br>→ 目標に ${yen(gap)}円 届きませんでした`) : gapF > 0 ? "<br>→ パイプラインの受注で目標達成（受注確定だけでは " + yen(gapF) + "円 不足）" : "<br>→ 受注確定だけで目標達成"}</div>
-  ${d.hasSeg ? `<details data-yjd="cat" ${open("cat")}><summary>区分別の詳細（保守・開発（既存）・開発（新規））</summary><div class="yj-cats">${catCards}</div><p class="muted small">実績・受注確定・パイプラインは月次PL、計画は計画シートの「保守」「開発(既存)」「開発(新規)」の行から読みます。</p></details>` : ""}
+  <div class="yj-tip" hidden></div>
 </section>`;
 
-    // ② コスト
+    // ② コスト（その月までの累計実績が計画の累計の○%を超えた実績月を突発とする）
     const sp = p.sp;
-    // その月までの累計実績 ÷ 計画の累計 が設定値（%）を超えた実績月を突発とする
     const cA = { c: cum(d.mc), g: cum(d.mg) }, cP = { c: cum(d.pC), g: cum(d.pG) };
     const isSp = (a, pl, pc) => a > 0 && a > pl * pc / 100;
     const spC = d.mc.map((_, i) => i < d.cur && isSp(cA.c[i], cP.c[i], sp.cp));
     const spG = d.mg.map((_, i) => i < d.cur && isSp(cA.g[i], cP.g[i], sp.sp));
-    const list = [];
-    for (let i = 0; i < d.cur; i++) {
-      const pr = (a, b) => (b ? (a / b * 100).toFixed(1) + "%" : "計画0円");
-      if (spC[i]) list.push(`${labels[i]}月 原価 累計${yen(cA.c[i])}円（計画累計 ${yen(cP.c[i])}円の${pr(cA.c[i], cP.c[i])}、${sgn(cA.c[i] - cP.c[i])}円）`);
-      if (spG[i]) list.push(`${labels[i]}月 販管費 累計${yen(cA.g[i])}円（計画累計 ${yen(cP.g[i])}円の${pr(cA.g[i], cP.g[i])}、${sgn(cA.g[i] - cP.g[i])}円）`);
-    }
+    const nSp = spC.filter(Boolean).length + spG.filter(Boolean).length;
     const sC = d.cAct, sCP = sum(d.pC.slice(0, d.cur)), sG = d.gAct, sGP = sum(d.pG.slice(0, d.cur));
     const over = (sCP && sC > sCP * 1.05) || (sGP && sG > sGP * 1.05);
-    const k2 = list.length ? "bad" : over ? "warn" : "ok";
-    const rt = (a, b) => (b ? (a / b * 100).toFixed(1) + "%" : "—");
-    const sec2 = `<section class="card">
-  <div class="card-head"><h2>② コスト（原価・販管費）</h2>${badge(k2, list.length ? "突発 " + list.length + "件" : over ? "計画超過" : "計画内")}</div>
-  <p class="muted small">目的：費用を計画の範囲内に収める。計画どおりか、突発が発生していないか。</p>
-  ${costChart({ label: "原価・販管費の月別", labels, cur: d.cur, bars: [{ name: "原価", color: COL.cogs, values: d.mc, plan: d.pC, spike: spC }, { name: "販管費", color: COL.sga, values: d.mg, plan: d.pG, spike: spG }] })}
-  <div class="legend"><span>${lgBox(COL.cogs)}原価</span><span>${lgBox(COL.sga)}販管費</span><span>${lgBox(COL.spike)}突発</span><span><i class="lg" style="border:1px dashed ${COL.cogs};background:#fff"></i>見込み</span><span>${lgLine("#1B2430")}計画</span></div>
-  <div class="yj-box yj-${k2}">累計　原価 <b>${yen(sC)}円</b>／計画 ${yen(sCP)}円（${rt(sC, sCP)}）<br>販管費 <b>${yen(sG)}円</b>／計画 ${yen(sGP)}円（${rt(sG, sGP)}）<br>${list.length ? "<b>突発</b>：" + list.map(esc).join("、") : "突発なし"}</div>
+    const k2 = nSp ? "bad" : over ? "warn" : "ok";
+    const pct = (a, b) => (b ? Math.round(a / b * 100) + "%" : "—");
+    const tip2 = (i) => {
+      const t = (d.mc[i] || 0) + (d.mg[i] || 0), pt = (d.pC[i] || 0) + (d.pG[i] || 0);
+      const spk = [];
+      if (spC[i]) spk.push(`原価の累計が計画累計の${pct(cA.c[i], cP.c[i])}（基準${sp.cp}%）`);
+      if (spG[i]) spk.push(`販管費の累計が計画累計の${pct(cA.g[i], cP.g[i])}（基準${sp.sp}%）`);
+      return tipId(`<div class="t">${mlab(i)}（${when(i)}）${spk.length ? ' <span class="t-err">突発</span>' : ""}<span class="yj-th">${when(i)} / 計画　差</span></div>`
+        + trow(sw(spG[i] ? COL.spike : COL.sga) + "販管費", man(d.mg[i]), man(d.pG[i]), (d.mg[i] || 0) - (d.pG[i] || 0))
+        + trow(sw(spC[i] ? COL.spike : COL.cogs) + "原価", man(d.mc[i]), man(d.pC[i]), (d.mc[i] || 0) - (d.pC[i] || 0))
+        + tsep + trow("<b>合計</b>", "<b>" + man(t) + "</b>", man(pt), t - pt)
+        + (i < d.cur ? `<div class="yj-tn2">累計の計画比　原価 ${pct(cA.c[i], cP.c[i])}・販管費 ${pct(cA.g[i], cP.g[i])}</div>` : "")
+        + (spk.length ? `<div class="t-err yj-tn2">${spk.join("<br>")}</div>` : ""));
+    };
+    const sec2 = `<section class="card yj-sec">
+  <div class="card-head"><h2>② コスト</h2>${badge(k2, nSp ? "突発 " + nSp + "件" : over ? "計画超過" : "計画内")}</div>
+  <div class="yj-sum"><span>${d.cur ? `${mlab(j)}まで ${man(sC + sG)} / 計画 ${man(sCP + sGP)}（${pct(sC + sG, sCP + sGP)}）` : "実績なし"}</span></div>
+  ${costChart({ d, labels, spC, spG, tip: tip2 })}
+  <div class="legend"><span>${lgBox(COL.cogs)}原価</span><span>${lgBox(COL.sga)}販管費</span><span>${lgBox(COL.spike)}突発</span><span>${lgLine(COL.ink)}計画</span></div>
   <details data-yjd="spk" ${open("spk")}><summary>突発の条件</summary>
-    <div class="yj-spk yj-spk2"><span></span><span>計画比（%超）</span>
-    <span>原価</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
-    <span>販管費</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div>
-    <div class="yj-cumtbl"><div class="yj-ctr yj-cth"><span>月</span><span>原価 累計（計画比）</span><span>販管費 累計（計画比）</span></div>${Array.from({ length: d.cur }, (_, i) => `<div class="yj-ctr"><span>${labels[i]}月</span><span class="${spC[i] ? "t-err" : ""}">${yen(cA.c[i])}円（${cP.c[i] ? (cA.c[i] / cP.c[i] * 100).toFixed(1) + "%" : "—"}）</span><span class="${spG[i] ? "t-err" : ""}">${yen(cA.g[i])}円（${cP.g[i] ? (cA.g[i] / cP.g[i] * 100).toFixed(1) + "%" : "—"}）</span></div>`).join("")}</div>
-    <p class="muted small">各月で、<b>その月までの累計実績</b>が<b>計画の累計</b>の○%を超えたら、その月を突発として赤で示します（計画の累計が0円のときは、実績があれば突発）。</p></details>
+    <div class="yj-spk yj-spk2"><span>原価（計画累計の%超）</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
+    <span>販管費（計画累計の%超）</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div></details>
+  <div class="yj-tip" hidden></div>
 </section>`;
 
     // ③ 利益率（年度末の着地）
     const tgtP = p.tgt, okOf = (m) => m >= tgtP;
     const groups = [
-      { label: "計画", m: d.mP, ok: okOf(d.mP), op: d.PR - d.PC - d.PG, rev: [{ name: "計画売上", v: d.PR, color: COL.planBar }], cost: [{ name: "原価（計画）", v: d.PC, color: COL.cogs }, { name: "販管費（計画）", v: d.PG, color: COL.sga }] },
-      { label: "受注確定ベース", m: d.m1, ok: okOf(d.m1), op: d.R1 - d.C1 - d.S, rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定（見込み月）", v: d.firm, color: COL.firm }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価見込み", v: d.C1 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] },
-      { label: "着地見込み", m: d.m2, ok: okOf(d.m2), op: d.R2 - d.C2 - d.S, rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定（見込み月）", v: d.firm, color: COL.firm }, { name: "パイプライン", v: d.pipe, color: COL.firm, hatch: "yjHf" }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価見込み", v: d.C2 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] }
+      { label: "計画", m: d.mP, ok: okOf(d.mP), rev: [{ name: "計画売上", v: d.PR, color: COL.planBar }], cost: [{ name: "原価", v: d.PC, color: COL.cogs }, { name: "販管費", v: d.PG, color: COL.sga }] },
+      { label: "受注確定", m: d.m1, ok: okOf(d.m1), rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定", v: d.firm, color: COL.firm }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価 見込み", v: d.C1 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費 見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] },
+      { label: "着地見込み", m: d.m2, ok: okOf(d.m2), rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定", v: d.firm, color: COL.firm }, { name: "パイプライン", v: d.pipe, color: COL.firm, hatch: "yjHf" }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価 見込み", v: d.C2 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費 見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] }
     ];
-    const ok = okOf(d.m2);
-    const k3 = ok ? (okOf(d.m1) ? "ok" : "warn") : "bad";
+    const ok = okOf(d.m2), k3 = ok ? (okOf(d.m1) ? "ok" : "warn") : "bad";
     // 目標に届かないときの上積み額（計画の原価率で受注した場合）
     const kk = 1 - d.cr - d.taxK - d.tg / 1.1, add = kk > 0 ? (d.C2 + d.S - d.R2 * (1 - d.taxK - d.tg / 1.1)) / kk : Infinity;
     // パイプライン案件で許容できる原価率の上限
     const allow = (d.R2 - d.S - d.R2 * d.taxK - d.tg * d.R2 / 1.1) - d.C1;
-    let capHtml = "", capK = "ok";
-    if (d.r > 0 && d.pipe > 0) {
-      if (allow <= 0) { capK = "bad"; capHtml = `<b class="yj-big">確保不可</b><span class="small">パイプラインの原価をゼロにしても${tgtP}%に届きません。売上の上積みか費用の見直しが必要です。</span>`; }
-      else {
-        const cap = allow / d.pipe * 100, room = allow - d.cPipe;
-        const now = d.cPipe / d.pipe * 100;
-        capK = now <= cap ? (cap - now < 3 ? "warn" : "ok") : "bad";
-        capHtml = `<b class="yj-big">${cap.toFixed(1)}%</b><div class="yj-meter"><div style="width:${Math.max(0, Math.min(100, cap / 100 * 100)).toFixed(1)}%"></div><i style="left:${Math.min(100, now).toFixed(1)}%"></i></div><span class="small">パイプライン ${yen(d.pipe)}円に対し、外注などの原価は <b>${yen(allow)}円以内</b>。入力済みの原価 ${yen(d.cPipe)}円（${(d.cPipe / d.pipe * 100).toFixed(1)}%）では${room >= 0 ? ` あと <b>${yen(room)}円</b> の余裕` : ` <b>${yen(-room)}円</b> 超過`}。</span>`;
-      }
-    }
-    const sec3 = `<section class="card">
-  <div class="card-head"><h2>③ 利益率（年度末の着地）</h2>${badge(k3, ok ? (okOf(d.m1) ? "受注確定で" + tgtP + "%確保" : "見込み込みで" + tgtP + "%") : "着地 " + d.m2.toFixed(1) + "%")}</div>
-  <p class="muted small">目的：調整後営業利益率（税抜）${tgtP}%以上を確保する。受注確定・パイプラインを含めて達成できるか、計画との乖離。</p>
-  <div class="yj-kpis">
-    <div class="kpi"><span class="kpi-l">受注確定ベース</span><span class="kpi-v ${okOf(d.m1) ? "up-good" : "up-bad"}">${d.m1.toFixed(1)}<small>%</small></span><span class="kpi-c">実績＋受注確定</span></div>
-    <div class="kpi"><span class="kpi-l">着地見込み</span><span class="kpi-v ${ok ? "up-good" : "up-bad"}">${d.m2.toFixed(1)}<small>%</small></span><span class="kpi-c">＋パイプライン</span></div>
-    <div class="kpi"><span class="kpi-l">計画</span><span class="kpi-v">${d.mP.toFixed(1)}<small>%</small></span><span class="kpi-c">計画シート</span></div>
-  </div>
-  ${landingChart({ label: "年度末の着地", groups })}
-  <div class="legend"><span>${lgBox(COL.act)}売上 実績</span><span>${lgBox(COL.firm)}受注確定（見込み月）</span><span>${lgHatch(COL.firm)}パイプライン</span><span>${lgBox(COL.planBar)}計画売上</span><span>${lgBox(COL.cogs)}原価</span><span>${lgHatch(COL.cogs)}原価見込み</span><span>${lgBox(COL.sga)}販管費</span><span>${lgHatch(COL.sga)}販管費見込み</span></div>
-  <div class="yj-box yj-${ok ? "ok" : "bad"}">計画との乖離（年度末）：売上 <b>${sgn(d.R2 - d.PR)}円</b>、コスト <b>${sgn(d.C2 + d.S - d.PC - d.PG)}円</b>、利益率 <b>${(d.m2 - d.mP >= 0 ? "+" : "−") + Math.abs(d.m2 - d.mP).toFixed(1)}pt</b><br>${ok ? (okOf(d.m1) ? `受注確定だけで${tgtP}%を確保` : `着地見込みで${tgtP}%を確保（受注確定ベースは ${d.m1.toFixed(1)}%。パイプライン ${yen(d.pipe)}円の受注が前提）`) : isFinite(add) && d.r > 0 ? `${tgtP}%確保には、パイプラインに加えて <b>あと${yen(add)}円</b> の受注が必要（計画の原価率 ${d.crP.toFixed(1)}%で受注した場合）` : `${tgtP}%に届きません`}</div>
-  ${capHtml ? `<div class="yj-box yj-${capK}"><span class="small">パイプライン案件で許容できる原価率の上限（${tgtP}%確保ライン）</span>${capHtml}</div>` : ""}
-  <details data-yjd="tax" ${open("tax")}><summary>利益率の計算条件</summary>
-    <div class="yj-spk"><span>目標（%）</span><input type="number" class="inp" data-yjc="tgt" value="${p.tgt}" min="0" step="0.5"><span></span>
-    <span>みなし仕入率（%）</span><input type="number" class="inp" data-yjc="mr" value="${p.mr}" min="0" max="90" step="10"><span></span></div>
-    <p class="muted small">調整後営業利益＝営業利益−消費税の納付見込み（売上×10/110×（1−みなし仕入率））。利益率は税抜売上（売上÷1.1）に対する割合です。簡易課税を前提にしています。</p></details>
+    const lines3 = [];
+    if (!ok) lines3.push(isFinite(add) && d.r > 0 ? `${tgtP}%確保には あと <b>${man(add)}円</b> の受注が必要` : `${tgtP}%に届きません`);
+    if (d.r > 0 && d.pipe > 0) lines3.push(allow <= 0 ? `パイプラインの原価をゼロにしても${tgtP}%に届きません` : `パイプラインの原価率の上限 <b>${(allow / d.pipe * 100).toFixed(1)}%</b>（入力済み ${(d.cPipe / d.pipe * 100).toFixed(1)}%）`);
+    const sec3 = `<section class="card yj-sec">
+  <div class="card-head"><h2>③ 利益率（着地）</h2>${badge(k3, "着地 " + d.m2.toFixed(1) + "%")}</div>
+  <div class="yj-sum"><span>目標 ${tgtP}%・受注確定 ${d.m1.toFixed(1)}%・計画 ${d.mP.toFixed(1)}%</span></div>
+  ${landingChart({ groups })}
+  <div class="legend"><span>${lgHatch(COL.muted)}見込み</span></div>
+  ${lines3.length ? `<p class="small yj-line">${lines3.join("<br>")}</p>` : ""}
+  <details data-yjd="tax" ${open("tax")}><summary>利益率の条件</summary>
+    <div class="yj-spk yj-spk2"><span>目標（%）</span><input type="number" class="inp" data-yjc="tgt" value="${p.tgt}" min="0" step="0.5">
+    <span>みなし仕入率（%）</span><input type="number" class="inp" data-yjc="mr" value="${p.mr}" min="0" max="90" step="10"></div>
+    <p class="muted small">調整後営業利益率（税抜）＝（営業利益−消費税の納付見込み）÷ 税抜売上。簡易課税が前提です。</p></details>
+  <div class="yj-tip" hidden></div>
 </section>`;
     return sec1 + sec2 + sec3;
   }
@@ -420,9 +423,39 @@ ${info(c, d)}
     if (!b || !last) return;
     const c = last.c, p = c.p;
     switch (b.dataset.yact) {
-      case "sel": p.sel[b.dataset.k] = !p.sel[b.dataset.k]; saveParams(p); b.classList.toggle("on", p.sel[b.dataset.k]); b.setAttribute("aria-pressed", p.sel[b.dataset.k]); refresh(); break;
+      case "seg": p.seg = b.dataset.k; saveParams(p); refresh(); break;
     }
   });
+
+  // ホバー（タッチではタップ）で、その月・その棒に積み上がっている内訳を出す
+  let tipOn = null;
+  function hideTip() {
+    if (!tipOn) return;
+    tipOn.tip.hidden = true;
+    if (tipOn.guide) tipOn.guide.setAttribute("visibility", "hidden");
+    tipOn = null;
+  }
+  function showTip(e) {
+    const h = e.target && e.target.closest ? e.target.closest("[data-yjh]") : null;
+    if (!h) { hideTip(); return; }
+    const sec = h.closest(".yj-sec"), tip = sec && sec.querySelector(".yj-tip"), html = TIPS[Number(h.dataset.yjh)];
+    if (!tip || html == null) { hideTip(); return; }
+    if (!tipOn || tipOn.h !== h) {
+      hideTip();
+      tip.innerHTML = html; tip.hidden = false;
+      const guide = h.dataset.g ? document.getElementById(h.dataset.g) : null;
+      if (guide) { guide.setAttribute("x1", h.dataset.gx); guide.setAttribute("x2", h.dataset.gx); guide.setAttribute("visibility", "visible"); }
+      tipOn = { h, tip, guide };
+    }
+    const r = sec.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = e.clientX - r.left + 12, y = e.clientY - r.top + 12;
+    if (x + tw > r.width - 4) x = Math.max(4, e.clientX - r.left - tw - 12);
+    if (y + th > r.height - 4) y = Math.max(4, e.clientY - r.top - th - 12);
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  document.addEventListener("pointermove", showTip);
+  document.addEventListener("pointerdown", showTip);
+  document.addEventListener("scroll", hideTip, true);
 
   global.Yojitsu = { render, refresh, loadParams, saveParams, compute };
 })(window);

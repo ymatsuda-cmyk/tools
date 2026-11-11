@@ -2,7 +2,7 @@
  * finance2 — 合計残高試算表の取込とBS/PLダッシュボード
  * タブ：取込 ／ 全体 ／ 月別 ／ 科目 ／ 予測 ／ 計画 ／ 予実
  * ============================================================ */
-const APP_VERSION = "rev_20261009_yj11";
+const APP_VERSION = "rev_20261111_yj12";
 window.APP_VERSION = APP_VERSION;
 
 (function () {
