@@ -151,8 +151,23 @@
   const sw = (c, hatch) => `<i class="yj-sw" style="${hatch ? `border:1px solid ${c};background:repeating-linear-gradient(135deg,${c} 0 1.5px,#fff 1.5px 4px)` : `background:${c}`}"></i>`;
   const trow = (lab, a, b, d) => `<div class="r"><span>${lab}</span><span>${a}</span><span>${b == null ? "" : b}</span>${d === undefined ? "<span></span>" : `<span class="${d < 0 ? "t-err" : "t-ok"}">${sman(d)}</span>`}</div>`;
   const tsep = `<hr>`;
+  // セルのコメント（月次PL）をツールチップ用に並べる。新しい月から、多いときは件数で省略
+  const KIND_TAG = { firm: "", pipe: "P", pcost: "P原価", sales: "", cogs: "", sga: "" };
+  function noteHtml(list, max) {
+    if (!list.length) return "";
+    max = max || 5;
+    const cut = (t) => (t.length > 60 ? t.slice(0, 59) + "…" : t);
+    const rows = list.slice(0, max).map(x => `<div class="yj-nt"><span>${esc(x.when)} ${esc(x.who)}</span>${esc(cut(x.text))}</div>`).join("");
+    return `<div class="yj-nts">${rows}${list.length > max ? `<div class="yj-tn2">ほか${list.length - max}件</div>` : ""}</div>`;
+  }
   // 透明な当たり判定（data-yjh：内訳の番号、data-g / data-gx：縦ガイド）
   const hit = (x, y, w, h, id, g, gx) => `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(1, w).toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" fill="transparent" data-yjh="${id}"${g ? ` data-g="${g}" data-gx="${gx.toFixed(1)}"` : ""}/>`;
+
+  // コメントのある月：月のラベルの右上に小さな印
+  function noteDots(s, f, noted, cx) {
+    if (!noted) return;
+    noted.forEach((v, i) => { if (v) s.push(`<circle cx="${(cx(i) + 7).toFixed(1)}" cy="${f.H - 15}" r="2.2" fill="${COL.fc}"/>`); });
+  }
 
   // ① 売上の累計（区分ごとの積み上げ面＋計画線）
   function salesChart(o) {
@@ -178,6 +193,7 @@
     if (cur < n && pipe[n - 1]) s.push(`<polyline points="${withPipe.map((v, i) => cx(i).toFixed(1) + "," + f.y(v).toFixed(1)).slice(Math.max(0, cur - 1)).join(" ")}" fill="none" stroke="${pc}" stroke-width="1.6" stroke-dasharray="1.5 2.5"/>`);
     if (cur > 0 && cur < n) s.push(marker(f, f.L + step * cur));
     labels.forEach((t, i) => s.push(`<text x="${cx(i).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(t)}</text>`));
+    noteDots(s, f, o.noted, cx);
     const g = "yjg" + (++gid);
     s.push(`<line id="${g}" x1="0" x2="0" y1="${f.T}" y2="${f.H - f.B}" stroke="${COL.ink}" stroke-opacity="0.45" visibility="hidden" pointer-events="none"/>`);
     for (let i = 0; i < n; i++) s.push(hit(f.L + step * i, 0, step, f.H - f.B, o.tip(i), g, cx(i)));
@@ -194,12 +210,14 @@
     const s = [`<svg viewBox="0 0 ${f.W} ${f.H}" width="100%" class="chart" role="img" aria-label="原価・販管費の月別">`, ...f.s];
     for (let i = 0; i < n; i++) {
       const x = f.L + step * i + (step - bw) / 2, fc = i >= d.cur, op = fc ? 0.3 : 1;
-      const c = d.mc[i] || 0, g = d.mg[i] || 0, y0 = f.y(0), y1 = f.y(c), y2 = f.y(c + g);
-      if (c) s.push(`<rect x="${x.toFixed(1)}" y="${(y1 + 0.5).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 0.5).toFixed(1)}" rx="1.5" fill="${o.spC[i] ? COL.spike : COL.cogs}" fill-opacity="${op}"/>`);
-      if (g) s.push(`<rect x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y1 - y2 - 1).toFixed(1)}" rx="1.5" fill="${o.spG[i] ? COL.spike : COL.sga}" fill-opacity="${op}"/>`);
+      // 下に販管費、上に原価を積む
+      const c = d.mc[i] || 0, g = d.mg[i] || 0, y0 = f.y(0), y1 = f.y(g), y2 = f.y(g + c);
+      if (g) s.push(`<rect x="${x.toFixed(1)}" y="${(y1 + 0.5).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 0.5).toFixed(1)}" rx="1.5" fill="${o.spG[i] ? COL.spike : COL.sga}" fill-opacity="${op}"/>`);
+      if (c) s.push(`<rect x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y1 - y2 - 1).toFixed(1)}" rx="1.5" fill="${o.spC[i] ? COL.spike : COL.cogs}" fill-opacity="${op}"/>`);
       const py = f.y(pt[i]);
       s.push(`<line x1="${(x - 2).toFixed(1)}" x2="${(x + bw + 2).toFixed(1)}" y1="${py.toFixed(1)}" y2="${py.toFixed(1)}" stroke="${COL.ink}" stroke-width="1.6"/>`);
       s.push(`<text x="${(x + bw / 2).toFixed(1)}" y="${f.H - 7}" font-size="9.5" fill="${COL.muted}" text-anchor="middle">${esc(labels[i])}</text>`);
+      if (o.noted && o.noted[i]) noteDots(s, f, o.noted.map((v, k) => k === i && v), () => x + bw / 2);
       s.push(hit(f.L + step * i, 0, step, f.H - f.B, o.tip(i)));
     }
     if (d.cur > 0 && d.cur < n) s.push(marker(f, f.L + step * d.cur));
@@ -227,7 +245,7 @@
           base += seg.v;
         });
         const rows = g[k].filter(x => x.v).slice().reverse().map(x => trow(sw(x.color, !!x.hatch) + esc(x.name), man(x.v))).join("");
-        const id = tipId(`<div class="t">${esc(g.label)}・${nm}</div>${rows}${tsep}${trow("<b>合計</b>", "<b>" + man(base) + "</b>")}`);
+        const id = tipId(`<div class="t">${esc(g.label)}・${nm}</div>${rows}${tsep}${trow("<b>合計</b>", "<b>" + man(base) + "</b>")}${g.notes && g.notes[k] ? g.notes[k] : ""}`);
         s.push(hit(x, f.y(base), bw, f.y(0) - f.y(base), id));
       });
       const top = f.y(Math.max(sum(g.rev.map(x => x.v)), sum(g.cost.map(x => x.v))));
@@ -260,6 +278,10 @@ ${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")
     TIPS = [];
     const p = c.p, labels = d.months.map(q => String(Number(q.slice(5)))), j = d.cur - 1;
     const mlab = (i) => labels[i] + "月";
+    // 月次PLのコメント：月の位置（0〜11）ごと
+    const NT = d.months.map(q => ((c.notes || {})[q] || []).map(x => Object.assign({ when: labels[d.months.indexOf(q)] + "月", who: (x.k ? CAT[x.k].short : x.label) + (KIND_TAG[x.kind] ? "（" + KIND_TAG[x.kind] + "）" : "") }, x)));
+    // from〜to の月のコメントのうち条件に合うもの（新しい月から）
+    const notesIn = (from, to, ok) => { const r = []; for (let i = to; i >= from; i--) NT[i].forEach(x => { if (ok(x)) r.push(x); }); return r; };
     const when = (i) => (i < d.cur ? "実績" : "見込み");
     const open = (k) => (p.open[k] ? "open" : "");
 
@@ -286,12 +308,15 @@ ${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")
         <span class="yj-bar"><b class="${rc}" style="width:${x.r == null ? 0 : Math.min(100, x.r).toFixed(0)}%"></b></span></button>`;
     }).join("")}</div>` : "";
     const keys = seg === "all" ? KEYS : [seg];
+    const salesNote = (x) => (x.kind === "firm" || x.kind === "pipe") ? keys.includes(x.k) : (x.kind === "sales" && seg === "all");
+    const noted1 = NT.map(l => l.some(salesNote));
     const lineColor = seg === "all" ? COL.muted : CAT[seg].col;
     const rowsOf = seg === "all" && d.hasSeg ? ["n", "e", "m"] : [];
     const tip1 = (i) => {
       const rw = (k) => { const a = act[k][i] + pip[k][i], pl = pln[k][i]; return trow(k === "all" ? "<b>" + esc(nameOf(k)) + "</b>" : sw(CAT[k].col) + esc(CAT[k].name), man(a), man(pl), a - pl); };
       const pp = pip[seg][i];
-      return tipId(`<div class="t">${mlab(i)} 累計（${when(i)}）<span class="yj-th">実績 / 計画　差</span></div>${rowsOf.map(rw).join("")}${rowsOf.length ? tsep : ""}${rw(seg)}${pp ? `<div class="yj-tn2">うちパイプライン ${man(pp)}</div>` : ""}`);
+      const nts = notesIn(0, i, salesNote);
+      return tipId(`<div class="t">${mlab(i)} 累計（${when(i)}）<span class="yj-th">実績 / 計画　差</span></div>${rowsOf.map(rw).join("")}${rowsOf.length ? tsep : ""}${rw(seg)}${pp ? `<div class="yj-tn2">うちパイプライン ${man(pp)}</div>` : ""}${noteHtml(nts)}`);
     };
     const segNotes = [];
     if (d.hasSeg && d.actMissing.length) segNotes.push(`内訳がない月（${d.actMissing.map(mlab).join("・")}）は開発（既存）に含めています。`);
@@ -305,7 +330,7 @@ ${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")
   <div class="card-head"><h2>① 売上</h2>${st1}</div>
   ${tiles}
   <div class="yj-sum"><span>${d.cur ? `${mlab(j)}まで ${man(st.a)} / 計画 ${man(st.pn)}` : "実績なし"}</span><span>年度末 ${man(st.end)} / ${man(st.plan)}</span></div>
-  ${salesChart({ d, keys, act, plan: pln[seg], pipe: pip[seg], labels, lineColor, tip: tip1 })}
+  ${salesChart({ d, keys, act, plan: pln[seg], pipe: pip[seg], labels, lineColor, tip: tip1, noted: noted1 })}
   <div class="legend">${lg1}</div>
   ${!d.hasSeg ? `<p class="muted small">区分（保守・開発(既存)・開発(新規)）で見るには、計画シートと月次PLの売上高の下にその行を追加してください。</p>` : ""}
   ${segNotes.length ? `<p class="small t-amber">${segNotes.map(esc).join("<br>")}</p>` : ""}
@@ -329,17 +354,19 @@ ${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")
       if (spC[i]) spk.push(`原価の累計が計画累計の${pct(cA.c[i], cP.c[i])}（基準${sp.cp}%）`);
       if (spG[i]) spk.push(`販管費の累計が計画累計の${pct(cA.g[i], cP.g[i])}（基準${sp.sp}%）`);
       return tipId(`<div class="t">${mlab(i)}（${when(i)}）${spk.length ? ' <span class="t-err">突発</span>' : ""}<span class="yj-th">${when(i)} / 計画　差</span></div>`
-        + trow(sw(spG[i] ? COL.spike : COL.sga) + "販管費", man(d.mg[i]), man(d.pG[i]), (d.mg[i] || 0) - (d.pG[i] || 0))
         + trow(sw(spC[i] ? COL.spike : COL.cogs) + "原価", man(d.mc[i]), man(d.pC[i]), (d.mc[i] || 0) - (d.pC[i] || 0))
+        + trow(sw(spG[i] ? COL.spike : COL.sga) + "販管費", man(d.mg[i]), man(d.pG[i]), (d.mg[i] || 0) - (d.pG[i] || 0))
         + tsep + trow("<b>合計</b>", "<b>" + man(t) + "</b>", man(pt), t - pt)
-        + (i < d.cur ? `<div class="yj-tn2">累計の計画比　原価 ${pct(cA.c[i], cP.c[i])}・販管費 ${pct(cA.g[i], cP.g[i])}</div>` : "")
-        + (spk.length ? `<div class="t-err yj-tn2">${spk.join("<br>")}</div>` : ""));
+        + (i < d.cur ? `<div class="yj-tn2">累計の計画比　販管費 ${pct(cA.g[i], cP.g[i])}・原価 ${pct(cA.c[i], cP.c[i])}</div>` : "")
+        + (spk.length ? `<div class="t-err yj-tn2">${spk.join("<br>")}</div>` : "")
+        + noteHtml(notesIn(i, i, costNote)));
     };
+    const costNote = (x) => ["cogs", "sga", "pcost"].includes(x.kind);
     const sec2 = `<section class="card yj-sec">
   <div class="card-head"><h2>② コスト</h2>${badge(k2, nSp ? "突発 " + nSp + "件" : over ? "計画超過" : "計画内")}</div>
   <div class="yj-sum"><span>${d.cur ? `${mlab(j)}まで ${man(sC + sG)} / 計画 ${man(sCP + sGP)}（${pct(sC + sG, sCP + sGP)}）` : "実績なし"}</span></div>
-  ${costChart({ d, labels, spC, spG, tip: tip2 })}
-  <div class="legend"><span>${lgBox(COL.cogs)}原価</span><span>${lgBox(COL.sga)}販管費</span><span>${lgBox(COL.spike)}突発</span><span>${lgLine(COL.ink)}計画</span></div>
+  ${costChart({ d, labels, spC, spG, tip: tip2, noted: NT.map(l => l.some(costNote)) })}
+  <div class="legend"><span>${lgBox(COL.sga)}販管費</span><span>${lgBox(COL.cogs)}原価</span><span>${lgBox(COL.spike)}突発</span><span>${lgLine(COL.ink)}計画</span></div>
   <details data-yjd="spk" ${open("spk")}><summary>突発の条件</summary>
     <div class="yj-spk yj-spk2"><span>原価（計画累計の%超）</span><input type="number" class="inp" data-yjc="cp" value="${sp.cp}" min="100" step="5">
     <span>販管費（計画累計の%超）</span><input type="number" class="inp" data-yjc="sp" value="${sp.sp}" min="100" step="5"></div></details>
@@ -353,6 +380,9 @@ ${notes.length ? `<p class="small t-amber yj-line">${notes.map(esc).join("<br>")
       { label: "受注確定", m: d.m1, ok: okOf(d.m1), rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定", v: d.firm, color: COL.firm }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価 見込み", v: d.C1 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費 見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] },
       { label: "着地見込み", m: d.m2, ok: okOf(d.m2), rev: [{ name: "売上 実績", v: d.Ract, color: COL.act }, { name: "受注確定", v: d.firm, color: COL.firm }, { name: "パイプライン", v: d.pipe, color: COL.firm, hatch: "yjHf" }], cost: [{ name: "原価 実績", v: d.cAct, color: COL.cogs }, { name: "原価 見込み", v: d.C2 - d.cAct, color: COL.cogs, hatch: "yjHc" }, { name: "販管費 実績", v: d.gAct, color: COL.sga }, { name: "販管費 見込み", v: d.gRem, color: COL.sga, hatch: "yjHg" }] }
     ];
+    const fut = (ok) => (d.cur < 12 ? notesIn(d.cur, 11, ok) : []);
+    groups[1].notes = { rev: noteHtml(fut(x => x.kind === "firm" || x.kind === "sales")), cost: noteHtml(fut(costNote)) };
+    groups[2].notes = { rev: noteHtml(fut(x => x.kind === "firm" || x.kind === "pipe" || x.kind === "sales"), 6), cost: noteHtml(fut(costNote)) };
     const ok = okOf(d.m2), k3 = ok ? (okOf(d.m1) ? "ok" : "warn") : "bad";
     // 目標に届かないときの上積み額（計画の原価率で受注した場合）
     const kk = 1 - d.cr - d.taxK - d.tg / 1.1, add = kk > 0 ? (d.C2 + d.S - d.R2 * (1 - d.taxK - d.tg / 1.1)) / kk : Infinity;

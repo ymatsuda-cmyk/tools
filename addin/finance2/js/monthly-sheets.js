@@ -465,6 +465,51 @@
     });
   }
 
+  /**
+   * 月次PLのセルのコメント（スレッド形式のコメントとメモの両方）を読み、月ごとに並べる。
+   * 対象は 売上高・売上原価・販管費合計 の行と、売上高／売上原価の下の内訳行（保守・開発・パイプライン）。
+   * 戻り値：{ "2026-02": [{ kind: "firm"|"pipe"|"pcost"|"sales"|"cogs"|"sga", k, label, text }] }
+   * コメントのAPIが使えない環境や読み取りに失敗したときは空のオブジェクトを返す（予実の表示は止めない）。
+   */
+  async function readNotes(lay) {
+    const out = {};
+    if (!lay || !lay.sheetName || typeof Office === "undefined" || !Office.context || !Office.context.requirements) return out;
+    const req = Office.context.requirements;
+    const canC = req.isSetSupported("ExcelApi", "1.10"), canN = req.isSetSupported("ExcelApi", "1.18");
+    if (!canC && !canN) return out;
+    // 行 → 種類
+    const kindOf = {};
+    (lay.segRows || []).forEach(s => { kindOf[s.r] = { kind: s.cost ? "pcost" : s.pipe ? "pipe" : "firm", k: s.k, label: s.raw }; });
+    (lay.rows || []).forEach(s => {
+      if (s.section || kindOf[s.r]) return;
+      const kind = ["売上高", "純売上高"].includes(s.key) ? "sales" : s.key === "売上原価" ? "cogs" : ["販管費合計", "販売費及び一般管理費", "販売費及び一般管理費計"].includes(s.key) ? "sga" : null;
+      if (kind) kindOf[s.r] = { kind, k: null, label: s.raw };
+    });
+    const colP = {};
+    lay.cols.forEach((c, i) => { colP[c] = lay.periods[i]; });
+    const add = (row, col, text) => {
+      const t = String(text == null ? "" : text).replace(/\s+/g, " ").trim(), kd = kindOf[row], p = colP[col];
+      if (!t || !kd || !p) return;
+      (out[p] = out[p] || []).push({ kind: kd.kind, k: kd.k, label: kd.label, text: t });
+    };
+    try {
+      await Excel.run(async (ctx) => {
+        const ws = ctx.workbook.worksheets.getItem(lay.sheetName);
+        let cs = null, ns = null;
+        if (canC) { cs = ws.comments; cs.load("items/content"); }
+        if (canN) { ns = ws.notes; ns.load("items/content"); }
+        await ctx.sync();
+        const locs = [];
+        if (cs) cs.items.forEach(c => { const r = c.getLocation(); r.load("rowIndex,columnIndex"); c.replies.load("items/content"); locs.push({ r, text: () => [c.content, ...c.replies.items.map(x => x.content)].filter(Boolean).join(" ／ ") }); });
+        if (ns) ns.items.forEach(n => { const r = n.getLocation(); r.load("rowIndex,columnIndex"); locs.push({ r, text: () => n.content }); });
+        if (!locs.length) return;
+        await ctx.sync();
+        locs.forEach(x => add(x.r.rowIndex, x.r.columnIndex, x.text()));
+      });
+    } catch (e) { console.warn("readNotes", e); }
+    return out;
+  }
+
   async function activateByPrefix(prefix) {
     return Excel.run(async (ctx) => {
       const wss = ctx.workbook.worksheets; wss.load("items/name"); await ctx.sync();
@@ -474,5 +519,5 @@
     });
   }
 
-  global.MonthlySheets = { reflect, readModel, activateByPrefix, mkey, base, segOf, segGroup, segLabelOnly, moveFormula, findHeader, CHECKS, DEFAULTS };
+  global.MonthlySheets = { reflect, readModel, readNotes, activateByPrefix, mkey, base, segOf, segGroup, segLabelOnly, moveFormula, findHeader, CHECKS, DEFAULTS };
 })(window);
