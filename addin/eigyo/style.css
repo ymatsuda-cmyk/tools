@@ -915,6 +915,8 @@ body {
 
 .kado-bar { position: relative; padding-top: 11px; }
 .kado-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; line-height: 11px; color: #1f2933; pointer-events: none; }
+.kado-mark-v { position: absolute; left: 100%; top: 0; margin-left: 2px; font-size: 10px; line-height: 11px; color: #52616b; white-space: nowrap; }
+.kado-mark.lbl-left .kado-mark-v { left: auto; right: 100%; margin-left: 0; margin-right: 2px; }
 .pbar { height: 14px; background: #eef1f3; border-radius: 4px; position: relative; overflow: hidden; }
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
 

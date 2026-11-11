@@ -30,7 +30,7 @@
  *   A:日付 B:名称（任意）
  * ============================================================ */
 
-const APP_VERSION = "rev_20261111_9c4d2a7";
+const APP_VERSION = "rev_20261111_b27e5c9";
 const SHEET_NAME = "営業報告";
 const CUST_SHEET = "顧客マスタ";
 const CUST_COLUMNS = ["顧客コード", "取引先名", "窓口", "備考", "保守費（月額）", "許容工数（人日/月）"];
@@ -3548,9 +3548,10 @@ function renderKadoUketaku() {
   const byClient = {};
   target.forEach(r => {
     if (!r.client) return;
-    if (!byClient[r.client]) byClient[r.client] = { client: r.client, amt: 0, est: 0, act: 0, n: 0 };
+    if (!byClient[r.client]) byClient[r.client] = { client: r.client, amt: 0, est: 0, act: 0, limit: 0, n: 0 };
     const g = byClient[r.client];
     g.amt += (r.finalAmount ?? r.amount) || 0;
+    g.limit += Math.floor(((r.finalAmount ?? r.amount) || 0) / KADO_LIMIT_UNIT);   // 案件ごとに切り捨てて合算（明細の合計と一致）
     g.est += Number(r.finalHours) || 0;
     g.act += Number(r.acceptHours) || 0;
     g.n++;
@@ -3563,25 +3564,27 @@ function renderKadoUketaku() {
   const overClients = [...new Set(overRows.map(r => r.client))];
 
   const rowsHtml = rows.map(g => {
-    const burn = g.est > 0 ? Math.round(g.act / g.est * 100) : (g.act > 0 ? 999 : null);
+    /* 消化は限度（受注額÷6万円）に対する実績の割合 */
+    const burn = g.limit > 0 ? Math.round(g.act / g.limit * 100) : (g.act > 0 ? 999 : null);
     const st = burn == null ? "" : burn > 100 ? "over" : burn >= 80 ? "warn" : "ok";
-    const stLabel = st === "over" ? "見積超過" : st === "warn" ? "要注意" : st === "ok" ? "順調" : "見積未確定";
+    const stLabel = st === "over" ? "限度超過" : st === "warn" ? "要注意" : st === "ok" ? "順調" : "限度未設定";
     const open = kadoUketakuOpen === g.client;
-    const barMax = Math.max(g.est, g.act, 1);  // 見積(▼)と実績のどちらも収まる尺度
+    const barMax = Math.max(g.limit, g.act, 1);  // 限度(▼)と実績のどちらも収まる尺度
+    const gap = Math.round((g.limit - g.act) * 10) / 10;
     return `
     <div class="kado-row kado-row-click${open ? " open" : ""}" onclick="toggleKadoClient('${esc(g.client)}')">
       <div class="kado-name"><b>${esc(g.client)}</b><div class="kado-sub">受注 ${Math.round(g.amt / 10000).toLocaleString()}万 / ${g.n}件</div></div>
       <div class="kado-chart">
         <div class="kado-bar">
-          ${g.est > 0 ? `<span class="kado-mark" style="left:${g.est / barMax * 100}%" title="見積 ${Math.round(g.est * 10) / 10}人日">▼</span>` : ""}
+          ${g.limit > 0 ? `<span class="kado-mark${g.limit / barMax > 0.8 ? " lbl-left" : ""}" style="left:${g.limit / barMax * 100}%" title="限度 ${g.limit}人日">▼<span class="kado-mark-v">限度 ${g.limit}人日</span></span>` : ""}
           <div class="pbar"><i style="width:${g.act / barMax * 100}%;background:${st === "over" ? "#dd5a55" : st === "warn" ? "#d9a038" : "#0e7a5f"}"></i></div>
         </div>
-        <div class="kado-t">消化 ${burn == null ? "－" : burn + "%"}（${Math.round(g.act * 10) / 10}人日） / 見積 ${Math.round(g.est * 10) / 10}人日</div>
+        <div class="kado-t">消化 ${burn == null ? "－" : burn + "%"}（${Math.round(g.act * 10) / 10}人日） / 限度 ${g.limit}人日</div>
       </div>
       <div class="kado-stat">
         <span class="badge-pill ${st || "muted"}">${stLabel}</span>
         <div class="kado-d" style="color:${st === "over" ? "#c0392b" : "#1f2933"}">
-          ${g.est > g.act ? `残 ${Math.round((g.est - g.act) * 10) / 10}人日` : g.act > g.est ? `見積超過 +${Math.round((g.act - g.est) * 10) / 10}人日` : "－"}</div>
+          ${g.limit <= 0 ? "－" : gap > 0 ? `限度まで残 ${gap}人日` : gap < 0 ? `限度超過 +${-gap}人日` : "限度ちょうど"}</div>
         <div class="kado-t">詳細 ${open ? "▲" : "▶"}</div>
       </div>
     </div>
@@ -3616,7 +3619,7 @@ function renderKadoUketaku() {
       ${rows.length ? rowsHtml : `<p class="muted">対象となる案件がありません。</p>`}
       <p style="font-size:10px;color:#a9b2ba;margin-top:8px">
         対象: 見積り／プリセールスで状態が「受託中」または「完了」の案件（計上日がこの期のもの、または計上日未入力の進行中案件）。状態フィルタで絞り込めます。<br>
-        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。棒グラフの▼が見積位置で、棒が▼を越えると見積超過です。行をクリックすると案件別の予実一覧を展開します。<br>
+        見積工数＝受注確定時に入力する最終工数（Y列）、実績工数＝受託完了時に入力する受託工数（AN列）。見積残＝見積工数－実績工数（実績が見積を上回った分は「見積超過」）。取引先の棒グラフは限度（受注額÷60,000円、案件ごとに小数切り捨てて合算）に対する実績で、▼が限度の位置です。▼の横に限度工数を表示。棒が▼を越えると限度超過、80%以上で要注意。右側に限度までの残工数（超過時は超過工数）を表示します。行をクリックすると案件別の予実一覧を展開します。<br>
         案件別明細: 限度＝受注額÷60,000円（小数切り捨て）、消化率＝実績÷限度、残工数＝限度－実績。
       </p>
     </div>`;
