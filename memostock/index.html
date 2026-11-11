@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>MemoStock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,9 +20,13 @@
     --accent:#6FB3A3;--accent-ink:#0F1A17;--mark:rgba(240,200,60,.38);--cmt:rgba(255,170,60,.14);--cmt-line:#D99A45;--cmt-on:rgba(255,170,60,.32);--warn:#E07A5F;--sel:#22302D;--amber:#D9AE5B;--active:rgba(111,179,163,.07)}
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;
+/* スマホで触っても画面全体が動かないよう固定する（拡大・ずれ・引っぱりの跳ね返りを止める） */
+html{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%}
+body{position:fixed;inset:0;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;
   padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+/* 中で動かせる所は、端まで行っても画面全体を引っぱらない */
+#list,#folderTree,#tagCloud,#clist,#syncPop,#popMenu,dialog,.diffv,#histList,#panes .host .cm-scroller{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#toolbar,.tabbar{overscroll-behavior-x:contain}
 button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 12px}
 button:hover:not(:disabled){border-color:var(--muted)}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
@@ -34,8 +38,10 @@ input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--
 .hidden{display:none!important}
 
 /* ロック画面 */
-#lock{min-height:100%;display:grid;place-items:center;padding:24px}
-#lock .box{width:min(440px,100%);display:grid;gap:16px}
+#lock{height:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:flex;padding:24px}
+#lock .box{width:min(440px,100%);display:grid;gap:16px;margin:auto}
+#bioGo{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 12px}
+#bioGo svg{width:20px;height:20px;color:var(--accent)}
 #lock form{display:grid;gap:12px}
 #lock .lead{margin:0;font-size:13px;color:var(--muted)}
 .tabs{display:flex;border-bottom:1px solid var(--line)}
@@ -143,7 +149,7 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 .tabbar.drop-end::after{flex:none}
 #panes .host .cm-editor{flex:1;height:100%;font-size:var(--fs);background:transparent;color:var(--ink)}
 #panes .host .cm-editor.cm-focused{outline:none}
-#panes .host .cm-scroller{font-family:inherit;line-height:var(--lh)}
+#panes .host .cm-scroller{font-family:var(--memofont,inherit);line-height:var(--lh)}
 #panes .host .cm-content{padding:24px 0;caret-color:var(--ink)}
 #panes .host .cm-line{padding:0 28px}
 #panes .host .cm-cursor{border-left-color:var(--ink)}
@@ -502,6 +508,82 @@ dialog .extra:empty{display:none}
 #focusExit{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:30;width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.14);color:var(--muted);opacity:.85}
 #focusExit:hover{opacity:1;color:var(--ink)}
 #focusExit svg{width:20px;height:20px}
+
+/* 本文のフォント・Face ID（設定の「この端末」） */
+.fontpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:38vh;overflow:auto;overscroll-behavior:contain}
+.fontpick button{text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:7px 9px;font:inherit}
+.fontpick button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;background:var(--sel)}
+.fontpick .fn{display:block;font-size:12px;color:var(--muted);font-family:"Zen Kaku Gothic New","Hiragino Sans",sans-serif}
+.fontpick .fk{font-size:10.5px;color:var(--muted);margin-left:4px}
+.fontpick .fs{display:block;font-size:16px;line-height:1.5;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.optrow{display:flex;align-items:center;gap:10px;font-size:13px}
+.optrow .lb{flex:1}
+.optrow .note{display:block;font-size:12px;color:var(--muted)}
+#bioForm:empty{display:none}
+#bioForm{display:grid;gap:8px}
+#bioForm .row{justify-content:flex-end}
+
+/* フォルダ */
+#folders{border-bottom:1px solid var(--line);flex:none}
+#folders .fhead{display:flex;align-items:center;gap:4px;padding:4px 6px 4px 10px}
+#folders .fhead .ftoggle{flex:1;min-width:0;display:flex;align-items:center;gap:6px;border:0;background:none;padding:4px 2px;font-size:12px;color:var(--muted);text-align:left}
+#folders .fhead .ftoggle .cur{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#folders .fhead .ftoggle svg{width:12px;height:12px;flex:none;transition:transform .15s}
+#folders[data-open="false"] .fhead .ftoggle svg{transform:rotate(-90deg)}
+#folders .fhead .ib{width:26px;height:26px}
+#folders .fhead .ib svg{width:16px;height:16px}
+#folderTree{list-style:none;margin:0;padding:0 0 6px;max-height:min(34vh,300px);overflow:auto}
+#folders[data-open="false"] #folderTree{display:none}
+#folderTree li{display:flex;align-items:center;gap:0;padding:0 6px 0 calc(8px + var(--d,0) * 14px);min-height:30px}
+#folderTree li[aria-current="true"]{background:var(--sel)}
+#folderTree li.drop{box-shadow:inset 0 0 0 2px var(--accent)}
+#folderTree .tw{width:20px;height:24px;padding:0;border:0;background:none;display:grid;place-items:center;color:var(--muted);flex:none}
+#folderTree .tw svg{width:11px;height:11px;transition:transform .15s}
+#folderTree .tw.shut svg{transform:rotate(-90deg)}
+#folderTree .tw.none{visibility:hidden}
+#folderTree .fo{flex:1;min-width:0;display:flex;align-items:center;gap:6px;border:0;background:none;padding:4px 2px;text-align:left;font-size:13px}
+#folderTree .fo svg{width:15px;height:15px;color:var(--muted);flex:none}
+#folderTree li[aria-current="true"] .fo svg{color:var(--accent)}
+#folderTree .fo .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#folderTree .fo .n{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;padding-left:6px}
+#folderTree .fm{width:26px;height:26px;padding:0;border:0;background:none;display:grid;place-items:center;color:var(--muted);border-radius:4px;opacity:0;flex:none}
+#folderTree li:hover .fm,#folderTree li[aria-current="true"] .fm,#folderTree .fm:focus-visible{opacity:1}
+#folderTree .fm svg{width:15px;height:15px}
+@media (hover:none){#folderTree .fm{opacity:.6}}
+#list .s .fp{display:inline-flex;align-items:center;gap:2px;color:var(--accent);margin-right:6px}
+#list .s .fp svg{width:11px;height:11px}
+#popMenu .item.fi{padding-left:calc(6px + var(--d,0) * 14px)}
+#popMenu .item[aria-checked="true"]{background:var(--sel);font-weight:500}
+#popMenu .item.warn{color:var(--warn)}
+#popMenu .flist{display:grid;max-height:50vh;overflow:auto;overscroll-behavior:contain}
+#folderBtn.set{color:var(--accent)}
+
+/* ④ スマホで書くとき：上の帯は書き始めると隠れ、上へ戻すと出る。キーボードが出たら道具はキーボードの真上へ */
+@media (max-width:720px){
+  #app,#app.side-hidden{grid-template-columns:minmax(0,1fr)}
+  #toolbar{flex-wrap:nowrap;overflow-x:auto;min-width:0;scrollbar-width:none;gap:2px;padding:4px 6px}
+  #toolbar::-webkit-scrollbar{display:none}
+  #toolbar .ib{width:38px;height:38px;flex:none}
+  #toolbar .step,#toolbar .sep{flex:none}
+  #toolbar .step .lbl{display:none}
+  #lay1,#layV,#layH,#keysBtn{display:none}
+  header{padding:6px 8px;gap:6px}
+  header button:not(.ib):not(#status){padding:5px 10px;white-space:nowrap;flex:none}
+  #status{flex:1 1 auto;margin-left:2px}
+}
+body.imm #app>header,body.imm #toolbar,body.imm .pane.active>.tabbar,body.imm .pane.active>.tagbar{position:fixed;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);z-index:25;transition:transform .22s ease,box-shadow .22s}
+body.imm #toolbar{background:var(--panel)}
+body.imm .pane.active>.tabbar.solo{display:none}
+body.imm.chrome #toolbar{box-shadow:0 6px 14px rgba(0,0,0,.08)}
+body.imm:not(.chrome) #app>header,body.imm:not(.chrome) #toolbar,body.imm:not(.chrome) .pane.active>.tabbar,body.imm:not(.chrome) .pane.active>.tagbar{transform:translateY(calc(-1 * var(--chromeh,0px) - env(safe-area-inset-top,0px) - 12px));box-shadow:none}
+body.imm .statusbar{display:none}
+body.imm #panes .host .cm-content{padding-top:calc(var(--chromeh,0px) + 6px);padding-bottom:40vh}
+/* キーボードが出ている間：見えている範囲にアプリを合わせ、上の帯は畳む */
+body.kb #app{position:fixed;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);top:var(--vvt,0px);height:var(--vvh,100%)}
+body.kb #app>header,body.kb .pane>.tabbar,body.kb .pane>.tagbar,body.kb .statusbar{display:none!important}
+body.kb #editorWrap #toolbar{position:static;top:auto!important;transform:none;order:3;border-bottom:0;border-top:1px solid var(--line);box-shadow:none}
+body.kb #panes .host .cm-content{padding-top:6px;padding-bottom:30vh}
+@media (prefers-reduced-motion:reduce){body.imm #app>header,body.imm #toolbar,body.imm .tabbar,body.imm .tagbar{transition:none}}
 </style>
 </head>
 <body>
@@ -514,6 +596,7 @@ dialog .extra:empty{display:none}
     <form id="unlockForm" class="hidden" autocomplete="off">
       <p class="dest" id="dest"></p>
       <label>パスフレーズ<input id="pass" type="password" autocomplete="current-password"></label>
+      <button type="button" id="bioGo" class="hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1"/><path d="M9.5 15.5a3.5 3.5 0 0 0 5 0"/></svg>Face ID・Touch ID で開く</button>
       <p class="msg" id="unlockMsg" role="status"></p>
       <div class="row">
         <button type="button" class="link" id="forgetBtn">別の設定を使う</button>
@@ -618,6 +701,13 @@ dialog .extra:empty{display:none}
     </div>
     <div id="tagCloud" class="hidden" aria-label="タグで絞り込み"></div>
     <datalist id="tagList"></datalist>
+    <div id="folders" data-open="true">
+      <div class="fhead">
+        <button type="button" class="ftoggle" id="fToggle" aria-expanded="true" aria-controls="folderTree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>フォルダ<span class="cur" id="fCur"></span></button>
+        <button type="button" class="ib" id="fAdd" title="フォルダを作る" aria-label="フォルダを作る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></button>
+      </div>
+      <ul id="folderTree" aria-label="フォルダ"></ul>
+    </div>
     <ul id="list"></ul>
   </aside>
   <main>
@@ -664,6 +754,7 @@ dialog .extra:empty{display:none}
         <button class="ib" id="layH" title="横に2分割（上下に並べる）" aria-label="横に2分割" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 12h17"/></svg></button>
         <button class="ib" id="focusBtn" title="集中モード：バーと一覧を隠してメモを広く使う（⌘⇧F）" aria-label="集中モード" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
         <span class="sep"></span>
+        <button class="ib" id="folderBtn" title="フォルダへ移動" aria-label="フォルダへ移動" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg></button>
         <button class="ib" id="pinBtn" title="ピン留めする（一覧の上に固定）" aria-label="ピン留めする（一覧の上に固定）" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6l-1 6.5 3.5 3.5v1.5h-11V13.5L10 10z"/><path d="M12 15v6"/></svg></button>
         <button class="ib" id="favBtn" title="お気に入りにする" aria-label="お気に入りにする" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
         <button class="ib" id="colorBtn" title="カラーラベルを付ける" aria-label="カラーラベルを付ける" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle class="fillc" cx="12" cy="12" r="4.2" stroke="none"/></svg></button>
@@ -808,6 +899,12 @@ dialog .extra:empty{display:none}
       </label>
       <button type="button" class="danger" id="forgetConn">この端末から接続情報を消去してロック</button>
     </fieldset>
+    <fieldset><legend>この端末</legend>
+      <div class="optrow"><span class="lb">本文のフォント<span class="note">この端末で覚えます</span></span></div>
+      <div class="fontpick" id="fontPick" role="group" aria-label="本文のフォント"></div>
+      <div class="optrow"><span class="lb">Face ID・Touch ID で開く<span class="note" id="bioNote"></span></span><button type="button" id="bioBtn" class="hidden"></button></div>
+      <div id="bioForm"></div>
+    </fieldset>
     <p>保存すると、設定は暗号化されて JSONBin に送られます。</p>
     <div class="row">
       <button value="cancel" formnovalidate>キャンセル</button>
@@ -856,7 +953,7 @@ const COLORS = [
 const colorOf = k => COLORS.find(x => x.k === k);
 let conflicts = {};   // id -> { memo, sha, at }：別の端末の版（どちらを残すか選ぶまで送信しない）
 const stampOf = m => `${m.updatedAt}|${m.metaAt || 0}`;
-const sigOf = m => JSON.stringify([m.name || '', tagsOf(m), m.comments || {}, m.body, !!m.pinned, !!m.fav, m.color || '']);
+const sigOf = m => JSON.stringify([m.name || '', tagsOf(m), m.comments || {}, m.body, !!m.pinned, !!m.fav, m.color || '', m.folder || '']);
 
 let pass = null;
 let keys = new Map();
@@ -878,7 +975,7 @@ const store = {
 const conn = {
   get(){ try{ return JSON.parse(store.get('memo.jsonbin') || 'null'); }catch{ return null; } },
   set(c){ store.set('memo.jsonbin', JSON.stringify(c)); },
-  clear(){ store.del('memo.jsonbin'); store.del('memo.cfgcache'); }
+  clear(){ store.del('memo.jsonbin'); store.del('memo.cfgcache'); store.del('memo.bio'); }
 };
 let settings = null;   // { github:{owner,repo,branch,folder,token}, view:{fs,lh,ln} } 復号後のみメモリ上に持つ
 let cfgTimer = null;
@@ -1066,7 +1163,7 @@ async function putMemo(m, sha){
   const comments = Object.fromEntries(Object.entries(m.comments || {}).filter(([k]) => used.has(k)));
   m.by = DEVICE;
   const env = await seal({ id, name, tags:tagsOf(m), comments, body, createdAt, updatedAt,
-    pinned:!!m.pinned, fav:!!m.fav, color:m.color || '', metaAt:m.metaAt || 0, by:DEVICE }, 'encrypted-memo');
+    pinned:!!m.pinned, fav:!!m.fav, color:m.color || '', folder:m.folder || '', metaAt:m.metaAt || 0, by:DEVICE }, 'encrypted-memo');
   const payload = { message:`Update memo ${id}`, content:b2a(te.encode(JSON.stringify(env, null, 2))), branch:cfg().branch };
   if (sha) payload.sha = sha;
   const r = await gh(fileURL(id), { method:'PUT', body:JSON.stringify(payload) });
@@ -1094,7 +1191,7 @@ function applyRemote(r){
   const local = find(r.id);
   if (!local){ memos.push(r); return; }
   Object.assign(local, { name:r.name, tags:tagsOf(r), comments:r.comments || {}, body:r.body, createdAt:r.createdAt, updatedAt:r.updatedAt,
-    pinned:!!r.pinned, fav:!!r.fav, color:r.color || '', metaAt:r.metaAt || 0, by:r.by });
+    pinned:!!r.pinned, fav:!!r.fav, color:r.color || '', folder:r.folder || '', metaAt:r.metaAt || 0, by:r.by });
   if (r.id === renamingId) renamingId = null;
   for (const p of panes){ if (p.active === r.id) replaceDoc(p.view, r.body); else p.states.delete(r.id); }
 }
@@ -3212,7 +3309,7 @@ $('#layH').onclick = () => setLayout('h');
 
 // 開いているタブの保存・復元（暗号化した控えに含める）
 function layoutState(){
-  return { layout, splitPct, activePane, panes: panes.map(p => ({ tabs:[...p.tabs], active:p.active })) };
+  return { layout, splitPct, activePane, panes: panes.map(p => ({ tabs:[...p.tabs], active:p.active })), folder:curFolder, fopen:folderOpen, fshut:[...folderShut] };
 }
 function saveLayoutSoon(){ if (!pass) return; clearTimeout(localTimer); localTimer = setTimeout(saveLocal, 800); }
 function resetPanes(){
@@ -3221,6 +3318,9 @@ function resetPanes(){
 }
 function restoreLayout(s){
   resetPanes();
+  curFolder = typeof s?.folder === 'string' ? s.folder : '*';
+  folderOpen = s?.fopen !== false;
+  folderShut = new Set(Array.isArray(s?.fshut) ? s.fshut : []);
   if (s){
     splitPct = s.splitPct || 50;
     const ok = id => !!find(id);
@@ -3263,6 +3363,8 @@ function updateStatusBar(){
   $('#colorBtn').style.setProperty('--c', lc ? lc.c : 'transparent');
   $('#colorBtn').classList.toggle('set', !!lc);
   $('#colorBtn').title = lc ? `カラーラベル：${lc.n}` : 'カラーラベルを付ける';
+  $('#folderBtn').classList.toggle('set', !!m?.folder);
+  $('#folderBtn').title = m?.folder ? `フォルダ：${m.folder}（クリックで移動）` : 'フォルダへ移動';
 }
 
 // ツールバーのボタンでエディタのフォーカスを奪わない
@@ -3436,15 +3538,16 @@ $('#favFilter').onclick = () => { favOnly = !favOnly; renderList(); };
 
 function renderList(){
   if (renamingId && document.activeElement?.classList.contains('rename')) return;  // 名前の入力中は描き直さない
-  renderTagCloud(); renderFilters();
+  renderTagCloud(); renderFilters(); renderFolders();
   const q = parseQuery($('#q').value);
   const key = JSON.stringify(q.words);
   if (key !== hlKey){ hlKey = key; hlTerms = q.words; refreshDecos(); }
   const want = [...activeTags].map(norm);
   const searching = q.words.length || q.not.length || q.tags.length;
-  const filtering = searching || want.length || favOnly || colorFilter.size;
+  const filtering = searching || want.length || favOnly || colorFilter.size || curFolder !== '*';
   const items = [];
   for (const m of memos){
+    if (!inFolder(m, curFolder)) continue;
     if (favOnly && !m.fav) continue;
     if (colorFilter.size && !colorFilter.has(m.color)) continue;
     if (want.length || q.tags.length){
@@ -3473,7 +3576,7 @@ function renderList(){
   list.textContent = '';
   if (!items.length){
     const li = document.createElement('li'); li.className = 'none';
-    li.textContent = filtering ? '一致するメモはありません' : 'メモはまだありません。「新規メモ」から作成できます';
+    li.textContent = filtering ? (curFolder !== '*' && !searching && !want.length && !favOnly && !colorFilter.size ? 'このフォルダにメモはありません' : '一致するメモはありません') : 'メモはまだありません。「新規メモ」から作成できます';
     list.append(li); return;
   }
   const sections = !q.words.length && items[0].m.pinned && items.some(x => !x.m.pinned);
@@ -3526,6 +3629,10 @@ function renderList(){
       li.append(tt);
       list.append(li);
     }
+    if (dragMemos){
+      li.draggable = true;
+      li.ondragstart = e => { e.dataTransfer.setData('text/x-memo-id', m.id); e.dataTransfer.effectAllowed = 'move'; };
+    }
     // 右上の印（競合・未送信・ピン・お気に入り）
     const fl = document.createElement('span'); fl.className = 'flags';
     if (conflicts[m.id]){
@@ -3548,9 +3655,14 @@ function renderList(){
 
     const ss = document.createElement('div');
     ss.className = 's';
+    if (folderOf(m) && folderOf(m) !== curFolder){
+      const fp = document.createElement('span'); fp.className = 'fp';
+      fp.innerHTML = folderIcon; fp.append(folderOf(m).split('/').pop()); fp.title = folderOf(m);
+      ss.append(fp);
+    }
     const sn = q.words.length && h ? snippetOf(h, q.words) : null;
     if (sn){ ss.append(`${fmt(m.updatedAt)}　`); markInto(ss, sn.text, sn.hits); ss.classList.add('hit'); }
-    else ss.textContent = `${fmt(m.updatedAt)}　${firstLine(m.body)}`;
+    else ss.append(`${fmt(m.updatedAt)}　${firstLine(m.body)}`);
     li.append(ss);
     if (tagsOf(m).length){
       const tg = document.createElement('div'); tg.className = 'tags';
@@ -3719,6 +3831,7 @@ function renderTagbars(focusPane){
 function newMemo(){
   const now = Date.now();
   const m = { id: crypto.randomUUID(), name: nextName(), body:'', createdAt:now, updatedAt:now };
+  if (curFolder !== '*' && curFolder) m.folder = curFolder;
   memos.push(m); dirtyIds.add(m.id);
   $('#q').value = '';
   openMemo(m.id); curView()?.focus(); schedule();
@@ -3941,7 +4054,7 @@ $('#histRestore').onclick = () => {
 $('#histCopy').onclick = () => {
   const it = hist.items[hist.sel]; if (!it?.memo) return;
   const now = Date.now(), r = it.memo;
-  const m = { id:crypto.randomUUID(), name:`${nameOf(r)}（${fmtShort(it.date)} の版）`, tags:tagsOf(r), comments:r.comments || {}, body:r.body, color:r.color || '', createdAt:now, updatedAt:now };
+  const m = { id:crypto.randomUUID(), name:`${nameOf(r)}（${fmtShort(it.date)} の版）`, tags:tagsOf(r), comments:r.comments || {}, body:r.body, color:r.color || '', folder:r.folder || '', createdAt:now, updatedAt:now };
   memos.push(m); dirtyIds.add(m.id);
   $('#histDlg').close();
   openMemo(m.id); schedule();
@@ -3980,6 +4093,7 @@ function openConflict(id){
   if (tagsOf(c.memo).join(',') !== tagsOf(m).join(',')) extra.push(`タグ：${tagsOf(c.memo).join('、') || 'なし'} → ${tagsOf(m).join('、') || 'なし'}`);
   if (JSON.stringify(c.memo.comments || {}) !== JSON.stringify(m.comments || {})) extra.push('コメントにも違いがあります');
   if (!!c.memo.pinned !== !!m.pinned || !!c.memo.fav !== !!m.fav || (c.memo.color || '') !== (m.color || '')) extra.push('ピン留め・お気に入り・色ラベルにも違いがあります');
+  if ((c.memo.folder || '') !== (m.folder || '')) extra.push(`フォルダ：${c.memo.folder || '未分類'} → ${m.folder || '未分類'}`);
   $('#confExtra').textContent = extra.join('　／　');
   renderDiff($('#confDiff'), diffLines(c.memo.body, m.body));
   closeSyncPop();
@@ -3995,7 +4109,7 @@ function resolveConflict(id, which){
   }else{
     if (which === 'both'){
       const now = Date.now(), r = c.memo;
-      memos.push({ id:crypto.randomUUID(), name:`${nameOf(r)}（${r.by || '別の端末'}の版）`, tags:tagsOf(r), comments:r.comments || {}, body:r.body, color:r.color || '', createdAt:now, updatedAt:now });
+      memos.push({ id:crypto.randomUUID(), name:`${nameOf(r)}（${r.by || '別の端末'}の版）`, tags:tagsOf(r), comments:r.comments || {}, body:r.body, color:r.color || '', folder:r.folder || '', createdAt:now, updatedAt:now });
       dirtyIds.add(memos[memos.length - 1].id);
     }
     // shas[id] は別の端末の版を指しているので、この端末の版で上書きできる
@@ -4271,7 +4385,11 @@ $('#unlockForm').addEventListener('submit', e => {
   e.preventDefault();
   const p = $('#pass').value, msg = $('#unlockMsg');
   if (!p){ msg.textContent = 'パスフレーズを入力してください'; return; }
-  busy($('#unlockBtn'), '開いています…', async () => {
+  unlockWith(p, $('#unlockBtn'));
+});
+function unlockWith(p, btn){
+  const msg = $('#unlockMsg');
+  return busy(btn, '開いています…', async () => {
     resetSecrets(); pass = p; msg.textContent = '';
     try{
       let env;
@@ -4286,7 +4404,7 @@ $('#unlockForm').addEventListener('submit', e => {
       await openNotebook();
     }catch(err){ resetSecrets(); msg.textContent = friendly(err); }
   });
-});
+}
 
 // 2) 初回：JSONBin から読み込む
 $('#loadForm').addEventListener('submit', e => {
@@ -4346,6 +4464,7 @@ function showLockView(){
   $('#unlockForm').classList.toggle('hidden', !c);
   $('#setup').classList.toggle('hidden', !!c);
   document.querySelectorAll('#lock .msg').forEach(m => m.textContent = '');
+  $('#bioGo').classList.toggle('hidden', !(c && bioOk() && store.get('memo.bio')));
   if (c){
     $('#dest').textContent = `JSONBin の設定（Bin ID ${c.binId}）で開きます。`;
     $('#pass').focus();
@@ -4369,6 +4488,7 @@ $('#forgetBtn').onclick = () => {
 async function lock(){
   if (rec.mr){ setStatus('録音中はロックできません。先に録音を停止してください', 'err'); return; }
   setFocus(false);   // 自動ロックでも集中モードを終える
+  if (dlg.open) dlg.close('cancel');
   closeSyncPop();
   if (cfgTimer) await saveSettings().catch(() => {});
   if (hasPending()) await sync();
@@ -4395,6 +4515,7 @@ function openSettings(){
   f.branch.value = c.branch; f.folder.value = c.folder;
   f.token.value = c.token;
   $('#binIdView').value = conn.get()?.binId || '';
+  renderFontPick(); renderBio();
   dlg.showModal();
 }
 dlg.addEventListener('close', async () => {
@@ -4428,6 +4549,402 @@ $('#forgetConn').onclick = async () => {
   conn.clear(); showLockView();
 };
 $('#openSettings2').onclick = openSettings;
+
+/* ================= ② 本文のフォント（端末ごとに覚える。書庫と同じ選択肢） ================= */
+const MIN_FB = '"Hiragino Mincho ProN","Yu Mincho","YuMincho",serif';
+const GO_FB = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif';
+const FONTS = [
+  { id:'zenkaku', name:'Zen Kaku Gothic New', fam:'"Zen Kaku Gothic New"', fb:GO_FB, kind:'ゴシック', note:'今までの文字' },
+  { id:'bizgo', name:'BIZ UDPゴシック', fam:'"BIZ UDPGothic"', gf:'BIZ+UDPGothic:wght@400;700', fb:GO_FB, kind:'ゴシック', note:'読みやすさ第一' },
+  { id:'notosans', name:'Noto Sans JP', fam:'"Noto Sans JP"', gf:'Noto+Sans+JP:wght@400;500;700', fb:GO_FB, kind:'ゴシック', note:'落ち着いた標準' },
+  { id:'mplus', name:'M PLUS 1p', fam:'"M PLUS 1p"', gf:'M+PLUS+1p:wght@400;700', fb:GO_FB, kind:'ゴシック', note:'小さくてもくっきり' },
+  { id:'bizmin', name:'BIZ UDP明朝', fam:'"BIZ UDPMincho"', gf:'BIZ+UDPMincho:wght@400;700', fb:MIN_FB, kind:'明朝', note:'画面で読みやすい' },
+  { id:'notoserif', name:'Noto Serif JP', fam:'"Noto Serif JP"', gf:'Noto+Serif+JP:wght@400;600', fb:MIN_FB, kind:'明朝', note:'癖のない標準' },
+  { id:'shippori', name:'しっぽり明朝', fam:'"Shippori Mincho"', gf:'Shippori+Mincho:wght@400;600', fb:MIN_FB, kind:'明朝', note:'活版の味わい' },
+  { id:'klee', name:'Klee One', fam:'"Klee One"', gf:'Klee+One:wght@400;600', fb:MIN_FB, kind:'教科書体', note:'手書きのような柔らかさ' },
+  { id:'sysgo', name:'端末のゴシック', fam:'', fb:GO_FB, kind:'ゴシック', note:'ヒラギノ・游ゴシック。読み込みなし' },
+  { id:'sysmin', name:'端末の明朝', fam:'', fb:MIN_FB, kind:'明朝', note:'ヒラギノ・游明朝。読み込みなし' },
+];
+const fontOf = id => FONTS.find(f => f.id === id) || FONTS[0];
+const fontStack = f => (f.fam ? f.fam + ',' : '') + f.fb;
+const gfLoaded = new Set();
+function loadFont(f){                       // Google Fonts は選んだ（見本を出した）ものだけ読み込む
+  if (!f.gf || gfLoaded.has(f.gf)) return;
+  gfLoaded.add(f.gf);
+  const l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;
+  document.head.appendChild(l);
+}
+function applyFont(){
+  const f = fontOf(store.get('memo.font'));
+  loadFont(f);
+  document.documentElement.style.setProperty('--memofont', fontStack(f));
+  for (const p of panes) p.view?.requestMeasure();
+}
+// 文字の形が後から届いたら、エディタの行の高さを測り直す
+document.fonts?.addEventListener?.('loadingdone', () => { for (const p of panes) p.view?.requestMeasure(); });
+function renderFontPick(){
+  const box = $('#fontPick'), cur = fontOf(store.get('memo.font')).id;
+  box.textContent = '';
+  for (const f of FONTS){
+    loadFont(f);
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.font = f.id;
+    b.setAttribute('aria-pressed', f.id === cur ? 'true' : 'false');
+    const fn = document.createElement('span'); fn.className = 'fn'; fn.textContent = f.name;
+    const fk = document.createElement('span'); fk.className = 'fk'; fk.textContent = `${f.kind}・${f.note}`; fn.append(fk);
+    const fs = document.createElement('span'); fs.className = 'fs'; fs.style.fontFamily = fontStack(f); fs.textContent = '会議のメモ 2026 Abc';
+    b.append(fn, fs);
+    box.append(b);
+  }
+}
+$('#fontPick').addEventListener('click', e => {
+  const b = e.target.closest('[data-font]'); if (!b) return;
+  store.set('memo.font', b.dataset.font); applyFont();
+  for (const x of $('#fontPick').children) x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+});
+applyFont();
+
+/* ================= ① Face ID・Touch ID（WebAuthn の PRF でパスフレーズを包む。書庫と同じ方式） =================
+   この端末の生体認証でしか取り出せない鍵で、パスフレーズを AES-GCM で暗号化して localStorage に置く。
+   GitHub・JSONBin には何も送らない。 */
+const bioOk = () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function prfKey(out){ return crypto.subtle.importKey('raw', new Uint8Array(out).slice(0, 32), 'AES-GCM', false, ['encrypt', 'decrypt']); }
+async function prfGet(idB64, salt){
+  const a = await navigator.credentials.get({ publicKey:{ challenge:rnd(32), rpId:location.hostname, userVerification:'required',
+    allowCredentials:[{ type:'public-key', id:a2b(idB64) }], extensions:{ prf:{ eval:{ first:salt } } }, timeout:60000 } });
+  const res = a.getClientExtensionResults()?.prf?.results?.first;
+  if (!res) throw new Error('この端末では Face ID・Touch ID での解錠に対応していません。');
+  return res;
+}
+const bioRec = () => { try{ return JSON.parse(store.get('memo.bio') || 'null'); }catch{ return null; } };
+function renderBio(){
+  const on = !!bioRec(), btn = $('#bioBtn');
+  $('#bioNote').textContent = !bioOk() ? 'この端末・ブラウザでは使えません（https で開いてください）'
+    : on ? 'この端末で使えるようになっています' : 'パスフレーズの代わりに使えます';
+  btn.classList.toggle('hidden', !bioOk());
+  btn.textContent = on ? 'やめる' : '設定する';
+  btn.classList.toggle('danger', on);
+  $('#bioForm').textContent = '';
+}
+$('#bioBtn').onclick = () => {
+  if (bioRec()){
+    store.del('memo.bio'); renderBio();
+    setStatus('Face ID・Touch ID での解錠をやめました', 'ok');
+    return;
+  }
+  const f = $('#bioForm');
+  f.innerHTML = `<label>確認のため、いまのパスフレーズを入れてください<input id="bioPass" type="password" autocomplete="current-password"></label>
+    <p class="msg" id="bioMsg"></p><div class="row"><span></span><button type="button" class="primary" id="bioDo">登録する</button></div>`;
+  $('#bioPass').focus();
+  $('#bioPass').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing){ e.preventDefault(); $('#bioDo').click(); } });
+  $('#bioDo').onclick = async () => {
+    const p = $('#bioPass').value, msg = $('#bioMsg');
+    if (!pass || p !== pass){ msg.textContent = 'パスフレーズが違います。'; return; }
+    try{
+      const salt = rnd(32);
+      const cred = await navigator.credentials.create({ publicKey:{
+        rp:{ name:'MemoStock', id:location.hostname }, user:{ id:rnd(16), name:'memostock', displayName:'MemoStock' }, challenge:rnd(32),
+        pubKeyCredParams:[{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+        authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+        extensions:{ prf:{ eval:{ first:salt } } }, timeout:60000 } });
+      const ext = cred.getClientExtensionResults()?.prf;
+      if (ext && ext.enabled === false) throw new Error('この端末では Face ID・Touch ID での解錠に対応していません。');
+      const id = b2a(new Uint8Array(cred.rawId));
+      const out = ext?.results?.first || await prfGet(id, salt);
+      const iv = rnd(12), ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, await prfKey(out), te.encode(p));
+      store.set('memo.bio', JSON.stringify({ id, salt:b2a(salt), iv:b2a(iv), ct:b2a(new Uint8Array(ct)) }));
+      renderBio();
+      setStatus('登録しました。次からは Face ID・Touch ID で開けます', 'ok');
+    }catch(e){ msg.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : (e.message || '登録できませんでした。'); }
+  };
+};
+$('#bioGo').onclick = async () => {
+  const msg = $('#unlockMsg'), v = bioRec(); if (!v) return;
+  msg.textContent = '';
+  let p;
+  try{
+    const out = await prfGet(v.id, a2b(v.salt));
+    p = td.decode(await crypto.subtle.decrypt({ name:'AES-GCM', iv:a2b(v.iv) }, await prfKey(out), a2b(v.ct)));
+  }catch(e){ msg.textContent = e?.name === 'NotAllowedError' ? '取り消されました。パスフレーズでも開けます。' : (e.message || '開けませんでした。パスフレーズで開いてください。'); return; }
+  await unlockWith(p, $('#bioGo'));
+  if (!pass && /パスフレーズが違います/.test(msg.textContent)){
+    store.del('memo.bio'); $('#bioGo').classList.add('hidden');
+    msg.textContent = 'パスフレーズが変わったようです。パスフレーズで開き、設定から Face ID・Touch ID を登録し直してください。';
+  }
+};
+
+/* ================= ⑤ フォルダ =================
+   メモごとに folder（"仕事/38期" のように / 区切り）を持たせ、メモと一緒に暗号化して GitHub へ。
+   中身が空のフォルダも残せるよう、フォルダの一覧は設定（JSONBin・暗号化）に置く。 */
+const folderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+const inboxIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z"/><path d="M4 13.5h4.5l1 2h5l1-2H20"/></svg>';
+const allIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>';
+const moreIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>';
+const twIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+let curFolder = '*';                  // '*'＝すべて、''＝未分類、それ以外はフォルダのパス
+let folderOpen = true;
+let folderShut = new Set();           // 子フォルダを畳んでいるフォルダ
+const dragMemos = matchMedia('(pointer:fine)').matches;   // マウスのときは一覧からドラッグでも移せる
+const folderOf = m => typeof m?.folder === 'string' ? m.folder : '';
+const parentOf = f => f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '';
+const leafOf = f => f.split('/').pop();
+const under = (x, f) => x === f || x.startsWith(f + '/');
+const inFolder = (m, f) => f === '*' || (f === '' ? folderOf(m) === '' : under(folderOf(m), f));
+const cleanFolderName = s => (s || '').replace(/[\/\\]/g, '／').replace(/\s+/g, ' ').trim().slice(0, 40);
+function allFolders(){
+  const set = new Set();
+  const add = f => { while (f){ set.add(f); f = parentOf(f); } };
+  for (const f of settings?.folders || []) add(f);
+  for (const m of memos) add(folderOf(m));
+  return [...set].sort((a, b) => {
+    const A = a.split('/'), B = b.split('/');
+    for (let i = 0; i < Math.min(A.length, B.length); i++){ const c = A[i].localeCompare(B[i], 'ja', { numeric:true }); if (c) return c; }
+    return A.length - B.length;
+  });
+}
+function saveFolders(list){
+  if (!settings) return;
+  settings.folders = [...new Set(list)].filter(Boolean);
+  saveSettingsSoon();
+}
+function selectFolder(f){
+  curFolder = f;
+  renderList(); saveLayoutSoon();
+  $('#list').scrollTop = 0;
+}
+function renderFolders(){
+  const box = $('#folders'), tree = $('#folderTree');
+  const fs = allFolders();
+  if (curFolder !== '*' && curFolder !== '' && !fs.includes(curFolder)) curFolder = '*';
+  box.dataset.open = folderOpen ? 'true' : 'false';
+  $('#fToggle').setAttribute('aria-expanded', folderOpen ? 'true' : 'false');
+  $('#fCur').textContent = curFolder === '*' ? '' : '：' + (curFolder === '' ? '未分類' : curFolder);
+  const cnt = new Map(); let none = 0;
+  for (const m of memos){ const f = folderOf(m); if (!f){ none++; continue; } let x = f; while (x){ cnt.set(x, (cnt.get(x) || 0) + 1); x = parentOf(x); } }
+  tree.textContent = '';
+  const row = (key, label, icon, n, depth, extra) => {
+    const li = document.createElement('li');
+    li.style.setProperty('--d', depth);
+    li.setAttribute('aria-current', curFolder === key ? 'true' : 'false');
+    li.dataset.f = key;
+    const tw = document.createElement('button'); tw.type = 'button'; tw.className = 'tw none'; tw.tabIndex = -1; tw.innerHTML = twIcon;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'fo';
+    b.innerHTML = icon;
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = label;
+    const c = document.createElement('span'); c.className = 'n'; c.textContent = n || '';
+    b.append(nm, c);
+    b.onclick = () => selectFolder(key);
+    li.append(tw, b);
+    extra?.(li, tw);
+    // 一覧のメモをドラッグして落とすと、そのフォルダへ移す
+    if (key !== '*'){
+      li.ondragover = e => { if (e.dataTransfer.types.includes('text/x-memo-id')){ e.preventDefault(); li.classList.add('drop'); } };
+      li.ondragleave = () => li.classList.remove('drop');
+      li.ondrop = e => { e.preventDefault(); li.classList.remove('drop'); const m = find(e.dataTransfer.getData('text/x-memo-id')); if (m) moveMemo(m, key); };
+    }
+    tree.append(li);
+    return li;
+  };
+  row('*', 'すべてのメモ', allIcon, memos.length, 0);
+  const hidden = f => { let p = parentOf(f); while (p){ if (folderShut.has(p)) return true; p = parentOf(p); } return false; };
+  for (const f of fs){
+    if (hidden(f)) continue;
+    const depth = f.split('/').length - 1;
+    const kids = fs.some(x => x.startsWith(f + '/'));
+    row(f, leafOf(f), folderIcon, cnt.get(f) || 0, depth, (li, tw) => {
+      li.title = f;
+      if (kids){
+        tw.classList.remove('none'); tw.classList.toggle('shut', folderShut.has(f));
+        tw.setAttribute('aria-label', folderShut.has(f) ? `「${leafOf(f)}」を開く` : `「${leafOf(f)}」を畳む`);
+        tw.onclick = () => { folderShut.has(f) ? folderShut.delete(f) : folderShut.add(f); renderFolders(); saveLayoutSoon(); };
+      }
+      const mb = document.createElement('button'); mb.type = 'button'; mb.className = 'fm'; mb.innerHTML = moreIcon;
+      mb.title = 'フォルダの操作'; mb.setAttribute('aria-label', `「${leafOf(f)}」の操作`);
+      mb.onclick = e => { e.stopPropagation(); folderMenu(mb, f); };
+      li.oncontextmenu = e => { e.preventDefault(); folderMenu(mb, f); };
+      li.append(mb);
+    });
+  }
+  if (fs.length) row('', '未分類', inboxIcon, none, 0);
+}
+$('#fToggle').onclick = () => { folderOpen = !folderOpen; renderFolders(); saveLayoutSoon(); };
+$('#fAdd').onclick = () => {
+  const base = curFolder !== '*' && curFolder ? curFolder : '';
+  createFolder(base);
+};
+function createFolder(parent, then){
+  const name = cleanFolderName(prompt(parent ? `「${parent}」の中に作るフォルダの名前` : '新しいフォルダの名前'));
+  if (!name) return;
+  const f = parent ? parent + '/' + name : name;
+  if (!allFolders().includes(f)) saveFolders([...(settings?.folders || []), f]);
+  folderOpen = true;
+  let p = parent; while (p){ folderShut.delete(p); p = parentOf(p); }
+  if (then) then(f); else selectFolder(f);
+}
+function folderMenu(anchor, f){
+  openPop(anchor, el => {
+    const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = f; el.append(cap);
+    const item = (label, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'item' + (cls ? ' ' + cls : ''); b.textContent = label; b.onclick = () => { closePop(); fn(); }; el.append(b); };
+    item('この中にフォルダを作る', () => createFolder(f));
+    item('名前を変える', () => renameFolder(f));
+    item('フォルダを削除…', () => deleteFolder(f), 'warn');
+  });
+}
+// f 以下のフォルダのパスを to に付け替える（メモと、設定のフォルダ一覧の両方）
+function remapFolders(f, to){
+  const map = x => under(x, f) ? (to + x.slice(f.length)).replace(/^\//, '') : x;
+  const now = Date.now();
+  for (const m of memos){
+    const x = folderOf(m);
+    if (x && under(x, f)){ m.folder = map(x); m.metaAt = now; dirtyIds.add(m.id); }
+  }
+  saveFolders((settings?.folders || []).map(map));
+  folderShut = new Set([...folderShut].map(map));
+  if (curFolder !== '*' && under(curFolder, f)) curFolder = map(curFolder);
+  schedule(); renderList(); renderTabs(); updateStatusBar(); saveLayoutSoon();
+}
+function renameFolder(f){
+  const name = cleanFolderName(prompt('フォルダの新しい名前', leafOf(f)));
+  if (!name || name === leafOf(f)) return;
+  const to = (parentOf(f) ? parentOf(f) + '/' : '') + name;
+  if (allFolders().includes(to) && !confirm(`「${to}」はすでにあります。中身をまとめますか？`)) return;
+  remapFolders(f, to);
+}
+function deleteFolder(f){
+  const n = memos.filter(m => under(folderOf(m), f)).length, up = parentOf(f);
+  const where = up ? `「${up}」` : '「未分類」';
+  if (!confirm(n ? `フォルダ「${f}」を削除します。中のメモ ${n} 件は${where}へ移します（メモは消えません）。` : `フォルダ「${f}」を削除します。`)) return;
+  if (curFolder !== '*' && under(curFolder, f)) curFolder = up || '*';
+  // 子フォルダごと親へ移してから、空になった一覧から外す
+  const now = Date.now();
+  for (const m of memos){ const x = folderOf(m); if (x && under(x, f)){ m.folder = up; m.metaAt = now; dirtyIds.add(m.id); } }
+  saveFolders((settings?.folders || []).filter(x => !under(x, f)));
+  schedule(); renderList(); renderTabs(); updateStatusBar(); saveLayoutSoon();
+}
+function moveMemo(m, f){
+  if (folderOf(m) === f) return;
+  setMeta(m, { folder:f });
+  setStatus(f ? `「${nameOf(m)}」を「${f}」へ移しました` : `「${nameOf(m)}」を未分類にしました`, 'dirty');
+}
+$('#folderBtn').onclick = () => {
+  const m = find(curId()); if (!m) return;
+  if (!$('#popMenu').hidden && popAnchor === $('#folderBtn')) return closePop();
+  openPop($('#folderBtn'), el => {
+    const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = 'フォルダへ移動'; el.append(cap);
+    const ls = document.createElement('div'); ls.className = 'flist'; el.append(ls);
+    const item = (f, label, depth) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'item fi'; b.style.setProperty('--d', depth);
+      b.setAttribute('role', 'menuitemradio'); b.setAttribute('aria-checked', folderOf(m) === f ? 'true' : 'false');
+      b.textContent = label;
+      b.onclick = () => { closePop(); moveMemo(m, f); };
+      ls.append(b);
+    };
+    item('', '未分類', 0);
+    for (const f of allFolders()) item(f, leafOf(f), f.split('/').length - 1);
+    const nb = document.createElement('button'); nb.type = 'button'; nb.className = 'item'; nb.textContent = '＋ 新しいフォルダを作って移す';
+    nb.onclick = () => { closePop(); createFolder('', f => moveMemo(m, f)); };
+    el.append(nb);
+  });
+};
+
+/* ================= ③④ スマホ：画面を固定し、書くときは帯が邪魔をしない =================
+   ・書き進めて下へ送ると上の帯（ヘッダー・道具・タブ）は隠れ、上へ戻すと出る（書庫の没入表示と同じ考え）
+   ・キーボードが出ている間は、見えている範囲にアプリを合わせ、道具の帯をキーボードの真上に置く */
+const mqPhone = matchMedia('(max-width:720px)');
+const vv = window.visualViewport;
+let chromeRaf = 0, lastTop = 0;
+function chromeEls(){
+  const p = panes[activePane]?.el;
+  return [$('#app>header'), $('#toolbar'), p?.querySelector(':scope>.tabbar'), p?.querySelector(':scope>.tagbar')].filter(Boolean);
+}
+function layoutChrome(){
+  chromeRaf = 0;
+  const body = document.body;
+  if (!body.classList.contains('imm')){ for (const el of chromeEls()) el.style.top = ''; return; }
+  const p = panes[activePane];
+  p?.tabbar?.classList.toggle('solo', (p.tabs?.length || 0) <= 1);
+  let y = 0;
+  for (const el of chromeEls()){
+    if (getComputedStyle(el).display === 'none'){ el.style.top = ''; continue; }
+    el.style.top = `calc(env(safe-area-inset-top,0px) + ${y}px)`;
+    y += el.offsetHeight;
+  }
+  document.documentElement.style.setProperty('--chromeh', y + 'px');
+}
+const queueChrome = () => { if (!chromeRaf) chromeRaf = requestAnimationFrame(layoutChrome); };
+function setChrome(on){ document.body.classList.toggle('chrome', on); }
+function updateImm(){
+  const app = $('#app');
+  const on = mqPhone.matches && !!pass && !app.classList.contains('hidden') && app.classList.contains('editing') && !app.classList.contains('focus');
+  const was = document.body.classList.contains('imm');
+  document.body.classList.toggle('imm', on);
+  if (on && !was) setChrome(true);
+  if (!on) document.body.classList.remove('chrome');
+  updateKb();
+  queueChrome();
+  for (const p of panes) p.view?.requestMeasure();
+}
+function updateKb(){
+  const app = $('#app');
+  const editingNow = mqPhone.matches && !!pass && !app.classList.contains('hidden') && app.classList.contains('editing');
+  const kbH = vv ? innerHeight - vv.height : 0;
+  const typing = !!document.activeElement?.closest?.('.cm-editor, .tagbar input, #cpanel textarea');
+  const on = editingNow && kbH > 120 && typing;
+  const was = document.body.classList.contains('kb');
+  document.body.classList.toggle('kb', on);
+  if (on){
+    document.documentElement.style.setProperty('--vvh', vv.height + 'px');
+    document.documentElement.style.setProperty('--vvt', vv.offsetTop + 'px');
+  }
+  if (was !== on){
+    if (!on){ window.scrollTo(0, 0); document.documentElement.style.removeProperty('--vvt'); }
+    for (const p of panes) p.view?.requestMeasure();
+    queueChrome();
+    // キーボードが出たらカーソルを見える所へ
+    if (on) setTimeout(() => { const v = curView(); if (v?.hasFocus) v.dispatch({ effects:EditorView.scrollIntoView(v.state.selection.main.head, { y:'nearest', yMargin:24 }) }); }, 60);
+  }
+}
+if (vv){
+  vv.addEventListener('resize', updateKb);
+  vv.addEventListener('scroll', () => { if (document.body.classList.contains('kb')) document.documentElement.style.setProperty('--vvt', vv.offsetTop + 'px'); });
+}
+document.addEventListener('focusin', () => setTimeout(updateKb, 50));
+document.addEventListener('focusout', () => setTimeout(updateKb, 120));
+mqPhone.addEventListener?.('change', updateImm);
+addEventListener('resize', queueChrome);
+new MutationObserver(updateImm).observe($('#app'), { attributes:true, attributeFilter:['class'] });
+// 本文を下へ送ると帯を隠し、上へ戻すと出す
+$('#panes').addEventListener('scroll', e => {
+  if (!document.body.classList.contains('imm') || !e.target.classList?.contains('cm-scroller')) return;
+  const t = e.target.scrollTop, d = t - lastTop;
+  if (t < 8) setChrome(true);
+  else if (d > 12) setChrome(false);
+  else if (d < -16) setChrome(true);
+  if (Math.abs(d) > 12 || t < 8) lastTop = t;
+}, true);
+// 書き始めたら帯をしまう（キーボードの無い iPhone 用の外付けキーボードでも同じ）
+$('#panes').addEventListener('beforeinput', () => { if (document.body.classList.contains('imm') && document.body.classList.contains('chrome')) setChrome(false); }, true);
+// タブ・タグ・帯の中身が変わったら、帯の並びを測り直す
+{
+  const mo = new MutationObserver(queueChrome);
+  for (const el of document.querySelectorAll('#panes .pane>.tabbar, #panes .pane>.tagbar')) mo.observe(el, { childList:true, attributes:true, attributeFilter:['class'] });
+  mo.observe($('#panes'), { attributes:true, attributeFilter:['class'] });
+  for (const el of document.querySelectorAll('#panes .pane')) mo.observe(el, { attributes:true, attributeFilter:['class'] });
+}
+// キーボードの上の道具を押しても、キーボードが閉じないようにエディタへ戻す
+{
+  let refocus = false;
+  $('#toolbar').addEventListener('pointerdown', e => { refocus = e.pointerType !== 'mouse' && document.body.classList.contains('kb') && !!curView()?.hasFocus; }, true);
+  $('#toolbar').addEventListener('click', () => {
+    if (!refocus) return; refocus = false;
+    setTimeout(() => {
+      const a = document.activeElement;
+      if ($('#popMenu').hidden && $('#inkMenu').hidden && !a?.closest?.('input, textarea, dialog, .cm-editor')) curView()?.focus();
+    }, 0);
+  });
+}
 
 applyView();
 showLockView();
