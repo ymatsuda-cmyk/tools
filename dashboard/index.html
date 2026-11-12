@@ -3175,6 +3175,7 @@ async function loadClipgenOptions(m, refresh){
   const st = clipgenState[m.id];
   try{
     const api = await clipgenModule();
+    await api.syncSettings(refresh);   /* api/ai/ で決めたAI接続・既定を JSONBin から取り込む */
     st.spaces = await api.spaces();
     st.models = api.models();
     if(!st.spaces.some(s => s.id === st.spaceId)) st.spaceId = st.spaces[0] ? st.spaces[0].id : '';
