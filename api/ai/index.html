@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI接続の管理</title>
+<style>
+:root{
+  --bg:#f4f2ec; --card:#fff; --ink:#2b2b28; --sub:#7b7a72; --line:#e2dfd4;
+  --accent:#5fa8a0; --accent-ink:#2f6f68; --danger:#b4533f; --chip:#eceae0;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#1d1e1c; --card:#262725; --ink:#e8e6df; --sub:#9a988f; --line:#3a3b37; --accent:#5fa8a0; --accent-ink:#8fd0c8; --danger:#e08a76; --chip:#33342f; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+label{display:block;font-size:12px;color:var(--sub);margin-bottom:2px}
+input,select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 14px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--danger)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row.end{justify-content:flex-end}
+.status{min-height:1.4em;margin-top:8px;font-size:13px}
+.status.err{color:var(--danger)} .status.ok{color:var(--accent-ink)}
+.conn{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.conn.active{border-color:var(--accent)}
+.conn-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.conn-head input{font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid transparent;border-radius:999px;padding:2px 4px 2px 10px;font-size:13px}
+.chip.on{border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chip button{border:0;background:none;padding:0 6px;color:var(--sub);cursor:pointer;line-height:1}
+.chip button:hover{color:var(--danger)}
+.chip .pick{padding:0;color:inherit}
+.add{display:flex;gap:6px}
+.add input{max-width:280px}
+.badge{font-size:11px;background:var(--accent);color:#fff;border-radius:999px;padding:1px 8px}
+.summary{width:100%;border-collapse:collapse;font-size:13px}
+.summary th,.summary td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+.summary th{color:var(--sub);font-weight:500}
+.hint{color:var(--sub);font-size:12px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>AI接続の管理</h1>
+  <p class="lead">JSONBin に置いた clipstock の設定（<code>llmSettings</code>）を読み込み、AI接続とモデルの一覧を確認・変更します。ダッシュボードの「使うAI」はここで決まります。</p>
+
+  <section class="card">
+    <h2>1. JSONBin に接続</h2>
+    <div class="grid">
+      <div><label for="binId">Bin ID</label><input id="binId" autocomplete="off" spellcheck="false"></div>
+      <div><label for="apiKey">APIキー（X-Master-Key）</label><input id="apiKey" type="password" autocomplete="off"></div>
+      <div><label for="pass">パスフレーズ（暗号化している場合）</label><input id="pass" type="password" autocomplete="off"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="load">読み込む</button>
+      <label class="row" style="margin:0"><input type="checkbox" id="remember" style="width:auto"> この端末に入力値を保存</label>
+    </div>
+    <div class="status" id="loadStatus"></div>
+  </section>
+
+  <div id="editor" class="hidden">
+    <section class="card">
+      <h2>2. 一覧</h2>
+      <table class="summary" id="summary"></table>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0">既定で使うAI</label>
+        <select id="activeSel" style="max-width:360px"></select>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. 接続とモデルの編集</h2>
+      <div id="conns"></div>
+      <button id="addConn">＋ 接続を追加</button>
+    </section>
+
+    <section class="card">
+      <div class="row end">
+        <button id="local">この端末の clipstock にも反映</button>
+        <button class="primary" id="save">JSONBin に保存</button>
+      </div>
+      <div class="status" id="saveStatus"></div>
+      <p class="hint">保存時は最新の Bin を読み直し、<code>llmSettings</code> だけを差し替えます（他の設定やプロンプトは保持）。パスフレーズ入力で読み込んだ場合は暗号化して書き戻します。</p>
+    </section>
+  </div>
+</main>
+
+<script>
+const API = 'https://api.jsonbin.io/v3/b';
+const ENC = 'clipstock-config-aesgcm/v1';
+const $ = (id) => document.getElementById(id);
+const LS = 'ai-admin:conn';
+
+let llm = null;        // 編集中の llmSettings
+let wasEncrypted = false;
+
+/* ---------- 暗号（clipstock/src/lib/jsonbin-crypto.js と同じ形式） ---------- */
+const utf8 = (s) => new TextEncoder().encode(s);
+const b64e = (u8) => btoa(String.fromCharCode(...u8));
+const b64d = (s) => Uint8Array.from(atob(String(s)), (c) => c.charCodeAt(0));
+const isEnvelope = (x) => !!x && typeof x === 'object' && x.enc === ENC && typeof x.ct === 'string';
+
+async function deriveKey(pass, salt, iter, usages){
+  if(!crypto.subtle) throw new Error('暗号化を使えません（https か localhost で開いてください）');
+  const base = await crypto.subtle.importKey('raw', utf8(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', hash:'SHA-256', salt, iterations:iter}, base, {name:'AES-GCM', length:256}, false, usages);
+}
+async function decrypt(env, pass){
+  if(!pass) throw new Error('中身が暗号化されています。パスフレーズを入力してください');
+  const key = await deriveKey(pass, b64d(env.salt), Number(env.iterations) || 250000, ['decrypt']);
+  let plain;
+  try{ plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv), additionalData:utf8(ENC), tagLength:128}, key, b64d(env.ct)); }
+  catch{ throw new Error('パスフレーズが違うか、データが壊れています'); }
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+async function encrypt(json, pass){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iterations = 250000;
+  const key = await deriveKey(pass, salt, iterations, ['encrypt']);
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv, additionalData:utf8(ENC), tagLength:128}, key, utf8(JSON.stringify(json)));
+  return {enc:ENC, kdf:'PBKDF2-SHA256', iterations, salt:b64e(salt), iv:b64e(iv), ct:b64e(new Uint8Array(ct))};
+}
+
+/* ---------- JSONBin ---------- */
+async function fetchRemote(){
+  const binId = $('binId').value.trim(), key = $('apiKey').value.trim(), pass = $('pass').value;
+  if(!binId || !key) throw new Error('Bin ID と APIキーを入力してください');
+  const res = await fetch(`${API}/${encodeURIComponent(binId)}/latest`, {headers:{'X-Master-Key':key, 'X-Bin-Meta':'false'}, cache:'no-store'});
+  if(!res.ok) throw new Error(`取得に失敗しました (HTTP ${res.status})`);
+  let body = await res.json();
+  const enc = isEnvelope(body);
+  if(enc) body = await decrypt(body, pass);
+  return {body: body || {}, enc};
+}
+
+/* ---------- 画面 ---------- */
+function setStatus(el, msg, kind){ el.textContent = msg || ''; el.className = 'status' + (kind ? ' ' + kind : ''); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function newId(){ return Math.random().toString(36).slice(2, 8); }
+
+function render(){ renderSummary(); renderConns(); }
+
+function renderSummary(){
+  // 一覧(サマリ)
+  const rows = llm.connections.flatMap((c) => (c.models || []).map((m) => ({c, m})));
+  $('summary').innerHTML = `<tr><th>接続</th><th>モデル</th><th>接続先</th><th></th></tr>` +
+    (rows.length ? rows.map(({c, m}) => {
+      const on = c.id === llm.activeConnectionId && m === llm.activeModel;
+      return `<tr><td>${esc(c.label)}</td><td>${esc(m)}</td><td class="hint">${esc(c.baseUrl)}</td><td>${on ? '<span class="badge">既定</span>' : ''}</td></tr>`;
+    }).join('') : `<tr><td colspan="4" class="hint">モデルがありません</td></tr>`);
+
+  // 既定セレクト
+  $('activeSel').innerHTML = rows.map(({c, m}) => {
+    const v = c.id + '::' + m;
+    const on = c.id === llm.activeConnectionId && m === llm.activeModel;
+    return `<option value="${esc(v)}" ${on ? 'selected' : ''}>${esc(c.label)} / ${esc(m)}</option>`;
+  }).join('');
+
+}
+
+function renderConns(){
+  // 接続ごとの編集
+  $('conns').innerHTML = llm.connections.map((c, i) => `
+    <div class="conn ${c.id === llm.activeConnectionId ? 'active' : ''}" data-i="${i}">
+      <div class="conn-head">
+        <input data-f="label" value="${esc(c.label)}" placeholder="ラベル">
+        <button class="danger" data-act="delConn">削除</button>
+      </div>
+      <div class="grid">
+        <div><label>接続先 URL（baseUrl）</label><input data-f="baseUrl" value="${esc(c.baseUrl)}" spellcheck="false"></div>
+        <div><label>APIキー</label><input data-f="apiKey" type="password" value="${esc(c.apiKey)}" autocomplete="off"></div>
+        <div><label>コンテキスト長（numCtx）</label><input data-f="numCtx" type="number" value="${esc(c.numCtx)}"></div>
+        <div><label>思考モード（think）</label>
+          <select data-f="think">
+            <option value="" ${c.think == null ? 'selected' : ''}>既定</option>
+            <option value="false" ${c.think === false ? 'selected' : ''}>オフ</option>
+            <option value="true" ${c.think === true ? 'selected' : ''}>オン</option>
+          </select></div>
+      </div>
+      <label style="margin-top:8px">モデル（クリックで既定に）</label>
+      <div class="chips">
+        ${(c.models || []).map((m, j) => `
+          <span class="chip ${c.id === llm.activeConnectionId && m === llm.activeModel ? 'on' : ''}">
+            <button class="pick" data-act="pick" data-j="${j}">${esc(m)}</button>
+            <button data-act="delModel" data-j="${j}" title="削除">×</button>
+          </span>`).join('') || '<span class="hint">モデルなし</span>'}
+      </div>
+      <div class="add"><input data-new placeholder="モデル名（例 qwen3.8:27b）" spellcheck="false"><button data-act="addModel">追加</button></div>
+    </div>`).join('');
+}
+
+function fixActive(){
+  if(!llm.connections.some((c) => c.id === llm.activeConnectionId)) llm.activeConnectionId = llm.connections[0]?.id ?? null;
+  const a = llm.connections.find((c) => c.id === llm.activeConnectionId);
+  if(!a?.models?.includes(llm.activeModel)) llm.activeModel = a?.models?.[0] ?? null;
+}
+
+$('conns').addEventListener('input', (e) => {
+  const f = e.target.dataset.f; if(!f) return;
+  const c = llm.connections[e.target.closest('.conn').dataset.i];
+  let v = e.target.value;
+  if(f === 'numCtx') v = Number(v) || 0;
+  if(f === 'think') v = v === '' ? null : v === 'true';
+  c[f] = v;
+  if(f === 'label') renderSummary();
+});
+$('conns').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  const box = b.closest('.conn'); const c = llm.connections[box.dataset.i];
+  const act = b.dataset.act;
+  if(act === 'delConn'){
+    if(!confirm(`接続「${c.label}」を削除しますか？`)) return;
+    llm.connections.splice(box.dataset.i, 1);
+  }else if(act === 'delModel'){
+    c.models.splice(b.dataset.j, 1);
+  }else if(act === 'pick'){
+    llm.activeConnectionId = c.id; llm.activeModel = c.models[b.dataset.j];
+  }else if(act === 'addModel'){
+    const inp = box.querySelector('[data-new]'); const m = inp.value.trim();
+    if(!m) return;
+    c.models = c.models || [];
+    if(!c.models.includes(m)) c.models.push(m);
+  }
+  fixActive(); render();
+});
+$('conns').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && e.target.dataset.new !== undefined){ e.preventDefault(); e.target.nextElementSibling.click(); }
+});
+$('activeSel').addEventListener('change', (e) => {
+  const [cid, ...rest] = e.target.value.split('::');
+  llm.activeConnectionId = cid; llm.activeModel = rest.join('::');
+  render();
+});
+$('addConn').addEventListener('click', () => {
+  llm.connections.push({id:newId(), label:'新しい接続', baseUrl:'', apiKey:'', numCtx:32768, gasUrl:'', controlToken:'', think:null, models:[]});
+  render();
+});
+
+$('load').addEventListener('click', async () => {
+  const st = $('loadStatus'); setStatus(st, '読み込み中…');
+  try{
+    const {body, enc} = await fetchRemote();
+    wasEncrypted = enc;
+    llm = body.llmSettings || {connections:[], activeConnectionId:null, activeModel:null, temperature:0.7, systemPrompt:'必ず日本語で回答してください。'};
+    if(!Array.isArray(llm.connections)) llm.connections = [];
+    fixActive();
+    if($('remember').checked) localStorage.setItem(LS, JSON.stringify({binId:$('binId').value, apiKey:$('apiKey').value, pass:$('pass').value}));
+    else localStorage.removeItem(LS);
+    $('editor').classList.remove('hidden');
+    render();
+    setStatus(st, `読み込みました（接続 ${llm.connections.length} 件${enc ? '・暗号化あり' : ''}）`, 'ok');
+  }catch(err){ setStatus(st, err.message, 'err'); }
+});
+
+$('save').addEventListener('click', async () => {
+  const st = $('saveStatus');
+  if(!confirm('JSONBin の llmSettings を、この内容で上書きします。よろしいですか？')) return;
+  setStatus(st, '保存中…');
+  try{
+    const {body} = await fetchRemote();           // 最新を読み直して他の項目を保持
+    fixActive();
+    body.llmSettings = llm;
+    let out = body;
+    if(wasEncrypted){
+      const pass = $('pass').value;
+      if(!pass) throw new Error('暗号化して書き戻すにはパスフレーズが必要です');
+      out = await encrypt(body, pass);
+    }
+    const res = await fetch(`${API}/${encodeURIComponent($('binId').value.trim())}`, {
+      method:'PUT', headers:{'Content-Type':'application/json', 'X-Master-Key':$('apiKey').value.trim()}, body:JSON.stringify(out)});
+    if(!res.ok) throw new Error(`保存に失敗しました (HTTP ${res.status})`);
+    setStatus(st, '保存しました。clipstock／ダッシュボードは次回の同期で反映されます。', 'ok');
+  }catch(err){ setStatus(st, err.message, 'err'); }
+});
+
+$('local').addEventListener('click', () => {
+  fixActive();
+  localStorage.setItem('gemma-chat.settings', JSON.stringify(llm));
+  setStatus($('saveStatus'), 'この端末の clipstock 設定（gemma-chat.settings）に反映しました。', 'ok');
+});
+
+/* ---------- 初期値: 保存済み入力 → clipstock の設定 の順で補う ---------- */
+try{
+  const saved = JSON.parse(localStorage.getItem(LS) || 'null');
+  if(saved){
+    $('binId').value = saved.binId || ''; $('apiKey').value = saved.apiKey || ''; $('pass').value = saved.pass || '';
+    $('remember').checked = true;
+  }else{
+    const cfg = JSON.parse(localStorage.getItem('videos:config') || '{}');
+    $('binId').value = cfg.jsonbinBinId || ''; $('apiKey').value = cfg.jsonbinApiKey || '';
+    $('pass').value = localStorage.getItem('videos:jsonbin-pass') || '';
+  }
+}catch{}
+</script>
+</body>
+</html>
