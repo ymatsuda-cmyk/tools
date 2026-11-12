@@ -820,6 +820,20 @@
       </select>
       <div class="hint">棒グラフはパターン（動画・Web記事・other・music・golf…）ごとに1本ずつ並べます。総覧の「すべて」は外れます</div>
     </div>
+    <div class="field" data-for="clipgen">
+      <label>AI用 JSONBin の Bin ID</label>
+      <input type="text" id="mf-clipgen-binid" placeholder="空欄なら clipstock の JSONBin 設定を使う" autocomplete="off" spellcheck="false">
+      <div class="hint">api/ai/ で編集する Bin。ここの「既定のAI」とモデル一覧をそのまま使います</div>
+    </div>
+    <div class="field" data-for="clipgen">
+      <label>AI用 JSONBin の APIキー（X-Master-Key）</label>
+      <input type="password" id="mf-clipgen-binkey" autocomplete="off">
+    </div>
+    <div class="field" data-for="clipgen">
+      <label>AI用 JSONBin のパスフレーズ</label>
+      <input type="password" id="mf-clipgen-binpass" placeholder="暗号化していなければ空欄" autocomplete="off">
+      <div class="hint">この3つはこのカードの設定として保存されます（この端末のブラウザ内）</div>
+    </div>
     <div class="field" data-for="manual">
       <label>単位</label>
       <input type="text" id="mf-unit" placeholder="回">
@@ -3175,7 +3189,7 @@ async function loadClipgenOptions(m, refresh){
   const st = clipgenState[m.id];
   try{
     const api = await clipgenModule();
-    const sync = await api.syncSettings(refresh); st.syncNote = sync && !sync.ok ? sync.message : '';   /* api/ai/ で決めたAI接続・既定を JSONBin から取り込む */
+    const sync = await api.syncSettings(refresh, { binId:m.aiBinId, apiKey:m.aiBinKey, passphrase:m.aiBinPass }); st.syncNote = sync && !sync.ok ? sync.message : '';   /* api/ai/ で決めたAI接続・既定を JSONBin から取り込む */
     st.spaces = await api.spaces();
     st.models = api.models();
     if(!st.spaces.some(s => s.id === st.spaceId)) st.spaceId = st.spaces[0] ? st.spaces[0].id : '';
@@ -5701,6 +5715,9 @@ function fillMonitorForm(m){
   F('mf-lines').value = m.lines || (Array.isArray(m.rows) ? m.rows.length : 1);
   F('mf-clipgen-total').value = m.total || '';
   F('mf-clipgen-chart').value = m.chart === 'bar' ? 'bar' : 'ring';
+  F('mf-clipgen-binid').value = m.aiBinId || '';
+  F('mf-clipgen-binkey').value = m.aiBinKey || '';
+  F('mf-clipgen-binpass').value = m.aiBinPass || '';
   F('mf-sch-max').value = m.max || 5;
   F('mf-sch-hidepast').value = m.hidePast ? 'hide' : 'show';
   F('mf-sch-defaultview').value = m.defaultView === 'week' ? 'week' : 'today';
@@ -5818,6 +5835,10 @@ function buildMonitor(){
     else delete m.total;
     if(F('mf-clipgen-chart').value === 'bar') m.chart = 'bar';
     else delete m.chart;
+    [['aiBinId','mf-clipgen-binid'],['aiBinKey','mf-clipgen-binkey'],['aiBinPass','mf-clipgen-binpass']].forEach(([k,id])=>{
+      const v = F(id).value.trim();
+      if(v) m[k] = v; else delete m[k];
+    });
   }
   if(type === 'schedule'){
     m.max = Math.max(1, Math.min(20, Number(F('mf-sch-max').value) || 5));

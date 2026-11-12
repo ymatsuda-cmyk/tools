@@ -216,6 +216,7 @@ clipstock の「完了ぶんをまとめて生成」を、clipstock を開かず
 | `space` | 最初に選んでおくパターン（省略可。省略時は spaces.json の既定） |
 | `model` | 最初に選んでおくAI（省略可。省略時は clipstock で選択中のもの） |
 | `showSpace` | `false` でパターンのコンボボックスを隠す。`space` の値で固定される |
+| `aiBinId` / `aiBinKey` / `aiBinPass` | AI用 JSONBin（`api/ai/` で編集する Bin）の Bin ID・APIキー・パスフレーズ（暗号化していなければ省略可）。設定画面の入力欄と同じ。空なら clipstock の JSONBin 設定を使う。取り込めたAI一覧・既定のAIがこのカードで使われる |
 
 ### 今日の予定（`type: "schedule"`）
 
