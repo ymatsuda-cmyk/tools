@@ -18,7 +18,9 @@ import { listVideos, listVideosFromNotion } from '../../clipstock/src/lib/store.
 import { fetchTranscript, saveGenerated, statusCounts } from '../../clipstock/src/lib/gas.js'
 import { generateAll, stagesOf } from '../../clipstock/src/lib/generate.js'
 import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../clipstock/src/lib/spaces.js'
-import { loadSettings, connectionOf } from '../../clipstock/src/lib/llm-settings.js'
+import { loadSettings, saveSettings, connectionOf } from '../../clipstock/src/lib/llm-settings.js'
+import { fetchBin } from '../../clipstock/src/lib/jsonbin.js'
+import { decryptConfig, isEnvelope } from '../../clipstock/src/lib/jsonbin-crypto.js'
 import { loadConfig, isConfigured, syncConfigFromJsonbinStrict } from '../../clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../clipstock/src/lib/filters.js'
 import { knownTagsOf } from '../../clipstock/src/lib/tags.js'
@@ -40,19 +42,31 @@ export async function spaces() {
 }
 
 let settingsSynced = null
+let settingsKey = ''
 
 /**
  * AI接続の一覧と既定のAIを JSONBin から取り込む(api/ai/ の管理画面で編集したもの)。
- * JSONBin を使う設定でなければ何もせず、取得に失敗してもこの端末の設定のまま続ける。
- * 画面を開いている間は1回だけ取りに行く。force=true で取り直す。
+ * source = { binId, apiKey, passphrase } を渡すと、そのBinを読む(ダッシュボードのAI用設定)。
+ * 空なら clipstock の JSONBin 設定を使う。失敗してもこの端末の設定のまま続け、理由を返す。
+ * 同じ接続先なら画面を開いている間は1回だけ取りに行く。force=true で取り直す。
  */
-export function syncSettings(force = false) {
-  if (!settingsSynced || force) {
+export function syncSettings(force = false, source = {}) {
+  const key = [source.binId, source.apiKey, source.passphrase].join('|')
+  if (!settingsSynced || force || key !== settingsKey) {
+    settingsKey = key
     settingsSynced = (async () => {
-      const c = loadConfig()
-      if (!c.useJsonbin) return { ok: false, message: 'この端末の clipstock で JSONBin 同期が有効になっていません(設定→JSONBin)' }
-      if (!c.jsonbinBinId || !c.jsonbinApiKey) return { ok: false, message: 'この端末に Bin ID / APIキーがありません' }
       try {
+        if (source.binId && source.apiKey) {
+          let remote = await fetchBin(source.binId, source.apiKey)
+          if (isEnvelope(remote)) remote = await decryptConfig(remote, source.passphrase)
+          if (!remote?.llmSettings) throw new Error('Binに llmSettings がありません')
+          saveSettings(remote.llmSettings)
+          return { ok: true, message: '' }
+        }
+        const c = loadConfig()
+        if (!c.useJsonbin || !c.jsonbinBinId || !c.jsonbinApiKey) {
+          return { ok: false, message: 'AI用 JSONBin が未設定です(カードの設定で Bin ID と APIキーを入れてください)' }
+        }
         await syncConfigFromJsonbinStrict()
         return { ok: true, message: '' }
       } catch (err) {
