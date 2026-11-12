@@ -19,7 +19,7 @@ import { fetchTranscript, saveGenerated, statusCounts } from '../../clipstock/sr
 import { generateAll, stagesOf } from '../../clipstock/src/lib/generate.js'
 import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../clipstock/src/lib/spaces.js'
 import { loadSettings, connectionOf } from '../../clipstock/src/lib/llm-settings.js'
-import { loadConfig, isConfigured, syncConfigFromJsonbin } from '../../clipstock/src/lib/videos-config.js'
+import { loadConfig, isConfigured, syncConfigFromJsonbinStrict } from '../../clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../clipstock/src/lib/filters.js'
 import { knownTagsOf } from '../../clipstock/src/lib/tags.js'
 
@@ -47,7 +47,19 @@ let settingsSynced = null
  * 画面を開いている間は1回だけ取りに行く。force=true で取り直す。
  */
 export function syncSettings(force = false) {
-  if (!settingsSynced || force) settingsSynced = syncConfigFromJsonbin().catch(() => null)
+  if (!settingsSynced || force) {
+    settingsSynced = (async () => {
+      const c = loadConfig()
+      if (!c.useJsonbin) return { ok: false, message: 'この端末の clipstock で JSONBin 同期が有効になっていません(設定→JSONBin)' }
+      if (!c.jsonbinBinId || !c.jsonbinApiKey) return { ok: false, message: 'この端末に Bin ID / APIキーがありません' }
+      try {
+        await syncConfigFromJsonbinStrict()
+        return { ok: true, message: '' }
+      } catch (err) {
+        return { ok: false, message: 'JSONBinから取得できませんでした: ' + (err?.message || err) }
+      }
+    })()
+  }
   return settingsSynced
 }
 
