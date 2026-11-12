@@ -76,6 +76,13 @@ export async function syncConfigFromJsonbin() {
   }
 }
 
+/** syncConfigFromJsonbin と同じ取り込みだが、失敗を握りつぶさず例外で返す(失敗理由を画面に出したい呼び出し側向け) */
+export async function syncConfigFromJsonbinStrict() {
+  const local = loadConfig()
+  if (!jsonbinReady(local)) throw new Error('JSONBinの設定が揃っていません')
+  return pullFromJsonbin(local, loadJsonbinPassphrase())
+}
+
 /** Binを読み、(暗号文なら復号して)中身を3つに分けて返す。この端末には何も書かない */
 async function readRemote(c, passphrase) {
   let remote = await fetchBin(c.jsonbinBinId, c.jsonbinApiKey)

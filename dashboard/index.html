@@ -3175,7 +3175,7 @@ async function loadClipgenOptions(m, refresh){
   const st = clipgenState[m.id];
   try{
     const api = await clipgenModule();
-    await api.syncSettings(refresh);   /* api/ai/ で決めたAI接続・既定を JSONBin から取り込む */
+    const sync = await api.syncSettings(refresh); st.syncNote = sync && !sync.ok ? sync.message : '';   /* api/ai/ で決めたAI接続・既定を JSONBin から取り込む */
     st.spaces = await api.spaces();
     st.models = api.models();
     if(!st.spaces.some(s => s.id === st.spaceId)) st.spaceId = st.spaces[0] ? st.spaces[0].id : '';
@@ -3343,6 +3343,7 @@ function clipgenPicks(m, st){
         ${st.models.map(x => `<option value="${esc(x.key)}" ${x.key === st.modelKey ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
       </select>`);
   }
+  if(st.syncNote) rows.push(`<div style="font-size:11px;color:#D9694F;line-height:1.4">AI一覧はこの端末の設定です(api/ai の内容は未反映): ${esc(st.syncNote)}</div>`);
   return rows.length ? `<div class="gen-picks">${rows.join('')}</div>` : '';
 }
 
