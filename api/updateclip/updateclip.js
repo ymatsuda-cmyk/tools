@@ -19,7 +19,7 @@ import { fetchTranscript, saveGenerated, statusCounts } from '../../clipstock/sr
 import { generateAll, stagesOf } from '../../clipstock/src/lib/generate.js'
 import { initSpaces, selectSpace, spaceList, spaceMode, sourcesOf } from '../../clipstock/src/lib/spaces.js'
 import { loadSettings, connectionOf } from '../../clipstock/src/lib/llm-settings.js'
-import { loadConfig, isConfigured } from '../../clipstock/src/lib/videos-config.js'
+import { loadConfig, isConfigured, syncConfigFromJsonbin } from '../../clipstock/src/lib/videos-config.js'
 import { excludeExcluded, STATUS_DONE, STATUS_SUMMARIZED } from '../../clipstock/src/lib/filters.js'
 import { knownTagsOf } from '../../clipstock/src/lib/tags.js'
 
@@ -37,6 +37,18 @@ function ensureSpaces() {
 export async function spaces() {
   await ensureSpaces()
   return spaceList().map((s) => ({ id: s.id, label: s.label, mode: s.mode || '' }))
+}
+
+let settingsSynced = null
+
+/**
+ * AI接続の一覧と既定のAIを JSONBin から取り込む(api/ai/ の管理画面で編集したもの)。
+ * JSONBin を使う設定でなければ何もせず、取得に失敗してもこの端末の設定のまま続ける。
+ * 画面を開いている間は1回だけ取りに行く。force=true で取り直す。
+ */
+export function syncSettings(force = false) {
+  if (!settingsSynced || force) settingsSynced = syncConfigFromJsonbin().catch(() => null)
+  return settingsSynced
 }
 
 /** 選べるAIの一覧。clipstock の設定に登録されている接続×モデルを平らに並べる */
