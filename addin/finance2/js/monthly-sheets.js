@@ -461,8 +461,66 @@
           });
         });
       }
-      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null, pipe: Object.keys(pipe).length ? pipe : null, pipeCost: Object.keys(pipeCost).length ? pipeCost : null, confirmed: confirmedAll };
+      // 期末整理後の確定値（月次PL：「◯期確定」「期末整理」「期末整理の内容」列、月次BS：「期末整理後」「期末整理」列）
+      let final = null;
+      try { final = readFinal(grab, layout, startMonth); } catch (e) { console.warn("readFinal", e); }
+      return { found: true, rows: out, layout, seg: Object.keys(seg).length ? seg : null, pipe: Object.keys(pipe).length ? pipe : null, pipeCost: Object.keys(pipeCost).length ? pipeCost : null, confirmed: confirmedAll, final };
     });
+  }
+
+  /**
+   * 期末整理後の確定値を読む。見出し行の右側の列名で探す。
+   *   確定列：「確定」または「期末整理後」を含む列（例：37期確定、37期末（期末整理後））
+   *   整理列：「期末整理」で始まり「内容」「後」を含まない列（例：期末整理、期末整理（N−M））
+   *   内容列：「内容」を含む列（PLのみ）、計画差列：「計画差」を含む列（PLのみ）
+   * PLは経常利益の下の 特別利益〜当期純利益 も対象（空行か【】の行で終わり）。
+   * 戻り値：{ fy, label, PL:[{key,name,kind,final,adj,base,plan,note}], BS:[...] } または null
+   */
+  function readFinal(grab, layout, startMonth) {
+    const res = { fy: null, label: "", PL: [], BS: [] };
+    let found = false;
+    for (const sh of ["PL", "BS"]) {
+      const used = grab[sh], lay = layout[sh];
+      if (!used || !lay) continue;
+      const vals = used.values, fmls = used.formulas;
+      const hrow = vals[lay.hdrRow] || [];
+      const lastMonthCol = lay.cols[lay.cols.length - 1];
+      let fc = -1, ac = -1, nc = -1, pc = -1;
+      hrow.forEach((v, c) => {
+        if (c <= lastMonthCol) return;
+        const t = String(v == null ? "" : v).replace(/[\s\u3000]/g, "");
+        if (!t) return;
+        if (/内容/.test(t)) { if (nc < 0) nc = c; return; }
+        if (/計画差/.test(t)) { if (pc < 0) pc = c; return; }
+        if (/確定|期末整理後/.test(t)) { if (fc < 0) { fc = c; if (!res.label || sh === "PL") res.label = String(v).trim(); } return; }
+        if (/^期末整理/.test(t)) { if (ac < 0) ac = c; }
+      });
+      if (fc < 0) continue;
+      found = true;
+      const lp = lay.periods[lay.periods.length - 1];
+      const y = Number(lp.slice(0, 4)), m = Number(lp.slice(5));
+      res.fy = startMonth === 1 ? y : (m >= startMonth ? y + 1 : y);
+      let afterOrd = false;
+      for (let r = lay.hdrRow + 1; r < vals.length; r++) {
+        const raw = String(vals[r][0] == null ? "" : vals[r][0]).trim();
+        if (sh === "BS" && (/^■/.test(raw) || /^【参考/.test(raw))) break;
+        if (!raw || /^[【※]/.test(raw)) { if (afterOrd) break; continue; }
+        const k = mkey(raw);
+        if (segLabelOnly(raw) || (sh === "PL" && segOf(raw) && !["売上高", "純売上高", "売上原価"].includes(k))) continue;
+        const fin = vals[r][fc];
+        if (typeof fin !== "number") { if (afterOrd && /当期純(利益|損失)/.test(k)) break; continue; }
+        const adj = ac >= 0 && typeof vals[r][ac] === "number" ? vals[r][ac] : 0;
+        const f0 = String(fmls[r][lay.cols[0]] == null ? "" : fmls[r][lay.cols[0]]);
+        res[sh].push({
+          key: sh + ":" + k, name: raw.replace(/[（(]旧[:：][^）)]*[）)]/g, ""), kind: f0.startsWith("=") ? "集計" : "明細",
+          final: fin, adj, base: fin - adj, plan: pc >= 0 && typeof vals[r][pc] === "number" ? fin - vals[r][pc] : null,
+          note: nc >= 0 ? String(vals[r][nc] == null ? "" : vals[r][nc]).trim() : ""
+        });
+        if (sh === "PL" && ["経常利益", "経常損失"].includes(k)) afterOrd = true;
+        if (sh === "PL" && ["当期純利益", "当期純損失"].includes(k)) break;
+      }
+    }
+    return found ? res : null;
   }
 
   /**
