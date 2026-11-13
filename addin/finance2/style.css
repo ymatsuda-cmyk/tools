@@ -252,3 +252,23 @@ main { padding: 12px 10px 40px; display: flex; flex-direction: column; gap: 10px
 .yj-nts { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 3px; display: flex; flex-direction: column; gap: 2px; }
 .yj-nt { font-size: 10.5px; line-height: 1.45; color: var(--ink); white-space: normal; }
 .yj-nt > span { color: var(--amber); font-weight: 700; margin-right: 4px; }
+
+/* 期末整理後の確定値 */
+.card.final { border-color: #9DB2D1; }
+.mchip.final { border-color: var(--navy); color: var(--navy); font-weight: 700; }
+.mchip.final.on { color: #fff; }
+.trow.is-adj { box-shadow: inset 3px 0 0 var(--navy); }
+.final-line { font-size: 12px; margin-top: 2px; }
+.bridge { display: flex; flex-direction: column; gap: 3px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.br-row { display: grid; grid-template-columns: minmax(88px, 38%) minmax(0, 1fr) 84px; gap: 6px; align-items: center; font-size: 11.5px; }
+.br-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-track { position: relative; height: 14px; background: #F2F4F2; border-radius: 3px; }
+.br-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #A9B3BF; }
+.br-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 2px; }
+.br-bar.tot { background: var(--navy); } .br-bar.pos { background: #5F7FA8; } .br-bar.neg { background: var(--amber); }
+.br-v { text-align: right; font-weight: 700; white-space: nowrap; }
+.br-v.neg { color: var(--amber); } .br-v.pos { color: var(--navy); }
+.adjs { display: flex; flex-direction: column; }
+.adj { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 7px 2px; border: none; border-top: 1px solid var(--rule); background: none; text-align: left; cursor: pointer; font-size: 12px; }
+.adj:hover { background: #F2F5F9; }
+.adj-note { grid-column: 1 / -1; font-size: 11px; }
