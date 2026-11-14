@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-13T11:12:59+09:00",
+ "generatedAt": "2026-11-14T10:53:15+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -1328,7 +1328,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116783",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：株式会社スコア・ジャパンより引用 株式会社スコア・ジャパンは2026年9月16日、同社が運営するウェブサイト（scorejp.com）が第三者による不正アクセスを受け、トップページが改ざんされたと発表しました。 同社による",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116783",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "leanbody",
@@ -1346,7 +1351,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116793",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：株式会社LEAN BODYより引用 株式会社LEAN BODYは2026年9月15日、社内で利用する分析ツール「Metabase」が不正アクセスを受け、退会者を含む約44万アカウントの顧客情報が外部に取得されたと発表しました。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116793",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "osakacity",
@@ -1364,7 +1374,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116729",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：大阪市より引用 大阪市は2026年9月15日、職員採用試験で利用している録画面接システムへの不正アクセスにより、試験申込者106人の個人情報が漏えいした可能性があると発表しました。 対象は「大阪市職員（社会人等技術【夏】）",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116729",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "mink",
@@ -1405,7 +1420,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116509",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：株式会社京都パープルサンガより引用 株式会社京都パープルサンガは2026年9月8日、プロサッカーチームのファンクラブである京都サンガF.C.に所属する職員によるメールの誤送信で、ファンクラブ会員1万5,612人分の個人情報が外部",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116509",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "revisio",
@@ -1423,7 +1443,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116488",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：REVISIO株式会社より引用 REVISIO株式会社は2026年9月8日、役職員が使用する業務用PC1台がマルウェアに感染し、取引先や同社関係者の個人情報の一部が外部に漏えいした可能性があると発表しました。 同社によると",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116488",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "tokyotech",
@@ -1441,7 +1466,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116492",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：東京科学大学より引用 東京科学大学は2026年9月7日、学内の情報基盤が第三者による不正アクセスを受け、個人情報が漏えいした疑いがあると発表しました。 同大は事案判明後、被害拡大を防ぐ措置を講じ、調査を実施しました。説明に",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116492",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "ota",
@@ -1459,7 +1489,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116494",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：大田区より引用 東京都大田区は2026年9月4日、指定管理者の公益財団法人大田区文化振興協会が運営する大田区民プラザで、個人情報が漏えいした可能性があると発表しました。 区によると2026年8月22日、施設職員が配備された",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116494",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "up",
@@ -1477,7 +1512,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116447",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-14",
+   "sec_summary": "画像：株式会社アップより引用 株式会社アップは2026年9月4日、同社が運営する「洛西進学教室」と「進学館」のプロモーションサイトが不正アクセスを受け、採用応募者と従業員計13人の個人情報を第三者に閲覧された可能性があると発表しました",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116447",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "osakacourt",
