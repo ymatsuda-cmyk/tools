@@ -575,7 +575,7 @@ function openSummaryImport(target, item, state) {
           <button id="imp-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div class="raw-modal-body">
-          <p class="edit-hint">タイプ1(## 議事メモ 形式)・タイプ2(会議のメモ: 形式)・タイプ3(### 会議メモ 形式)のいずれかの要約を貼り付けてください。議事は置き換わります。決定事項・ToDo・論点は、貼り付けた要約に含まれる場合だけ置き換わります。</p>
+          <p class="edit-hint">タイプ1(## 議事メモ 形式)・タイプ2(会議のメモ: 形式)・タイプ3(会議メモの下に議題の見出しが並ぶ形式)のいずれかの要約を貼り付けてください。議事は置き換わります。決定事項・ToDo・論点は、貼り付けた要約に含まれる場合だけ置き換わります。</p>
           <textarea id="imp-textarea" class="edit-textarea" rows="14" placeholder="## 議事メモ&#10;- トピック: ..."></textarea>
           <p id="imp-parse" class="edit-hint"></p>
           <p id="imp-error" class="error-text" style="display:none"></p>

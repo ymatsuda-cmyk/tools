@@ -5,7 +5,7 @@
 //   タイトル → ミーティング名 / タグ → カテゴリー / 開始日時 → 日時
 //   会議時間 → 会議時間(「1時間 12分 36秒」形式) / 原文 → ページ本文
 // 原文は必須。要約テキストは任意で、入れた場合は summary-text.js(タイプ1: ## 議事メモ 形式 /
-// タイプ2: 会議のメモ: 形式 / タイプ3: ### 会議メモ 形式)で議事・決定事項・ToDo・論点に分けて一緒に送り、状態は「要約」で
+// タイプ2: 会議のメモ: 形式 / タイプ3: 会議メモの下に議題の見出しが並ぶ形式)で議事・決定事項・ToDo・論点に分けて一緒に送り、状態は「要約」で
 // 登録する。要約テキストが空なら、状態は「文字起こし」で要約は作らない。
 // 権限 → 権限: 管理者は自由に選べる(空なら管理者のみ閲覧)。管理者以外は
 // 自分の検証済み role で固定(GAS 側でも role 以外は受け付けない)。
@@ -146,7 +146,7 @@ function openModal() {
         </div>
         <div class="upload-field">
           <label for="tr-sum"><span>要約テキスト <em class="tr-opt">任意</em></span><span class="tr-col">要約・議事・ToDo など</span></label>
-          <textarea id="tr-sum" class="tr-raw" rows="6" placeholder="## 議事メモ(タイプ1)・会議のメモ:(タイプ2)・### 会議メモ(タイプ3) の要約を貼り付け"></textarea>
+          <textarea id="tr-sum" class="tr-raw" rows="6" placeholder="## 議事メモ(タイプ1)・会議のメモ:(タイプ2)・会議メモ+議題の見出し(タイプ3) の要約を貼り付け"></textarea>
           <div class="tr-hint" id="tr-parse"></div>
         </div>
         <div class="tr-note" id="tr-note"></div>
