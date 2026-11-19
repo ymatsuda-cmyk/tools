@@ -5,7 +5,7 @@
 //   タイトル → ミーティング名 / タグ → カテゴリー / 開始日時 → 日時
 //   会議時間 → 会議時間(「1時間 12分 36秒」形式) / 原文 → ページ本文
 // 原文は必須。要約テキストは任意で、入れた場合は summary-text.js(タイプ1: ## 議事メモ 形式 /
-// タイプ2: 会議のメモ: 形式)で議事・決定事項・ToDo・論点に分けて一緒に送り、状態は「要約」で
+// タイプ2: 会議のメモ: 形式 / タイプ3: ### 会議メモ 形式)で議事・決定事項・ToDo・論点に分けて一緒に送り、状態は「要約」で
 // 登録する。要約テキストが空なら、状態は「文字起こし」で要約は作らない。
 // 権限 → 権限: 管理者は自由に選べる(空なら管理者のみ閲覧)。管理者以外は
 // 自分の検証済み role で固定(GAS 側でも role 以外は受け付けない)。
@@ -17,7 +17,7 @@
 
 import { addPending } from './upload.js'
 import { filterByPermission, excludeDeleted } from './lib/filters.js'
-import { parseSummaryText } from './lib/summary-text.js'
+import { parseSummaryText, summaryTypeLabel } from './lib/summary-text.js'
 
 const ADMIN_ROLE = 'xYz'
 
@@ -146,7 +146,7 @@ function openModal() {
         </div>
         <div class="upload-field">
           <label for="tr-sum"><span>要約テキスト <em class="tr-opt">任意</em></span><span class="tr-col">要約・議事・ToDo など</span></label>
-          <textarea id="tr-sum" class="tr-raw" rows="6" placeholder="## 議事メモ(タイプ1) または 会議のメモ:(タイプ2) の要約を貼り付け"></textarea>
+          <textarea id="tr-sum" class="tr-raw" rows="6" placeholder="## 議事メモ(タイプ1)・会議のメモ:(タイプ2)・### 会議メモ(タイプ3) の要約を貼り付け"></textarea>
           <div class="tr-hint" id="tr-parse"></div>
         </div>
         <div class="tr-note" id="tr-note"></div>
@@ -307,7 +307,7 @@ function openModal() {
     if (!sum.value.trim()) { el.textContent = ''; return }
     try {
       const r = parseSummaryText(sum.value)
-      el.textContent = `${r.type === 'type1' ? 'タイプ1' : 'タイプ2'}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
+      el.textContent = `${summaryTypeLabel(r.type)}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
       if (r.meetingAt && (!atInput.value || atInput.value === autoAt || atInput.dataset.touched !== '1')) {
         atInput.value = r.meetingAt
         autoAt = r.meetingAt

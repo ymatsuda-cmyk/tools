@@ -1,6 +1,6 @@
 import { renderList, renderDetailHtml, renderToolbar, escapeHtml } from './ui/render.js'
 import { fetchSummary, fetchTranscript, saveSummary, saveTags, saveTitle, saveDetail, requestRetranscribe, verifyCode, savePermissions, saveMemo, saveMindmap, deleteItem, updateRawContextCount, saveRule, fetchRules, deleteRule, setRuleEnabled } from './lib/gas.js'
-import { parseSummaryText } from './lib/summary-text.js'
+import { parseSummaryText, summaryTypeLabel } from './lib/summary-text.js'
 import { getDetailCache, setDetailCache, isCacheFresh } from './lib/cache.js'
 import { generateSummary } from './lib/summarize.js'
 import { loadConfig, saveConfig, isConfigured, isAdmin, isDenied } from './lib/minutes-config.js'
@@ -558,7 +558,7 @@ async function commitLineEdit(target, item, state, index, sub, value) {
 }
 
 /**
- * 議事タブ: 要約テキスト(タイプ1/タイプ2)を貼り付けて、この議事録の要約として登録する。
+ * 議事タブ: 要約テキスト(タイプ1/タイプ2/タイプ3)を貼り付けて、この議事録の要約として登録する。
  * 議事は置き換え、決定事項・ToDo・論点は要約テキストに含まれるときだけ置き換える
  * (ToDoは文言の近さで突き合わせ、チェック状態と経過ログを引き継ぐ)。
  * サマリは空のときだけ補う(すでにあるサマリは上書きしない)。
@@ -575,7 +575,7 @@ function openSummaryImport(target, item, state) {
           <button id="imp-close" class="btn-ghost" aria-label="閉じる"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div class="raw-modal-body">
-          <p class="edit-hint">タイプ1(## 議事メモ 形式)またはタイプ2(会議のメモ: 形式)の要約を貼り付けてください。議事は置き換わります。決定事項・ToDo・論点は、貼り付けた要約に含まれる場合だけ置き換わります。</p>
+          <p class="edit-hint">タイプ1(## 議事メモ 形式)・タイプ2(会議のメモ: 形式)・タイプ3(### 会議メモ 形式)のいずれかの要約を貼り付けてください。議事は置き換わります。決定事項・ToDo・論点は、貼り付けた要約に含まれる場合だけ置き換わります。</p>
           <textarea id="imp-textarea" class="edit-textarea" rows="14" placeholder="## 議事メモ&#10;- トピック: ..."></textarea>
           <p id="imp-parse" class="edit-hint"></p>
           <p id="imp-error" class="error-text" style="display:none"></p>
@@ -599,7 +599,7 @@ function openSummaryImport(target, item, state) {
     if (!ta.value.trim()) { parseEl.textContent = ''; return }
     try {
       const r = parseSummaryText(ta.value)
-      parseEl.textContent = `${r.type === 'type1' ? 'タイプ1' : 'タイプ2'}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
+      parseEl.textContent = `${summaryTypeLabel(r.type)}として読み取りました: 議題${r.agenda.length}件・決定事項${r.decisions.length}件・ToDo${r.todos.length}件・論点${r.topics.length}件`
     } catch (err) {
       parseEl.textContent = err.message
     }

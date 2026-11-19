@@ -4,6 +4,8 @@
 //   タイプ1: 「## 会議情報 / ## 議事メモ / ## 次の段取り / ## AIからの提案」の Markdown 形式
 //   タイプ2: 「会議のメモ:」で始まり、議題ごとに概要とインデント付きの要点が並ぶ形式
 //            (末尾に「フォローアップ タスク:」)
+//   タイプ3: 「### 会議情報 / ### 会議メモ / ### 次の段取り / ### AIによる提案」の Markdown 形式。
+//            議題は「#### 議題名」、要点は「- 」の箇条書き(字下げした子の箇条書きも可)
 //
 // 戻り値は summarize.js の generateSummary と同じ形(model を除く):
 //   { cardSummary, agenda: [{topic, points, outcome}], decisions, todos: [{text, done}], topics }
@@ -11,9 +13,18 @@
 
 const CARD_MAX = 100
 
-/** 'type1' | 'type2' | null */
+const TYPE_LABELS = { type1: 'タイプ1', type2: 'タイプ2', type3: 'タイプ3' }
+
+/** 画面に出す形式名(「タイプ1」など) */
+export function summaryTypeLabel(type) {
+  return TYPE_LABELS[type] || type
+}
+
+/** 'type1' | 'type2' | 'type3' | null */
 export function detectSummaryType(text) {
   const t = String(text || '')
+  // タイプ3 は「###」。タイプ1 の「##」の判定は「###」には当たらない(# は空白ではないため)
+  if (/^###\s*(会議情報|会議メモ|議事メモ)/m.test(t)) return 'type3'
   if (/^##\s*(会議情報|議事メモ)/m.test(t)) return 'type1'
   if (/^\s*会議の?メモ\s*[:：]/m.test(t) || /^\s*フォローアップ\s*タスク\s*[:：]/m.test(t)) return 'type2'
   return null
@@ -22,8 +33,8 @@ export function detectSummaryType(text) {
 export function parseSummaryText(text) {
   const src = String(text || '').replace(/\r\n?/g, '\n')
   const type = detectSummaryType(src)
-  if (!type) throw new Error('形式を判別できません。タイプ1(## 議事メモ)かタイプ2(会議のメモ:)の要約を貼り付けてください。')
-  const parsed = type === 'type1' ? parseType1(src) : parseType2(src)
+  if (!type) throw new Error('形式を判別できません。タイプ1(## 議事メモ)・タイプ2(会議のメモ:)・タイプ3(### 会議メモ)のいずれかの要約を貼り付けてください。')
+  const parsed = type === 'type1' ? parseType1(src) : type === 'type2' ? parseType2(src) : parseType3(src)
   if (!parsed.agenda.length && !parsed.todos.length) {
     throw new Error('議題もToDoも読み取れませんでした。貼り付けた内容を確認してください。')
   }
@@ -153,4 +164,96 @@ function parseType2(src) {
   })
 
   return { cardSummary: cardSummaryOf(agenda), agenda, decisions: [], todos, topics: [], meetingAt: '' }
+}
+
+// ------------------------------------------------------------ タイプ3
+
+/** 箇条書きの親が「担当体制」のような短い見出し語か(句点で終わる文ではない) */
+const isLabelLike = (s) => s.length <= 20 && !/[。．.]$/.test(s) && !/[:：]/.test(s)
+
+function parseType3(src) {
+  // 「##」「###」で区切る(「####」は議題なので区切りにしない)
+  const sections = {}
+  let cur = null
+  src.split('\n').forEach((line) => {
+    const m = line.match(/^#{2,3}(?!#)\s*(.+?)\s*$/)
+    if (m) { cur = m[1]; sections[cur] = []; return }
+    if (cur) sections[cur].push(line)
+  })
+  const sec = (...names) => sections[Object.keys(sections).find((k) => names.some((n) => k.includes(n)))] || []
+
+  // 会議情報: 「> 日付: 2026-06-25 16:01:48 / 2026-06-25 16:01:48」(先頭の日時を使う)
+  let meetingAt = ''
+  sec('会議情報').forEach((l) => {
+    if (meetingAt) return
+    const m = l.match(/日付\s*[:：]\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/)
+    if (m) {
+      const p = (n) => String(n).padStart(2, '0')
+      meetingAt = `${m[1]}-${p(m[2])}-${p(m[3])}T${p(m[4] || 0)}:${m[5] || '00'}`
+    }
+  })
+
+  // 会議メモ: 「#### 議題」の下に「- 要点」。字下げした子の箇条書きは、
+  // 親が「担当体制」のような見出し語なら「【担当体制】子」、文なら親の次に「└ 子」として並べる
+  const agenda = []
+  let item = null
+  let parent = null // { text, indent, label, emitted }
+  const indentOf = (line) => line.match(/^[ \t　]*/)[0].replace(/\t/g, '    ').length
+  const flushParent = () => {
+    if (parent && !parent.emitted) { item.points.push(parent.text); parent.emitted = true }
+  }
+  sec('会議メモ', '議事メモ').forEach((line) => {
+    const t = line.trim()
+    if (!t || /^-{3,}$/.test(t)) return
+    const h = line.match(/^####+\s*(.+?)\s*$/)
+    if (h) {
+      if (item) flushParent()
+      item = { topic: h[1].trim(), points: [], outcome: '' }
+      agenda.push(item)
+      parent = null
+      return
+    }
+    if (!item) { // 議題見出しのない要点は「その他」にまとめる
+      item = { topic: 'その他', points: [], outcome: '' }
+      agenda.push(item)
+    }
+    const body = t.replace(/^(?:[-*・]|\d+[.．)）])\s*/, '').trim()
+    if (!body) return
+    const indent = indentOf(line)
+    if (parent && indent > parent.indent) {
+      if (parent.label) {
+        item.points.push(`【${parent.text}】${body}`)
+        parent.emitted = true // 見出し語は子に付けたので、単独の要点にはしない
+      } else {
+        flushParent()
+        item.points.push(`└ ${body}`)
+      }
+      parent.hasChild = true
+      return
+    }
+    // 子を持たなかった見出し語の親は、そのまま要点にする
+    flushParent()
+    parent = { text: body, indent, label: isLabelLike(body), emitted: false, hasChild: false }
+    if (!parent.label) { item.points.push(body); parent.emitted = true }
+  })
+  if (item) flushParent()
+
+  // 次の段取り: 「- [ ] 内容」「- [x] 内容」
+  const todos = []
+  sec('次の段取り').forEach((line) => {
+    const m = line.match(/^\s*[-*]\s*\[([ xX])\]\s*(.*)$/)
+    if (!m) return
+    const text = m[2].trim()
+    if (!text || isPlaceholder(text)) return
+    todos.push({ text, done: m[1].toLowerCase() === 'x' })
+  })
+
+  // AIによる提案: 「- 内容」または「1. 内容」を未解決の論点にする
+  const topics = []
+  sec('AIによる提案', 'AIからの提案').forEach((line) => {
+    const m = line.match(/^>?\s*(?:[-*・]|\d+[.．)）])\s*(.+)$/)
+    if (m) topics.push(m[1].trim())
+  })
+
+  return { cardSummary: cardSummaryOf(agenda), agenda, decisions: [], todos, topics, meetingAt }
 }
