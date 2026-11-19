@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-18T12:11:53+09:00",
+ "generatedAt": "2026-11-19T11:52:14+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -1627,7 +1627,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116430",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "画像：DAIKO XTECH株式会社より引用 DAIKO XTECH株式会社は9月1日までに、旧大興ビジネスが「daiko-b.co.jp」ドメインで使用していた一部のメールアカウントが、第三者から不正アクセスを受けた問題について最終",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116430",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "chiba",
@@ -1645,7 +1650,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/116507",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-16"
+   "got": "2026-10-16",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "画像：千葉県より引用 千葉県は2026年9月1日、生物多様性センターのホームページが外部からの不正アクセスを受けたと発表しました。 千葉県によると2026年8月27日、千葉県警から連絡を受け、職員がアクセスログを確認したところ、",
+   "sources": "元記事|https://cybersecurity-jp.com/news/116507",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "aflac",
@@ -5856,7 +5866,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118584",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "Francfrancは11月17日、顧客データの分析に使うプレイドのCXプラットフォーム「KARTE」への第三者による不正アクセスを受け、会員情報最大約598万件と公式ECサイトの購入履歴に関連するデータ最大約400万件が外部に流出した可能性があると公表した。委託先のSaaSへの侵入が、1社で数百万件規模の影響に波及した事例である。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118584",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118585",
@@ -5874,7 +5889,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118585",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "アインズ＆トルペは11月17日、公式アプリ・公式オンラインストアおよびアユーラのLINE公式アカウントに関係する会員情報について、合計最大約260万件が流出した可能性があると発表した。原因は委託先であるプレイドのシステムへの不正アクセスで、同日にはFrancfrancも最大約598万件の可能性を公表している。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118585",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118586",
@@ -5892,7 +5912,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118586",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "ワールドは11月17日、「ワールドオンラインストア」と連結子会社ティンパンアレイがプレイドの「KARTE」に保管していた会員情報の一部が漏えいしたと発表した。漏えいした情報の項目、件数、会員の範囲はいずれも調査中で、第一報の段階にとどまる。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118586",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118587",
@@ -5910,7 +5935,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118587",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "モリサワは11月17日、業務委託先であるプレイドのサービス「KARTE」への不正アクセスにより、「Morisawa Fonts」の顧客の氏名やメールアドレスなどが外部に漏えいしたと発表した。件数は2万3,957件で、対象は2023年5月以降にサービスサイト経由で購入した一部ユーザーであり、対象範囲の詳細は調査中とされている。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118587",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118588",
@@ -5928,7 +5958,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118588",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "SmartHRは11月17日、業務で利用するNotion AIのチャット記録の一部が、Notion社の委託先Fireworks AI社への不正アクセスにより外部へ流出した可能性があると第一報で発表した。対象期間は10月6日から10月24日で、記録に含まれる情報の内容は調査中である。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118588",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118589",
@@ -5946,7 +5981,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118589",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-18"
+   "got": "2026-11-18",
+   "enrichedAt": "2026-11-19",
+   "sec_summary": "株式会社MTGは11月16日、ECモール内の一部MTGショップで利用する外部サービス「GoQSystem」への不正アクセスにより、ソーシャルギフト機能を使ったお届け先1万5,033名分の個人情報が漏えいしたと発表した。不正アクセスの被害は外部サービス側で起きており、MTGの対象者はGoQSystem全体の被害の一部にあたる。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118589",
+   "method": "紹介文",
+   "enrichResult": "meta"
   }
  ]
 }
