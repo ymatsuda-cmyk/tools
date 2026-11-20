@@ -20,7 +20,9 @@
           "id": "schedule",
           "label": "スケジュール",
           "icon": "",
-          "url": "https://ymatsuda-cmyk.github.io/tools/addin/schedule/"
+          "popup": "https://ymatsuda-cmyk.github.io/tools/addin/schedule/app.html",
+          "width": 95,
+          "height": 92
         },
         {
           "id": "bug",
