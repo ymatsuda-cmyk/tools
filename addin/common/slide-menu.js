@@ -50,6 +50,16 @@
  *     ]
  *   }
  *
+ * ■ ポップアップ項目（Excel連携ツール用）
+ *   menu.json の項目に "popup": "https://.../app.html" を書くと、画面遷移せずに、
+ *   Officeのポップアップ（ダイアログ）でそのページを開く。同じ common フォルダの
+ *   schedule-bridge.js を自動で読み込み、Excelとの読み書きを仲介する。
+ *   例: { "id": "schedule", "label": "スケジュール",
+ *         "popup": "https://.../schedule/app.html", "width": 95, "height": 92 }
+ *   ・ポップアップは、メニューを開いているページ（作業ウィンドウ側）が仲介する。
+ *     そのページを閉じる・別ツールへ遷移すると、ポップアップも閉じる。
+ *   ・ポップアップのURLは、メニューを開いているページと同じドメインにすること。
+ *
  * ■ 公開API
  *   SlideMenu.init(config)   初期化（再実行で設定を更新）
  *   SlideMenu.open()         開く（初回はmenu.jsonを取得）
@@ -57,6 +67,7 @@
  *   SlideMenu.toggle()
  *   SlideMenu.isOpen()
  *   SlideMenu.reload()       menu.jsonを再取得して描画し直す
+ *   SlideMenu.openPopup(item) ポップアップ項目を開く（menu.json の1項目と同じ形）
  * ============================================================ */
 (function (global) {
   "use strict";
@@ -70,6 +81,11 @@
   var lastFocus = null;
   var menuData = null;     // menu.json のキャッシュ
   var fetching = null;     // 取得中のPromise
+  var SELF_SRC = (document.currentScript && document.currentScript.src) || "";   // このファイルのURL（共通フォルダの特定に使う）
+  var popupHandles = {};   // ポップアップ項目ごとの、開いているダイアログ
+  var bridgeLoading = null;
+  var POPUP_BUILD = "popup-20261120b";
+  try { console.info("[SlideMenu] " + POPUP_BUILD + " loaded"); } catch (e) { /* 無視 */ }
 
   /* ---------------- CSS ---------------- */
   var CSS = "" +
@@ -114,7 +130,11 @@
 ".sm-note{padding:10px;font-size:11px;color:var(--sm-ink-faint);text-align:center}" +
 ".sm-foot{border-top:1px solid var(--sm-line);padding:10px 14px;" +
 "font-size:10px;color:var(--sm-ink-faint)}" +
-"@media (prefers-reduced-motion:reduce){.sm-panel,.sm-overlay{transition:none}}";
+".sm-toast{position:fixed;left:12px;right:12px;bottom:14px;z-index:calc(var(--sm-z) + 2);background:#1C2733;color:#fff;" +
+"padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;font-family:var(--sm-font);" +
+"box-shadow:0 6px 20px rgba(28,39,51,.3);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}" +
+".sm-toast.sm-show{opacity:1;visibility:visible}.sm-toast.sm-err{background:#8A1F14}" +
+"@media (prefers-reduced-motion:reduce){.sm-panel,.sm-overlay,.sm-toast{transition:none}}";
 
   function injectCSS() {
     if (document.getElementById("sm-style")) return;
@@ -237,14 +257,20 @@
       if ((config.localItems || []).length > 0) {
         appendItem({ divider: true });
       }
+      var hasPopup = data.sections.some(function (sec) {
+        return (sec.items || []).some(function (raw) { return !!raw.popup; });
+      });
+      if (hasPopup && global.Office) loadBridge().catch(function () { /* 失敗はクリック時に通知 */ });
       data.sections.forEach(function (sec) {
         if (sec.title) appendItem({ section: sec.title });
         (sec.items || []).forEach(function (raw) {
           appendItem({
             label: raw.label,
             icon: raw.icon,
-            href: raw.url,
+            href: raw.popup ? null : raw.url,          // popup 指定の項目は画面遷移させない
             target: raw.external ? "_blank" : null,
+            popup: raw.popup || null,
+            onClick: raw.popup ? function () { openPopup(raw); } : undefined,
             current: config.currentId && raw.id === config.currentId
           });
         });
@@ -298,6 +324,12 @@
       ex.className = "sm-ext";
       ex.textContent = "↗";
       el.appendChild(ex);
+    } else if (it.popup) {
+      var px = document.createElement("span");
+      px.className = "sm-ext";
+      px.title = "ポップアップで開きます";
+      px.textContent = "⧉";
+      el.appendChild(px);
     }
 
     el.addEventListener("click", function () {
@@ -307,6 +339,109 @@
 
     bodyEl.appendChild(el);
   }
+
+  /* ---------------- ポップアップ項目（画面遷移せずにダイアログで開く） ---------------- */
+  function commonBase() {
+    var u = SELF_SRC || (config && config.menuUrl) || "";
+    return u.replace(/[?#].*$/, "").replace(/\/[^\/]*$/, "");
+  }
+
+  function toast(msg, isErr) {
+    injectCSS();
+    var t = document.getElementById("sm-toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "sm-toast";
+      t.className = "sm-toast";
+      t.setAttribute("role", "status");
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.className = "sm-toast sm-show" + (isErr ? " sm-err" : "");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = "sm-toast"; }, isErr ? 9000 : 3500);
+  }
+
+  function loadBridge() {
+    if (global.ScheduleBridge) return Promise.resolve();
+    if (bridgeLoading) return bridgeLoading;
+    bridgeLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = commonBase() + "/schedule-bridge.js?v=" + Date.now();
+      s.onload = function () { resolve(); };
+      s.onerror = function () { bridgeLoading = null; reject(new Error("schedule-bridge.js を読み込めませんでした")); };
+      document.head.appendChild(s);
+    });
+    return bridgeLoading;
+  }
+
+  function popupError(e) {
+    var c = e && e.code;
+    if (c === 12007) return "すでにポップアップが開いています。";
+    if (c === 12009) return "ポップアップの表示が許可されませんでした。もう一度押して、許可してください。";
+    return "ポップアップを開けませんでした：" + ((e && (e.message || e.name)) || "不明なエラー") + (c ? "（" + c + "）" : "");
+  }
+
+  function openPopup(item) {
+    var id = item.id || item.popup;
+    function log(msg) { try { console.info("[SlideMenu] openPopup(" + id + "): " + msg); } catch (e) { /* 無視 */ } }
+    log("clicked / build " + POPUP_BUILD);
+    if (typeof Office === "undefined" || !Office.context || !Office.context.ui) {
+      log("Office not available");
+      toast("Excelのアドインの中でのみ開けます。", true);
+      return;
+    }
+    if (Office.context.requirements && !Office.context.requirements.isSetSupported("DialogApi", "1.2")) {
+      log("DialogApi 1.2 not supported");
+      toast("このExcelはポップアップとの双方向通信（DialogApi 1.2）に対応していません。", true);
+      return;
+    }
+    if (popupHandles[id]) {
+      log("already open");
+      toast("すでに開いています。見つからないときは、ポップアップを閉じてからもう一度押してください。");
+      return;
+    }
+    function launch() {
+      var done = false, hadErr = false;
+      log("displayDialogAsync " + item.popup);
+      var h = global.ScheduleBridge.open({
+        url: item.popup,
+        width: item.width || 95,
+        height: item.height || 92,
+        displayInIframe: item.iframe !== false,   // Excel on the web：別ウィンドウだとブロックされやすいので、画面内に重ねて表示
+        sheetName: item.sheetName,
+        masterName: item.masterName,
+        onClose: function () {
+          done = true;
+          delete popupHandles[id];
+          log("closed");
+          if (!hadErr) toast("ポップアップを閉じました。");
+        },
+        onError: function (e) {
+          hadErr = true;
+          log("error " + (e && (e.code || e.message || e.name)));
+          toast(popupError(e), true);
+        }
+      });
+      if (!done) popupHandles[id] = h;
+    }
+    toast("ポップアップを開いています…");
+    if (global.ScheduleBridge) {
+      // 読み込み済みなら、クリックの中でそのまま開く（ブラウザのポップアップ規制に引っかかりにくい）
+      try { launch(); } catch (e) { log("launch failed " + e); toast(String((e && e.message) || e), true); }
+      return;
+    }
+    log("loading schedule-bridge.js");
+    loadBridge().then(launch).catch(function (e) {
+      log("load/launch failed " + e);
+      toast(String((e && e.message) || e), true);
+    });
+  }
+
+  // このページを離れる（別ツールへ遷移・作業ウィンドウを閉じる）と、仲介が止まるのでポップアップも閉じる
+  global.addEventListener("pagehide", function () {
+    Object.keys(popupHandles).forEach(function (k) { try { popupHandles[k].close(); } catch (e) { /* 無視 */ } });
+  });
 
   /* ---------------- 開閉 ---------------- */
   function open() {
@@ -350,6 +485,7 @@
     close: close,
     toggle: function () { opened ? close() : open(); },
     isOpen: function () { return opened; },
+    openPopup: openPopup,
     reload: function () {
       return fetchMenu(true).then(function (data) {
         if (built) render(data);

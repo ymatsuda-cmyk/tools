@@ -40,6 +40,12 @@
 - Excelでこの2シートのセルを直接編集すると、ポップアップに反映されます。
 - DialogApi 1.2（ホスト→ポップアップの送信に使う）に未対応のExcelでは、その旨を画面下に表示して開きません。
 
+## 何も起きないとき（切り分け）
+1. **古い `slide-menu.js` を読んでいないか**：開発者ツールのコンソールに `[SlideMenu] popup-20261120b loaded` と出ればOK。出なければ、更新が反映されていない（GitHub Pagesの反映待ち／ブラウザのキャッシュ）。Networkタブの「Disable cache」を入れて、作業ウィンドウを再読み込みする。
+2. **押したときのログ**：コンソールに `[SlideMenu] openPopup(schedule): …` が順に出る。どこで止まったかが分かる（`clicked` → `loading schedule-bridge.js` → `displayDialogAsync` → `closed`／`error`）。
+3. **Excel on the web の許可の確認**：`displayInIframe:true`（既定）の場合は、画面内に重ねて表示される。別ウィンドウ方式だとブラウザにブロックされやすく、コンソールに「Blocked script execution in 'about:blank'」が出る。メニュー項目に `"iframe": false` を書くと、別ウィンドウ方式に戻せる。
+4. 画面下に出る通知（赤＝エラー）の文言を確認する。
+
 ## 注意
 - 仲介役は「メニューを開いているページ」です。そのページを閉じる、または別のツールへ移動すると、ポップアップも閉じます（連携が切れるため）。
 - 同じページから開けるポップアップは1つまでです。

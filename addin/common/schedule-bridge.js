@@ -278,7 +278,7 @@
 
   /* ================= ダイアログを開いて中継する ================= */
   function open(opts) {
-    opts = Object.assign({ url: '', width: 95, height: 92, sheetName: '計画シート', masterName: '計画マスタ', fy: null, displayInIframe: false, onClose: null, onError: null }, opts || {});
+    opts = Object.assign({ url: '', width: 95, height: 92, sheetName: '計画シート', masterName: '計画マスタ', fy: null, displayInIframe: true, onClose: null, onError: null }, opts || {});
     if (!opts.url) throw new Error('url（スケジュールHTMLのURL）を指定してください');
     const adapter = makeExcelAdapter(opts);
     let dialog = null, engine = null, unsub = null, closed = false;
