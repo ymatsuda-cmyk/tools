@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+<title>スケジュール</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="schedule-bridge.js?v=20261120"></script>
+<style>
+  body{margin:0;padding:14px;font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;font-size:13px;color:#1A1D23;background:#fff}
+  h1{margin:0 0 4px;font-size:16px}
+  .muted{color:#555D6B;font-size:12px;line-height:1.6}
+  .row{display:flex;gap:8px;margin:12px 0}
+  button{height:36px;padding:0 14px;border-radius:8px;border:1px solid #C9D0DB;background:#fff;font-size:13px;font-family:inherit;cursor:pointer}
+  button.primary{background:#0E7A5F;border-color:#0E7A5F;color:#fff;font-weight:700}
+  #state{margin-top:8px;padding:8px 10px;border-radius:8px;background:#F1F4F9;font-size:12px;line-height:1.6;min-height:1.6em}
+  #state.err{background:#FDE6E2;color:#8A1F14}
+  a{color:#0E7A5F}
+</style>
+</head>
+<body>
+<h1>スケジュール（期の工数計画）</h1>
+<p class="muted">画面は、別のウィンドウ（ポップアップ）で開きます。<br>ブックの「計画シート」「計画マスタ」を読み書きし、Excelの共同編集で他の人が変えた内容も反映します。</p>
+<div class="row">
+  <button class="primary" id="openBtn" disabled>ポップアップで開く</button>
+  <button id="closeBtn" disabled>閉じる</button>
+</div>
+<div id="state" role="status">Excelに接続中…</div>
+<p class="muted">※ このページを閉じる・別のツールへ移動すると、ポップアップとExcelの連携も終了します。使っている間は、このページを開いたままにしてください。</p>
+<script>
+(function () {
+  var handle = null;
+  var APP_URL = new URL('app.html', location.href).href;   // このページと同じドメイン・同じフォルダ（ダイアログの必須条件）
+  var $ = function (id) { return document.getElementById(id); };
+  function setState(t, err) { var el = $('state'); el.textContent = t; el.className = err ? 'err' : ''; }
+  function errText(e) {
+    var c = e && e.code;
+    if (c === 12007) return 'すでにポップアップが開いています（このページ1つにつき1つまで）。';
+    if (c === 12009) return 'ポップアップの表示が許可されませんでした。もう一度「ポップアップで開く」を押して、許可してください。';
+    return (e && (e.message || e.name)) ? ('エラー：' + (e.message || e.name) + (c ? '（' + c + '）' : '')) : 'エラーが発生しました。';
+  }
+  function openSchedule() {
+    if (handle) { setState('すでに開いています。見つからないときは「閉じる」→「ポップアップで開く」を押してください。'); return; }
+    if (Office.context.requirements && !Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
+      setState('このExcelはポップアップとの双方向通信（DialogApi 1.2）に対応していません。', true); return;
+    }
+    var closedEarly = false, hadErr = false;
+    try {
+      var h = ScheduleBridge.open({
+        url: APP_URL, width: 95, height: 92,
+        onClose: function () { closedEarly = true; handle = null; $('openBtn').disabled = false; $('closeBtn').disabled = true; if (!hadErr) setState('ポップアップを閉じました。'); },
+        onError: function (e) { hadErr = true; setState(errText(e), true); }
+      });
+      handle = closedEarly ? null : h;
+      if (handle) { $('closeBtn').disabled = false; setState('ポップアップを開いています…'); }
+    } catch (e) { handle = null; setState(errText(e), true); }
+  }
+  Office.onReady(function (info) {
+    if (info.host && info.host !== Office.HostType.Excel) { setState('Excelで開いてください。', true); return; }
+    $('openBtn').disabled = false;
+    $('openBtn').onclick = openSchedule;
+    $('closeBtn').onclick = function () { if (handle) handle.close(); };
+    setState('準備ができました。');
+    openSchedule();   // メニューから来たら、そのままポップアップを開く（環境によっては許可の確認が出る）
+  });
+  window.addEventListener('pagehide', function () { if (handle) handle.close(); });
+})();
+</script>
+</body>
+</html>
