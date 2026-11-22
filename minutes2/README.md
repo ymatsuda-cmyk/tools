@@ -7,7 +7,7 @@ ClipStock と同じ作りで、議事録を暗号化して GitHub の private �
 
 | フォルダ | 置き場所 | 役割 |
 |---|---|---|
-| `web/` | `ymatsuda-cmyk/tools` の `minutes2/`（GitHub Pages） | アプリ本体（一覧・詳細・変換管理・登録・設定） |
+| `index.html`・`src/`・`css/` | `ymatsuda-cmyk/tools` の `minutes2/`（GitHub Pages） | アプリ本体（一覧・詳細・変換管理・登録・設定） |
 | `gas/Code.gs`・`appsscript.json` | 新しい GAS プロジェクト（今の minutes の GAS とは別） | ログイン、音声の中継、暗号化済みデータの書き込み、鍵束の保管（スクリプトプロパティ） |
 | `mac/` | Mac mini | 鍵の準備（`setup_keys.py`）、5分おきの監視（`minutes_worker.py`）、Notion 議事録DBからの取り込み（`notion_import.py`） |
 | `skill/minutes2-claude-summarizer/` | Claude.ai のスキル | 要約待ちを Claude.ai で要約して Notion に書く |
@@ -55,8 +55,9 @@ cd mac && ~/.minutes2/venv/bin/python setup_keys.py token
    - `~/.minutes2/keys.json` に全グループの秘密鍵が入ります。この Mac の外に出さないでください（暗号化したバックアップは可）。
 
 ### 4. アプリ
-1. `web/src/config.js` の `GAS_URL` に、手順2の URL を入れる。
-2. `web/` の中身を `tools` リポジトリの `minutes2/` に置いて push。`https://ymatsuda-cmyk.github.io/tools/minutes2/` で開きます。
+
+1. `src/config.js` の `GAS_URL` に、手順2の URL を入れる。
+2. この `minutes2/` フォルダを `tools` リポジトリに push すると、GitHub Pages で公開されます。`https://ymatsuda-cmyk.github.io/tools/minutes2/` で開きます。
 
 ### 5. Mac の監視
 1. Google ドライブ for desktop で、音声の受付フォルダを Mac に同期する（`DRIVE_DIR` に設定した場所）。
