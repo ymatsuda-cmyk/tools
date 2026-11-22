@@ -747,6 +747,7 @@ body.kb #panes .host .cm-content{padding-top:6px;padding-bottom:30vh}
         <button class="ib" id="cmtAdd" title="コメントを追加（⌘⌥M / Ctrl+Alt+M）" aria-label="コメントを追加"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg></button>
         <button class="ib" id="cmtToggle" title="コメント一覧" aria-label="コメント一覧" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg><span id="ccount"></span></button>
         <button class="ib" id="tableBtn" title="表を挿入" aria-label="表を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/></svg></button>
+        <button class="ib" id="checkBtn" title="チェックボックスを挿入（行頭に - [ ] を付ける）" aria-label="チェックボックスを挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m7.5 12 3 3 6-6"/></svg></button>
         <button class="ib" id="inkboardBtn" title="手書きボードを挿入" aria-label="手書きボードを挿入" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15c1.5-3 3-4.5 4-3.5s-1 3 .5 3.5 2.5-3 5-4.5"/></svg></button>
         <button class="ib" id="mindmapBtn" title="マインドマップを挿入" aria-label="マインドマップを挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8.5" y="9.5" width="7" height="5" rx="1.5"/><circle cx="4" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="4" cy="19" r="1.8"/><circle cx="20" cy="19" r="1.8"/><path d="M8.5 11 5.5 6.3M15.5 11l3-4.7M8.5 13l-3 4.7M15.5 13l3 4.7"/></svg></button>
         <button class="ib" id="imageBtn" title="画像を挿入（コピーした画像は ⌘V で貼り付け）" aria-label="画像を挿入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5.5-5 4 3.5 2.5-2 4.5 3.5"/></svg></button>
@@ -1845,6 +1846,19 @@ function insertTable(v){
   const tableFrom = from + (blank ? 0 : 1);
   v.dispatch({ changes:{ from, to:line.to, insert } });
   for (const w of v.contentDOM.querySelectorAll('.cm-tbl')) if (v.posAtDOM(w) === tableFrom){ focusCell(w, 0, 0, true); return; }
+}
+// チェックボックス（Markdown のタスクリスト）：現在行の行頭に「- [ ] 」を付ける。既に付いていれば外す
+function insertCheckbox(v){
+  const st = v.state, line = st.doc.lineAt(st.selection.main.head);
+  const m = /^([ \t]*)(- \[[ xX]\] )/.exec(line.text);
+  if (m){
+    v.dispatch({ changes:{ from:line.from + m[1].length, to:line.from + m[0].length } });
+    return;
+  }
+  const ind = /^[ \t]*/.exec(line.text)[0];
+  const prefix = '- [ ] ';
+  const at = line.from + ind.length;
+  v.dispatch({ changes:{ from:at, insert:prefix }, selection:{ anchor:at + prefix.length } });
 }
 // 貼り付け内容が表（Excel等のHTML表／タブ区切り）かどうかを判定し、行×列の配列にする
 function rowsFromClipboardData(cd){
@@ -3427,6 +3441,7 @@ $('#mindmapBtn').onclick = () => { const v = curView(); if (v) insertMindmap(v);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden){ e.preventDefault(); closeMenu(); } }, true);
 }
 $('#tableBtn').onclick = () => { const v = curView(); if (v) insertTable(v); };
+$('#checkBtn').onclick = () => { const v = curView(); if (v){ insertCheckbox(v); v.focus(); } };
 $('#indentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, 1); else { indentCmd(v, 1); v.focus(); } };
 $('#outdentBtn').onclick = () => { const v = curView(); if (!v) return; if (activeTable()) indentCmd(v, -1); else { indentCmd(v, -1); v.focus(); } };
 $('#markBtn').onclick = () => { const v = curView(); if (v){ markerToggle(v); v.focus(); } };
