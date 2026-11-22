@@ -3,6 +3,7 @@ import { GAS_URL, POLL_MS, CLAUDE_DEFAULT_URL, WORKER_EVERY_SEC } from './config
 import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd } from './crypto.js'
 import { gas, repo } from './store.js'
 import { bioOk, bioRegistered, bioRegister, bioUnlock, bioForget } from './bio.js'
+import { PASS_MIN, passRegistered, passRegister, passUnlock, passForget } from './pass.js'
 import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText } from './summary.js'
 import { parseSummaryText, summaryTypeLabel } from './summary-text.js'
 import { loadSettings, saveSettings, newConnection, activeConnection, activeModelName, allModels, connectionOf } from './llm-settings.js'
@@ -41,7 +42,8 @@ const LOCK_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x
 const S = {
   code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null,
   session: null, exp: 0, pub: {}, raw: [], items: [], byId: new Map(), worker: null, sig: '', syncedAt: 0, syncErr: '',
-  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', q: '', sel: null, dtab: 'sum',
+  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', q: '', sel: null,
+  dtab: 'body', sec: 'sum', jump: null, secLock: 0, memoDraft: {}, // dtab: body（本文を全部並べる）/ tr（文字起こし）/ chat
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null,
   files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0,
 }
@@ -49,31 +51,52 @@ const DEK = new Map()
 const META = new Map()
 
 /* ---------- ログイン ---------- */
-function showGate(msg = '') {
+/** mode: ''＝合言葉を決めてあれば合言葉で開く / 'code'＝権限コードで開く */
+function showGate(msg = '', mode = '') {
   clearInterval(S.timer)
   $('#app').hidden = true
   $('#gate').hidden = false
   const bio = bioOk() && bioRegistered()
-  $('#gate').innerHTML = `
-    <div class="gate-card">
-      <h1 class="gate-title">議事録</h1>
-      <p class="gate-sub">暗号化して保管しています。開くには権限コードが必要です。</p>
-      ${bio ? '<button class="btn main wide" data-act="bio">Face ID・Touch ID で開く</button><div class="gate-or">または</div>' : ''}
-      <form id="loginForm" class="gate-form">
+  const pw = passRegistered()
+  const byPass = pw && mode !== 'code'
+  const form = byPass
+    ? `<form id="passForm" class="gate-form">
+        <label for="pass">合言葉</label>
+        <input id="pass" type="password" autocomplete="current-password" required>
+        <button class="btn ${bio ? '' : 'main'} wide" type="submit">開く</button>
+      </form>
+      <button class="link" data-act="gate-code">権限コードで開く</button>`
+    : `<form id="loginForm" class="gate-form">
         <label for="code">権限コード</label>
         <input id="code" type="password" autocomplete="current-password" required>
         <button class="btn ${bio ? '' : 'main'} wide" type="submit">開く</button>
       </form>
+      ${pw ? '<button class="link" data-act="gate-pass">合言葉で開く</button>' : ''}`
+  $('#gate').innerHTML = `
+    <div class="gate-card">
+      <h1 class="gate-title">議事録</h1>
+      <p class="gate-sub">${byPass ? '暗号化して保管しています。合言葉を入れてください。' : '暗号化して保管しています。開くには権限コードが必要です。'}</p>
+      ${bio ? '<button class="btn main wide" data-act="bio">Face ID・Touch ID で開く</button><div class="gate-or">または</div>' : ''}
+      ${form}
       <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
-      ${bio || ls.get('m2.seen', null) ? '<button class="link danger" data-act="reset">この端末の設定を消して、最初から設定する</button>' : ''}
+      ${bio || pw || ls.get('m2.seen', null) ? '<button class="link danger" data-act="reset">この端末の設定を消して、最初から設定する</button>' : ''}
     </div>`
-  $('#loginForm').addEventListener('submit', async (e) => {
+  $('#loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const code = $('#code').value.trim()
     if (!code) return
     await doLogin(code, true)
   })
-  if (!bio) $('#code')?.focus()
+  $('#passForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const p = $('#pass').value
+    if (!p.trim()) return
+    $('#gateMsg').textContent = '確認しています…'
+    let code
+    try { code = await passUnlock(p) } catch (err) { showGate(err.message); return }
+    await doLogin(code, false)
+  })
+  if (!bio) $('#code, #pass')?.focus()
 }
 
 async function doLogin(code, typed) {
@@ -84,10 +107,16 @@ async function doLogin(code, typed) {
     if (GAS_URL.includes('ここに')) throw new Error('src/config.js の GAS_URL が未設定です。')
     await login(code)
     await start()
-    if (typed && bioOk() && !bioRegistered() && !ls.get('m2.bioAsked', false)) askBio()
+    if (typed) askRemember()
   } catch (e) {
     S.code = null
-    showGate(e.message || '開けませんでした。')
+    // この端末に覚えていた権限コードが、サーバーに「違う」と言われた＝権限コードが変わった。覚えていた分は使えないので消す
+    if (!typed && /権限コードが違います/.test(e.message || '')) {
+      passForget(); bioForget()
+      showGate('覚えていた権限コードが使えなくなりました（変更された可能性があります）。新しい権限コードで開き直してください。', 'code')
+      return
+    }
+    showGate(e.message || '開けませんでした。', typed ? 'code' : '')
   }
 }
 
@@ -117,10 +146,46 @@ async function gasS(action, body) {
 
 function lock() {
   clearInterval(S.timer)
-  Object.assign(S, { code: null, privs: {}, gh: null, R: null, session: null, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '' })
+  Object.assign(S, { code: null, privs: {}, gh: null, R: null, session: null, raw: [], items: [], files: {}, chat: {}, memoDraft: {}, sel: null, sig: '' })
   S.byId = new Map(); DEK.clear(); META.clear()
   closeModal()
   showGate()
+}
+
+/** 権限コードで開いた直後：合言葉を決めるか、次に Face ID を登録するかを聞く */
+function askRemember() {
+  if (!passRegistered() && !ls.get('m2.pwAsked', false)) askPass(true)
+  else askBioMaybe()
+}
+
+function askBioMaybe() {
+  if (bioOk() && !bioRegistered() && !ls.get('m2.bioAsked', false)) askBio()
+}
+
+/** 合言葉を決める（first: 開いた直後の案内。設定から開いたときは false） */
+function askPass(first = false) {
+  modal('合言葉', `
+    <form id="pwForm">
+      <p>${first ? '次から、権限コードの代わりに「合言葉」だけで開けるようにしますか？ ' : ''}権限コードは、合言葉で暗号化して、この端末の中にだけ置きます（サーバーには送りません）。</p>
+      <div class="fcol"><label for="pwNew">合言葉（${PASS_MIN}文字以上）</label><input id="pwNew" type="password" autocomplete="new-password"></div>
+      <div class="fcol"><label for="pwNew2">もう一度</label><input id="pwNew2" type="password" autocomplete="new-password"></div>
+      <div class="acts"><button class="btn main" type="submit">決める</button>${first ? '<button class="btn" type="button" data-act="pwSkip">今はしない</button>' : '<button class="btn" type="button" data-act="close">キャンセル</button>'}</div>
+      <p class="msg" id="pwMsg" role="alert"></p>
+    </form>`)
+}
+
+async function savePass() {
+  const a = $('#pwNew').value, b = $('#pwNew2').value, m = $('#pwMsg')
+  if (a.trim().length < PASS_MIN) { m.textContent = `合言葉は ${PASS_MIN} 文字以上にしてください。`; return }
+  if (a !== b) { m.textContent = '2回の入力が合っていません。'; return }
+  if (!S.code) { m.textContent = '開き直してから決めてください。'; return }
+  try {
+    await passRegister(a, S.code)
+    ls.set('m2.pwAsked', true)
+    closeModal()
+    toast('合言葉を決めました。次から合言葉だけで開けます。')
+    setTimeout(askBioMaybe, 600)
+  } catch (e) { m.textContent = e.message }
 }
 
 function askBio() {
@@ -260,12 +325,21 @@ function paintHeader() {
   $('#role').textContent = S.admin ? '管理者' : (S.role || '')
 }
 
+let shown = { tab: '', sel: null }
 function renderMain() {
   const m = $('#main')
+  // 同じ会議を開いたまま描き直すとき（ToDo のチェックの保存など）、本文の位置とメモの入力を保つ
+  const same = S.tab === 'list' && shown.tab === 'list' && shown.sel === S.sel && !!S.sel
+  const sc = same ? $('.sheet-scroll')?.scrollTop : 0
+  const memo = same ? $('#memoIn') : null
+  const caret = memo && document.activeElement === memo ? [memo.selectionStart, memo.selectionEnd] : null
   if (S.tab === 'list') m.innerHTML = listHTML()
   else if (S.tab === 'notes') m.innerHTML = notesHTML()
   else m.innerHTML = convertHTML()
-  if (S.tab === 'list') afterList()
+  shown = { tab: S.tab, sel: S.sel }
+  if (sc) { const el = $('.sheet-scroll'); if (el) el.scrollTop = sc }
+  if (caret) { const m2 = $('#memoIn'); if (m2) { m2.focus(); m2.setSelectionRange(...caret) } }
+  if (S.tab === 'list') { afterList(); runJump() }
   if (S.tab === 'notes') kickNotes()
 }
 
@@ -420,7 +494,7 @@ async function prefetch(list, name) {
 }
 
 /* ---------- 詳細 ---------- */
-const NEED = { sum: ['s'], todo: ['s', 'n'], tr: ['t'], chat: ['s', 't'], memo: ['n'] }
+const NEED = { body: ['s', 'n'], tr: ['t'], chat: ['s', 't'] }
 
 function loadDetail(it) {
   if (it.locked) return
@@ -436,11 +510,56 @@ function paintDetail() {
   if (!el) return
   const it = S.sel ? S.byId.get(S.sel) : null
   const sc = el.querySelector('.sheet-scroll')?.scrollTop
+  // 入力途中のメモは、描き直しても消さない（入力のたびに S.memoDraft へ取ってあり、メモ欄に戻す）
+  const memo = el.querySelector('#memoIn')
+  const keepFocus = memo && document.activeElement === memo ? [memo.selectionStart, memo.selectionEnd] : null
   el.innerHTML = detailHTML(it)
-  if (sc) { const s2 = el.querySelector('.sheet-scroll'); if (s2) s2.scrollTop = sc }
+  const s2 = el.querySelector('.sheet-scroll')
+  if (sc && s2) s2.scrollTop = sc
+  if (keepFocus) { const m2 = $('#memoIn'); if (m2) { m2.focus(); m2.setSelectionRange(...keepFocus) } }
   const f = S.seek && !S.seek.scrolled && el.querySelector('.seg-row.flash')
   if (f) { S.seek.scrolled = true; f.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+  runJump()
   if (it) loadDetail(it)
+}
+
+/** タブ・ノートから「ここへ飛ぶ」と頼まれていたら、本文が読み込まれたところで飛ぶ */
+function runJump() {
+  const it = S.sel ? S.byId.get(S.sel) : null
+  if (!S.jump || !it || S.dtab !== 'body' || !NEED.body.every((n) => cached(it, n) !== undefined)) return
+  const k = S.jump; S.jump = null
+  requestAnimationFrame(() => jumpTo(k, false))
+}
+
+/** 本文の中の、そのセクションの頭へ移る */
+function jumpTo(k, smooth = true) {
+  const sc = $('.sheet-scroll'), el = $(`#sec-${k}`)
+  if (!sc || !el) return
+  S.sec = k
+  S.secLock = Date.now() + 900 // 移動中にスクロールで見出しが切り替わらないようにする
+  markSec()
+  const top = sc.scrollTop + (el.getBoundingClientRect().top - sc.getBoundingClientRect().top) - 8
+  sc.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' })
+}
+
+/** 今いるセクションのタブを光らせる（描き直さずにクラスだけ替える） */
+function markSec() {
+  $$('.dtab[data-sec]').forEach((b) => {
+    const on = S.dtab === 'body' && b.dataset.sec === S.sec
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on)
+  })
+}
+
+/** スクロールした位置に合わせて、タブの光る場所を替える */
+function spySec(sc) {
+  if (S.dtab !== 'body' || Date.now() < S.secLock) return
+  const secs = $$('.ssec[data-sec]', sc)
+  if (!secs.length) return
+  const base = sc.getBoundingClientRect().top + 48
+  let cur = secs[0].dataset.sec
+  for (const s of secs) if (s.getBoundingClientRect().top <= base) cur = s.dataset.sec
+  if (sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4) cur = secs[secs.length - 1].dataset.sec
+  if (cur !== S.sec) { S.sec = cur; markSec() }
 }
 
 function metaLine(it) {
@@ -468,63 +587,146 @@ function detailHTML(it) {
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
   ].join('')
-  const tabs = [['sum', '要約'], ['todo', 'ToDo'], ['tr', '文字起こし'], ['chat', 'チャット'], ['memo', 'メモ']]
-    .map(([k, l]) => `<button class="dtab ${S.dtab === k ? 'on' : ''}" data-act="dtab" data-v="${k}" aria-pressed="${S.dtab === k}">${l}${k === 'todo' && cached(it, 's')?.todos?.length ? ' ' + cached(it, 's').todos.length : ''}</button>`).join('')
+  const s0 = cached(it, 's')
+  const cnt = { agenda: s0?.agenda?.length, dec: s0?.decisions?.length, todo: s0?.todos?.length }
+  const jumpTabs = SECS.map(([k, l]) => { const on = S.dtab === 'body' && S.sec === k; return `<button class="dtab ${on ? 'on' : ''}" data-act="sec" data-sec="${k}" data-v="${k}" aria-pressed="${on}">${l}${cnt[k] ? ' ' + cnt[k] : ''}</button>` }).join('')
+  const viewTabs = [['tr', '文字起こし'], ['chat', 'チャット']]
+    .map(([k, l]) => `<button class="dtab view ${S.dtab === k ? 'on' : ''}" data-act="dtab" data-v="${k}" aria-pressed="${S.dtab === k}">${l}</button>`).join('')
+  const tabs = `${jumpTabs}<span class="dsep" aria-hidden="true"></span>${viewTabs}`
   return `
     <div class="dhead">${back}
       <div class="dtitle"><h1>${esc(it.title)}${isNew(it) ? '<span class="new">新着</span>' : ''}</h1><div class="dmeta">${metaLine(it)}</div></div>
       <div class="dacts">${acts}</div>
     </div>
-    <nav class="dtabs" aria-label="詳細の切り替え">${tabs}</nav>
+    <nav class="dtabs" aria-label="本文の項目（押すとその場所へ飛びます）">${tabs}</nav>
     <div class="sheet-scroll"><div class="sheet">${tabBody(it)}</div></div>`
 }
 
 const tchip = (t) => (t && parseT(t) != null ? `<button class="tchip" data-act="seek" data-t="${esc(t)}" aria-label="${esc(t)} の発言へ">${esc(t)}</button>` : '')
 const loadingHTML = '<p class="muted">読み込んでいます…</p>'
+/** 本文に並べる順番。タブを押すとそのセクションへ飛ぶ */
+const SECS = [['sum', 'サマリ'], ['agenda', '議事'], ['mind', 'マインドマップ'], ['dec', '決定事項'], ['todo', 'ToDo'], ['memo', 'メモ']]
 
 function tabBody(it) {
-  switch (S.dtab) {
-    case 'sum': return sumBody(it)
-    case 'todo': return todoBody(it)
-    case 'tr': return trBody(it)
-    case 'chat': return chatBody(it)
-    default: return memoBody(it)
-  }
+  if (S.dtab === 'tr') return trBody(it)
+  if (S.dtab === 'chat') return chatBody(it)
+  return bodyView(it)
 }
 
-function sumBody(it) {
-  const s = cached(it, 's')
-  if (s === undefined) return loadingHTML
-  if (!s) {
-    if (['tw', 'tr'].includes(it.st)) return '<p class="muted">Mac の文字起こしが終わると、要約できるようになります。</p>'
-    if (it.st === 'err') return `<p class="muted">処理に失敗しました${it.err ? `（${esc(it.err)}）` : ''}。変換管理から再実行できます。</p>`
-    return `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude">Claude.ai で要約</button></div></div>`
-  }
-  const sec = (title, body) => `<section class="ssec"><h2>${title}</h2>${body}</section>`
-  const bullets = (arr) => `<ul class="dots">${arr.map((p) => `<li><span>${esc(p.text)} ${tchip(p.t)}</span></li>`).join('')}</ul>`
+/* ---------- 本文：サマリ → 議事 → マインドマップ → 決定事項 → ToDo → メモ の順に全部並べる ---------- */
+const secBlock = (k, title, body) => `<section class="ssec" id="sec-${k}" data-sec="${k}"><h2>${title}</h2>${body}</section>`
+const dotsList = (arr) => `<ul class="dots">${arr.map((p) => `<li><span>${esc(p.text)} ${tchip(p.t)}</span></li>`).join('')}</ul>`
+const none = (text) => `<p class="muted">${text}</p>`
+const needSummary = none('要約すると、ここに表示されます。')
+
+function bodyView(it) {
+  const s = cached(it, 's'), n = cached(it, 'n')
+  if (s === undefined || n === undefined) return `<div class="read">${loadingHTML}</div>`
   return `<div class="read">
-    ${sec('サマリ', `<p>${esc(s.summary || s.cardSummary || '')}</p>`)}
-    ${s.decisions.length ? sec('決定事項', bullets(s.decisions)) : ''}
-    ${s.agenda.length ? sec('論点別', s.agenda.map((a) => `
-      <div class="topic">
-        <h3>${esc(a.topic)} ${tchip(a.t)}</h3>
-        ${a.points.length ? bullets(a.points) : ''}
-        ${a.outcome ? `<p class="outcome"><span class="ol">結論</span>${esc(a.outcome)}</p>` : ''}
-      </div>`).join('')) : ''}
-    ${s.topics.length ? sec('未解決の論点', `<ul class="dots">${s.topics.map((t) => `<li><span>${esc(t)}</span></li>`).join('')}</ul>`) : ''}
-    <p class="foot">要約：${esc(s.model || '—')} ・ 時刻を押すと、その発言を文字起こしで表示します</p>
+    ${secBlock('sum', 'サマリ', sumPart(it, s))}
+    ${secBlock('agenda', '議事', agendaPart(s))}
+    ${secBlock('mind', 'マインドマップ', mindPart(it, s))}
+    ${secBlock('dec', '決定事項', decPart(s))}
+    ${secBlock('todo', 'ToDo', todoPart(it, s, n))}
+    ${secBlock('memo', 'メモ', memoPart(it, n))}
+    ${s ? `<p class="foot">要約：${esc(s.model || '—')} ・ 時刻を押すと、その発言を文字起こしで表示します</p>` : ''}
   </div>`
 }
 
-function todoBody(it) {
-  const s = cached(it, 's'), n = cached(it, 'n')
-  if (s === undefined || n === undefined) return loadingHTML
-  const todos = s?.todos || []
-  if (!todos.length) return '<p class="muted">この会議の ToDo はありません。要約すると、宿題がここに並びます。</p>'
+function sumPart(it, s) {
+  if (!s) {
+    if (['tw', 'tr'].includes(it.st)) return none('Mac の文字起こしが終わると、要約できるようになります。')
+    if (it.st === 'err') return none(`処理に失敗しました${it.err ? `（${esc(it.err)}）` : ''}。変換管理から再実行できます。`)
+    return `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude">Claude.ai で要約</button></div></div>`
+  }
+  return `<p>${esc(s.summary || s.cardSummary || '')}</p>`
+}
+
+function agendaPart(s) {
+  if (!s) return needSummary
+  const agenda = s.agenda || [], topics = s.topics || []
+  if (!agenda.length && !topics.length) return none('議事はありません。')
+  return agenda.map((a) => `
+      <div class="topic">
+        <h3>${esc(a.topic)} ${tchip(a.t)}</h3>
+        ${a.points?.length ? dotsList(a.points) : ''}
+        ${a.outcome ? `<p class="outcome"><span class="ol">結論</span>${esc(a.outcome)}</p>` : ''}
+      </div>`).join('')
+    + (topics.length ? `<div class="topic"><h3>未解決の論点</h3><ul class="dots">${topics.map((t) => `<li><span>${esc(t)}</span></li>`).join('')}</ul></div>` : '')
+}
+
+function decPart(s) {
+  if (!s) return needSummary
+  return s.decisions?.length ? dotsList(s.decisions) : none('決定事項はありません。')
+}
+
+function todoPart(it, s, n) {
+  if (!s) return needSummary
+  const todos = s.todos || []
+  if (!todos.length) return none('この会議の ToDo はありません。')
   const done = n?.done || {}
-  return `<div class="read"><ul class="todos">${todos.map((t, i) => `
+  return `<ul class="todos">${todos.map((t, i) => `
     <li class="${done[i] ? 'done' : ''}"><label><input type="checkbox" data-todo="${it.id}" data-i="${i}" ${done[i] ? 'checked' : ''}><span class="tt">${esc(t.text)}</span></label>
-    <span class="tm">${t.owner ? '担当：' + esc(t.owner) : ''}${t.owner && t.due ? ' ・ ' : ''}${t.due ? '期限：' + esc(t.due) : ''}</span></li>`).join('')}</ul></div>`
+    <span class="tm">${t.owner ? '担当：' + esc(t.owner) : ''}${t.owner && t.due ? ' ・ ' : ''}${t.due ? '期限：' + esc(t.due) : ''}</span></li>`).join('')}</ul>`
+}
+
+function memoPart(it, n) {
+  const draft = S.memoDraft[it.id]
+  return `<label for="memoIn" class="lbl">メモ（同じグループの人にも見えます）</label>
+    <textarea id="memoIn" rows="8">${esc(draft ?? n?.memo ?? '')}</textarea>
+    <div class="acts"><button class="btn main" data-act="memo-save" data-id="${it.id}">メモを保存</button><span class="muted" id="memoMsg"></span></div>`
+}
+
+/* ---------- マインドマップ（Markdown の見出し・箇条書きを、枝分かれの図にする） ---------- */
+const MM_MAX = 500
+const indentW = (str) => [...(/^[ \t]*/.exec(str)[0])].reduce((w, c) => w + (c === '\t' ? 4 : 1), 0)
+const mmClean = (t) => t.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/(\*\*|__|~~|`)/g, '').replace(/\*([^*]+)\*/g, '$1').trim()
+
+/** Markdown の見出し（# の数）と箇条書き（字下げ）から、{t, kids} の木を作る */
+function parseMindmap(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n')
+  const bullet = /^([ \t]*)(?:[-*+•・]|\d+[.)])\s+(.*)$/
+  const widths = lines.map((l) => { const m = bullet.exec(l); return m ? indentW(m[1]) : 0 }).filter((w) => w > 0)
+  const unit = widths.length ? Math.min(...widths) : 2
+  const rows = []
+  let head = -1
+  for (const raw of lines) {
+    if (!raw.trim()) continue
+    let m
+    if ((m = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(raw))) { head = m[1].length - 1; rows.push({ lv: head, t: mmClean(m[2]) }) }
+    else if ((m = bullet.exec(raw))) rows.push({ lv: head + 1 + Math.floor(indentW(m[1]) / unit), t: mmClean(m[2]) })
+    else rows.push({ lv: head + 1, t: mmClean(raw) })
+  }
+  const root = { t: '', kids: [] }
+  const stack = [{ lv: -1, node: root }]
+  for (const r of rows.filter((x) => x.t).slice(0, MM_MAX)) {
+    while (stack.length > 1 && stack[stack.length - 1].lv >= r.lv) stack.pop()
+    const node = { t: r.t, kids: [] }
+    stack[stack.length - 1].node.kids.push(node)
+    stack.push({ lv: r.lv, node })
+  }
+  return root
+}
+
+function mmNode(n, lv) {
+  const kids = n.kids.length ? `<div class="mm-kids">${n.kids.map((k) => `<div class="mm-kid">${mmNode(k, lv + 1)}</div>`).join('')}</div>` : ''
+  const label = n.kids.length
+    ? `<button class="mm-label has" data-act="mm-toggle" aria-label="${esc(n.t)}（押すと枝を畳みます）">${esc(n.t)}</button>`
+    : `<span class="mm-label">${esc(n.t)}</span>`
+  return `<div class="mm-node l${Math.min(lv, 3)}">${label}${kids}</div>`
+}
+
+function mindPart(it, s) {
+  if (!s) return needSummary
+  const text = String(s.mindmap || '').trim()
+  if (!text) return none('この会議のマインドマップはありません。')
+  if (/<\/?(html|body|svg|div|script|style)\b/i.test(text)) return `<pre class="mm-raw">${esc(text)}</pre>`
+  const root = parseMindmap(text)
+  if (!root.kids.length) return none('この会議のマインドマップはありません。')
+  // 先頭がひとつだけならそれを中心に、複数なら会議のタイトルを中心にする
+  const center = root.kids.length === 1 ? root.kids[0] : { t: it.title, kids: root.kids }
+  return `<div class="mm" aria-label="マインドマップ">${mmNode(center, 0)}</div>
+    <p class="muted sm">枝の名前を押すと、その先を畳めます。</p>`
 }
 
 function trBody(it) {
@@ -549,16 +751,6 @@ function chatBody(it) {
   return `<div class="read chat">
     <div class="msgs" id="msgs">${msgs.length ? msgs.map((m) => `<div class="msg-b ${m.role}">${esc(m.content) || '…'}</div>`).join('') : '<p class="muted">この会議について質問できます（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）。答えには根拠の時刻を添えます。</p>'}</div>
     <form class="ask" data-chat="${it.id}"><label for="askIn" class="sr">質問</label><textarea id="askIn" rows="2" placeholder="この会議について質問する"></textarea><button class="btn main" type="submit">送信</button></form>
-  </div>`
-}
-
-function memoBody(it) {
-  const n = cached(it, 'n')
-  if (n === undefined) return loadingHTML
-  return `<div class="read">
-    <label for="memoIn" class="lbl">メモ（同じグループの人にも見えます）</label>
-    <textarea id="memoIn" rows="10">${esc(n?.memo || '')}</textarea>
-    <div class="acts"><button class="btn main" data-act="memo-save" data-id="${it.id}">メモを保存</button><span class="muted" id="memoMsg"></span></div>
   </div>`
 }
 
@@ -985,6 +1177,11 @@ function openSettings() {
       <div class="fcol"><label for="stClaude">リンク（claude.ai のプロジェクトかチャット）</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="${CLAUDE_DEFAULT_URL}" autocapitalize="off" spellcheck="false"></div>
       <div class="acts"><button class="btn" data-act="claude-save">保存</button></div>
     </section>
+    <section class="sset"><h3>合言葉</h3>
+      ${passRegistered()
+        ? '<p class="sm">決めてあります。開くときは合言葉だけで入れます（権限コードでも開けます）。</p><div class="acts"><button class="btn" data-act="pw-set">合言葉を変える</button><button class="btn" data-act="pw-off">やめる</button></div>'
+        : '<p class="sm">権限コードを、合言葉で暗号化してこの端末に覚えておき、次から合言葉だけで開けるようにします。</p><div class="acts"><button class="btn" data-act="pw-set">合言葉を決める</button></div>'}
+    </section>
     <section class="sset"><h3>Face ID・Touch ID</h3>
       ${!bio ? '<p class="muted sm">このブラウザでは使えません（https で開いた、対応する端末が必要です）。</p>'
         : bioRegistered() ? '<p class="sm">登録済みです。権限コードでも開けます。</p><div class="acts"><button class="btn" data-act="bio-off">解除</button></div>'
@@ -1047,9 +1244,14 @@ const ACT = {
     try { await bioRegister(S.code); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
   },
   'bio-off': () => { bioForget(); openSettings() },
+  'gate-code': () => showGate('', 'code'),
+  'gate-pass': () => showGate(),
+  pwSkip: () => { ls.set('m2.pwAsked', true); closeModal(); setTimeout(askBioMaybe, 300) },
+  'pw-set': () => askPass(false),
+  'pw-off': () => { passForget(); openSettings() },
   reset: () => {
-    if (!confirm('この端末の設定（Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先は残ります。よろしいですか？')) return
-    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl']) ls.del(k)
+    if (!confirm('この端末の設定（合言葉・Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先は残ります。よろしいですか？')) return
+    for (const k of ['m2.pw', 'm2.pwAsked', 'm2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl']) ls.del(k)
     S.fav = new Set(); S.seen = {}
     lock()
   },
@@ -1072,7 +1274,7 @@ const ACT = {
     S.sel = it.id
     S.seek = null
     S.tab = 'list'
-    if (a.dataset.go) S.dtab = a.dataset.go
+    S.dtab = 'body'; S.sec = a.dataset.go || 'sum'; S.jump = a.dataset.go || null // ノートの ToDo から来たときは、本文の ToDo へ飛ぶ
     if (!it.locked && S.seen[it.id] !== it.upd) { S.seen[it.id] = it.upd; ls.set('m2.seen', S.seen) }
     if (it.date && !it.date.startsWith(S.month)) S.month = it.date.slice(0, 7)
     render()
@@ -1080,6 +1282,14 @@ const ACT = {
   },
   'close-detail': () => { S.sel = null; renderMain() },
   dtab: (a) => { S.dtab = a.dataset.v; S.seek = null; paintDetail() },
+  // 本文のタブ：本文を見ているならその場所へ飛ぶ。文字起こし・チャットを見ているなら本文に戻ってから飛ぶ
+  sec: (a) => {
+    const k = a.dataset.v
+    if (S.dtab === 'body') { S.seek = null; jumpTo(k); return }
+    S.dtab = 'body'; S.sec = k; S.jump = k; S.seek = null
+    paintDetail()
+  },
+  'mm-toggle': (a) => { a.closest('.mm-node')?.classList.toggle('closed') },
   fav: (a) => {
     const id = a.dataset.id
     if (S.fav.has(id)) S.fav.delete(id); else S.fav.add(id)
@@ -1101,7 +1311,7 @@ const ACT = {
     const it = S.byId.get(id)
     const n = { ...(await file(it, 'n') || {}), memo: $('#memoIn').value }
     $('#memoMsg').textContent = '保存しています…'
-    try { await saveFile(it, 'n', n); toast('メモを保存しました。') } catch (e) { $('#memoMsg').textContent = e.message }
+    try { await saveFile(it, 'n', n); delete S.memoDraft[id]; toast('メモを保存しました。') } catch (e) { const m = $('#memoMsg'); if (m) m.textContent = e.message }
   },
   edit: (a) => openEdit(a.dataset.id),
   'edit-save': (a) => saveEdit(a.dataset.id),
@@ -1150,6 +1360,7 @@ document.addEventListener('click', (e) => {
 })
 
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'memoIn' && S.sel) S.memoDraft[S.sel] = e.target.value
   if (e.target.id === 'q') {
     S.q = e.target.value
     clearTimeout(ACT._qt)
@@ -1177,6 +1388,7 @@ document.addEventListener('change', (e) => {
 })
 
 document.addEventListener('submit', (e) => {
+  if (e.target.id === 'pwForm') { e.preventDefault(); savePass(); return }
   const f = e.target.closest('form[data-chat]')
   if (!f) return
   e.preventDefault()
@@ -1188,6 +1400,14 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('#modal').innerHTML && !$('#upGo')) closeModal()
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.target.id === 'askIn') e.target.closest('form')?.requestSubmit()
 })
+
+// 本文をスクロールしたら、いまいるセクションのタブを光らせる（scroll は泡立たないので capture で拾う）
+let spyRaf = 0
+document.addEventListener('scroll', (e) => {
+  const t = e.target
+  if (!t?.classList?.contains('sheet-scroll') || spyRaf) return
+  spyRaf = requestAnimationFrame(() => { spyRaf = 0; spySec(t) })
+}, true)
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.R) refresh() })
 

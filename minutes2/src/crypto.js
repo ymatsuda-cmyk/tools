@@ -37,6 +37,19 @@ export async function openBundle(code, sealed) {
   return JSON.parse(td.decode(pt))
 }
 
+/** 合言葉で文字列（権限コード）を包む → {salt, iv, ct}。この端末に置くときだけ使う */
+export async function sealText(pass, text) {
+  const salt = rnd(16), iv = rnd(12)
+  const ct = await subtle.encrypt({ name: 'AES-GCM', iv }, await codeKey(pass, salt), te.encode(text))
+  return { salt: b64(salt), iv: b64(iv), ct: b64(new Uint8Array(ct)) }
+}
+
+/** sealText で包んだものを合言葉で開く。合言葉が違うと例外 */
+export async function openText(pass, v) {
+  const pt = await subtle.decrypt({ name: 'AES-GCM', iv: unb64(v.iv) }, await codeKey(pass, unb64(v.salt)), unb64(v.ct))
+  return td.decode(pt)
+}
+
 const aesKey = (raw) => subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
 
 export const newDek = () => rnd(32)
