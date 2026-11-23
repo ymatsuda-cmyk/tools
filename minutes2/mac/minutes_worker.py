@@ -40,6 +40,7 @@ class Worker:
         self.admin_gid = admin["gid"]
         self.admin_priv = jwk_to_priv(admin["priv"])
         self.dek_cache = {}
+        self.stats = {"取り込み": 0, "文字起こし": 0, "Notionへ書き出し": 0, "要約を回収": 0}   # 1回の確認でやったこと（最後にログへ1行で残す）
 
     # ---------- 共通 ----------
 
@@ -119,6 +120,7 @@ class Worker:
                     raise RuntimeError("音声から文字を起こせませんでした（無音の可能性があります）")
                 self.write_file(e, "t", {"segments": segments, "asr": MODEL})
                 self.patch(e["id"], st="sw", dur=int(dur or e.get("dur") or 0), err=None)
+                self.stats["文字起こし"] += 1
                 log(f"{e['id']}: 文字起こし完了 {len(segments)} 区切り / {int(dur)} 秒")
             except Exception as ex:  # noqa: BLE001
                 log(f"{e['id']}: 失敗 {ex}\n{traceback.format_exc()}")
@@ -162,6 +164,7 @@ class Worker:
                 self.patch(eid, st="ok", err=None, td=len(s["todos"]))
                 e["st"] = "ok"  # 手元の一覧も更新して、下の書き出しで二重に出さない
                 n.trash(page["id"]); pages.pop(eid)
+                self.stats["要約を回収"] += 1
                 log(f"{eid}: Claude.ai の要約を回収")
             except Exception as ex:  # noqa: BLE001
                 log(f"{eid}: 要約を読み取れません {ex}")
@@ -181,6 +184,7 @@ class Worker:
                 meta = open_json(self.dek(e), e["m"])
                 t = self.read_file(e, "t") or {}
                 n.create(e["id"], meta.get("title") or "（無題）", e.get("date", ""), e.get("dur", 0), t.get("segments") or [])
+                self.stats["Notionへ書き出し"] += 1
                 log(f"{e['id']}: Notion の作業DBへ書き出し")
             except Exception as ex:  # noqa: BLE001
                 log(f"{e['id']}: Notion へ書き出せません {ex}")
@@ -191,7 +195,7 @@ class Worker:
         self.heartbeat()
         try:
             from notion_import import import_pages
-            import_pages()
+            self.stats["取り込み"] = import_pages() or 0
         except Exception as ex:  # noqa: BLE001  取り込みが失敗しても文字起こしは続ける
             log(f"Notion からの取り込みに失敗しました: {ex}")
         index = self.gh.get_json("index.json", []) or []
@@ -199,6 +203,8 @@ class Worker:
         index = self.gh.get_json("index.json", []) or []
         self.notion_bridge(index)
         self.heartbeat()
+        # 何も無かった回も、確認したことが分かるように1行残す（動いているのにログが空、を無くす）
+        log("確認しました：" + "・".join(f"{k} {v}件" for k, v in self.stats.items()))
 
 
 def transcribe(path: pathlib.Path):

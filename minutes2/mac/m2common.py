@@ -12,7 +12,6 @@ import requests
 
 HOME = pathlib.Path(os.environ.get("MINUTES2_HOME", pathlib.Path.home() / ".minutes2"))
 KEYS_PATH = HOME / "keys.json"
-LOG_PATH = HOME / "worker.log"
 
 
 def load_env() -> dict:
@@ -33,12 +32,31 @@ def load_env() -> dict:
 
 ENV = load_env()
 
+# ログの置き場所：既定は ~/scripts/logs（.env の MINUTES2_LOG_DIR で変えられる）
+LOG_DIR = pathlib.Path(os.path.expanduser(ENV.get("MINUTES2_LOG_DIR") or "~/scripts/logs"))
+LOG_PATH = LOG_DIR / "minutes2_worker.log"
+LOG_MAX_BYTES = 5 * 1024 * 1024   # これを超えたら、古いログに回す（.1 .2 .3 を残す）
+LOG_KEEP = 3
+
+
+def _rotate_log():
+    try:
+        if LOG_PATH.exists() and LOG_PATH.stat().st_size > LOG_MAX_BYTES:
+            for i in range(LOG_KEEP, 0, -1):
+                src = LOG_PATH if i == 1 else LOG_PATH.with_name(f"{LOG_PATH.name}.{i - 1}")
+                dst = LOG_PATH.with_name(f"{LOG_PATH.name}.{i}")
+                if src.exists():
+                    src.replace(dst)
+    except OSError:
+        pass
+
 
 def log(msg: str):
     line = time.strftime("%Y-%m-%d %H:%M:%S ") + msg
     print(line, flush=True)
     try:
-        HOME.mkdir(parents=True, exist_ok=True)
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        _rotate_log()
         with open(LOG_PATH, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except OSError:
