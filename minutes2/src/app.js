@@ -55,6 +55,28 @@ const S = {
 const DEK = new Map()
 const META = new Map()
 
+/* ---------- 文字の大きさ（この端末に保存。次回も同じ大きさで開く） ---------- */
+const FS_LEVELS = [{ n: '小', v: 0.88 }, { n: '標準', v: 1 }, { n: '大', v: 1.15 }, { n: '特大', v: 1.3 }, { n: '最大', v: 1.5 }]
+{
+  const saved = Number(ls.get('m2.fs', 1))
+  S.fs = Number.isInteger(saved) && saved >= 0 && saved < FS_LEVELS.length ? saved : 1
+}
+const applyFs = () => document.documentElement.style.setProperty('--rs', String(FS_LEVELS[S.fs].v))
+
+function fsCtl() {
+  return `<span class="fsctl" role="group" aria-label="文字の大きさ"><button type="button" class="btn sm" data-act="fs" data-d="-1" aria-label="文字を小さく" ${S.fs <= 0 ? 'disabled' : ''}>A−</button><span class="fsl">${FS_LEVELS[S.fs].n}</span><button type="button" class="btn sm" data-act="fs" data-d="1" aria-label="文字を大きく" ${S.fs >= FS_LEVELS.length - 1 ? 'disabled' : ''}>A＋</button></span>`
+}
+
+function setFs(i) {
+  S.fs = Math.max(0, Math.min(FS_LEVELS.length - 1, i))
+  ls.set('m2.fs', S.fs)
+  applyFs()
+  captureEdit()   // 編集中の入力を失わない
+  if (S.tab === 'list') paintDetail()
+  else if (S.tab === 'todo' || S.tab === 'notes') renderMain()
+  $$('#fsset [data-v]').forEach((b) => { b.classList.toggle('main', Number(b.dataset.v) === S.fs); b.setAttribute('aria-pressed', Number(b.dataset.v) === S.fs) })
+}
+
 /* ---------- ログイン ---------- */
 function showGate(msg = '') {
   clearInterval(S.timer)
@@ -271,6 +293,12 @@ function paintHeader() {
   $('#role').textContent = S.admin ? '管理者' : (S.role || '')
 }
 
+/** 通信の安全設定（CSP）で style 属性は使えないので、棒の長さ・高さは data-w / data-h に持たせて、描いたあとに当てる */
+function applyDyn(root = document) {
+  root.querySelectorAll('[data-w]').forEach((el) => { el.style.width = el.dataset.w + 'px' })
+  root.querySelectorAll('[data-h]').forEach((el) => { el.style.height = el.dataset.h + 'px' })
+}
+
 function renderMain(reset = false, noSheet = false) {
   const m = $('#main')
   const keep = reset ? null : { main: m.scrollTop, list: $('.listpane')?.scrollTop, sheet: $('.sheet-scroll')?.scrollTop }
@@ -283,6 +311,7 @@ function renderMain(reset = false, noSheet = false) {
     const lp = $('.listpane'); if (lp && keep.list) lp.scrollTop = keep.list
     const sh = $('.sheet-scroll'); if (sh && keep.sheet && !noSheet) sh.scrollTop = keep.sheet
   }
+  applyDyn(m)
   if (S.tab === 'list') afterList()
   if (S.tab === 'todo') kickTodo()
   if (S.tab === 'notes') kickNotes()
@@ -375,7 +404,7 @@ function timelineHTML(items) {
           <div class="tl-rail"><span class="tl-line"></span><span class="tl-dot ${(ST[it.st] || ST.tw).c}"></span><span class="tl-line grow"></span></div>
           <button class="tl-card ${S.sel === it.id ? 'sel' : ''}" data-act="open" data-id="${it.id}">
             <span class="tl-top"><span class="tl-title">${esc(it.title)}</span>${it.locked ? LOCK_SVG : ''}${isNew(it) ? '<span class="new">新着</span>' : ''}${stChip(it)}</span>
-            <span class="tl-meta"><span class="bar ${(ST[it.st] || ST.tw).c}" style="width:${Math.round(Math.min(it.dur || 0, 7200) / 7200 * 110) + 6}px"></span>${fmtDur(it.dur)}${it.tags?.length ? ' ・ ' + esc(it.tags.join('・')) : ''}</span>
+            <span class="tl-meta"><span class="bar ${(ST[it.st] || ST.tw).c}" data-w="${Math.round(Math.min(it.dur || 0, 7200) / 7200 * 110) + 6}"></span>${fmtDur(it.dur)}${it.tags?.length ? ' ・ ' + esc(it.tags.join('・')) : ''}</span>
           </button>
         </div>`).join('')}
     </div>`
@@ -409,13 +438,18 @@ function stripHTML(mi) {
   const days = new Date(y, m, 0).getDate()
   const by = new Map()
   for (const it of mi) { if (!by.has(it.day)) by.set(it.day, []); by.get(it.day).push(it) }
+  const durOf = (it) => it.dur || 1800   // 長さが分からない会議は、30分として描く
+  // 棒の高さは、その月でいちばん会議時間の長い日を最大（40px）にそろえる。会議ごとに積み上げ、色は状態
+  const maxTotal = Math.max(1, ...[...by.values()].map((l) => l.reduce((a, it) => a + durOf(it), 0)))
   const today = todayKey()
   let h = ''
   for (let d = 1; d <= days; d++) {
     const k = `${S.month}-${pad(d)}`
     const list = by.get(k) || []
-    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c}" style="height:${Math.max(4, Math.round(Math.min(it.dur || 1800, 7200) / 7200 * 40))}px"></span>`).join('')
-    h += `<button class="sday ${k === today ? 'today' : ''}" ${list.length ? `data-act="jump" data-day="${k}"` : 'disabled'} aria-label="${m}月${d}日 ${list.length}件"><span class="sbars">${bars}</span><span class="sn">${d}</span></button>`
+    const total = list.reduce((a, it) => a + durOf(it), 0)
+    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
+    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}`
+    h += `<button class="sday ${k === today ? 'today' : ''}" ${list.length ? `data-act="jump" data-day="${k}"` : 'disabled'} aria-label="${label}" title="${label}"><span class="sbars">${bars}</span><span class="sn">${d}</span></button>`
   }
   return `<div class="strip"><div class="strip-in">${h}</div></div>`
 }
@@ -556,7 +590,7 @@ function bodyAll(it) {
   const todos = s.todos || []
   const open = todos.filter((t, i) => !doneOf(n, todoKey(t, i))).length
   return `<div class="read body">
-    <div class="sumbar"><span class="hint">文字を選ぶとマーカーを付けられます。付けた箇所は「ノート」に集まります。</span>${canEditBody(it) ? `<button class="btn sm" data-act="edit-sum" data-id="${it.id}">本文を編集</button>` : ''}</div>
+    <div class="sumbar"><span class="hint">文字を選ぶとマーカーを付けられます。付けた箇所は「ノート」に集まります。</span>${fsCtl()}${canEditBody(it) ? `<button class="btn sm" data-act="edit-sum" data-id="${it.id}">本文を編集</button>` : ''}</div>
     ${sec('summary', 'サマリ', `<p>${m('summary', s.summary || s.cardSummary || '')}</p>`)}
     ${sec('agenda', '論点別', `${s.agenda.length ? s.agenda.map((a, ai) => `
       <div class="topic">
@@ -585,7 +619,7 @@ function mapBody(it) {
   if (s === undefined) return loadingHTML
   if (!s) return '<p class="muted">要約すると、マインドマップが作られます。</p>'
   const tree = mindmapTree(it.title, s)
-  return `<div class="read mmwrap"><div class="acts mmbar"><button class="btn sm" data-act="mm-open">すべて開く</button><button class="btn sm" data-act="mm-close">すべて閉じる</button><span class="muted sm">${s.mindmap ? '保存済みのマインドマップ' : '要約の構成から作っています'} ・ 項目を押すと、開け閉めできます</span></div>${renderTree(tree, esc)}</div>`
+  return `<div class="read mmwrap"><div class="acts mmbar"><button class="btn sm" data-act="mm-open">すべて開く</button><button class="btn sm" data-act="mm-close">すべて閉じる</button>${fsCtl()}<span class="muted sm">${s.mindmap ? '保存済みのマインドマップ' : '要約の構成から作っています'} ・ 項目を押すと、開け閉めできます</span></div>${renderTree(tree, esc)}</div>`
 }
 
 /** ToDo 1件：完了・本文（マーカーつき）・担当と期限・経過・経過の追記 */
@@ -618,7 +652,7 @@ function trBody(it) {
   if (S.seek) t.segments.forEach((x, i) => { if (x.t != null && x.t <= S.seek.t) target = i })
   if (S.seek && target < 0) target = 0
   return `<div class="read tr">
-    <div class="trbar"><label for="trq" class="sr">文字起こし内を検索</label><input id="trq" type="search" placeholder="文字起こし内を検索" value="${esc(q)}">${canEditBody(it) ? `<button class="btn sm" data-act="edit-tr" data-id="${it.id}">本文を編集</button>` : ''}<button class="btn sm" data-act="copy-tr" data-id="${it.id}">コピー</button></div>
+    <div class="trbar"><label for="trq" class="sr">文字起こし内を検索</label><input id="trq" type="search" placeholder="文字起こし内を検索" value="${esc(q)}">${fsCtl()}${canEditBody(it) ? `<button class="btn sm" data-act="edit-tr" data-id="${it.id}">本文を編集</button>` : ''}<button class="btn sm" data-act="copy-tr" data-id="${it.id}">コピー</button></div>
     <p class="hint">文字を選ぶとマーカーを付けられます。</p>
     <div class="segs">${t.segments.map((x, i) => {
       const hit = q && x.s.includes(q)
@@ -693,7 +727,7 @@ function todoPageHTML() {
   return `<div class="page">
     <div class="toolbar"><h1 class="ptitle">ToDo</h1>${chips}
       ${owners.size ? `<label class="sr" for="towner">担当</label><select id="towner"><option value="">担当：全員</option>${[...owners].sort().map((o) => `<option ${S.towner === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : ''}
-      <span class="grow"></span>${rangeSelect()}</div>
+      <span class="grow"></span>${fsCtl()}${rangeSelect()}</div>
     <div class="notes">${blocks || (loading ? '' : `<p class="empty">${emptyMsg}</p>`)}${loading}</div>
   </div>`
 }
@@ -737,7 +771,7 @@ function notesPageHTML() {
   const loading = pending ? `<p class="muted sm">読み込んでいます… ${list.length - pending}/${list.length}</p>` : ''
   return `<div class="page">
     <div class="toolbar"><h1 class="ptitle">ノート</h1>${chips}<span class="grow"></span>
-      <label class="sr" for="nq">ノート内を検索</label><input id="nq" class="nsearch" type="search" placeholder="ノート内を検索" value="${esc(S.nq)}">${rangeSelect()}</div>
+      <label class="sr" for="nq">ノート内を検索</label><input id="nq" class="nsearch" type="search" placeholder="ノート内を検索" value="${esc(S.nq)}">${fsCtl()}${rangeSelect()}</div>
     <div class="notes">${blocks || (pending ? '' : '<p class="empty">マーカーはまだありません。議事録の文字を選ぶと、マーカーを付けられます。付けた箇所は、ここに集まります。</p>')}${loading}</div>
   </div>`
 }
@@ -1408,6 +1442,10 @@ function openSettings() {
   const c = activeConnection(s) || newConnection()
   const bio = bioOk()
   modal('設定', `
+    <section class="sset"><h3>文字の大きさ</h3>
+      <div class="fsset" id="fsset" role="group" aria-label="文字の大きさ">${FS_LEVELS.map((l, i) => `<button type="button" class="btn ${i === S.fs ? 'main' : ''}" data-act="fs-set" data-v="${i}" aria-pressed="${i === S.fs}">${l.n}</button>`).join('')}</div>
+      <p class="muted sm">本文（要約・文字起こし・ToDo・ノート・マインドマップ）の文字の大きさです。この端末に保存され、次回も同じ大きさで開きます。</p>
+    </section>
     <section class="sset"><h3>AI の接続先（この端末だけ）</h3>
       <div class="fcol"><label for="stConn">接続</label><select id="stConn">${s.connections.map((x) => `<option value="${esc(x.id)}" ${x.id === c.id ? 'selected' : ''}>${esc(x.label || '名前なし')}</option>`).join('')}</select></div>
       <div class="frow"><div class="fcol grow2"><label for="stLabel">名前</label><input id="stLabel" value="${esc(c.label)}"></div><div class="fcol"><label for="stCtx">num_ctx</label><input id="stCtx" inputmode="numeric" value="${esc(c.numCtx)}"></div></div>
@@ -1486,8 +1524,8 @@ const ACT = {
   'bio-off': () => { bioForget(); openSettings() },
   reset: () => {
     if (!confirm('この端末の設定（Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先は残ります。よろしいですか？')) return
-    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl']) ls.del(k)
-    S.fav = new Set(); S.seen = {}
+    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs']) ls.del(k)
+    S.fav = new Set(); S.seen = {}; S.fs = 1; applyFs()
     lock()
   },
   lock,
@@ -1525,6 +1563,8 @@ const ACT = {
   'close-detail': () => { if (!leaveEdit()) return; S.sel = null; hideBar(); scrollHide.reset(); renderMain() },
   dtab: (a) => { captureEdit(); S.dtab = a.dataset.v; S.seek = null; hideBar(); paintDetail(true) },
   sec: (a) => goSection(a.dataset.v),
+  fs: (a) => setFs(S.fs + Number(a.dataset.d)),
+  'fs-set': (a) => setFs(Number(a.dataset.v)),
   'mm-open': () => $$('.mm details').forEach((d) => { d.open = true }),
   'mm-close': () => $$('.mm details').forEach((d) => { d.open = false }),
   fav: (a) => {
@@ -1716,5 +1756,6 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.R) refresh() })
 
+applyFs()
 const scrollHide = initScrollHide($('#app'), matchMedia('(max-width: 1024px), (pointer: coarse)'))
 showGate()
