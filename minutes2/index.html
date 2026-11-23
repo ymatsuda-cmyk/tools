@@ -3,24 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https: http://localhost:* http://127.0.0.1:*; img-src 'self' data:; media-src blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https: http://localhost:* http://127.0.0.1:*; img-src 'self' data:; manifest-src 'self'; media-src blob:; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#26335a">
-<title>議事録</title>
-<link rel="icon" href="data:,">
+<title>MinuteStock</title>
+<meta name="application-name" content="MinuteStock">
+<meta name="apple-mobile-web-app-title" content="MinuteStock">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="./icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="manifest" href="./manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Shippori+Mincho:wght@600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-<main id="gate" class="gate" aria-label="ログイン"></main>
+<main id="gate" class="gate" aria-label="MinuteStock ログイン"></main>
 
 <div id="app" hidden>
   <header class="top">
-    <div class="brand">議事録</div>
+    <div class="brand">MinuteStock</div>
     <nav class="tabs" aria-label="画面">
       <button data-act="tab" data-tab="list">一覧</button>
+      <button data-act="tab" data-tab="todo">ToDo</button>
       <button data-act="tab" data-tab="notes">ノート</button>
       <button data-act="tab" data-tab="convert">変換管理 <span class="badge" hidden></span></button>
     </nav>
@@ -41,11 +49,13 @@
   <div id="main" class="main"></div>
   <nav class="tabbar" aria-label="画面">
     <button data-act="tab" data-tab="list">一覧</button>
+    <button data-act="tab" data-tab="todo">ToDo</button>
     <button data-act="tab" data-tab="notes">ノート</button>
     <button data-act="tab" data-tab="convert">変換管理 <span class="badge" hidden></span></button>
   </nav>
 </div>
 
+<div id="mkbar" role="toolbar" aria-label="マーカー" hidden></div>
 <div id="modal"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script type="module" src="./src/app.js"></script>

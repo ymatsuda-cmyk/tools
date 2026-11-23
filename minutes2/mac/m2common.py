@@ -100,10 +100,28 @@ class GitHub:
         if sha:
             body["sha"] = sha
         r = self.s.put(self._url(path), json=body, timeout=120)
+        if r.status_code == 404 and self._is_empty_repo():
+            # 空のリポジトリにはまだブランチが無いので、ブランチを指定せずに最初のコミットを作る
+            body.pop("branch")
+            r = self.s.put(self._url(path), json=body, timeout=120)
         if r.status_code in (409, 422):
             return False
+        if r.status_code == 404:
+            raise RuntimeError(
+                f"GitHub に書けませんでした（404）: {self.owner}/{self.repo} が見つかりません。"
+                "リポジトリ名と、書き込み用トークン（GH_TOKEN）の Repository access にこのリポジトリが入っているかを確かめてください。"
+                f" GitHub の応答: {r.text[:200]}")
+        if r.status_code in (401, 403):
+            raise RuntimeError(
+                f"GitHub に書けませんでした（{r.status_code}）: 書き込み用トークン（GH_TOKEN）の権限を確かめてください"
+                "（Contents: Read and write が必要です）。"
+                f" GitHub の応答: {r.text[:200]}")
         r.raise_for_status()
         return True
+
+    def _is_empty_repo(self) -> bool:
+        r = self.s.get(f"https://api.github.com/repos/{self.owner}/{self.repo}/branches", timeout=60)
+        return r.status_code == 200 and r.json() == []
 
     def write(self, path, text, message=None):
         for _ in range(4):

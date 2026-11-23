@@ -12,6 +12,7 @@
 // t は文字起こしの時刻（"m:ss" か "h:mm:ss"）。分からなければ ""。
 import { streamChat } from './llm-client.js'
 import { loadSettings, connectionOf } from './llm-settings.js'
+import { newTodoKey } from './todos.js'
 
 export const SUMMARY_PROMPT = `あなたは会議の文字起こしを要約するアシスタントです。
 文字起こしの各行の先頭にある [m:ss] は、その発言の時刻です。
@@ -82,8 +83,8 @@ export function normalizeSummary(raw, model) {
     agenda,
     decisions: (Array.isArray(r.decisions) ? r.decisions : []).map(item).filter((d) => d.text),
     todos: (Array.isArray(r.todos) ? r.todos : []).map((t) => (typeof t === 'string'
-      ? { text: str(t), owner: '', due: '' }
-      : { text: str(t?.text), owner: str(t?.owner), due: str(t?.due) })).filter((t) => t.text),
+      ? { id: newTodoKey(), text: str(t), owner: '', due: '' }
+      : { id: str(t?.id) || newTodoKey(), text: str(t?.text), owner: str(t?.owner), due: str(t?.due) })).filter((t) => t.text),
     topics: (Array.isArray(r.topics) ? r.topics : []).map(str).filter(Boolean),
     model: str(model || r.model) || '—',
     at: Number(r.at) || Date.now(),

@@ -338,6 +338,7 @@ function put_(sess, body) {
         id: id, date: String(e.date || '').slice(0, 16), dur: Number(e.dur) || 0, st: e.st,
         src: e.src === 'text' ? 'text' : 'audio', by: sess.gid, upd: Date.now(), k: e.k, m: e.m,
       };
+      if (e.td != null) entry.td = Number(e.td) || 0;   // ToDo の件数（ToDo 一覧で、読まなくてよい会議を飛ばすため）
       Object.keys(files).forEach(function (n) { ghWrite_('m/' + id + '/' + n + '.json', JSON.stringify(files[n])); });
       updateIndex_(function (list) { list.push(entry); });
       return { entry: entry };
@@ -356,7 +357,8 @@ function put_(sess, body) {
         (p.st === 'tw' && cur0.st === 'err');
       if (!okMove) throw new Error('この状態には変えられません');
     }
-    if (files.t && !sess.admin) throw new Error('文字起こしを書き換えられるのは管理者だけです');
+    // 本文（要約・文字起こし）の手直しは、その会議を開ける人（鍵を持つグループ）なら誰でもできる。
+    // GAS は中身を見られないので、「どのグループの鍵で包まれているか」だけで確かめている。
 
     Object.keys(files).forEach(function (n) { ghWrite_('m/' + id + '/' + n + '.json', JSON.stringify(files[n])); });
     var updated = updateIndex_(function (list) {
@@ -367,6 +369,8 @@ function put_(sess, body) {
       if (p.m) e2.m = p.m;
       if (p.date) e2.date = String(p.date).slice(0, 16);
       if (p.dur != null) e2.dur = Number(p.dur) || 0;
+      if (p.nt != null) e2.nt = p.nt ? 1 : 0;           // メモ・マーカー・経過・完了が1つでもある（ノートを読みにいく目印）
+      if (p.td != null) e2.td = Number(p.td) || 0;      // ToDo の件数
       e2.upd = Date.now();
       return e2;
     });

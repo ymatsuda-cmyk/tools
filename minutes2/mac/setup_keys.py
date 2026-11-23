@@ -132,7 +132,7 @@ def set_code(keys: dict, role: str, code: str):
 
 def cmd_init(a):
     if KEYS_PATH.exists():
-        sys.exit(f"{KEYS_PATH} がもうあります。作り直すときは退避してから実行してください。")
+        sys.exit(f"{KEYS_PATH} がもうあります。まだ誰にも権限コードを渡していなければ、このファイルを消してから実行し直してください。")
     roles = [r.strip() for r in a.roles.split(",") if r.strip()]
     if ADMIN_ROLE not in roles:
         sys.exit(f"--roles に管理者 {ADMIN_ROLE} を含めてください")
@@ -146,9 +146,10 @@ def cmd_init(a):
     props = common_props(keys)
     for role in roles:
         props.update(bundle_prop(codes[role], keys, role))
-    save_keys(keys)
+    # GitHub と GAS への登録がどちらも済んでから keys.json を保存する（途中で失敗してもやり直せるように）
     push_pub(keys)
     report(gas_setup(props))
+    save_keys(keys)
     print_codes(codes)
 
 

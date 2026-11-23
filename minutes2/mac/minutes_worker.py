@@ -159,7 +159,7 @@ class Worker:
                 raw = n.summary_json(page["id"])
                 s = normalize(raw)
                 self.write_file(e, "s", s)
-                self.patch(eid, st="ok", err=None)
+                self.patch(eid, st="ok", err=None, td=len(s["todos"]))
                 e["st"] = "ok"  # 手元の一覧も更新して、下の書き出しで二重に出さない
                 n.trash(page["id"]); pages.pop(eid)
                 log(f"{eid}: Claude.ai の要約を回収")
@@ -247,12 +247,15 @@ def normalize(raw: dict) -> dict:
             todos.append({"text": t.strip(), "owner": "", "due": ""})
         else:
             todos.append({"text": str(t.get("text", "")).strip(), "owner": str(t.get("owner", "")).strip(), "due": str(t.get("due", "")).strip()})
+    todos = [t for t in todos if t["text"]]
+    for i, t in enumerate(todos):
+        t["id"] = f"i{i}"   # 完了・経過を結び付ける識別子（アプリの todoKey と同じ規則）
     s = {
         "cardSummary": str(raw.get("cardSummary", "")).strip(),
         "summary": str(raw.get("summary", "") or raw.get("cardSummary", "")).strip(),
         "agenda": agenda,
         "decisions": [d for d in (item(x) for x in raw.get("decisions") or []) if d["text"]],
-        "todos": [t for t in todos if t["text"]],
+        "todos": todos,
         "topics": [str(x).strip() for x in raw.get("topics") or [] if str(x).strip()],
         "model": str(raw.get("model") or "Claude.ai"),
         "at": int(time.time() * 1000),
