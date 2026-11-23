@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-22T10:43:43+09:00",
+ "generatedAt": "2026-11-23T11:02:21+09:00",
  "sources": [
   "サイバーセキュリティ.com"
  ],
@@ -2375,7 +2375,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/53914",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-10-23"
+   "got": "2026-10-23",
+   "enrichedAt": "2026-11-23",
+   "sec_summary": "英国放送協会BBCは2021年6月12日、大手ハンバーガーチェーンのマクドナルド社がサイバー攻撃を受けたことにより、同社の韓国や台湾法人から顧客情報が流出したほか、米国法人の従業員情報が流出した可能性があると明らかにしました。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/53914",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs117646",
@@ -6257,7 +6262,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118632",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-20"
+   "got": "2026-11-20",
+   "enrichedAt": "2026-11-23",
+   "sec_summary": "三菱UFJフィナンシャル・グループは11月18日、傘下の三菱UFJ銀行など5社で計約800万件の情報漏えいがあったと発表した。業務委託先プレイドが提供するサービスが不正アクセスを受けたためとされる。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118632",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118631",
@@ -6275,7 +6285,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118631",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-20"
+   "got": "2026-11-20",
+   "enrichedAt": "2026-11-23",
+   "sec_summary": "ディーエイチシー（DHC）は11月18日、利用しているプレイドのサービス「KARTE」への不正アクセスにより、顧客情報約1,911万件が外部へ漏えいしたと発表した。氏名やメールアドレスなどが対象で、ログインパスワードとクレジットカード情報は含まれない。同じ事案で複数の企業に被害が広がるなか、件数の大きさが目立つ。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118631",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118630",
@@ -6293,7 +6308,12 @@
    "rel": "",
    "url": "https://cybersecurity-jp.com/news/118630",
    "src": "サイバーセキュリティ.com",
-   "got": "2026-11-20"
+   "got": "2026-11-20",
+   "enrichedAt": "2026-11-23",
+   "sec_summary": "大崎電気工業は11月18日、ランサムウェアの攻撃を受け、埼玉県と岩手県の拠点で生産と出荷を停止したと発表した。主力製品のスマートメーターが対象で、生産再開の時期は未定とされている。",
+   "sources": "元記事|https://cybersecurity-jp.com/news/118630",
+   "method": "紹介文",
+   "enrichResult": "meta"
   },
   {
    "id": "cs118714",
