@@ -37,10 +37,11 @@ export function editorHTML(d) {
       <textarea class="ein" data-f="text" rows="2" aria-label="本文">${attr(x.text)}</textarea>${tin(x.t)}${del(list, i, ai)}
     </div>`).join('')
   return `<form class="editor" id="editor" data-edit="sum">
-    <div class="efield"><label for="edCard">一覧に出す短い要約</label><input id="edCard" data-k="card" value="${attr(d.card)}"></div>
-    <div class="efield"><label for="edSum">サマリ</label><textarea id="edSum" data-k="summary" rows="5">${attr(d.summary)}</textarea></div>
-    <section class="esec"><h2>決定事項</h2>${rows('decisions', d.decisions)}${add('decisions', '決定事項を追加')}</section>
-    <section class="esec"><h2>論点別</h2>
+    <div class="esec" data-sec="summary">
+      <div class="efield"><label for="edCard">一覧に出す短い要約</label><input id="edCard" data-k="card" value="${attr(d.card)}"></div>
+      <div class="efield"><label for="edSum">サマリ</label><textarea id="edSum" data-k="summary" rows="5">${attr(d.summary)}</textarea></div>
+    </div>
+    <section class="esec" data-sec="agenda"><h2>論点別</h2>
       ${d.agenda.map((a, ai) => `
         <div class="eagenda" data-ai="${ai}">
           <div class="erow top"><input class="ein" data-f="topic" value="${attr(a.topic)}" placeholder="議題" aria-label="議題">${tin(a.t)}${del('agenda', ai)}</div>
@@ -49,12 +50,12 @@ export function editorHTML(d) {
           <div class="efield"><label>結論</label><input class="ein" data-f="outcome" value="${attr(a.outcome)}" placeholder="結論（無ければ空）"></div>
         </div>`).join('')}
       ${add('agenda', '議題を追加')}
-    </section>
-    <section class="esec"><h2>未解決の論点</h2>
+      <h3 class="esub">未解決の論点</h3>
       ${d.topics.map((t, i) => `<div class="erow" data-list="topics" data-i="${i}"><input class="ein" data-f="text" value="${attr(t)}" aria-label="論点">${del('topics', i)}</div>`).join('')}
       ${add('topics', '論点を追加')}
     </section>
-    <section class="esec"><h2>ToDo</h2>
+    <section class="esec" data-sec="decisions"><h2>決定事項</h2>${rows('decisions', d.decisions)}${add('decisions', '決定事項を追加')}</section>
+    <section class="esec" data-sec="todo"><h2>ToDo</h2>
       ${d.todos.map((t, i) => `
         <div class="erow todo" data-list="todos" data-i="${i}" data-key="${attr(t.key)}" data-orphan="${t.orphan ? 1 : 0}">
           <textarea class="ein" data-f="text" rows="2" aria-label="ToDo">${attr(t.text)}</textarea>

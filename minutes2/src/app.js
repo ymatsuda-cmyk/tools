@@ -11,6 +11,7 @@ import { groupMarks, marksOf, validFor, renderMarked, applyRange, recolor, recon
 import { todoKey, doneOf, logsOf, mergeTodos } from './todos.js'
 import { draftFromSummary, editorHTML, readDraft, summaryFromDraft, blank, trToText, textToSegments } from './edit.js'
 import { initScrollHide } from './scrollhide.js'
+import { mindmapTree, renderTree } from './mindmap.js'
 
 /* ---------- 小物 ---------- */
 const $ = (s, el = document) => el.querySelector(s)
@@ -48,7 +49,7 @@ const S = {
   tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', q: '', sel: null, dtab: 'sum',
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
-  edit: null, jump: null, wq: {},
+  edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
   files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0,
 }
 const DEK = new Map()
@@ -422,6 +423,8 @@ function stripHTML(mi) {
 /** 一覧を描いたあと：カードの要約・検索用に要約を先読みし、詳細のファイルを読む */
 function afterList() {
   const sel = S.sel ? S.byId.get(S.sel) : null
+  applySecJump()
+  centerActiveTab()
   if (sel) loadDetail(sel)
   if (S.view === 'cards' || S.q) prefetch(monthItems().filter((x) => !x.locked && x.st === 'ok' && cached(x, 's') === undefined), 's')
 }
@@ -438,7 +441,7 @@ async function prefetch(list, name) {
 }
 
 /* ---------- 詳細 ---------- */
-const NEED = { sum: ['s', 'n'], todo: ['s', 'n'], tr: ['t', 'n'], chat: ['s', 't'], memo: ['n'] }
+const NEED = { sum: ['s', 'n'], tr: ['t', 'n'], chat: ['s', 't'], map: ['s'] }
 
 function loadDetail(it) {
   if (it.locked) return
@@ -466,6 +469,8 @@ function paintDetail(reset = false) {
     else if (it && NEED[S.dtab].every((n) => cached(it, n) !== undefined)) S.jump = null   // 見つからない（文章が変わった）
   }
   if (S.edit?.focus) { el.querySelector(S.edit.focus)?.focus(); S.edit.focus = null }
+  applySecJump()
+  centerActiveTab()
   if (it) loadDetail(it)
 }
 
@@ -494,8 +499,13 @@ function detailHTML(it) {
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
   ].join('')
-  const tabs = [['sum', '要約'], ['todo', 'ToDo'], ['tr', '文字起こし'], ['chat', 'チャット'], ['memo', 'メモ']]
-    .map(([k, l]) => `<button class="dtab ${S.dtab === k ? 'on' : ''}" data-act="dtab" data-v="${k}" aria-pressed="${S.dtab === k}">${l}${k === 'todo' && cached(it, 's')?.todos?.length ? ' ' + cached(it, 's').todos.length : ''}</button>`).join('')
+  const nT = cached(it, 's')?.todos?.length
+  const onSum = S.dtab === 'sum'
+  const secs = [['summary', 'サマリ'], ['agenda', '論点別'], ['decisions', '決定事項'], ['todo', 'ToDo'], ['memo', 'メモ']]
+  const views = [['tr', '文字起こし'], ['chat', 'チャット'], ['map', 'マインドマップ']]
+  const tabs = secs.map(([k, l]) => `<button class="dtab ${onSum && S.sec === k ? 'on' : ''}" data-act="sec" data-v="${k}" aria-pressed="${onSum && S.sec === k}">${l}${k === 'todo' && nT ? ' ' + nT : ''}</button>`).join('')
+    + '<span class="dtab-sep" aria-hidden="true"></span>'
+    + views.map(([k, l]) => `<button class="dtab ${S.dtab === k ? 'on' : ''}" data-act="dtab" data-v="${k}" aria-pressed="${S.dtab === k}">${l}</button>`).join('')
   const backTab = '<button class="dtab-back" data-act="close-detail" aria-label="一覧へ">‹</button>'
   return `
     <div class="dhead">${back}
@@ -511,11 +521,10 @@ const loadingHTML = '<p class="muted">読み込んでいます…</p>'
 
 function tabBody(it) {
   switch (S.dtab) {
-    case 'sum': return sumBody(it)
-    case 'todo': return todoBody(it)
     case 'tr': return trBody(it)
     case 'chat': return chatBody(it)
-    default: return memoBody(it)
+    case 'map': return mapBody(it)
+    default: return bodyAll(it)
   }
 }
 
@@ -528,31 +537,55 @@ const tagName = (c) => (MARK_TAGS.find((t) => t.id === c) || {}).name || `色${c
 const fmtLog = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}` }
 const canEditBody = (it) => !it.locked
 
-function sumBody(it) {
+/** 要約の本文：サマリ・論点別・決定事項・ToDo・メモを、1枚のスクロールに並べる（タブは、その見出しへ飛ぶ） */
+function bodyAll(it) {
   const s = cached(it, 's'), n = cached(it, 'n')
   if (s === undefined || n === undefined) return loadingHTML
+  const memo = memoSection(it, n)
   if (!s) {
-    if (['tw', 'tr'].includes(it.st)) return '<p class="muted">Mac の文字起こしが終わると、要約できるようになります。</p>'
-    if (it.st === 'err') return `<p class="muted">処理に失敗しました${it.err ? `（${esc(it.err)}）` : ''}。変換管理から再実行できます。</p>`
-    return `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude">Claude.ai で要約</button></div></div>`
+    let wait
+    if (['tw', 'tr'].includes(it.st)) wait = '<p class="muted">Mac の文字起こしが終わると、要約できるようになります。</p>'
+    else if (it.st === 'err') wait = `<p class="muted">処理に失敗しました${it.err ? `（${esc(it.err)}）` : ''}。変換管理から再実行できます。</p>`
+    else wait = `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude">Claude.ai で要約</button></div></div>`
+    return `<div class="read body">${wait}${memo}</div>`
   }
-  if (S.edit && S.edit.id === it.id && S.edit.kind === 'sum') return editorHTML(S.edit.draft)
+  if (S.edit && S.edit.id === it.id && S.edit.kind === 'sum') return `<div class="read body">${editorHTML(S.edit.draft)}${memo}</div>`
   const m = markerFn(it)
-  const sec = (title, body) => `<section class="ssec"><h2>${title}</h2>${body}</section>`
-  const bullets = (arr, loc) => `<ul class="dots">${arr.map((p, i) => `<li><span>${m(loc + i, p.text)} ${tchip(p.t)}</span></li>`).join('')}</ul>`
-  return `<div class="read">
+  const sec = (key, title, inner) => `<section class="ssec" data-sec="${key}"><h2>${title}</h2>${inner}</section>`
+  const none = (t) => `<p class="muted">${t}</p>`
+  const todos = s.todos || []
+  const open = todos.filter((t, i) => !doneOf(n, todoKey(t, i))).length
+  return `<div class="read body">
     <div class="sumbar"><span class="hint">文字を選ぶとマーカーを付けられます。付けた箇所は「ノート」に集まります。</span>${canEditBody(it) ? `<button class="btn sm" data-act="edit-sum" data-id="${it.id}">本文を編集</button>` : ''}</div>
-    ${sec('サマリ', `<p>${m('summary', s.summary || s.cardSummary || '')}</p>`)}
-    ${s.decisions.length ? sec('決定事項', bullets(s.decisions, 'decision:')) : ''}
-    ${s.agenda.length ? sec('論点別', s.agenda.map((a, ai) => `
+    ${sec('summary', 'サマリ', `<p>${m('summary', s.summary || s.cardSummary || '')}</p>`)}
+    ${sec('agenda', '論点別', `${s.agenda.length ? s.agenda.map((a, ai) => `
       <div class="topic">
         <h3>${m(`agenda:${ai}:topic`, a.topic)} ${tchip(a.t)}</h3>
         ${a.points.length ? `<ul class="dots">${a.points.map((p, j) => `<li><span>${m(`agenda:${ai}:point:${j}`, p.text)} ${tchip(p.t)}</span></li>`).join('')}</ul>` : ''}
         ${a.outcome ? `<p class="outcome"><span class="ol">結論</span>${m(`agenda:${ai}:outcome`, a.outcome)}</p>` : ''}
-      </div>`).join('')) : ''}
-    ${s.topics.length ? sec('未解決の論点', `<ul class="dots">${s.topics.map((t, i) => `<li><span>${m('topic:' + i, t)}</span></li>`).join('')}</ul>`) : ''}
+      </div>`).join('') : none('論点はありません。')}
+      ${s.topics.length ? `<h3 class="sub">未解決の論点</h3><ul class="dots">${s.topics.map((t, i) => `<li><span>${m('topic:' + i, t)}</span></li>`).join('')}</ul>` : ''}`)}
+    ${sec('decisions', '決定事項', s.decisions.length ? `<ul class="dots">${s.decisions.map((p, i) => `<li><span>${m('decision:' + i, p.text)} ${tchip(p.t)}</span></li>`).join('')}</ul>` : none('決定事項はありません。'))}
+    ${sec('todo', 'ToDo', todos.length ? `<p class="muted sm">残り ${open} / ${todos.length} 件 ・ 経過は追記だけできます（消せません）</p><ul class="todos">${todos.map((t, i) => todoItem(it, t, i, n, m)).join('')}</ul>` : none('この会議の ToDo はありません。「本文を編集」で追加することもできます。'))}
+    ${memo}
     <p class="foot">要約：${esc(s.model || '—')}${s.edited ? ' ・ 手直し済み' : ''} ・ 時刻を押すと、その発言を文字起こしで表示します</p>
   </div>`
+}
+
+function memoSection(it, n) {
+  return `<section class="ssec" data-sec="memo"><h2>メモ</h2>
+    <label for="memoIn" class="sr">メモ</label>
+    <textarea id="memoIn" class="memoin" rows="6" placeholder="この会議のメモ（同じグループの人にも見えます）">${esc(n?.memo || '')}</textarea>
+    <div class="acts"><button class="btn main" data-act="memo-save" data-id="${it.id}">メモを保存</button><span class="muted" id="memoMsg"></span></div>
+  </section>`
+}
+
+function mapBody(it) {
+  const s = cached(it, 's')
+  if (s === undefined) return loadingHTML
+  if (!s) return '<p class="muted">要約すると、マインドマップが作られます。</p>'
+  const tree = mindmapTree(it.title, s)
+  return `<div class="read mmwrap"><div class="acts mmbar"><button class="btn sm" data-act="mm-open">すべて開く</button><button class="btn sm" data-act="mm-close">すべて閉じる</button><span class="muted sm">${s.mindmap ? '保存済みのマインドマップ' : '要約の構成から作っています'} ・ 項目を押すと、開け閉めできます</span></div>${renderTree(tree, esc)}</div>`
 }
 
 /** ToDo 1件：完了・本文（マーカーつき）・担当と期限・経過・経過の追記 */
@@ -568,17 +601,6 @@ function todoItem(it, t, i, n, m) {
       ? `<form class="logform" data-log="${it.id}" data-k="${esc(key)}"><label class="sr" for="logIn">経過を追記</label><input id="logIn" placeholder="経過を追記（Enter で追記）" autocomplete="off"><button class="btn sm main" type="submit">追記</button><button class="btn sm" type="button" data-act="log-close">閉じる</button></form>`
       : `<button class="btn sm tlbtn" data-act="log-open" data-id="${it.id}" data-k="${esc(key)}">経過を追記${logs.length ? `（${logs.length}件）` : ''}</button>`}
   </li>`
-}
-
-function todoBody(it) {
-  const s = cached(it, 's'), n = cached(it, 'n')
-  if (s === undefined || n === undefined) return loadingHTML
-  const todos = s?.todos || []
-  if (!todos.length) return '<p class="muted">この会議の ToDo はありません。要約すると、宿題がここに並びます。本文の編集で追加することもできます。</p>'
-  const m = markerFn(it)
-  const open = todos.filter((t, i) => !doneOf(n, todoKey(t, i))).length
-  return `<div class="read"><p class="muted sm">残り ${open} / ${todos.length} 件 ・ 経過は追記だけできます（消せません）</p>
-    <ul class="todos">${todos.map((t, i) => todoItem(it, t, i, n, m)).join('')}</ul></div>`
 }
 
 function trBody(it) {
@@ -610,16 +632,6 @@ function chatBody(it) {
   return `<div class="read chat">
     <div class="msgs" id="msgs">${msgs.length ? msgs.map((m) => `<div class="msg-b ${m.role}">${esc(m.content) || '…'}</div>`).join('') : '<p class="muted">この会議について質問できます（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）。答えには根拠の時刻を添えます。</p>'}</div>
     <form class="ask" data-chat="${it.id}"><label for="askIn" class="sr">質問</label><textarea id="askIn" rows="2" placeholder="この会議について質問する"></textarea><button class="btn main" type="submit">送信</button></form>
-  </div>`
-}
-
-function memoBody(it) {
-  const n = cached(it, 'n')
-  if (n === undefined) return loadingHTML
-  return `<div class="read">
-    <label for="memoIn" class="lbl">メモ（同じグループの人にも見えます）</label>
-    <textarea id="memoIn" rows="10">${esc(n?.memo || '')}</textarea>
-    <div class="acts"><button class="btn main" data-act="memo-save" data-id="${it.id}">メモを保存</button><span class="muted" id="memoMsg"></span></div>
   </div>`
 }
 
@@ -1012,6 +1024,68 @@ async function applyMarker(c) {
     })
   } catch { /* mutateNotes が知らせる */ }
 }
+
+/* ---------- 本文の見出しへ飛ぶ・読んでいる場所をタブに映す ---------- */
+/** 選んでいるタブが、横にはみ出して見えないとき（スマホ）は、見える位置までタブの列を動かす */
+function centerActiveTab() {
+  const nav = $('.dtabs')
+  const on = nav && nav.querySelector('.dtab.on')
+  if (!on || nav.scrollWidth <= nav.clientWidth) return
+  nav.scrollLeft = Math.max(0, on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2)
+}
+
+function setSec(key) {
+  S.sec = key
+  $$('.dtab[data-act="sec"]').forEach((b) => { const on = S.dtab === 'sum' && b.dataset.v === key; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on) })
+  centerActiveTab()
+}
+
+function scrollToSection(key, smooth = true) {
+  const sc = $('.sheet-scroll')
+  const el = sc && sc.querySelector(`[data-sec="${key}"]`)
+  if (!el) return
+  setSec(key)
+  S.spyLock = performance.now() + (smooth ? 800 : 200)   // 動いている間は、通り過ぎる見出しにタブを追従させない
+  const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 6
+  if (smooth && sc.scrollTo) sc.scrollTo({ top, behavior: 'smooth' }); else sc.scrollTop = top
+}
+
+function applySecJump() {
+  if (!S.secJump) return
+  const sc = $('.sheet-scroll')
+  if (!sc || !sc.querySelector(`[data-sec="${S.secJump}"]`)) return
+  const key = S.secJump
+  S.secJump = null
+  scrollToSection(key, false)
+}
+
+function goSection(key) {
+  hideBar()
+  if (S.dtab !== 'sum') {   // 文字起こし・チャット・マインドマップから戻るときは、本文を出してから飛ぶ
+    captureEdit()
+    S.dtab = 'sum'; S.sec = key; S.secJump = key; S.seek = null
+    paintDetail(true)
+    return
+  }
+  scrollToSection(key, true)
+}
+
+let spyRaf = 0
+document.addEventListener('scroll', (e) => {
+  const sc = e.target
+  if (!(sc instanceof Element) || !sc.classList.contains('sheet-scroll') || S.dtab !== 'sum') return
+  cancelAnimationFrame(spyRaf)
+  spyRaf = requestAnimationFrame(() => {
+    if (performance.now() < S.spyLock) return
+    const secs = [...sc.querySelectorAll('[data-sec]')]
+    if (!secs.length) return
+    const line = sc.getBoundingClientRect().top + 28
+    let cur = secs[0].dataset.sec
+    for (const el of secs) if (el.getBoundingClientRect().top <= line) cur = el.dataset.sec
+    if (sc.scrollTop > 0 && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4) cur = secs[secs.length - 1].dataset.sec
+    if (cur !== S.sec) setSec(cur)
+  })
+}, true)
 
 /* ---------- 本文の手直し ---------- */
 function captureEdit() {
@@ -1438,7 +1512,9 @@ const ACT = {
     S.seek = null
     S.jump = null
     S.tab = 'list'
-    if (a.dataset.go) S.dtab = a.dataset.go
+    S.sec = 'summary'
+    if (a.dataset.go === 'todo') { S.dtab = 'sum'; S.sec = 'todo'; S.secJump = 'todo' }
+    else if (a.dataset.go) S.dtab = a.dataset.go
     if (!it.locked && S.seen[it.id] !== it.upd) { S.seen[it.id] = it.upd; ls.set('m2.seen', S.seen) }
     if (it.date && !it.date.startsWith(S.month)) S.month = it.date.slice(0, 7)
     hideBar()
@@ -1448,6 +1524,9 @@ const ACT = {
   },
   'close-detail': () => { if (!leaveEdit()) return; S.sel = null; hideBar(); scrollHide.reset(); renderMain() },
   dtab: (a) => { captureEdit(); S.dtab = a.dataset.v; S.seek = null; hideBar(); paintDetail(true) },
+  sec: (a) => goSection(a.dataset.v),
+  'mm-open': () => $$('.mm details').forEach((d) => { d.open = true }),
+  'mm-close': () => $$('.mm details').forEach((d) => { d.open = false }),
   fav: (a) => {
     const id = a.dataset.id
     if (S.fav.has(id)) S.fav.delete(id); else S.fav.add(id)

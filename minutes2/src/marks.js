@@ -16,8 +16,8 @@ const SUB_LABEL = { topic: '議題', outcome: '結論' }
 
 export const SUMMARY_KINDS = ['summary', 'decision', 'agenda', 'topic', 'todo']
 
-/** 見る場所（詳細のタブ）：文字起こし→tr、ToDo→todo、ほかは要約 */
-export const locTab = (loc) => ({ tr: 'tr', todo: 'todo' }[kindOf(loc)] || 'sum')
+/** 見る場所（詳細の表示）：文字起こしだけ別の表示（tr）、ほかは要約の本文（sum）の中 */
+export const locTab = (loc) => (kindOf(loc) === 'tr' ? 'tr' : 'sum')
 
 export function locLabel(loc) {
   const p = String(loc).split(':')

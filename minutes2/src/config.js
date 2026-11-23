@@ -1,6 +1,6 @@
 // src/config.js — デプロイごとに変える値（秘密ではない）
 // GAS をウェブアプリとしてデプロイした URL（…/exec）
-export const GAS_URL = 'https://script.google.com/macros/s/AKfycbzptPsP4bWRkRlGpU_u1t6GXj0tPhAruwhrzATfmYZ1V7AVBcXTGHhoTr9jTv-50IHeeg/exec'
+export const GAS_URL = 'https://script.google.com/macros/s/ここにデプロイIDを入れる/exec'
 // 一覧を取り直す間隔（ほかの端末の登録を拾う）
 export const POLL_MS = 120000
 // Claude.ai で要約待ちを変換するときに開くページ（設定で端末ごとに変えられる）
