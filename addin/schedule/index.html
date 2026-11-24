@@ -78,7 +78,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:
 .seg button{height:34px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:13px;font-weight:700}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .fy{display:inline-flex;align-items:center;gap:4px}
-.fy span{font-size:14px;font-weight:700;min-width:6.5em;text-align:center}
+.fy span{font-size:14px;font-weight:700;min-width:12.5em;text-align:center}
 .xl .fy{display:none}
 
 .layout{--aside-w:340px;display:flex;align-items:flex-start;padding:16px 20px 24px}
@@ -120,10 +120,11 @@ aside{flex:0 0 var(--aside-w);min-width:0;display:flex;flex-direction:column;gap
 .legend i{display:inline-block;width:14px;height:10px;margin-right:6px;vertical-align:-1px}
 
 /* gantt */
-.gwrap{overflow-x:auto}
+.gwrap{overflow:auto}
 .gantt{min-width:880px;position:relative}
-.ghead{display:flex;border-bottom:1px solid var(--line)}
-.ghead .hl{flex:0 0 260px;padding:10px 14px;font-size:12px;color:var(--muted)}
+.ghead{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:8;background:var(--surface)}
+.ghead .hl{flex:0 0 260px;display:flex;align-items:center;padding:0 10px;font-size:12px;color:var(--muted);background:var(--surface)}
+.ghead .hl .seg button{height:30px}
 .thead{flex:1 1 auto;position:relative;height:52px;min-width:0}
 .mlab{position:absolute;top:0;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border-left:1px solid var(--line)}
 .tlab{position:absolute;top:30px;font-size:11px;color:var(--muted);padding-left:3px;white-space:nowrap}
@@ -343,6 +344,37 @@ dialog p{margin:0 0 14px;font-size:14px;white-space:pre-line}
 :root[data-theme="dark"] .bar.lc5{background-color:#1F4747;color:#CBECEC}
 :root[data-theme="dark"] .bar.lc6{background-color:#54471A;color:#F6EBC0}
 :root[data-theme="dark"] .bar.lc7{background-color:#343B49;color:#E3E7EE}
+/* 画面いっぱいに使い、カレンダーのヘッダは固定。その下だけをスクロールする */
+html,body{height:100%}
+body{display:flex;flex-direction:column;overflow:hidden}
+header.top{flex:0 0 auto}
+.layout{flex:1 1 0;min-height:0;align-items:stretch;overflow:hidden;padding:12px 20px}
+.maincol{height:100%;min-height:0;overflow-y:auto;padding:2px}
+.maincol>.card,.maincol>.hint-line{flex:0 0 auto}
+#ganttCard{flex:1 1 auto;min-height:320px;display:flex;flex-direction:column;overflow:hidden}
+#ganttCard .gwrap{flex:1 1 auto;min-height:0}
+aside{overflow-y:auto;overflow-x:hidden}
+.acc{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;padding:0;font-size:15px;font-weight:700;color:var(--ink);cursor:pointer;text-align:left}
+.acc .car{color:var(--muted)}
+#hcTable .scroll{overflow-x:auto}
+#hcTable .legend{margin-top:10px}
+.ov-sum{font-size:13px;color:var(--muted);font-weight:400}
+.ghost{position:fixed;z-index:50;pointer-events:none;background:var(--surface);color:var(--ink);border:1.5px solid var(--accent);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95;white-space:nowrap}
+@media (max-width:900px){
+  html,body{height:auto}
+  body{display:block;overflow:auto}
+  .layout{overflow:visible}
+  .maincol{height:auto;overflow:visible}
+  #ganttCard{min-height:0;overflow:visible}
+  #ganttCard .gwrap{max-height:75vh}
+}
+@media print{
+  html,body{height:auto}
+  body{display:block;overflow:visible}
+  .layout,.maincol{overflow:visible;height:auto}
+  #ganttCard{overflow:visible}
+  #ganttCard .gwrap{max-height:none;overflow:visible}
+}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 @media print{
   header.top .btn, header.top .seg, .fy button, aside, .gtabs, .rz, .reopen, .ov-head .chip, .hint-line, .lgrip, .tg, .gr.add, .addlane{display:none!important}
@@ -380,16 +412,11 @@ dialog p{margin:0 0 14px;font-size:14px;white-space:pre-line}
 <div class="layout">
   <div class="maincol">
     <section class="card pad" id="overview" aria-label="年間の工数過不足"></section>
+    <section class="card pad" id="hcTable" aria-label="工数表"></section>
     <section class="card" id="ganttCard">
-      <div class="gtabs">
-        <div class="seg" role="group" aria-label="表示の切り替え" id="viewSeg"><button data-view="lane">取引先別</button><button data-view="person">要員別</button></div>
-        <span class="grow"></span>
-        <label class="sw"><input type="checkbox" id="tblToggle" role="switch"><span>工数表を表示</span></label>
-      </div>
       <div class="gwrap"><div class="gantt" id="gantt"></div></div>
-      <div class="hct" id="hcTable" hidden></div>
     </section>
-    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定の「⠿」を別の予定の行へドラッグすると、その予定の詳細予定に移せます（右パネルの「親の予定」でも変えられます）。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
+    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定の「⠿」を別の予定の行へドラッグすると、その予定の詳細予定に移せます（右パネルの「親の予定」でも変えられます）。要員別では、バーを別の要員の行へドラッグすると、担当者を付け替えられます。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
   </div>
   <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="右パネルの幅（ドラッグ、または左右キーで変更。ダブルクリックで初期値）" tabindex="0" aria-valuemin="260" aria-valuemax="760" aria-valuenow="340"></div>
   <aside id="aside">
@@ -422,6 +449,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const DOW = '日月火水木金土';
 const PD_PER_PM = 20;
+const fyName = (fy) => (fy - 1988) + '期';   // 2026年10月始まりの期が「38期」
 const XL = /[?&]excel=1(&|$)/.test(location.search);   // Excelのポップアップ（ダイアログ）として開かれたとき
 const GRIP = '<svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true" fill="currentColor"><circle cx="4" cy="4" r="1.7"/><circle cx="10" cy="4" r="1.7"/><circle cx="4" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="4" cy="16" r="1.7"/><circle cx="10" cy="16" r="1.7"/></svg>';
 
@@ -465,7 +493,7 @@ const currentFY = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 
 
 function emptyPlan(fy) {
   return {
-    v: 2, fy, name: fy + '年10月期',
+    v: 2, fy, name: fyName(fy),
     lanes: ['取引先A', '取引先B', '社内'].map((n) => ({ id: uid(), name: n })),
     members: [], tasks: [], decisions: [], todos: [],
     settings: { excludeHolidays: true, yearEnd: true }, updatedAt: 0
@@ -476,7 +504,7 @@ function normalize(p, fy) {
   if (!p || typeof p !== 'object') return e;
   const out = {
     v: 2, fy,
-    name: typeof p.name === 'string' && p.name ? p.name : e.name,
+    name: typeof p.name === 'string' && p.name && !/^\d{4}年10月期$/.test(p.name) ? p.name : e.name,   // 以前の初期名「2026年10月期」は「38期」に置き換える
     lanes: Array.isArray(p.lanes) && p.lanes.length ? p.lanes.map((l) => ({ id: String(l.id || uid()), name: String(l.name || '取引先') })) : e.lanes,
     members: Array.isArray(p.members) ? p.members.map((m) => ({ id: String(m.id || uid()), name: String(m.name || '要員') })) : [],
     tasks: Array.isArray(p.tasks) ? p.tasks.filter((t) => t && t.start && t.end).map((t) => ({
@@ -516,8 +544,8 @@ function normalize(p, fy) {
 }
 
 const prefs = (() => { try { return JSON.parse(localStorage.getItem('kiSchedule:prefs') || '{}'); } catch (_) { return {}; } })();
-const ui = { sel: null, ws: 0, wm: [3, 6, 12].includes(prefs.wm) ? prefs.wm : 3, unit: prefs.unit === 'month' ? 'month' : 'day', loadLane: 'all', open: new Set(), view: prefs.view === 'person' ? 'person' : 'lane', tbl: !!prefs.tbl, paneW: clamp(Number(prefs.paneW) || 340, 260, 760), paneOpen: prefs.paneOpen !== false, tabY: clamp(Number(prefs.tabY) || 0.5, 0.08, 0.92) };
-function savePrefs() { try { localStorage.setItem('kiSchedule:prefs', JSON.stringify({ wm: ui.wm, unit: ui.unit, view: ui.view, tbl: ui.tbl, paneW: ui.paneW, paneOpen: ui.paneOpen, tabY: ui.tabY })); } catch (_) {} }
+const ui = { sel: null, ws: 0, wm: [3, 6, 12].includes(prefs.wm) ? prefs.wm : 3, unit: prefs.unit === 'month' ? 'month' : 'day', loadLane: 'all', open: new Set(), view: prefs.view === 'person' ? 'person' : 'lane', ovOpen: prefs.ovOpen !== false, tblOpen: prefs.tblOpen !== false, paneW: clamp(Number(prefs.paneW) || 340, 260, 760), paneOpen: prefs.paneOpen !== false, tabY: clamp(Number(prefs.tabY) || 0.5, 0.08, 0.92) };
+function savePrefs() { try { localStorage.setItem('kiSchedule:prefs', JSON.stringify({ wm: ui.wm, unit: ui.unit, view: ui.view, ovOpen: ui.ovOpen, tblOpen: ui.tblOpen, paneW: ui.paneW, paneOpen: ui.paneOpen, tabY: ui.tabY })); } catch (_) {} }
 
 function localKey(fy) { return 'kiSchedule:fy' + fy; }
 function loadLocal(fy) { try { const s = localStorage.getItem(localKey(fy)); return s ? normalize(JSON.parse(s), fy) : null; } catch (_) { return null; } }
@@ -817,12 +845,10 @@ function renderHeader() {
   const D = all.dem.reduce((a, b) => a + b, 0), S = all.sup.reduce((a, b) => a + b, 0), diff = S - D;
   $('#planName').textContent = plan.name;
   document.title = plan.name + ' | 期スケジュール＋工数';
-  $('#fyLabel').textContent = plan.fy + '/10〜' + (plan.fy + 1) + '/9';
+  $('#fyLabel').textContent = fyName(plan.fy) + '（' + plan.fy + '/10〜' + (plan.fy + 1) + '/9）';
   $('#totals').textContent = '年間 必要 ' + fmtU(D) + '／投入 ' + fmtU(S) + '（' + (diff < -1e-9 ? '不足 ' + fmtU(-diff) : '余裕 ' + fmtU(Math.max(0, diff))) + '）';
   document.querySelectorAll('#zoomSeg button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.wm) === ui.wm)));
   document.querySelectorAll('#unitSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.unit === ui.unit)));
-  document.querySelectorAll('#viewSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === ui.view)));
-  $('#tblToggle').checked = ui.tbl;
   const wn = allWarnings(), wb = $('#warnBtn');
   wb.hidden = !wn.length;
   if (wn.length) { wb.textContent = '⚠ 詳細予定の超過 ' + wn.length + '件（クリックで該当へ）'; wb.title = wn.map((x) => '【' + x.name + '】\n' + x.msgs.join('\n')).join('\n\n'); }
@@ -834,10 +860,16 @@ function renderOverview() {
   if (ui.loadLane !== 'all' && !laneById(ui.loadLane)) ui.loadLane = 'all';
   const ids = ui.loadLane === 'all' ? plan.lanes.map((l) => l.id) : [ui.loadLane];
   const L = loadOf(ids), maxV = Math.max(1, ...L.dem, ...L.sup);
-  let h = '<div class="ov-head"><h2>年間の工数 過不足<span class="muted" style="font-weight:400">（月をクリックで移動）</span></h2>';
-  h += '<button class="chip" data-load="all" aria-pressed="' + (ui.loadLane === 'all') + '">全体</button>';
-  plan.lanes.forEach((l) => { h += '<button class="chip" data-load="' + esc(l.id) + '" aria-pressed="' + (ui.loadLane === l.id) + '">' + esc(l.name) + '</button>'; });
-  h += '</div><div class="ov-grid">';
+  const AL = loadOf(plan.lanes.map((l) => l.id)), AD = AL.dem.reduce((a, b) => a + b, 0), AS = AL.sup.reduce((a, b) => a + b, 0);
+  let h = '<div class="ov-head"><h2><button class="acc" data-acc="ov" aria-expanded="' + ui.ovOpen + '" aria-controls="ovBody"><span class="car' + (ui.ovOpen ? ' open' : '') + '">▸</span>年間の工数 過不足</button>'
+    + (ui.ovOpen ? '<span class="muted" style="font-weight:400">（月をクリックで移動）</span>' : '<span class="ov-sum">　必要 ' + fmtU(AD) + '／投入 ' + fmtU(AS) + '（' + (AS - AD < -1e-9 ? '不足 ' + fmtU(AD - AS) : '余裕 ' + fmtU(Math.max(0, AS - AD))) + '）</span>') + '</h2>';
+  if (ui.ovOpen) {
+    h += '<button class="chip" data-load="all" aria-pressed="' + (ui.loadLane === 'all') + '">全体</button>';
+    plan.lanes.forEach((l) => { h += '<button class="chip" data-load="' + esc(l.id) + '" aria-pressed="' + (ui.loadLane === l.id) + '">' + esc(l.name) + '</button>'; });
+  }
+  h += '</div>';
+  if (!ui.ovOpen) { $('#overview').innerHTML = h; return; }
+  h += '<div id="ovBody"><div class="ov-grid">';
   for (let k = 0; k < 12; k++) {
     const d = L.dem[k], s = L.sup[k], df = s - d, short = df < -1e-9, inW = k >= w.ws && k < w.ws + w.wm;
     const txt = d === 0 && s === 0 ? '—' : (short ? '不足' + fmtU(-df) : '+' + fmtU(Math.max(0, df)));
@@ -849,7 +881,7 @@ function renderOverview() {
   }
   h += '<div class="ov-frame" style="left:' + (w.ws / 12 * 100) + '%;width:' + (w.wm / 12 * 100) + '%"></div></div>';
   h += '<div class="legend"><span><i style="border:2px dashed var(--supply)"></i>投入（人数×稼働日）</span><span><i style="background:var(--ok-fill)"></i>必要工数・足りている</span><span><i style="background:var(--short-fill)"></i>必要工数・不足</span>'
-    + '<span>稼働日：土日' + (plan.settings.excludeHolidays ? '・祝日' : '') + (plan.settings.yearEnd ? '・年末年始(12/29〜1/3)' : '') + 'を除く</span></div>';
+    + '<span>稼働日：土日' + (plan.settings.excludeHolidays ? '・祝日' : '') + (plan.settings.yearEnd ? '・年末年始(12/29〜1/3)' : '') + 'を除く</span></div></div>';
   $('#overview').innerHTML = h;
 }
 const PERSON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><circle cx="6" cy="3.4" r="2.5"/><path d="M1 11.5c0-3.1 2.3-4.6 5-4.6s5 1.5 5 4.6z"/></svg>';
@@ -896,7 +928,7 @@ function taskRowHtml(t, ef, o) {
   return h + '</div></div>';
 }
 function ganttHead(c, w, pct, title) {
-  let h = '<div class="ghead"><div class="hl">' + esc(title) + '</div><div class="thead">';
+  let h = '<div class="ghead"><div class="hl"><div class="seg" role="group" aria-label="表示の切り替え" id="viewSeg"><button data-view="lane" aria-pressed="' + (ui.view === 'lane') + '">取引先別</button><button data-view="person" aria-pressed="' + (ui.view === 'person') + '">要員別</button></div></div><div class="thead">';
   for (let k = w.ws; k < w.ws + w.wm; k++) h += '<div class="mlab" style="left:' + pct(c.ms[k] - w.W0) + ';width:' + pct(c.ms[k + 1] - c.ms[k]) + '">' + c.labels[k] + '</div>';
   const ticks = [];
   if (w.wm <= 3) { for (let i = w.W0; i < w.W1; i++) if (c.days[i].dow === 1) ticks.push({ l: pct(i - w.W0), t: c.days[i].mo + '/' + c.days[i].da }); }
@@ -1017,7 +1049,7 @@ function renderPersonView(c, w, pct) {
     const left = m
       ? '<span class="av" aria-hidden="true">' + esc(m.name.slice(0, 1)) + '</span><button class="tname" style="font-size:14px;font-weight:700" data-act="sel-member" data-id="' + esc(m.id) + '" title="' + esc(m.name) + '">' + esc(m.name) + '</button><span class="pc' + (over ? ' bad' : '') + '" title="表示期間の平均稼働' + (over ? '（1人を超える日があります）' : '') + '">稼働 ' + Math.round(rate * 100) + '%' + (over ? ' ⚠' : '') + '</span>'
       : '<span class="av" aria-hidden="true">？</span><span class="tname" style="font-size:14px;font-weight:700">未割当</span><span class="pc" title="担当者が未設定の予定">担当者未設定</span>';
-    return '<div class="gr prow' + (selM ? ' sel' : '') + '" style="height:' + rowH + 'px"><div class="lc' + (strip ? ' top' : '') + '">' + left + cap + '</div><div class="tr">' + idle + pk.out.map((it) => personBarHtml(it, w, pct)).join('') + strip + '</div></div>';
+    return '<div class="gr prow' + (selM ? ' sel' : '') + ((drag && drag.pv && drag.dropMember != null && drag.dropMember !== drag.srcMember && (m ? m.id : '') === drag.dropMember) ? ' drop' : '') + '" data-member="' + (m ? esc(m.id) : '') + '" style="height:' + rowH + 'px"><div class="lc' + (strip ? ' top' : '') + '">' + left + cap + '</div><div class="tr">' + idle + pk.out.map((it) => personBarHtml(it, w, pct)).join('') + strip + '</div></div>';
   };
   const un = allItems.filter((it) => !it.asg.length);
   if (un.length) h += rowHtml(null, un);
@@ -1030,9 +1062,10 @@ function renderPersonView(c, w, pct) {
 function relCls(x) { return x <= 0.0005 ? 'hm0' : x < 0.2 ? 'hm1' : x < 0.4 ? 'hm2' : x < 0.6 ? 'hm3' : x < 0.8 ? 'hm4' : 'hm5'; }
 function renderHcTable() {
   const el = $('#hcTable');
-  if (!ui.tbl) { el.innerHTML = ''; el.hidden = true; return; }
-  el.hidden = false;
   const c = C(), w = win(), person = ui.view === 'person', rows = [];
+  const ttl = person ? '要員別の工数表（月ごとの担当工数・人日）' : '工数表（月ごとの必要工数・人日）';
+  const head = '<div class="ov-head"><h2><button class="acc" data-acc="tbl" aria-expanded="' + ui.tblOpen + '" aria-controls="tblBody"><span class="car' + (ui.tblOpen ? ' open' : '') + '">▸</span>' + ttl + '</button></h2></div>';
+  if (!ui.tblOpen) { el.innerHTML = head; return; }
   const monthSum = (arr) => c.ms.slice(0, 12).map((m0, k) => { let sm = 0; for (let i = m0; i < c.ms[k + 1]; i++) if (c.days[i].work) sm += arr[i]; return sm; });
   if (!person) plan.lanes.forEach((l) => rows.push({ name: l.name, v: loadOf([l.id]).dem }));
   else {
@@ -1042,7 +1075,7 @@ function renderHcTable() {
   const tot = new Array(12).fill(0); rows.forEach((r) => r.v.forEach((x, k) => { tot[k] += x; }));
   const mx = Math.max(0, ...tot), pk = mx > 0 ? tot.indexOf(mx) : -1, cellMax = Math.max(1e-9, ...rows.flatMap((r) => r.v));
   const f = (x) => (x <= 0.05 ? '—' : String(Math.round(x * 10) / 10)), sum = (a) => a.reduce((x, y) => x + y, 0);
-  let h = '<h2>' + (person ? '要員別の工数表（月ごとの担当工数・人日）' : '工数表（月ごとの必要工数・人日）') + '</h2><div class="scroll"><div class="hgrid" role="table">';
+  let h = head + '<div id="tblBody"><div class="scroll"><div class="hgrid" role="table">';
   h += '<div class="hn hh">' + (person ? '要員' : '取引先等') + '</div>';
   c.labels.forEach((lb, k) => { h += '<div class="hh' + (k >= w.ws && k < w.ws + w.wm ? ' in' : '') + '">' + lb + '</div>'; });
   h += '<div class="hh">年計</div>';
@@ -1055,7 +1088,7 @@ function renderHcTable() {
   h += '<div class="hn tot">合計</div>'; tot.forEach((x, k) => { h += '<div class="tot' + (k === pk ? ' pk' : '') + '">' + f(x) + '</div>'; });
   h += '<div class="tot">' + f(sum(tot)) + '</div></div></div><div class="legend"><span>単位＝人日（人月への切り替えに関わらず人日で表示）</span>'
     + (person ? '<span>赤＝その月の稼働日数（＝100%）を超える工数</span>' : '<span>濃さ＝表の中での多さ</span>')
-    + (pk >= 0 ? '<span>合計の枠＝ピーク月（' + c.labels[pk] + '・' + f(mx) + '人日）</span>' : '') + '</div>';
+    + (pk >= 0 ? '<span>合計の枠＝ピーク月（' + c.labels[pk] + '・' + f(mx) + '人日）</span>' : '') + '</div></div>';
   el.innerHTML = h;
 }
 function fitLabels() {
@@ -1308,8 +1341,7 @@ function reparentTask(id, newParentId) {
 let rdrag = null;
 function startReparent(grip, e) {
   const id = grip.dataset.id; if (!taskById(id)) return;
-  rdrag = { id, pid: e.pointerId, target: '', moved: false, y0: e.clientY };
-  document.body.classList.add('reordering');
+  rdrag = { id, pid: e.pointerId, target: '', moved: false, y0: e.clientY, ghost: null };
   selectTask(id); renderInspector();
 }
 function reparentTargetAt(x, y) {
@@ -1320,7 +1352,11 @@ function reparentTargetAt(x, y) {
 }
 function moveReparent(e) {
   const d = rdrag; if (!d.moved && Math.abs(e.clientY - d.y0) < 4) return;
-  d.moved = true;
+  if (!d.moved) {
+    d.moved = true; document.body.classList.add('reordering');
+    const g = document.createElement('div'); g.className = 'ghost'; g.textContent = (taskById(d.id) || {}).name || ''; document.body.appendChild(g); d.ghost = g;
+  }
+  if (d.ghost) { d.ghost.style.left = (e.clientX + 14) + 'px'; d.ghost.style.top = (e.clientY + 10) + 'px'; }
   const tgt = reparentTargetAt(e.clientX, e.clientY);
   if (tgt === d.target) return;
   d.target = tgt;
@@ -1331,6 +1367,7 @@ function moveReparent(e) {
 function endReparent(cancel) {
   const d = rdrag; if (!d) return; rdrag = null;
   document.body.classList.remove('reordering');
+  if (d.ghost) d.ghost.remove();
   document.querySelectorAll('#gantt .gr.drop').forEach((x) => x.classList.remove('drop'));
   const t = taskById(d.id);
   if (!cancel && d.moved && d.target && t && d.target !== t.parentId) reparentTask(d.id, d.target);
@@ -1434,8 +1471,7 @@ $('#rz').addEventListener('keydown', (e) => {
   e.preventDefault(); savePrefs(); applyPane();
 });
 $('#rz').addEventListener('dblclick', () => { ui.paneW = 340; savePrefs(); applyPane(); });
-$('#viewSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; ui.view = b.dataset.view === 'person' ? 'person' : 'lane'; savePrefs(); renderAll(); });
-$('#tblToggle').addEventListener('change', (e) => { ui.tbl = e.target.checked; savePrefs(); renderHcTable(); });
+$('#hcTable').addEventListener('click', (e) => { if (e.target.closest('[data-acc="tbl"]')) { ui.tblOpen = !ui.tblOpen; savePrefs(); renderHcTable(); } });
 $('#fyPrev').addEventListener('click', () => switchFY(plan.fy - 1));
 $('#fyNext').addEventListener('click', () => switchFY(plan.fy + 1));
 $('#zoomSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; ui.wm = Number(b.dataset.wm); ui.ws = clamp(ui.ws, 0, 12 - ui.wm); savePrefs(); renderAll(); });
@@ -1443,6 +1479,7 @@ $('#unitSeg').addEventListener('click', (e) => { const b = e.target.closest('but
 $('#winPrev').addEventListener('click', () => { const w = win(); ui.ws = Math.max(0, w.ws - w.wm); renderAll(); });
 $('#winNext').addEventListener('click', () => { const w = win(); ui.ws = Math.min(12 - w.wm, w.ws + w.wm); renderAll(); });
 $('#overview').addEventListener('click', (e) => {
+  if (e.target.closest('[data-acc="ov"]')) { ui.ovOpen = !ui.ovOpen; savePrefs(); renderOverview(); return; }
   const m = e.target.closest('[data-month]'); if (m) { ui.ws = clamp(Number(m.dataset.month), 0, 12 - ui.wm); renderAll(); return; }
   const l = e.target.closest('[data-load]'); if (l) { ui.loadLane = l.dataset.load; renderOverview(); }
 });
@@ -1450,6 +1487,8 @@ $('#overview').addEventListener('click', (e) => {
 /* gantt */
 const gantt = $('#gantt');
 gantt.addEventListener('click', (e) => {
+  const vb = e.target.closest('[data-view]');
+  if (vb) { ui.view = vb.dataset.view === 'person' ? 'person' : 'lane'; savePrefs(); renderAll(); return; }
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, lid = a.dataset.lane, id = a.dataset.id;
   if (act === 'sel-lane') { ui.sel = { type: 'lane', id: lid }; renderAll(); }
@@ -1510,6 +1549,8 @@ gantt.addEventListener('pointerdown', (e) => {
   if (grip) { e.preventDefault(); startLaneDrag(grip, e); return; }
   const dgrip = e.target.closest('.dgrip');
   if (dgrip) { e.preventDefault(); startReparent(dgrip, e); return; }
+  const dcell = e.target.closest('.gr.detail .lc');
+  if (dcell) { startReparent({ dataset: { id: dcell.closest('.gr.detail').dataset.id } }, e); return; }
   const bar = e.target.closest('.bar'); if (!bar) return;
   const t = taskById(bar.dataset.id); if (!t) return;
   e.preventDefault();
@@ -1517,6 +1558,7 @@ gantt.addEventListener('pointerdown', (e) => {
   drag = {
     id: t.id, mode: e.target.dataset.mode || 'move', x0: e.clientX, w: bar.parentElement.getBoundingClientRect().width,
     s0: ef.s, e0: ef.e, WD: w.WD, moved: false, before: snapshot(), pid: e.pointerId,
+    pv: ui.view === 'person', srcMember: (() => { const r = bar.closest('.gr.prow'); return r ? r.dataset.member : null; })(), dropMember: null,
     order: plan.tasks.slice().sort((a, b) => effort(a).s - effort(b).s).map((x) => x.id),
     kids: ef.n ? kidsOf(t.id).map((k) => { const o = ownEffort(k); return { id: k.id, s0: o.s, e0: o.e, open: o.open }; }) : null
   };
@@ -1534,6 +1576,11 @@ window.addEventListener('pointermove', (e) => {
   drag.moved = true;
   const T = C().T, dd = Math.round(dx / drag.w * drag.WD);
   let dirty = false;
+  if (drag.pv) {
+    const el = document.elementFromPoint ? document.elementFromPoint(e.clientX, e.clientY) : null, pr = el && el.closest ? el.closest('.gr.prow') : null;
+    const dm = pr ? pr.dataset.member : null;
+    if (dm !== drag.dropMember) { drag.dropMember = dm; dirty = true; }
+  }
   {
     const t = taskById(drag.id); if (!t) return;
     let sh = 0;
@@ -1563,6 +1610,13 @@ function endDrag(e) {
   if (ldrag && (!e || e.pointerId === ldrag.pid)) { endLaneDrag(false); return; }
   if (!drag || (e && e.pointerId !== drag.pid)) return;
   const d = drag; drag = null;
+  if (d.pv && d.moved && d.dropMember != null && d.srcMember != null && d.dropMember !== d.srcMember) {
+    const tt = taskById(d.id);
+    if (tt) {
+      tt.assignees = tt.assignees.filter((a) => a !== d.srcMember);
+      if (d.dropMember && !tt.assignees.includes(d.dropMember)) tt.assignees.push(d.dropMember);   // 未割当の行へ落とすと、担当者を外す
+    }
+  }
   if (d.moved && snapshot() !== d.before) { pushHistory(d.before); changed(); }
   else renderGantt();
   focusBar(d.id);
@@ -1848,13 +1902,13 @@ function mergeInto(inc) {
 async function importPlan(inc, fname) {
   let dy = 0;
   if (inc.fy !== plan.fy) {
-    const k = await askChoice('期が違うデータです', '「' + fname + '」は ' + inc.fy + '年10月期のデータです。\n今の期（' + plan.fy + '年10月期）に取り込むとき、日付を' + (plan.fy - inc.fy) + '年ずらしますか？',
+    const k = await askChoice('期が違うデータです', '「' + fname + '」は ' + fyName(inc.fy) + 'のデータです。\n今の期（' + fyName(plan.fy) + '）に取り込むとき、日付を' + (plan.fy - inc.fy) + '年ずらしますか？',
       [{ key: 'shift', label: '日付をずらして取り込む', primary: true }, { key: 'keep', label: '日付はそのまま' }, { key: 'cancel', label: 'キャンセル' }]);
     if (k === 'cancel') return;
     if (k === 'shift') dy = plan.fy - inc.fy;
   }
   const msg = '「' + fname + '」から 取引先等' + inc.lanes.length + '件・予定' + inc.tasks.length + '件' + (inc.members.length ? '・要員' + inc.members.length + '名' : '') + ' を読み込みました。'
-    + (inc._warn ? '\n（日付が読めない行' + inc._warn + '件は除きました）' : '') + '\n今の期（' + plan.fy + '年10月期）にどう取り込みますか？';
+    + (inc._warn ? '\n（日付が読めない行' + inc._warn + '件は除きました）' : '') + '\n今の期（' + fyName(plan.fy) + '）にどう取り込みますか？';
   const k2 = await askChoice('インポート', msg, [{ key: 'merge', label: '追加で取り込む', primary: true }, { key: 'replace', label: '今の期を置き換える', danger: true }, { key: 'cancel', label: 'キャンセル' }]);
   if (k2 === 'cancel') return;
   if (dy) shiftYears(inc, dy);
@@ -1863,7 +1917,7 @@ async function importPlan(inc, fname) {
 }
 async function importAll(data, fname) {
   const fys = Object.keys(data.plans).map(Number).filter((n) => !isNaN(n)).sort();
-  const k = await askChoice('全期バックアップ', '「' + fname + '」には ' + fys.map((y) => y + '年10月期').join('、') + ' のデータが入っています。\n同じ期の内容はすべて置き換わります。',
+  const k = await askChoice('全期バックアップ', '「' + fname + '」には ' + fys.map((y) => fyName(y)).join('、') + ' のデータが入っています。\n同じ期の内容はすべて置き換わります。',
     [{ key: 'replace', label: 'すべて置き換えて取り込む', danger: true }, { key: 'cancel', label: 'キャンセル' }]);
   if (k !== 'replace') return;
   for (const y of fys) {

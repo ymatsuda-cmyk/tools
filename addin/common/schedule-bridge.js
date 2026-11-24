@@ -77,7 +77,7 @@
   function tablesToPlan(tbl, fyHint) {
     const g = (kind, id) => tbl.master.find((r) => norm(r['種別']) === kind && norm(r['ID']) === id);
     const fy = Number(norm((g('期', 'fy') || {})['値1'])) || fyHint;
-    const plan = { fy, name: norm((g('計画名', 'name') || {})['値1']) || (fy + '年10月期'), lanes: [], members: [], tasks: [], decisions: [], todos: [], settings: { excludeHolidays: true, yearEnd: true } };
+    const plan = { fy, name: norm((g('計画名', 'name') || {})['値1']) || ((fy - 1988) + '期'), lanes: [], members: [], tasks: [], decisions: [], todos: [], settings: { excludeHolidays: true, yearEnd: true } };
     tbl.master.forEach((r) => {
       const k = norm(r['種別']), id = norm(r['ID']), v1 = norm(r['値1']), v2 = norm(r['値2']);
       if (k === '取引先等') plan.lanes.push({ id, name: v1 || '取引先' });
