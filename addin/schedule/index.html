@@ -81,6 +81,11 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:
 .fy{display:inline-flex;align-items:center;gap:4px}
 .fy span{font-size:14px;font-weight:700;min-width:12.5em;text-align:center}
 .xl .fy{display:none}
+.setwrap{position:relative}
+.setpop{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:320px;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:14px;display:flex;flex-direction:column;gap:12px}
+.setpop[hidden]{display:none}
+.setpop .chk{display:flex;gap:8px;align-items:center;font-size:14px}
+.setpop .chk input{width:20px;height:20px}
 html.dense .bar{font-size:11px;padding:0 8px;gap:4px}
 html.dense .pbadge{height:15px;font-size:10px;padding:0 6px 0 4px;border-radius:8px}
 html.dense .pill{line-height:14px;font-size:10px;padding:0 6px}
@@ -437,7 +442,7 @@ aside{overflow-y:auto;overflow-x:hidden}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 @media print{
-  header.top .btn, header.top .seg, .spc, .fy button, aside, .gtabs, .rz, .reopen, .ov-head .chip, .hint-line, .lgrip, .tg, .gr.add, .addlane{display:none!important}
+  header.top .btn, header.top .seg, .spc, .setwrap, .fy button, aside, .gtabs, .rz, .reopen, .ov-head .chip, .hint-line, .lgrip, .tg, .gr.add, .addlane{display:none!important}
   body{background:#fff}
   .gwrap{overflow:visible}
 }
@@ -466,8 +471,16 @@ aside{overflow-y:auto;overflow-x:hidden}
     <button data-unit="day">人日</button><button data-unit="month">人月</button>
   </div>
   <button class="btn" id="undoBtn" title="元に戻す（Ctrl+Z）">↶ 元に戻す</button>
-  <button class="btn primary" id="addBtn">＋ 予定を追加</button>
-  <button class="btn" id="paneBtn" aria-expanded="true" aria-controls="aside"><span id="paneLbl">パネルを閉じる ▶</span></button>
+  <div class="setwrap">
+    <button class="btn" id="setBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="setPop">⚙ 設定</button>
+    <div class="setpop" id="setPop" role="dialog" aria-label="設定" hidden>
+      <label class="fld">期の名前<input type="text" id="setName" maxlength="40"></label>
+      <label class="chk"><input type="checkbox" data-ps="excludeHolidays">祝日を稼働日から除く</label>
+      <label class="chk"><input type="checkbox" data-ps="yearEnd">年末年始（12/29〜1/3）を除く</label>
+      <label class="fld">付箋（コメント）の表示<select data-us="cm"><option value="icon">付箋アイコン → 吹き出し</option><option value="leader">引き出し線で、余白に付箋</option><option value="thread">件数の印 → 右パネルのスレッド</option><option value="corner">バーの角に印 → ホバーで全文</option><option value="pin">日付にピン</option><option value="off">表示しない</option></select></label>
+      <label class="fld">コメントに付ける名前<input type="text" data-us="me" maxlength="20" placeholder="例：松田"></label>
+    </div>
+  </div>
 </header>
 
 <div class="layout">
@@ -1294,7 +1307,7 @@ function commentsHtml(t) {
 }
 function parentSelectHtml(t) {
   const det = !!t.parentId;
-  if (!det && kidsOf(t.id).length) return '';
+  if (!det) return '';   // 予定を、他の予定の詳細予定にする操作は設けない
   let o = '<option value="">' + (det ? '（独立した予定にする）' : '（変更しない）') + '</option>';
   topTasks().filter((x) => x.id !== t.id).forEach((x) => { o += '<option value="' + esc(x.id) + '"' + (x.id === t.parentId ? ' selected' : '') + '>' + esc(((laneById(x.laneId) || {}).name || '') + '／' + x.name) + '</option>'; });
   return '<label class="fld">' + (det ? '親の予定（変えると、その予定の詳細予定に移ります）' : '他の予定の詳細予定にする') + '<select data-f="parent">' + o + '</select></label>';
@@ -1395,11 +1408,7 @@ function renderInspector() {
     return;
   }
   el.innerHTML = '<div class="insp"><span class="muted">バーや予定名、取引先等の名前を選ぶと、ここで編集できます。</span>'
-    + '<label class="fld">期の名前<input type="text" data-pf="name" value="' + esc(plan.name) + '"></label>'
-    + '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-ps="excludeHolidays"' + (plan.settings.excludeHolidays ? ' checked' : '') + ' style="width:20px;height:20px">祝日を稼働日から除く</label>'
-    + '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-ps="yearEnd"' + (plan.settings.yearEnd ? ' checked' : '') + ' style="width:20px;height:20px">年末年始（12/29〜1/3）を除く</label>'
-    + '<label class="fld">付箋（コメント）の表示<select data-us="cm">' + [['icon', '付箋アイコン → 吹き出し'], ['leader', '引き出し線で、余白に付箋'], ['thread', '件数の印 → 右パネルのスレッド'], ['corner', 'バーの角に印 → ホバーで全文'], ['pin', '日付にピン'], ['off', '表示しない']].map((o) => '<option value="' + o[0] + '"' + (ui.cm === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>'
-    + '<label class="fld">コメントに付ける名前<input type="text" data-us="me" maxlength="20" value="' + esc(ui.me) + '" placeholder="例：松田"></label>'
+    + '<span class="muted">期の名前・稼働日・付箋の表示は、右上の「⚙ 設定」で変えられます。</span>'
     + '<dl class="kv"><dt>取引先等</dt><dd>' + plan.lanes.length + '件</dd><dt>予定</dt><dd>' + plan.tasks.filter((t) => !t.parentId).length + '件</dd><dt>詳細予定</dt><dd>' + plan.tasks.filter((t) => t.parentId).length + '件</dd></dl>'
     + '</div>';
 }
@@ -1595,7 +1604,6 @@ function shiftTask(t, k) {
   });
 }
 
-$('#addBtn').addEventListener('click', () => { const w = win(); const ti = idxOf(TODAY); newTask(defaultLane(), ti >= w.W0 && ti < w.W1 ? ti : w.W0, 10); });
 $('#undoBtn').addEventListener('click', undo);
 let warnIdx = -1;
 $('#warnBtn').addEventListener('click', () => {
@@ -1632,15 +1640,39 @@ function applyPane() {
   const lay = document.querySelector('.layout'), asd = $('#aside');
   lay.style.setProperty('--aside-w', ui.paneW + 'px');
   lay.classList.toggle('closed', !ui.paneOpen);
-  $('#paneBtn').setAttribute('aria-expanded', String(ui.paneOpen));
-  $('#paneLbl').textContent = ui.paneOpen ? 'パネルを閉じる ▶' : '◀ パネルを開く';
   $('#rz').setAttribute('aria-valuenow', String(ui.paneW));
   asd.setAttribute('aria-hidden', ui.paneOpen ? 'false' : 'true');
   if ('inert' in asd) asd.inert = !ui.paneOpen;
   applyTab();
   setTimeout(fitLabels, 260);
 }
-$('#paneBtn').addEventListener('click', () => { ui.paneOpen = !ui.paneOpen; savePrefs(); applyPane(); });
+/* ---------- 設定（ヘッダーの「⚙ 設定」） ---------- */
+const setBtn = $('#setBtn'), setPop = $('#setPop');
+function openSettings(open) {
+  setPop.hidden = !open; setBtn.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  $('#setName').value = plan.name;
+  setPop.querySelectorAll('[data-ps]').forEach((c) => { c.checked = !!plan.settings[c.dataset.ps]; });
+  setPop.querySelector('[data-us="cm"]').value = ui.cm;
+  setPop.querySelector('[data-us="me"]').value = ui.me;
+  $('#setName').focus();
+}
+setBtn.addEventListener('click', (e) => { e.stopPropagation(); openSettings(setPop.hidden); });
+document.addEventListener('click', (e) => { if (!setPop.hidden && !e.target.closest('.setwrap')) openSettings(false); });
+setPop.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.id === 'setName') { plan.name = t.value; renderHeader(); scheduleSave(); }
+  else if (t.dataset.us === 'me') { ui.me = t.value.slice(0, 20); savePrefs(); }
+});
+setPop.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.ps) commit(() => { plan.settings[t.dataset.ps] = t.checked; });
+  else if (t.dataset.us === 'cm') { ui.cm = t.value; ui.cmOpen = ''; savePrefs(); renderGantt(); }
+});
+setPop.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); openSettings(false); setBtn.focus(); }
+  else if (e.key === 'Enter' && e.target.matches('input[type=text]')) e.target.blur();
+});
 function narrowMode() { return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches); }
 function applyTab() {
   const tb = $('#reopenBtn'); if (!tb) return;
