@@ -18,6 +18,7 @@
   --red:#DC2626; --red-ink:#B3261E; --short:#C2410C; --short-fill:#F08A3E; --ok:#0F766E; --ok-fill:#8FC1B7; --supply:#8C95A5;
   --today:#EA7A1A; --off:rgba(140,149,165,.10); --danger:#A12828; --danger-line:#E2B4B4;
   --badge:#B45309; --chip:#EEF1F5;
+  --note-bg:#FFF3B0; --note-bd:#E2C54A; --note-ink:#5A4500; --note-ico:#8A5A00;
   color-scheme: light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -32,7 +33,7 @@
     --dbar:#21423A; --dbar-ink:#C4EEDD; --dsel:#1B7F73; --dsel-bg:#2F7A68; --bar-sel:#3B5A94; --stripe:rgba(255,255,255,.12);
     --run:#2B3E63; --run-ink:#D3E1FF;
     --red:#F0645A; --red-ink:#FF9B93; --short:#FF9D63; --short-fill:#D06A26; --ok:#62C7B6; --ok-fill:#2E6C64; --supply:#7C8696;
-    --today:#F59A4A; --off:rgba(160,170,185,.08); --danger:#FF9090; --danger-line:#6B3434;
+    --today:#F59A4A; --note-bg:#4A3F10; --note-bd:#8A7420; --note-ink:#FFE9A0; --note-ico:#F5D26B; --off:rgba(160,170,185,.08); --danger:#FF9090; --danger-line:#6B3434;
     --badge:#C76A12; --chip:#232932;
     color-scheme: dark;
   }
@@ -45,7 +46,7 @@
   --dbar:#21423A; --dbar-ink:#C4EEDD; --dsel:#1B7F73; --dsel-bg:#2F7A68; --bar-sel:#3B5A94; --stripe:rgba(255,255,255,.12);
   --run:#2B3E63; --run-ink:#D3E1FF;
   --red:#F0645A; --red-ink:#FF9B93; --short:#FF9D63; --short-fill:#D06A26; --ok:#62C7B6; --ok-fill:#2E6C64; --supply:#7C8696;
-  --today:#F59A4A; --off:rgba(160,170,185,.08); --danger:#FF9090; --danger-line:#6B3434;
+  --today:#F59A4A; --note-bg:#4A3F10; --note-bd:#8A7420; --note-ink:#FFE9A0; --note-ico:#F5D26B; --off:rgba(160,170,185,.08); --danger:#FF9090; --danger-line:#6B3434;
   --badge:#C76A12; --chip:#232932;
   color-scheme: dark;
 }
@@ -80,11 +81,15 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:
 .fy{display:inline-flex;align-items:center;gap:4px}
 .fy span{font-size:14px;font-weight:700;min-width:12.5em;text-align:center}
 .xl .fy{display:none}
-.spc{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:10px;padding:3px}
-.spc>span.spl{font-size:12px;color:var(--muted);padding:0 6px 0 8px}
-.spc button{width:30px;height:34px;border:0;border-radius:7px;background:var(--surface);color:var(--ink);font-size:17px;line-height:1;padding:0}
+html.dense .bar{font-size:11px;padding:0 8px;gap:4px}
+html.dense .pbadge{height:15px;font-size:10px;padding:0 6px 0 4px;border-radius:8px}
+html.dense .pill{line-height:14px;font-size:10px;padding:0 6px}
+html.dense .tname{font-size:12px}
+.spc{display:inline-flex;align-items:center;gap:2px;background:var(--chip);border-radius:9px;padding:2px}
+.spc>span.spl{font-size:11px;color:var(--muted);padding:0 3px 0 6px}
+.spc button{width:22px;height:26px;border:0;border-radius:6px;background:var(--surface);color:var(--ink);font-size:14px;line-height:1;padding:0}
 .spc button:disabled{opacity:.4;cursor:default}
-.spc .rgv{min-width:2.4em;text-align:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;cursor:default;user-select:none}
+.spc .rgv{min-width:2em;text-align:center;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;cursor:default;user-select:none}
 
 .layout{--aside-w:340px;display:flex;align-items:flex-start;padding:16px 20px 24px}
 .maincol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:14px}
@@ -194,12 +199,12 @@ aside{flex:0 0 var(--aside-w);min-width:0;display:flex;flex-direction:column;gap
 .run{position:absolute;bottom:0;background:var(--run);color:var(--run-ink);border-radius:3px 3px 0 0;font-size:11px;font-weight:700;text-align:center;line-height:16px;overflow:hidden;border-right:1px solid var(--surface)}
 .ft{display:flex;flex-direction:column;padding-left:6px}
 .ft b{font-size:14px}
-.bar{position:absolute;top:calc(6px + var(--rg,0px) / 2);height:34px;border:0;border-radius:6px;background-color:var(--bar);color:var(--bar-ink);display:flex;align-items:center;gap:6px;padding:0 12px;font-size:13px;text-align:left;white-space:nowrap;overflow:visible;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.bar{position:absolute;top:calc(6px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4);height:calc(34px + min(var(--rg,0px), 0px) / 2);border:0;border-radius:6px;background-color:var(--bar);color:var(--bar-ink);display:flex;align-items:center;gap:6px;padding:0 12px;font-size:13px;text-align:left;white-space:nowrap;overflow:visible;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .bar.sel{background-color:var(--bar-sel);box-shadow:0 0 0 3px var(--ring)}
 .bar.sum{background-image:linear-gradient(to top,rgba(0,0,0,.22) 5px,transparent 5px)}
 .bar.on{background-image:repeating-linear-gradient(135deg,var(--stripe) 0 6px,transparent 6px 12px)}
 .bar.sum.on{background-image:linear-gradient(to top,rgba(0,0,0,.22) 5px,transparent 5px),repeating-linear-gradient(135deg,var(--stripe) 0 6px,transparent 6px 12px)}
-.bar.d{top:calc(7px + var(--rg,0px) / 2);height:22px;font-size:12px;padding:0 10px;border-radius:5px;background-color:var(--dbar);color:var(--dbar-ink)}
+.bar.d{top:calc(7px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4);height:calc(22px + min(var(--rg,0px), 0px) / 2);font-size:12px;padding:0 10px;border-radius:5px;background-color:var(--dbar);color:var(--dbar-ink)}
 .bar.d.sel{background-color:var(--dsel-bg)}
 .bar.dragging{cursor:grabbing}
 .bar .h{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;background:rgba(30,58,138,.12)}
@@ -286,7 +291,7 @@ label.btn:focus-within{outline:3px solid var(--accent);outline-offset:2px}
 .gr.prow.sel .lc{box-shadow:inset 4px 0 0 var(--accent)}
 .pc.bad{background:var(--over,#B93C0B);color:#fff}
 .idle{position:absolute;border:1.5px dashed var(--line);border-radius:6px;color:var(--faint);font-size:12px;display:flex;align-items:center;padding:0 8px;white-space:nowrap;background-image:repeating-linear-gradient(135deg,var(--off) 0 6px,transparent 6px 12px);pointer-events:none;box-sizing:border-box}
-.bar.pv{height:30px;font-size:12px;border-radius:5px;padding:0 8px}
+.bar.pv{height:calc(30px + min(var(--rg,0px), 0px));font-size:12px;border-radius:5px;padding:0 8px}
 .empty-note{padding:16px 14px;font-size:14px;color:var(--muted)}
 .asg{display:flex;flex-wrap:wrap;gap:6px 14px}
 .ck{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--ink)}
@@ -368,7 +373,52 @@ aside{overflow-y:auto;overflow-x:hidden}
 #hcTable .scroll{overflow-x:auto}
 #hcTable .legend{margin-top:10px}
 .ov-sum{font-size:13px;color:var(--muted);font-weight:400}
+#overview,#hcTable{padding:5px 14px}
+#overview .ov-head,#hcTable .ov-head{margin:0;min-height:30px;gap:8px}
+#ovBody,#tblBody{margin-top:6px;padding-bottom:4px}
+.acc{font-size:14px}
+#status:empty{display:none}
+.maincol{gap:6px}
 .ghost{position:fixed;z-index:50;pointer-events:none;background:var(--surface);color:var(--ink);border:1.5px solid var(--accent);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95;white-space:nowrap}
+/* 付箋（コメント） */
+.cm{position:absolute;z-index:3;font-family:inherit}
+.cm.ic{top:calc(1px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4);min-width:20px;height:20px;padding:0 3px;display:inline-flex;align-items:center;justify-content:center;gap:2px;background:#FFE066;color:#5A4500;border:1px solid #D9B52E;border-radius:5px;font-size:10px;font-weight:700;line-height:1;cursor:pointer}
+.gr.detail .cm.ic{top:calc(2px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4)}
+.cm.ic svg{width:12px;height:12px}
+.cm.ic.on{box-shadow:0 0 0 3px rgba(224,180,30,.55)}
+.cm.cn{top:calc(6px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4);width:0;height:0;border-style:solid;border-width:0 13px 13px 0;border-color:transparent #F59E0B transparent transparent;cursor:pointer;border-radius:0 6px 0 0;z-index:4}
+.gr.detail .cm.cn{top:calc(7px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4)}
+.cm.cn .cmtip{display:none;position:absolute;right:-13px;top:17px;width:280px;max-width:60vw;background:#1A1D23;color:#fff;border-radius:7px;padding:7px 10px;font-size:12px;line-height:1.5;font-weight:400;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:31;cursor:default}
+.cm.cn .cmtip span{display:block}
+.cm.cn:hover .cmtip,.cm.cn:focus .cmtip{display:block}
+.cm.ld{left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:2}
+.cm.ld .ldl{position:absolute;left:var(--x);top:50%;width:max(0px, calc(min(calc(var(--x) + 4%), calc(100% - 330px)) - var(--x)));border-top:1.5px dotted #C9A62A}
+.cm.ld .ldn{position:absolute;left:min(calc(var(--x) + 4%), calc(100% - 330px));top:50%;transform:translateY(-50%);max-width:320px;pointer-events:auto;display:inline-flex;align-items:center;gap:5px;background:var(--note-bg);color:var(--note-ink);border:1px solid var(--note-bd);border-radius:5px;padding:0 8px;line-height:22px;font-size:12px;cursor:pointer;font-family:inherit}
+.cm.ld .ldn svg{width:12px;height:12px;flex:0 0 auto;color:var(--note-ico)}
+.cm.ld .ldn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm.ld .ldn b{font-weight:400;white-space:nowrap;opacity:.8}
+.cm.pn{top:calc(0px + max(var(--rg,0px), 0px) / 2 + min(var(--rg,0px), 0px) / 4);width:12px;height:12px;margin-left:-6px;padding:0;border-radius:50%;background:#FFE066;border:1.5px solid #C9A62A;cursor:pointer;z-index:4}
+.cm.pn.on{box-shadow:0 0 0 3px rgba(224,180,30,.5)}
+.cm.pnl{top:8px;bottom:2px;width:0;border-left:1.5px dotted #C9A62A;z-index:2;pointer-events:none}
+.cmpop{position:absolute;z-index:30;width:320px;box-sizing:border-box;left:clamp(8px, var(--px), calc(100% - 330px));top:calc(32px + max(var(--rg,0px), 0px) / 2);background:var(--note-bg);border:1px solid var(--note-bd);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;color:var(--note-ink);box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.gr.detail .cmpop{top:calc(26px + max(var(--rg,0px), 0px) / 2)}
+.cmph{font-size:11px;font-weight:700;margin-bottom:4px;opacity:.85}
+.cmpi{padding:3px 0;border-top:1px solid color-mix(in srgb,var(--note-bd) 55%,transparent)}
+.cmpi:first-of-type{border-top:0}
+.cmpm{font-size:11px;opacity:.75}
+.cmpa{display:flex;gap:6px;margin-top:6px}
+.cmpa input{flex:1 1 auto;min-width:0;height:28px;border:1px solid var(--note-bd);border-radius:6px;background:var(--surface);color:var(--ink);padding:0 8px;font-size:12px}
+.cmsec{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line2);padding-top:10px}
+.cmh{font-size:13px;font-weight:700}
+.cmi{display:flex;gap:8px}
+.cmi .av{flex:0 0 auto;width:22px;height:22px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.cmb{min-width:0;flex:1 1 auto}
+.cmm{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.cmm .x{margin-left:auto;border:0;background:transparent;color:var(--faint);cursor:pointer;font-size:15px;line-height:1}
+.cmt{font-size:13px;word-break:break-word}
+.cmsec textarea{width:100%;box-sizing:border-box;min-height:52px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:6px 8px;font:inherit;font-size:13px;resize:vertical}
+.cmrow{display:flex;gap:6px;align-items:center}
+.cmrow input[type=date]{flex:1 1 auto;min-width:0;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 8px;font:inherit;font-size:12px}
 @media (max-width:900px){
   html,body{height:auto}
   body{display:block;overflow:auto}
@@ -383,6 +433,7 @@ aside{overflow-y:auto;overflow-x:hidden}
   .layout,.maincol{overflow:visible;height:auto}
   #ganttCard{overflow:visible}
   #ganttCard .gwrap{max-height:none;overflow:visible}
+  .cmpop{display:none}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 @media print{
@@ -426,7 +477,7 @@ aside{overflow-y:auto;overflow-x:hidden}
     <section class="card" id="ganttCard">
       <div class="gwrap"><div class="gantt" id="gantt"></div></div>
     </section>
-    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定は、左のセルをドラッグして、同じ予定の中で順序を入れ替えたり、別の予定へ移したりできます（行の上半分に落とすとその上、下半分に落とすとその下へ入ります。右パネルの「親の予定」でも別の予定へ移せます）。要員別では、バーを別の要員の行へドラッグすると、担当者を付け替えられます。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
+    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。予定は、左のセルをドラッグして、同じ取引先等の中で順序を入れ替えたり、別の取引先等へ移したりできます（詳細予定も一緒に動きます）。詳細予定も、左のセルをドラッグして、同じ予定の中で順序を入れ替えたり、別の予定へ移したりできます（行の上半分に落とすとその上、下半分に落とすとその下へ入ります。右パネルの「親の予定」でも別の予定へ移せます）。要員別では、バーを別の要員の行へドラッグすると、担当者を付け替えられます。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
   </div>
   <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="右パネルの幅（ドラッグ、または左右キーで変更。ダブルクリックで初期値）" tabindex="0" aria-valuemin="260" aria-valuemax="760" aria-valuenow="340"></div>
   <aside id="aside">
@@ -460,6 +511,28 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const DOW = '日月火水木金土';
 const PD_PER_PM = 20;
 const fyName = (fy) => (fy - 1988) + '期';   // 2026年10月始まりの期が「38期」
+/* コメント：{ id, text, by, at('YYYY-MM-DD HH:MM'), date('YYYY-MM-DD'または空) }。CSV・Excelでは「日時｜名前｜日付｜本文」を改行でつなぐ */
+const hid = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'c' + (h >>> 0).toString(36); };
+const cmLine = (c) => [c.at || '', c.by || '', c.date || '', String(c.text || '').replace(/\r?\n/g, '⏎').replace(/｜/g, '|')].join('｜');
+const cmStr = (list) => (list || []).map(cmLine).join('\n');
+const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+function cmParse(str) {
+  return String(str || '').split(/\r?\n/).map((line) => {
+    if (!line.trim()) return null;
+    const p = line.split('｜');
+    if (p.length < 4) return { id: hid(line), at: '', by: '', date: '', text: line.trim() };
+    const text = p.slice(3).join('｜').replace(/⏎/g, '\n');
+    return text.trim() ? { id: hid(line), at: p[0], by: p[1], date: isDay(p[2]) ? p[2] : '', text } : null;
+  }).filter(Boolean);
+}
+function cmNorm(c) {
+  if (!c || !String(c.text || '').trim()) return null;
+  const o = { text: String(c.text), by: String(c.by || ''), at: String(c.at || ''), date: isDay(c.date) ? c.date : '' };
+  o.id = String(c.id || hid(cmLine(o)));
+  return o;
+}
+const cmWhen = (at) => (at && at.length >= 16 ? Number(at.slice(5, 7)) + '/' + Number(at.slice(8, 10)) + ' ' + at.slice(11, 16) : '');
+const cmDay = (iso) => Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10));
 const XL = /[?&]excel=1(&|$)/.test(location.search);   // Excelのポップアップ（ダイアログ）として開かれたとき
 const GRIP = '<svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true" fill="currentColor"><circle cx="4" cy="4" r="1.7"/><circle cx="10" cy="4" r="1.7"/><circle cx="4" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="4" cy="16" r="1.7"/><circle cx="10" cy="16" r="1.7"/></svg>';
 
@@ -526,7 +599,8 @@ function normalize(p, fy) {
       people: t.people != null && Number(t.people) >= 0 ? Number(t.people) : null,
       assignees: Array.isArray(t.assignees) ? t.assignees.map(String) : [],
       note: String(t.note || ''),
-      seq: t.seq != null && isFinite(Number(t.seq)) ? Number(t.seq) : null
+      seq: t.seq != null && isFinite(Number(t.seq)) ? Number(t.seq) : null,
+      comments: Array.isArray(t.comments) ? t.comments.map(cmNorm).filter(Boolean) : []
     })) : [],
     decisions: Array.isArray(p.decisions) ? p.decisions.map((d) => ({ id: String(d.id || uid()), text: String(d.text || ''), taskId: d.taskId ? String(d.taskId) : '' })) : [],
     todos: Array.isArray(p.todos) ? p.todos.map((t) => ({ id: String(t.id || uid()), text: String(t.text || ''), done: !!t.done })) : [],
@@ -555,8 +629,9 @@ function normalize(p, fy) {
 }
 
 const prefs = (() => { try { return JSON.parse(localStorage.getItem('kiSchedule:prefs') || '{}'); } catch (_) { return {}; } })();
-const ui = { sel: null, ws: 0, wm: [3, 6, 12].includes(prefs.wm) ? prefs.wm : 3, unit: prefs.unit === 'month' ? 'month' : 'day', loadLane: 'all', open: new Set(), view: prefs.view === 'person' ? 'person' : 'lane', ovOpen: prefs.ovOpen !== false, tblOpen: prefs.tblOpen !== false, paneW: clamp(Number(prefs.paneW) || 340, 260, 760), paneOpen: prefs.paneOpen !== false, tabY: clamp(Number(prefs.tabY) || 0.5, 0.08, 0.92), rg: clamp(Math.round((Number(prefs.rg) || 0) / 2) * 2, -10, 30) };
-function savePrefs() { try { localStorage.setItem('kiSchedule:prefs', JSON.stringify({ wm: ui.wm, unit: ui.unit, view: ui.view, ovOpen: ui.ovOpen, tblOpen: ui.tblOpen, paneW: ui.paneW, paneOpen: ui.paneOpen, tabY: ui.tabY, rg: ui.rg })); } catch (_) {} }
+const ui = { sel: null, ws: 0, wm: [3, 6, 12].includes(prefs.wm) ? prefs.wm : 3, unit: prefs.unit === 'month' ? 'month' : 'day', loadLane: 'all', open: new Set(), view: prefs.view === 'person' ? 'person' : 'lane', ovOpen: prefs.ovOpen !== false, tblOpen: prefs.tblOpen !== false,
+  cm: ['icon', 'leader', 'thread', 'corner', 'pin', 'off'].includes(prefs.cm) ? prefs.cm : 'icon', me: String(prefs.me || '').slice(0, 20), cmOpen: '', paneW: clamp(Number(prefs.paneW) || 340, 260, 760), paneOpen: prefs.paneOpen !== false, tabY: clamp(Number(prefs.tabY) || 0.5, 0.08, 0.92), rg: clamp(Math.round((Number(prefs.rg) || 0) / 2) * 2, -16, 30) };
+function savePrefs() { try { localStorage.setItem('kiSchedule:prefs', JSON.stringify({ wm: ui.wm, unit: ui.unit, view: ui.view, ovOpen: ui.ovOpen, tblOpen: ui.tblOpen, paneW: ui.paneW, paneOpen: ui.paneOpen, tabY: ui.tabY, rg: ui.rg, cm: ui.cm, me: ui.me })); } catch (_) {} }
 
 function localKey(fy) { return 'kiSchedule:fy' + fy; }
 function loadLocal(fy) { try { const s = localStorage.getItem(localKey(fy)); return s ? normalize(JSON.parse(s), fy) : null; } catch (_) { return null; } }
@@ -720,7 +795,7 @@ function heatCls(v) { return v <= 0.05 ? 'hm0' : v < 1.5 ? 'hm1' : v < 2.5 ? 'hm
 function win() { const wm = ui.wm; const ws = clamp(ui.ws, 0, 12 - wm); const c = C(); return { ws, wm, W0: c.ms[ws], W1: c.ms[ws + wm], WD: c.ms[ws + wm] - c.ms[ws] }; }
 function ord(list) {
   if (drag && drag.order) { const ix = drag.order; return list.slice().sort((a, b) => ix.indexOf(a.id) - ix.indexOf(b.id)); }
-  const manual = list.length > 1 && !!list[0].parentId && list.some((t) => t.seq != null);   // 詳細予定を並べ替えた予定は、並び順（seq）で表示
+  const manual = list.length > 1 && list.some((t) => t.seq != null);   // 並べ替えた予定・詳細予定は、並び順（seq）で表示
   const key = (t) => (t.seq == null ? 1e9 : t.seq);
   return list.slice().sort((a, b) => (manual ? key(a) - key(b) : 0) || effort(a).s - effort(b).s);
 }
@@ -749,7 +824,8 @@ function undo() {
 
 /* ---------- 保存 ---------- */
 let db = null, unsub = null, saveTimer = null, saving = false, ver = 0, savedVer = 0, lastSaved = '', remoteReady = false;
-function setStatus(text, warn) { const el = $('#status'); el.textContent = text; el.classList.toggle('warn', !!warn); }
+function setStatus(text, warn) { const el = $('#status'); if (XL && !warn) text = '';   // Excel連携中は、エラーのときだけ表示（成功メッセージは出さない）
+  el.textContent = text; el.classList.toggle('warn', !!warn); }
 function scheduleSave() {
   ver++; saveLocal();
   clearTimeout(saveTimer);
@@ -913,6 +989,41 @@ function durTxt(ef) {
   return txt;
 }
 function durPill(ef) { return '<span class="pill">' + durTxt(ef) + '</span>'; }
+const CM_ICO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2.5h12v8H8l-3.5 3v-3H2z" fill="currentColor"/></svg>';
+function cmPop(t, list, left, dateKey) {
+  let h = '<div class="cmpop" data-id="' + esc(t.id) + '" style="--px:' + left + '"><div class="cmph">' + (dateKey && dateKey !== 'start' ? cmDay(dateKey) + ' のコメント' : 'コメント') + '（' + list.length + '）</div>';
+  list.forEach((c) => { h += '<div class="cmpi"><div class="cmpm">' + esc(c.by || '名前なし') + '　' + esc(cmWhen(c.at)) + (c.date && !(dateKey && dateKey !== 'start') ? '　［' + cmDay(c.date) + '］' : '') + '</div><div>' + esc(c.text).replace(/\n/g, '<br>') + '</div></div>'; });
+  return h + '<div class="cmpa"><input type="text" data-cmq placeholder="コメントを追加…" aria-label="コメントを追加"><button type="button" class="btn sm" data-act="cm-qadd" data-id="' + esc(t.id) + '"' + (dateKey && dateKey !== 'start' ? ' data-date="' + esc(dateKey) + '"' : '') + '>追加</button></div></div>';
+}
+function cmHtml(t, ef, w, pct, vs, ve) {
+  const list = t.comments || [];
+  if (!list.length || ui.cm === 'off') return '';
+  const x = pct(ve - w.W0), id = esc(t.id), n = list.length, last = list[n - 1], lbl = 'コメント' + n + '件';
+  if (ui.cm === 'icon' || ui.cm === 'thread') {   // C2：付箋アイコン → 吹き出し ／ C7：件数の印 → 右パネルのスレッド
+    const open = ui.cm === 'icon' && ui.cmOpen === t.id;
+    return '<button type="button" class="cm ic' + (open ? ' on' : '') + '" data-act="' + (ui.cm === 'icon' ? 'cm-icon' : 'cm-sel') + '" data-id="' + id + '" style="left:calc(' + x + ' - 11px)" aria-label="' + lbl + '" title="' + lbl + '">' + CM_ICO + (ui.cm === 'thread' || n > 1 ? '<b>' + n + '</b>' : '') + '</button>'
+      + (open ? cmPop(t, list, 'calc(' + x + ' - 150px)', '') : '');
+  }
+  if (ui.cm === 'corner') {   // C9：バーの角に印 → ホバーで全文
+    return '<span class="cm cn" role="button" tabindex="0" data-act="cm-sel" data-id="' + id + '" style="left:calc(' + x + ' - 13px)" aria-label="' + lbl + '"><span class="cmtip">'
+      + list.slice(-3).map((c) => '<span>' + esc(c.text) + '</span>').join('') + (n > 3 ? '<span>… 他' + (n - 3) + '件</span>' : '') + '</span></span>';
+  }
+  if (ui.cm === 'leader') {   // C5：引き出し線で、右の余白に付箋
+    return '<div class="cm ld" style="--x:' + x + '"><span class="ldl"></span><button type="button" class="ldn" data-act="cm-sel" data-id="' + id + '" title="' + esc(last.text) + '">' + CM_ICO + '<span>' + esc(last.text) + '</span>' + (n > 1 ? '<b>（他' + (n - 1) + '件）</b>' : '') + '</button></div>';
+  }
+  if (ui.cm === 'pin') {   // C10：日付にピン（日付のないコメントは、バーの開始位置）
+    const groups = new Map();
+    list.forEach((c) => { const key = c.date || 'start', day = c.date ? idxOf(c.date) : vs; if (day < w.W0 || day >= w.W1) return; if (!groups.has(key)) groups.set(key, { day, items: [] }); groups.get(key).items.push(c); });
+    let h = '';
+    groups.forEach((g, key) => {
+      const px = pct(g.day - w.W0 + 0.5), k = t.id + '|' + key, open = ui.cmOpen === k;
+      h += '<span class="cm pnl" style="left:' + px + '"></span><button type="button" class="cm pn' + (open ? ' on' : '') + '" data-act="cm-pin" data-id="' + id + '" data-key="' + esc(key) + '" style="left:' + px + '" aria-label="' + (key === 'start' ? '' : cmDay(key) + ' の') + 'コメント' + g.items.length + '件" title="' + (key === 'start' ? 'コメント' : cmDay(key)) + '（' + g.items.length + '件）"></button>';
+      if (open) h += cmPop(t, g.items, 'calc(' + px + ' - 24px)', key);
+    });
+    return h;
+  }
+  return '';
+}
 function taskRowHtml(t, ef, o) {
   const w = o.w, pct = o.pct, det = !!t.parentId;
   const sel = ui.sel && ui.sel.type === 'task' && ui.sel.id === t.id;
@@ -940,7 +1051,7 @@ function taskRowHtml(t, ef, o) {
       + (short && !det ? '<span class="ov">不足' + fmtU(amt) + '</span>' : '')
       + (iss.length ? '<span class="ov" title="' + esc(iss.join('\n')) + '">⚠ ' + (det ? '予定の期間外' : '詳細が超過') + '</span>' : '')
       + (ef.e + 1 > w.W1 || ef.open ? '<span>▶</span>' : '') + '</span>'
-      + (ef.open ? '' : '<span class="h e" data-mode="end"></span>') + '</button>';
+      + (ef.open ? '' : '<span class="h e" data-mode="end"></span>') + '</button>' + cmHtml(t, ef, w, pct, vs, ve);
   } else {
     h += '<span class="offtxt">' + md(ef.s) + '〜' + (ef.open ? '継続' : md(ef.e)) + '・表示範囲外</span>';
   }
@@ -1017,7 +1128,7 @@ function personBarHtml(it, w, pct) {
   const { t, ef, share, row } = it, vs = Math.max(ef.s, w.W0), ve = Math.min(ef.e + 1, w.W1);
   const sel = ui.sel && ui.sel.type === 'task' && ui.sel.id === t.id, par = t.parentId ? taskById(t.parentId) : null;
   const nm = (par ? par.name + '／' : '') + t.name + (it.remainder ? '（詳細にしていない分）' : ''), lab = it.remainder ? '詳細にしていない分' : labelOf(t, ef);
-  return '<button type="button" class="bar pv ' + palCls(t.laneId) + (ef.open ? ' on' : '') + (sel ? ' sel' : '') + (drag && drag.id === t.id && drag.moved ? ' dragging' : '') + '" data-id="' + esc(t.id) + '" style="left:' + pct(vs - w.W0) + ';width:' + pct(ve - vs) + ';top:' + (6 + ui.rg / 2 + row * (36 + ui.rg)) + 'px"'
+  return '<button type="button" class="bar pv ' + palCls(t.laneId) + (ef.open ? ' on' : '') + (sel ? ' sel' : '') + (drag && drag.id === t.id && drag.moved ? ' dragging' : '') + '" data-id="' + esc(t.id) + '" style="left:' + pct(vs - w.W0) + ';width:' + pct(ve - vs) + ';top:' + (6 + Math.max(ui.rg, 0) / 2 + row * (36 + ui.rg)) + 'px"'
     + ' title="' + esc(nm) + '　' + md(ef.s) + '〜' + (ef.open ? '継続' : md(ef.e)) + '　' + lab + '　担当1人あたり' + num(r2(share)) + '人日/日" aria-label="' + esc(nm) + ' ' + md(ef.s) + 'から' + (ef.open ? '継続' : md(ef.e)) + '">'
     + '<span class="h s" data-mode="start"></span><span class="lbl">' + (ef.s < w.W0 ? '<span>◀</span>' : '') + '<b>' + esc(nm) + '</b>' + '<span>' + num(r2(share)) + '人日/日</span>' + (ef.open || ef.e + 1 > w.W1 ? '<span>▶</span>' : '') + '</span>'
     + (ef.open ? '' : '<span class="h e" data-mode="end"></span>') + '</button>';
@@ -1060,7 +1171,7 @@ function renderPersonView(c, w, pct) {
       for (let i = w.W0; i < w.W1;) {
         if (cov[i]) { i++; continue; }
         let j = i; while (j + 1 < w.W1 && !cov[j + 1]) j++;
-        if (j - i >= 6) idle += '<div class="idle" style="left:' + pct(i - w.W0) + ';width:' + pct(j - i + 1) + ';top:' + (6 + ui.rg / 2) + 'px;height:30px">空き ' + md(i) + '〜</div>';
+        if (j - i >= 6) idle += '<div class="idle" style="left:' + pct(i - w.W0) + ';width:' + pct(j - i + 1) + ';top:' + (6 + Math.max(ui.rg, 0) / 2) + 'px;height:calc(30px + min(var(--rg,0px), 0px))">空き ' + md(i) + '〜</div>';
         i = j + 1;
       }
     }
@@ -1173,6 +1284,14 @@ function parentCheckHtml(k, p) {
   msgs.forEach((m) => { h += '<span style="font-size:13px;color:var(--short)">⚠ ' + esc(m) + '</span>'; });
   return h + '</div>';
 }
+function commentsHtml(t) {
+  const list = t.comments || [], col = (n) => ['#7C3AED', '#0F766E', '#B45309', '#2563EB', '#BE185D', '#4D7C0F'][[...(n || '?')].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 6];
+  let h = '<div class="cmsec"><div class="cmh">コメント（' + list.length + '）</div>';
+  list.forEach((c) => {
+    h += '<div class="cmi"><span class="av" style="background:' + col(c.by) + '">' + esc([...(c.by || '？')][0]) + '</span><div class="cmb"><div class="cmm"><span>' + esc(c.by || '名前なし') + '　' + esc(cmWhen(c.at)) + (c.date ? '　［' + cmDay(c.date) + '］' : '') + '</span><button class="x" data-act="cm-del" data-cid="' + esc(c.id) + '" aria-label="このコメントを削除">×</button></div><div class="cmt">' + esc(c.text).replace(/\n/g, '<br>') + '</div></div></div>';
+  });
+  return h + '<textarea data-cm="text" rows="2" placeholder="コメントを書く…（Ctrl+Enterで追加）" aria-label="コメントを書く"></textarea><div class="cmrow"><input type="date" data-cm="date" aria-label="日付（任意）" title="日付（任意）。「日付にピン」の表示では、この日にピンが立ちます"><button class="btn sm" data-act="cm-add-insp">コメントを追加</button></div></div>';
+}
 function parentSelectHtml(t) {
   const det = !!t.parentId;
   if (!det && kidsOf(t.id).length) return '';
@@ -1247,6 +1366,7 @@ function renderInspector() {
     if (!det && ef.n) h += detailCheckHtml(t, ef); else if (det && parent) h += parentCheckHtml(t, parent);
     h += assigneesHtml(t);
     h += '<label class="fld">メモ<textarea data-f="note" placeholder="前提・条件など">' + esc(t.note) + '</textarea></label>';
+    h += commentsHtml(t);
     h += '<div class="btnrow"><button class="btn danger" data-act="del-task">削除</button>'
       + (ef.sum ? '' : '<button class="btn" data-act="dup-task">複製</button>')
       + '<button class="btn" data-act="decide" style="background:var(--ink);color:var(--surface);border-color:var(--ink);font-weight:700">決定事項に追加</button></div>';
@@ -1278,6 +1398,8 @@ function renderInspector() {
     + '<label class="fld">期の名前<input type="text" data-pf="name" value="' + esc(plan.name) + '"></label>'
     + '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-ps="excludeHolidays"' + (plan.settings.excludeHolidays ? ' checked' : '') + ' style="width:20px;height:20px">祝日を稼働日から除く</label>'
     + '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" data-ps="yearEnd"' + (plan.settings.yearEnd ? ' checked' : '') + ' style="width:20px;height:20px">年末年始（12/29〜1/3）を除く</label>'
+    + '<label class="fld">付箋（コメント）の表示<select data-us="cm">' + [['icon', '付箋アイコン → 吹き出し'], ['leader', '引き出し線で、余白に付箋'], ['thread', '件数の印 → 右パネルのスレッド'], ['corner', 'バーの角に印 → ホバーで全文'], ['pin', '日付にピン'], ['off', '表示しない']].map((o) => '<option value="' + o[0] + '"' + (ui.cm === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>'
+    + '<label class="fld">コメントに付ける名前<input type="text" data-us="me" maxlength="20" value="' + esc(ui.me) + '" placeholder="例：松田"></label>'
     + '<dl class="kv"><dt>取引先等</dt><dd>' + plan.lanes.length + '件</dd><dt>予定</dt><dd>' + plan.tasks.filter((t) => !t.parentId).length + '件</dd><dt>詳細予定</dt><dd>' + plan.tasks.filter((t) => t.parentId).length + '件</dd></dl>'
     + '</div>';
 }
@@ -1349,6 +1471,17 @@ function addAsg() {
   });
   const again = $('#asgNew'); if (again) again.focus();
 }
+function addComment(id, text, date) {
+  text = String(text || '').trim(); const t = taskById(id); if (!text || !t) return;
+  const d = new Date(), z = (n) => String(n).padStart(2, '0');
+  const c = { text, by: ui.me || '', at: d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()), date: isDay(date) ? date : '' };
+  c.id = hid(cmLine(c));
+  commit(() => { if (!t.comments) t.comments = []; t.comments.push(c); });
+}
+function delComment(id, cid) {
+  const t = taskById(id); if (!t) return;
+  commit(() => { t.comments = (t.comments || []).filter((c) => c.id !== cid); if (!t.comments.length && ui.cmOpen.split('|')[0] === id) ui.cmOpen = ''; });
+}
 function reparentTask(id, newParentId) {
   const t = taskById(id); if (!t) return;
   commit(() => {
@@ -1361,22 +1494,46 @@ function reparentTask(id, newParentId) {
 let rdrag = null;
 function startReparent(grip, e) {
   const id = grip.dataset.id; if (!taskById(id)) return;
-  rdrag = { id, pid: e.pointerId, target: '', moved: false, y0: e.clientY, ghost: null };
+  rdrag = { id, pid: e.pointerId, target: null, moved: false, y0: e.clientY, ghost: null, kind: taskById(id).parentId ? 'detail' : 'top' };
   selectTask(id); renderInspector();
 }
-function reparentTargetAt(x, y) {
+function reparentTargetAt(x, y, kind) {
   const el = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
-  const row = el && el.closest ? el.closest('.gr.task, .gr.detail') : null;
-  const t = row ? taskById(row.dataset.id) : null;
-  if (!t) return null;
-  if (t.parentId) {   // 詳細予定の行：行の上半分なら「その上」、下半分なら「その下」に入れる
-    const r = row.getBoundingClientRect(), after = r.height ? y > r.top + r.height / 2 : false;
-    return { parent: t.parentId, ref: t.id, pos: after ? 'after' : 'before', row: t.id };
+  const rowEl = el && el.closest ? el.closest('.gr') : null;
+  if (!rowEl) return null;
+  const laneEl = rowEl.closest('.lane'), laneId = laneEl ? laneEl.dataset.lane : '';
+  const t = rowEl.dataset.id ? taskById(rowEl.dataset.id) : null;
+  const lower = () => { const r = rowEl.getBoundingClientRect(); return r.height ? y > r.top + r.height / 2 : false; };
+  if (kind === 'top') {   // 予定を動かす：行の上半分なら「その予定の上」、下半分なら「その予定（詳細予定を含む）の下」
+    if (t) { const top = t.parentId ? taskById(t.parentId) : t; return top ? { kind: 'top', lane: top.laneId, ref: top.id, pos: (t.parentId || lower()) ? 'after' : 'before' } : null; }
+    if (rowEl.classList.contains('add') && rowEl.dataset.parent) { const top = taskById(rowEl.dataset.parent); return top ? { kind: 'top', lane: top.laneId, ref: top.id, pos: 'after' } : null; }
+    if (rowEl.classList.contains('lhead') && laneId) return { kind: 'top', lane: laneId, ref: '', pos: 'first' };
+    if (rowEl.classList.contains('add') && laneId) return { kind: 'top', lane: laneId, ref: '', pos: 'end' };
+    return null;
   }
-  return { parent: t.id, ref: '', pos: 'end', row: t.id };   // 予定の行：別の予定なら末尾へ、自分の親なら先頭へ
+  if (!t) return null;
+  if (t.parentId) return { kind: 'detail', parent: t.parentId, ref: t.id, pos: lower() ? 'after' : 'before', row: t.id };   // 詳細予定の行：上半分なら「その上」、下半分なら「その下」
+  return { kind: 'detail', parent: t.id, ref: '', pos: 'end', row: t.id };   // 予定の行：別の予定なら末尾へ、自分の親なら先頭へ
 }
-function sameTarget(a, b) { return (!a && !b) || (!!a && !!b && a.parent === b.parent && a.ref === b.ref && a.pos === b.pos); }
+function sameTarget(a, b) { return (!a && !b) || (!!a && !!b && a.kind === b.kind && a.parent === b.parent && a.lane === b.lane && a.ref === b.ref && a.pos === b.pos); }
 function clearDropMarks() { document.querySelectorAll('#gantt .gr.drop, #gantt .gr.drop-before, #gantt .gr.drop-after').forEach((x) => x.classList.remove('drop', 'drop-before', 'drop-after')); }
+function markTarget(tgt) {
+  clearDropMarks();
+  if (!tgt || tgt.ref === rdrag.id) return;
+  const g = $('#gantt'), q = (sel) => g.querySelector(sel), E = CSS.escape;
+  if (tgt.kind === 'top') {
+    let r = null, cls = 'drop-after';
+    if (tgt.ref && tgt.pos === 'before') { r = q('.gr.task[data-id="' + E(tgt.ref) + '"]'); cls = 'drop-before'; }
+    else if (tgt.ref) {   // 予定のブロック（予定＋詳細予定）の末尾
+      r = q('.gr.add[data-parent="' + E(tgt.ref) + '"]') || [...g.querySelectorAll('.gr.detail')].filter((x) => (taskById(x.dataset.id) || {}).parentId === tgt.ref).pop() || q('.gr.task[data-id="' + E(tgt.ref) + '"]');
+    } else if (tgt.pos === 'first') r = q('.lane[data-lane="' + E(tgt.lane) + '"] .gr.lhead');
+    else { r = q('.lane[data-lane="' + E(tgt.lane) + '"] .gr.add.thin'); cls = 'drop-before'; }
+    if (r) r.classList.add(cls);
+    return;
+  }
+  const row = q('.gr[data-id="' + E(tgt.row) + '"]');
+  if (row) row.classList.add(tgt.ref ? 'drop-' + tgt.pos : 'drop');
+}
 function moveReparent(e) {
   const d = rdrag; if (!d.moved && Math.abs(e.clientY - d.y0) < 4) return;
   if (!d.moved) {
@@ -1384,19 +1541,30 @@ function moveReparent(e) {
     const g = document.createElement('div'); g.className = 'ghost'; g.textContent = (taskById(d.id) || {}).name || ''; document.body.appendChild(g); d.ghost = g;
   }
   if (d.ghost) { d.ghost.style.left = (e.clientX + 14) + 'px'; d.ghost.style.top = (e.clientY + 10) + 'px'; }
-  const tgt = reparentTargetAt(e.clientX, e.clientY);
+  const tgt = reparentTargetAt(e.clientX, e.clientY, d.kind);
   if (sameTarget(tgt, d.target)) return;
-  d.target = tgt; clearDropMarks();
-  if (!tgt || tgt.ref === d.id) return;
-  const row = document.querySelector('#gantt .gr[data-id="' + CSS.escape(tgt.row) + '"]');
-  if (row) row.classList.add(tgt.ref ? 'drop-' + tgt.pos : 'drop');
+  d.target = tgt; markTarget(tgt);
 }
 function endReparent(cancel) {
   const d = rdrag; if (!d) return; rdrag = null;
   document.body.classList.remove('reordering');
   if (d.ghost) d.ghost.remove();
   clearDropMarks();
-  if (!cancel && d.moved && d.target) moveDetail(d.id, d.target);
+  if (!cancel && d.moved && d.target) { if (d.target.kind === 'top') moveTop(d.id, d.target); else moveDetail(d.id, d.target); }
+}
+function moveTop(id, tgt) {
+  const t = taskById(id); if (!t || t.parentId || tgt.ref === id) return;
+  const lane = laneById(tgt.lane); if (!lane) return;
+  const topsOf = (lid) => ord(plan.tasks.filter((x) => x.laneId === lid && !x.parentId));
+  const ol = t.laneId, before = topsOf(ol).map((x) => x.id), sib = topsOf(lane.id).filter((x) => x.id !== id);
+  let idx = sib.length;
+  if (tgt.ref) { const ri = sib.findIndex((x) => x.id === tgt.ref); idx = ri < 0 ? sib.length : (tgt.pos === 'before' ? ri : ri + 1); }
+  else if (tgt.pos === 'first') idx = 0;
+  if (lane.id === ol && sib.slice(0, idx).concat([t], sib.slice(idx)).map((x) => x.id).join() === before.join()) return;   // 順序が変わらない
+  commit(() => {
+    if (lane.id !== ol) { t.laneId = lane.id; kidsOf(t.id).forEach((k) => { k.laneId = lane.id; }); }   // 詳細予定も一緒に移る
+    const list = sib.slice(); list.splice(idx, 0, t); list.forEach((x, i) => { x.seq = i; });
+  });
 }
 function moveDetail(id, tgt) {
   const t = taskById(id); if (!t || !t.parentId || tgt.ref === id) return;
@@ -1444,10 +1612,11 @@ $('#warnBtn').addEventListener('click', () => {
 function applyRg() {
   document.documentElement.style.setProperty('--rg', ui.rg + 'px');
   const v = $('#rgVal'); if (v) v.textContent = (ui.rg > 0 ? '+' : '') + ui.rg;
-  const a = $('#rgDec'), b = $('#rgInc'); if (a) a.disabled = ui.rg <= -10; if (b) b.disabled = ui.rg >= 30;
+  const a = $('#rgDec'), b = $('#rgInc'); if (a) a.disabled = ui.rg <= -16; if (b) b.disabled = ui.rg >= 30;
+  document.documentElement.classList.toggle('dense', ui.rg <= -8);
 }
 function setRg(v) {
-  const nv = clamp(Math.round(v / 2) * 2, -10, 30); if (nv === ui.rg) return;
+  const nv = clamp(Math.round(v / 2) * 2, -16, 30); if (nv === ui.rg) return;
   ui.rg = nv; applyRg(); savePrefs(); renderGantt();
 }
 function bindRg(btn, delta) {
@@ -1547,8 +1716,17 @@ const gantt = $('#gantt');
 gantt.addEventListener('click', (e) => {
   const vb = e.target.closest('[data-view]');
   if (vb) { ui.view = vb.dataset.view === 'person' ? 'person' : 'lane'; savePrefs(); renderAll(); return; }
+  if (ui.cmOpen && !e.target.closest('.cmpop, [data-act="cm-icon"], [data-act="cm-pin"]')) { ui.cmOpen = ''; renderGantt(); }   // 吹き出しの外を押したら閉じる
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, lid = a.dataset.lane, id = a.dataset.id;
+  if (act === 'cm-icon') { ui.cmOpen = ui.cmOpen === id ? '' : id; renderGantt(); return; }
+  if (act === 'cm-pin') { const k = id + '|' + a.dataset.key; ui.cmOpen = ui.cmOpen === k ? '' : k; renderGantt(); return; }
+  if (act === 'cm-sel') {
+    selectTask(id); if (!ui.paneOpen) { ui.paneOpen = true; savePrefs(); applyPane(); }
+    renderAll(); const ta = document.querySelector('#inspector [data-cm="text"]'); if (ta) { ta.scrollIntoView({ block: 'nearest' }); ta.focus({ preventScroll: true }); }
+    return;
+  }
+  if (act === 'cm-qadd') { const inp = a.parentElement.querySelector('[data-cmq]'); addComment(id, inp ? inp.value : '', a.dataset.date || ''); return; }
   if (act === 'sel-lane') { ui.sel = { type: 'lane', id: lid }; renderAll(); }
   else if (act === 'sel-member') { ui.sel = { type: 'member', id }; renderAll(); }
   else if (act === 'add-member') addMember();
@@ -1601,6 +1779,9 @@ function endLaneDrag(cancel) {
 }
 
 /* 予定バーのドラッグ */
+gantt.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-cmq]')) { e.preventDefault(); const b = e.target.parentElement.querySelector('[data-act="cm-qadd"]'); if (b) b.click(); }
+});
 gantt.addEventListener('pointerdown', (e) => {
   if (e.button > 0) return;
   const grip = e.target.closest('.lgrip');
@@ -1609,6 +1790,8 @@ gantt.addEventListener('pointerdown', (e) => {
   if (dgrip) { e.preventDefault(); startReparent(dgrip, e); return; }
   const dcell = e.target.closest('.gr.detail .lc');
   if (dcell) { startReparent({ dataset: { id: dcell.closest('.gr.detail').dataset.id } }, e); return; }
+  const tcell = e.target.closest('.gr.task .lc');
+  if (tcell && !e.target.closest('.tg')) { startReparent({ dataset: { id: tcell.closest('.gr.task').dataset.id } }, e); return; }
   const bar = e.target.closest('.bar'); if (!bar) return;
   const t = taskById(bar.dataset.id); if (!t) return;
   e.preventDefault();
@@ -1715,8 +1898,12 @@ function updateChk() {
   const tmp = document.createElement('div'); tmp.innerHTML = html;
   if (tmp.firstElementChild) cb.replaceWith(tmp.firstElementChild);
 }
+insp.addEventListener('keydown', (e) => {
+  if (e.target.matches && e.target.matches('[data-cm="text"]') && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); const b = e.target.closest('.cmsec').querySelector('[data-act="cm-add-insp"]'); if (b) b.click(); }
+});
 insp.addEventListener('input', (e) => {
   const f = e.target.dataset.f, lf = e.target.dataset.lf, pf = e.target.dataset.pf, mf = e.target.dataset.mf;
+  if (e.target.dataset.us === 'me') { ui.me = e.target.value.slice(0, 20); savePrefs(); return; }
   if (f === 'name' || f === 'note') { const t = taskById(ui.sel.id); t[f] = e.target.value; if (f === 'name') renderGantt(); scheduleSave(); }
   else if (f === 'eff' || f === 'people') {
     const v = parseFloat(e.target.value);
@@ -1728,6 +1915,7 @@ insp.addEventListener('input', (e) => {
 });
 insp.addEventListener('change', (e) => {
   const f = e.target.dataset.f, ps = e.target.dataset.ps, asg = e.target.dataset.asg;
+  if (e.target.dataset.us === 'cm') { ui.cm = e.target.value; ui.cmOpen = ''; savePrefs(); renderGantt(); return; }
   if (asg) { commit(() => { const t = taskById(ui.sel.id), i = t.assignees.indexOf(asg); if (i >= 0) t.assignees.splice(i, 1); else t.assignees.push(asg); }); return; }
   if (f === 'parent') { const t0 = taskById(ui.sel.id), v = e.target.value; if (t0 && (v || t0.parentId) && v !== t0.parentId) reparentTask(t0.id, v); else renderInspector(); return; }
   if (f === 'laneId') { commit(() => { const t = taskById(ui.sel.id); t.laneId = e.target.value; kidsOf(t.id).forEach((k) => { k.laneId = e.target.value; }); }); return; }
@@ -1752,6 +1940,8 @@ insp.addEventListener('keydown', (e) => {
 insp.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, sel = ui.sel;
+  if (act === 'cm-add-insp') { const sec = a.closest('.cmsec'); addComment(sel.id, sec.querySelector('[data-cm="text"]').value, sec.querySelector('[data-cm="date"]').value); return; }
+  if (act === 'cm-del') { delComment(sel.id, a.dataset.cid); return; }
   if (act.startsWith('basis-')) commit(() => {
     const t = taskById(sel.id), nb = act.slice(6); if (basisOf(t) === nb) return;
     const ef = ownEffort(t);
@@ -1776,7 +1966,7 @@ insp.addEventListener('click', async (e) => {
     if (n && !(await askYes('詳細予定' + n + '件も一緒に削除します。よろしいですか？（元に戻すで復元できます）'))) return;
     commit(() => removeTask(sel.id));
   }
-  else if (act === 'dup-task') { const t = taskById(sel.id); const n = { ...t, id: uid(), name: t.name + '（コピー）', assignees: (t.assignees || []).slice() }; if (n.parentId && n.seq != null) n.seq = Math.max(...kidsOf(n.parentId).map((x) => (x.seq == null ? 0 : x.seq))) + 1; commit(() => { plan.tasks.push(n); selectTask(n.id); }); }
+  else if (act === 'dup-task') { const t = taskById(sel.id); const n = { ...t, id: uid(), name: t.name + '（コピー）', assignees: (t.assignees || []).slice(), comments: (t.comments || []).map((c) => ({ ...c })) }; if (n.parentId && n.seq != null) n.seq = Math.max(...kidsOf(n.parentId).map((x) => (x.seq == null ? 0 : x.seq))) + 1; else if (!n.parentId) n.seq = null; commit(() => { plan.tasks.push(n); selectTask(n.id); }); }
   else if (act === 'add-detail') addDetail(a.dataset.id);
   else if (act === 'sel-parent') { const t = taskById(sel.id); if (t && t.parentId) { selectTask(t.parentId); renderAll(); } }
   else if (act === 'sel-kid') { selectTask(a.dataset.id); ui.open.add(taskById(a.dataset.id).parentId); renderAll(); }
@@ -1819,6 +2009,7 @@ mins.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposin
 
 /* global keys */
 document.addEventListener('keydown', async (e) => {
+  if (e.key === 'Escape' && ui.cmOpen) { ui.cmOpen = ''; renderGantt(); return; }
   if (e.key === 'Escape' && rdrag) { endReparent(true); return; }
   if (e.key === 'Escape' && ldrag) { endLaneDrag(true); return; }
   if (isTyping()) return;
@@ -1861,7 +2052,7 @@ function askChoice(title, msg, buttons) {
     dlg.returnValue = ''; dlg.showModal();
   });
 }
-const CSV_HEAD = ['取引先等', '区分', '予定', '詳細予定', '開始', '終了', '暦日数', '稼働日数', '工数合計(人日)', '1日あたり(人日/日)', '入力単位', '入力値', '投入人数', '担当者', '過不足(人日)', '期間の目安', 'メモ', '順'];
+const CSV_HEAD = ['取引先等', '区分', '予定', '詳細予定', '開始', '終了', '暦日数', '稼働日数', '工数合計(人日)', '1日あたり(人日/日)', '入力単位', '入力値', '投入人数', '担当者', '過不足(人日)', '期間の目安', 'メモ', '順', 'コメント'];
 function buildCsv() {
   const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   const rows = [CSV_HEAD];
@@ -1869,7 +2060,7 @@ function buildCsv() {
   const line = (l, kind, name, sub, t, ef) => {
     const b = basisOf(t);
     rows.push([l.name, kind, name, sub, isoAt(ef.s), ef.open ? '継続' : isoAt(ef.e), ef.days, ef.wd, r2(ef.pd), ef.per == null ? '' : r3(ef.per),
-      ef.sum ? '' : BASIS_LBL[b], ef.sum ? '' : r3(t[BASIS_KEY[b]]), r2(ef.people), ef.sum ? '' : who(t), r2(ef.diff), durTxt(ef), t.note, (t.parentId && t.seq != null) ? t.seq : '']);
+      ef.sum ? '' : BASIS_LBL[b], ef.sum ? '' : r3(t[BASIS_KEY[b]]), r2(ef.people), ef.sum ? '' : who(t), r2(ef.diff), durTxt(ef), t.note, t.seq != null ? t.seq : '', cmStr(t.comments)]);
   };
   plan.lanes.forEach((l) => ord(plan.tasks.filter((t) => t.laneId === l.id && !t.parentId)).forEach((t) => {
     const ef = effort(t); line(l, ef.n ? (t.ongoing ? '予定（詳細あり・終了なし）' : '予定（詳細あり）') : (t.ongoing ? '予定（終了なし）' : '予定'), t.name, '', t, ef);
@@ -1912,7 +2103,7 @@ function csvToPlan(rows, fy) {
   const hi = rows.findIndex((r) => r.some((c) => c.trim() === '予定'));
   if (hi < 0) throw new Error('見出し行（「予定」「開始」など）が見つかりません。書き出したCSVと同じ見出しにしてください。');
   const hd = rows[hi].map((c) => c.trim()), col = (n) => hd.indexOf(n);
-  const ci = { lane: col('取引先等'), kind: col('区分'), name: col('予定'), sub: col('詳細予定'), start: col('開始'), end: col('終了'), pd: col('工数合計(人日)'), per: col('1日あたり(人日/日)'), unit: col('入力単位'), val: col('入力値'), ppl: col('投入人数'), asg: col('担当者'), note: col('メモ'), seq: col('順') };
+  const ci = { lane: col('取引先等'), kind: col('区分'), name: col('予定'), sub: col('詳細予定'), start: col('開始'), end: col('終了'), pd: col('工数合計(人日)'), per: col('1日あたり(人日/日)'), unit: col('入力単位'), val: col('入力値'), ppl: col('投入人数'), asg: col('担当者'), note: col('メモ'), seq: col('順'), cm: col('コメント') };
   if (ci.start < 0) throw new Error('「開始」の列が必要です。');
   const out = { fy, name: plan.name, lanes: [], members: [], tasks: [], decisions: [], todos: [], settings: plan.settings, _warn: 0 };
   const g = (r, k) => (k >= 0 && r[k] != null ? String(r[k]).trim() : '');
@@ -1935,7 +2126,8 @@ function csvToPlan(rows, fy) {
       id: uid(), name: det ? (g(r, ci.sub) || '詳細') : nameCol, laneId: lid, parentId: '', start: sd, end: ed,
       pd: basis === 'total' ? (isNaN(val) ? (isNaN(pdc) ? 0 : pdc) : val) : (isNaN(pdc) ? 0 : pdc),
       ongoing: open, rate, mrate: basis === 'month' ? (isNaN(val) ? 20 : val) : rate * PD_PER_PM, basis,
-      people: isNaN(pp) ? 1 : pp, assignees: g(r, ci.asg).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: g(r, ci.note), seq: (det && g(r, ci.seq) !== '' && isFinite(parseFloat(g(r, ci.seq)))) ? parseFloat(g(r, ci.seq)) : null
+      people: isNaN(pp) ? 1 : pp, assignees: g(r, ci.asg).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: g(r, ci.note), seq: (g(r, ci.seq) !== '' && isFinite(parseFloat(g(r, ci.seq)))) ? parseFloat(g(r, ci.seq)) : null,
+      comments: ci.cm >= 0 ? cmParse(g(r, ci.cm)) : []
     };
     if (det) { const par = mkParent(lid, nameCol, sd, ed, false, true); if (par._auto) { if (sd < par.start) par.start = sd; if (ed > par.end) par.end = ed; } t.parentId = par.id; }
     out.tasks.push(t);

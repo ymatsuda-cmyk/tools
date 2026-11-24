@@ -18,7 +18,7 @@
   'use strict';
 
   /* ================= 定数・シート構成 ================= */
-  const TASK_COLS = ['ID', '種別', '親ID', '取引先等', '予定名', '開始', '終了', '継続', '入力単位', '入力値', '投入人数', '担当者', 'メモ'];
+  const TASK_COLS = ['ID', '種別', '親ID', '取引先等', '予定名', '開始', '終了', '継続', '入力単位', '入力値', '投入人数', '担当者', 'メモ', '順', 'コメント'];
   const MASTER_COLS = ['種別', 'ID', '値1', '値2', '値3'];
   const DATE_COLS = ['開始', '終了'];
   const UNIT_LABEL = { total: '人日（合計）', day: '人日/日', month: '人日/月' };
@@ -30,6 +30,20 @@
   const pad = (n) => String(n).padStart(2, '0');
   const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
   const norm = (v) => (v == null ? '' : typeof v === 'number' ? String(Math.round(v * 1000) / 1000) : typeof v === 'boolean' ? (v ? '1' : '0') : String(v).trim());
+  /* コメント：「日時｜名前｜日付｜本文」を改行でつなぐ（アプリのCSVと同じ形式） */
+  const hid = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'c' + (h >>> 0).toString(36); };
+  const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+  const cmLine = (c) => [c.at || '', c.by || '', c.date || '', String(c.text || '').replace(/\r?\n/g, '⏎').replace(/｜/g, '|')].join('｜');
+  const cmStr = (list) => (list || []).map(cmLine).join('\n');
+  function cmParse(str) {
+    return String(str == null ? '' : str).split(/\r?\n/).map((line) => {
+      if (!line.trim()) return null;
+      const p = line.split('｜');
+      if (p.length < 4) return { id: hid(line), at: '', by: '', date: '', text: line.trim() };
+      const text = p.slice(3).join('｜').replace(/⏎/g, '\n');
+      return text.trim() ? { id: hid(line), at: p[0], by: p[1], date: isDay(p[2]) ? p[2] : '', text } : null;
+    }).filter(Boolean);
+  }
   const truthy = (v) => { const s = norm(v); return s === '○' || s === '◯' || s === '1' || /^(true|yes|y)$/i.test(s); };
 
   /* ================= 日付（Excelのシリアル値 ⇄ ISO） ================= */
@@ -57,7 +71,7 @@
       return {
         'ID': t.id, '種別': t.parentId ? '詳細予定' : '予定', '親ID': t.parentId || '', '取引先等': laneName.get(t.laneId) || '', '予定名': t.name,
         '開始': t.start, '終了': t.ongoing ? '' : t.end, '継続': t.ongoing ? '○' : '', '入力単位': UNIT_LABEL[basis] || UNIT_LABEL.total,
-        '入力値': r3(t[BASIS_KEY[basis]]), '投入人数': r3(t.people), '担当者': (t.assignees || []).map((a) => memName.get(a)).filter(Boolean).join('・'), 'メモ': t.note || ''
+        '入力値': r3(t[BASIS_KEY[basis]]), '投入人数': r3(t.people), '担当者': (t.assignees || []).map((a) => memName.get(a)).filter(Boolean).join('・'), 'メモ': t.note || '', '順': t.seq != null ? r3(t.seq) : '', 'コメント': cmStr(t.comments)
       };
     });
     const master = [];
@@ -100,7 +114,9 @@
       const t = {
         id: norm(r['ID']), name, laneId: laneId(norm(r['取引先等'])), parentId: norm(r['親ID']), start, end, ongoing, basis,
         people: ppl !== '' && isFinite(Number(ppl)) ? Number(ppl) : 1,
-        assignees: norm(r['担当者']).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: norm(r['メモ'])
+        assignees: norm(r['担当者']).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: norm(r['メモ']),
+        seq: (norm(r['順']) !== '' && isFinite(Number(norm(r['順'])))) ? Number(norm(r['順'])) : null,
+        comments: cmParse(r['コメント'])
       };
       const v = isFinite(val) ? val : 0;
       if (basis === 'total') t.pd = v; else if (basis === 'day') t.rate = v; else t.mrate = v;
@@ -303,5 +319,5 @@
     return { close() { try { if (dialog) dialog.close(); } catch (_) {} cleanup(); } };
   }
 
-  return { open, Engine, makeExcelAdapter, Core: { planToTables, tablesToPlan, diffTables, tablesEqual, isEmptyDelta, cellToIso, isoToSerial, serialToIso, TASK_COLS, MASTER_COLS, DATE_COLS, keyTask, keyMaster, norm } };
+  return { open, Engine, makeExcelAdapter, Core: { planToTables, tablesToPlan, diffTables, tablesEqual, isEmptyDelta, cmStr, cmParse, cellToIso, isoToSerial, serialToIso, TASK_COLS, MASTER_COLS, DATE_COLS, keyTask, keyMaster, norm } };
 });
