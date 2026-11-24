@@ -169,6 +169,10 @@ aside{flex:0 0 var(--aside-w);min-width:0;display:flex;flex-direction:column;gap
 .dgrip:hover{background:var(--chip);color:var(--ink)}
 .dgrip svg{width:10px;height:14px}
 .gr.drop{outline:2px solid var(--accent);outline-offset:-2px;background:var(--soft)}
+.gr.drop-before,.gr.drop-after{position:relative}
+.gr.drop-before::after,.gr.drop-after::after{content:"";position:absolute;left:0;right:0;height:3px;background:var(--accent);z-index:9;pointer-events:none}
+.gr.drop-before::after{top:-1px}
+.gr.drop-after::after{bottom:-1px}
 .pc,.chipd,.chipo{flex:0 0 auto;border-radius:10px;padding:0 6px;font-size:11px;white-space:nowrap;line-height:18px}
 .pc{background:var(--chip);color:var(--ink);font-weight:700}
 .chipd{background:var(--dbar);color:var(--dbar-ink)}
@@ -422,7 +426,7 @@ aside{overflow-y:auto;overflow-x:hidden}
     <section class="card" id="ganttCard">
       <div class="gwrap"><div class="gantt" id="gantt"></div></div>
     </section>
-    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定の「⠿」を別の予定の行へドラッグすると、その予定の詳細予定に移せます（右パネルの「親の予定」でも変えられます）。要員別では、バーを別の要員の行へドラッグすると、担当者を付け替えられます。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
+    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定は、左のセルをドラッグして、同じ予定の中で順序を入れ替えたり、別の予定へ移したりできます（行の上半分に落とすとその上、下半分に落とすとその下へ入ります。右パネルの「親の予定」でも別の予定へ移せます）。要員別では、バーを別の要員の行へドラッグすると、担当者を付け替えられます。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
   </div>
   <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="右パネルの幅（ドラッグ、または左右キーで変更。ダブルクリックで初期値）" tabindex="0" aria-valuemin="260" aria-valuemax="760" aria-valuenow="340"></div>
   <aside id="aside">
@@ -521,7 +525,8 @@ function normalize(p, fy) {
       mrate: t.mrate != null && Number(t.mrate) >= 0 ? Number(t.mrate) : null, basis: ['total', 'day', 'month'].includes(t.basis) ? t.basis : null,
       people: t.people != null && Number(t.people) >= 0 ? Number(t.people) : null,
       assignees: Array.isArray(t.assignees) ? t.assignees.map(String) : [],
-      note: String(t.note || '')
+      note: String(t.note || ''),
+      seq: t.seq != null && isFinite(Number(t.seq)) ? Number(t.seq) : null
     })) : [],
     decisions: Array.isArray(p.decisions) ? p.decisions.map((d) => ({ id: String(d.id || uid()), text: String(d.text || ''), taskId: d.taskId ? String(d.taskId) : '' })) : [],
     todos: Array.isArray(p.todos) ? p.todos.map((t) => ({ id: String(t.id || uid()), text: String(t.text || ''), done: !!t.done })) : [],
@@ -715,7 +720,15 @@ function heatCls(v) { return v <= 0.05 ? 'hm0' : v < 1.5 ? 'hm1' : v < 2.5 ? 'hm
 function win() { const wm = ui.wm; const ws = clamp(ui.ws, 0, 12 - wm); const c = C(); return { ws, wm, W0: c.ms[ws], W1: c.ms[ws + wm], WD: c.ms[ws + wm] - c.ms[ws] }; }
 function ord(list) {
   if (drag && drag.order) { const ix = drag.order; return list.slice().sort((a, b) => ix.indexOf(a.id) - ix.indexOf(b.id)); }
-  return list.slice().sort((a, b) => effort(a).s - effort(b).s);
+  const manual = list.length > 1 && !!list[0].parentId && list.some((t) => t.seq != null);   // 詳細予定を並べ替えた予定は、並び順（seq）で表示
+  const key = (t) => (t.seq == null ? 1e9 : t.seq);
+  return list.slice().sort((a, b) => (manual ? key(a) - key(b) : 0) || effort(a).s - effort(b).s);
+}
+function displayOrderIds() {
+  const ids = [];
+  plan.lanes.forEach((l) => ord(plan.tasks.filter((t) => t.laneId === l.id && !t.parentId)).forEach((t) => { ids.push(t.id); ord(kidsOf(t.id)).forEach((k) => ids.push(k.id)); }));
+  plan.tasks.forEach((t) => { if (ids.indexOf(t.id) < 0) ids.push(t.id); });
+  return ids;
 }
 
 /* ---------- 変更・履歴 ---------- */
@@ -1302,6 +1315,7 @@ function addDetail(parentId, atIdx) {
     const ef = effort(p), s = clamp(atIdx != null ? atIdx : ef.s, 0, T - 1), e = clamp(s + 9, s, T - 1);
     k.start = isoAt(s); k.end = isoAt(e); k.pd = Math.round(Math.max(0, ef.pd - ef.kidPd) * 10) / 10; k.people = p.people;
   }
+  if (ks.some((x) => x.seq != null)) k.seq = Math.max(...ks.map((x) => (x.seq == null ? 0 : x.seq))) + 1;   // 並べ替え済みなら、末尾に追加
   commit(() => { plan.tasks.push(k); ui.open.add(p.id); selectTask(k.id); });
   focusName();
 }
@@ -1338,10 +1352,10 @@ function addAsg() {
 function reparentTask(id, newParentId) {
   const t = taskById(id); if (!t) return;
   commit(() => {
-    if (!newParentId) { t.parentId = ''; return; }                                  // 独立した予定にする（取引先等はそのまま）
+    if (!newParentId) { t.parentId = ''; t.seq = null; return; }                                  // 独立した予定にする（取引先等はそのまま）
     const p = taskById(newParentId);
     if (!p || p.id === t.id || p.parentId || kidsOf(t.id).length) return;           // 詳細予定の下には詳細予定を作れない
-    t.parentId = p.id; t.laneId = p.laneId; ui.open.add(p.id);
+    t.parentId = p.id; t.laneId = p.laneId; t.seq = null; ui.open.add(p.id);
   });
 }
 let rdrag = null;
@@ -1354,8 +1368,15 @@ function reparentTargetAt(x, y) {
   const el = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
   const row = el && el.closest ? el.closest('.gr.task, .gr.detail') : null;
   const t = row ? taskById(row.dataset.id) : null;
-  return t ? (t.parentId || t.id) : '';
+  if (!t) return null;
+  if (t.parentId) {   // 詳細予定の行：行の上半分なら「その上」、下半分なら「その下」に入れる
+    const r = row.getBoundingClientRect(), after = r.height ? y > r.top + r.height / 2 : false;
+    return { parent: t.parentId, ref: t.id, pos: after ? 'after' : 'before', row: t.id };
+  }
+  return { parent: t.id, ref: '', pos: 'end', row: t.id };   // 予定の行：別の予定なら末尾へ、自分の親なら先頭へ
 }
+function sameTarget(a, b) { return (!a && !b) || (!!a && !!b && a.parent === b.parent && a.ref === b.ref && a.pos === b.pos); }
+function clearDropMarks() { document.querySelectorAll('#gantt .gr.drop, #gantt .gr.drop-before, #gantt .gr.drop-after').forEach((x) => x.classList.remove('drop', 'drop-before', 'drop-after')); }
 function moveReparent(e) {
   const d = rdrag; if (!d.moved && Math.abs(e.clientY - d.y0) < 4) return;
   if (!d.moved) {
@@ -1364,19 +1385,32 @@ function moveReparent(e) {
   }
   if (d.ghost) { d.ghost.style.left = (e.clientX + 14) + 'px'; d.ghost.style.top = (e.clientY + 10) + 'px'; }
   const tgt = reparentTargetAt(e.clientX, e.clientY);
-  if (tgt === d.target) return;
-  d.target = tgt;
-  document.querySelectorAll('#gantt .gr.drop').forEach((x) => x.classList.remove('drop'));
-  const t = taskById(d.id);
-  if (tgt && t && tgt !== t.parentId) { const row = document.querySelector('#gantt .gr.task[data-id="' + CSS.escape(tgt) + '"]'); if (row) row.classList.add('drop'); }
+  if (sameTarget(tgt, d.target)) return;
+  d.target = tgt; clearDropMarks();
+  if (!tgt || tgt.ref === d.id) return;
+  const row = document.querySelector('#gantt .gr[data-id="' + CSS.escape(tgt.row) + '"]');
+  if (row) row.classList.add(tgt.ref ? 'drop-' + tgt.pos : 'drop');
 }
 function endReparent(cancel) {
   const d = rdrag; if (!d) return; rdrag = null;
   document.body.classList.remove('reordering');
   if (d.ghost) d.ghost.remove();
-  document.querySelectorAll('#gantt .gr.drop').forEach((x) => x.classList.remove('drop'));
-  const t = taskById(d.id);
-  if (!cancel && d.moved && d.target && t && d.target !== t.parentId) reparentTask(d.id, d.target);
+  clearDropMarks();
+  if (!cancel && d.moved && d.target) moveDetail(d.id, d.target);
+}
+function moveDetail(id, tgt) {
+  const t = taskById(id); if (!t || !t.parentId || tgt.ref === id) return;
+  const np = taskById(tgt.parent); if (!np || np.parentId || np.id === t.id) return;
+  const op = t.parentId, before = ord(kidsOf(op)).map((k) => k.id), sib = ord(kidsOf(np.id)).filter((k) => k.id !== id);
+  let idx = sib.length;
+  if (tgt.ref) { const ri = sib.findIndex((k) => k.id === tgt.ref); idx = ri < 0 ? sib.length : (tgt.pos === 'before' ? ri : ri + 1); }
+  else if (np.id === op) idx = 0;
+  if (np.id === op && sib.slice(0, idx).concat([t], sib.slice(idx)).map((k) => k.id).join() === before.join()) return;   // 順序が変わらない
+  commit(() => {
+    if (np.id !== op) { t.parentId = np.id; t.laneId = np.laneId; ui.open.add(np.id); }
+    const list = sib.slice(); list.splice(idx, 0, t);
+    list.forEach((k, i) => { k.seq = i; });
+  });
 }
 function moveLane(id, dir) {
   const i = plan.lanes.findIndex((l) => l.id === id), j = i + dir;
@@ -1583,7 +1617,7 @@ gantt.addEventListener('pointerdown', (e) => {
     id: t.id, mode: e.target.dataset.mode || 'move', x0: e.clientX, w: bar.parentElement.getBoundingClientRect().width,
     s0: ef.s, e0: ef.e, WD: w.WD, moved: false, before: snapshot(), pid: e.pointerId,
     pv: ui.view === 'person', srcMember: (() => { const r = bar.closest('.gr.prow'); return r ? r.dataset.member : null; })(), dropMember: null,
-    order: plan.tasks.slice().sort((a, b) => effort(a).s - effort(b).s).map((x) => x.id),
+    order: displayOrderIds(),
     kids: ef.n ? kidsOf(t.id).map((k) => { const o = ownEffort(k); return { id: k.id, s0: o.s, e0: o.e, open: o.open }; }) : null
   };
   const was = ui.sel && ui.sel.id === t.id;
@@ -1742,7 +1776,7 @@ insp.addEventListener('click', async (e) => {
     if (n && !(await askYes('詳細予定' + n + '件も一緒に削除します。よろしいですか？（元に戻すで復元できます）'))) return;
     commit(() => removeTask(sel.id));
   }
-  else if (act === 'dup-task') { const t = taskById(sel.id); const n = { ...t, id: uid(), name: t.name + '（コピー）', assignees: (t.assignees || []).slice() }; commit(() => { plan.tasks.push(n); selectTask(n.id); }); }
+  else if (act === 'dup-task') { const t = taskById(sel.id); const n = { ...t, id: uid(), name: t.name + '（コピー）', assignees: (t.assignees || []).slice() }; if (n.parentId && n.seq != null) n.seq = Math.max(...kidsOf(n.parentId).map((x) => (x.seq == null ? 0 : x.seq))) + 1; commit(() => { plan.tasks.push(n); selectTask(n.id); }); }
   else if (act === 'add-detail') addDetail(a.dataset.id);
   else if (act === 'sel-parent') { const t = taskById(sel.id); if (t && t.parentId) { selectTask(t.parentId); renderAll(); } }
   else if (act === 'sel-kid') { selectTask(a.dataset.id); ui.open.add(taskById(a.dataset.id).parentId); renderAll(); }
@@ -1827,7 +1861,7 @@ function askChoice(title, msg, buttons) {
     dlg.returnValue = ''; dlg.showModal();
   });
 }
-const CSV_HEAD = ['取引先等', '区分', '予定', '詳細予定', '開始', '終了', '暦日数', '稼働日数', '工数合計(人日)', '1日あたり(人日/日)', '入力単位', '入力値', '投入人数', '担当者', '過不足(人日)', '期間の目安', 'メモ'];
+const CSV_HEAD = ['取引先等', '区分', '予定', '詳細予定', '開始', '終了', '暦日数', '稼働日数', '工数合計(人日)', '1日あたり(人日/日)', '入力単位', '入力値', '投入人数', '担当者', '過不足(人日)', '期間の目安', 'メモ', '順'];
 function buildCsv() {
   const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   const rows = [CSV_HEAD];
@@ -1835,7 +1869,7 @@ function buildCsv() {
   const line = (l, kind, name, sub, t, ef) => {
     const b = basisOf(t);
     rows.push([l.name, kind, name, sub, isoAt(ef.s), ef.open ? '継続' : isoAt(ef.e), ef.days, ef.wd, r2(ef.pd), ef.per == null ? '' : r3(ef.per),
-      ef.sum ? '' : BASIS_LBL[b], ef.sum ? '' : r3(t[BASIS_KEY[b]]), r2(ef.people), ef.sum ? '' : who(t), r2(ef.diff), durTxt(ef), t.note]);
+      ef.sum ? '' : BASIS_LBL[b], ef.sum ? '' : r3(t[BASIS_KEY[b]]), r2(ef.people), ef.sum ? '' : who(t), r2(ef.diff), durTxt(ef), t.note, (t.parentId && t.seq != null) ? t.seq : '']);
   };
   plan.lanes.forEach((l) => ord(plan.tasks.filter((t) => t.laneId === l.id && !t.parentId)).forEach((t) => {
     const ef = effort(t); line(l, ef.n ? (t.ongoing ? '予定（詳細あり・終了なし）' : '予定（詳細あり）') : (t.ongoing ? '予定（終了なし）' : '予定'), t.name, '', t, ef);
@@ -1878,7 +1912,7 @@ function csvToPlan(rows, fy) {
   const hi = rows.findIndex((r) => r.some((c) => c.trim() === '予定'));
   if (hi < 0) throw new Error('見出し行（「予定」「開始」など）が見つかりません。書き出したCSVと同じ見出しにしてください。');
   const hd = rows[hi].map((c) => c.trim()), col = (n) => hd.indexOf(n);
-  const ci = { lane: col('取引先等'), kind: col('区分'), name: col('予定'), sub: col('詳細予定'), start: col('開始'), end: col('終了'), pd: col('工数合計(人日)'), per: col('1日あたり(人日/日)'), unit: col('入力単位'), val: col('入力値'), ppl: col('投入人数'), asg: col('担当者'), note: col('メモ') };
+  const ci = { lane: col('取引先等'), kind: col('区分'), name: col('予定'), sub: col('詳細予定'), start: col('開始'), end: col('終了'), pd: col('工数合計(人日)'), per: col('1日あたり(人日/日)'), unit: col('入力単位'), val: col('入力値'), ppl: col('投入人数'), asg: col('担当者'), note: col('メモ'), seq: col('順') };
   if (ci.start < 0) throw new Error('「開始」の列が必要です。');
   const out = { fy, name: plan.name, lanes: [], members: [], tasks: [], decisions: [], todos: [], settings: plan.settings, _warn: 0 };
   const g = (r, k) => (k >= 0 && r[k] != null ? String(r[k]).trim() : '');
@@ -1901,7 +1935,7 @@ function csvToPlan(rows, fy) {
       id: uid(), name: det ? (g(r, ci.sub) || '詳細') : nameCol, laneId: lid, parentId: '', start: sd, end: ed,
       pd: basis === 'total' ? (isNaN(val) ? (isNaN(pdc) ? 0 : pdc) : val) : (isNaN(pdc) ? 0 : pdc),
       ongoing: open, rate, mrate: basis === 'month' ? (isNaN(val) ? 20 : val) : rate * PD_PER_PM, basis,
-      people: isNaN(pp) ? 1 : pp, assignees: g(r, ci.asg).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: g(r, ci.note)
+      people: isNaN(pp) ? 1 : pp, assignees: g(r, ci.asg).split(/[・,、;；]/).map((x) => x.trim()).filter(Boolean).map(memberId), note: g(r, ci.note), seq: (det && g(r, ci.seq) !== '' && isFinite(parseFloat(g(r, ci.seq)))) ? parseFloat(g(r, ci.seq)) : null
     };
     if (det) { const par = mkParent(lid, nameCol, sd, ed, false, true); if (par._auto) { if (sd < par.start) par.start = sd; if (ed > par.end) par.end = ed; } t.parentId = par.id; }
     out.tasks.push(t);
