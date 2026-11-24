@@ -144,7 +144,7 @@ aside{flex:0 0 var(--aside-w);min-width:0;display:flex;flex-direction:column;gap
 .gr.foot{height:84px;border-bottom:0}
 .gr.task.sel .lc,.gr.detail.sel .lc{box-shadow:inset 4px 0 0 var(--accent)}
 .gr.task .lc{padding-left:34px}
-.gr.detail .lc{padding-left:60px}
+.gr.detail .lc{padding-left:40px}
 .lrow{display:flex;align-items:center;gap:2px;max-width:100%}
 .lgrip{width:28px;height:30px;padding:0;border:0;background:transparent;color:var(--faint);border-radius:6px;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .lgrip:hover{background:var(--chip);color:var(--ink)}
@@ -159,11 +159,23 @@ aside{flex:0 0 var(--aside-w);min-width:0;display:flex;flex-direction:column;gap
 .tname{flex:1;min-width:0;border:0;background:transparent;padding:0;text-align:left;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gr.detail .tname{font-weight:400;font-size:12px}
 .dm{flex:0 0 auto;width:10px;height:10px;border-radius:3px;background:var(--dsel)}
+.dgrip{flex:0 0 auto;width:18px;height:26px;padding:0;border:0;background:transparent;color:var(--faint);border-radius:5px;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center}
+.dgrip:hover{background:var(--chip);color:var(--ink)}
+.dgrip svg{width:10px;height:14px}
+.gr.drop{outline:2px solid var(--accent);outline-offset:-2px;background:var(--soft)}
 .pc,.chipd,.chipo{flex:0 0 auto;border-radius:10px;padding:0 6px;font-size:11px;white-space:nowrap;line-height:18px}
 .pc{background:var(--chip);color:var(--ink);font-weight:700}
 .chipd{background:var(--dbar);color:var(--dbar-ink)}
 .chipo{background:var(--soft);color:var(--soft-ink)}
 .gr.add.thin{height:24px}
+.gr.notice{height:58px}
+.gr.notice .lc{padding-left:60px}
+.nl{font-size:11px;color:var(--muted)}
+.nb{position:absolute;left:12px;top:12px;max-width:calc(100% - 24px);padding:6px 12px;border-radius:10px;border:1.5px solid;font-size:12px;line-height:1.5;font-weight:700;background:var(--nbb);color:var(--nbi);border-color:var(--nbc);z-index:2}
+.nb::before{content:"";position:absolute;left:var(--tl,26px);top:-7px;width:10px;height:10px;transform:rotate(45deg);border-left:1.5px solid var(--nbc);border-top:1.5px solid var(--nbc);background:var(--nbb)}
+.nb.over{--nbc:var(--red);--nbi:var(--red-ink);--nbb:color-mix(in srgb,var(--red) 10%,var(--surface))}
+.nb.short{--nbc:var(--short-fill);--nbi:var(--short);--nbb:color-mix(in srgb,var(--short-fill) 14%,var(--surface))}
+.nb.ok{--nbc:var(--ok);--nbi:var(--ok);--nbb:color-mix(in srgb,var(--ok-fill) 22%,var(--surface))}
 .gr.add.thin .hint{top:3px}
 .gr.add .hint{position:absolute;top:7px;left:10px;font-size:12px;color:var(--faint);opacity:0;transition:opacity .15s}
 .gr.add:hover .hint{opacity:1}
@@ -377,7 +389,7 @@ dialog p{margin:0 0 14px;font-size:14px;white-space:pre-line}
       <div class="gwrap"><div class="gantt" id="gantt"></div></div>
       <div class="hct" id="hcTable" hidden></div>
     </section>
-    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
+    <p class="hint-line" style="margin:0">取引先等の左端の「⠿」をドラッグ（または選んで ↑↓ キー）で並べ替え。予定の「▸」で詳細予定を開閉。詳細予定の「⠿」を別の予定の行へドラッグすると、その予定の詳細予定に移せます（右パネルの「親の予定」でも変えられます）。バーは、つかんで移動・両端で期間変更（工数は変わらず、1日あたりの工数が変わります）。行の空いたところをダブルクリックで追加。選んだバーは ← → で1日ずつ動き、Shift＋← → で長さが変わります。Delete で削除。「要員別」タブでは、予定の担当者に設定した名前ごとに並べ替えて表示します。終わりのない予定は、行の空きをShiftを押しながらダブルクリックで追加するか、予定を選んで「終了なし（継続）」に切り替えます。必要工数は、予定を選んで「人日（合計）／人日/日／人日/月」から入力単位を選んで入力します。</p>
   </div>
   <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="右パネルの幅（ドラッグ、または左右キーで変更。ダブルクリックで初期値）" tabindex="0" aria-valuemin="260" aria-valuemax="760" aria-valuenow="340"></div>
   <aside id="aside">
@@ -592,15 +604,19 @@ function effort(t) {
   o.n = ks.length; o.kidPd = ks.reduce((a, k) => a + ownEffort(k).pd, 0);
   return o;
 }
-function kidIssues(k, p) {
-  const msgs = [], pe = ownEffort(p), o = ownEffort(k);
-  if (o.s < pe.s || (!pe.open && (o.open || o.e > pe.e))) msgs.push('詳細「' + k.name + '」（' + md(o.s) + '〜' + (o.open ? '継続' : md(o.e)) + '）が予定「' + p.name + '」の期間（' + md(pe.s) + '〜' + (pe.open ? '継続' : md(pe.e)) + '）の外にあります');
-  return msgs;
+function kidIssues(k, p) { return []; }
+function balanceOf(ef) {
+  const rem = ef.pd - ef.kidPd;
+  return rem < -0.05 ? { k: 'over', rem: -rem } : rem > 0.05 ? { k: 'short', rem } : { k: 'ok', rem: 0 };
+}
+function balanceText(ef) {
+  const b = balanceOf(ef), head = '詳細の合計 ' + fmtU(ef.kidPd) + ' ／ 予定 ' + fmtU(ef.pd);
+  return b.k === 'over' ? '⚠ ' + head + '（' + fmtU(b.rem) + ' 超過）'
+    : b.k === 'short' ? head + '（' + fmtU(b.rem) + ' 不足＝詳細にしていない分）' : '✓ ' + head + '（過不足なし）';
 }
 function detailIssues(t, ef) {
   const msgs = [];
   if (ef.kidPd > ef.pd + 0.05) msgs.push('詳細予定の工数合計（' + fmtU(ef.kidPd) + '）が予定の工数（' + fmtU(ef.pd) + '）を超えています（超過 ' + fmtU(ef.kidPd - ef.pd) + '）');
-  kidsOf(t.id).forEach((k) => { kidIssues(k, t).forEach((m) => msgs.push(m)); });
   return msgs;
 }
 function allWarnings() {
@@ -637,16 +653,14 @@ function headcount(laneIds) {
 function personItems() {
   const items = [];
   topTasks().forEach((t) => {
-    const ks = kidsOf(t.id), dp = demandOf(t);
-    if (!ks.length) { items.push({ t, d: dp, asg: t.assignees }); return; }
-    const kd = ks.map((k) => ({ k, d: demandOf(k) }));
-    kd.forEach(({ k, d }) => items.push({ t: k, d, asg: k.assignees }));
-    const arr = new Array(dp.e - dp.s + 1).fill(0); let any = false;
-    for (let i = dp.s; i <= dp.e; i++) {
-      let used = 0; kd.forEach(({ d }) => { if (i >= d.s && i <= d.e) used += d.arr[i - d.s]; });
-      const r = Math.max(0, dp.arr[i - dp.s] - used); arr[i - dp.s] = r; if (r > 1e-6) any = true;
+    const ks = kidsOf(t.id);
+    if (ks.some((k) => k.assignees.length)) {
+      // 担当者を割り当てた詳細予定がある → 予定ではなく、詳細予定を表示する（担当者のない詳細は「未割当」に出る）
+      ks.forEach((k) => items.push({ t: k, d: demandOf(k), asg: k.assignees }));
+    } else {
+      // 詳細予定に担当者がなければ、予定そのものを表示する
+      items.push({ t, d: demandOf(t), asg: t.assignees });
     }
-    if (any) items.push({ t, d: { s: dp.s, e: dp.e, wd: dp.wd, arr }, asg: t.assignees, remainder: true });
   });
   return items;
 }
@@ -858,7 +872,7 @@ function taskRowHtml(t, ef, o) {
   const vs = Math.max(ef.s, w.W0), ve = Math.min(ef.e + 1, w.W1), vis = ve > vs;
   const open = ui.open.has(t.id);
   let h = '<div class="gr ' + (det ? 'detail' : 'task') + (sel ? ' sel' : '') + '" data-id="' + esc(t.id) + '"><div class="lc">';
-  if (det) h += '<span class="dm" aria-hidden="true"></span>';
+  if (det) h += '<button class="dgrip" data-id="' + esc(t.id) + '" aria-label="' + esc(t.name) + 'を別の予定へ移動（ドラッグ）" title="ドラッグして、別の予定の詳細予定に移します">' + GRIP + '</button><span class="dm" aria-hidden="true"></span>';
   else h += '<button class="tg" data-act="toggle" data-id="' + esc(t.id) + '" aria-expanded="' + open + '" aria-label="' + esc(t.name) + 'の詳細予定を' + (open ? '閉じる' : '開く') + '"><span class="car' + (open ? ' open' : '') + '">▸</span></button>';
   h += '<button class="tname" data-act="sel-task" data-id="' + esc(t.id) + '" title="' + esc(t.name) + '">' + esc(t.name) + '</button>';
   if (!det && ef.n) h += '<span class="chipd">詳細' + ef.n + '</span>';
@@ -872,7 +886,7 @@ function taskRowHtml(t, ef, o) {
       + '<span class="h s" data-mode="start"></span>'
       + (nos.length ? '<span class="badge">' + nos.join(',') + '</span>' : '')
       + '<span class="lbl">' + (ef.s < w.W0 ? '<span>◀</span>' : '') + pbadge(ef.people) + '<b>' + esc(labelOf(t, ef)) + '</b>' + durPill(ef)
-      + (short ? '<span class="ov">不足' + fmtU(amt) + '</span>' : '')
+      + (short && !det ? '<span class="ov">不足' + fmtU(amt) + '</span>' : '')
       + (iss.length ? '<span class="ov" title="' + esc(iss.join('\n')) + '">⚠ ' + (det ? '予定の期間外' : '詳細が超過') + '</span>' : '')
       + (ef.e + 1 > w.W1 || ef.open ? '<span>▶</span>' : '') + '</span>'
       + (ef.open ? '' : '<span class="h e" data-mode="end"></span>') + '</button>';
@@ -923,6 +937,14 @@ function renderGantt() {
     tops.forEach((t) => {
       h += taskRowHtml(t, effort(t), { w, pct });
       if (ui.open.has(t.id)) {
+        const ef0 = effort(t);
+        if (ef0.n) {
+          const b = balanceOf(ef0);
+          if (b.k !== 'ok') {
+            const bx = ef0.e < w.W0 || ef0.s >= w.W1 ? 0 : (Math.max(ef0.s, w.W0) - w.W0) / w.WD;
+            h += '<div class="gr notice"><div class="lc"><span class="nl">詳細予定の工数</span></div><div class="tr"><div class="nb ' + b.k + '" role="status" data-bx="' + bx + '">' + esc(balanceText(ef0)) + '</div></div></div>';
+          }
+        }
         ord(kidsOf(t.id)).forEach((k) => { h += taskRowHtml(k, ownEffort(k), { w, pct }); });
         h += '<div class="gr add" data-lane="' + esc(l.id) + '" data-parent="' + esc(t.id) + '"><div class="lc d"><button class="btn sm" data-act="add-detail" data-id="' + esc(t.id) + '">＋ 詳細予定を追加</button></div><div class="tr"><span class="hint">ダブルクリックで詳細予定を追加</span></div></div>';
       }
@@ -1043,6 +1065,16 @@ function fitLabels() {
     const trr = tr.getBoundingClientRect(); if (!trr.width) return;
     if (lbl.getBoundingClientRect().right > trr.right - 2) bar.classList.add('rev');
   });
+  fitNotices();
+}
+function fitNotices() {
+  document.querySelectorAll('#gantt .gr.notice').forEach((row) => {
+    const tr = row.querySelector('.tr'), nb = row.querySelector('.nb'); if (!tr || !nb) return;
+    const W = tr.getBoundingClientRect().width, bw = nb.getBoundingClientRect().width; if (!W || !bw) return;
+    const bx = Number(nb.dataset.bx) || 0, left = clamp(bx * W - 8, 8, Math.max(8, W - bw - 8));
+    nb.style.left = left + 'px';
+    nb.style.setProperty('--tl', clamp(bx * W + 18 - left, 14, Math.max(14, bw - 24)) + 'px');   // 矢印は、予定バーの左端の少し内側を指す
+  });
 }
 function taskMonthly(t) {
   const c = C(), dem = new Array(12).fill(0), list = [t];
@@ -1076,7 +1108,7 @@ function detailCheckHtml(t, ef) {
   const rem = ef.pd - ef.kidPd, msgs = detailIssues(t, ef);
   let h = '<div class="sumbox" id="chkBox"><span style="font-size:13px">詳細予定（' + ef.n + '件）は、この予定を細分化したものです。詳細の工数は予定には足しません。</span><dl class="kv">'
     + '<dt>予定の工数</dt><dd>' + fmtU(ef.pd) + '</dd><dt>詳細の工数合計</dt><dd>' + fmtU(ef.kidPd) + '</dd>'
-    + '<dt>' + (rem < -0.05 ? '超過' : '詳細にしていない残り') + '</dt><dd style="color:var(' + (rem < -0.05 ? '--short' : '--ok') + ')">' + fmtU(Math.abs(rem)) + '</dd></dl>';
+    + '<dt>' + (rem < -0.05 ? '超過' : rem > 0.05 ? '不足（詳細にしていない分）' : '過不足') + '</dt><dd style="color:var(' + (rem < -0.05 ? '--red-ink' : rem > 0.05 ? '--short' : '--ok') + ')">' + (Math.abs(rem) <= 0.05 ? 'なし' : fmtU(Math.abs(rem))) + '</dd></dl>';
   msgs.forEach((m) => { h += '<span style="font-size:13px;color:var(--short)">⚠ ' + esc(m) + '</span>'; });
   h += '<div class="sublist" aria-label="詳細予定">';
   ord(kidsOf(t.id)).forEach((k) => { const ke = ownEffort(k); h += '<button data-act="sel-kid" data-id="' + esc(k.id) + '">' + esc(k.name) + '<span>' + md(ke.s) + '〜' + (k.ongoing ? '継続' : md(ke.e)) + '・' + labelOf(k, ke) + '</span></button>'; });
@@ -1085,9 +1117,16 @@ function detailCheckHtml(t, ef) {
 function parentCheckHtml(k, p) {
   const pe = effort(p), rem = pe.pd - pe.kidPd, msgs = kidIssues(k, p);
   if (pe.kidPd > pe.pd + 0.05) msgs.unshift('詳細予定の工数合計（' + fmtU(pe.kidPd) + '）が予定「' + p.name + '」の工数（' + fmtU(pe.pd) + '）を超えています');
-  let h = '<div class="sumbox" id="chkBox"><span style="font-size:13px">予定「' + esc(p.name) + '」の工数 ' + fmtU(pe.pd) + ' のうち、詳細の合計は ' + fmtU(pe.kidPd) + '（' + (rem >= -0.05 ? '残り ' + fmtU(Math.max(0, rem)) : '超過 ' + fmtU(-rem)) + '）</span>';
+  let h = '<div class="sumbox" id="chkBox"><span style="font-size:13px">予定「' + esc(p.name) + '」の工数 ' + fmtU(pe.pd) + ' のうち、詳細の合計は ' + fmtU(pe.kidPd) + '（' + (rem < -0.05 ? '超過 ' + fmtU(-rem) : rem > 0.05 ? '不足 ' + fmtU(rem) : '過不足なし') + '）</span>';
   msgs.forEach((m) => { h += '<span style="font-size:13px;color:var(--short)">⚠ ' + esc(m) + '</span>'; });
   return h + '</div>';
+}
+function parentSelectHtml(t) {
+  const det = !!t.parentId;
+  if (!det && kidsOf(t.id).length) return '';
+  let o = '<option value="">' + (det ? '（独立した予定にする）' : '（変更しない）') + '</option>';
+  topTasks().filter((x) => x.id !== t.id).forEach((x) => { o += '<option value="' + esc(x.id) + '"' + (x.id === t.parentId ? ' selected' : '') + '>' + esc(((laneById(x.laneId) || {}).name || '') + '／' + x.name) + '</option>'; });
+  return '<label class="fld">' + (det ? '親の予定（変えると、その予定の詳細予定に移ります）' : '他の予定の詳細予定にする') + '<select data-f="parent">' + o + '</select></label>';
 }
 function asgNote(t) {
   if (!Array.isArray(t.assignees)) t.assignees = [];
@@ -1113,6 +1152,7 @@ function renderInspector() {
     let h = '<div class="insp">';
     if (det) h += '<div class="muted">詳細予定（親：<button class="lnk" data-act="sel-parent">' + esc(parent ? parent.name : '') + '</button>）</div>';
     h += '<label class="fld">' + (det ? '詳細予定名' : '予定名') + '<input type="text" data-f="name" value="' + esc(t.name) + '"></label>';
+    h += parentSelectHtml(t);
     if (!det) {
       let opts = ''; plan.lanes.forEach((l) => { opts += '<option value="' + esc(l.id) + '"' + (l.id === t.laneId ? ' selected' : '') + '>' + esc(l.name) + '</option>'; });
       h += '<label class="fld">取引先等<select data-f="laneId">' + opts + '</select></label>';
@@ -1255,6 +1295,45 @@ function addAsg() {
     const t = taskById(id); if (t && !t.assignees.includes(m.id)) t.assignees.push(m.id);
   });
   const again = $('#asgNew'); if (again) again.focus();
+}
+function reparentTask(id, newParentId) {
+  const t = taskById(id); if (!t) return;
+  commit(() => {
+    if (!newParentId) { t.parentId = ''; return; }                                  // 独立した予定にする（取引先等はそのまま）
+    const p = taskById(newParentId);
+    if (!p || p.id === t.id || p.parentId || kidsOf(t.id).length) return;           // 詳細予定の下には詳細予定を作れない
+    t.parentId = p.id; t.laneId = p.laneId; ui.open.add(p.id);
+  });
+}
+let rdrag = null;
+function startReparent(grip, e) {
+  const id = grip.dataset.id; if (!taskById(id)) return;
+  rdrag = { id, pid: e.pointerId, target: '', moved: false, y0: e.clientY };
+  document.body.classList.add('reordering');
+  selectTask(id); renderInspector();
+}
+function reparentTargetAt(x, y) {
+  const el = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+  const row = el && el.closest ? el.closest('.gr.task, .gr.detail') : null;
+  const t = row ? taskById(row.dataset.id) : null;
+  return t ? (t.parentId || t.id) : '';
+}
+function moveReparent(e) {
+  const d = rdrag; if (!d.moved && Math.abs(e.clientY - d.y0) < 4) return;
+  d.moved = true;
+  const tgt = reparentTargetAt(e.clientX, e.clientY);
+  if (tgt === d.target) return;
+  d.target = tgt;
+  document.querySelectorAll('#gantt .gr.drop').forEach((x) => x.classList.remove('drop'));
+  const t = taskById(d.id);
+  if (tgt && t && tgt !== t.parentId) { const row = document.querySelector('#gantt .gr.task[data-id="' + CSS.escape(tgt) + '"]'); if (row) row.classList.add('drop'); }
+}
+function endReparent(cancel) {
+  const d = rdrag; if (!d) return; rdrag = null;
+  document.body.classList.remove('reordering');
+  document.querySelectorAll('#gantt .gr.drop').forEach((x) => x.classList.remove('drop'));
+  const t = taskById(d.id);
+  if (!cancel && d.moved && d.target && t && d.target !== t.parentId) reparentTask(d.id, d.target);
 }
 function moveLane(id, dir) {
   const i = plan.lanes.findIndex((l) => l.id === id), j = i + dir;
@@ -1429,6 +1508,8 @@ gantt.addEventListener('pointerdown', (e) => {
   if (e.button > 0) return;
   const grip = e.target.closest('.lgrip');
   if (grip) { e.preventDefault(); startLaneDrag(grip, e); return; }
+  const dgrip = e.target.closest('.dgrip');
+  if (dgrip) { e.preventDefault(); startReparent(dgrip, e); return; }
   const bar = e.target.closest('.bar'); if (!bar) return;
   const t = taskById(bar.dataset.id); if (!t) return;
   e.preventDefault();
@@ -1446,6 +1527,7 @@ gantt.addEventListener('pointerdown', (e) => {
 });
 window.addEventListener('pointermove', (e) => {
   if (ldrag) { if (e.pointerId === ldrag.pid) moveLaneDrag(e); return; }
+  if (rdrag) { if (e.pointerId === rdrag.pid) moveReparent(e); return; }
   if (!drag || e.pointerId !== drag.pid) return;
   const dx = e.clientX - drag.x0;
   if (!drag.moved && Math.abs(dx) < 4) return;
@@ -1477,6 +1559,7 @@ window.addEventListener('pointermove', (e) => {
   if (dirty) { renderGantt(); renderOverview(); renderHeader(); renderInspector(); renderHcTable(); }
 });
 function endDrag(e) {
+  if (rdrag && (!e || e.pointerId === rdrag.pid)) { endReparent(false); return; }
   if (ldrag && (!e || e.pointerId === ldrag.pid)) { endLaneDrag(false); return; }
   if (!drag || (e && e.pointerId !== drag.pid)) return;
   const d = drag; drag = null;
@@ -1486,7 +1569,7 @@ function endDrag(e) {
 }
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('resize', () => fitLabels());
-window.addEventListener('pointercancel', (e) => { if (ldrag) endLaneDrag(true); else endDrag(e); });
+window.addEventListener('pointercancel', (e) => { if (rdrag) endReparent(true); else if (ldrag) endLaneDrag(true); else endDrag(e); });
 gantt.addEventListener('keydown', (e) => {
   const g = e.target.closest('.lgrip');
   if (g) { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); moveLane(g.dataset.lane, e.key === 'ArrowUp' ? -1 : 1); } return; }
@@ -1534,6 +1617,7 @@ insp.addEventListener('input', (e) => {
 insp.addEventListener('change', (e) => {
   const f = e.target.dataset.f, ps = e.target.dataset.ps, asg = e.target.dataset.asg;
   if (asg) { commit(() => { const t = taskById(ui.sel.id), i = t.assignees.indexOf(asg); if (i >= 0) t.assignees.splice(i, 1); else t.assignees.push(asg); }); return; }
+  if (f === 'parent') { const t0 = taskById(ui.sel.id), v = e.target.value; if (t0 && (v || t0.parentId) && v !== t0.parentId) reparentTask(t0.id, v); else renderInspector(); return; }
   if (f === 'laneId') { commit(() => { const t = taskById(ui.sel.id); t.laneId = e.target.value; kidsOf(t.id).forEach((k) => { k.laneId = e.target.value; }); }); return; }
   if (f === 'start' || f === 'end') {
     const t = taskById(ui.sel.id); const v = e.target.value; if (!v) { renderInspector(); return; }
@@ -1623,6 +1707,7 @@ mins.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposin
 
 /* global keys */
 document.addEventListener('keydown', async (e) => {
+  if (e.key === 'Escape' && rdrag) { endReparent(true); return; }
   if (e.key === 'Escape' && ldrag) { endLaneDrag(true); return; }
   if (isTyping()) return;
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
