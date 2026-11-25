@@ -5,7 +5,10 @@ const LIB_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.co
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.add('./secure-memo.html')).catch(() => {}));
+  e.waitUntil(caches.open(CACHE).then(async c => {
+    await c.add('../shared/devicelink.js').catch(() => {});   // 受け渡しの共通部品
+    await c.add('./secure-memo.html').catch(() => {});
+  }));
 });
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
@@ -26,6 +29,20 @@ self.addEventListener('fetch', e => {
         return r;
       }catch{
         return (await caches.match('./secure-memo.html')) || Response.error();
+      }
+    })());
+    return;
+  }
+  // 受け渡しの共通部品（shared/devicelink.js）：まずネットから取り、つながらないときは保存しておいた版を使う
+  if (u.origin === location.origin && /\/shared\/devicelink\.js$/.test(u.pathname)){
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
+      try{
+        const r = await fetch(req, { cache:'no-store' });
+        if (r.ok) c.put(req, r.clone());
+        return r;
+      }catch{
+        return (await c.match(req)) || (await c.match('../shared/devicelink.js')) || Response.error();
       }
     })());
     return;
