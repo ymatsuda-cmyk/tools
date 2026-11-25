@@ -82,6 +82,21 @@ function setFs(i) {
 // 開き方：auto（この端末の控え）／typed（入力）／bio（Face ID）／recv（他の端末から受け取り）／change（設定で変更）
 const DL_APP = 'minutestock'
 const DL = () => window.DeviceLink
+// index.html の <script> が古いキャッシュで読まれていないときに備えて、ここからも読み込む
+let dlLoading = null
+function ensureDL() {
+  if (window.DeviceLink) return Promise.resolve(window.DeviceLink)
+  if (!dlLoading) {
+    dlLoading = new Promise((resolve) => {
+      const el = document.createElement('script')
+      el.src = new URL('../common/devicelink.js', location.href).href
+      el.onload = () => resolve(window.DeviceLink || null)
+      el.onerror = () => { dlLoading = null; resolve(null) }
+      document.head.append(el)
+    })
+  }
+  return dlLoading
+}
 const DL_MISSING = '受け渡しの部品（common/devicelink.js）を読み込めませんでした。オンラインで開き直してください。'
 const LOCKED = 'm2.locked'   // 鍵をかけたあとは、このタブを閉じるまで自動で開かない
 
@@ -132,7 +147,7 @@ function showReceive(pkg = null, msg = '') {
   $('#recvForm').addEventListener('submit', async (e) => {
     e.preventDefault()
     const m = $('#gateMsg')
-    const dl = DL()
+    const dl = await ensureDL()
     if (!dl) { m.textContent = DL_MISSING; return }
     $$('#gate button').forEach((b) => { b.disabled = true })
     let got = pkg
@@ -230,6 +245,7 @@ function askBio() {
 /** 起動：リンク・QR で開かれたら受け取り、控えがあれば自動で開く */
 async function boot() {
   let pkg = null
+  if (/^#dl=/.test(location.hash)) await ensureDL()
   try { pkg = DL()?.fromURL(DL_APP) || null } catch (e) {
     showGate(e.message === 'DeviceLink の形式ではありません' ? 'リンクを読み取れませんでした。渡す端末でもう一度コピーし直してください。' : e.message)
     return
@@ -334,12 +350,15 @@ const normPass = (v) => { const s = String(v || '').toUpperCase().replace(/[^A-Z
 let dlPanel = null
 let dlShare = null   // { pass, pkg } 設定画面を開いている間だけ同じパスフレーズを使う
 
-function mountShare() {
+async function mountShare() {
   dlPanel?.destroy(); dlPanel = null
-  const el = $('#devLink')
+  let el = $('#devLink')
   if (!el) return
-  const dl = DL()
+  const dl = await ensureDL()
+  el = $('#devLink')   // 読み込みを待つ間に設定を閉じたり開き直したりしたとき
+  if (!el || el.dataset.mounted) return
   if (!dl) { el.innerHTML = `<p class="msg">${esc(DL_MISSING)}</p>`; return }
+  el.dataset.mounted = '1'
   dlShare = { pass: newPass(), pkg: null }
   dlPanel = dl.panel(el, {
     app: DL_APP,
