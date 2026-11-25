@@ -13,21 +13,30 @@
  */
 
 /**
- * ファイル名を直接指定しないこと。
+ * 読み込み先は、まずこのフォルダの vendor/（版を固定してリポジトリに置いたもの）。
+ * 外部のスクリプトを許さないアプリ（MinuteStock など CSP で script-src 'self' のもの）でも描けるようにするため。
+ * vendor/ が無いときだけ CDN を使う。
+ *
+ * CDN 側はファイル名を直接指定しないこと。
  * ブラウザ向けの実体は markmap-view が dist/browser/index.js なのに対し、
  * markmap-lib は dist/browser/index.iife.js と名前が違う。
  * パッケージ名だけを指定すれば、CDNが package.json の jsdelivr フィールドを見て
  * 正しいファイルを返す。読み込み順も lib(Transformer) -> view(Markmap) から変えない。
+ *
+ * vendor/ の版を上げるときは、公開から2週間以上たった版にし、ファイル名の版も変える（古いキャッシュを使わせないため）。
  */
+const VENDOR = new URL('./vendor/', import.meta.url).href
 const CDN = [
-  { url: 'https://cdn.jsdelivr.net/npm/d3@7', check: () => Boolean(window.d3), name: 'd3' },
+  { local: VENDOR + 'd3-7.9.0.min.js', url: 'https://cdn.jsdelivr.net/npm/d3@7.9.0', check: () => Boolean(window.d3), name: 'd3' },
   {
-    url: 'https://cdn.jsdelivr.net/npm/markmap-lib@0.18',
+    local: VENDOR + 'markmap-lib-0.18.12.js',
+    url: 'https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12',
     check: () => Boolean(window.markmap?.Transformer),
     name: 'markmap-lib',
   },
   {
-    url: 'https://cdn.jsdelivr.net/npm/markmap-view@0.18',
+    local: VENDOR + 'markmap-view-0.18.12.js',
+    url: 'https://cdn.jsdelivr.net/npm/markmap-view@0.18.12',
     check: () => Boolean(window.markmap?.Markmap),
     name: 'markmap-view',
   },
@@ -53,8 +62,10 @@ function loadMarkmap() {
   if (!loading) {
     loading = (async () => {
       for (const dep of CDN) {
-        await loadScript(dep.url)
-        if (!dep.check()) throw new Error(`${dep.name} を読み込めませんでした (${dep.url})`)
+        if (dep.check()) continue
+        try { await loadScript(dep.local) } catch { /* vendor/ が無ければ CDN へ */ }
+        if (!dep.check()) await loadScript(dep.url)
+        if (!dep.check()) throw new Error(`${dep.name} を読み込めませんでした (${dep.local})`)
       }
       return window.markmap
     })().catch((err) => {

@@ -12,7 +12,8 @@ import { groupMarks, marksOf, validFor, renderMarked, applyRange, recolor, recon
 import { todoKey, doneOf, logsOf, mergeTodos } from './todos.js'
 import { draftFromSummary, editorHTML, readDraft, summaryFromDraft, blank, trToText, textToSegments } from './edit.js'
 import { initScrollHide } from './scrollhide.js'
-import { mindmapTree, renderTree } from './mindmap.js'
+import { mindmapMarkdown } from './mindmap.js'
+import { renderMindmap, isLegacyHtml } from '../../api/mindmap2/mindmap2.js'
 
 /* ---------- 小物 ---------- */
 const $ = (s, el = document) => el.querySelector(s)
@@ -41,13 +42,14 @@ const ST = {
   tw: { l: '文字起こし待ち', c: 'st-tw' }, tr: { l: '文字起こし中', c: 'st-tr' },
   sw: { l: '要約待ち', c: 'st-sw' }, ok: { l: '要約済み', c: 'st-ok' }, err: { l: '失敗', c: 'st-err' },
 }
+const USERS_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.2A4.6 4.6 0 0 1 21 19"/></svg>'
 const LOCK_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
 
 /* ---------- 状態 ---------- */
 const S = {
   code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null,
   session: null, exp: 0, pub: {}, raw: [], items: [], byId: new Map(), worker: null, sig: '', syncedAt: 0, syncErr: '',
-  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', q: '', sel: null, dtab: 'sum',
+  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', favOnly: false, scope: 'all', tagOpen: null, q: '', sel: null, dtab: 'sum',
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
@@ -537,6 +539,7 @@ function renderMain(reset = false, noSheet = false) {
   }
   applyDyn(m)
   if (S.tab === 'list') afterList()
+  if (S.tab === 'list' && S.sel && S.dtab === 'map') mountMap(S.byId.get(S.sel))
   if (S.tab === 'todo') kickTodo()
   if (S.tab === 'notes') kickNotes()
 }
@@ -549,6 +552,34 @@ const stChip = (it) => {
 const isNew = (it) => !it.locked && Date.now() - (it.upd || 0) < 86400000 && S.seen[it.id] !== it.upd
 
 /* ---------- 一覧 ---------- */
+// 閲覧範囲（管理者だけに見せる）：管理者のみ／ほかのグループと共有
+const roleOfGid = () => Object.fromEntries(Object.entries(S.roles || {}).map(([r, g]) => [g, r]))
+const shareGids = (it) => Object.keys(it.k || {}).filter((g) => g !== S.adminGid)
+const scopeOf = (it) => (shareGids(it).length ? 'share' : 'admin')
+const scopeNames = (it) => { const m = roleOfGid(); return shareGids(it).map((g) => m[g] || '不明なグループ') }
+/** 題名の横に置く閲覧権限のアイコン（管理者だけ）。鍵＝管理者のみ、人＝共有（グループ名つき） */
+function scopeIcon(it) {
+  if (!S.admin || it.locked) return ''
+  if (scopeOf(it) === 'admin') return `<span class="scope" title="閲覧：管理者のみ" aria-label="閲覧：管理者のみ">${LOCK_SVG}</span>`
+  const names = scopeNames(it)
+  return `<span class="scope sh" title="閲覧：${esc(names.join('・'))}" aria-label="閲覧：${esc(names.join('・'))}">${USERS_SVG}<span class="scope-n">${esc(names.join('・'))}</span></span>`
+}
+
+/** 権限の絞り込み（管理者だけ）：すべて／管理者のみ／グループごと */
+function scopeMatch(x) {
+  if (S.scope === 'all') return true
+  if (x.locked) return false
+  if (S.scope === 'admin') return scopeOf(x) === 'admin'
+  return shareGids(x).includes(S.scope)
+}
+
+function scopeSelectHTML(mi) {
+  const open = mi.filter((x) => !x.locked)
+  const groups = Object.entries(S.roles || {}).filter(([, g]) => g !== S.adminGid)
+  const opt = (v, l, n) => `<option value="${esc(v)}" ${S.scope === v ? 'selected' : ''}>${esc(l)}（${n}）</option>`
+  return `<label class="scopesel ${S.scope !== 'all' ? 'on' : ''}">${S.scope === 'admin' ? LOCK_SVG : USERS_SVG}<span class="sr">閲覧権限で絞り込み</span>
+    <select id="scopeSel">${opt('all', '権限：すべて', open.length)}${opt('admin', '管理者のみ', open.filter((x) => scopeOf(x) === 'admin').length)}${groups.map(([r, g]) => opt(g, r, open.filter((x) => shareGids(x).includes(g)).length)).join('')}</select></label>`
+}
 function monthItems() {
   return S.items.filter((x) => (x.date || '').startsWith(S.month))
 }
@@ -558,7 +589,8 @@ function filtered() {
   return monthItems().filter((x) => {
     if (S.filter === 'ok' && x.st !== 'ok') return false
     if (S.filter === 'proc' && !['tw', 'tr', 'sw', 'err'].includes(x.st)) return false
-    if (S.filter === 'fav' && !S.fav.has(x.id)) return false
+    if (S.favOnly && !S.fav.has(x.id)) return false
+    if (S.admin && !scopeMatch(x)) return false
     if (q) {
       if (x.locked) return false
       const s = cached(x, 's')
@@ -589,8 +621,10 @@ function listHTML() {
   const cards = S.view === 'cards'
   const items = filtered()
   const sel = S.sel ? S.byId.get(S.sel) : null
-  const chips = [['all', 'すべて'], ['ok', '要約済み'], ['proc', '処理中'], ['fav', '★ お気に入り']]
-    .map(([k, l]) => `<button class="fchip ${S.filter === k ? 'on' : ''}" data-act="filter" data-v="${k}" aria-pressed="${S.filter === k}">${l} ${cnt[k]}</button>`).join('')
+  // 状態はコンボボックス、お気に入りは押して切り替え（状態と組み合わせて絞り込める）
+  const chips = `<label class="scopesel ${S.filter !== 'all' ? 'on' : ''}"><span class="sr">状態で絞り込み</span><select id="stSel">${[['all', 'すべて'], ['ok', '要約済み'], ['proc', '処理中']]
+    .map(([k, l]) => `<option value="${k}" ${S.filter === k ? 'selected' : ''}>${l}（${cnt[k]}）</option>`).join('')}</select></label>`
+    + `<button class="fchip ${S.favOnly ? 'on' : ''}" data-act="favonly" aria-pressed="${S.favOnly}">★ お気に入り ${cnt.fav}</button>`
   return `
     <div class="toolbar ${sel ? 'hide-m' : ''}">
       <div class="monthnav">
@@ -598,7 +632,7 @@ function listHTML() {
         <span class="month">${Number(y)}年${Number(mo)}月</span>
         <button class="ib" data-act="month" data-d="1" aria-label="次の月">›</button>
       </div>
-      <div class="fchips">${chips}</div>
+      <div class="fchips">${chips}${S.admin ? scopeSelectHTML(mi) : ''}</div>
       <span class="grow"></span>
       <div class="seg" role="group" aria-label="表示の切り替え">
         <button data-act="view" data-v="timeline" aria-pressed="${!cards}" class="${!cards ? 'on' : ''}">タイムライン</button>
@@ -613,7 +647,7 @@ function listHTML() {
 }
 
 function emptyListHTML(any) {
-  if (any) return '<p class="empty">条件に合う議事録がありません。絞り込みを「すべて」に戻してください。</p>'
+  if (any) return '<p class="empty">条件に合う議事録がありません。絞り込み（状態・お気に入り・権限）を戻してください。</p>'
   return '<div class="empty"><p>この月の議事録はまだありません。</p><button class="btn main" data-act="upload">議事録を登録</button></div>'
 }
 
@@ -627,7 +661,7 @@ function timelineHTML(items) {
           <div class="tl-time">${hm(it.date) || '—'}</div>
           <div class="tl-rail"><span class="tl-line"></span><span class="tl-dot ${(ST[it.st] || ST.tw).c}"></span><span class="tl-line grow"></span></div>
           <button class="tl-card ${S.sel === it.id ? 'sel' : ''}" data-act="open" data-id="${it.id}">
-            <span class="tl-top"><span class="tl-title">${esc(it.title)}</span>${it.locked ? LOCK_SVG : ''}${isNew(it) ? '<span class="new">新着</span>' : ''}${stChip(it)}</span>
+            <span class="tl-top"><span class="tl-title">${esc(it.title)}</span>${scopeIcon(it)}${it.locked ? LOCK_SVG : ''}${isNew(it) ? '<span class="new">新着</span>' : ''}${stChip(it)}</span>
             <span class="tl-meta"><span class="bar ${(ST[it.st] || ST.tw).c}" data-w="${Math.round(Math.min(it.dur || 0, 7200) / 7200 * 110) + 6}"></span>${fmtDur(it.dur)}${it.tags?.length ? ' ・ ' + esc(it.tags.join('・')) : ''}</span>
           </button>
         </div>`).join('')}
@@ -650,7 +684,7 @@ function cardsHTML(items) {
       <div class="cardgrid">${list.map((it) => `
         <button class="mcard ${S.sel === it.id ? 'sel' : ''}" data-act="open" data-id="${it.id}">
           <span class="mc-top"><span class="mc-time">${hm(it.date) || '—'}</span><span class="mc-dur">${fmtDur(it.dur)}</span><span class="grow"></span>${stChip(it)}</span>
-          <span class="mc-title">${esc(it.title)}${it.locked ? LOCK_SVG : ''}${isNew(it) ? '<span class="new">新着</span>' : ''}</span>
+          <span class="mc-title">${esc(it.title)}${scopeIcon(it)}${it.locked ? LOCK_SVG : ''}${isNew(it) ? '<span class="new">新着</span>' : ''}</span>
           <span class="mc-lead">${esc(cardLead(it))}</span>
         </button>`).join('')}</div>
     </div>`
@@ -729,7 +763,72 @@ function paintDetail(reset = false) {
   if (S.edit?.focus) { el.querySelector(S.edit.focus)?.focus(); S.edit.focus = null }
   applySecJump()
   centerActiveTab()
+  if (it && S.dtab === 'map') mountMap(it)
   if (it) loadDetail(it)
+}
+
+/* ---------- タグ（よく使うタグを押して付け外し） ---------- */
+function dtagsHTML(it, canEdit) {
+  const tags = it.tags || []
+  if (!tags.length && !canEdit) return ''
+  return `<div class="dtags">${tags.map((t) => `<span class="ttag">${esc(t)}</span>`).join('')}${canEdit ? `<button class="ttag add" data-act="tags" data-id="${it.id}" aria-expanded="${S.tagOpen === it.id}">${S.tagOpen === it.id ? '閉じる' : tags.length ? '＋ タグ' : '＋ タグを付ける'}</button>` : ''}</div>`
+}
+
+function tagStats() {
+  const m = new Map()
+  for (const x of S.items) if (!x.locked) for (const t of x.tags || []) m.set(t, (m.get(t) || 0) + 1)
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'))
+}
+
+function tagPanelHTML(it) {
+  const cur = new Set(it.tags || [])
+  const stats = tagStats().filter(([t]) => !cur.has(t))
+  const s = cached(it, 's')
+  const hay = [it.title, s?.cardSummary || '', s?.summary || '', ...((s?.agenda || []).map((a) => a.topic || ''))].join(' ')
+  const rec = stats.filter(([t]) => t.length >= 2 && hay.includes(t)).slice(0, 6).map(([t]) => t)
+  const freq = stats.filter(([t]) => !rec.includes(t)).slice(0, 18)
+  const on = (t) => `<button class="ttag on" data-act="tag-off" data-id="${it.id}" data-t="${esc(t)}" aria-label="${esc(t)} を外す">${esc(t)}<span aria-hidden="true">×</span></button>`
+  const off = (t, n) => `<button class="ttag off" data-act="tag-on" data-id="${it.id}" data-t="${esc(t)}" aria-label="${esc(t)} を付ける">${esc(t)}${n ? `<span class="tn">${n}</span>` : ''}</button>`
+  return `<div class="tagpanel" role="region" aria-label="タグの付け外し">
+    <div class="tp-row"><span class="tp-l">付いている</span><div class="tp-c">${cur.size ? [...cur].map(on).join('') : '<span class="muted sm">まだありません</span>'}</div></div>
+    ${rec.length ? `<div class="tp-row"><span class="tp-l">この会議に合いそう</span><div class="tp-c">${rec.map((t) => off(t)).join('')}</div></div>` : ''}
+    <div class="tp-row"><span class="tp-l">よく使う</span><div class="tp-c">${freq.length ? freq.map(([t, n]) => off(t, n)).join('') : '<span class="muted sm">ほかの会議のタグがここに並びます</span>'}</div></div>
+    <form class="tp-new" data-tagform="${it.id}"><label for="tagNew" class="sr">新しいタグ</label><input id="tagNew" maxlength="20" placeholder="新しいタグ" autocomplete="off"><button class="btn sm" type="submit" data-act="tag-add" data-id="${it.id}">追加</button></form>
+    <p class="muted sm">押すとすぐ保存します。「この会議に合いそう」は、ほかの会議で使ったタグのうち、題名や要約に出てくる言葉です。</p>
+  </div>`
+}
+
+let tagQueue = Promise.resolve()
+const normTag = (t) => String(t || '').replace(/[、,，]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 20)
+
+/** タグを変える。先に画面へ反映し（META を差し替える）、保存は順番に送る */
+function setTags(id, next) {
+  const m = META.get(id)
+  if (!m) return
+  const meta = { ...m.v, tags: next }
+  META.set(id, { iv: m.iv, v: meta })   // 保存が返るまで、decryptAll がこの内容を使う
+  const it = S.byId.get(id); if (it) it.tags = next
+  paintDetail()
+  tagQueue = tagQueue.then(async () => {
+    const latest = META.get(id)?.v || meta
+    const r = await gasS('put', { id, patch: { m: await sealJson(DEK.get(id), latest) } })
+    await applyEntry(r.entry, {}, false, true)
+    renderMain()
+  }).catch((e) => { toast('タグを保存できませんでした：' + e.message, true); refresh(true) })
+}
+
+function toggleTag(id, t, add) {
+  const it = S.byId.get(id); if (!it) return
+  const cur = it.tags || []
+  if (add && !cur.includes(t)) setTags(id, [...cur, t])
+  if (!add) setTags(id, cur.filter((x) => x !== t))
+}
+
+function addTagFromInput(id) {
+  const t = normTag($('#tagNew')?.value)
+  if (!t) { $('#tagNew')?.focus(); return }
+  toggleTag(id, t, true)
+  setTimeout(() => $('#tagNew')?.focus(), 0)
 }
 
 function metaLine(it) {
@@ -753,7 +852,7 @@ function detailHTML(it) {
     `<button class="btn sm" data-act="fav" data-id="${it.id}" aria-pressed="${S.fav.has(it.id)}">${S.fav.has(it.id) ? '★ お気に入り' : '☆ お気に入り'}</button>`,
     hasT ? `<button class="btn sm" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${it.st === 'ok' ? '再要約' : '要約する'}</button>` : '',
     it.st === 'sw' ? `<button class="btn sm" data-act="claude" data-id="${it.id}">Claude.ai で要約</button>` : '',
-    canEdit ? `<button class="btn sm" data-act="edit" data-id="${it.id}">タイトル・タグ</button>` : '',
+    canEdit ? `<button class="btn sm" data-act="edit" data-id="${it.id}">タイトル・日時</button>` : '',
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
   ].join('')
@@ -767,9 +866,11 @@ function detailHTML(it) {
   const backTab = '<button class="dtab-back" data-act="close-detail" aria-label="一覧へ">‹</button>'
   return `
     <div class="dhead">${back}
-      <div class="dtitle"><h1>${esc(it.title)}${isNew(it) ? '<span class="new">新着</span>' : ''}</h1><div class="dmeta">${metaLine(it)}</div></div>
+      <div class="dtitle"><h1>${esc(it.title)}${scopeIcon(it)}${isNew(it) ? '<span class="new">新着</span>' : ''}</h1><div class="dmeta">${metaLine(it)}</div>
+        ${dtagsHTML(it, canEdit)}</div>
       <div class="dacts">${acts}</div>
     </div>
+    ${canEdit && S.tagOpen === it.id ? tagPanelHTML(it) : ''}
     <nav class="dtabs" aria-label="詳細の切り替え">${backTab}${tabs}</nav>
     <div class="sheet-scroll"><div class="sheet">${tabBody(it)}</div></div>`
 }
@@ -838,12 +939,105 @@ function memoSection(it, n) {
   </section>`
 }
 
+/* ---------- マインドマップ（共通部品 api/mindmap2。markmap はリポジトリの vendor/ から読む） ----------
+   表示：保存済みのマインドマップ（s.mindmap）があればそれ、無ければ要約の構成から作る
+   編集：管理者と登録した人だけ。項目を押して選び、ボタンかキー（Space・Tab・Enter・Delete）で直す。直すと少し待って自動で保存 */
+const MM = { id: null, src: '', md: '', el: null, mm: null, dirty: false, saving: false, timer: 0, status: '' }
+const canEditIt = (it) => S.admin || it.by === S.gid
+
+function mapSource(it, s) {
+  return s.mindmap && !isLegacyHtml(s.mindmap) ? String(s.mindmap) : mindmapMarkdown(it.title, s)
+}
+
 function mapBody(it) {
   const s = cached(it, 's')
   if (s === undefined) return loadingHTML
   if (!s) return '<p class="muted">要約すると、マインドマップが作られます。</p>'
-  const tree = mindmapTree(it.title, s)
-  return `<div class="read mmwrap"><div class="acts mmbar"><button class="btn sm" data-act="mm-open">すべて開く</button><button class="btn sm" data-act="mm-close">すべて閉じる</button>${fsCtl()}<span class="muted sm">${s.mindmap ? '保存済みのマインドマップ' : '要約の構成から作っています'} ・ 項目を押すと、開け閉めできます</span></div>${renderTree(tree, esc)}</div>`
+  const ed = canEditIt(it)
+  const saved = s.mindmap && !isLegacyHtml(s.mindmap)
+  const keys = [['Space', '名前を変える', ' '], ['Tab', '子を追加', 'Tab'], ['Enter', '下に追加', 'Enter'], ['Delete', '削除', 'Delete']]
+  return `<div class="mmwrap">
+    <div class="acts mmbar">
+      <button class="btn sm" data-act="mm-fit">全体を表示</button>
+      ${ed ? keys.map(([k, l, key]) => `<button class="btn sm" data-act="mm-key" data-k="${key}" title="${k}">${l}</button>`).join('') : ''}
+      ${ed && saved ? `<button class="btn sm danger" data-act="mm-reset" data-id="${it.id}">要約から作り直す</button>` : ''}
+      <span class="muted sm" id="mmStatus" role="status">${esc(MM.id === it.id && MM.status ? MM.status : (saved ? '保存済みのマインドマップ' : '要約の構成から作っています'))}</span>
+    </div>
+    <div id="mmSlot" class="mm2" data-id="${it.id}"></div>
+    <p class="muted sm">${ed ? '項目を押して選び、上のボタンかキー（Space・Tab・Enter・Delete、矢印で移動）で直します。直すと自動で保存します。' : '丸を押すと開け閉めできます。ドラッグで移動、ピンチやホイールで拡大縮小。'}</p>
+  </div>`
+}
+
+function ensureMapCss() {
+  if (document.querySelector('link[data-mm2]')) return
+  const l = document.createElement('link')
+  l.rel = 'stylesheet'; l.href = new URL('../api/mindmap2/mindmap2.css', location.href).href; l.dataset.mm2 = '1'
+  document.head.append(l)
+}
+
+/** paintDetail のあとに呼ぶ。同じ会議・同じ中身なら、描いた地図をそのまま差し戻す（位置や開閉を保つ） */
+async function mountMap(it) {
+  const slot = $('#mmSlot')
+  if (!slot || !it) return
+  const s = cached(it, 's')
+  if (!s) return
+  const src = mapSource(it, s)
+  if (MM.el && MM.id === it.id && (MM.dirty || MM.saving || MM.md === src)) { slot.replaceWith(MM.el); return }
+  clearTimeout(MM.timer)
+  const el = document.createElement('div')
+  el.className = 'mm2'; el.id = 'mmHost'; el.setAttribute('aria-label', 'マインドマップ')
+  slot.replaceWith(el)
+  Object.assign(MM, { id: it.id, src, md: src, el, mm: null, dirty: false, saving: false, status: '' })
+  ensureMapCss()
+  const ed = canEditIt(it)
+  MM.mm = await renderMindmap(el, src, {
+    autoFocus: false,
+    initialExpandLevel: 3,
+    emptyText: 'マインドマップにする内容がありません。',
+    onChange: ed ? (md) => {
+      if (MM.el !== el) return
+      MM.md = md; MM.dirty = true
+      mmStatus('保存待ち…')
+      clearTimeout(MM.timer)
+      MM.timer = setTimeout(() => saveMap(it.id), 1500)
+    } : undefined,
+  })
+}
+
+function mmStatus(t) { MM.status = t; const e = $('#mmStatus'); if (e) e.textContent = t }
+
+/** 選んでいる項目に、キー操作と同じことをする（スマホなどキーボードが無いとき用） */
+function mmKey(key) {
+  if (!MM.el) return
+  MM.el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+}
+
+async function saveMap(id) {
+  const it = S.byId.get(id)
+  const s = it && cached(it, 's')
+  if (!s || MM.id !== id || MM.saving) return
+  MM.saving = true; MM.dirty = false
+  const md = MM.md
+  mmStatus('保存しています…')
+  try {
+    await saveFile(it, 's', { ...s, mindmap: md })
+    mmStatus('保存しました')
+  } catch (e) {
+    MM.dirty = true
+    mmStatus('保存できませんでした：' + e.message)
+  } finally {
+    MM.saving = false
+    if (MM.dirty && MM.md !== md) { clearTimeout(MM.timer); MM.timer = setTimeout(() => saveMap(id), 1500) }
+  }
+}
+
+async function resetMap(id) {
+  const it = S.byId.get(id)
+  const s = it && cached(it, 's')
+  if (!s || !confirm('手で直したマインドマップを消して、要約の構成から作り直します。よろしいですか？')) return
+  clearTimeout(MM.timer)
+  MM.el = null; MM.dirty = false
+  try { const next = { ...s }; delete next.mindmap; await saveFile(it, 's', next); toast('要約から作り直しました。') } catch (e) { toast(e.message, true) }
 }
 
 /** ToDo 1件：完了・本文（マーカーつき）・担当と期限・経過・経過の追記 */
@@ -1617,9 +1811,9 @@ async function submitUpload() {
 /* ---------- 編集・閲覧グループ・削除（管理者／登録した人） ---------- */
 function openEdit(id) {
   const it = S.byId.get(id)
-  modal('タイトル・タグ', `
+  modal('タイトル・日時', `
     <div class="fcol"><label for="edTitle">タイトル</label><input id="edTitle" value="${esc(it.title)}"></div>
-    <div class="fcol"><label for="edTags">タグ（読点・カンマ区切り）</label><input id="edTags" value="${esc((it.tags || []).join('、'))}"></div>
+    <p class="muted sm">タグは、見出しの「＋ タグ」から付け外しします。</p>
     <div class="fcol"><label for="edDate">開始日時</label><input id="edDate" type="datetime-local" value="${esc(it.date)}"></div>
     <div class="dlg-foot"><span class="grow"></span><button class="btn" data-act="close">キャンセル</button><button class="btn main" data-act="edit-save" data-id="${id}">保存</button></div>
     <p class="msg" id="edMsg" role="alert"></p>`)
@@ -1629,7 +1823,7 @@ async function saveEdit(id) {
   const it = S.byId.get(id)
   const title = $('#edTitle').value.trim()
   if (!title) { $('#edMsg').textContent = 'タイトルを入れてください。'; return }
-  const meta = { ...(META.get(id)?.v || {}), title, tags: $('#edTags').value.split(/[、,，]/).map((s) => s.trim()).filter(Boolean) }
+  const meta = { ...(META.get(id)?.v || {}), title }
   try {
     const r = await gasS('put', { id, patch: { m: await sealJson(DEK.get(id), meta), date: $('#edDate').value || it.date } })
     closeModal()
@@ -1685,58 +1879,76 @@ async function retry(id) {
 }
 
 /* ---------- 設定 ---------- */
-function openSettings() {
+// タブで分ける：表示／AI／ログイン／他端末へ設定共有。最後に開いたタブを覚えておく
+const SET_TABS = [['view', '表示'], ['ai', 'AI'], ['login', 'ログイン'], ['share', '他端末へ設定共有']]
+let setTab = 'view'
+
+function openSettings(tab) {
+  if (tab && SET_TABS.some(([k]) => k === tab)) setTab = tab
   const s = loadSettings()
   const c = activeConnection(s) || newConnection()
   const bio = bioOk()
   const auto = autoEnabled()
   const where = S.gh ? `${S.gh.owner}/${S.gh.repo}` : 'データ用リポジトリ'
+  const pane = (k, html) => `<div class="spane" data-pane="${k}" role="tabpanel" aria-labelledby="stab-${k}" ${setTab === k ? '' : 'hidden'}>${html}</div>`
   modal('設定', `
-    <section class="sset"><h3>文字の大きさ</h3>
-      <div class="fsset" id="fsset" role="group" aria-label="文字の大きさ">${FS_LEVELS.map((l, i) => `<button type="button" class="btn ${i === S.fs ? 'main' : ''}" data-act="fs-set" data-v="${i}" aria-pressed="${i === S.fs}">${l.n}</button>`).join('')}</div>
-      <p class="muted sm">本文（要約・文字起こし・ToDo・ノート・マインドマップ）の文字の大きさです。</p>
-    </section>
-    <section class="sset"><h3>AI の接続先（個人の設定）</h3>
-      <div class="fcol"><label for="stConn">接続</label><select id="stConn">${s.connections.map((x) => `<option value="${esc(x.id)}" ${x.id === c.id ? 'selected' : ''}>${esc(x.label || '名前なし')}</option>`).join('')}</select></div>
-      <div class="frow"><div class="fcol grow2"><label for="stLabel">名前</label><input id="stLabel" value="${esc(c.label)}"></div><div class="fcol"><label for="stCtx">num_ctx</label><input id="stCtx" inputmode="numeric" value="${esc(c.numCtx)}"></div></div>
-      <div class="fcol"><label for="stUrl">URL（OpenAI 互換。例：https://xxxx.ngrok-free.app/v1）</label><input id="stUrl" value="${esc(c.baseUrl)}" autocapitalize="off" spellcheck="false"></div>
-      <div class="fcol"><label for="stKey">API キー</label><input id="stKey" type="password" value="${esc(c.apiKey)}" autocomplete="off"></div>
-      <div class="fcol"><label for="stModels">モデル（カンマ区切り。先頭を使います）</label><input id="stModels" value="${esc((c.models || []).join(', '))}" autocapitalize="off" spellcheck="false"></div>
-      <div class="acts"><button class="btn main" data-act="ai-save">保存</button><button class="btn" data-act="ai-add">接続を追加</button>${s.connections.length > 1 ? '<button class="btn danger" data-act="ai-del">この接続を消す</button>' : ''}</div>
-      <p class="muted sm">この端末にだけ保存し、GitHub（グループで共有する設定）には送りません。自分の別の端末へは「他端末へ設定共有」で権限コードと一緒に渡せます。ほかの自作アプリ（gemma-chat・今の議事録）と同じ設定を使います。</p>
-    </section>
-    <section class="sset"><h3>Claude.ai で要約するページ</h3>
-      <p class="muted sm">空のままなら、依頼文を入れた新しいチャットを開きます（おすすめ）。スキル minutes2-claude-summarizer を Claude.ai に入れておいてください。</p>
-      <div class="fcol"><label for="stClaude">リンク（特定のプロジェクトで開きたいときだけ）</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="${CLAUDE_DEFAULT_URL}" autocapitalize="off" spellcheck="false"></div>
-      <div class="acts"><button class="btn" data-act="claude-save">保存</button></div>
-    </section>
-    <section class="sset"><h3>権限コード</h3>
-      <p class="sm">いまのグループ：<span class="strong">${esc(S.admin ? '管理者' : S.role)}</span></p>
-      <form id="codeForm" class="fcol" autocomplete="off">
-        <label for="stCode">新しい権限コード</label>
-        <div class="frow"><input id="stCode" class="grow" type="password" autocomplete="new-password" required><button class="btn" type="submit">変更する</button></div>
-      </form>
-      <p class="msg" id="codeMsg" role="status"></p>
-      <label class="chk"><input type="checkbox" id="stAuto" ${auto ? 'checked' : ''}> この端末では自動で開く</label>
-      <p class="muted sm">${auto ? '権限コードを、この端末の中だけで取り出せる鍵で暗号化して覚えておき、次から入力なしで開きます。端末を人に使われる心配があるときはオフにしてください。'
-        : 'オフのときは、開くたびに権限コード（または Face ID・Touch ID）を使います。'}</p>
-      <div class="acts"><button class="btn" data-act="lock">鍵をかける</button><button class="btn danger" data-act="reset">この端末の設定を消す</button></div>
-    </section>
-    <section class="sset"><h3>Face ID・Touch ID</h3>
-      ${!bio ? '<p class="muted sm">このブラウザでは使えません（https で開いた、対応する端末が必要です）。</p>'
-        : bioRegistered() ? '<p class="sm">登録済みです。権限コードでも開けます。</p><div class="acts"><button class="btn" data-act="bio-off">解除</button></div>'
-          : '<p class="sm">権限コードを、この端末の生体認証で包んで置きます。</p><div class="acts"><button class="btn" data-act="bioReg">登録する</button></div>'}
-      ${bio && auto ? '<p class="muted sm">「自動で開く」がオンの間は使いません。鍵をかけたあとに開くときに使えます。</p>' : ''}
-      <p class="msg" id="bioMsg"></p>
-    </section>
-    <section class="sset"><h3>他端末へ設定共有</h3>
-      <p class="muted sm">設定（Claude.ai のページ・文字の大きさ・表示・お気に入り）は ${esc(where)} の settings/${esc(S.gid || '')}.json に、暗号化して保存しています。同じ権限コードで開いた端末には自動で反映されます。</p>
-      <div id="devLink" class="dl" aria-live="polite"></div>
-      <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
-      <p class="hint">渡す中身（権限コードと、この端末の AI の接続先）はパスフレーズで暗号化してあります。受け取った端末でパスフレーズを入れると、権限コードを入れずに使えます。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
-      <button type="button" class="btn danger wide" data-act="forget-conn">この端末から接続情報を消去してロック</button>
-    </section>
-    <p class="msg" id="stMsg" role="status"></p>`, { wide: true })
+    <div class="stabs" role="tablist" aria-label="設定の種類">${SET_TABS.map(([k, l]) => `<button type="button" role="tab" id="stab-${k}" class="stab ${setTab === k ? 'on' : ''}" data-act="stab" data-v="${k}" aria-selected="${setTab === k}">${l}</button>`).join('')}</div>
+
+    ${pane('view', `
+      <section class="sset"><h3>文字の大きさ</h3>
+        <div class="fsset" id="fsset" role="group" aria-label="文字の大きさ">${FS_LEVELS.map((l, i) => `<button type="button" class="btn ${i === S.fs ? 'main' : ''}" data-act="fs-set" data-v="${i}" aria-pressed="${i === S.fs}">${l.n}</button>`).join('')}</div>
+        <p class="muted sm">要約・文字起こし・ToDo・ノート・マインドマップの文字の大きさです。</p>
+      </section>`)}
+
+    ${pane('ai', `
+      <section class="sset"><h3>要約・チャットに使う AI <span class="tag">個人の設定</span></h3>
+        <div class="srow"><label for="stConn" class="sr">接続</label><select id="stConn">${s.connections.map((x) => `<option value="${esc(x.id)}" ${x.id === c.id ? 'selected' : ''}>${esc(x.label || '名前なし')}</option>`).join('')}</select><button type="button" class="btn" data-act="ai-add">＋ 接続を追加</button></div>
+        <div class="sgrid">
+          <div class="fcol"><label for="stLabel">名前</label><input id="stLabel" value="${esc(c.label)}"></div>
+          <div class="fcol narrow"><label for="stCtx">num_ctx</label><input id="stCtx" inputmode="numeric" value="${esc(c.numCtx)}"></div>
+          <div class="fcol full"><label for="stUrl">URL <span class="muted">（OpenAI 互換。例：https://xxxx.ngrok-free.app/v1）</span></label><input id="stUrl" value="${esc(c.baseUrl)}" autocapitalize="off" spellcheck="false"></div>
+          <div class="fcol full"><label for="stKey">API キー</label><div class="srow"><input id="stKey" type="password" value="${esc(c.apiKey)}" autocomplete="off"><button type="button" class="btn" data-act="key-eye" aria-pressed="false">表示</button></div></div>
+          <div class="fcol full"><label for="stModels">モデル <span class="muted">（カンマ区切り。先頭を使います）</span></label><input id="stModels" value="${esc((c.models || []).join(', '))}" autocapitalize="off" spellcheck="false"></div>
+        </div>
+        <div class="sfoot"><button class="btn main" data-act="ai-save">保存</button>${s.connections.length > 1 ? '<span class="grow"></span><button class="btn danger" data-act="ai-del">この接続を消す</button>' : ''}</div>
+        <p class="muted sm">この端末にだけ保存します（グループで共有する設定には入れません）。自分の別の端末へは「他端末へ設定共有」で渡せます。gemma-chat・今の議事録と同じ設定です。</p>
+      </section>
+      <section class="sset"><h3>Claude.ai で要約するページ</h3>
+        <div class="srow"><label for="stClaude" class="sr">リンク</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="空欄なら標準のページ" autocapitalize="off" spellcheck="false"><button class="btn" data-act="claude-save">保存</button></div>
+        <p class="muted sm">ふだんは空欄のままで構いません。別のページで要約したいときだけ、そのリンクを入れます。</p>
+      </section>
+      <p class="msg" id="stMsg" role="status"></p>`)}
+
+    ${pane('login', `
+      <section class="sset"><h3>権限コード</h3>
+        <p class="sm">いまのグループ <span class="tag strong">${esc(S.admin ? '管理者' : S.role)}</span></p>
+        <form id="codeForm" class="srow" autocomplete="off">
+          <label for="stCode" class="sr">新しい権限コード</label>
+          <input id="stCode" type="password" autocomplete="new-password" placeholder="新しい権限コード" required>
+          <button class="btn" type="submit">変更する</button>
+        </form>
+        <p class="msg" id="codeMsg" role="status"></p>
+      </section>
+      <section class="sset"><h3>開き方</h3>
+        <label class="chk"><input type="checkbox" id="stAuto" ${auto ? 'checked' : ''}> この端末では自動で開く</label>
+        <p class="muted sm">${auto ? '権限コードを、この端末の中だけで取り出せる鍵で暗号化して覚えておきます。端末を人に使われる心配があるときはオフにしてください。'
+          : '開くたびに、権限コード（または Face ID・Touch ID）を使います。'}</p>
+        <div class="srow between"><span class="sm">Face ID・Touch ID：${!bio ? '<span class="muted">このブラウザでは使えません</span>' : bioRegistered() ? '登録済み' : '未登録'}</span>
+          ${!bio ? '' : bioRegistered() ? '<button class="btn" data-act="bio-off">解除</button>' : '<button class="btn" data-act="bioReg">登録する</button>'}</div>
+        ${bio && auto ? '<p class="muted sm">自動で開く間は使いません。鍵をかけたあとに開くときに使えます。</p>' : ''}
+        <p class="msg" id="bioMsg"></p>
+      </section>
+      <div class="sfoot"><button class="btn" data-act="lock">鍵をかける</button><span class="grow"></span><button class="btn danger" data-act="reset">この端末の設定を消す</button></div>`)}
+
+    ${pane('share', `
+      <section class="sset">
+        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、この端末の AI の接続先です。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
+        <div id="devLink" class="dl" aria-live="polite"></div>
+        <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
+        <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
+      </section>
+      <div class="sfoot"><button type="button" class="btn danger" data-act="forget-conn">この端末から接続情報を消去してロック</button></div>`)}
+    `, { wide: true })
   $('#stConn').addEventListener('change', (e) => {
     const s2 = loadSettings(); s2.activeConnectionId = e.target.value
     const c2 = activeConnection(s2); s2.activeModel = c2?.models?.[0] ?? null
@@ -1781,7 +1993,7 @@ function saveAI() {
   })
   if (!c.models.includes(s.activeModel)) s.activeModel = c.models[0] ?? null
   saveSettings(s)
-  $('#stMsg').textContent = '保存しました。'
+  $('#stMsg').textContent = ''; toast('保存しました。')
   if (S.tab === 'convert') renderMain()
 }
 
@@ -1814,6 +2026,16 @@ const ACT = {
     try { await bioRegister(S.code); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
   },
   'bio-off': () => { bioForget(); openSettings() },
+  stab: (a) => {
+    setTab = a.dataset.v
+    $$('.stab').forEach((b) => { const on = b.dataset.v === setTab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on) })
+    $$('.spane').forEach((p) => { p.hidden = p.dataset.pane !== setTab })
+  },
+  'key-eye': (a) => {
+    const k = $('#stKey'); if (!k) return
+    const show = k.type === 'password'
+    k.type = show ? 'text' : 'password'; a.textContent = show ? '隠す' : '表示'; a.setAttribute('aria-pressed', show)
+  },
   reset: async () => {
     if (!confirm('この端末の設定（覚えている権限コード・Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先と、GitHub に保存した設定は残ります。よろしいですか？')) return
     clearData()   // 先に接続を切って、消した設定が GitHub に送られないようにする
@@ -1845,7 +2067,14 @@ const ACT = {
     S.month = monthKey(new Date(y, m - 1 + Number(a.dataset.d), 1))
     renderMain()
   },
-  filter: (a) => { S.filter = a.dataset.v; renderMain() },
+  favonly: () => { S.favOnly = !S.favOnly; renderMain() },
+  tags: (a) => { S.tagOpen = S.tagOpen === a.dataset.id ? null : a.dataset.id; paintDetail(); if (S.tagOpen) $('#tagNew')?.focus() },
+  'tag-on': (a) => toggleTag(a.dataset.id, a.dataset.t, true),
+  'tag-off': (a) => toggleTag(a.dataset.id, a.dataset.t, false),
+  'tag-add': (a) => addTagFromInput(a.dataset.id),
+  'mm-key': (a) => mmKey(a.dataset.k),
+  'mm-fit': () => MM.mm?.fit?.(),
+  'mm-reset': (a) => resetMap(a.dataset.id),
   view: (a) => { S.view = a.dataset.v; ls.set('m2.view', S.view); if (S.view === 'cards') S.sel = null; renderMain() },
   jump: (a) => { $(`#d-${a.dataset.day}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
   open: (a) => {
@@ -1872,8 +2101,6 @@ const ACT = {
   sec: (a) => goSection(a.dataset.v),
   fs: (a) => setFs(S.fs + Number(a.dataset.d)),
   'fs-set': (a) => setFs(Number(a.dataset.v)),
-  'mm-open': () => $$('.mm details').forEach((d) => { d.open = true }),
-  'mm-close': () => $$('.mm details').forEach((d) => { d.open = false }),
   fav: (a) => {
     const id = a.dataset.id
     if (S.fav.has(id)) S.fav.delete(id); else S.fav.add(id)
@@ -1931,7 +2158,7 @@ const ACT = {
     const u = $('#stClaude').value.trim()
     if (u) { try { const o = new URL(u); if (o.protocol !== 'https:' || !(o.hostname === 'claude.ai' || o.hostname.endsWith('.claude.ai'))) throw 0 } catch { $('#stMsg').textContent = 'claude.ai の https のリンクだけ使えます。'; return } }
     if (u) ls.set('m2.claudeUrl', u); else ls.del('m2.claudeUrl')
-    $('#stMsg').textContent = '保存しました。'
+    $('#stMsg').textContent = ''; toast('保存しました。')
   },
 }
 
@@ -2034,6 +2261,8 @@ document.addEventListener('change', (e) => {
   if (t.dataset.chk) { if (t.checked) S.checked.add(t.dataset.chk); else S.checked.delete(t.dataset.chk); renderMain() }
   if (t.dataset.todo) { toggleTodo(t.dataset.todo, t.dataset.k, t.checked); t.closest('li')?.classList.toggle('done', t.checked) }
   if (t.id === 'stAuto') toggleAuto(t.checked)
+  if (t.id === 'scopeSel') { S.scope = t.value; renderMain() }
+  if (t.id === 'stSel') { S.filter = t.value; renderMain() }
   if (t.id === 'rangeSel') { S.range = t.value; ls.set('m2.range', S.range); renderMain() }
   if (t.id === 'towner') { S.towner = t.value; renderMain() }
   if (t.id === 'aiSel' && t.value.includes('|')) {
@@ -2045,6 +2274,7 @@ document.addEventListener('change', (e) => {
 document.addEventListener('submit', (e) => {
   const f = e.target
   if (f.matches && f.matches('form.editor')) { e.preventDefault(); return }
+  if (f.matches && f.matches('form[data-tagform]')) { e.preventDefault(); return }   // 追加は送信ボタンの data-act で行う
   const lg = f.closest && f.closest('form[data-log]')
   if (lg) { e.preventDefault(); const v = $('#logIn').value.trim(); if (v) appendLog(lg.dataset.log, lg.dataset.k, v); return }
   const mm = f.closest && f.closest('form[data-mkmemo]')

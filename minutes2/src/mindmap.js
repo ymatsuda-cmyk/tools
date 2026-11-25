@@ -68,3 +68,18 @@ export function renderTree(tree, esc, openLevel = 2) {
   const kids = tree.children.map((k, i) => branch(k, 1, i % COLORS)).join('')
   return `<div class="mm"><div class="mm-root">${esc(tree.text)}</div><div class="mm-k root">${kids}</div></div>`
 }
+
+/** 木 → markmap 用の Markdown（# 中心 / ## 大項目 / - 子、2字下げで下の階層）。api/mindmap2 に渡す */
+export function treeToMarkdown(tree) {
+  const one = (t) => clean(t).replace(/^[#\-*+]\s*/, '') || '（無題）'
+  const out = [`# ${one(tree.text)}`]
+  for (const b of tree.children || []) {
+    out.push(`## ${one(b.text)}`)
+    const walk = (n, depth) => { out.push(`${'  '.repeat(depth)}- ${one(n.text)}`); (n.children || []).forEach((k) => walk(k, depth + 1)) }
+    ;(b.children || []).forEach((k) => walk(k, 0))
+  }
+  return out.join('\n')
+}
+
+/** 要約の構成から作る Markdown（保存済みのマインドマップが無いとき・作り直すとき） */
+export const mindmapMarkdown = (title, s) => treeToMarkdown(outlineFromSummary(title, s || {}))
