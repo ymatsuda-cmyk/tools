@@ -493,3 +493,5 @@ h1 .scope .ic{width:16px;height:16px}
 .tl-top .scope{margin-left:0}
 .scopesel select{width:auto;min-width:0}
 .scopesel:not(:has(.ic)){padding-left:6px}
+.sb.dim{opacity:.18}
+.scnt{font:700 11px/1 var(--body);color:var(--ink);text-align:center;margin-bottom:1px}

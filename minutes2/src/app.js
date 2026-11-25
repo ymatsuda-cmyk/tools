@@ -705,8 +705,12 @@ function stripHTML(mi) {
     const k = `${S.month}-${pad(d)}`
     const list = by.get(k) || []
     const total = list.reduce((a, it) => a + durOf(it), 0)
-    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
-    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}`
+    // 権限を選んでいるとき（管理者）：該当する会議だけ濃く、ほかは薄く残し、上に該当の件数（案 C3）
+    const pick = S.admin && S.scope !== 'all'
+    const hit = pick ? list.filter(scopeMatch).length : 0
+    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c} ${pick && !scopeMatch(it) ? 'dim' : ''}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
+      + (pick && hit ? `<span class="scnt">${hit}</span>` : '')
+    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}${pick ? `・選んだ権限 ${hit}件` : ''}`
     h += `<button class="sday ${k === today ? 'today' : ''}" ${list.length ? `data-act="jump" data-day="${k}"` : 'disabled'} aria-label="${label}" title="${label}"><span class="sbars">${bars}</span><span class="sn">${d}</span></button>`
   }
   return `<div class="strip"><div class="strip-in">${h}</div></div>`
