@@ -49,7 +49,7 @@ const LOCK_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x
 const S = {
   code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null,
   session: null, exp: 0, pub: {}, raw: [], items: [], byId: new Map(), worker: null, sig: '', syncedAt: 0, syncErr: '',
-  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', favOnly: false, scope: 'all', tagOpen: null, q: '', sel: null, dtab: 'sum',
+  tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', favOnly: false, scope: 'all', tagF: '', tagOpen: null, q: '', sel: null, dtab: 'sum',
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
@@ -573,6 +573,21 @@ function scopeMatch(x) {
   return shareGids(x).includes(S.scope)
 }
 
+/** タグの絞り込み（全員）：'' はすべて */
+const tagMatch = (x) => !S.tagF || (!x.locked && (x.tags || []).includes(S.tagF))
+/** 帯の強調に使う：権限（管理者）かタグを選んでいるか、選んだ条件に合うか */
+const picking = () => (S.admin && S.scope !== 'all') || !!S.tagF
+const pickMatch = (x) => (!S.admin || scopeMatch(x)) && tagMatch(x)
+
+function tagSelectHTML(mi) {
+  const m = new Map()
+  for (const x of mi) if (!x.locked) for (const t of x.tags || []) m.set(t, (m.get(t) || 0) + 1)
+  if (S.tagF && !m.has(S.tagF)) m.set(S.tagF, 0)   // 月を変えても、選んだタグは残す
+  const list = [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'))
+  const opt = (v, l, n) => `<option value="${esc(v)}" ${S.tagF === v ? 'selected' : ''}>${esc(l)}（${n}）</option>`
+  return `<label class="scopesel ${S.tagF ? 'on' : ''}"><span class="sr">タグで絞り込み</span><select id="tagSel">${opt('', 'タグ：すべて', mi.filter((x) => !x.locked).length)}${list.map(([t, n]) => opt(t, t, n)).join('')}</select></label>`
+}
+
 function scopeSelectHTML(mi) {
   const open = mi.filter((x) => !x.locked)
   const groups = Object.entries(S.roles || {}).filter(([, g]) => g !== S.adminGid)
@@ -591,6 +606,7 @@ function filtered() {
     if (S.filter === 'proc' && !['tw', 'tr', 'sw', 'err'].includes(x.st)) return false
     if (S.favOnly && !S.fav.has(x.id)) return false
     if (S.admin && !scopeMatch(x)) return false
+    if (!tagMatch(x)) return false
     if (q) {
       if (x.locked) return false
       const s = cached(x, 's')
@@ -622,7 +638,7 @@ function listHTML() {
   const items = filtered()
   const sel = S.sel ? S.byId.get(S.sel) : null
   // 状態はコンボボックス、お気に入りは押して切り替え（状態と組み合わせて絞り込める）
-  const chips = `<label class="scopesel ${S.filter !== 'all' ? 'on' : ''}"><span class="sr">状態で絞り込み</span><select id="stSel">${[['all', 'すべて'], ['ok', '要約済み'], ['proc', '処理中']]
+  const chips = `<label class="scopesel ${S.filter !== 'all' ? 'on' : ''}"><span class="sr">状態で絞り込み</span><select id="stSel">${[['all', '状態：すべて'], ['ok', '要約済み'], ['proc', '処理中']]
     .map(([k, l]) => `<option value="${k}" ${S.filter === k ? 'selected' : ''}>${l}（${cnt[k]}）</option>`).join('')}</select></label>`
     + `<button class="fchip ${S.favOnly ? 'on' : ''}" data-act="favonly" aria-pressed="${S.favOnly}">★ お気に入り ${cnt.fav}</button>`
   return `
@@ -632,7 +648,7 @@ function listHTML() {
         <span class="month">${Number(y)}年${Number(mo)}月</span>
         <button class="ib" data-act="month" data-d="1" aria-label="次の月">›</button>
       </div>
-      <div class="fchips">${chips}${S.admin ? scopeSelectHTML(mi) : ''}</div>
+      <div class="fchips">${S.admin ? scopeSelectHTML(mi) : ''}${tagSelectHTML(mi)}${chips}</div>
       <span class="grow"></span>
       <div class="seg" role="group" aria-label="表示の切り替え">
         <button data-act="view" data-v="timeline" aria-pressed="${!cards}" class="${!cards ? 'on' : ''}">タイムライン</button>
@@ -647,7 +663,7 @@ function listHTML() {
 }
 
 function emptyListHTML(any) {
-  if (any) return '<p class="empty">条件に合う議事録がありません。絞り込み（状態・お気に入り・権限）を戻してください。</p>'
+  if (any) return '<p class="empty">条件に合う議事録がありません。絞り込み（権限・タグ・状態・お気に入り）を戻してください。</p>'
   return '<div class="empty"><p>この月の議事録はまだありません。</p><button class="btn main" data-act="upload">議事録を登録</button></div>'
 }
 
@@ -706,11 +722,11 @@ function stripHTML(mi) {
     const list = by.get(k) || []
     const total = list.reduce((a, it) => a + durOf(it), 0)
     // 権限を選んでいるとき（管理者）：該当する会議だけ濃く、ほかは薄く残し、上に該当の件数（案 C3）
-    const pick = S.admin && S.scope !== 'all'
-    const hit = pick ? list.filter(scopeMatch).length : 0
-    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c} ${pick && !scopeMatch(it) ? 'dim' : ''}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
+    const pick = picking()
+    const hit = pick ? list.filter(pickMatch).length : 0
+    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c} ${pick && !pickMatch(it) ? 'dim' : ''}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
       + (pick && hit ? `<span class="scnt">${hit}</span>` : '')
-    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}${pick ? `・選んだ権限 ${hit}件` : ''}`
+    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}${pick ? `・選んだ条件 ${hit}件` : ''}`
     h += `<button class="sday ${k === today ? 'today' : ''}" ${list.length ? `data-act="jump" data-day="${k}"` : 'disabled'} aria-label="${label}" title="${label}"><span class="sbars">${bars}</span><span class="sn">${d}</span></button>`
   }
   return `<div class="strip"><div class="strip-in">${h}</div></div>`
@@ -2267,6 +2283,7 @@ document.addEventListener('change', (e) => {
   if (t.id === 'stAuto') toggleAuto(t.checked)
   if (t.id === 'scopeSel') { S.scope = t.value; renderMain() }
   if (t.id === 'stSel') { S.filter = t.value; renderMain() }
+  if (t.id === 'tagSel') { S.tagF = t.value; renderMain() }
   if (t.id === 'rangeSel') { S.range = t.value; ls.set('m2.range', S.range); renderMain() }
   if (t.id === 'towner') { S.towner = t.value; renderMain() }
   if (t.id === 'aiSel' && t.value.includes('|')) {
