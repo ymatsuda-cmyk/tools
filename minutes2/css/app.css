@@ -495,3 +495,10 @@ h1 .scope .ic{width:16px;height:16px}
 .scopesel:not(:has(.ic)){padding-left:6px}
 .sb.dim{opacity:.18}
 .scnt{font:700 11px/1 var(--body);color:var(--ink);text-align:center;margin-bottom:1px}
+
+/* Claude.ai で要約（貼り付け方式） */
+.csteps{margin:0;padding:0;list-style:none;counter-reset:cs;display:flex;flex-direction:column;gap:16px}
+.csteps li{display:flex;flex-direction:column;gap:6px}
+.csteps li{counter-increment:cs}
+.csteps li > p.strong::before{content:counter(cs) ". "}
+.ccbox{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sheet);font:12.5px/1.6 ui-monospace,Menlo,monospace;resize:vertical}

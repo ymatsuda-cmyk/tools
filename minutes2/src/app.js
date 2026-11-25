@@ -4,7 +4,7 @@ import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek,
 import { gas, repo } from './store.js'
 import { bioOk, bioRegistered, bioRegister, bioUnlock, bioForget } from './bio.js'
 import { autoEnabled, setAutoEnabled, autoSaved, autoSave, autoLoad, autoForget } from './autoopen.js'
-import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText } from './summary.js'
+import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText, SUMMARY_PROMPT, extractJson } from './summary.js'
 import { parseSummaryText, summaryTypeLabel } from './summary-text.js'
 import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf } from './llm-settings.js'
 import { streamChat } from './llm-client.js'
@@ -367,7 +367,7 @@ async function mountShare() {
     getPackage: async () => {
       if (!S.code) throw new Error('ログインし直してください。')
       if (!dlShare.pkg) {
-        const ai = aiForShare()
+        const ai = ls.get('m2.shareAi', true) ? aiForShare() : null
         dlShare.pkg = await dl.seal({ v: 1, code: S.code, ai }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
         dlShare.noAi = false
         // QR・中継に収まらないほど大きいときは、権限コードだけ渡す（AI の接続先は受け取った端末で設定）
@@ -871,7 +871,7 @@ function detailHTML(it) {
   const acts = [
     `<button class="btn sm" data-act="fav" data-id="${it.id}" aria-pressed="${S.fav.has(it.id)}">${S.fav.has(it.id) ? '★ お気に入り' : '☆ お気に入り'}</button>`,
     hasT ? `<button class="btn sm" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${it.st === 'ok' ? '再要約' : '要約する'}</button>` : '',
-    it.st === 'sw' ? `<button class="btn sm" data-act="claude" data-id="${it.id}">Claude.ai で要約</button>` : '',
+    hasT ? `<button class="btn sm" data-act="claude" data-id="${it.id}">Claude.ai で${it.st === 'ok' ? '再要約' : '要約'}</button>` : '',
     canEdit ? `<button class="btn sm" data-act="edit" data-id="${it.id}">タイトル・日時</button>` : '',
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
@@ -1294,6 +1294,89 @@ async function saveFile(it, name, obj, patch) {
   await applyEntry(r.entry, { [name]: obj })
 }
 
+/** 要約を保存する（AI でも Claude.ai でも同じ）。再要約なら前の ToDo の完了と経過を引き継ぎ、マーカーも合わせる */
+async function storeSummary(id, s, prevS, prevN) {
+  if (prevS?.todos?.length) s = { ...s, todos: mergeTodos(prevS.todos, s.todos, prevN) }
+  if (prevS?.mindmap) s = { ...s, mindmap: prevS.mindmap }   // 手で直したマインドマップは残す（作り直しは画面から）
+  await saveFile(S.byId.get(id), 's', s, { st: 'ok' })
+  if (marksOf(prevN).length) await mutateNotes(S.byId.get(id), (n) => { n.marks = reconcile(n.marks, summaryTexts(s), SUMMARY_KINDS) })
+}
+
+/* ---------- Claude.ai で要約（文字起こしを渡して、返ってきた要約を貼り付ける。Mac・Notion は使わない） ---------- */
+const CLAUDE_NEW = 'https://claude.ai/new'
+const claudeChatUrl = () => { const u = ls.get('m2.claudeUrl', ''); return /^https:\/\/claude\.ai\/(project|new)/.test(u) ? u : CLAUDE_NEW }
+let claudeReq = null   // { id, text } 依頼文（文字起こし込み）。開いたときに作っておき、押した瞬間にコピーする
+
+async function openClaudePaste(id) {
+  const it = S.byId.get(id)
+  if (!it || it.locked) return
+  const ns = notionState()
+  const viaNotion = ns && ns.ok && (ns.ids || []).includes(id)
+  modal('Claude.ai で要約', `
+    <ol class="csteps">
+      <li><p class="strong">依頼文をコピーして Claude.ai を開く</p>
+        <p class="muted sm">要約の依頼と「${esc(it.title)}」の文字起こしをまとめてコピーします。開いた Claude.ai に貼り付けて送ってください（長い文字起こしは、貼り付けると添付ファイルになります）。</p>
+        <div class="acts"><button class="btn main" data-act="claude-copy" data-id="${id}" id="ccCopy" disabled>読み込んでいます…</button><span class="muted sm" id="ccInfo"></span></div>
+        <textarea id="ccManual" class="ccbox" rows="4" readonly hidden aria-label="依頼文（手でコピーする）"></textarea></li>
+      <li><p class="strong">Claude.ai の返事を貼り付けて取り込む</p>
+        <p class="muted sm">返ってきた JSON（{ で始まる部分）をそのまま貼り付けます。前後に文章が付いていても構いません。</p>
+        <textarea id="ccPaste" class="ccbox" rows="6" placeholder='{"cardSummary": "…", "summary": "…", …}'></textarea>
+        <div class="acts"><button class="btn main" data-act="claude-take" data-id="${id}">取り込んで保存</button>${it.st === 'ok' ? '<span class="muted sm">今の要約を置き換えます（ToDo の完了・経過は引き継ぎます）</span>' : ''}</div>
+        <p class="msg" id="ccMsg" role="alert"></p></li>
+    </ol>
+    ${viaNotion ? `<p class="muted sm">Mac が Notion の作業DBに書き出し済みなので、<button class="link" data-act="claude-notion" data-id="${id}">Notion 経由で要約する</button>こともできます（貼り付け不要。Mac の次の確認で反映）。</p>` : ''}`, { wide: true })
+  claudeReq = null
+  try {
+    const t = await file(it, 't')
+    if (!t?.segments?.length) throw new Error('文字起こしがありません。')
+    const body = transcriptText(t.segments)
+    claudeReq = { id, text: `${SUMMARY_PROMPT}\n\n会議：${it.title}（${md(it.date)} ${hm(it.date)}）\n\n文字起こし：\n${body}` }
+    const b = $('#ccCopy'); if (b) { b.disabled = false; b.textContent = '依頼文をコピーして Claude.ai を開く' }
+    const info = $('#ccInfo'); if (info) info.textContent = `文字起こし ${body.length.toLocaleString()}字`
+  } catch (e) {
+    const m = $('#ccMsg'); if (m) m.textContent = e.message
+    const b = $('#ccCopy'); if (b) b.textContent = 'コピーできません'
+  }
+}
+
+function claudeCopy(id) {
+  if (!claudeReq || claudeReq.id !== id) return
+  const text = claudeReq.text
+  const w = window.open(claudeChatUrl(), '_blank', 'noopener,noreferrer')   // 押した操作の中で開く（ポップアップ扱いにしない）
+  navigator.clipboard.writeText(text).then(() => {
+    $('#ccInfo').textContent = 'コピーしました。Claude.ai に貼り付けて送ってください。'
+  }).catch(() => {
+    // コピーが許可されないブラウザ：選択した状態で見せて、手でコピーしてもらう
+    const ta = $('#ccManual'); if (!ta) return
+    ta.hidden = false; ta.value = text; ta.focus(); ta.select()
+    $('#ccInfo').textContent = '自動でコピーできませんでした。下の欄を選択したままコピー（⌘C / Ctrl+C）してください。'
+  })
+  if (!w) $('#ccInfo').textContent += ' Claude.ai が開かないときは、ポップアップの許可を確かめてください。'
+}
+
+async function claudeTake(id) {
+  const it = S.byId.get(id)
+  const m = $('#ccMsg')
+  const txt = $('#ccPaste')?.value || ''
+  if (!txt.trim()) { m.textContent = 'Claude.ai の返事を貼り付けてください。'; return }
+  let s
+  try {
+    s = normalizeSummary(extractJson(txt), 'Claude.ai')
+    if (!s.summary && !s.agenda.length) throw new Error('要約の中身が空です。返事全体を貼り付けてください。')
+  } catch (e) { m.textContent = e instanceof SyntaxError ? 'JSON として読み取れませんでした。返事の { から } までを、欠けずに貼り付けてください。' : e.message; return }
+  m.textContent = '保存しています…'
+  $$('.csteps button').forEach((b) => { b.disabled = true })
+  try {
+    const [prevS, prevN] = await Promise.all([file(it, 's'), file(it, 'n')])
+    await storeSummary(id, s, prevS, prevN)
+    closeModal()
+    toast(`「${it.title}」を Claude.ai の要約で保存しました。`)
+  } catch (e) {
+    m.textContent = e.message
+    $$('.csteps button').forEach((b) => { b.disabled = false })
+  }
+}
+
 async function runSummary(id) {
   const it = S.byId.get(id)
   if (!it || it.locked || S.busy[id]) return
@@ -1307,11 +1390,8 @@ async function runSummary(id) {
       S.busy[id] = `要約中…（${n}字）`
       $$(`[data-busy="${id}"]`).forEach((el) => { el.textContent = S.busy[id] })
     })
-    // 再要約：前の ToDo と文言の近さで突き合わせ、完了と経過を引き継ぐ
-    if (prevS?.todos?.length) s = { ...s, todos: mergeTodos(prevS.todos, s.todos, prevN) }
     delete S.busy[id]
-    await saveFile(S.byId.get(id), 's', s, { st: 'ok' })
-    if (marksOf(prevN).length) await mutateNotes(S.byId.get(id), (n) => { n.marks = reconcile(n.marks, summaryTexts(s), SUMMARY_KINDS) })
+    await storeSummary(id, s, prevS, prevN)
     toast(`「${it.title}」を要約しました。`)
   } catch (e) {
     delete S.busy[id]
@@ -1340,8 +1420,9 @@ const notionState = () => (S.worker && S.worker.notion) || null
 function openClaude(a) {
   const id = a?.dataset?.id || ''
   const ns = notionState()
+  if (id && !a.dataset.notion) { openClaudePaste(id); return }
   if (id) {
-    // 会議から開いた：その会議が作業DBに無ければ、開いても別の会議しか出ないので先に伝える
+    // Notion 経由：その会議が作業DBに無ければ、開いても別の会議しか出ないので先に伝える
     if (ns && !ns.ok) { toast('Mac が Notion の作業DBに書き出せていません：' + ns.err, true, 10000); return }
     if (ns && !(ns.ids || []).includes(id)) {
       toast('この会議は、まだ Notion の作業DBに書き出されていません。Mac の次の確認（5分以内）のあとに押してください。', true, 8000)
@@ -1935,7 +2016,7 @@ function openSettings(tab) {
       </section>
       <section class="sset"><h3>Claude.ai で要約するページ</h3>
         <div class="srow"><label for="stClaude" class="sr">リンク</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="空欄なら標準のページ" autocapitalize="off" spellcheck="false"><button class="btn" data-act="claude-save">保存</button></div>
-        <p class="muted sm">ふだんは空欄のままで構いません。別のページで要約したいときだけ、そのリンクを入れます。</p>
+        <p class="muted sm">ふだんは空欄のままで構いません。Claude.ai の特定のプロジェクトで要約したいときは、そのプロジェクトのリンクを入れます。</p>
       </section>
       <p class="msg" id="stMsg" role="status"></p>`)}
 
@@ -1962,7 +2043,9 @@ function openSettings(tab) {
 
     ${pane('share', `
       <section class="sset">
-        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、この端末の AI の接続先です。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
+        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
+        <label class="chk"><input type="checkbox" id="dlAi" ${ls.get('m2.shareAi', true) ? 'checked' : ''}> AI の接続先（URL・API キー）も渡す</label>
+        <p class="muted sm" id="dlAiHint">${ls.get('m2.shareAi', true) ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'}</p>
         <div id="devLink" class="dl" aria-live="polite"></div>
         <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
         <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
@@ -2128,6 +2211,9 @@ const ACT = {
   },
   summarize: (a) => runSummary(a.dataset.id),
   claude: openClaude,
+  'claude-copy': (a) => claudeCopy(a.dataset.id),
+  'claude-take': (a) => claudeTake(a.dataset.id),
+  'claude-notion': (a) => { closeModal(); a.dataset.notion = '1'; openClaude(a) },
   seek: (a) => {
     S.seek = { t: parseT(a.dataset.t), scrolled: false }
     S.dtab = 'tr'
@@ -2284,6 +2370,13 @@ document.addEventListener('change', (e) => {
   if (t.id === 'scopeSel') { S.scope = t.value; renderMain() }
   if (t.id === 'stSel') { S.filter = t.value; renderMain() }
   if (t.id === 'tagSel') { S.tagF = t.value; renderMain() }
+  if (t.id === 'dlAi') {
+    localStorage.setItem('m2.shareAi', JSON.stringify(t.checked))   // この端末だけの選択（GitHub には送らない）
+    $('#dlAiHint').textContent = t.checked ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'
+    $('#dlPassBox').hidden = true
+    const el = $('#devLink'); if (el) { el.innerHTML = ''; delete el.dataset.mounted }
+    mountShare()   // 渡す中身が変わるので、表示中の QR・コードを作り直す
+  }
   if (t.id === 'rangeSel') { S.range = t.value; ls.set('m2.range', S.range); renderMain() }
   if (t.id === 'towner') { S.towner = t.value; renderMain() }
   if (t.id === 'aiSel' && t.value.includes('|')) {
