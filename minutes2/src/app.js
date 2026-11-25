@@ -146,7 +146,8 @@ function showReceive(pkg = null, msg = '') {
         throw err
       }
       if (!data || typeof data.code !== 'string' || !data.code) throw new Error('受け取った内容に権限コードがありません。')
-      await doLogin(data.code, 'recv')
+      const aiMsg = takeAi(data.ai)
+      if (await doLogin(data.code, 'recv') && aiMsg) setTimeout(() => toast(aiMsg, false, 6000), 4200)
     } catch (err) {
       showReceive(got, err.message || '受け取れませんでした。')
     }
@@ -243,7 +244,8 @@ async function boot() {
 }
 
 /* ---------- 設定の保管（GitHub private の settings/<グループ>.json。暗号化して GAS 経由で書く） ----------
-   中身：AI の接続先・Claude.ai のページ・文字の大きさ・一覧の表示・ToDo の期間・お気に入り
+   中身：Claude.ai のページ・文字の大きさ・一覧の表示・ToDo の期間・お気に入り
+   AI の接続先（URL・API キー）は個人の設定なので入れない。この端末だけに置き、他の端末へは「他端末へ設定共有」で一緒に渡す
    会議と同じく「使い捨ての鍵（DEK）で暗号化 → グループの公開鍵で包む」。開けるのは同じグループの端末だけ */
 const SYNC_KEYS = new Set(['m2.fs', 'm2.view', 'm2.range', 'm2.fav', 'm2.claudeUrl'])
 let prefsTimer = 0
@@ -252,12 +254,11 @@ const prefsUpdOf = () => (ls.get('m2.prefsUpd', {}) || {})[S.gid] || 0
 function setPrefsUpd(v) { const m = ls.get('m2.prefsUpd', {}) || {}; m[S.gid] = v; localStorage.setItem('m2.prefsUpd', JSON.stringify(m)) }
 
 function localPrefs() {
-  return { ai: loadSettings(), claudeUrl: ls.get('m2.claudeUrl', ''), fs: S.fs, view: S.view, range: S.range, fav: [...S.fav] }
+  return { claudeUrl: ls.get('m2.claudeUrl', ''), fs: S.fs, view: S.view, range: S.range, fav: [...S.fav] }
 }
 
 function applyPrefs(p) {
   const raw = (k, v) => (v == null || v === '' ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)))   // 送り返さないよう ls.set は使わない
-  if (p.ai && Array.isArray(p.ai.connections)) saveSettingsLocal(p.ai)
   raw('m2.claudeUrl', p.claudeUrl || '')
   if (Number.isInteger(p.fs) && p.fs >= 0 && p.fs < FS_LEVELS.length) { S.fs = p.fs; raw('m2.fs', p.fs); applyFs() }
   if (p.view === 'timeline' || p.view === 'cards') { S.view = p.view; raw('m2.view', p.view) }
@@ -275,6 +276,7 @@ async function pullPrefs() {
       applyPrefs(p)
       setPrefsUpd(f.upd)
       render()
+      if (p.ai) { S.prefsReady = true; await pushPrefs() }   // 以前の形式で入っていた AI の接続先を、GitHub から消す
     } else if (!f || local > f.upd) {
       S.prefsReady = true
       await pushPrefs()
@@ -303,7 +305,26 @@ async function pushPrefs() {
   setPrefsUpd(upd)
 }
 
-function saveSettings(s) { saveSettingsLocal(s); schedulePush() }
+// AI の接続先は個人の設定：この端末にだけ保存し、GitHub（グループ共有）には送らない
+const saveSettings = (s) => saveSettingsLocal(s)
+
+/** 他端末へ渡す AI の接続先（空の接続は省く。QR に収まるよう小さくする） */
+function aiForShare() {
+  const s = loadSettings()
+  const connections = s.connections.filter((c) => c.baseUrl || c.apiKey || (c.models || []).length)
+    .map(({ id, label, baseUrl, apiKey, numCtx, models, think }) => ({ id, label, baseUrl, apiKey, numCtx, models, think }))
+  if (!connections.length) return null
+  return { connections, activeConnectionId: s.activeConnectionId, activeModel: s.activeModel, temperature: s.temperature, systemPrompt: s.systemPrompt }
+}
+
+/** 受け取った AI の接続先を入れる。この端末にすでに接続先があれば上書きしない */
+function takeAi(ai) {
+  if (!ai || !Array.isArray(ai.connections) || !ai.connections.length) return ''
+  const mine = loadSettings()
+  if (mine.connections.some((c) => c.baseUrl)) return 'この端末の AI の接続先はそのままにしました。'
+  saveSettingsLocal({ ...mine, ...ai, connections: ai.connections.map((c) => newConnection(c)) })
+  return 'AI の接続先も受け取りました。'
+}
 
 /* ---------- 他端末へ設定共有（common/devicelink.js） ----------
    渡すのは権限コードだけ。その場で作るパスフレーズ（10文字）で暗号化する。設定は GitHub から自動で入る */
@@ -324,9 +345,21 @@ function mountShare() {
     app: DL_APP,
     getPackage: async () => {
       if (!S.code) throw new Error('ログインし直してください。')
-      if (!dlShare.pkg) dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+      if (!dlShare.pkg) {
+        const ai = aiForShare()
+        dlShare.pkg = await dl.seal({ v: 1, code: S.code, ai }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+        dlShare.noAi = false
+        // QR・中継に収まらないほど大きいときは、権限コードだけ渡す（AI の接続先は受け取った端末で設定）
+        if (ai && dlShare.pkg.length > 1800) {
+          dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+          dlShare.noAi = true
+        }
+      }
       const p = $('#dlPassBox')
-      if (p) { p.hidden = false; $('#dlPassVal').textContent = dlShare.pass }
+      if (p) {
+        p.hidden = false; $('#dlPassVal').textContent = dlShare.pass
+        $('#dlAiNote').textContent = dlShare.noAi ? 'AI の接続先は大きすぎて入れられませんでした。受け取った端末の設定で入れてください。' : ''
+      }
       return dlShare.pkg
     },
   })
@@ -700,7 +733,7 @@ function detailHTML(it) {
   const acts = [
     `<button class="btn sm" data-act="fav" data-id="${it.id}" aria-pressed="${S.fav.has(it.id)}">${S.fav.has(it.id) ? '★ お気に入り' : '☆ お気に入り'}</button>`,
     hasT ? `<button class="btn sm" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${it.st === 'ok' ? '再要約' : '要約する'}</button>` : '',
-    it.st === 'sw' ? '<button class="btn sm" data-act="claude">Claude.ai で要約</button>' : '',
+    it.st === 'sw' ? `<button class="btn sm" data-act="claude" data-id="${it.id}">Claude.ai で要約</button>` : '',
     canEdit ? `<button class="btn sm" data-act="edit" data-id="${it.id}">タイトル・タグ</button>` : '',
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
@@ -752,7 +785,7 @@ function bodyAll(it) {
     let wait
     if (['tw', 'tr'].includes(it.st)) wait = '<p class="muted">Mac の文字起こしが終わると、要約できるようになります。</p>'
     else if (it.st === 'err') wait = `<p class="muted">処理に失敗しました${it.err ? `（${esc(it.err)}）` : ''}。変換管理から再実行できます。</p>`
-    else wait = `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude">Claude.ai で要約</button></div></div>`
+    else wait = `<div class="sumwait"><p>まだ要約されていません。</p><div class="acts"><button class="btn main" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${S.busy[it.id] ? esc(S.busy[it.id]) : '要約する（' + esc(activeModelName(loadSettings()) || 'AI未設定') + '）'}</button><button class="btn" data-act="claude" data-id="${it.id}">Claude.ai で要約</button></div></div>`
     return `<div class="read body">${wait}${memo}</div>`
   }
   if (S.edit && S.edit.id === it.id && S.edit.kind === 'sum') return `<div class="read body">${editorHTML(S.edit.draft)}${memo}</div>`
@@ -962,6 +995,13 @@ function workerLine() {
   }
 }
 
+function notionLine() {
+  const ns = notionState()
+  if (!ns) return ''
+  if (!ns.ok) return `<div class="sm bad-t">Notion の作業DB：書き出せていません（${esc(ns.err)}）</div>`
+  return `<div class="muted sm">Notion の作業DB：要約待ち ${(ns.ids || []).length} 件を書き出し済み</div>`
+}
+
 function convertHTML() {
   const vis = S.items
   const c = (k) => vis.filter((x) => x.st === k).length
@@ -975,7 +1015,7 @@ function convertHTML() {
   const swAll = vis.filter((x) => x.st === 'sw' && !x.locked)
   return `<div class="page conv">
     <div class="cv-top">
-      <div class="panel wk"><span class="dot ${w.ok ? 'ok' : 'bad'}"></span><div class="grow"><div class="strong">${esc(w.t)}</div><div class="muted sm">${w.s}</div></div></div>
+      <div class="panel wk"><span class="dot ${w.ok ? 'ok' : 'bad'}"></span><div class="grow"><div class="strong">${esc(w.t)}</div><div class="muted sm">${w.s}</div>${notionLine()}</div></div>
       <div class="panel"><div class="grow"><div class="strong">要約AI</div><div class="muted sm">URL で指定した AI（この端末の設定）</div></div>
         <label for="aiSel" class="sr">要約AI</label>
         <select id="aiSel">${models.length ? models.map((m) => `<option value="${esc(m.connectionId)}|${esc(m.model)}" ${m.active ? 'selected' : ''}>${esc(m.connectionLabel)}：${esc(m.model)}</option>`).join('') : '<option>未設定</option>'}</select>
@@ -1053,21 +1093,38 @@ async function sumSelected() {
   for (const id of ids) await runSummary(id)
 }
 
-const CLAUDE_PROMPT = '議事録の要約待ちを一覧で表示して、私が選んだものを要約し、Notion の作業DBに書き込んでください。'
 
-function openClaude() {
+/** Claude.ai の要約ページの URL。会議から開いたときは、その会議の ID を #m-xxxx で渡す（そのページで、その会議だけを選ぶ） */
+function claudeUrl(id = '') {
+  const saved = ls.get('m2.claudeUrl', '')
+  if (saved) return saved
+  return CLAUDE_DEFAULT_URL + (id ? '#' + id.replace(/_/g, '-') : '')
+}
+
+/** Mac が Notion の作業DBに書き出した状態（worker.json）。古い Mac のときは null */
+const notionState = () => (S.worker && S.worker.notion) || null
+
+function openClaude(a) {
+  const id = a?.dataset?.id || ''
+  const ns = notionState()
+  if (id) {
+    // 会議から開いた：その会議が作業DBに無ければ、開いても別の会議しか出ないので先に伝える
+    if (ns && !ns.ok) { toast('Mac が Notion の作業DBに書き出せていません：' + ns.err, true, 10000); return }
+    if (ns && !(ns.ids || []).includes(id)) {
+      toast('この会議は、まだ Notion の作業DBに書き出されていません。Mac の次の確認（5分以内）のあとに押してください。', true, 8000)
+      return
+    }
+    window.open(claudeUrl(id), '_blank', 'noopener,noreferrer')
+    toast('Claude.ai を開きました。要約が済むと、Mac の次の確認でここに反映されます。', false, 6000)
+    return
+  }
   const n = S.items.filter((x) => x.st === 'sw' && !x.locked).length
   if (!n) { setNote('要約待ちの議事録はありません。'); return }
-  const saved = ls.get('m2.claudeUrl', '')
-  // 保存したリンクが無ければ、依頼文を入れたチャットを開く（スキル minutes2-claude-summarizer が動く）
-  const url = saved || `${CLAUDE_DEFAULT_URL}?q=${encodeURIComponent(CLAUDE_PROMPT)}`
-  const w = window.open(url, '_blank', 'noopener,noreferrer')
-  if (w === null && !document.hidden && !saved) {
-    // noopener のときは null が返るのが普通なので、ここでは何もしない（開けなかった場合だけ下の案内が役に立つ）
-  }
-  setNote(`Claude.ai を開きました（要約待ち ${n} 件）。開かないときは、ブラウザのポップアップの許可を確かめてください。`
-    + ' Claude.ai が要約を Notion の作業DBに書き込むと、Mac が次の確認（5分以内）で回収し、ここが「要約済み」になります。'
-    + ' 作業DBに要約待ちが無いと言われたら、Mac の .env の NOTION_WORK_DB_ID と、Mac の確認時刻を確かめてください。')
+  if (ns && !ns.ok) { setNote('Mac が Notion の作業DBに書き出せていません：' + ns.err); return }
+  window.open(claudeUrl(), '_blank', 'noopener,noreferrer')
+  const inDb = ns ? (ns.ids || []).length : null
+  setNote(`Claude.ai を開きました（要約待ち ${n} 件${inDb != null && inDb !== n ? `、うち Notion の作業DBに書き出し済み ${inDb} 件` : ''}）。開かないときは、ブラウザのポップアップの許可を確かめてください。`
+    + ' Claude.ai が要約を Notion の作業DBに書き込むと、Mac が次の確認（5分以内）で回収し、ここが「要約済み」になります。')
 }
 
 function setNote(text) {
@@ -1620,14 +1677,14 @@ function openSettings() {
       <div class="fsset" id="fsset" role="group" aria-label="文字の大きさ">${FS_LEVELS.map((l, i) => `<button type="button" class="btn ${i === S.fs ? 'main' : ''}" data-act="fs-set" data-v="${i}" aria-pressed="${i === S.fs}">${l.n}</button>`).join('')}</div>
       <p class="muted sm">本文（要約・文字起こし・ToDo・ノート・マインドマップ）の文字の大きさです。</p>
     </section>
-    <section class="sset"><h3>AI の接続先</h3>
+    <section class="sset"><h3>AI の接続先（個人の設定）</h3>
       <div class="fcol"><label for="stConn">接続</label><select id="stConn">${s.connections.map((x) => `<option value="${esc(x.id)}" ${x.id === c.id ? 'selected' : ''}>${esc(x.label || '名前なし')}</option>`).join('')}</select></div>
       <div class="frow"><div class="fcol grow2"><label for="stLabel">名前</label><input id="stLabel" value="${esc(c.label)}"></div><div class="fcol"><label for="stCtx">num_ctx</label><input id="stCtx" inputmode="numeric" value="${esc(c.numCtx)}"></div></div>
       <div class="fcol"><label for="stUrl">URL（OpenAI 互換。例：https://xxxx.ngrok-free.app/v1）</label><input id="stUrl" value="${esc(c.baseUrl)}" autocapitalize="off" spellcheck="false"></div>
       <div class="fcol"><label for="stKey">API キー</label><input id="stKey" type="password" value="${esc(c.apiKey)}" autocomplete="off"></div>
       <div class="fcol"><label for="stModels">モデル（カンマ区切り。先頭を使います）</label><input id="stModels" value="${esc((c.models || []).join(', '))}" autocapitalize="off" spellcheck="false"></div>
       <div class="acts"><button class="btn main" data-act="ai-save">保存</button><button class="btn" data-act="ai-add">接続を追加</button>${s.connections.length > 1 ? '<button class="btn danger" data-act="ai-del">この接続を消す</button>' : ''}</div>
-      <p class="muted sm">ほかの自作アプリ（gemma-chat・今の議事録）と同じ設定を使います。</p>
+      <p class="muted sm">この端末にだけ保存し、GitHub（グループで共有する設定）には送りません。自分の別の端末へは「他端末へ設定共有」で権限コードと一緒に渡せます。ほかの自作アプリ（gemma-chat・今の議事録）と同じ設定を使います。</p>
     </section>
     <section class="sset"><h3>Claude.ai で要約するページ</h3>
       <p class="muted sm">空のままなら、依頼文を入れた新しいチャットを開きます（おすすめ）。スキル minutes2-claude-summarizer を Claude.ai に入れておいてください。</p>
@@ -1654,10 +1711,10 @@ function openSettings() {
       <p class="msg" id="bioMsg"></p>
     </section>
     <section class="sset"><h3>他端末へ設定共有</h3>
-      <p class="muted sm">設定（AI の接続先・Claude.ai のページ・文字の大きさ・表示・お気に入り）は ${esc(where)} の settings/${esc(S.gid || '')}.json に、暗号化して保存しています。同じ権限コードで開いた端末には自動で反映されます。</p>
+      <p class="muted sm">設定（Claude.ai のページ・文字の大きさ・表示・お気に入り）は ${esc(where)} の settings/${esc(S.gid || '')}.json に、暗号化して保存しています。同じ権限コードで開いた端末には自動で反映されます。</p>
       <div id="devLink" class="dl" aria-live="polite"></div>
-      <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span></div>
-      <p class="hint">渡す中身（権限コード）はパスフレーズで暗号化してあります。受け取った端末でパスフレーズを入れると、権限コードを入れずに使えます。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
+      <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
+      <p class="hint">渡す中身（権限コードと、この端末の AI の接続先）はパスフレーズで暗号化してあります。受け取った端末でパスフレーズを入れると、権限コードを入れずに使えます。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
       <button type="button" class="btn danger wide" data-act="forget-conn">この端末から接続情報を消去してロック</button>
     </section>
     <p class="msg" id="stMsg" role="status"></p>`, { wide: true })

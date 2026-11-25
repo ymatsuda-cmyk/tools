@@ -40,6 +40,11 @@ class Worker:
         self.admin_gid = admin["gid"]
         self.admin_priv = jwk_to_priv(admin["priv"])
         self.dek_cache = {}
+        self.notion = None   # Claude.ai との受け渡しの状態（worker.json に載せて、アプリに見せる）。前回の値から始める
+        try:
+            self.notion = json.loads(STATE.read_text()).get("notion") if STATE.exists() else None
+        except ValueError:
+            self.notion = None
         self.stats = {"取り込み": 0, "文字起こし": 0, "Notionへ書き出し": 0, "要約を回収": 0}   # 1回の確認でやったこと（最後にログへ1行で残す）
 
     # ---------- 共通 ----------
@@ -82,12 +87,14 @@ class Worker:
                 st = {}
         now = int(time.time() * 1000)
         # 毎回コミットすると履歴が増えるので、状態が変わったときと 15 分ごとだけ書く
-        if not force and st.get("busy") == busy and now - st.get("at", 0) < 15 * 60 * 1000:
+        if not force and st.get("busy") == busy and st.get("notion") == self.notion and now - st.get("at", 0) < 15 * 60 * 1000:
             return
         body = {"at": now, "every": EVERY, "busy": busy, "asr": MODEL.split("/")[-1]}
+        if self.notion is not None:
+            body["notion"] = self.notion   # {ok, err, ids: 作業DBに要約待ちで置いてある議事録ID}
         try:
             self.gh.write("worker.json", json.dumps(body), "worker")
-            STATE.write_text(json.dumps({"at": now, "busy": busy}))
+            STATE.write_text(json.dumps({"at": now, "busy": busy, "notion": self.notion}))
         except Exception as ex:  # noqa: BLE001  確認時刻が書けなくても本処理は続ける
             log(f"worker.json を書けませんでした: {ex}")
 
@@ -144,8 +151,21 @@ class Worker:
     def notion_bridge(self, index):
         token, db = ENV.get("NOTION_TOKEN"), ENV.get("NOTION_WORK_DB_ID")
         if not token or not db:
+            if any(e.get("st") == "sw" for e in index):
+                log("要約待ちがありますが、.env の NOTION_TOKEN / NOTION_WORK_DB_ID が空のため、Notion の作業DBへ書き出していません")
+            self.notion = {"ok": False, "err": "Mac の .env に NOTION_TOKEN / NOTION_WORK_DB_ID がありません", "ids": []}
             return
-        n = Notion(token, db)
+        try:
+            self._notion_bridge(Notion(token, db), index)
+        except Exception as ex:  # noqa: BLE001  受け渡しが失敗しても、文字起こしなどは続ける
+            msg = str(ex)
+            if "404" in msg:
+                msg = ("作業DBが見つかりません（NOTION_WORK_DB_ID がデータベースのID〈URLの32桁〉か、"
+                       "インテグレーションをDBに接続したかを確かめてください）: " + msg)
+            log(f"Notion の作業DBとの受け渡しに失敗しました: {msg}")
+            self.notion = {"ok": False, "err": msg[:300], "ids": []}
+
+    def _notion_bridge(self, n, index):
         pages = n.pages()  # {議事録ID: page}
         by_id = {e["id"]: e for e in index}
 
@@ -184,10 +204,12 @@ class Worker:
                 meta = open_json(self.dek(e), e["m"])
                 t = self.read_file(e, "t") or {}
                 n.create(e["id"], meta.get("title") or "（無題）", e.get("date", ""), e.get("dur", 0), t.get("segments") or [])
+                pages[e["id"]] = {"properties": {"状態": {"select": {"name": "要約待ち"}}}}
                 self.stats["Notionへ書き出し"] += 1
                 log(f"{e['id']}: Notion の作業DBへ書き出し")
             except Exception as ex:  # noqa: BLE001
                 log(f"{e['id']}: Notion へ書き出せません {ex}")
+        self.notion = {"ok": True, "err": "", "ids": sorted(eid for eid, p in pages.items() if n.status(p) == "要約待ち")}
 
     # ---------- 実行 ----------
 

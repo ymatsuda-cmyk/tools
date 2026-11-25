@@ -60,6 +60,20 @@ button:disabled{cursor:default;opacity:.55}
 .gate-or{text-align:center;color:var(--cloth-mute);font-size:12.5px}
 .gate-msg{min-height:1.4em;margin:0;text-align:center;color:#ffd3c9;font-size:13.5px}
 .gate .link.danger{color:#f4b4a6;align-self:center}
+.gate .link.gate-link{color:var(--cloth-ink);align-self:center;font-size:13.5px}
+.gate-form input#dlPass,.gate-form input#dlCode{font-size:18px;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+
+/* 設定：他端末へ設定共有（common/devicelink.js の部品。CSP で style 属性が効かないので、ここで見た目を付ける） */
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}
+.chk input{width:18px;height:18px}
+.dl > div:first-child{display:flex;flex-wrap:wrap;gap:8px}
+.dl button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--sheet);border-radius:8px;padding:8px 14px;min-height:38px;line-height:1.3}
+.dl [data-dl=out]{display:grid;justify-items:center;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;text-align:center}
+.dl [data-dl=out] > div:has(svg){background:#fff;padding:10px;border-radius:8px;width:min(260px,100%);line-height:0}
+.dl [data-dl=out] > div:not(:has(svg)){font-size:34px;letter-spacing:.12em;font-variant-numeric:tabular-nums;font-weight:500}
+.dl [data-dl=out] p{margin:0;font-size:12px;color:var(--muted)}
+.dlpass{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:10px 12px;border:1px dashed var(--foil);border-radius:10px;background:var(--foil-soft)}
+.dlpass-v{font:700 20px/1.2 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.08em;color:var(--foil-text);user-select:all}
 
 /* アプリの骨組み */
 #app{height:100dvh;display:flex;flex-direction:column}
@@ -421,3 +435,4 @@ details[open]>summary.mm-n::before{content:"▾"}
   .mcolors{margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none !important;scroll-behavior:auto !important} }
+.bad-t{color:var(--danger)}
