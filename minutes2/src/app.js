@@ -3,9 +3,10 @@ import { GAS_URL, POLL_MS, CLAUDE_DEFAULT_URL, WORKER_EVERY_SEC, MARK_TAGS } fro
 import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd } from './crypto.js'
 import { gas, repo } from './store.js'
 import { bioOk, bioRegistered, bioRegister, bioUnlock, bioForget } from './bio.js'
+import { autoEnabled, setAutoEnabled, autoSaved, autoSave, autoLoad, autoForget } from './autoopen.js'
 import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText } from './summary.js'
 import { parseSummaryText, summaryTypeLabel } from './summary-text.js'
-import { loadSettings, saveSettings, newConnection, activeConnection, activeModelName, allModels, connectionOf } from './llm-settings.js'
+import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf } from './llm-settings.js'
 import { streamChat } from './llm-client.js'
 import { groupMarks, marksOf, validFor, renderMarked, applyRange, recolor, reconcile, summaryTexts, trTexts, withTimes, locCompare, locLabel, locTab, kindOf, SUMMARY_KINDS } from './marks.js'
 import { todoKey, doneOf, logsOf, mergeTodos } from './todos.js'
@@ -19,8 +20,8 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)]
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const ls = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v) } catch { return d } },
-  set(k, v) { localStorage.setItem(k, JSON.stringify(v)) },
-  del(k) { localStorage.removeItem(k) },
+  set(k, v) { localStorage.setItem(k, JSON.stringify(v)); if (SYNC_KEYS.has(k)) schedulePush() },
+  del(k) { localStorage.removeItem(k); if (SYNC_KEYS.has(k)) schedulePush() },
 }
 const pad = (n) => String(n).padStart(2, '0')
 const WD = ['日', '月', '火', '水', '木', '金', '土']
@@ -50,7 +51,7 @@ const S = {
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
-  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0,
+  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false,
 }
 const DEK = new Map()
 const META = new Map()
@@ -78,45 +79,102 @@ function setFs(i) {
 }
 
 /* ---------- ログイン ---------- */
-function showGate(msg = '') {
+// 開き方：auto（この端末の控え）／typed（入力）／bio（Face ID）／recv（他の端末から受け取り）／change（設定で変更）
+const DL_APP = 'minutestock'
+const DL = () => window.DeviceLink
+const DL_MISSING = '受け渡しの部品（common/devicelink.js）を読み込めませんでした。オンラインで開き直してください。'
+const LOCKED = 'm2.locked'   // 鍵をかけたあとは、このタブを閉じるまで自動で開かない
+
+function gateShell(inner) {
   clearInterval(S.timer)
   $('#app').hidden = true
   $('#gate').hidden = false
+  $('#gate').innerHTML = `<div class="gate-card"><h1 class="gate-title">MinuteStock</h1>${inner}</div>`
+}
+
+function showGate(msg = '') {
   const bio = bioOk() && bioRegistered()
-  $('#gate').innerHTML = `
-    <div class="gate-card">
-      <h1 class="gate-title">MinuteStock</h1>
+  const saved = autoEnabled() && autoSaved()
+  gateShell(`
       <p class="gate-sub">暗号化して保管しています。開くには権限コードが必要です。</p>
-      ${bio ? '<button class="btn main wide" data-act="bio">Face ID・Touch ID で開く</button><div class="gate-or">または</div>' : ''}
+      ${saved ? '<button class="btn main wide" data-act="auto-open">開く</button><div class="gate-or">または</div>' : ''}
+      ${bio ? `<button class="btn ${saved ? '' : 'main'} wide gate-alt" data-act="bio">Face ID・Touch ID で開く</button><div class="gate-or">または</div>` : ''}
       <form id="loginForm" class="gate-form">
         <label for="code">権限コード</label>
         <input id="code" type="password" autocomplete="current-password" required>
-        <button class="btn ${bio ? '' : 'main'} wide" type="submit">開く</button>
+        <button class="btn ${bio || saved ? '' : 'main'} wide" type="submit">${bio || saved ? '権限コードで開く' : '開く'}</button>
       </form>
+      <button class="link gate-link" data-act="recv">コードで受け取る（別の端末から）</button>
       <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
-      ${bio || ls.get('m2.seen', null) ? '<button class="link danger" data-act="reset">この端末の設定を消して、最初から設定する</button>' : ''}
-    </div>`
+      ${bio || saved || ls.get('m2.seen', null) ? '<button class="link danger" data-act="reset">この端末の設定を消して、最初から設定する</button>' : ''}`)
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault()
     const code = $('#code').value.trim()
-    if (!code) return
-    await doLogin(code, true)
+    if (code) await doLogin(code, 'typed')
   })
-  if (!bio) $('#code')?.focus()
+  if (!bio && !saved) $('#code')?.focus()
 }
 
-async function doLogin(code, typed) {
+/** 他の端末から受け取る。pkg があれば（QR・リンク、またはコードで受け取り済み）パスフレーズだけ聞く */
+function showReceive(pkg = null, msg = '') {
+  gateShell(`
+      <p class="gate-sub">${pkg ? '別の端末から設定を受け取りました。渡した端末に表示されたパスフレーズを入れてください。'
+        : '渡す端末の 設定 →「他端末へ設定共有」→「コードを発行」で表示された6桁のコードと、パスフレーズを入れてください。'}</p>
+      <form id="recvForm" class="gate-form">
+        ${pkg ? '' : '<label for="dlCode">コード（6桁）</label><input id="dlCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>'}
+        <label for="dlPass">パスフレーズ</label>
+        <input id="dlPass" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例：ABCDE-FGHJK" required>
+        <button class="btn main wide" type="submit">受け取って開く</button>
+      </form>
+      <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
+      <button class="link gate-link" data-act="gate">権限コードで開く</button>`)
+  $(pkg ? '#dlPass' : '#dlCode')?.focus()
+  $('#recvForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const m = $('#gateMsg')
+    const dl = DL()
+    if (!dl) { m.textContent = DL_MISSING; return }
+    $$('#gate button').forEach((b) => { b.disabled = true })
+    let got = pkg
+    try {
+      m.textContent = '受け取っています…'
+      if (!got) got = await dl.receiveCode(DL_APP, $('#dlCode').value)
+      let data
+      try { data = await dl.open(got, normPass($('#dlPass').value)) } catch (err) {
+        // コードは1回きりなので、受け取った包みを持ったまま、パスフレーズだけ聞き直す
+        if (err.message === 'BADPASS') { showReceive(got, 'パスフレーズが違います。渡した端末に表示されているものを入れてください。'); return }
+        throw err
+      }
+      if (!data || typeof data.code !== 'string' || !data.code) throw new Error('受け取った内容に権限コードがありません。')
+      await doLogin(data.code, 'recv')
+    } catch (err) {
+      showReceive(got, err.message || '受け取れませんでした。')
+    }
+  })
+}
+
+async function doLogin(code, how = 'typed') {
   const m = $('#gateMsg')
   if (m) m.textContent = '確認しています…'
   $$('#gate button').forEach((b) => { b.disabled = true })
   try {
     if (GAS_URL.includes('ここに')) throw new Error('src/config.js の GAS_URL が未設定です。')
     await login(code)
+    sessionStorage.removeItem(LOCKED)
+    if (how !== 'auto' && how !== 'bio' && autoEnabled()) await autoSave(code).catch(() => {})
     await start()
-    if (typed && bioOk() && !bioRegistered() && !ls.get('m2.bioAsked', false)) askBio()
+    if (how === 'typed' && !autoEnabled() && bioOk() && !bioRegistered() && !ls.get('m2.bioAsked', false)) askBio()
+    if (how === 'recv') toast(`この端末で使えるようにしました（グループ：${S.admin ? '管理者' : S.role}）。`)
+    return true
   } catch (e) {
     S.code = null
-    showGate(e.message || '開けませんでした。')
+    let msg = e.message || '開けませんでした。'
+    if (how === 'auto' && /権限コードが違います/.test(msg)) {
+      await autoForget()
+      msg = 'この端末に覚えていた権限コードが使えなくなりました（変更された可能性があります）。新しい権限コードで開くか、別の端末から受け取ってください。'
+    }
+    showGate(msg)
+    return false
   }
 }
 
@@ -144,12 +202,19 @@ async function gasS(action, body) {
   return gas(action, { session: S.session, ...body })
 }
 
-function lock() {
+/** 読み込んだ議事録・鍵を手放す（画面はそのまま） */
+function clearData() {
   clearInterval(S.timer)
+  clearTimeout(prefsTimer)
   hideBar()
-  Object.assign(S, { code: null, privs: {}, gh: null, R: null, session: null, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '' })
-  S.byId = new Map(); DEK.clear(); META.clear()
+  Object.assign(S, { code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null, session: null, exp: 0, pub: {}, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '', edit: null, prefsReady: false })
+  S.byId = new Map(); S.checked = new Set(); DEK.clear(); META.clear()
   closeModal()
+}
+
+function lock() {
+  sessionStorage.setItem(LOCKED, '1')
+  clearData()
   showGate()
 }
 
@@ -161,11 +226,118 @@ function askBio() {
     <p class="msg" id="bioMsg"></p>`)
 }
 
+/** 起動：リンク・QR で開かれたら受け取り、控えがあれば自動で開く */
+async function boot() {
+  let pkg = null
+  try { pkg = DL()?.fromURL(DL_APP) || null } catch (e) {
+    showGate(e.message === 'DeviceLink の形式ではありません' ? 'リンクを読み取れませんでした。渡す端末でもう一度コピーし直してください。' : e.message)
+    return
+  }
+  if (pkg) { showReceive(pkg); return }
+  if (autoEnabled() && autoSaved() && !sessionStorage.getItem(LOCKED)) {
+    gateShell('<p class="gate-sub">開いています…</p><p class="gate-msg" id="gateMsg" role="status"></p>')
+    const code = await autoLoad()
+    if (code) { await doLogin(code, 'auto'); return }
+  }
+  showGate()
+}
+
+/* ---------- 設定の保管（GitHub private の settings/<グループ>.json。暗号化して GAS 経由で書く） ----------
+   中身：AI の接続先・Claude.ai のページ・文字の大きさ・一覧の表示・ToDo の期間・お気に入り
+   会議と同じく「使い捨ての鍵（DEK）で暗号化 → グループの公開鍵で包む」。開けるのは同じグループの端末だけ */
+const SYNC_KEYS = new Set(['m2.fs', 'm2.view', 'm2.range', 'm2.fav', 'm2.claudeUrl'])
+let prefsTimer = 0
+const prefsPath = () => `settings/${S.gid}.json`
+const prefsUpdOf = () => (ls.get('m2.prefsUpd', {}) || {})[S.gid] || 0
+function setPrefsUpd(v) { const m = ls.get('m2.prefsUpd', {}) || {}; m[S.gid] = v; localStorage.setItem('m2.prefsUpd', JSON.stringify(m)) }
+
+function localPrefs() {
+  return { ai: loadSettings(), claudeUrl: ls.get('m2.claudeUrl', ''), fs: S.fs, view: S.view, range: S.range, fav: [...S.fav] }
+}
+
+function applyPrefs(p) {
+  const raw = (k, v) => (v == null || v === '' ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)))   // 送り返さないよう ls.set は使わない
+  if (p.ai && Array.isArray(p.ai.connections)) saveSettingsLocal(p.ai)
+  raw('m2.claudeUrl', p.claudeUrl || '')
+  if (Number.isInteger(p.fs) && p.fs >= 0 && p.fs < FS_LEVELS.length) { S.fs = p.fs; raw('m2.fs', p.fs); applyFs() }
+  if (p.view === 'timeline' || p.view === 'cards') { S.view = p.view; raw('m2.view', p.view) }
+  if (typeof p.range === 'string' && p.range) { S.range = p.range; raw('m2.range', p.range) }
+  if (Array.isArray(p.fav)) { S.fav = new Set(p.fav); raw('m2.fav', p.fav) }
+}
+
+/** ログイン直後：GitHub の設定が新しければ取り込み、手元が新しければ送る */
+async function pullPrefs() {
+  try {
+    const f = await S.R.json(prefsPath())
+    const local = prefsUpdOf()
+    if (f && f.upd > local && f.k && f.d && S.privs[S.gid]) {
+      const p = await openJson(await unwrapDek(f.k, S.privs[S.gid]), f.d)
+      applyPrefs(p)
+      setPrefsUpd(f.upd)
+      render()
+    } else if (!f || local > f.upd) {
+      S.prefsReady = true
+      await pushPrefs()
+    }
+  } catch (e) {
+    console.warn('設定の読み込みに失敗:', e)
+  } finally {
+    S.prefsReady = true
+  }
+}
+
+function schedulePush() {
+  if (!S.R || !S.prefsReady) return
+  clearTimeout(prefsTimer)
+  prefsTimer = setTimeout(() => { pushPrefs().catch((e) => toast('設定を GitHub に保存できませんでした：' + e.message, true)) }, 1500)
+}
+
+async function pushPrefs() {
+  if (!S.R || !S.prefsReady) return
+  const pub = S.pub[S.gid]
+  if (!pub) throw new Error('グループの公開鍵が見つかりません')
+  const upd = Date.now()
+  const dek = newDek()
+  const file = { v: 1, upd, k: await wrapDek(dek, pub), d: await sealJson(dek, localPrefs()) }
+  await gasS('putSettings', { file })
+  setPrefsUpd(upd)
+}
+
+function saveSettings(s) { saveSettingsLocal(s); schedulePush() }
+
+/* ---------- 他端末へ設定共有（common/devicelink.js） ----------
+   渡すのは権限コードだけ。その場で作るパスフレーズ（10文字）で暗号化する。設定は GitHub から自動で入る */
+const PASS_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const newPass = () => { const s = [...rnd(10)].map((x) => PASS_ABC[x % 32]).join(''); return `${s.slice(0, 5)}-${s.slice(5)}` }
+const normPass = (v) => { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return s.length === 10 ? `${s.slice(0, 5)}-${s.slice(5)}` : String(v || '').trim() }
+let dlPanel = null
+let dlShare = null   // { pass, pkg } 設定画面を開いている間だけ同じパスフレーズを使う
+
+function mountShare() {
+  dlPanel?.destroy(); dlPanel = null
+  const el = $('#devLink')
+  if (!el) return
+  const dl = DL()
+  if (!dl) { el.innerHTML = `<p class="msg">${esc(DL_MISSING)}</p>`; return }
+  dlShare = { pass: newPass(), pkg: null }
+  dlPanel = dl.panel(el, {
+    app: DL_APP,
+    getPackage: async () => {
+      if (!S.code) throw new Error('ログインし直してください。')
+      if (!dlShare.pkg) dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+      const p = $('#dlPassBox')
+      if (p) { p.hidden = false; $('#dlPassVal').textContent = dlShare.pass }
+      return dlShare.pkg
+    },
+  })
+}
+
 /* ---------- 読み込み ---------- */
 async function start() {
   $('#gate').hidden = true
   $('#app').hidden = false
   await refresh(true)
+  await pullPrefs()
   clearInterval(S.timer)
   S.timer = setInterval(() => { if (!document.hidden) refresh() }, POLL_MS)
 }
@@ -1441,12 +1613,14 @@ function openSettings() {
   const s = loadSettings()
   const c = activeConnection(s) || newConnection()
   const bio = bioOk()
+  const auto = autoEnabled()
+  const where = S.gh ? `${S.gh.owner}/${S.gh.repo}` : 'データ用リポジトリ'
   modal('設定', `
     <section class="sset"><h3>文字の大きさ</h3>
       <div class="fsset" id="fsset" role="group" aria-label="文字の大きさ">${FS_LEVELS.map((l, i) => `<button type="button" class="btn ${i === S.fs ? 'main' : ''}" data-act="fs-set" data-v="${i}" aria-pressed="${i === S.fs}">${l.n}</button>`).join('')}</div>
-      <p class="muted sm">本文（要約・文字起こし・ToDo・ノート・マインドマップ）の文字の大きさです。この端末に保存され、次回も同じ大きさで開きます。</p>
+      <p class="muted sm">本文（要約・文字起こし・ToDo・ノート・マインドマップ）の文字の大きさです。</p>
     </section>
-    <section class="sset"><h3>AI の接続先（この端末だけ）</h3>
+    <section class="sset"><h3>AI の接続先</h3>
       <div class="fcol"><label for="stConn">接続</label><select id="stConn">${s.connections.map((x) => `<option value="${esc(x.id)}" ${x.id === c.id ? 'selected' : ''}>${esc(x.label || '名前なし')}</option>`).join('')}</select></div>
       <div class="frow"><div class="fcol grow2"><label for="stLabel">名前</label><input id="stLabel" value="${esc(c.label)}"></div><div class="fcol"><label for="stCtx">num_ctx</label><input id="stCtx" inputmode="numeric" value="${esc(c.numCtx)}"></div></div>
       <div class="fcol"><label for="stUrl">URL（OpenAI 互換。例：https://xxxx.ngrok-free.app/v1）</label><input id="stUrl" value="${esc(c.baseUrl)}" autocapitalize="off" spellcheck="false"></div>
@@ -1460,15 +1634,31 @@ function openSettings() {
       <div class="fcol"><label for="stClaude">リンク（特定のプロジェクトで開きたいときだけ）</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="${CLAUDE_DEFAULT_URL}" autocapitalize="off" spellcheck="false"></div>
       <div class="acts"><button class="btn" data-act="claude-save">保存</button></div>
     </section>
+    <section class="sset"><h3>権限コード</h3>
+      <p class="sm">いまのグループ：<span class="strong">${esc(S.admin ? '管理者' : S.role)}</span></p>
+      <form id="codeForm" class="fcol" autocomplete="off">
+        <label for="stCode">新しい権限コード</label>
+        <div class="frow"><input id="stCode" class="grow" type="password" autocomplete="new-password" required><button class="btn" type="submit">変更する</button></div>
+      </form>
+      <p class="msg" id="codeMsg" role="status"></p>
+      <label class="chk"><input type="checkbox" id="stAuto" ${auto ? 'checked' : ''}> この端末では自動で開く</label>
+      <p class="muted sm">${auto ? '権限コードを、この端末の中だけで取り出せる鍵で暗号化して覚えておき、次から入力なしで開きます。端末を人に使われる心配があるときはオフにしてください。'
+        : 'オフのときは、開くたびに権限コード（または Face ID・Touch ID）を使います。'}</p>
+      <div class="acts"><button class="btn" data-act="lock">鍵をかける</button><button class="btn danger" data-act="reset">この端末の設定を消す</button></div>
+    </section>
     <section class="sset"><h3>Face ID・Touch ID</h3>
       ${!bio ? '<p class="muted sm">このブラウザでは使えません（https で開いた、対応する端末が必要です）。</p>'
         : bioRegistered() ? '<p class="sm">登録済みです。権限コードでも開けます。</p><div class="acts"><button class="btn" data-act="bio-off">解除</button></div>'
           : '<p class="sm">権限コードを、この端末の生体認証で包んで置きます。</p><div class="acts"><button class="btn" data-act="bioReg">登録する</button></div>'}
+      ${bio && auto ? '<p class="muted sm">「自動で開く」がオンの間は使いません。鍵をかけたあとに開くときに使えます。</p>' : ''}
       <p class="msg" id="bioMsg"></p>
     </section>
-    <section class="sset"><h3>ログイン</h3>
-      <p class="sm">グループ：${esc(S.admin ? '管理者' : S.role)}</p>
-      <div class="acts"><button class="btn" data-act="lock">鍵をかける</button><button class="btn danger" data-act="reset">この端末の設定を消す</button></div>
+    <section class="sset"><h3>他端末へ設定共有</h3>
+      <p class="muted sm">設定（AI の接続先・Claude.ai のページ・文字の大きさ・表示・お気に入り）は ${esc(where)} の settings/${esc(S.gid || '')}.json に、暗号化して保存しています。同じ権限コードで開いた端末には自動で反映されます。</p>
+      <div id="devLink" class="dl" aria-live="polite"></div>
+      <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span></div>
+      <p class="hint">渡す中身（権限コード）はパスフレーズで暗号化してあります。受け取った端末でパスフレーズを入れると、権限コードを入れずに使えます。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
+      <button type="button" class="btn danger wide" data-act="forget-conn">この端末から接続情報を消去してロック</button>
     </section>
     <p class="msg" id="stMsg" role="status"></p>`, { wide: true })
   $('#stConn').addEventListener('change', (e) => {
@@ -1476,6 +1666,32 @@ function openSettings() {
     const c2 = activeConnection(s2); s2.activeModel = c2?.models?.[0] ?? null
     saveSettings(s2); openSettings()
   })
+  $('#codeForm').addEventListener('submit', (e) => { e.preventDefault(); changeCode() })
+  mountShare()
+}
+
+/** 設定から権限コードを変える（この端末で使うコードを入れ替える。グループが変われば見られる会議も変わる） */
+async function changeCode() {
+  const code = $('#stCode')?.value.trim()
+  const m = $('#codeMsg')
+  if (!code || !m) return
+  if (code === S.code) { m.textContent = 'いまと同じ権限コードです。'; return }
+  if (S.edit) { m.textContent = '編集中の内容を保存するか取り消してから変えてください。'; return }
+  m.textContent = '確認しています…'
+  try { await gas('login', { code }) } catch (e) { m.textContent = e.message; return }   // 先に確かめて、違っていたら今のまま
+  if (bioRegistered()) bioForget()   // Face ID が包んでいるのは古いコードなので外す
+  clearData()
+  gateShell('<p class="gate-sub">権限コードを切り替えています…</p><p class="gate-msg" id="gateMsg" role="status"></p>')
+  if (await doLogin(code, 'change')) toast(`権限コードを変更しました（グループ：${S.admin ? '管理者' : S.role}）。`)
+}
+
+async function toggleAuto(on) {
+  setAutoEnabled(on)
+  try {
+    if (on && S.code) await autoSave(S.code)
+    if (!on) await autoForget()
+  } catch (e) { toast('この端末に覚えられませんでした：' + e.message, true) }
+  openSettings()
 }
 
 function saveAI() {
@@ -1501,7 +1717,7 @@ function modal(title, body, opt = {}) {
   const first = $('#modal input, #modal textarea, #modal select, #modal button:not(.x)')
   first?.focus()
 }
-function closeModal() { $('#modal').innerHTML = '' }
+function closeModal() { dlPanel?.destroy(); dlPanel = null; dlShare = null; $('#modal').innerHTML = '' }
 
 let toastTimer = 0
 function toast(text, bad = false, ms = 4000) {
@@ -1515,17 +1731,32 @@ function toast(text, bad = false, ms = 4000) {
 /* ---------- 操作 ---------- */
 const ACT = {
   bio: async () => {
-    try { const code = await bioUnlock(); await doLogin(code, false) } catch (e) { showGate(e?.name === 'NotAllowedError' ? '取り消されました。権限コードでも開けます。' : e.message) }
+    try { const code = await bioUnlock(); await doLogin(code, 'bio') } catch (e) { showGate(e?.name === 'NotAllowedError' ? '取り消されました。権限コードでも開けます。' : e.message) }
   },
   bioReg: async () => {
     const m = $('#bioMsg')
     try { await bioRegister(S.code); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
   },
   'bio-off': () => { bioForget(); openSettings() },
-  reset: () => {
-    if (!confirm('この端末の設定（Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先は残ります。よろしいですか？')) return
-    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs']) ls.del(k)
+  reset: async () => {
+    if (!confirm('この端末の設定（覚えている権限コード・Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先と、GitHub に保存した設定は残ります。よろしいですか？')) return
+    clearData()   // 先に接続を切って、消した設定が GitHub に送られないようにする
+    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff']) localStorage.removeItem(k)
+    await autoForget()
     S.fav = new Set(); S.seen = {}; S.fs = 1; applyFs()
+    lock()
+  },
+  'auto-open': async () => {
+    const code = await autoLoad()
+    if (code) await doLogin(code, 'auto'); else showGate('この端末に覚えていた権限コードを読めませんでした。権限コードで開いてください。')
+  },
+  recv: () => showReceive(),
+  gate: () => showGate(),
+  'code-change': changeCode,
+  'forget-conn': async () => {
+    if (!confirm('この端末から接続情報（覚えている権限コード・Face ID の登録）を消去してロックします。設定そのものは GitHub に残ります。')) return
+    await autoForget()
+    bioForget()
     lock()
   },
   lock,
@@ -1726,6 +1957,7 @@ document.addEventListener('change', (e) => {
   const t = e.target
   if (t.dataset.chk) { if (t.checked) S.checked.add(t.dataset.chk); else S.checked.delete(t.dataset.chk); renderMain() }
   if (t.dataset.todo) { toggleTodo(t.dataset.todo, t.dataset.k, t.checked); t.closest('li')?.classList.toggle('done', t.checked) }
+  if (t.id === 'stAuto') toggleAuto(t.checked)
   if (t.id === 'rangeSel') { S.range = t.value; ls.set('m2.range', S.range); renderMain() }
   if (t.id === 'towner') { S.towner = t.value; renderMain() }
   if (t.id === 'aiSel' && t.value.includes('|')) {
@@ -1758,4 +1990,4 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
 
 applyFs()
 const scrollHide = initScrollHide($('#app'), matchMedia('(max-width: 1024px), (pointer: coarse)'))
-showGate()
+boot()
