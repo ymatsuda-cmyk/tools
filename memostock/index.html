@@ -171,6 +171,8 @@ main{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 #panes .host .cm-h3{font-size:calc(var(--fs) + 3pt);font-weight:700}
 #panes .host .cm-h4{font-size:calc(var(--fs) + 1.5pt);font-weight:700}
 #panes .host .cm-hmark{color:var(--muted);font-weight:400}
+#panes .host .cm-task{width:1.05em;height:1.05em;margin:0 .45em 0 .1em;vertical-align:-.12em;accent-color:var(--accent);cursor:pointer}
+#panes .host .cm-done{color:var(--muted);text-decoration:line-through}
 #panes .host .cm-tbl{padding:6px 28px;display:flex;align-items:flex-start;outline:none}
 #panes .host .cm-tbl .ind{white-space:pre;flex:none}
 #panes .host .cm-tbl .tbox{position:relative;flex:0 0 auto}
@@ -1437,6 +1439,28 @@ function hitsIn(text, terms = hlTerms){
 const commentRe = /\[([^\[\]\n]+)\]\(c:([\w-]+)\)/g;
 const refreshFx = StateEffect.define();
 const markRe = /==([^=\n](?:[^\n]*?[^=\n])?)==/g;
+// Markdown のタスクリスト「- [ ] 」「- [x] 」（空白なしの「- []」も可）を、クリックで切り替えられるチェックボックスにする
+const taskRe = /^([ \t]*)- \[([ xX]?)\](?= |$)/;
+class CheckWidget extends WidgetType {
+  constructor(checked){ super(); this.checked = checked; }
+  eq(o){ return o.checked === this.checked; }
+  toDOM(view){
+    const b = document.createElement('input');
+    b.type = 'checkbox'; b.className = 'cm-task'; b.checked = this.checked;
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      const pos = view.posAtDOM(b);
+      const line = view.state.doc.lineAt(pos);
+      const m = taskRe.exec(line.text);
+      if (!m) return;
+      const at = line.from + m[1].length + 3;
+      view.dispatch({ changes:{ from:at, to:at + m[2].length, insert: /x/i.test(m[2]) ? ' ' : 'x' } });
+    });
+    return b;
+  }
+  ignoreEvent(){ return true; }
+}
 function buildHeadings(v){
   const st = v.state, doc = st.doc, out = [];
   const active = new Set();
@@ -1458,6 +1482,12 @@ function buildHeadings(v){
         out.push(Decoration.line({ class:'cm-h' + m[2].length }).range(line.from));
         if (active.has(line.number)) out.push(Decoration.mark({ class:'cm-hmark' }).range(s, e));
         else out.push(Decoration.replace({}).range(s, e));
+      }
+      const tk = taskRe.exec(line.text);
+      if (tk && !rowRe.test(line.text)){
+        const s = line.from + tk[1].length, e = line.from + tk[0].length, done = /x/i.test(tk[2]);
+        out.push(Decoration.replace({ widget:new CheckWidget(done) }).range(s, e));
+        if (done && e < line.to) out.push(Decoration.mark({ class:'cm-done' }).range(e, line.to));
       }
       if (line.text.includes('](c:') && !rowRe.test(line.text)){
         const memo = find(paneOf(v)?.active);
