@@ -527,6 +527,18 @@
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--border-strong);}
   .field .hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
   .field .err{font-size:11px;color:var(--danger);margin-top:5px;display:none;}
+  details.acc{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;background:transparent;}
+  details.acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:14px;font-weight:600;color:var(--text);}
+  details.acc>summary::-webkit-details-marker{display:none;}
+  details.acc>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--text-muted);border-bottom:2px solid var(--text-muted);transform:rotate(45deg);transition:transform .15s ease;margin-right:4px;}
+  details.acc[open]>summary::after{transform:rotate(-135deg);}
+  details.acc>.acc-body{padding:0 16px 14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .danger-btn{width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius);color:var(--danger);padding:11px;font-size:13px;cursor:pointer;}
+  .danger-btn:hover{border-color:var(--danger);}
+  #devLink button{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-secondary);padding:8px 11px;font-size:12px;cursor:pointer;transition:all .15s ease;}
+  #devLink button:hover{border-color:var(--border-strong);color:var(--text);}
+  #devLink button:disabled{opacity:.5;cursor:default;}
   .upload-row{display:flex;gap:8px;align-items:center;margin-top:7px;}
   .upload-row input[type=file]{
     flex:1;min-width:0;font-size:11px;color:var(--text-muted);
@@ -1126,22 +1138,54 @@
     </div>
 
     <div class="tab-panel" data-panel="data">
-      <div class="field">
-        <label>保存先</label>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
-          <input type="checkbox" id="s-jsonbin-enabled" style="width:auto;">
-          JSONBinを使用する（オフの場合はこのブラウザのローカル保存を使用します）
-        </label>
-      </div>
-      <div class="field">
-        <label>JSONBin Bin ID</label>
-        <input type="text" id="s-jsonbin-binid" placeholder="例: 6512abcd1f2e3a4b5c6d7e8f">
-      </div>
-      <div class="field">
-        <label>JSONBin X-Master-Key（またはAccess Key）</label>
-        <input type="password" id="s-jsonbin-apikey" placeholder="$2a$10$...">
-        <div class="hint" id="hint-jsonbin">jsonbin.io のBin詳細ページで発行したキーを入力します。このブラウザにのみ保存されます</div>
-      </div>
+      <details class="acc" id="acc-gh">
+        <summary>GitHub（ダッシュボードの保存先）</summary>
+        <div class="acc-body">
+          <div class="grid2">
+            <div class="field"><label>オーナー</label><input type="text" id="v-owner" placeholder="例: ymatsuda-cmyk" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label>リポジトリ</label><input type="text" id="v-repo" placeholder="例: data（プライベート）" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label>ブランチ</label><input type="text" id="v-branch" placeholder="main" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label>保存フォルダ</label><input type="text" id="v-path" placeholder="dashboard" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="field">
+            <label>アクセストークン</label>
+            <input type="password" id="v-token" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+            <div class="hint" id="v-token-hint">Fine-grained トークン。対象はこのリポジトリだけ、権限は Contents の「Read and write」だけにしてください</div>
+          </div>
+          <div id="vault-form">
+            <div class="field">
+              <label>パスフレーズ（暗号化の鍵）</label>
+              <input type="password" id="v-pass" autocomplete="new-password">
+              <input type="password" id="v-pass2" placeholder="確認のためもう一度（新規作成のときだけ必要）" autocomplete="new-password" style="margin-top:6px;">
+              <div class="hint">最初に1回だけ入力します。この端末に保存され、次回からは自動で暗号化・復号します。10文字以上を推奨。忘れるとデータを復元できません</div>
+            </div>
+            <button class="icon-btn" id="v-connect" style="width:100%;">接続して暗号化保存を始める</button>
+            <div class="field"><div class="err" id="err-vault"></div></div>
+          </div>
+          <div class="hint" id="vault-sync"></div>
+        </div>
+      </details>
+
+      <details class="acc" id="acc-share" open>
+        <summary>他の端末へ設定共有</summary>
+        <div class="acc-body">
+          <div id="vault-connected" hidden>
+            <div class="hint" id="vault-state" style="margin:0 0 10px;"></div>
+            <div id="devLink"></div>
+            <div class="hint" style="margin:10px 0 14px;">渡す中身（リポジトリとトークン）はパスフレーズで暗号化してあります。受け取った端末でパスフレーズを入れると使えます。QR（スマホ・タブレット向け）／6桁コード（PC向け・5分・1回きり）／リンクから選べます。</div>
+            <button class="danger-btn" id="v-disconnect">この端末から接続情報を消去してロック</button>
+          </div>
+          <div id="vault-receive">
+            <div class="hint" id="vault-state-off" style="margin:0 0 10px;">他の端末で設定済みなら、ここで受け取れます（QR・リンクで開いたときは自動でここに来ます）。</div>
+            <div class="hint" id="v-pending" hidden style="margin:0 0 6px;"></div>
+            <input type="text" id="v-code" inputmode="numeric" maxlength="7" placeholder="6桁コード" autocomplete="off">
+            <input type="password" id="v-rpass" placeholder="パスフレーズ" autocomplete="off" style="margin-top:6px;">
+            <button class="icon-btn" id="v-receive" style="width:100%;margin-top:8px;">受け取って接続</button>
+            <div class="field"><div class="err" id="err-receive"></div></div>
+          </div>
+        </div>
+      </details>
+
       <div class="field">
         <label>書き出しファイル名</label>
         <input type="text" id="s-indexfile" placeholder="index.json">
@@ -1152,7 +1196,7 @@
         <button class="icon-btn" id="btn-export" style="width:100%;margin-bottom:8px;">index.json を書き出す</button>
         <button class="icon-btn" id="btn-copyjson" style="width:100%;margin-bottom:8px;">JSONをコピー</button>
         <button class="icon-btn" id="btn-reload" style="width:100%;">読み込み直す（編集を破棄）</button>
-        <div class="hint">JSONBin使用時は「読み込み直す」でJSONBin側の最新内容を取得します。data/dashboard/index.json からの自動読み込みは行いません</div>
+        <div class="hint">GitHub接続時は「読み込み直す」でGitHub側の最新内容を取得します。data/dashboard/index.json からの自動読み込みは行いません</div>
       </div>
     </div>
 
@@ -1270,6 +1314,8 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="../common/devicelink.js"></script>
+<script src="../common/ghvault.js"></script>
 <script src="dashboard-config.js"></script>
 <script src="kanban-styles.js?v=rev_20261008_kbs01"></script>
 <script>
@@ -1386,74 +1432,139 @@ const store = {
   }
 };
 
-/* ---------- JSONBin連携（有効時は読み込み・保存の両方をJSONBinに向ける） ---------- */
-let jsonbinSettings = { enabled:false, binId:'', apiKey:'' };
+/* ---------- GitHub（プライベートリポジトリ）へ暗号化して保存 ----------
+   接続情報とパスフレーズはこの端末の localStorage に保存し、次回からは自動で暗号化・復号する（common/ghvault.js）。
+   他の端末へは common/devicelink.js（QR・6桁コード・リンク）で渡す。 */
+const VAULT_OPT = { app:'dashboard', defaultPath:'dashboard/state.enc.json' };
+const VAULT = window.GhVault ? GhVault.create(VAULT_OPT) : null;   // 読み込めなかったとき（初回からオフラインなど）はローカル保存のまま動く
+const DL_APP = 'dashboard';
+const vaultOn = () => !!(VAULT && VAULT.configured());
+/* GitHubの内容を読めた（または「まだ無い」と確認できた）あとだけ保存を許す。読めないまま保存してGitHub側の中身を消さないため */
+let remoteReady = false;
+let rsTimer = null, rsRunning = false, rsDirty = false;
 
-async function loadJsonbinSettings(){
-  const raw = await store.get('jsonbinSettings');
-  if(raw){
-    try{ jsonbinSettings = { ...jsonbinSettings, ...JSON.parse(raw) }; }catch(e){}
-  }
+function stateFrom(data){
+  return { config:{ ...DEFAULT_CONFIG, ...((data && data.config) || {}) }, resources:(data && data.resources) || [] };
 }
 
-async function saveJsonbinSettings(){
-  await store.set('jsonbinSettings', JSON.stringify(jsonbinSettings));
+async function readLocalState(){
+  const raw = await store.get('dashboardState');
+  if(!raw) return null;
+  try{ return stateFrom(JSON.parse(raw)); }catch(e){ return null; }
 }
 
-/** JSONBinを使う条件が揃っているか（有効化 + Bin ID + キーが入力済み） */
-function jsonbinReady(){
-  return !!(jsonbinSettings.enabled && jsonbinSettings.binId && jsonbinSettings.apiKey);
+function hhmm(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 
-/** JSONBinから最新のレコードを取得。Binがまだ空の場合はnullを返す */
-async function jsonbinLoad(){
-  const res = await fetch('https://api.jsonbin.io/v3/b/' + encodeURIComponent(jsonbinSettings.binId) + '/latest', {
-    headers:{ 'X-Master-Key': jsonbinSettings.apiKey, 'X-Bin-Meta':'false' },
-    cache:'no-store'
-  });
-  if(res.status === 404) return null;
-  if(!res.ok) throw new Error('JSONBinの読み込みに失敗しました（' + res.status + '）');
-  return await res.json();
+function vaultErrText(e){
+  if(e instanceof TypeError) return 'GitHubに接続できません（ネットワークを確認してください）';
+  if(e && e.code === 'BADPASS') return 'パスフレーズが違うか、データが壊れています';
+  return (e && e.message) || String(e);
 }
 
-/** JSONBinへ現在の内容を上書き保存 */
-async function jsonbinSave(data){
-  const res = await fetch('https://api.jsonbin.io/v3/b/' + encodeURIComponent(jsonbinSettings.binId), {
-    method:'PUT',
-    headers:{ 'Content-Type':'application/json', 'X-Master-Key': jsonbinSettings.apiKey },
-    body: JSON.stringify(data)
-  });
-  if(!res.ok) throw new Error('JSONBinへの保存に失敗しました（' + res.status + '）');
+function setSync(msg){
+  const el = document.getElementById('vault-sync');
+  if(el) el.textContent = msg || '';
 }
 
 /**
  * 現在の設定に応じて config/resources を読み込む。
- * JSONBin有効時はJSONBinから、そうでなければ従来通りこのブラウザのローカル保存(store)から読み込む。
+ * GitHub接続時は暗号化ファイルを復号して読み込み、そうでなければこのブラウザのローカル保存(store)から読み込む。
  * data/dashboard/index.json からの読み込みは行わない。
  */
 async function loadState(){
-  if(jsonbinReady()){
-    try{
-      const data = await jsonbinLoad();
-      if(data){
-        return { config:{ ...DEFAULT_CONFIG, ...(data.config || {}) }, resources: data.resources || [], status:'JSONBinから読み込みました' };
-      }
-      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'JSONBinにデータがありません。追加した内容は自動的に保存されます' };
-    }catch(e){
-      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'JSONBinの読み込みに失敗しました: ' + e.message };
-    }
+  const local = await readLocalState();
+  if(!vaultOn()){
+    if(local) return { ...local, status:'ローカルの編集内容を表示中' };
+    return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'データがありません。追加した内容はこの端末に保存されます' };
   }
-  const local = await store.get('dashboardState');
-  if(local){
-    try{
-      const parsed = JSON.parse(local);
-      return { config:{ ...DEFAULT_CONFIG, ...(parsed.config || {}) }, resources: parsed.resources || [], status:'ローカルの編集内容を表示中' };
-    }catch(e){
-      return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'保存データの読み込みに失敗しました' };
+  try{
+    const r = await VAULT.load();
+    remoteReady = true;
+    if(r){
+      const st = stateFrom(r.data);
+      await store.set('dashboardState', JSON.stringify(st));   // 読み込めないときのための、この端末の控え
+      setSync('GitHubから読み込みました ' + hhmm());
+      return { ...st, status:'GitHub（暗号化）から読み込みました' };
     }
+    if(local){
+      scheduleRemoteSave();
+      return { ...local, status:'GitHubにまだデータがありません。この端末の内容を暗号化して初回保存します' };
+    }
+    return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'GitHubにまだデータがありません。追加した内容は暗号化して自動保存されます' };
+  }catch(e){
+    remoteReady = false;
+    const base = local || { config:{ ...DEFAULT_CONFIG }, resources:[] };
+    const hint = e && e.code === 'BADPASS' ? 'パスフレーズが違います。設定 > データ で接続し直してください' : vaultErrText(e);
+    setSync('GitHubを読み込めていません：' + hint);
+    return { ...base, status:'GitHubから読み込めませんでした（' + hint + '）。復旧するまでGitHubへの保存は止めています' + (local ? '（この端末の控えを表示中）' : '') };
   }
-  return { config:{ ...DEFAULT_CONFIG }, resources:[], status:'データがありません。追加した内容はこの端末に保存されます' };
 }
+
+function scheduleRemoteSave(){
+  if(!vaultOn()) return;
+  if(!remoteReady){ setSync('GitHubを読み込めていないため、変更はこの端末だけに保存されています'); return; }
+  rsDirty = true;
+  clearTimeout(rsTimer);
+  rsTimer = setTimeout(flushRemote, 1500);   // 連続した編集は1回にまとめる（保存のたびにGitHubのコミットが1つ増えるため）
+  setSync('GitHubへ保存待ち…');
+}
+
+async function flushRemote(){
+  if(rsRunning || !rsDirty || !vaultOn() || !remoteReady) return;
+  rsRunning = true;
+  try{
+    while(rsDirty){
+      rsDirty = false;
+      const snap = { config, resources };
+      setSync('GitHubへ保存中…');
+      try{
+        try{ await VAULT.save(snap); }
+        catch(e){
+          if(e.code !== 'CONFLICT') throw e;
+          await resolveConflict(snap);
+        }
+        setSync('GitHubに暗号化して保存しました ' + hhmm());
+      }catch(e){
+        const msg = vaultErrText(e);
+        rsDirty = true;                       // 失敗した内容は残しておき、次の編集か再試行で保存し直す
+        setSync('GitHubに保存できませんでした：' + msg);
+        toast('GitHubに保存できませんでした：' + msg);
+        clearTimeout(rsTimer);
+        if(e instanceof TypeError || /^HTTP_5/.test(e.code || '')) rsTimer = setTimeout(flushRemote, 15000);
+        break;
+      }
+    }
+  }finally{
+    rsRunning = false;
+  }
+}
+
+/** 別の端末が先に保存していたとき：上書きするか、GitHubの最新に合わせるかを選ぶ */
+async function resolveConflict(snap){
+  const overwrite = confirm('他の端末でダッシュボードが更新されています。\n\nOK：この端末の内容で上書きする\nキャンセル：GitHubの最新を読み込む（この端末の直近の編集は破棄されます）');
+  if(overwrite){
+    await VAULT.save(snap, { force:true });
+    return;
+  }
+  const r = await VAULT.load();
+  if(r) await applyState(stateFrom(r.data), 'GitHubの最新を読み込みました');
+}
+
+async function applyState(st, status){
+  config = st.config;
+  resources = st.resources;
+  await store.set('dashboardState', JSON.stringify(st));
+  applyConfig(); render(); syncSettingsForm();
+  setStatus(status);
+}
+
+// 画面を閉じる・別のアプリに移るときは、待たずにすぐ保存する
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && rsDirty){ clearTimeout(rsTimer); flushRemote(); }
+});
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1517,18 +1628,11 @@ function renderTabStructure(){
 }
 
 async function persistLocal(){
-  if(jsonbinReady()){
-    try{
-      await jsonbinSave({ config, resources });
-    }catch(e){
-      toast(e.message);
-    }
-    return;
-  }
-  await store.set('dashboardState', JSON.stringify({ config, resources }));
+  await store.set('dashboardState', JSON.stringify({ config, resources }));   // GitHub接続中も、この端末の控えとして常に残す
+  scheduleRemoteSave();
 }
 
-/* ---------- 初期読み込み: JSONBin有効時はJSONBin、そうでなければローカル保存 ---------- */
+/* ---------- 初期読み込み: GitHub接続時はGitHub（暗号化）、そうでなければローカル保存 ---------- */
 async function init(){
   const state = await loadState();
   config = state.config;
@@ -1918,9 +2022,7 @@ const settingsOverlay = document.getElementById('settingsOverlay');
 function syncSettingsForm(){
   F('s-title').value = config.title;
   F('s-theme').value = config.theme === 'light' ? 'light' : 'dark';
-  F('s-jsonbin-enabled').checked = !!jsonbinSettings.enabled;
-  F('s-jsonbin-binid').value = jsonbinSettings.binId || '';
-  F('s-jsonbin-apikey').value = jsonbinSettings.apiKey || '';
+  syncVaultForm();
   F('s-indexfile').value = sanitizeIndexFile(config.indexFile);
   F('hint-indexfile').textContent = '書き出しファイル名: ' + sanitizeIndexFile(config.indexFile);
   const pairs = [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
@@ -1986,24 +2088,171 @@ F('s-indexfile').addEventListener('input', async e=>{
   await persistLocal();
 });
 
-F('s-jsonbin-enabled').addEventListener('change', async e=>{
-  jsonbinSettings.enabled = e.target.checked;
-  await saveJsonbinSettings();
-  const state = await loadState();
-  config = state.config;
-  resources = state.resources;
-  applyConfig(); render(); syncSettingsForm();
-  setStatus(state.status);
-  toast(jsonbinSettings.enabled ? 'JSONBinを使用します' : 'ローカル保存を使用します');
+/* ---------- GitHub接続（設定 > データ） ---------- */
+let devLinkPanel = null;
+let pendingPkg = null;      // リンク・QR・コードで受け取った包み（パスフレーズ待ち）
+
+function showErr(el, e){
+  el.textContent = vaultErrText(e);
+  el.style.display = 'block';
+}
+
+function renderDevLink(){
+  if(devLinkPanel){ devLinkPanel.destroy(); devLinkPanel = null; }
+  const el = F('devLink');
+  el.textContent = '';
+  if(!vaultOn()) return;
+  if(!window.DeviceLink){
+    el.innerHTML = '<div class="hint">受け渡しの部品（common/devicelink.js）を読み込めませんでした。オンラインで開き直してください</div>';
+    return;
+  }
+  devLinkPanel = DeviceLink.panel(el, { app:DL_APP, getPackage:()=>VAULT.package() });
+}
+
+function renderPending(){
+  const p = F('v-pending');
+  if(pendingPkg){
+    let label = '';
+    try{ label = DeviceLink.info(pendingPkg).label; }catch(e){}
+    p.hidden = false;
+    p.textContent = '受け取った設定：' + (label || 'GitHub') + '。パスフレーズを入れて接続してください';
+    F('v-code').hidden = true;
+  }else{
+    p.hidden = true;
+    F('v-code').hidden = false;
+  }
+}
+
+let vaultWasOn = null;
+const vaultFolder = path => String(path || '').replace(/\/?[^\/]*$/, '');
+function syncVaultForm(){
+  const on = vaultOn();
+  const d = VAULT && VAULT.describe();
+  F('vault-form').hidden = on;
+  F('vault-connected').hidden = !on;
+  F('vault-receive').hidden = on && !pendingPkg;
+  F('vault-state-off').hidden = on;
+  ['v-owner','v-repo','v-branch','v-path','v-token'].forEach(id=>{ F(id).disabled = on; });
+  if(on){
+    F('v-owner').value = d.owner; F('v-repo').value = d.repo; F('v-branch').value = d.branch; F('v-path').value = vaultFolder(d.path);
+    F('v-token').value = ''; F('v-token').placeholder = '●●●●●●●●●●●●●●●●●●●●';
+    F('v-token-hint').textContent = 'トークンはこの端末に保存済みです（表示しません）';
+    F('vault-state').textContent = '設定は ' + d.owner + '/' + d.repo + ' の ' + d.path + ' に、パスフレーズで暗号化して保存しています。' + (remoteReady ? '' : '（現在は読み込めていません）');
+  }else{
+    F('v-token').placeholder = 'github_pat_...';
+    F('v-token-hint').textContent = 'Fine-grained トークン。対象はこのリポジトリだけ、権限は Contents の「Read and write」だけにしてください';
+    if(d){
+      if(!F('v-owner').value) F('v-owner').value = d.owner;
+      if(!F('v-repo').value) F('v-repo').value = d.repo;
+      if(!F('v-branch').value) F('v-branch').value = d.branch;
+      if(!F('v-path').value) F('v-path').value = vaultFolder(d.path);
+    }
+  }
+  if(!VAULT) F('vault-sync').textContent = '暗号化保存の部品（common/ghvault.js）を読み込めませんでした。ローカル保存を使用中';
+  if(vaultWasOn !== on){                       // 接続の状態が変わったときだけ開閉を決める（そのあとは手で開け閉めできる）
+    F('acc-gh').open = !on;
+    if(pendingPkg) F('acc-share').open = true;
+    vaultWasOn = on;
+  }
+  renderDevLink();
+  renderPending();
+}
+
+/**
+ * 接続を試し、成功したらこの端末に保存して使い始める。
+ * confirmPass … 新規作成のときだけ確認する2回目のパスフレーズ（受け取りのときは null）
+ * 戻り値 … 接続した＝true／ユーザーが途中でやめた＝false
+ */
+async function connectVault(conn, pass, { confirmPass }){
+  if(!VAULT) throw new Error('暗号化保存の部品（common/ghvault.js）を読み込めませんでした');
+  if(!pass) throw new Error('パスフレーズを入力してください');
+  const tmp = GhVault.scratch(VAULT_OPT, conn, pass);
+  const info = await tmp.check();
+  if(!info.private && !confirm('このリポジトリは「公開」です。データは暗号化されますが、プライベートリポジトリにすることを強くおすすめします。\nこのまま続けますか？')) return false;
+  const r = await tmp.load();                       // パスフレーズ違いはここで BADPASS になる
+  if(!r){
+    if(confirmPass !== null){
+      if(pass.length < 10) throw new Error('パスフレーズは10文字以上にしてください（QR・リンクから総当たりで破られにくくするため）');
+      if(pass !== confirmPass) throw new Error('確認用のパスフレーズが一致しません');
+    }
+  }else{
+    const local = await readLocalState();
+    if(local && local.resources.length && JSON.stringify(local) !== JSON.stringify(stateFrom(r.data))
+       && !confirm('この端末のローカルの内容は、GitHubにある内容で置き換わります。続けますか？')) return false;
+  }
+  const saved = VAULT.adopt(tmp);
+  remoteReady = true;
+  if(r) await applyState(stateFrom(r.data), 'GitHub（暗号化）から読み込みました');
+  else { scheduleRemoteSave(); setStatus('GitHubにまだデータがありません。この端末の内容を暗号化して初回保存します'); }
+  if(!saved) toast('この端末にパスフレーズを保存できませんでした（プライベートブラウズでは保存されません）');
+  return true;
+}
+
+F('v-connect').addEventListener('click', async ()=>{
+  const err = F('err-vault'), btn = F('v-connect'), label = btn.textContent;
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '接続を確認中…';
+  try{
+    const ok = await connectVault(
+      { owner:F('v-owner').value, repo:F('v-repo').value, branch:F('v-branch').value, path:(F('v-path').value.trim().replace(/^\/+|\/+$/g,'') || 'dashboard') + '/state.enc.json', token:F('v-token').value },
+      F('v-pass').value, { confirmPass:F('v-pass2').value });
+    if(ok){
+      ['v-token','v-pass','v-pass2'].forEach(id=>{ F(id).value = ''; });
+      syncVaultForm();
+      toast('GitHubへの暗号化保存を始めました');
+    }
+  }catch(e){ showErr(err, e); }
+  finally{ btn.disabled = false; btn.textContent = label; }
 });
-F('s-jsonbin-binid').addEventListener('input', async e=>{
-  jsonbinSettings.binId = e.target.value.trim();
-  await saveJsonbinSettings();
+
+F('v-disconnect').addEventListener('click', ()=>{
+  if(!confirm('この端末から、GitHubの接続情報とパスフレーズを消去します。\nGitHub上のデータはそのまま残り、この端末はローカル保存に戻ります。')) return;
+  clearTimeout(rsTimer); rsDirty = false; remoteReady = false;
+  VAULT.forget();
+  setSync('');
+  syncVaultForm();
+  setStatus('この端末のローカル保存に戻しました');
 });
-F('s-jsonbin-apikey').addEventListener('input', async e=>{
-  jsonbinSettings.apiKey = e.target.value.trim();
-  await saveJsonbinSettings();
+
+F('v-receive').addEventListener('click', async ()=>{
+  const err = F('err-receive'), btn = F('v-receive'), label = btn.textContent;
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '接続を確認中…';
+  try{
+    if(!window.DeviceLink) throw new Error('受け渡しの部品（common/devicelink.js）を読み込めませんでした。オンラインで開き直してください');
+    const pass = F('v-rpass').value;
+    if(!pass) throw new Error('パスフレーズを入力してください');
+    if(!pendingPkg){
+      // コードは1回きり。受け取った包みは持っておき、パスフレーズを打ち間違えても再入力だけで続けられるようにする
+      pendingPkg = await DeviceLink.receiveCode(DL_APP, F('v-code').value);
+      renderPending();
+    }
+    let conn;
+    try{ conn = await DeviceLink.open(pendingPkg, pass); }
+    catch(e){ throw new Error(e.message === 'BADPASS' ? 'パスフレーズが違います' : e.message); }
+    const ok = await connectVault(conn, pass, { confirmPass:null });
+    if(ok){
+      pendingPkg = null;
+      F('v-code').value = ''; F('v-rpass').value = '';
+      syncVaultForm();
+      toast('接続しました。次回から自動で復号します');
+    }
+  }catch(e){ showErr(err, e); }
+  finally{ btn.disabled = false; btn.textContent = label; }
 });
+
+/** リンク・QR（#dl=…）で開かれたとき：設定 > データ を開いて、パスフレーズの入力を待つ */
+function handleIncomingLink(){
+  if(!window.DeviceLink) return;
+  let pkg = null;
+  try{ pkg = DeviceLink.fromURL(DL_APP); }catch(e){ toast(e.message); return; }
+  if(!pkg) return;
+  pendingPkg = pkg;
+  syncSettingsForm();
+  settingsOverlay.classList.add('show');
+  document.querySelector('#settingsTabs button[data-tab="data"]').click();
+  F('v-rpass').focus();
+}
 
 [['s-cardmin','v-cardmin','cardMin','px'],['s-thumbh','v-thumbh','thumbH','px'],
  ['s-gap','v-gap','gap','px'],['s-radius','v-radius','radius','px'],
@@ -6016,7 +6265,7 @@ F('s-interval').addEventListener('input', async e=>{
 });
 
 initialParams = readUrlParams();
-Promise.all([loadGasSettings(), loadJsonbinSettings(), loadLauncherSettings()]).then(init);
+Promise.all([loadGasSettings(), loadLauncherSettings()]).then(init).then(handleIncomingLink);
 </script>
 </body>
 </html>
