@@ -548,3 +548,5 @@ html{touch-action:manipulation}
 .nblock.acc .acc-body{padding-bottom:6px}
 .nblock.acc .acc-body > .mkcard:first-child{margin-top:2px}
 .warn{margin:0;color:var(--danger);font-size:13px;line-height:1.7;font-weight:700}
+/* ログイン画面の白いボタン（Face ID・Touch ID で開く）：画面全体の文字色（明るい色）を引き継いで、白地に白い文字になっていた */
+.gate .btn:not(.main){color:var(--ink)}
