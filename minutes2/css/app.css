@@ -24,7 +24,11 @@
 }
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none !important}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--paper)}
+/* 全体の枠は動かさない：文書そのものはスクロール・引っ張り（弾み）をさせず、中の領域だけがスクロールする。
+   どの入れ子の領域も、端まで行っても外へ連鎖させない */
+*{overscroll-behavior:contain}
+html,body{overscroll-behavior:none}
 body{background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans);-webkit-text-size-adjust:100%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -48,7 +52,7 @@ button:disabled{cursor:default;opacity:.55}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
 
 /* ログイン */
-.gate{min-height:100dvh;background:var(--cloth);color:var(--cloth-ink);display:flex;justify-content:center;align-items:flex-start;padding:max(64px,env(safe-area-inset-top)) 18px 40px}
+.gate{position:fixed;inset:0;overflow:auto;min-height:0;background:var(--cloth);color:var(--cloth-ink);display:flex;justify-content:center;align-items:flex-start;padding:max(64px,env(safe-area-inset-top)) 18px 40px}
 .gate-card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px;align-items:stretch}
 .gate-title{margin:0;text-align:center;font:600 clamp(30px,9vw,40px)/1.3 var(--serif);letter-spacing:.06em}
 .gate-sub{margin:0 0 14px;text-align:center;color:var(--cloth-mute);font-size:13.5px}
@@ -76,7 +80,10 @@ button:disabled{cursor:default;opacity:.55}
 .dlpass-v{font:700 20px/1.2 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.08em;color:var(--foil-text);user-select:all}
 
 /* アプリの骨組み */
-#app{height:100dvh;display:flex;flex-direction:column}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;overflow:clip}   /* clip：選択ドラッグなどで、プログラムからも動かせない */
+/* 枠（上のバー・絞り込み・帯・タブ）はドラッグで文字を選ばない。本文・入力欄は今までどおり選べる */
+.top,.toolbar,.strip,.tabbar,.stabs,.fchips,.tabs,.dhead .dacts{-webkit-user-select:none;user-select:none}
+.top input,.toolbar select{-webkit-user-select:text;user-select:text}
 .top{background:var(--cloth);color:var(--cloth-ink);display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:calc(8px + env(safe-area-inset-top)) 16px 8px}
 .brand{font:600 20px/1 var(--serif);letter-spacing:.08em}
 .tabs{display:flex;gap:2px}
@@ -502,3 +509,7 @@ h1 .scope .ic{width:16px;height:16px}
 .csteps li{counter-increment:cs}
 .csteps li > p.strong::before{content:counter(cs) ". "}
 .ccbox{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sheet);font:12.5px/1.6 ui-monospace,Menlo,monospace;resize:vertical}
+
+/* マインドマップ：ドラッグは地図の移動に使い、ページを動かさない */
+.mm2,.mm2 svg{touch-action:none}
+.strip{overscroll-behavior-x:contain}
