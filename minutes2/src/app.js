@@ -696,7 +696,7 @@ function applyDyn(root = document) {
 
 function renderMain(reset = false, noSheet = false) {
   const m = $('#main')
-  const keep = reset ? null : { main: m.scrollTop, list: $('.listpane')?.scrollTop, sheet: $('.sheet-scroll')?.scrollTop }
+  const keep = reset ? null : { main: m.scrollTop, list: $('.listpane')?.scrollTop, sheet: $('.sheet-scroll')?.scrollTop, chips: $('.toolbar .fchips')?.scrollLeft }
   if (S.tab === 'list') m.innerHTML = listHTML()
   else if (S.tab === 'todo') m.innerHTML = todoPageHTML()
   else if (S.tab === 'notes') m.innerHTML = notesPageHTML()
@@ -705,6 +705,7 @@ function renderMain(reset = false, noSheet = false) {
     m.scrollTop = keep.main || 0
     const lp = $('.listpane'); if (lp && keep.list) lp.scrollTop = keep.list
     const sh = $('.sheet-scroll'); if (sh && keep.sheet && !noSheet) sh.scrollTop = keep.sheet
+    const fc = $('.toolbar .fchips'); if (fc && keep.chips) fc.scrollLeft = keep.chips   // 絞り込みの行を横に送っていても、選んだあとに先頭へ戻らない
   }
   applyDyn(m)
   if (S.tab === 'list') afterList()

@@ -561,3 +561,19 @@ html{touch-action:manipulation}
 .dtitle h1 .inl-title{width:min(100%,680px);font:600 26px/1.4 var(--serif)}
 .dmeta .inl-date{font:inherit;font-size:13px;padding:1px 6px}
 @media (max-width:640px){.dtitle h1 .inl-title{font-size:20px}}
+
+/* 絞り込み（権限・タグ・状態・お気に入り）は、折り返さず1行。入りきらないときは、この行だけ横に動かす */
+.fchips{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0}
+.fchips::-webkit-scrollbar{display:none}
+.fchips > *{flex:none}
+@media (max-width:820px){
+  /* 1行目：月の移動と表示の切り替え／2行目：絞り込み（画面の端から端まで） */
+  .toolbar .monthnav{order:1}
+  .toolbar .grow{order:2}
+  .toolbar .seg{order:3}
+  .toolbar .fchips{order:4;flex:1 1 100%;margin:0 -16px;padding:2px 16px}
+  /* 月の移動と表示の切り替えが、同じ行に入るように詰める */
+  .toolbar .month{min-width:0;font-size:17px;padding:0 2px}
+  .toolbar .monthnav .ib{width:34px}
+  .toolbar .seg button{padding:6px 10px}
+}
