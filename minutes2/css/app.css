@@ -518,3 +518,12 @@ h1 .scope .ic{width:16px;height:16px}
 .gate-hint{margin:0;text-align:center;color:var(--cloth-mute);font-size:12.5px;line-height:1.7}
 .spass{display:flex;flex-direction:column;gap:10px}
 .gate .btn.wide{width:100%}
+
+/* スマホ：画面の枠を動かさない
+   ・iPhone の Safari は、文字が16px未満の入力欄・選択欄を押すと画面を自動で拡大し、そのまま横・縦にずらせてしまう。
+     指で操作する端末では、入力欄・選択欄を16px以上にして、拡大を起こさない
+   ・ダブルタップの拡大も止める（地図のドラッグ・ピンチは、地図の領域が自分で扱う） */
+html{touch-action:manipulation}
+@media (pointer:coarse){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px !important}
+}

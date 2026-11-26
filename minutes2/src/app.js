@@ -2571,4 +2571,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
 
 applyFs()
 const scrollHide = initScrollHide($('#app'), matchMedia('(max-width: 1024px), (pointer: coarse)'))
+/* iPhone：2本指で画面全体が拡大されたり、キーボードの出し入れで枠がずれたまま戻らないことがあるので、元へ戻す */
+document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false })
+const resetFrame = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0) }
+document.addEventListener('focusout', () => setTimeout(() => {
+  if (!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) resetFrame()
+}, 80))
+window.visualViewport?.addEventListener('resize', () => { if (window.visualViewport.scale <= 1.01) resetFrame() })
 boot()
