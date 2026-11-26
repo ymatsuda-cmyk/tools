@@ -54,7 +54,7 @@ const S = {
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
-  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}), noteOpen: ls.get('m2.noteOpen', {}), inl: null,
+  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}), noteOpen: ls.get('m2.noteOpen', {}), inl: null, ghosts: [],
 }
 const DEK = new Map()
 const META = new Map()
@@ -329,7 +329,7 @@ function clearData() {
   clearInterval(S.timer)
   clearTimeout(prefsTimer)
   hideBar()
-  Object.assign(S, { code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null, session: null, exp: 0, uid: null, pdek: null, pub: {}, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '', edit: null, prefsReady: false })
+  Object.assign(S, { code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null, session: null, exp: 0, uid: null, pdek: null, pub: {}, raw: [], items: [], ghosts: [], files: {}, chat: {}, sel: null, sig: '', edit: null, prefsReady: false })
   S.byId = new Map(); S.checked = new Set(); DEK.clear(); META.clear()
   closeModal()
 }
@@ -595,10 +595,11 @@ async function refresh(first = false) {
 
 async function decryptAll() {
   const out = []
+  const ghosts = []   // 管理者以外：閲覧できない会議。一覧・件数・ToDo・ノートには出さず、月の帯に灰色の棒で出すためだけに、日付と長さを持つ
   for (const e of S.raw) {
     const gid = Object.keys(e.k || {}).find((g) => S.privs[g])
     const base = { ...e, day: String(e.date || '').slice(0, 10) }
-    if (!gid) { if (S.admin) out.push({ ...base, locked: true, title: '非公開の会議', tags: [] }); continue }   // 見られない会議は、管理者以外には存在ごと出さない
+    if (!gid) { if (S.admin) out.push({ ...base, locked: true, title: '非公開の会議', tags: [] }); else ghosts.push({ id: e.id, day: base.day, date: e.date, dur: e.dur }); continue }   // 見られない会議は、管理者以外には一覧に出さない
     try {
       let dek = DEK.get(e.id)
       if (!dek) { dek = await unwrapDek(e.k[gid], S.privs[gid]); DEK.set(e.id, dek) }
@@ -607,9 +608,11 @@ async function decryptAll() {
       out.push({ ...base, locked: false, title: meta.v.title || '（無題）', tags: meta.v.tags || [], file: meta.v.file || null })
     } catch {
       if (S.admin) out.push({ ...base, locked: true, title: '開けない議事録', tags: [] })   // 管理者には、異常の目印として残す
+      else ghosts.push({ id: e.id, day: base.day, date: e.date, dur: e.dur })
     }
   }
   out.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  S.ghosts = ghosts
   S.items = out
   S.byId = new Map(out.map((x) => [x.id, x]))
   if (S.sel && !S.byId.has(S.sel)) S.sel = null
@@ -882,9 +885,12 @@ function stripHTML(mi) {
   const days = new Date(y, m, 0).getDate()
   const by = new Map()
   for (const it of mi) { if (!by.has(it.day)) by.set(it.day, []); by.get(it.day).push(it) }
+  const gby = new Map()   // 閲覧できない会議（管理者以外）：灰色の棒
+  for (const g of S.ghosts || []) if (g.day.startsWith(S.month)) { if (!gby.has(g.day)) gby.set(g.day, []); gby.get(g.day).push(g) }
   const durOf = (it) => it.dur || 1800   // 長さが分からない会議は、30分として描く
-  // 棒の高さは、その月でいちばん会議時間の長い日を最大（40px）にそろえる。会議ごとに積み上げ、色は状態
-  const maxTotal = Math.max(1, ...[...by.values()].map((l) => l.reduce((a, it) => a + durOf(it), 0)))
+  // 棒の高さは、その月でいちばん会議時間の長い日を最大（40px）にそろえる。会議ごとに積み上げ、色は状態（閲覧できない会議は灰色）
+  const dayTotals = new Set([...by.keys(), ...gby.keys()])
+  const maxTotal = Math.max(1, ...[...dayTotals].map((k) => [...(by.get(k) || []), ...(gby.get(k) || [])].reduce((a, it) => a + durOf(it), 0)))
   const today = todayKey()
   let h = ''
   for (let d = 1; d <= days; d++) {
@@ -894,9 +900,11 @@ function stripHTML(mi) {
     // 権限を選んでいるとき（管理者）：該当する会議だけ濃く、ほかは薄く残し、上に該当の件数（案 C3）
     const pick = picking()
     const hit = pick ? list.filter(pickMatch).length : 0
-    const bars = list.map((it) => `<span class="sb ${(ST[it.st] || ST.tw).c} ${pick && !pickMatch(it) ? 'dim' : ''}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
+    const gl = gby.get(k) || []
+    const all = [...list, ...gl].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    const bars = all.map((it) => `<span class="sb ${it.title === undefined ? 'ghost' : (ST[it.st] || ST.tw).c} ${pick && it.title !== undefined && !pickMatch(it) ? 'dim' : ''}" data-h="${Math.max(5, Math.round(durOf(it) / maxTotal * 40))}"></span>`).join('')
       + (pick && hit ? `<span class="scnt">${hit}</span>` : '')
-    const label = `${m}月${d}日 ${list.length}件${list.length ? '・計' + fmtT(total) : ''}${pick ? `・選んだ条件 ${hit}件` : ''}`
+    const label = `${m}月${d}日 ${list.length ? list.length + '件・計' + fmtT(total) : ''}${gl.length ? `${list.length ? '・' : ''}閲覧できない会議 ${gl.length}件` : ''}${pick ? `・選んだ条件 ${hit}件` : ''}`.trim()
     h += `<button class="sday ${k === today ? 'today' : ''}" ${list.length ? `data-act="jump" data-day="${k}"` : 'disabled'} aria-label="${label}" title="${label}"><span class="sbars">${bars}</span><span class="sn">${d}</span></button>`
   }
   return `<div class="strip"><div class="strip-in">${h}</div></div>`

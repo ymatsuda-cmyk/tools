@@ -577,3 +577,6 @@ html{touch-action:manipulation}
   .toolbar .monthnav .ib{width:34px}
   .toolbar .seg button{padding:6px 10px}
 }
+
+/* 閲覧できない会議（管理者以外）：月の帯に灰色の棒だけ出す。カードや一覧には出さない */
+.sb.ghost{background:var(--muted);opacity:.4}
