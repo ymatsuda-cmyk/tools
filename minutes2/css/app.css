@@ -527,3 +527,21 @@ html{touch-action:manipulation}
 @media (pointer:coarse){
   input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px !important}
 }
+
+/* ホーム画面のアプリ（iPhone・iPad）：ステータス表示（時刻・電池）の下まで紺色を敷き、上の薄い帯を無くす。
+   apple-mobile-web-app-status-bar-style=black-translucent で、ページがステータス表示の下まで広がる。
+   ヘッダーをしまっている間も、その部分は紺色のままにして、白い文字を読めるようにする */
+#app::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--cloth);z-index:35;pointer-events:none}
+.main{transition:padding-top .25s ease}
+#app.collapsed .main{padding-top:env(safe-area-inset-top)}
+
+/* ToDo：会議ごとのアコーディオン */
+.nblock.acc{padding:6px 18px}
+.acc-h{display:flex;flex-wrap:nowrap;align-items:center;gap:10px}
+.acc-btn{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:10px 0;border:0;background:none;text-align:left;color:var(--ink);cursor:pointer}
+.acc-btn .chev{width:16px;height:16px;flex:none;align-self:center;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;color:var(--muted);transition:transform .15s}
+.nblock.open .acc-btn .chev{transform:rotate(90deg)}
+.acc-title{font-weight:700;font-size:calc(16px*var(--rs,1))}
+.acc-meta{font-size:13px}
+.acc-open{flex:none;font-size:13px;white-space:nowrap}
+.nblock.acc .todos{padding-bottom:6px}

@@ -54,7 +54,7 @@ const S = {
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
-  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false,
+  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}),
 }
 const DEK = new Map()
 const META = new Map()
@@ -563,7 +563,7 @@ async function decryptAll() {
   for (const e of S.raw) {
     const gid = Object.keys(e.k || {}).find((g) => S.privs[g])
     const base = { ...e, day: String(e.date || '').slice(0, 10) }
-    if (!gid) { out.push({ ...base, locked: true, title: '非公開の会議', tags: [] }); continue }
+    if (!gid) { if (S.admin) out.push({ ...base, locked: true, title: '非公開の会議', tags: [] }); continue }   // 見られない会議は、管理者以外には存在ごと出さない
     try {
       let dek = DEK.get(e.id)
       if (!dek) { dek = await unwrapDek(e.k[gid], S.privs[gid]); DEK.set(e.id, dek) }
@@ -571,7 +571,7 @@ async function decryptAll() {
       if (!meta || meta.iv !== e.m?.iv) { meta = { iv: e.m.iv, v: await openJson(dek, e.m) }; META.set(e.id, meta) }
       out.push({ ...base, locked: false, title: meta.v.title || '（無題）', tags: meta.v.tags || [], file: meta.v.file || null })
     } catch {
-      out.push({ ...base, locked: true, title: '開けない議事録', tags: [] })
+      if (S.admin) out.push({ ...base, locked: true, title: '開けない議事録', tags: [] })   // 管理者には、異常の目印として残す
     }
   }
   out.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
@@ -640,8 +640,10 @@ function procCount() {
 }
 
 function paintHeader() {
+  if (S.tab === 'convert' && !S.admin) S.tab = 'list'   // 変換管理は管理者だけ
   const n = procCount()
   $$('[data-tab]').forEach((b) => {
+    if (b.dataset.tab === 'convert') b.hidden = !S.admin
     b.classList.toggle('on', b.dataset.tab === S.tab)
     b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false')
     const badge = b.querySelector('.badge')
@@ -1267,6 +1269,17 @@ function kickLoad(list, names, tab) {
 }
 
 const todoEntries = () => S.items.filter((x) => !x.locked && x.st === 'ok' && x.td !== 0 && inRange(x))
+/** 開け閉めの状態を、会議ごとに覚える（この端末のブラウザにだけ） */
+function setTodoOpen(id, open) {
+  S.todoOpen[id] = open
+  if (S.byId.size) for (const k of Object.keys(S.todoOpen)) if (!S.byId.has(k)) delete S.todoOpen[k]
+  try { localStorage.setItem('m2.todoOpen', JSON.stringify(S.todoOpen)) } catch { /* 保存できなくても、開け閉めはできる */ }
+}
+function paintTodoOpen(sec, open) {
+  sec.classList.toggle('open', open)
+  sec.querySelector('.acc-btn')?.setAttribute('aria-expanded', String(open))
+  const ul = sec.querySelector('.todos'); if (ul) ul.hidden = !open
+}
 function kickTodo() { kickLoad(todoEntries(), ['s', 'n'], 'todo') }
 
 function todoPageHTML() {
@@ -1278,6 +1291,7 @@ function todoPageHTML() {
   data.forEach(({ s, n }) => s.todos.forEach((t, i) => { if (doneOf(n, todoKey(t, i))) done++; else open++; if (t.owner) owners.add(t.owner) }))
   const chips = [['open', '未完了', open], ['done', '完了', done], ['all', 'すべて', open + done]]
     .map(([k, l, c]) => `<button class="fchip ${S.tfilter === k ? 'on' : ''}" data-act="tfilter" data-v="${k}" aria-pressed="${S.tfilter === k}">${l} ${c}</button>`).join('')
+  let shown = 0
   const blocks = data.map(({ it, s, n }) => {
     const m = markerFn(it)
     const rows = s.todos.map((t, i) => ({ t, i })).filter(({ t, i }) => {
@@ -1288,15 +1302,25 @@ function todoPageHTML() {
     })
     if (!rows.length) return ''
     const left = s.todos.filter((t, i) => !doneOf(n, todoKey(t, i))).length
-    return `<section class="nblock">
-      <div class="nhead"><button class="link" data-act="open" data-id="${it.id}" data-go="todo">${esc(it.title)}</button><span class="muted">${md(it.date)} ・ 残り ${left} / ${s.todos.length}</span></div>
-      <ul class="todos">${rows.map(({ t, i }) => todoItem(it, t, i, n, m)).join('')}</ul></section>`
+    // タイトルを押して開け閉めする。決めていない会議は、いちばん新しい1件だけ開いておく
+    const isOpen = it.id in S.todoOpen ? !!S.todoOpen[it.id] : shown === 0
+    shown++
+    return `<section class="nblock acc ${isOpen ? 'open' : ''}" data-tid="${it.id}">
+      <div class="nhead acc-h">
+        <button class="acc-btn" data-act="todo-toggle" data-id="${it.id}" aria-expanded="${isOpen}" aria-controls="todo-${it.id}">
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          <span class="acc-title">${esc(it.title)}</span><span class="muted acc-meta">${md(it.date)} ・ 残り ${left} / ${s.todos.length}</span>
+        </button>
+        <button class="link acc-open" data-act="open" data-id="${it.id}" data-go="todo">会議を開く</button>
+      </div>
+      <ul class="todos" id="todo-${it.id}" ${isOpen ? '' : 'hidden'}>${rows.map(({ t, i }) => todoItem(it, t, i, n, m)).join('')}</ul></section>`
   }).join('')
   const loading = ready.length < list.length ? `<p class="muted sm">読み込んでいます… ${ready.length}/${list.length}</p>` : ''
   const emptyMsg = S.tfilter === 'open' ? '未完了の ToDo はありません。' : 'この条件に合う ToDo はありません。'
   return `<div class="page">
     <div class="toolbar"><h1 class="ptitle">ToDo</h1>${chips}
       ${owners.size ? `<label class="sr" for="towner">担当</label><select id="towner"><option value="">担当：全員</option>${[...owners].sort().map((o) => `<option ${S.towner === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : ''}
+      ${shown > 1 ? '<button class="btn sm" data-act="todo-all" data-v="open">すべて開く</button><button class="btn sm" data-act="todo-all" data-v="close">すべて閉じる</button>' : ''}
       <span class="grow"></span>${fsCtl()}${rangeSelect()}</div>
     <div class="notes">${blocks || (loading ? '' : `<p class="empty">${emptyMsg}</p>`)}${loading}</div>
   </div>`
@@ -2298,7 +2322,7 @@ const ACT = {
     if (!confirm('この端末の設定（権限コード・AI の接続先・Face ID の登録・お気に入りなどの表示の設定）を消します。会議のデータと、GitHub に保存した設定は残ります。よろしいですか？')) return
     clearData()   // 先に接続を切って、消した設定が GitHub に送られないようにする
     scrubUi(); lockVault(); vaultWipe(); bioForget(); await autoForget()
-    for (const k of ['m2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff', 'm2.idle', 'm2.shareAi']) localStorage.removeItem(k)
+    for (const k of ['m2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff', 'm2.idle', 'm2.shareAi', 'm2.todoOpen']) localStorage.removeItem(k)
     S.fav = new Set(); S.seen = {}; S.fs = 1; applyFs()
     showSetup()
   },
@@ -2323,7 +2347,7 @@ const ACT = {
   },
   lock,
   close: closeModal,
-  tab: (a) => { if (!leaveEdit()) return; S.tab = a.dataset.tab; hideBar(); window.scrollTo(0, 0); scrollHide.reset(); render(true) },
+  tab: (a) => { if (!leaveEdit()) return; if (a.dataset.tab === 'convert' && !S.admin) return; S.tab = a.dataset.tab; hideBar(); window.scrollTo(0, 0); scrollHide.reset(); render(true) },
   upload: openUpload,
   settings: openSettings,
   month: (a) => {
@@ -2332,6 +2356,15 @@ const ACT = {
     renderMain()
   },
   favonly: () => { S.favOnly = !S.favOnly; renderMain() },
+  'todo-toggle': (a) => {
+    const sec = a.closest('.nblock'); if (!sec) return
+    const open = a.getAttribute('aria-expanded') !== 'true'
+    setTodoOpen(a.dataset.id, open); paintTodoOpen(sec, open)   // 描き直さず、その場で開け閉めする（位置が動かない）
+  },
+  'todo-all': (a) => {
+    const open = a.dataset.v === 'open'
+    $$('.nblock[data-tid]').forEach((sec) => { setTodoOpen(sec.dataset.tid, open); paintTodoOpen(sec, open) })
+  },
   tags: (a) => { S.tagOpen = S.tagOpen === a.dataset.id ? null : a.dataset.id; paintDetail(); if (S.tagOpen) $('#tagNew')?.focus() },
   'tag-on': (a) => toggleTag(a.dataset.id, a.dataset.t, true),
   'tag-off': (a) => toggleTag(a.dataset.id, a.dataset.t, false),
