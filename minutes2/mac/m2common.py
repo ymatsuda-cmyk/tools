@@ -14,6 +14,9 @@ HOME = pathlib.Path(os.environ.get("MINUTES2_HOME", pathlib.Path.home() / ".minu
 KEYS_PATH = HOME / "keys.json"
 
 
+ENV_OVERRIDES: list = []   # 環境変数が、.env の値を（違う値で）上書きしたキー。気付かずに別のリポジトリなどを見る事故を、ログで知らせるため
+
+
 def load_env() -> dict:
     env = {}
     p = HOME / ".env"
@@ -26,7 +29,9 @@ def load_env() -> dict:
             env[k.strip()] = v.strip().strip('"').strip("'")
     for k, v in os.environ.items():
         if k.startswith(("GH_", "GAS_", "AUDIO_", "NOTION_", "DRIVE_", "WHISPER_", "MINUTES2_")):
-            env[k] = v
+            if k in env and env[k] != v:
+                ENV_OVERRIDES.append(k)
+            env[k] = v   # 環境変数が優先（launchd の EnvironmentVariables で上書きできるように）
     return env
 
 
@@ -94,6 +99,18 @@ class GitHub:
 
     def _url(self, path):
         return f"https://api.github.com/repos/{self.owner}/{self.repo}/contents/{path}"
+
+    def check(self):
+        """リポジトリに入れるかを確かめる。違っていると、ファイルが「無い」のと同じ見え方（404）になり、何もしないまま終わってしまうため"""
+        r = self.s.get(f"https://api.github.com/repos/{self.owner}/{self.repo}", timeout=60)
+        if r.status_code == 200:
+            return
+        if r.status_code in (401, 403):
+            raise RuntimeError(f"GitHub に入れません（{r.status_code}）。GH_TOKEN が無効か、期限が切れている可能性があります。")
+        if r.status_code == 404:
+            raise RuntimeError(f"GitHub のリポジトリ {self.owner}/{self.repo} が見つかりません。GH_OWNER・GH_REPO と、"
+                               "GH_TOKEN（fine-grained）の Resource owner と Repository access にこのリポジトリが入っているかを確かめてください。")
+        r.raise_for_status()
 
     def get(self, path):
         """→ (text, sha) / 無ければ (None, None)"""

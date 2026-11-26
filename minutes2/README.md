@@ -196,3 +196,15 @@ Notion には要約待ちの文字起こしが一時的に（平文で）置か�
 - 会議の見出しのタイトルと日時は、押すとその場で直せます（Enter か 外を押すと保存、Esc で取り消し。タイトルが空のときは保存しません）。直せるのは、管理者と、その会議を登録した人だけです。以前の「タイトル・日時」ボタンとダイアログは、なくしました。指で操作する端末では、日時を押すと選択画面がすぐ開きます。
 - アプリ名は「MinutesStock」です（画面・ホーム画面のアプリ名・Claude.ai の要約ページの題名）。内部の保存名（`m2.*` や DeviceLink の `minutestock`）は、これまでの端末の設定を引き継ぐため、変えていません。ホーム画面のアプリ名は、追加し直すと新しい名前になります。
 
+## 変換管理に「Mac から応答がありません」「書き出せていません」と出たとき
+
+- 「Notion の作業DB：書き出せていません（.env に NOTION_TOKEN / NOTION_WORK_DB_ID がありません）」：`~/.minutes2/.env` に次の2行を入れる。`NOTION_TOKEN` は、議事録DBの取り込みに使っているものと同じで構わない（すでに入っていれば、`NOTION_WORK_DB_ID` だけ）。入れたら、Notion で「議事録 要約作業」のDBを開き、右上の「…」→「接続」から、そのインテグレーションを追加する。
+  ```
+  NOTION_TOKEN=（インテグレーションのシークレット）
+  NOTION_WORK_DB_ID=4200e7a535dc8189b0f6f73da7b3d56e
+  ```
+  DBのID は URL にある32桁（データソースのID `4200e7a5-35dc-8140-…` ではない）。
+- 「Mac から応答がありません」：まず `launchctl list | grep minutes2`、`tail -40 ~/scripts/logs/minutes2_worker.log`、`tail -20 ~/scripts/logs/minutes2_launchd.err` を見る。ログに「前回の処理がまだ動いているので、今回は見送ります」が出ていれば、長い文字起こしの最中なので、待てば戻る（文字起こし中は4分おきに確認を書き、アプリは3時間まで「文字起こし中」と出す）。動いていなければ `launchctl kickstart gui/$(id -u)/com.minutes2.worker`（文字起こし中に `-k` を付けると、途中で止まるので付けない）。Mac が眠っていると動かないので、`pmset -g` で sleep を確かめる。
+- ログに「GitHub に書けませんでした（404）」「GitHub のリポジトリ …/… が見つかりません」が出るとき：Mac が見ているリポジトリの持ち主（`GH_OWNER`）かリポジトリ名が違うか、`GH_TOKEN`（fine-grained）が、そのリポジトリの持ち主（Resource owner）で作られていない・Repository access に入っていない。この間、ワーカーは何も処理できず、`worker.json` も書けないので、「Mac から応答がありません」になる。`grep -E '^GH_(OWNER|REPO)=' ~/.minutes2/.env` と `env | grep -E '^GH_(OWNER|REPO)='` で確かめる（環境変数は `.env` より優先される。違う値で上書きしているときは、ログに「注意：環境変数 … が .env より優先されています」と出る）。直るまでは、`setup_keys.py push` と `rebuild` は流さない（`.env` の値を GAS と鍵束に書き込むため）。
+- ログに「作業DBが見つかりません … 404 object_not_found」が出るとき：Notion で「議事録 要約作業」のDBを開き、右上の「…」→「接続」から、`NOTION_TOKEN` のインテグレーションを追加する（トークンを作ったワークスペースと、DBのワークスペースが同じことも確かめる）。
+

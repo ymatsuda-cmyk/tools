@@ -1472,11 +1472,13 @@ function workerLine() {
   const w = S.worker
   if (!w?.at) return { ok: false, t: 'Mac から、まだ確認の記録が届いていません。', s: 'Mac で minutes_worker を設定してください。' }
   const every = (w.every || WORKER_EVERY_SEC) * 1000
-  const late = Date.now() - w.at > every * 4
   const busy = w.busy ? S.byId.get(w.busy) : null
+  // 文字起こし中は、長い録音だと確認が遅れる（古いワーカーは、終わるまで書かない）。3時間までは「応答なし」にしない
+  const late = Date.now() - w.at > (w.busy ? 3 * 3600 * 1000 : every * 4)
+  const slow = !!w.busy && Date.now() - w.at > every * 4
   return {
     ok: !late,
-    t: late ? 'Mac から応答がありません' : (busy ? `Mac が文字起こし中：${busy.title}` : 'Mac mini 監視中'),
+    t: late ? 'Mac から応答がありません' : (busy ? `Mac が文字起こし中：${busy.title}${slow ? '（長い録音は、時間がかかります）' : ''}` : 'Mac mini 監視中'),
     s: `最終確認 ${ago(w.at)}（${Math.round(every / 60000)}分おき）${w.asr ? ' ・ ' + esc(w.asr) : ''}`,
   }
 }

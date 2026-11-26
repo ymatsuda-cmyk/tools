@@ -16,12 +16,13 @@ import fcntl
 import json
 import pathlib
 import sys
+import threading
 import time
 import traceback
 
 import requests
 
-from m2common import ENV, GitHub, HOME, log, load_keys
+from m2common import ENV, ENV_OVERRIDES, GitHub, HOME, log, load_keys
 from m2crypto import jwk_to_priv, open_json, seal_json, unwrap_dek
 
 ADMIN_ROLE = "xYz"
@@ -122,7 +123,11 @@ class Worker:
                 self.patch(e["id"], st="tr")
                 started = True
                 self.heartbeat(busy=e["id"], force=True)
-                segments, dur = transcribe(path)
+                stop = self._beat_while(e["id"])   # 長い録音でも、アプリが「応答なし」と誤らないよう、数分おきに知らせる
+                try:
+                    segments, dur = transcribe(path)
+                finally:
+                    stop()   # 終わりを待ってから、あとの書き込みへ（同じブランチへの同時の書き込みを避ける）
                 if not segments:
                     raise RuntimeError("音声から文字を起こせませんでした（無音の可能性があります）")
                 self.write_file(e, "t", {"segments": segments, "asr": MODEL})
@@ -138,6 +143,25 @@ class Worker:
             finally:
                 if started:
                     self.heartbeat(busy=None, force=True)
+
+    def _beat_while(self, busy, every=240):
+        """文字起こしの間、every 秒おきに「文字起こし中」の確認を書く。返す関数を呼ぶと止まり、最後の1回が終わるのを待つ"""
+        done = threading.Event()
+
+        def loop():
+            while not done.wait(every):
+                try:
+                    self.heartbeat(busy=busy, force=True)
+                except Exception as ex:  # noqa: BLE001  知らせが書けなくても、文字起こしは続ける
+                    log(f"文字起こし中の確認を書けませんでした: {ex}")
+
+        t = threading.Thread(target=loop, name="minutes2-beat", daemon=True)
+        t.start()
+
+        def stop():
+            done.set()
+            t.join(timeout=60)
+        return stop
 
     @staticmethod
     def _synced(path: pathlib.Path) -> bool:
@@ -214,6 +238,11 @@ class Worker:
     # ---------- 実行 ----------
 
     def run(self):
+        try:
+            self.gh.check()
+        except Exception as ex:  # noqa: BLE001  リポジトリに入れないまま続けても、何もできない（何もしない回に見えてしまう）
+            log(f"GitHub につながりません。この回は何もしません: {ex}")
+            return
         self.heartbeat()
         try:
             from notion_import import import_pages
@@ -307,9 +336,14 @@ class Notion:
             if r.status_code == 429:
                 time.sleep(1 + i * 2)
                 continue
-            r.raise_for_status()
+            if r.status_code >= 400:   # Notion の説明（「インテグレーションと共有されていません」など）をそのまま出す
+                try:
+                    j = r.json()
+                except ValueError:
+                    j = {}
+                raise RuntimeError(f"{r.status_code} {j.get('code', '')}: {j.get('message') or r.text[:200]}")
             return r.json()
-        r.raise_for_status()
+        raise RuntimeError("429 rate_limited: Notion への呼び出しが多すぎます")
 
     def pages(self):
         out, cursor = {}, None
@@ -383,6 +417,8 @@ class Notion:
 
 def main():
     HOME.mkdir(parents=True, exist_ok=True)
+    for k in ENV_OVERRIDES:
+        log(f"注意：環境変数 {k} が、.env の {k} と違う値で、.env より優先されています。意図していなければ unset {k} してください")
     lock = open("/tmp/minutes2_worker.lock", "w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
