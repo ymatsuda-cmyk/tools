@@ -23,11 +23,11 @@ export function repo(gh) {
     try {
       r = await fetch(url, { cache: 'no-store', headers: { Authorization: 'Bearer ' + gh.token, Accept: 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28' } })
     } catch {
-      throw new Error('GitHub につながりません。')
+      throw new Error('データの保管先につながりません。')
     }
     if (r.status === 404) return null
-    if (r.status === 401 || r.status === 403) throw new Error('GitHub の読み取りトークンが使えません（管理者に連絡してください）')
-    if (!r.ok) throw new Error(`GitHub の読み込みに失敗しました（${r.status}）`)
+    if (r.status === 401 || r.status === 403) throw new Error('データを読み取れません（管理者に連絡してください）')
+    if (!r.ok) throw new Error(`データの読み込みに失敗しました（${r.status}）`)
     return r.text()
   }
   return {

@@ -216,13 +216,13 @@ function branch_() { return prop_('GH_BRANCH', false) || 'main'; }
 function ghGet_(path) {
   var res = UrlFetchApp.fetch(ghUrl_(path) + '?ref=' + encodeURIComponent(branch_()), { headers: ghHeaders_(), muteHttpExceptions: true });
   if (res.getResponseCode() === 404) return null;
-  if (res.getResponseCode() !== 200) throw new Error('GitHub の読み込みに失敗しました (' + res.getResponseCode() + ')');
+  if (res.getResponseCode() !== 200) throw new Error('データの読み込みに失敗しました (' + res.getResponseCode() + ')');
   var j = JSON.parse(res.getContentText());
   var b64 = j.content;
   if (!b64 || j.encoding !== 'base64') { // 1MB を超えると content が空になるので blob API で取る
     var r2 = UrlFetchApp.fetch('https://api.github.com/repos/' + prop_('GH_OWNER') + '/' + prop_('GH_REPO') + '/git/blobs/' + j.sha,
       { headers: ghHeaders_(), muteHttpExceptions: true });
-    if (r2.getResponseCode() !== 200) throw new Error('GitHub の読み込みに失敗しました (blob ' + r2.getResponseCode() + ')');
+    if (r2.getResponseCode() !== 200) throw new Error('データの読み込みに失敗しました (blob ' + r2.getResponseCode() + ')');
     b64 = JSON.parse(r2.getContentText()).content;
   }
   var text = Utilities.newBlob(Utilities.base64Decode(String(b64).replace(/\n/g, ''))).getDataAsString('UTF-8');
@@ -244,7 +244,7 @@ function ghPut_(path, text, sha, message) {
   var code = res.getResponseCode();
   if (code === 200 || code === 201) return true;
   if (code === 409 || code === 422) return false;
-  throw new Error('GitHub への書き込みに失敗しました (' + code + ')');
+  throw new Error('データの書き込みに失敗しました (' + code + ')');
 }
 
 function ghWrite_(path, text) {
@@ -252,7 +252,7 @@ function ghWrite_(path, text) {
     var cur = ghGet_(path);
     if (ghPut_(path, text, cur && cur.sha)) return;
   }
-  throw new Error('GitHub への書き込みが競合しました。もう一度試してください。');
+  throw new Error('データの書き込みが競合しました。もう一度試してください。');
 }
 
 function ghDelete_(path) {

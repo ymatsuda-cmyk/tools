@@ -545,3 +545,5 @@ html{touch-action:manipulation}
 .acc-meta{font-size:13px}
 .acc-open{flex:none;font-size:13px;white-space:nowrap}
 .nblock.acc .todos{padding-bottom:6px}
+.nblock.acc .acc-body{padding-bottom:6px}
+.nblock.acc .acc-body > .mkcard:first-child{margin-top:2px}

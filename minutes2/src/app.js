@@ -54,7 +54,7 @@ const S = {
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
-  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}),
+  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}), noteOpen: ls.get('m2.noteOpen', {}),
 }
 const DEK = new Map()
 const META = new Map()
@@ -449,7 +449,7 @@ async function pullPrefs() {
 function schedulePush() {
   if (!S.R || !S.prefsReady) return
   clearTimeout(prefsTimer)
-  prefsTimer = setTimeout(() => { pushPrefs().catch((e) => toast('設定を GitHub に保存できませんでした：' + e.message, true)) }, 1500)
+  prefsTimer = setTimeout(() => { pushPrefs().catch((e) => toast('設定を保存できませんでした：' + e.message, true)) }, 1500)
 }
 
 async function pushPrefs() {
@@ -1269,16 +1269,17 @@ function kickLoad(list, names, tab) {
 }
 
 const todoEntries = () => S.items.filter((x) => !x.locked && x.st === 'ok' && x.td !== 0 && inRange(x))
-/** 開け閉めの状態を、会議ごとに覚える（この端末のブラウザにだけ） */
-function setTodoOpen(id, open) {
-  S.todoOpen[id] = open
-  if (S.byId.size) for (const k of Object.keys(S.todoOpen)) if (!S.byId.has(k)) delete S.todoOpen[k]
-  try { localStorage.setItem('m2.todoOpen', JSON.stringify(S.todoOpen)) } catch { /* 保存できなくても、開け閉めはできる */ }
+/** 開け閉めの状態を、会議ごとに覚える（ToDo とノートで別々に。この端末のブラウザにだけ） */
+function setAccOpen(kind, id, open) {
+  const map = kind === 'note' ? S.noteOpen : S.todoOpen
+  map[id] = open
+  if (S.byId.size) for (const k of Object.keys(map)) if (!S.byId.has(k)) delete map[k]
+  try { localStorage.setItem(kind === 'note' ? 'm2.noteOpen' : 'm2.todoOpen', JSON.stringify(map)) } catch { /* 保存できなくても、開け閉めはできる */ }
 }
-function paintTodoOpen(sec, open) {
+function paintAcc(sec, open) {
   sec.classList.toggle('open', open)
   sec.querySelector('.acc-btn')?.setAttribute('aria-expanded', String(open))
-  const ul = sec.querySelector('.todos'); if (ul) ul.hidden = !open
+  const body = sec.querySelector('.acc-body'); if (body) body.hidden = !open
 }
 function kickTodo() { kickLoad(todoEntries(), ['s', 'n'], 'todo') }
 
@@ -1313,7 +1314,7 @@ function todoPageHTML() {
         </button>
         <button class="link acc-open" data-act="open" data-id="${it.id}" data-go="todo">会議を開く</button>
       </div>
-      <ul class="todos" id="todo-${it.id}" ${isOpen ? '' : 'hidden'}>${rows.map(({ t, i }) => todoItem(it, t, i, n, m)).join('')}</ul></section>`
+      <ul class="todos acc-body" id="todo-${it.id}" ${isOpen ? '' : 'hidden'}>${rows.map(({ t, i }) => todoItem(it, t, i, n, m)).join('')}</ul></section>`
   }).join('')
   const loading = ready.length < list.length ? `<p class="muted sm">読み込んでいます… ${ready.length}/${list.length}</p>` : ''
   const emptyMsg = S.tfilter === 'open' ? '未完了の ToDo はありません。' : 'この条件に合う ToDo はありません。'
@@ -1346,8 +1347,20 @@ function notesPageHTML() {
     .map((t) => `<button class="fchip ${S.nfilter === t.id ? 'on' : ''}" data-act="nfilter" data-v="${t.id}" aria-pressed="${S.nfilter === t.id}">${t.id ? `<span class="mdot c${t.id}"></span>` : ''}${esc(t.name)} ${counts[t.id]}</button>`).join('')
   const byMeeting = new Map()
   shown.forEach((x) => { if (!byMeeting.has(x.it.id)) byMeeting.set(x.it.id, { it: x.it, items: [] }); byMeeting.get(x.it.id).items.push(x.mk) })
-  const blocks = [...byMeeting.values()].map(({ it, items }) => `<section class="nblock">
-      <div class="nhead"><button class="link" data-act="open" data-id="${it.id}">${esc(it.title)}</button><span class="muted">${md(it.date)}</span></div>
+  // タイトルを押して開け閉めする。決めていない会議は、いちばん新しい1件だけ開いておく。検索中は、当たった会議をすべて開く
+  let shownN = 0
+  const blocks = [...byMeeting.values()].map(({ it, items }) => {
+    const isOpen = q ? true : (it.id in S.noteOpen ? !!S.noteOpen[it.id] : shownN === 0)
+    shownN++
+    return `<section class="nblock acc ${isOpen ? 'open' : ''}" data-nid="${it.id}">
+      <div class="nhead acc-h">
+        <button class="acc-btn" data-act="note-toggle" data-id="${it.id}" aria-expanded="${isOpen}" aria-controls="note-${it.id}">
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          <span class="acc-title">${esc(it.title)}</span><span class="muted acc-meta">${md(it.date)} ・ ${items.length}件</span>
+        </button>
+        <button class="link acc-open" data-act="open" data-id="${it.id}">会議を開く</button>
+      </div>
+      <div class="acc-body" id="note-${it.id}" ${isOpen ? '' : 'hidden'}>
       ${items.sort((a, b) => locCompare(a.loc, b.loc) || a.s - b.s).map((mk) => `
         <div class="mkcard c${mk.c}" data-mid="${esc(mk.id)}">
           <blockquote class="mq">${esc(mk.q)}</blockquote>
@@ -1361,10 +1374,11 @@ function notesPageHTML() {
             <button class="btn sm danger" data-act="mk-del" data-id="${it.id}" data-mid="${esc(mk.id)}">消す</button>
           </div>
         </div>`).join('')}
-    </section>`).join('')
+      </div></section>`
+  }).join('')
   const loading = pending ? `<p class="muted sm">読み込んでいます… ${list.length - pending}/${list.length}</p>` : ''
   return `<div class="page">
-    <div class="toolbar"><h1 class="ptitle">ノート</h1>${chips}<span class="grow"></span>
+    <div class="toolbar"><h1 class="ptitle">ノート</h1>${chips}${shownN > 1 && !q ? '<button class="btn sm" data-act="note-all" data-v="open">すべて開く</button><button class="btn sm" data-act="note-all" data-v="close">すべて閉じる</button>' : ''}<span class="grow"></span>
       <label class="sr" for="nq">ノート内を検索</label><input id="nq" class="nsearch" type="search" placeholder="ノート内を検索" value="${esc(S.nq)}">${fsCtl()}${rangeSelect()}</div>
     <div class="notes">${blocks || (pending ? '' : '<p class="empty">マーカーはまだありません。議事録の文字を選ぶと、マーカーを付けられます。付けた箇所は、ここに集まります。</p>')}${loading}</div>
   </div>`
@@ -2147,7 +2161,6 @@ function openSettings(tab) {
   const bio = bioOk()
   const idle = idleMin()
   const sharedLeft = hasConn(readSharedSettings())
-  const where = S.gh ? `${S.gh.owner}/${S.gh.repo}` : 'データ用リポジトリ'
   const pane = (k, html) => `<div class="spane" data-pane="${k}" role="tabpanel" aria-labelledby="stab-${k}" ${setTab === k ? '' : 'hidden'}>${html}</div>`
   modal('設定', `
     <div class="stabs" role="tablist" aria-label="設定の種類">${SET_TABS.map(([k, l]) => `<button type="button" role="tab" id="stab-${k}" class="stab ${setTab === k ? 'on' : ''}" data-act="stab" data-v="${k}" aria-selected="${setTab === k}">${l}</button>`).join('')}</div>
@@ -2210,7 +2223,7 @@ function openSettings(tab) {
 
     ${pane('share', `
       <section class="sset">
-        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です（受け取った端末で、その端末のパスコードを決めます）。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
+        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です（受け取った端末で、その端末のパスコードを決めます）。表示の設定は、暗号化して保管しています。同じ権限コードで開いた端末には、自動で反映されます。</p>
         <label class="chk"><input type="checkbox" id="dlAi" ${ls.get('m2.shareAi', true) ? 'checked' : ''}> AI の接続先（URL・API キー）も渡す</label>
         <p class="muted sm" id="dlAiHint">${ls.get('m2.shareAi', true) ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'}</p>
         <div id="devLink" class="dl" aria-live="polite"></div>
@@ -2319,15 +2332,15 @@ const ACT = {
     k.type = show ? 'text' : 'password'; a.textContent = show ? '隠す' : '表示'; a.setAttribute('aria-pressed', show)
   },
   reset: async () => {
-    if (!confirm('この端末の設定（権限コード・AI の接続先・Face ID の登録・お気に入りなどの表示の設定）を消します。会議のデータと、GitHub に保存した設定は残ります。よろしいですか？')) return
+    if (!confirm('この端末の設定（権限コード・AI の接続先・Face ID の登録・お気に入りなどの表示の設定）を消します。会議のデータと、保管している設定は残ります。よろしいですか？')) return
     clearData()   // 先に接続を切って、消した設定が GitHub に送られないようにする
     scrubUi(); lockVault(); vaultWipe(); bioForget(); await autoForget()
-    for (const k of ['m2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff', 'm2.idle', 'm2.shareAi', 'm2.todoOpen']) localStorage.removeItem(k)
+    for (const k of ['m2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff', 'm2.idle', 'm2.shareAi', 'm2.todoOpen', 'm2.noteOpen']) localStorage.removeItem(k)
     S.fav = new Set(); S.seen = {}; S.fs = 1; applyFs()
     showSetup()
   },
   forgot: () => {
-    if (!confirm('パスコードを忘れたときは、この端末に置いた権限コードと AI の接続先を消して、最初から設定し直します（会議のデータは GitHub に残るので消えません）。よろしいですか？')) return
+    if (!confirm('パスコードを忘れたときは、この端末に置いた権限コードと AI の接続先を消して、最初から設定し直します（会議のデータは保管先に残るので消えません）。よろしいですか？')) return
     vaultWipe(); bioForget()
     showSetup()
   },
@@ -2341,7 +2354,7 @@ const ACT = {
   gate: () => { if (vaultExists()) showUnlock(); else showSetup() },
   'code-change': changeCode,
   'forget-conn': async () => {
-    if (!confirm('この端末から接続情報（権限コード・AI の接続先・Face ID の登録）を消去してロックします。会議のデータと設定は GitHub に残ります。よろしいですか？')) return
+    if (!confirm('この端末から接続情報（権限コード・AI の接続先・Face ID の登録）を消去してロックします。会議のデータと設定は保管先に残ります。よろしいですか？')) return
     clearData(); scrubUi(); lockVault(); vaultWipe(); bioForget(); await autoForget()
     showSetup()
   },
@@ -2359,11 +2372,20 @@ const ACT = {
   'todo-toggle': (a) => {
     const sec = a.closest('.nblock'); if (!sec) return
     const open = a.getAttribute('aria-expanded') !== 'true'
-    setTodoOpen(a.dataset.id, open); paintTodoOpen(sec, open)   // 描き直さず、その場で開け閉めする（位置が動かない）
+    setAccOpen('todo', a.dataset.id, open); paintAcc(sec, open)   // 描き直さず、その場で開け閉めする（位置が動かない）
+  },
+  'note-toggle': (a) => {
+    const sec = a.closest('.nblock'); if (!sec) return
+    const open = a.getAttribute('aria-expanded') !== 'true'
+    setAccOpen('note', a.dataset.id, open); paintAcc(sec, open)
+  },
+  'note-all': (a) => {
+    const open = a.dataset.v === 'open'
+    $$('.nblock[data-nid]').forEach((sec) => { setAccOpen('note', sec.dataset.nid, open); paintAcc(sec, open) })
   },
   'todo-all': (a) => {
     const open = a.dataset.v === 'open'
-    $$('.nblock[data-tid]').forEach((sec) => { setTodoOpen(sec.dataset.tid, open); paintTodoOpen(sec, open) })
+    $$('.nblock[data-tid]').forEach((sec) => { setAccOpen('todo', sec.dataset.tid, open); paintAcc(sec, open) })
   },
   tags: (a) => { S.tagOpen = S.tagOpen === a.dataset.id ? null : a.dataset.id; paintDetail(); if (S.tagOpen) $('#tagNew')?.focus() },
   'tag-on': (a) => toggleTag(a.dataset.id, a.dataset.t, true),
