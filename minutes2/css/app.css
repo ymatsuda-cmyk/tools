@@ -513,3 +513,8 @@ h1 .scope .ic{width:16px;height:16px}
 /* マインドマップ：ドラッグは地図の移動に使い、ページを動かさない */
 .mm2,.mm2 svg{touch-action:none}
 .strip{overscroll-behavior-x:contain}
+
+/* ログイン（パスコード方式） */
+.gate-hint{margin:0;text-align:center;color:var(--cloth-mute);font-size:12.5px;line-height:1.7}
+.spass{display:flex;flex-direction:column;gap:10px}
+.gate .btn.wide{width:100%}

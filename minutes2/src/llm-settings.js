@@ -6,6 +6,18 @@
 
 const KEY = 'gemma-chat.settings'
 
+// 保存先。既定は localStorage（gemma-chat と共有）。MinuteStock は、パスコードで暗号化した保管庫へ差し替えて使う
+// （差し替えない限り、このファイルの動きは gemma-chat 側と同じ）
+const SHARED = { get: () => localStorage.getItem(KEY), set: (v) => localStorage.setItem(KEY, v) }
+let store = SHARED
+export function useSettingsStore(s) { store = s || SHARED }
+
+/** 共有の保存（gemma-chat など他のアプリと同じ場所）に残っている接続情報。引っ越しと削除のボタン用 */
+export function readSharedSettings() {
+  try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null } catch { return null }
+}
+export function clearSharedSettings() { localStorage.removeItem(KEY) }
+
 function makeId() {
   return Math.random().toString(36).slice(2, 8)
 }
@@ -96,7 +108,7 @@ function migrate(raw) {
 
 export function loadSettings() {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = store.get()
     return migrate(raw ? JSON.parse(raw) : {})
   } catch {
     return { ...DEFAULT_SETTINGS, connections: [newConnection()] }
@@ -104,7 +116,7 @@ export function loadSettings() {
 }
 
 export function saveSettings(s) {
-  localStorage.setItem(KEY, JSON.stringify(s))
+  store.set(JSON.stringify(s))
 }
 
 export function activeConnection(s) {

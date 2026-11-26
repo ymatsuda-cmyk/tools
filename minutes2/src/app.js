@@ -3,10 +3,11 @@ import { GAS_URL, POLL_MS, CLAUDE_DEFAULT_URL, WORKER_EVERY_SEC, MARK_TAGS } fro
 import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd } from './crypto.js'
 import { gas, repo } from './store.js'
 import { bioOk, bioRegistered, bioRegister, bioUnlock, bioForget } from './bio.js'
-import { autoEnabled, setAutoEnabled, autoSaved, autoSave, autoLoad, autoForget } from './autoopen.js'
+import { autoSaved, autoLoad, autoForget } from './autoopen.js'   // 以前の版の控えを、パスコード方式へ引っ越すためだけに使う
+import { vaultExists, vaultOpened, vaultData, vaultPass, vaultCreate, vaultOpen, vaultUpdate, vaultRepass, vaultLock, vaultWipe, failsLeft, MAX_FAIL, MIN_PASS } from './vault.js'
 import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText, SUMMARY_PROMPT, extractJson } from './summary.js'
 import { parseSummaryText, summaryTypeLabel } from './summary-text.js'
-import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf } from './llm-settings.js'
+import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf, useSettingsStore, readSharedSettings, clearSharedSettings } from './llm-settings.js'
 import { streamChat } from './llm-client.js'
 import { groupMarks, marksOf, validFor, renderMarked, applyRange, recolor, reconcile, summaryTexts, trTexts, withTimes, locCompare, locLabel, locTab, kindOf, SUMMARY_KINDS } from './marks.js'
 import { todoKey, doneOf, logsOf, mergeTodos } from './todos.js'
@@ -100,7 +101,17 @@ function ensureDL() {
   return dlLoading
 }
 const DL_MISSING = '受け渡しの部品（common/devicelink.js）を読み込めませんでした。オンラインで開き直してください。'
-const LOCKED = 'm2.locked'   // 鍵をかけたあとは、このタブを閉じるまで自動で開かない
+/* 鍵がかかっている間は、AI の接続先を読まない・書かない。開いている間は、パスコードで暗号化した保管庫の中に置く
+   （gemma-chat など他のアプリの保存とは共有しない） */
+const LOCKED_STORE = { get: () => null, set: () => {} }
+useSettingsStore(LOCKED_STORE)
+function bindStore() {
+  useSettingsStore({
+    get: () => { const a = vaultData()?.ai; return a ? JSON.stringify(a) : null },
+    set: (v) => { vaultUpdate({ ai: JSON.parse(v) }).catch((e) => toast('AI の接続先を保存できませんでした：' + e.message, true)) },
+  })
+}
+const hasConn = (x) => !!x && ((x.connections || x.profiles || []).some((c) => c.baseUrl || c.apiKey) || !!(x.baseUrl || x.apiKey))
 
 function gateShell(inner) {
   clearInterval(S.timer)
@@ -108,31 +119,149 @@ function gateShell(inner) {
   $('#gate').hidden = false
   $('#gate').innerHTML = `<div class="gate-card"><h1 class="gate-title">MinuteStock</h1>${inner}</div>`
 }
+const gateOff = () => $$('#gate button').forEach((b) => { b.disabled = true })
 
-function showGate(msg = '') {
-  const bio = bioOk() && bioRegistered()
-  const saved = autoEnabled() && autoSaved()
+/* ---------- 初回：権限コードと、この端末のパスコードを決める ----------
+   code があれば（以前の版が覚えていた分・他の端末から受け取った分）権限コードは聞かない */
+function showSetup({ code = null, ai = null, from = '', msg = '' } = {}) {
+  const known = !!code
   gateShell(`
-      <p class="gate-sub">暗号化して保管しています。開くには権限コードが必要です。</p>
-      ${saved ? '<button class="btn main wide" data-act="auto-open">開く</button><div class="gate-or">または</div>' : ''}
-      ${bio ? `<button class="btn ${saved ? '' : 'main'} wide gate-alt" data-act="bio">Face ID・Touch ID で開く</button><div class="gate-or">または</div>` : ''}
-      <form id="loginForm" class="gate-form">
-        <label for="code">権限コード</label>
-        <input id="code" type="password" autocomplete="current-password" required>
-        <button class="btn ${bio || saved ? '' : 'main'} wide" type="submit">${bio || saved ? '権限コードで開く' : '開く'}</button>
+      <p class="gate-sub">${from === 'recv' ? '別の端末から受け取りました。この端末のパスコードを決めてください。'
+        : known ? '権限コードは、この端末に覚えていたものを使います。これからは、この端末のパスコードで開きます。'
+          : '初めて使う端末です。権限コードと、この端末のパスコードを設定します。'}</p>
+      <form id="setupForm" class="gate-form">
+        ${known ? '' : '<label for="code">権限コード（グループを決めます）</label><input id="code" type="password" autocomplete="off" required>'}
+        <label for="pw1">パスコード（${MIN_PASS}文字以上）</label>
+        <input id="pw1" type="password" autocomplete="new-password" minlength="${MIN_PASS}" required>
+        <label for="pw2">もう一度</label>
+        <input id="pw2" type="password" autocomplete="new-password" minlength="${MIN_PASS}" required>
+        <button class="btn main wide" type="submit">設定して開く</button>
       </form>
-      <button class="link gate-link" data-act="recv">コードで受け取る（別の端末から）</button>
+      <p class="gate-hint">パスコードはこの端末の中だけで使い、サーバーには送りません。権限コードと AI の接続先を、これで暗号化して置きます。${vaultExists() ? ' この端末に置いてある内容は、置き換わります。' : ''}</p>
       <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
-      ${bio || saved || ls.get('m2.seen', null) ? '<button class="link danger" data-act="reset">この端末の設定を消して、最初から設定する</button>' : ''}`)
-  $('#loginForm').addEventListener('submit', async (e) => {
+      ${known ? '<button class="link gate-link" data-act="setup-new">別の権限コードで設定する</button>'
+        : '<button class="link gate-link" data-act="recv">コードで受け取る（別の端末から）</button>'}`)
+  $(known ? '#pw1' : '#code')?.focus()
+  $('#setupForm').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const code = $('#code').value.trim()
-    if (code) await doLogin(code, 'typed')
+    const m = $('#gateMsg')
+    const c = known ? code : $('#code').value.trim()
+    const p1 = $('#pw1').value, p2 = $('#pw2').value
+    if (!c) { m.textContent = '権限コードを入れてください。'; return }
+    if (p1.length < MIN_PASS) { m.textContent = `パスコードは${MIN_PASS}文字以上にしてください。`; return }
+    if (p1 !== p2) { m.textContent = 'パスコードが一致しません。'; return }
+    await doSetup(c, p1, { ai, from, known })
   })
-  if (!bio && !saved) $('#code')?.focus()
 }
 
-/** 他の端末から受け取る。pkg があれば（QR・リンク、またはコードで受け取り済み）パスフレーズだけ聞く */
+async function doSetup(code, pass, { ai = null, from = '', known = false } = {}) {
+  const m = $('#gateMsg')
+  if (m) m.textContent = '確認しています…'
+  gateOff()
+  try {
+    await login(code)   // 権限コードを GAS で確かめ、鍵束を開く（違えばここで止まる）
+    // 以前の版の控え（権限コードを覚えて自動で開く方式）と、それを包んでいた Face ID の登録は、ここで終わりにする
+    await autoForget(); bioForget()
+    for (const k of ['m2.autoOff', 'm2.bioAsked']) localStorage.removeItem(k)
+    const shared = readSharedSettings()   // 引っ越し：これまでの接続先を、保管庫の中へコピーする
+    await vaultCreate(pass, { v: 1, code, ai: ai || (hasConn(shared) ? shared : null) })
+    bindStore()
+    await start(); armIdle()
+    toast(from === 'recv' ? `この端末で使えるようにしました（グループ：${S.admin ? '管理者' : S.role}）。` : '設定しました。', false, 5000)
+    if (bioOk()) askBio()
+    return true
+  } catch (e) {
+    S.code = null
+    showSetup({ code: known ? code : null, ai, from, msg: e.message || '設定できませんでした。' })
+    return false
+  }
+}
+
+/* ---------- 2回目以降：パスコードで開く ---------- */
+function showUnlock(msg = '') {
+  const bio = bioOk() && bioRegistered()
+  const left = failsLeft()
+  gateShell(`
+      <p class="gate-sub">パスコードを入れてください。</p>
+      <form id="unlockForm" class="gate-form">
+        <label for="pw">パスコード</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
+        <button class="btn main wide" type="submit">開く</button>
+      </form>
+      ${bio ? '<div class="gate-or">または</div><button class="btn wide" data-act="bio">Face ID・Touch ID で開く</button>' : ''}
+      <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
+      <p class="gate-hint">誤入力が${MAX_FAIL}回続くと、この端末に置いた権限コードと AI の接続先を消します（会議のデータは消えません）。${left < MAX_FAIL && !msg ? `いま、あと${left}回です。` : ''}</p>
+      <button class="link gate-link" data-act="recv">コードで受け取る（別の端末から）</button>
+      <button class="link gate-link" data-act="forgot">パスコードを忘れた／権限コードを入れ直す</button>
+      <button class="link danger" data-act="reset">この端末の設定を消す</button>`)
+  $('#pw')?.focus()
+  $('#unlockForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const p = $('#pw').value
+    if (p) await doUnlock(p)
+  })
+}
+
+async function doUnlock(pass, how = 'typed') {
+  const m = $('#gateMsg')
+  if (m) m.textContent = '確認しています…'
+  gateOff()
+  let data
+  try { data = await vaultOpen(pass) } catch (e) {
+    if (e.message === 'WIPED') { bioForget(); showSetup({ msg: `誤入力が${MAX_FAIL}回続いたため、この端末に置いた権限コードと AI の接続先を消しました。権限コードから設定し直してください。` }) }
+    else if (e.message === 'BADPASS') { if (how === 'bio') bioForget(); showUnlock(how === 'bio' ? 'パスコードが変わっています。パスコードを入れてください。' : `パスコードが違います（あと${e.left}回）。`) }
+    else showSetup()
+    return false
+  }
+  bindStore()
+  return enter(data.code)
+}
+
+/** 権限コードで GAS にログインして、画面を開く（権限コードは保管庫から取り出したもの） */
+async function enter(code) {
+  const m = $('#gateMsg')
+  if (m) m.textContent = '開いています…'
+  try {
+    await login(code)
+    await start(); armIdle()
+    return true
+  } catch (e) {
+    S.code = null
+    if (/権限コードが違います/.test(e.message)) { showRecode('この端末に置いた権限コードが使えなくなりました（変更された可能性があります）。新しい権限コードを入れてください。'); return false }
+    lockVault()   // 通信できないなど。パスコードは合っているので、閉じてもう一度入力してもらう
+    showUnlock(e.message || '開けませんでした。')
+    return false
+  }
+}
+
+/** パスコードは合っているが、権限コードが変わっていたとき（保管庫は開いたまま） */
+function showRecode(msg = '') {
+  gateShell(`
+      <p class="gate-sub">${esc(msg || '新しい権限コードを入れてください。')}</p>
+      <form id="recodeForm" class="gate-form">
+        <label for="code">権限コード</label>
+        <input id="code" type="password" autocomplete="off" required>
+        <button class="btn main wide" type="submit">開く</button>
+      </form>
+      <p class="gate-msg" id="gateMsg" role="alert"></p>
+      <button class="link gate-link" data-act="lockgate">パスコードの画面へ戻る</button>`)
+  $('#code')?.focus()
+  $('#recodeForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const c = $('#code').value.trim()
+    if (!c) return
+    $('#gateMsg').textContent = '確認しています…'
+    gateOff()
+    try {
+      await login(c)
+      await vaultUpdate({ code: c })
+      await start(); armIdle()
+      toast(`権限コードを変更しました（グループ：${S.admin ? '管理者' : S.role}）。`)
+    } catch (err) { S.code = null; showRecode(err.message) }
+  })
+}
+
+/** 他の端末から受け取る。pkg があれば（QR・リンク、またはコードで受け取り済み）パスフレーズだけ聞く。受け取ったら、この端末のパスコードを決める */
 function showReceive(pkg = null, msg = '') {
   gateShell(`
       <p class="gate-sub">${pkg ? '別の端末から設定を受け取りました。渡した端末に表示されたパスフレーズを入れてください。'
@@ -141,17 +270,17 @@ function showReceive(pkg = null, msg = '') {
         ${pkg ? '' : '<label for="dlCode">コード（6桁）</label><input id="dlCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>'}
         <label for="dlPass">パスフレーズ</label>
         <input id="dlPass" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例：ABCDE-FGHJK" required>
-        <button class="btn main wide" type="submit">受け取って開く</button>
+        <button class="btn main wide" type="submit">受け取る</button>
       </form>
       <p class="gate-msg" id="gateMsg" role="alert">${esc(msg)}</p>
-      <button class="link gate-link" data-act="gate">権限コードで開く</button>`)
+      <button class="link gate-link" data-act="gate">戻る</button>`)
   $(pkg ? '#dlPass' : '#dlCode')?.focus()
   $('#recvForm').addEventListener('submit', async (e) => {
     e.preventDefault()
     const m = $('#gateMsg')
     const dl = await ensureDL()
     if (!dl) { m.textContent = DL_MISSING; return }
-    $$('#gate button').forEach((b) => { b.disabled = true })
+    gateOff()
     let got = pkg
     try {
       m.textContent = '受け取っています…'
@@ -163,40 +292,15 @@ function showReceive(pkg = null, msg = '') {
         throw err
       }
       if (!data || typeof data.code !== 'string' || !data.code) throw new Error('受け取った内容に権限コードがありません。')
-      const aiMsg = takeAi(data.ai)
-      if (await doLogin(data.code, 'recv') && aiMsg) setTimeout(() => toast(aiMsg, false, 6000), 4200)
+      showSetup({ code: data.code, ai: data.ai || null, from: 'recv' })
     } catch (err) {
       showReceive(got, err.message || '受け取れませんでした。')
     }
   })
 }
 
-async function doLogin(code, how = 'typed') {
-  const m = $('#gateMsg')
-  if (m) m.textContent = '確認しています…'
-  $$('#gate button').forEach((b) => { b.disabled = true })
-  try {
-    if (GAS_URL.includes('ここに')) throw new Error('src/config.js の GAS_URL が未設定です。')
-    await login(code)
-    sessionStorage.removeItem(LOCKED)
-    if (how !== 'auto' && how !== 'bio' && autoEnabled()) await autoSave(code).catch(() => {})
-    await start()
-    if (how === 'typed' && !autoEnabled() && bioOk() && !bioRegistered() && !ls.get('m2.bioAsked', false)) askBio()
-    if (how === 'recv') toast(`この端末で使えるようにしました（グループ：${S.admin ? '管理者' : S.role}）。`)
-    return true
-  } catch (e) {
-    S.code = null
-    let msg = e.message || '開けませんでした。'
-    if (how === 'auto' && /権限コードが違います/.test(msg)) {
-      await autoForget()
-      msg = 'この端末に覚えていた権限コードが使えなくなりました（変更された可能性があります）。新しい権限コードで開くか、別の端末から受け取ってください。'
-    }
-    showGate(msg)
-    return false
-  }
-}
-
 async function login(code) {
+  if (GAS_URL.includes('ここに')) throw new Error('src/config.js の GAS_URL が未設定です。')
   const d = await gas('login', { code })
   let b
   try { b = await openBundle(code, d.bundle) } catch { throw new Error('鍵束を開けませんでした（管理者に連絡してください）') }
@@ -230,36 +334,72 @@ function clearData() {
   closeModal()
 }
 
-function lock() {
-  sessionStorage.setItem(LOCKED, '1')
-  clearData()
-  showGate()
+/** 読み込んだ議事録が画面に残らないよう、描いた中身も消す */
+function scrubUi() {
+  const main = $('#main'); if (main) main.innerHTML = ''
+  const q = $('#q'); if (q) q.value = ''
+  S.q = ''
+  for (const id of ['role', 'sync']) { const e = $('#' + id); if (e) e.textContent = '' }
 }
+
+/** 保管庫を閉じる（メモリの鍵・パスコード・AI の接続先を手放す）。暗号文は残る */
+function lockVault() {
+  clearInterval(idleTimer)
+  vaultLock()
+  useSettingsStore(LOCKED_STORE)
+}
+
+function lock() {
+  clearData()
+  scrubUi()
+  lockVault()
+  if (vaultExists()) showUnlock(); else showSetup()
+}
+
+/* 放置したら自動で鍵をかける（既定15分。設定で変えられる。編集中・要約中はかけない） */
+const IDLE_KEY = 'm2.idle'
+const idleMin = () => { const v = localStorage.getItem(IDLE_KEY); return v == null ? 15 : Math.max(0, Number(v) || 0) }
+let idleTimer = 0
+let lastAct = Date.now()
+const touchAct = () => { lastAct = Date.now() }
+for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) addEventListener(ev, touchAct, { capture: true, passive: true })
+function checkIdle() {
+  const m = idleMin()
+  if (!m || !vaultOpened()) return
+  if (S.edit || Object.keys(S.busy).length) { touchAct(); return }
+  if (Date.now() - lastAct > m * 60000) lock()
+}
+function armIdle() {
+  touchAct()
+  clearInterval(idleTimer)
+  idleTimer = setInterval(checkIdle, Math.min(10000, Math.max(500, idleMin() * 30000)))
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdle() })   // 裏に回っている間は時計が止まるので、戻ったときに確かめる
 
 function askBio() {
   ls.set('m2.bioAsked', true)
   modal('Face ID・Touch ID', `
-    <p>次から、権限コードを入れずに Face ID・Touch ID で開けるようにしますか？ 権限コードはこの端末の中だけに、生体認証で包んで置きます。</p>
+    <p>次から、パスコードを入れずに Face ID・Touch ID で開けるようにしますか？ パスコードはこの端末の中だけに、生体認証で包んで置きます。</p>
     <div class="acts"><button class="btn main" data-act="bioReg">登録する</button><button class="btn" data-act="close">今はしない</button></div>
     <p class="msg" id="bioMsg"></p>`)
 }
 
-/** 起動：リンク・QR で開かれたら受け取り、控えがあれば自動で開く */
+/** 起動：リンク・QR で開かれたら受け取り、保管庫があればパスコード、無ければ初回の設定 */
 async function boot() {
   let pkg = null
   if (/^#dl=/.test(location.hash)) await ensureDL()
   try { pkg = DL()?.fromURL(DL_APP) || null } catch (e) {
-    showGate(e.message === 'DeviceLink の形式ではありません' ? 'リンクを読み取れませんでした。渡す端末でもう一度コピーし直してください。' : e.message)
+    showUnlockOrSetup(e.message === 'DeviceLink の形式ではありません' ? 'リンクを読み取れませんでした。渡す端末でもう一度コピーし直してください。' : e.message)
     return
   }
   if (pkg) { showReceive(pkg); return }
-  if (autoEnabled() && autoSaved() && !sessionStorage.getItem(LOCKED)) {
-    gateShell('<p class="gate-sub">開いています…</p><p class="gate-msg" id="gateMsg" role="status"></p>')
-    const code = await autoLoad()
-    if (code) { await doLogin(code, 'auto'); return }
-  }
-  showGate()
+  if (vaultExists()) { showUnlock(); return }
+  // 以前の版（権限コードを覚えて自動で開く方式）の控えがあれば、権限コードはそれを使う
+  let legacy = null
+  if (autoSaved()) legacy = await autoLoad()
+  showSetup({ code: legacy })
 }
+function showUnlockOrSetup(msg) { if (vaultExists()) showUnlock(msg); else showSetup({ msg }) }
 
 /* ---------- 設定の保管（GitHub private の settings/<グループ>.json。暗号化して GAS 経由で書く） ----------
    中身：Claude.ai のページ・文字の大きさ・一覧の表示・ToDo の期間・お気に入り
@@ -335,14 +475,6 @@ function aiForShare() {
   return { connections, activeConnectionId: s.activeConnectionId, activeModel: s.activeModel, temperature: s.temperature, systemPrompt: s.systemPrompt }
 }
 
-/** 受け取った AI の接続先を入れる。この端末にすでに接続先があれば上書きしない */
-function takeAi(ai) {
-  if (!ai || !Array.isArray(ai.connections) || !ai.connections.length) return ''
-  const mine = loadSettings()
-  if (mine.connections.some((c) => c.baseUrl)) return 'この端末の AI の接続先はそのままにしました。'
-  saveSettingsLocal({ ...mine, ...ai, connections: ai.connections.map((c) => newConnection(c)) })
-  return 'AI の接続先も受け取りました。'
-}
 
 /* ---------- 他端末へ設定共有（common/devicelink.js） ----------
    渡すのは権限コードだけ。その場で作るパスフレーズ（10文字）で暗号化する。設定は GitHub から自動で入る */
@@ -1989,7 +2121,8 @@ function openSettings(tab) {
   const s = loadSettings()
   const c = activeConnection(s) || newConnection()
   const bio = bioOk()
-  const auto = autoEnabled()
+  const idle = idleMin()
+  const sharedLeft = hasConn(readSharedSettings())
   const where = S.gh ? `${S.gh.owner}/${S.gh.repo}` : 'データ用リポジトリ'
   const pane = (k, html) => `<div class="spane" data-pane="${k}" role="tabpanel" aria-labelledby="stab-${k}" ${setTab === k ? '' : 'hidden'}>${html}</div>`
   modal('設定', `
@@ -2012,7 +2145,8 @@ function openSettings(tab) {
           <div class="fcol full"><label for="stModels">モデル <span class="muted">（カンマ区切り。先頭を使います）</span></label><input id="stModels" value="${esc((c.models || []).join(', '))}" autocapitalize="off" spellcheck="false"></div>
         </div>
         <div class="sfoot"><button class="btn main" data-act="ai-save">保存</button>${s.connections.length > 1 ? '<span class="grow"></span><button class="btn danger" data-act="ai-del">この接続を消す</button>' : ''}</div>
-        <p class="muted sm">この端末にだけ保存します（グループで共有する設定には入れません）。自分の別の端末へは「他端末へ設定共有」で渡せます。gemma-chat・今の議事録と同じ設定です。</p>
+        <p class="muted sm">パスコードで暗号化して、この端末にだけ置きます（グループで共有する設定にも、gemma-chat など他のアプリにも入れません）。自分の別の端末へは「他端末へ設定共有」で渡せます。</p>
+        ${sharedLeft ? '<p class="muted sm">gemma-chat など他のアプリと共有している保存（暗号化されていません）に、以前の接続情報が残っています。<button class="link" data-act="shared-clear">ここから消す</button>（他のアプリでは接続の入れ直しが必要になります）</p>' : ''}
       </section>
       <section class="sset"><h3>Claude.ai で要約するページ</h3>
         <div class="srow"><label for="stClaude" class="sr">リンク</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="空欄なら標準のページ" autocapitalize="off" spellcheck="false"><button class="btn" data-act="claude-save">保存</button></div>
@@ -2025,25 +2159,34 @@ function openSettings(tab) {
         <p class="sm">いまのグループ <span class="tag strong">${esc(S.admin ? '管理者' : S.role)}</span></p>
         <form id="codeForm" class="srow" autocomplete="off">
           <label for="stCode" class="sr">新しい権限コード</label>
-          <input id="stCode" type="password" autocomplete="new-password" placeholder="新しい権限コード" required>
+          <input id="stCode" type="password" autocomplete="off" placeholder="新しい権限コード" required>
           <button class="btn" type="submit">変更する</button>
         </form>
         <p class="msg" id="codeMsg" role="status"></p>
       </section>
-      <section class="sset"><h3>開き方</h3>
-        <label class="chk"><input type="checkbox" id="stAuto" ${auto ? 'checked' : ''}> この端末では自動で開く</label>
-        <p class="muted sm">${auto ? '権限コードを、この端末の中だけで取り出せる鍵で暗号化して覚えておきます。端末を人に使われる心配があるときはオフにしてください。'
-          : '開くたびに、権限コード（または Face ID・Touch ID）を使います。'}</p>
+      <section class="sset"><h3>パスコード <span class="tag">この端末だけ</span></h3>
+        <form id="passForm" class="spass" autocomplete="off">
+          <div class="fcol"><label for="pwCur">いまのパスコード</label><input id="pwCur" type="password" autocomplete="current-password" required></div>
+          <div class="fcol"><label for="pwNew">新しいパスコード（${MIN_PASS}文字以上）</label><input id="pwNew" type="password" autocomplete="new-password" minlength="${MIN_PASS}" required></div>
+          <div class="fcol"><label for="pwNew2">もう一度</label><input id="pwNew2" type="password" autocomplete="new-password" minlength="${MIN_PASS}" required></div>
+          <div class="sfoot"><button class="btn" type="submit">変更する</button></div>
+        </form>
+        <p class="msg" id="passMsg" role="status"></p>
+        <p class="muted sm">権限コードと AI の接続先は、このパスコードで暗号化して、この端末にだけ置いています。パスコードはサーバーに送りません。</p>
+      </section>
+      <section class="sset"><h3>鍵のかけ方</h3>
+        <div class="srow between"><label for="stIdle" class="sm">放置したら自動で鍵をかける</label>
+          <select id="stIdle">${[[5, '5分'], [15, '15分'], [60, '60分'], [0, 'かけない']].map(([v, l]) => `<option value="${v}" ${idle === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <p class="muted sm">編集中・要約中はかかりません。鍵がかかると、パスコード（または Face ID・Touch ID）で開き直します。</p>
         <div class="srow between"><span class="sm">Face ID・Touch ID：${!bio ? '<span class="muted">このブラウザでは使えません</span>' : bioRegistered() ? '登録済み' : '未登録'}</span>
           ${!bio ? '' : bioRegistered() ? '<button class="btn" data-act="bio-off">解除</button>' : '<button class="btn" data-act="bioReg">登録する</button>'}</div>
-        ${bio && auto ? '<p class="muted sm">自動で開く間は使いません。鍵をかけたあとに開くときに使えます。</p>' : ''}
         <p class="msg" id="bioMsg"></p>
       </section>
       <div class="sfoot"><button class="btn" data-act="lock">鍵をかける</button><span class="grow"></span><button class="btn danger" data-act="reset">この端末の設定を消す</button></div>`)}
 
     ${pane('share', `
       <section class="sset">
-        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
+        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です（受け取った端末で、その端末のパスコードを決めます）。表示の設定（${esc(where)} の settings/${esc(S.gid || '')}.json に暗号化して保存）は、同じ権限コードで開いた端末に自動で反映されます。</p>
         <label class="chk"><input type="checkbox" id="dlAi" ${ls.get('m2.shareAi', true) ? 'checked' : ''}> AI の接続先（URL・API キー）も渡す</label>
         <p class="muted sm" id="dlAiHint">${ls.get('m2.shareAi', true) ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'}</p>
         <div id="devLink" class="dl" aria-live="polite"></div>
@@ -2058,6 +2201,7 @@ function openSettings(tab) {
     saveSettings(s2); openSettings()
   })
   $('#codeForm').addEventListener('submit', (e) => { e.preventDefault(); changeCode() })
+  $('#passForm').addEventListener('submit', (e) => { e.preventDefault(); changePass() })
   mountShare()
 }
 
@@ -2070,19 +2214,28 @@ async function changeCode() {
   if (S.edit) { m.textContent = '編集中の内容を保存するか取り消してから変えてください。'; return }
   m.textContent = '確認しています…'
   try { await gas('login', { code }) } catch (e) { m.textContent = e.message; return }   // 先に確かめて、違っていたら今のまま
-  if (bioRegistered()) bioForget()   // Face ID が包んでいるのは古いコードなので外す
+  try { await vaultUpdate({ code }) } catch (e) { m.textContent = '保存できませんでした：' + e.message; return }
   clearData()
   gateShell('<p class="gate-sub">権限コードを切り替えています…</p><p class="gate-msg" id="gateMsg" role="status"></p>')
-  if (await doLogin(code, 'change')) toast(`権限コードを変更しました（グループ：${S.admin ? '管理者' : S.role}）。`)
+  if (await enter(code)) toast(`権限コードを変更しました（グループ：${S.admin ? '管理者' : S.role}）。`)
 }
 
-async function toggleAuto(on) {
-  setAutoEnabled(on)
+/** 設定からパスコードを変える（塩も鍵も作り直し、権限コードと AI の接続先を暗号化し直す） */
+async function changePass() {
+  const m = $('#passMsg')
+  const cur = $('#pwCur').value, n1 = $('#pwNew').value, n2 = $('#pwNew2').value
+  if (cur !== vaultPass()) { m.textContent = 'いまのパスコードが違います。'; return }
+  if (n1.length < MIN_PASS) { m.textContent = `新しいパスコードは${MIN_PASS}文字以上にしてください。`; return }
+  if (n1 !== n2) { m.textContent = '新しいパスコードが一致しません。'; return }
+  if (n1 === cur) { m.textContent = 'いまのパスコードと同じです。'; return }
+  m.textContent = '変更しています…'
   try {
-    if (on && S.code) await autoSave(S.code)
-    if (!on) await autoForget()
-  } catch (e) { toast('この端末に覚えられませんでした：' + e.message, true) }
-  openSettings()
+    await vaultRepass(n1)
+    const hadBio = bioRegistered()
+    if (hadBio) bioForget()   // Face ID が包んでいるのは古いパスコードなので外す
+    openSettings()
+    $('#passMsg').textContent = hadBio ? '変更しました。Face ID・Touch ID は登録し直してください。' : '変更しました。'
+  } catch (e) { m.textContent = e.message }
 }
 
 function saveAI() {
@@ -2122,11 +2275,13 @@ function toast(text, bad = false, ms = 4000) {
 /* ---------- 操作 ---------- */
 const ACT = {
   bio: async () => {
-    try { const code = await bioUnlock(); await doLogin(code, 'bio') } catch (e) { showGate(e?.name === 'NotAllowedError' ? '取り消されました。権限コードでも開けます。' : e.message) }
+    try { const pass = await bioUnlock(); await doUnlock(pass, 'bio') } catch (e) { showUnlock(e?.name === 'NotAllowedError' ? '取り消されました。パスコードでも開けます。' : e.message) }
   },
   bioReg: async () => {
     const m = $('#bioMsg')
-    try { await bioRegister(S.code); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
+    const pass = vaultPass()
+    if (!pass) { if (m) m.textContent = 'パスコードを確認できません。鍵をかけて、開き直してください。'; return }
+    try { await bioRegister(pass); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
   },
   'bio-off': () => { bioForget(); openSettings() },
   stab: (a) => {
@@ -2140,25 +2295,31 @@ const ACT = {
     k.type = show ? 'text' : 'password'; a.textContent = show ? '隠す' : '表示'; a.setAttribute('aria-pressed', show)
   },
   reset: async () => {
-    if (!confirm('この端末の設定（覚えている権限コード・Face ID の登録・お気に入り・表示の設定）を消します。AI の接続先と、GitHub に保存した設定は残ります。よろしいですか？')) return
+    if (!confirm('この端末の設定（権限コード・AI の接続先・Face ID の登録・お気に入りなどの表示の設定）を消します。会議のデータと、GitHub に保存した設定は残ります。よろしいですか？')) return
     clearData()   // 先に接続を切って、消した設定が GitHub に送られないようにする
-    for (const k of ['m2.bio', 'm2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff']) localStorage.removeItem(k)
-    await autoForget()
+    scrubUi(); lockVault(); vaultWipe(); bioForget(); await autoForget()
+    for (const k of ['m2.fav', 'm2.seen', 'm2.view', 'm2.bioAsked', 'm2.claudeUrl', 'm2.fs', 'm2.prefsUpd', 'm2.autoOff', 'm2.idle', 'm2.shareAi']) localStorage.removeItem(k)
     S.fav = new Set(); S.seen = {}; S.fs = 1; applyFs()
-    lock()
+    showSetup()
   },
-  'auto-open': async () => {
-    const code = await autoLoad()
-    if (code) await doLogin(code, 'auto'); else showGate('この端末に覚えていた権限コードを読めませんでした。権限コードで開いてください。')
+  forgot: () => {
+    if (!confirm('パスコードを忘れたときは、この端末に置いた権限コードと AI の接続先を消して、最初から設定し直します（会議のデータは GitHub に残るので消えません）。よろしいですか？')) return
+    vaultWipe(); bioForget()
+    showSetup()
+  },
+  'setup-new': () => showSetup(),
+  lockgate: () => { lockVault(); showUnlock() },
+  'shared-clear': () => {
+    if (!confirm('gemma-chat など他のアプリと共有している保存から、AI の接続情報を消します。他のアプリでは接続の入れ直しが必要になります。MinuteStock の接続先（パスコードで暗号化したもの）は消えません。よろしいですか？')) return
+    clearSharedSettings(); openSettings()
   },
   recv: () => showReceive(),
-  gate: () => showGate(),
+  gate: () => { if (vaultExists()) showUnlock(); else showSetup() },
   'code-change': changeCode,
   'forget-conn': async () => {
-    if (!confirm('この端末から接続情報（覚えている権限コード・Face ID の登録）を消去してロックします。設定そのものは GitHub に残ります。')) return
-    await autoForget()
-    bioForget()
-    lock()
+    if (!confirm('この端末から接続情報（権限コード・AI の接続先・Face ID の登録）を消去してロックします。会議のデータと設定は GitHub に残ります。よろしいですか？')) return
+    clearData(); scrubUi(); lockVault(); vaultWipe(); bioForget(); await autoForget()
+    showSetup()
   },
   lock,
   close: closeModal,
@@ -2366,7 +2527,7 @@ document.addEventListener('change', (e) => {
   const t = e.target
   if (t.dataset.chk) { if (t.checked) S.checked.add(t.dataset.chk); else S.checked.delete(t.dataset.chk); renderMain() }
   if (t.dataset.todo) { toggleTodo(t.dataset.todo, t.dataset.k, t.checked); t.closest('li')?.classList.toggle('done', t.checked) }
-  if (t.id === 'stAuto') toggleAuto(t.checked)
+  if (t.id === 'stIdle') { localStorage.setItem(IDLE_KEY, t.value); armIdle() }
   if (t.id === 'scopeSel') { S.scope = t.value; renderMain() }
   if (t.id === 'stSel') { S.filter = t.value; renderMain() }
   if (t.id === 'tagSel') { S.tagF = t.value; renderMain() }

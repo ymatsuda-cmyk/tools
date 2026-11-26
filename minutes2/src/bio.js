@@ -1,4 +1,4 @@
-// src/bio.js — Face ID・Touch ID（ClipStock と同じ作り。WebAuthn の PRF で権限コードを包んで、この端末にだけ置く）
+// src/bio.js — Face ID・Touch ID（ClipStock と同じ作り。WebAuthn の PRF でパスコードを包んで、この端末にだけ置く。開いたパスコードで保管庫を開く）
 import { b64, unb64, rnd } from './crypto.js'
 
 const KEY = 'm2.bio'
@@ -21,7 +21,7 @@ async function prfGet(idB64, salt) {
   return res
 }
 
-export async function bioRegister(code) {
+export async function bioRegister(secret) {
   const salt = rnd(32)
   const cred = await navigator.credentials.create({ publicKey: {
     rp: { name: '議事録', id: location.hostname },
@@ -35,11 +35,11 @@ export async function bioRegister(code) {
   const id = b64(new Uint8Array(cred.rawId))
   const out = ext?.results?.first || await prfGet(id, salt)
   const iv = rnd(12)
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await prfKey(out), te.encode(code)))
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await prfKey(out), te.encode(secret)))
   localStorage.setItem(KEY, JSON.stringify({ id, salt: b64(salt), iv: b64(iv), ct: b64(ct) }))
 }
 
-/** → 権限コード */
+/** → パスコード */
 export async function bioUnlock() {
   const v = JSON.parse(localStorage.getItem(KEY) || 'null')
   if (!v) throw new Error('Face ID・Touch ID が登録されていません。')
