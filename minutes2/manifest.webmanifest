@@ -1,6 +1,6 @@
 {
-  "name": "MinuteStock",
-  "short_name": "MinuteStock",
+  "name": "MinutesStock",
+  "short_name": "MinutesStock",
   "description": "会議の記録を暗号化して保管し、要約・検索できる議事録アプリ",
   "lang": "ja",
   "start_url": "./",

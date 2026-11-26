@@ -6,7 +6,7 @@
 
 const KEY = 'gemma-chat.settings'
 
-// 保存先。既定は localStorage（gemma-chat と共有）。MinuteStock は、パスコードで暗号化した保管庫へ差し替えて使う
+// 保存先。既定は localStorage（gemma-chat と共有）。MinutesStock は、パスコードで暗号化した保管庫へ差し替えて使う
 // （差し替えない限り、このファイルの動きは gemma-chat 側と同じ）
 const SHARED = { get: () => localStorage.getItem(KEY), set: (v) => localStorage.setItem(KEY, v) }
 let store = SHARED

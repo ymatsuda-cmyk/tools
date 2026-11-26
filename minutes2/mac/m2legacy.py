@@ -1,4 +1,4 @@
-"""m2legacy.py — 今の minutes（Notion）の形式 → MinuteStock の形式
+"""m2legacy.py — 今の minutes（Notion）の形式 → MinutesStock の形式
 
   マーカー   文字列に <m1>…</m1>（色1〜3）が埋め込まれている → 文章は素の文字、マーカーは n.json の marks に位置で持つ
   ToDo経過   [{text, done, logs:[{date, text}]}] の JSON → n.json の logs（ToDo の key ごと）

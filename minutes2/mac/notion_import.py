@@ -215,7 +215,7 @@ def lines(text):
 
 
 def old_summary(props):
-    """今の minutes の要約欄 → MinuteStock の形 (s, n)。マーカーは位置で持ち、ToDo の完了・経過は n に分ける"""
+    """今の minutes の要約欄 → MinutesStock の形 (s, n)。マーカーは位置で持ち、ToDo の完了・経過は n に分ける"""
     agenda = []
     raw_agenda = prop_text(props, P_AGENDA)
     if raw_agenda:

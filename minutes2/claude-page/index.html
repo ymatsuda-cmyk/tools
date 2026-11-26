@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>MinutesStock 要約待ちを要約する</title>
+<style>
+:root{
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  --cloth:#26335a; --cloth-ink:#e9ecf4; --foil:#a9822a; --foil-text:#7d5f17; --foil-soft:rgba(169,130,42,.14);
+  --desk:#eceae3; --paper:#ffffff; --sheet:#f7f5ef; --ink:#1c222c; --muted:#5d6678; --line:#dcd8cd;
+  --danger:#a33a2b; --ok:#2f6b4f; --run:#2d5fa8; --warn:#9a6a10;
+  --serif:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --cloth:#121a30; --cloth-ink:#dfe4f0; --foil:#d7b25a; --foil-text:#d7b25a; --foil-soft:rgba(215,178,90,.16);
+    --desk:#101318; --paper:#1a1f29; --sheet:#151922; --ink:#e6e9f0; --muted:#9aa3b5; --line:#2c3342;
+    --danger:#e08a7b; --ok:#7fbf9c; --run:#8db4ee; --warn:#e0b25a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --cloth:#121a30; --cloth-ink:#dfe4f0; --foil:#d7b25a; --foil-text:#d7b25a; --foil-soft:rgba(215,178,90,.16);
+  --desk:#101318; --paper:#1a1f29; --sheet:#151922; --ink:#e6e9f0; --muted:#9aa3b5; --line:#2c3342;
+  --danger:#e08a7b; --ok:#7fbf9c; --run:#8db4ee; --warn:#e0b25a; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0; background:var(--desk); color:var(--ink); font:15px/1.7 var(--sans); -webkit-text-size-adjust:100%}
+:focus-visible{outline:2px solid var(--foil); outline-offset:2px; border-radius:4px}
+button{font:inherit; color:inherit; cursor:pointer}
+.top{background:var(--cloth); color:var(--cloth-ink); padding:18px 20px 16px}
+.top-in{max-width:880px; margin:0 auto; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap}
+.top h1{font:600 21px/1.35 var(--serif); margin:0; letter-spacing:.02em}
+.top p{margin:4px 0 0; font-size:13px; opacity:.82; max-width:36em}
+.top .grow{flex:1 1 260px}
+.ghost{border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.08); color:var(--cloth-ink); border-radius:6px; min-height:36px; padding:0 14px; font-size:13.5px}
+.ghost:hover{border-color:var(--foil)}
+.ghost[disabled]{opacity:.5; cursor:default}
+main{max-width:880px; margin:0 auto; padding:16px 16px 160px}
+#banner{margin:0 0 12px}
+.note{border:1px solid var(--line); border-left:4px solid var(--foil); background:var(--paper); border-radius:6px; padding:10px 14px; font-size:13.5px; line-height:1.75}
+.note.err{border-left-color:var(--danger)} .note.ok{border-left-color:var(--ok)}
+.note b{font-weight:600}
+.note .act{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap}
+.btn{border:1px solid var(--line); background:var(--paper); border-radius:6px; min-height:36px; padding:0 14px; font-size:13.5px}
+.btn:hover{border-color:var(--foil)}
+.btn.primary{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth); font-weight:600}
+.btn.primary:hover{border-color:var(--foil)}
+.btn[disabled]{opacity:.45; cursor:default; border-color:var(--line)}
+.tools{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px}
+.tools input[type=search]{flex:1 1 200px; min-width:0; border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:6px; min-height:36px; padding:0 12px; font:inherit; font-size:14px}
+.tools select{border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:6px; min-height:36px; padding:0 8px; font:inherit; font-size:13.5px}
+.tools label.sw{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted)}
+.count{font-size:12.5px; color:var(--muted); margin-left:auto}
+ul#list{list-style:none; margin:0; padding:0; display:grid; gap:8px}
+.row{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:start; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px 14px}
+.row.sel{border-color:var(--foil); box-shadow:0 0 0 1px var(--foil) inset; background:color-mix(in srgb, var(--paper) 92%, var(--foil))}
+.row.dup{opacity:.62}
+.chk{display:flex; padding-top:3px}
+.chk input{width:20px; height:20px; accent-color:var(--cloth)}
+.t{font:600 15px/1.55 var(--serif); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-all}
+.m{font-size:12.5px; color:var(--muted); margin-top:2px}
+.tag{display:inline-block; font-size:11px; border:1px solid var(--line); border-radius:9px; padding:0 7px; margin-left:6px; line-height:1.6}
+.tag.long{color:var(--warn); border-color:var(--warn)}
+.tag.dup{color:var(--danger); border-color:var(--danger)}
+.stage{font-size:12.5px; color:var(--run); margin-top:6px; min-height:0}
+.stage:empty{display:none}
+.stage.ng{color:var(--danger)}
+.side{display:flex; flex-direction:column; align-items:flex-end; gap:6px}
+.chip{font-size:12px; border-radius:11px; padding:1px 10px; border:1px solid var(--line); color:var(--muted); white-space:nowrap}
+.chip.run{color:var(--run); border-color:var(--run)} .chip.ok{color:var(--ok); border-color:var(--ok)} .chip.ng{color:var(--danger); border-color:var(--danger)}
+.chip.run::before{content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.chip.run::before{animation:none}}
+.side a{font-size:12px; color:var(--foil-text)}
+details.res{margin-top:8px; font-size:13px}
+details.res summary{cursor:pointer; color:var(--foil-text)}
+.resbody{margin-top:6px; padding:10px 12px; background:var(--sheet); border-radius:6px; font:14px/1.85 var(--serif); white-space:pre-wrap; max-height:320px; overflow:auto}
+.empty{color:var(--muted); text-align:center; padding:36px 12px; border:1px dashed var(--line); border-radius:8px}
+#bar{position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--cloth); color:var(--cloth-ink); padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); box-shadow:0 -8px 24px rgba(10,14,30,.25)}
+#bar .in{max-width:880px; margin:0 auto; display:grid; gap:8px}
+#bar .sum{font-size:13.5px; display:flex; gap:6px 14px; flex-wrap:wrap; align-items:baseline}
+#bar .sum b{font-size:17px; font-weight:600}
+.meter{height:6px; border-radius:3px; background:rgba(255,255,255,.18); overflow:hidden}
+.meter i{display:block; height:100%; width:0; background:var(--foil); transition:width .2s}
+.meter.over i{background:#d98a5c}
+#bar .btns{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+#bar .btn{background:transparent; color:var(--cloth-ink); border-color:rgba(255,255,255,.35)}
+#bar .btn.primary{background:var(--foil); color:#1b1606; border-color:var(--foil); margin-left:auto}
+#bar .btn[disabled]{opacity:.4}
+.overall{height:4px; background:rgba(255,255,255,.18); border-radius:2px; overflow:hidden}
+.overall i{display:block; height:100%; width:0; background:#fff; opacity:.85; transition:width .3s}
+details#logWrap{margin-top:18px; font-size:13px}
+details#logWrap summary{cursor:pointer; color:var(--muted)}
+ol#log{list-style:none; margin:8px 0 0; padding:0; display:grid; gap:2px; font-size:12.5px; color:var(--muted); max-height:240px; overflow:auto}
+ol#log li{display:grid; grid-template-columns:auto 1fr; gap:10px}
+ol#log time{font-variant-numeric:tabular-nums; opacity:.8}
+ol#log li.err{color:var(--danger)}
+@media (max-width:560px){
+  .row{grid-template-columns:auto minmax(0,1fr); }
+  .side{grid-column:2; flex-direction:row; align-items:center; justify-content:space-between}
+  #bar .btn.primary{margin-left:0; flex:1 1 100%}
+}
+
+.tag.cut{color:var(--warn); border-color:var(--warn)}
+.tag.dup{color:var(--danger); border-color:var(--danger)}
+.pre{font-size:12.5px; color:var(--muted)}
+.sumline{margin:8px 0 0; font-size:13px; color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="grow"><h1>要約待ちを要約する</h1><p>Notion の「議事録 要約作業」で「要約待ち」の議事録を選び、Claude が議事録アプリの形式（サマリ・議題・決定事項・ToDo）に要約して、Notion に書き込みます。Mac が5分以内に回収して、議事録アプリに反映します。</p></div>
+  <button class="ghost" id="reload" type="button">↻ 再取得</button>
+</div></header>
+<main>
+  <div id="banner" role="status" aria-live="polite"></div>
+  <div class="tools">
+    <input type="search" id="q" placeholder="題名で探す" aria-label="題名で探す">
+    <select id="sort" aria-label="並び順"><option value="new">新しい順</option><option value="old">古い順</option><option value="short">短い順</option><option value="long">長い順</option></select>
+    <label class="sw"><input type="checkbox" id="hideDup" checked>重複を隠す</label>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="pre" id="pre" role="status"></div>
+  <ul id="list" aria-label="要約待ちの一覧"></ul>
+  <details id="logWrap"><summary>経過</summary><ol id="log"></ol></details>
+</main>
+<div id="bar" hidden><div class="in">
+  <div class="overall" id="overall" hidden><i id="overallFill"></i></div>
+  <div class="sum"><span><b id="selN">0</b> 件を選択</span><span id="selChars">0字</span><span id="selEta"></span><span id="selWarn"></span></div>
+  <div class="meter" id="meter" aria-hidden="true"><i id="meterFill"></i></div>
+  <div class="btns">
+    <button class="btn" id="selAll" type="button">すべて選ぶ</button>
+    <button class="btn" id="selNone" type="button">解除</button>
+    <button class="btn" id="stop" type="button" hidden>止める</button>
+    <button class="btn primary" id="go" type="button" disabled>選んだものを要約する</button>
+  </div>
+</div></div>
+
+<script>
+(() => {
+  "use strict";
+  const SERVER = "Notion";
+  const DS = "collection://4200e7a5-35dc-8140-8b52-000bac3634b0";     // 議事録 要約作業
+  const VIEW = "view://4200e7a5-35dc-8147-b050-000c5560dba6";         // その「Default view」。Notion の SQL・rows の回数制限を受けないので、一覧はこれで読む
+  const T = { q: "notion-query-data-sources", f: "notion-fetch", u: "notion-update-page" };
+  const SOFT_LIMIT = 300000;      // 選んだ分の字数の合計がこれを超えたら「多め」と知らせる
+  const MAX_BYTES = 200000;       // 1件の依頼に載せる文字起こしの上限（UTF-8 のバイト数。Claude への依頼は、全体で 256 KiB まで）
+  const PRELOAD = 2;              // 字数を数えるための読み込みの同時数
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const hm = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()); };
+  const num = n => Number(n || 0).toLocaleString("ja-JP");
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const str = v => (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
+  const enc = new TextEncoder();
+
+  const S = { items: [], sel: new Set(), running: false, stop: false, abort: null, demo: false, q: "", sort: "new", hideDup: true, fatal: "", doneCount: 0, runTotal: 0, more: false, pre: { done: 0, total: 0 }, auto: null };
+  let mcp = null, sample = null;
+  const pages = new Map();        // url → 読み込み済みのページ（Promise）。字数を数えた読み込みを、要約でもそのまま使う
+
+  /* ---------- 経過・お知らせ ---------- */
+  function log(text, err) { const li = document.createElement("li"); if (err) li.className = "err"; li.innerHTML = `<time>${hm()}</time><span></span>`; li.lastChild.textContent = text; $("#log").appendChild(li); $("#log").scrollTop = 1e9; }
+  function banner(html, kind, actions) {
+    const b = $("#banner"); b.innerHTML = html ? `<div class="note ${kind || ""}">${html}${actions ? `<div class="act">${actions}</div>` : ""}</div>` : "";
+  }
+
+  /* ---------- Notion の値 ---------- */
+  const unescapeMd = s => String(s || "").replace(/\\([\\[\]_*~`#>|(){}+.!\-])/g, "$1");
+  function firstJson(text) {
+    const i = text.indexOf("{"); if (i < 0) return null;
+    let depth = 0, inStr = false, esc2 = false;
+    for (let k = i; k < text.length; k++) {
+      const c = text[k];
+      if (inStr) { if (esc2) esc2 = false; else if (c === "\\") esc2 = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true; else if (c === "{") depth++; else if (c === "}") { depth--; if (depth === 0) { try { return JSON.parse(text.slice(i, k + 1)); } catch { return null; } } }
+    }
+    return null;
+  }
+  function dataOf(res) {
+    let p = res && (res.structuredContent ?? res.payload);
+    if (p == null && res && Array.isArray(res.content)) p = res.content.map(c => c.text || "").join("\n");
+    if (typeof p === "string") { try { p = JSON.parse(p); } catch { p = firstJson(p) ?? p; } }
+    return p;
+  }
+  async function call(tool, input, opts) { return mcp.callTool(SERVER, tool, input, opts); }
+  const idOf = url => (String(url).match(/([0-9a-f]{32})(?:[?#].*)?$/i) || [, String(url)])[1];
+
+  /* ---------- 一覧を取る ---------- */
+  async function viewRows() {          // 保存済みのビュー（全件）。回数制限を受けない
+    const d = dataOf(await call(T.q, { data: { mode: "view", view_url: VIEW } }, { cache: false }));
+    if (!d || !Array.isArray(d.results)) throw Object.assign(new Error("ビューの結果が読めませんでした。"), { code: "bad_shape" });
+    S.more = !!d.has_more;
+    return d.results;
+  }
+  async function rowsMode() {          // ビューが使えないときの代わり（Notion の回数制限の対象）
+    const d = dataOf(await call(T.q, { data: { mode: "rows", data_source_url: DS, limit: 100, filter: { type: "group", operator: "and", filters: [
+      { type: "property", property: "状態", propertyType: "select", operator: "enum_is", value: { type: "exact", value: "要約待ち" } }] } } }, { cache: false }));
+    S.more = !!(d && d.has_more);
+    return (d && d.results) || [];
+  }
+  async function fetchRows() {
+    try { return await viewRows(); }
+    catch (e) {
+      if (FATAL.has(e && e.code)) throw e;
+      log("保存済みのビューから読めませんでした（" + ((e && e.code) || (e && e.message) || "") + "）。別の方法で読みます。", true);
+    }
+    return rowsMode();
+  }
+  function markDups(items, doneIds) {
+    const seen = new Set();
+    items.forEach(x => { x.dup = ""; });
+    items.forEach(x => {
+      if (!x.mid) return;
+      if (doneIds.has(x.mid)) x.dup = "すでに要約済みの同じ会議があります（Mac の回収待ちです）";
+      else if (seen.has(x.mid)) x.dup = "同じ会議が、ほかにもあります（先に出てきた方を残します）";
+      else seen.add(x.mid);
+    });
+  }
+  async function load() {
+    S.fatal = ""; S.more = false; banner("Notion から、要約待ちを取っています…", "");
+    $("#reload").disabled = true;
+    try {
+      if (!S.running) pages.clear();
+      const rows = S.demo ? demoRows() : await fetchRows();
+      const doneIds = new Set(rows.filter(r => r["状態"] === "要約済み").map(r => unescapeMd(r["userDefined:ID"] || "")).filter(Boolean));
+      const old = new Map(S.items.map(x => [x.url, x]));
+      S.items = rows.filter(r => r["状態"] === "要約待ち").map(r => Object.assign({
+        url: r.url, id: idOf(r.url), mid: unescapeMd(r["userDefined:ID"] || ""), title: unescapeMd(r["名前"] || "") || "（題名なし）",
+        memo: unescapeMd(r["メモ"] || ""), d: "", dur: "", chars: 0, cut: false, st: "idle", stage: "", result: null, loadErr: "",
+      }, (old.get(r.url) && old.get(r.url).st === "ok") ? { st: "ok", result: old.get(r.url).result } : {}));
+      markDups(S.items, doneIds);
+      S.sel = new Set(S.items.filter(x => !x.dup && x.st !== "ok").map(x => x.id));     // 開いたときは、重複でないものをすべて選んでおく
+      const dups = S.items.filter(x => x.dup).length, n = S.items.length - dups;
+      banner(S.demo ? `<b>デモ表示です。</b>Claude.ai でこのページを開くと、あなたの Notion の要約待ちが出ます（ここの題名は見本で、実在しません）。`
+        : (S.items.length ? `要約待ちは <b>${num(n)}</b> 件です${dups ? `（重複 ${num(dups)} 件は、要約しません）` : ""}。${S.more ? "ほかにも要約待ちがあります。要約が済んだら「再取得」を押してください。" : ""}`
+          : "要約待ちは、ありません。議事録アプリで要約待ちがあるのにここが空なら、Mac が Notion に書き出すまで数分待ってから「再取得」を押してください。"), S.items.length ? "" : "ok");
+      log(`要約待ち ${S.items.length} 件を取りました。`);
+    } catch (e) { fail(e, "一覧を取る"); }
+    $("#reload").disabled = false; render();
+    if (!S.fatal && !S.demo) { preload(); autoStart(); }
+  }
+
+  /* ---------- エラー ---------- */
+  const FATAL = new Set(["needs_reauth", "server_not_connected", "selection_required", "approval_required", "not_in_manifest", "blocked_by_policy", "consent_required", "not_granted", "capability_disabled", "capability_removed", "user_changed"]);
+  const isLimit = e => /usage_limit|allowance|query data source/i.test(String((e && e.message) || ""));
+  function fail(e, what) {
+    const c = e && e.code;
+    const retry = `<button class="btn" type="button" data-act="retry">もう一度試す</button>`;
+    let msg;
+    if (c === "server_not_connected" || c === "server_not_found") msg = `<b>Notion が、Claude.ai につながっていません。</b>Claude.ai の「設定 → コネクタ」で Notion を追加してから、開き直してください。`;
+    else if (c === "needs_reauth") msg = `<b>Notion の接続が切れています。</b>Claude.ai の「設定 → コネクタ」で、Notion を再接続してください。`;
+    else if (c === "selection_required") msg = `<b>Notion のコネクタが複数あります。</b>どれを使うか選ぶ画面が出ていないときは、ページを開き直してください。`;
+    else if (c === "approval_required" || c === "not_in_manifest" || c === "consent_required" || c === "not_granted") msg = `<b>${esc(what)}には、許可が必要です。</b>Claude.ai の確認で「許可」を選んでから、もう一度試してください。`;
+    else if (c === "blocked_by_policy") msg = `<b>組織の設定で、このコネクタの操作が止められています。</b>`;
+    else if (c === "rate_limited") msg = `<b>呼び出しが多すぎます。</b>少し待ってから、もう一度試してください。`;
+    else if (c === "tool_error" && isLimit(e)) msg = `<b>Notion の「データベースへの問い合わせ」の回数が、ワークスペースの上限に達しています（Notion 側の制限です）。</b>1時間ほどで戻ります。そのあと「もう一度試す」を押してください。`;
+    else if (c === "server_unavailable" || c === "upstream_error") msg = `<b>Notion につながりませんでした（${esc(what)}）。</b>少し待って、もう一度試してください。`;
+    else msg = `<b>${esc(what)}に失敗しました。</b>${esc((e && e.message) || String(e))}`;
+    if (FATAL.has(c)) S.fatal = c;
+    banner(msg, "err", retry);
+    log(`${what}：${c || ""} ${(e && e.message) || ""}`.trim().slice(0, 300), true);
+  }
+
+  /* ---------- ページを読む（字数・会議日時・文字起こし） ---------- */
+  const TC = /^\[((?:\d{1,2}:)?\d{1,3}:\d{2})\]/;
+  function parsePage(payload) {
+    const text = typeof payload === "string" ? payload : (payload && typeof payload.text === "string" ? payload.text : JSON.stringify(payload || ""));
+    let props = {}; const pm = text.match(/<properties>\s*([\s\S]*?)\s*<\/properties>/); try { props = pm ? JSON.parse(pm[1]) : {}; } catch { props = {}; }
+    const cm = text.match(/<content>([\s\S]*?)<\/content>/); const raw = cm ? cm[1] : "";
+    const blocks = [...raw.matchAll(/```[A-Za-z]*[ \t]*\n([\s\S]*?)\n```/g)].map(m => m[1]);
+    const hasJson = blocks.length > 0 || /"cardSummary"\s*:/.test(raw);
+    const body = unescapeMd(raw.replace(/```[\s\S]*?```/g, "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")).trim();
+    const head = body.match(/会議日時:\s*(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?[^\n]*?長さ:\s*([0-9:]+)/);
+    const lines = body.split("\n").map(s => s.trim()).filter(l => l && !/^会議日時:/.test(l) && !/^文字起こし（/.test(l));
+    const trunc = !!(payload && (payload.truncated === true || (payload.metadata && payload.metadata.truncated === true) || Number(payload.unknown_block_count) > 0));
+    return { props, blocks, hasJson, raw, lines, chars: lines.reduce((a, l) => a + l.length + 1, 0), d: head ? head[1] + (head[2] ? " " + head[2] : "") : "", dur: head ? head[3] : "", trunc };
+  }
+  function getPage(x, fresh) {          // fresh：実行の直前は、必ず読み直す（前回の書き込みや、Mac・ほかの画面での変更を見逃さないため）
+    const hit = pages.get(x.url);
+    if (!hit || fresh) pages.set(x.url, { t: Date.now(), p: call(T.f, { id: x.url }, { cache: false }).then(r => parsePage(dataOf(r))) });
+    return pages.get(x.url).p;
+  }
+  const pageAge = x => { const h = pages.get(x.url); return h ? Date.now() - h.t : Infinity; };
+  function applyPage(x, p) { x.d = p.d; x.dur = p.dur; x.chars = p.chars; x.cut = p.trunc; }
+  let preRun = 0;
+  async function preload() {         // 字数と会議日時を、裏で数える。要約でも、この読み込みを使い回す
+    const run = ++preRun;
+    const todo = S.items.filter(x => !x.dup && x.st !== "ok" && !x.chars);
+    S.pre = { done: 0, total: todo.length }; renderPre();
+    let i = 0;
+    const worker = async () => {
+      while (run === preRun && i < todo.length) {
+        while (S.running && run === preRun) await sleep(400);     // 要約している間は、要約を優先する
+        const x = todo[i++]; if (!x || run !== preRun) return;
+        try { applyPage(x, await getPage(x)); }
+        catch (e) { x.loadErr = (e && e.code) || "error"; pages.delete(x.url); if (FATAL.has(e && e.code)) { preRun++; fail(e, "字数を数える"); } }
+        S.pre.done++; renderPre(); schedule();
+      }
+    };
+    await Promise.all(Array.from({ length: PRELOAD }, worker));
+    if (run === preRun) { S.pre = { done: 0, total: 0 }; renderPre(); render(); }
+  }
+  function renderPre() { $("#pre").textContent = S.pre.total ? `字数を数えています… ${S.pre.done}/${S.pre.total}` : ""; }
+  let timer = 0; const schedule = () => { if (!timer) timer = setTimeout(() => { timer = 0; render(); }, 250); };
+
+  /* ---------- 表示 ---------- */
+  const sortFn = { new: (a, b) => (b.d || "").localeCompare(a.d || ""), old: (a, b) => (a.d || "~").localeCompare(b.d || "~"), short: (a, b) => a.chars - b.chars, long: (a, b) => b.chars - a.chars };
+  const shown = () => { const q = S.q.trim().toLowerCase(); return S.items.filter(x => (!S.hideDup || !x.dup) && (!q || x.title.toLowerCase().includes(q))).sort(sortFn[S.sort]); };
+  const CHIP = { idle: ["待機中", ""], run: ["要約中", "run"], ok: ["要約済み", "ok"], ng: ["失敗", "ng"] };
+  function resultHtml(r) {
+    const ag = (r.agenda || []).map(a => `・${a.topic}${a.outcome ? "（" + a.outcome + "）" : ""}`).join("\n");
+    return `${esc(r.cardSummary)}\n\n${esc(r.summary)}${ag ? "\n\n議題\n" + esc(ag) : ""}${(r.todos || []).length ? `\n\nToDo ${r.todos.length} 件` : ""}`;
+  }
+  function rowHtml(x) {
+    const [lab, cls] = x.dup ? ["重複", "ng"] : CHIP[x.st];
+    const dis = x.dup || x.st === "ok" || S.running ? "disabled" : "";
+    const md = x.d ? x.d.slice(5, 10).replace("-", "/") + (x.d.length > 10 ? " " + x.d.slice(11) : "") : "";
+    return `<li class="row${S.sel.has(x.id) ? " sel" : ""}${x.dup ? " dup" : ""}" data-id="${esc(x.id)}">
+      <label class="chk"><input type="checkbox" data-id="${esc(x.id)}" ${S.sel.has(x.id) ? "checked" : ""} ${dis} aria-label="${esc(x.title)} を選ぶ"></label>
+      <div><div class="t">${esc(x.title)}</div>
+        <div class="m">${esc(md)}${md ? " ・ " : ""}${x.dur ? "長さ " + esc(x.dur) + " ・ " : ""}${x.chars ? num(x.chars) + "字" : (x.loadErr ? "字数を読めませんでした" : "字数を数えています…")}${x.chars > 60000 ? '<span class="tag long">長い</span>' : ""}${x.cut ? '<span class="tag cut">一部のみ</span>' : ""}${x.dup ? `<span class="tag dup">重複</span>` : ""}</div>
+        ${x.dup ? `<div class="m">${esc(x.dup)}</div>` : ""}${x.memo && !x.dup ? `<div class="m">前回のメモ：${esc(x.memo)}</div>` : ""}
+        <div class="stage${x.st === "ng" ? " ng" : ""}" role="status">${esc(x.stage)}</div>
+        ${x.result ? `<details class="res"><summary>要約の内容を見る</summary><div class="resbody">${resultHtml(x.result)}</div></details>` : ""}</div>
+      <div class="side"><span class="chip ${cls}">${lab}</span>${S.demo ? "" : `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">Notion</a>`}</div></li>`;
+  }
+  function render() {
+    const rows = shown();
+    $("#list").innerHTML = rows.map(rowHtml).join("") || `<li class="empty">${S.items.length ? "この条件の会議はありません。" : "まだ一覧がありません。"}</li>`;
+    const dups = S.items.filter(x => x.dup).length;
+    $("#count").textContent = S.items.length ? `${num(rows.length)} 件を表示${dups && S.hideDup ? `（重複 ${num(dups)} 件は隠しています）` : ""}` : "";
+    $("#bar").hidden = !S.items.length;
+    renderBar();
+  }
+  function renderBar() {
+    const sel = S.items.filter(x => S.sel.has(x.id)), known = sel.filter(x => x.chars), chars = known.reduce((a, x) => a + x.chars, 0), unknown = sel.length - known.length;
+    $("#selN").textContent = sel.length;
+    $("#selChars").textContent = num(chars) + "字" + (unknown ? `（未取得 ${unknown} 件）` : "");
+    const est = chars + unknown * 25000;
+    $("#selEta").textContent = sel.length ? "（目安：約" + Math.max(1, Math.ceil(sel.length * 0.8 + est / 20000)) + "分）" : "";
+    const over = est > SOFT_LIMIT;
+    $("#meterFill").style.width = Math.min(100, est / SOFT_LIMIT * 100) + "%"; $("#meter").classList.toggle("over", over);
+    $("#selWarn").textContent = over ? "多めです。時間と、Claude の利用量がかかります。" : "";
+    $("#go").disabled = !sel.length || S.running || !!S.fatal;
+    $("#go").textContent = S.running ? "要約しています…" : (sel.length ? `選んだ ${sel.length} 件を要約する` : "選んだものを要約する");
+    $("#selAll").disabled = S.running; $("#selNone").disabled = S.running || !sel.length;
+    $("#stop").hidden = !S.running;
+    $("#overall").hidden = !S.running; $("#overallFill").style.width = S.runTotal ? (S.doneCount / S.runTotal * 100) + "%" : "0";
+  }
+  function setItem(x, st, stage, extra) { x.st = st; x.stage = stage || ""; Object.assign(x, extra || {}); render(); }
+  function setStage(x, text) { x.stage = text; const el = document.querySelector(`.row[data-id="${x.id}"] .stage`); if (el) el.textContent = text; }
+
+  /* ---------- 要約（Claude） ---------- */
+  const SPEC = `あなたは会議の文字起こしを要約するアシスタントです。
+文字起こしの各行の先頭にある [m:ss] は、その発言の時刻です。
+次のJSON形式だけで回答してください。前後に説明文やコードフェンスを付けないこと。
+
+{
+  "cardSummary": "一覧に表示する100字程度の要約",
+  "summary": "会議の目的と結論を3〜5文で",
+  "agenda": [
+    {
+      "topic": "議題（論点）の見出し",
+      "t": "その議題が始まった時刻 m:ss",
+      "outcome": "その議題の結論。結論が出ていなければ「継続検討」など",
+      "points": [{ "text": "話された経緯・論拠を1件1文で", "t": "その発言の時刻 m:ss" }]
+    }
+  ],
+  "decisions": [{ "text": "決定事項", "t": "決まった時刻 m:ss" }],
+  "todos": [{ "text": "やること", "owner": "担当（分からなければ空）", "due": "期限（分からなければ空）" }],
+  "topics": ["未解決の論点や気になる点"]
+}
+
+agenda は必ず1つ以上、議題ごとに分け、points は「なぜそうなったか」が後から追える順に並べてください。
+t は文字起こしの行頭にある時刻のうち、実在するものだけを、そのまま使ってください。推測せず、分からなければ "" にしてください。
+decisions / todos / topics は該当が無ければ空配列で構いません。
+音声認識の誤変換は、文脈から直してよい。文字起こしに無いことを書き足さないこと。人名・数値は文字起こしの表記のまま。日本語で出力してください。`;
+  function cutLines(lines) {
+    let used = 0; const keep = [];
+    for (const l of lines) { const b = enc.encode(l).length + 1; if (used + b > MAX_BYTES) break; keep.push(l); used += b; }
+    return { keep, cut: keep.length < lines.length };
+  }
+  function validate(o) {
+    if (!o || typeof o !== "object" || Array.isArray(o)) return "JSON ではありません";
+    if (typeof o.summary !== "string" || o.summary.trim().length < 20) return "summary が短すぎます";
+    if (!Array.isArray(o.agenda) || !o.agenda.length) return "agenda が空です";
+    if (o.agenda.some(a => !a || typeof a.topic !== "string" || !a.topic.trim())) return "agenda の題が空です";
+    return "";
+  }
+  function tidy(o, allowed, note) {      // 議事録アプリが読む形に整える。実在しない時刻は消す
+    const t = v => (allowed.has(str(v)) ? str(v) : "");
+    const arr = v => (Array.isArray(v) ? v : []);
+    const out = {
+      cardSummary: str(o.cardSummary) || str(o.summary).slice(0, 100), summary: str(o.summary),
+      agenda: o.agenda.map(a => ({ topic: str(a.topic), t: t(a.t), outcome: str(a.outcome), points: arr(a.points).map(p => ({ text: str(p && p.text), t: t(p && p.t) })).filter(p => p.text) })),
+      decisions: arr(o.decisions).map(d => ({ text: str(d && d.text), t: t(d && d.t) })).filter(d => d.text),
+      todos: arr(o.todos).map(d => ({ text: str(d && d.text), owner: str(d && d.owner), due: str(d && d.due) })).filter(d => d.text),
+      topics: arr(o.topics).map(str).filter(Boolean),
+      model: "Claude.ai",
+    };
+    if (note) out.topics.push(note);
+    return out;
+  }
+  async function summarize(x, p) {
+    const { keep, cut } = cutLines(p.lines);
+    const allowed = new Set(p.lines.map(l => (l.match(TC) || [])[1]).filter(Boolean));
+    const prompt = `${SPEC}\n\n# 会議\n題名：${x.title}${p.d ? "\n会議日時：" + p.d : ""}\n\n# 文字起こし${cut ? `（長いため、先頭の ${keep.length}/${p.lines.length} 行）` : ""}\n${keep.join("\n")}`;
+    let lastErr = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      S.abort = new AbortController();
+      let o;
+      try {
+        o = await sample.json(prompt + (attempt ? `\n\n前回は「${lastErr}」でした。形式を守って、JSON だけを返してください。` : ""), {
+          modelTier: "default", signal: S.abort.signal, cache: false,
+          onText: ({ text }) => setStage(x, `Claude が要約しています…（${num(p.chars)}字を読んで、${num(text.length)}字を書きました）`),
+        });
+      } finally { S.abort = null; }
+      lastErr = validate(o);
+      if (!lastErr) return tidy(o, allowed, (cut || p.trunc) ? "文字起こしが長い（または一部しか読めなかった）ため、後半の一部は要約に含まれていません。" : "");
+    }
+    throw Object.assign(new Error("要約の形が整いませんでした（" + lastErr + "）"), { code: "bad_format" });
+  }
+
+  /* ---------- 書き込み（Notion）と、最後まで入ったかの確認 ---------- */
+  const normV = t => String(t).replace(/<br\s*\/?>/gi, "").replace(/\\[nrt"\\\/]/g, "").replace(/[^\p{L}\p{N}]/gu, "");   // 記号・改行・エスケープを除いて、文字だけで比べる
+  const jsonOfBlock = b => { try { const o = JSON.parse(b); return validate(o) ? null : o; } catch { return null; } };
+  async function verifyWritten(x, o) {
+    for (let k = 0; k < 2; k++) {
+      if (k) await sleep(1500);                       // 保存の反映を、少しだけ待つ
+      const p = parsePage(dataOf(await call(T.f, { id: x.url }, { cache: false })));
+      if (p.blocks.length === 1) { const w = jsonOfBlock(p.blocks[0]); if (w && w.summary === o.summary && w.agenda.length === o.agenda.length) return true; }
+      if (!p.blocks.length) {              // Notion がコードブロックを別の形で見せているとき：本文の末尾が入っているかで確かめる
+        const back = normV(p.raw), last = o.agenda[o.agenda.length - 1];
+        if (back.includes(normV(o.summary).slice(-24)) && back.includes(normV(last.topic).slice(-12))) return true;
+      }
+    }
+    return false;
+  }
+  async function markDone(x) { await call(T.u, { command: "update_properties", page_id: x.url, properties: { "状態": "要約済み" }, allow_async: false }, { cache: false }); }
+  async function writeAndVerify(x, o) {
+    const json = JSON.stringify(o).replace(/```/g, "'''");
+    setStage(x, "Notion に書き込んでいます…");
+    await call(T.u, { command: "insert_content", page_id: x.url, position: { type: "end" }, content: "```json\n" + json + "\n```", allow_async: false }, { cache: false });
+    setStage(x, "最後まで保存されたか、確認しています…");
+    if (!await verifyWritten(x, JSON.parse(json))) throw Object.assign(new Error("書き込んだ要約を、Notion で最後まで確認できませんでした。Notion のページを確かめてください（状態は「要約待ち」のままにしました）。"), { code: "truncated" });
+    setStage(x, "状態を「要約済み」にしています…");
+    try { await markDone(x); }
+    catch (e) { throw Object.assign(new Error("要約は書き込めましたが、状態を「要約済み」にできませんでした。もう一度実行すると、状態だけを直します。"), { code: "state_not_updated", cause: e }); }
+  }
+  async function runOne(x) {
+    setItem(x, "run", "文字起こしを読んでいます…");
+    const p = await getPage(x, x.tried || pageAge(x) > 120000); x.tried = true; applyPage(x, p);
+    if (p.props["状態"] && p.props["状態"] !== "要約待ち") { setItem(x, "ok", "", { result: null }); log(`「${x.title.slice(0, 28)}」は、ほかで要約済みでした。`); return; }
+    if (p.hasJson && !p.blocks.length) throw Object.assign(new Error("Notion のページに、要約らしい内容がすでにあります。Notion で確かめて、不要なら消してから、もう一度実行してください。"), { code: "broken_block" });
+    if (p.blocks.length > 1) throw Object.assign(new Error("Notion のページに、要約のコードブロックが複数あります（前回の書き込みが残っているようです）。余分なコードブロックを Notion で消してから、もう一度実行してください。"), { code: "multi_block" });
+    if (p.blocks.length === 1) {          // 前回の書き込みが残っている：完全ならそれを使い、状態だけ直す。途中で切れているなら、手で消してもらう
+      const w = jsonOfBlock(p.blocks[0]);
+      if (!w) throw Object.assign(new Error("Notion のページに、途中で切れた要約が残っています。そのコードブロックを Notion で消してから、もう一度実行してください。"), { code: "broken_block" });
+      setStage(x, "前回の要約が残っていたので、状態だけを直しています…");
+      await markDone(x); setItem(x, "ok", "", { result: w }); return;
+    }
+    if (p.chars < 100) throw Object.assign(new Error("文字起こしがありません（または短すぎます）。"), { code: "no_transcript" });
+    setStage(x, `Claude が要約しています…（${num(p.chars)}字）`);
+    const o = await summarize(x, p);
+    await writeAndVerify(x, o);
+    setItem(x, "ok", "", { result: o });
+  }
+  async function run() {
+    const targets = S.items.filter(x => S.sel.has(x.id) && !x.dup && x.st !== "ok");
+    if (!targets.length || S.running) return;
+    S.running = true; S.stop = false; S.doneCount = 0; S.runTotal = targets.length; banner(`<b>${targets.length} 件を要約します。</b>このページを開いたままにしてください。`, ""); render();
+    let ok = 0, ng = 0;
+    for (const x of targets) {
+      if (S.stop) break;
+      try { await runOne(x); ok++; log(`「${x.title.slice(0, 28)}」を要約済みにしました。`); }
+      catch (e) {
+        ng++; const c = e && e.code;
+        const msg = c === "cancelled" ? "止めました。" : (c === "rate_limited" && e.reason === "usage_limit") ? "Claude の利用上限に達しました。時間をおいてから、続きを要約してください。" : (c === "prompt_too_large") ? "文字起こしが長すぎて、一度に要約できませんでした。" : ((e && e.message) || String(e));
+        setItem(x, c === "cancelled" ? "idle" : "ng", c === "cancelled" ? "" : msg);
+        log(`「${x.title.slice(0, 28)}」：${c || ""} ${msg}`.trim().slice(0, 300), true);
+        if (c === "cancelled") break;
+        if (FATAL.has(c)) { fail(e, "要約"); break; }
+        if (c === "rate_limited") { banner(`<b>${esc(msg)}</b>`, "err", `<button class="btn" type="button" data-act="retry">残りを取り直す</button>`); S.fatal = "rate_limited"; break; }
+        if (c === "server_unavailable" || c === "upstream_error") { log("書き込みの結果が分かりません。もう一度実行すると、書き込み済みかどうかを確かめて続けます。", true); break; }
+      }
+      S.doneCount++; renderBar();
+    }
+    S.running = false; S.sel = new Set([...S.sel].filter(id => S.items.find(x => x.id === id && x.st !== "ok")));
+    if (!S.fatal) banner(`<b>${ok} 件を要約済みにしました。</b>${ng ? `失敗は ${ng} 件です（各行に理由を出しています）。` : ""}Mac が5分以内に回収して、議事録アプリを「要約済み」にします。`, ng ? "err" : "ok",
+      `<button class="btn" type="button" data-act="reload">残りの要約待ちを取り直す</button>${ng ? `<button class="btn" type="button" data-act="selng">失敗した分を選び直す</button>` : ""}`);
+    render();
+  }
+
+  /* ---------- 議事録アプリから開かれたとき：#run＝要約待ちをすべて、#m-xxxx＝その会議だけ。すぐに始める ---------- */
+  function wanted() {
+    const h = location.hash;
+    if (h === "#run") return { all: true };
+    const m = h.match(/^#m-([a-z0-9]{1,40})$/);
+    return m ? { mid: "m_" + m[1] } : null;
+  }
+  function clearHash() { try { history.replaceState(null, "", location.pathname + location.search); } catch { try { location.hash = ""; } catch { /* 消せなくても、2回は始めない */ } } }
+  function autoStart() {
+    const w = wanted();
+    if (!w || S.auto === location.hash || S.running || S.fatal) return;
+    S.auto = location.hash;
+    let pick;
+    if (w.all) pick = S.items.filter(x => !x.dup && x.st !== "ok");
+    else {
+      pick = S.items.filter(x => !x.dup && x.mid === w.mid && x.st !== "ok");
+      if (!pick.length) { banner("<b>議事録アプリで選んだ会議は、まだ作業DBにありません。</b>Mac が書き出すまで数分待ってから、「再取得」を押してください。下にあるのは、ほかの要約待ちです。", "err"); clearHash(); return; }
+    }
+    clearHash();
+    if (!pick.length) return;
+    S.sel = new Set(pick.map(x => x.id)); render();
+    log(`議事録アプリから開かれたので、${pick.length} 件の要約をすぐに始めます。`);
+    run();
+  }
+  window.addEventListener("hashchange", () => { if (wanted() && !S.running && !S.demo) { S.auto = null; load(); } });
+
+  /* ---------- デモ（Claude.ai の外で開いたとき。実在しない見本） ---------- */
+  const demoRows = () => [
+    ["デモ：定例会議（営業）", "m_demo0001"], ["デモ：顧客打合せ（セキュリティ提案）", "m_demo0002"], ["デモ：38期計画レビュー", "m_demo0003"], ["デモ：定例会議（営業）", "m_demo0001"],
+  ].map(([title, id], i) => ({ url: "https://example.invalid/demo" + String(i).padStart(32, "0"), "状態": "要約待ち", "userDefined:ID": id, "メモ": "", "名前": title }));
+  async function demoRun() {
+    const targets = S.items.filter(x => S.sel.has(x.id) && !x.dup && x.st !== "ok");
+    S.running = true; S.runTotal = targets.length; S.doneCount = 0; render();
+    for (const x of targets) {
+      if (S.stop) break;
+      for (const s of ["文字起こしを読んでいます…", "Claude が要約しています…", "Notion に書き込んでいます…", "最後まで保存されたか、確認しています…"]) { setItem(x, "run", s); await sleep(500); }
+      setItem(x, "ok", "", { result: { cardSummary: "（デモ）一覧に出る100字程度の要約です。", summary: "（デモ）ここに、会議の目的と結論が入ります。", agenda: [{ topic: "（デモ）議題", outcome: "継続検討" }], todos: [] } }); S.doneCount++; renderBar();
+    }
+    S.running = false; S.sel.clear(); banner("<b>デモの要約が終わりました。</b>実際の画面では、ここまでの内容が Notion に書き込まれます。", "ok"); render();
+  }
+
+  /* ---------- 操作 ---------- */
+  $("#list").addEventListener("change", e => {
+    const c = e.target.closest("input[type=checkbox][data-id]"); if (!c) return;
+    c.checked ? S.sel.add(c.dataset.id) : S.sel.delete(c.dataset.id); c.closest(".row").classList.toggle("sel", c.checked); renderBar();
+  });
+  $("#q").addEventListener("input", e => { S.q = e.target.value; render(); });
+  $("#sort").addEventListener("change", e => { S.sort = e.target.value; render(); });
+  $("#hideDup").addEventListener("change", e => { S.hideDup = e.target.checked; render(); });
+  $("#selAll").addEventListener("click", () => { shown().filter(x => !x.dup && x.st !== "ok").forEach(x => S.sel.add(x.id)); render(); });
+  $("#selNone").addEventListener("click", () => { S.sel.clear(); render(); });
+  $("#go").addEventListener("click", () => (S.demo ? demoRun() : run()));
+  $("#stop").addEventListener("click", () => { S.stop = true; if (S.abort) S.abort.abort(); $("#stop").disabled = true; log("止めます（いま書き込み中の1件は、終わるまで待ちます）。"); });
+  $("#reload").addEventListener("click", () => { if (!S.running) { S.fatal = ""; load(); } });
+  $("#banner").addEventListener("click", e => {
+    const a = e.target.closest("[data-act]"); if (!a || S.running) return;
+    if (a.dataset.act === "selng") { S.sel = new Set(S.items.filter(x => x.st === "ng").map(x => x.id)); S.items.filter(x => x.st === "ng").forEach(x => { x.st = "idle"; x.stage = ""; }); render(); return; }
+    S.fatal = ""; load();
+  });
+
+  /* ---------- 起動 ---------- */
+  (async () => {
+    try { mcp = window.claude ? await window.claude.use("mcp") : null; sample = window.claude ? await window.claude.use("sample") : null; } catch { mcp = sample = null; }
+    if (!mcp || !sample) { S.demo = true; log("Claude.ai の外で開かれているため、デモ表示にします。"); }
+    await load();
+  })();
+  window.__minutestock = { S, run, load };   // 動作確認用
+})();
+</script>
+</body>
+</html>

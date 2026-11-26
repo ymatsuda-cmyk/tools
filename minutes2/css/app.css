@@ -1,4 +1,4 @@
-/* MinuteStock — ClipStock と同じ配色・書体。本文は BIZ UDPゴシック */
+/* MinutesStock — ClipStock と同じ配色・書体。本文は BIZ UDPゴシック */
 :root{
   --paper:#f6f7f5; --sheet:#ffffff; --ink:#1c222c; --muted:#5f6878; --line:#d5dae1; --line2:#e4e7ec;
   --cloth:#26335a; --cloth-ink:#e9ecf4; --cloth-mute:#c9d0e2;
@@ -550,3 +550,14 @@ html{touch-action:manipulation}
 .warn{margin:0;color:var(--danger);font-size:13px;line-height:1.7;font-weight:700}
 /* ログイン画面の白いボタン（Face ID・Touch ID で開く）：画面全体の文字色（明るい色）を引き継いで、白地に白い文字になっていた */
 .gate .btn:not(.main){color:var(--ink)}
+
+/* タイトル・日時を、その場で直す */
+.ed{cursor:text;border-radius:4px;padding:0 2px;margin:0 -2px;transition:background .12s}
+.ed::after{content:"✎";font-size:.62em;margin-left:.4em;opacity:0;color:var(--foil-text)}
+.ed:hover,.ed:focus-visible{background:var(--foil-soft)}
+.ed:hover::after,.ed:focus-visible::after{opacity:.85}
+@media (pointer:coarse){.ed::after{opacity:.5}}
+.inl{border:1px solid var(--foil);border-radius:6px;background:var(--paper);color:var(--ink);padding:2px 8px;min-width:0}
+.dtitle h1 .inl-title{width:min(100%,680px);font:600 26px/1.4 var(--serif)}
+.dmeta .inl-date{font:inherit;font-size:13px;padding:1px 6px}
+@media (max-width:640px){.dtitle h1 .inl-title{font-size:20px}}

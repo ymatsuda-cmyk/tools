@@ -8,9 +8,11 @@ description: >
   旧スキル notion-transcript-summarizer（議事録DBの要約カラムに書く）とは書き込む先と形式が違う。議事録 v2 の話ならこちらを使う。
 ---
 
-# MinuteStock（議事録 v2）：要約待ちを Claude.ai で要約する
+# MinutesStock（議事録 v2）：要約待ちを Claude.ai で要約する
 
-MinuteStock（議事録アプリ v2）は、議事録を暗号化して GitHub に保管している。Claude.ai は暗号を開けないので、
+> 通常は、議事録アプリの変換管理「Claude.ai で要約待ちを変換」で開く専用ページ（`claude-page/`）が、一覧・要約・書き込み・確認までを自動で行う。このスキルは、チャットで頼むとき用（手順と書き込む形は、専用ページと同じ）。
+
+MinutesStock（議事録アプリ v2）は、議事録を暗号化して GitHub に保管している。Claude.ai は暗号を開けないので、
 Mac が「要約待ち」の文字起こしだけを Notion の作業DBへ一時的に書き出している。
 このスキルは、その作業DBのページを要約して JSON を書き込み、状態を「要約済み」にする。
 Mac が次の確認（5分おき）で回収・暗号化し、アプリに反映したあと、Notion のページは消える。

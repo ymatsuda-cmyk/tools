@@ -1,4 +1,4 @@
-// src/app.js — MinuteStock（議事録 v2。ClipStock と同じ作り：暗号化して GitHub private に保管、GAS 経由で書く）
+// src/app.js — MinutesStock（議事録 v2。ClipStock と同じ作り：暗号化して GitHub private に保管、GAS 経由で書く）
 import { GAS_URL, POLL_MS, CLAUDE_DEFAULT_URL, WORKER_EVERY_SEC, MARK_TAGS } from './config.js'
 import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd, newPk, personalIds } from './crypto.js'
 import { gas, repo } from './store.js'
@@ -54,7 +54,7 @@ const S = {
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
   edit: null, jump: null, wq: {}, sec: 'summary', secJump: null, spyLock: 0,
-  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}), noteOpen: ls.get('m2.noteOpen', {}),
+  files: {}, fav: new Set(ls.get('m2.fav', [])), seen: ls.get('m2.seen', {}), timer: 0, prefsReady: false, todoOpen: ls.get('m2.todoOpen', {}), noteOpen: ls.get('m2.noteOpen', {}), inl: null,
 }
 const DEK = new Map()
 const META = new Map()
@@ -117,7 +117,7 @@ function gateShell(inner) {
   clearInterval(S.timer)
   $('#app').hidden = true
   $('#gate').hidden = false
-  $('#gate').innerHTML = `<div class="gate-card"><h1 class="gate-title">MinuteStock</h1>${inner}</div>`
+  $('#gate').innerHTML = `<div class="gate-card"><h1 class="gate-title">MinutesStock</h1>${inner}</div>`
 }
 const gateOff = () => $$('#gate button').forEach((b) => { b.disabled = true })
 
@@ -531,14 +531,14 @@ async function mountShare() {
         dlShare.noAi = false
         if (mode === 'other') {
           // 他の人の端末へは、権限コードだけ。個人の鍵・設定・AI の接続先は渡さない（相手の設定は、あなたとは別に保たれる）
-          dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+          dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinutesStock' })
         } else {
           const ai = ls.get('m2.shareAi', true) ? aiForShare() : null
           const pk = vaultData()?.pk
-          dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk, ai }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+          dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk, ai }, dlShare.pass, { app: DL_APP, label: 'MinutesStock' })
           // QR・中継に収まらないほど大きいときは、AI の接続先を外す（受け取った端末の設定で入れてもらう）
           if (ai && dlShare.pkg.length > 1800) {
-            dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+            dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk }, dlShare.pass, { app: DL_APP, label: 'MinutesStock' })
             dlShare.noAi = true
           }
         }
@@ -933,12 +933,16 @@ function loadDetail(it) {
   }).catch((e) => toast(e.message, true))
 }
 
+let paintingDetail = false   // 描き直しで入力欄が消えるときの blur を、保存と取り違えないための印
 function paintDetail(reset = false) {
   const el = $('#detail')
   if (!el) return
+  if (S.inl && S.inl.id !== S.sel) S.inl = null   // 別の会議を開いたら、直していた欄は閉じる（外を押した時点で保存は済んでいる）
   const it = S.sel ? S.byId.get(S.sel) : null
   const sc = reset ? 0 : el.querySelector('.sheet-scroll')?.scrollTop
+  paintingDetail = true
   el.innerHTML = detailHTML(it)
+  paintingDetail = false
   if (reset) scrollHide.reset()
   const sh = el.querySelector('.sheet-scroll')
   if (sc && sh) sh.scrollTop = sc
@@ -950,6 +954,14 @@ function paintDetail(reset = false) {
     else if (it && NEED[S.dtab].every((n) => cached(it, n) !== undefined)) S.jump = null   // 見つからない（文章が変わった）
   }
   if (S.edit?.focus) { el.querySelector(S.edit.focus)?.focus(); S.edit.focus = null }
+  if (S.inl) {
+    const inp = el.querySelector('#inlIn')
+    if (inp) {
+      inp.focus()
+      if (S.inl.fresh) { S.inl.fresh = false; if (S.inl.kind === 'title') inp.select(); else if (matchMedia('(pointer: coarse)').matches) { try { inp.showPicker?.() } catch { /* 開けなくても、そのまま打てる */ } } }   // 指で操作する端末では、日時の選択画面をすぐ開く。マウス・キーボードでは、開かずに打てるようにする（Enter が選択画面に取られないように）
+      else if (S.inl.kind === 'title') inp.setSelectionRange(inp.value.length, inp.value.length)
+    }
+  }
   applySecJump()
   centerActiveTab()
   if (it && S.dtab === 'map') mountMap(it)
@@ -1020,10 +1032,46 @@ function addTagFromInput(id) {
   setTimeout(() => $('#tagNew')?.focus(), 0)
 }
 
-function metaLine(it) {
+function metaLine(it, canEdit = false) {
   const s = cached(it, 's')
   const tail = it.st === 'ok' ? (s?.model || '要約済み') : (ST[it.st] || ST.tw).l
-  return `${it.src === 'text' ? 'テキスト' : it.src === 'plaud' ? 'PLAUD' : '会議'} ・ ${md(it.date)} ${hm(it.date)} ・ ${fmtDur(it.dur)} ・ ${esc(tail)}`
+  return `${it.src === 'text' ? 'テキスト' : it.src === 'plaud' ? 'PLAUD' : '会議'} ・ ${dateHTML(it, canEdit)} ・ ${fmtDur(it.dur)} ・ ${esc(tail)}`
+}
+
+/* ---------- 見出しのタイトル・日時：押すとその場で直せる（Enter か 外を押すと保存、Esc で取り消し） ---------- */
+const inlOn = (it, kind) => S.inl && S.inl.id === it.id && S.inl.kind === kind
+function titleHTML(it, canEdit) {
+  if (!canEdit) return esc(it.title)
+  if (inlOn(it, 'title')) return `<input id="inlIn" class="inl inl-title" value="${esc(S.inl.value)}" maxlength="200" aria-label="タイトル" autocomplete="off" enterkeyhint="done">`
+  return `<span class="ed" role="button" tabindex="0" data-act="inl-title" data-id="${it.id}" title="クリックして修正">${esc(it.title)}</span>`
+}
+function dateHTML(it, canEdit) {
+  if (!canEdit) return `${md(it.date)} ${hm(it.date)}`
+  if (inlOn(it, 'date')) return `<input id="inlIn" class="inl inl-date" type="datetime-local" value="${esc(S.inl.value)}" aria-label="開始日時">`
+  return `<span class="ed" role="button" tabindex="0" data-act="inl-date" data-id="${it.id}" title="クリックして修正">${md(it.date)} ${hm(it.date)}</span>`
+}
+function startInline(id, kind) {
+  const it = S.byId.get(id)
+  if (!it || it.locked || !(S.admin || it.by === S.gid)) return
+  if (S.inl) commitInline()
+  S.inl = { id, kind, value: kind === 'title' ? it.title : String(it.date).slice(0, 16), fresh: true }
+  paintDetail()
+}
+function cancelInline() { if (!S.inl) return; S.inl = null; paintDetail() }
+async function commitInline() {
+  const inl = S.inl; if (!inl) return
+  S.inl = null
+  const it = S.byId.get(inl.id)
+  const v = String(inl.value || '').trim()
+  const same = inl.kind === 'title' ? v === it?.title : v.slice(0, 16) === String(it?.date || '').slice(0, 16)
+  if (!it || same || (inl.kind === 'date' && !v)) { paintDetail(); return }
+  if (inl.kind === 'title' && !v) { toast('タイトルを入れてください。', true); paintDetail(); return }
+  try {
+    const patch = inl.kind === 'title' ? { m: await sealJson(DEK.get(inl.id), { ...(META.get(inl.id)?.v || {}), title: v }) } : { date: v }
+    const r = await gasS('put', { id: inl.id, patch })
+    await applyEntry(r.entry)
+    toast('保存しました。')
+  } catch (e) { toast('保存できませんでした：' + e.message, true); paintDetail() }
 }
 
 function detailHTML(it) {
@@ -1041,7 +1089,6 @@ function detailHTML(it) {
     `<button class="btn sm" data-act="fav" data-id="${it.id}" aria-pressed="${S.fav.has(it.id)}">${S.fav.has(it.id) ? '★ お気に入り' : '☆ お気に入り'}</button>`,
     hasT ? `<button class="btn sm" data-act="summarize" data-id="${it.id}" ${S.busy[it.id] ? 'disabled' : ''}>${it.st === 'ok' ? '再要約' : '要約する'}</button>` : '',
     hasT ? `<button class="btn sm" data-act="claude" data-id="${it.id}">Claude.ai で${it.st === 'ok' ? '再要約' : '要約'}</button>` : '',
-    canEdit ? `<button class="btn sm" data-act="edit" data-id="${it.id}">タイトル・日時</button>` : '',
     S.admin ? `<button class="btn sm" data-act="groups" data-id="${it.id}">閲覧グループ</button>` : '',
     canDel ? `<button class="btn sm danger" data-act="delete" data-id="${it.id}">削除</button>` : '',
   ].join('')
@@ -1055,7 +1102,7 @@ function detailHTML(it) {
   const backTab = '<button class="dtab-back" data-act="close-detail" aria-label="一覧へ">‹</button>'
   return `
     <div class="dhead">${back}
-      <div class="dtitle"><h1>${esc(it.title)}${scopeIcon(it)}${isNew(it) ? '<span class="new">新着</span>' : ''}</h1><div class="dmeta">${metaLine(it)}</div>
+      <div class="dtitle"><h1>${titleHTML(it, canEdit)}${scopeIcon(it)}${isNew(it) ? '<span class="new">新着</span>' : ''}</h1><div class="dmeta">${metaLine(it, canEdit)}</div>
         ${dtagsHTML(it, canEdit)}</div>
       <div class="dacts">${acts}</div>
     </div>
@@ -1465,8 +1512,9 @@ function convertHTML() {
       <button class="btn" data-act="check-sw">要約待ちを全選択</button>
       <button class="btn main" data-act="sum-selected" ${swSel.length ? '' : 'disabled'}>選択を要約する（${swSel.length}件）</button>
       <span class="grow"></span>
-      <button class="btn gold" data-act="claude">Claude.ai で要約待ちを変換（${swAll.length}件）</button>
+      <button class="btn gold" data-act="claude" title="Claude.ai が開き、要約待ちをすぐに要約し始めます">Claude.ai で要約待ちを変換（${swAll.length}件）</button>
     </div>
+    <p class="muted sm cauto">「Claude.ai で要約待ちを変換」を押すと、Claude.ai が開いて、要約待ちの要約をすぐに始めます。終わるまで、開いたページを閉じないでください。</p>
     <p class="cnote" id="cnote" role="status" ${S.cnote ? '' : 'hidden'}>${esc(S.cnote)}</p>
     <div class="tablebox"><table class="ctable">
       <thead><tr><th><span class="sr">選択</span></th><th>日時</th><th>タイトル</th><th>長さ</th><th>登録</th><th>状態</th><th></th></tr></thead>
@@ -1617,8 +1665,10 @@ async function sumSelected() {
 function claudeUrl(id = '') {
   const saved = ls.get('m2.claudeUrl', '')
   if (saved) return saved
-  return CLAUDE_DEFAULT_URL + (id ? '#' + id.replace(/_/g, '-') : '')
+  // 標準のページは、開いたらすぐに要約を始める：#run＝要約待ちをすべて、#m-xxxx＝その会議だけ
+  return CLAUDE_DEFAULT_URL + (id ? '#' + id.replace(/_/g, '-') : '#run')
 }
+const claudeAuto = () => !ls.get('m2.claudeUrl', '')   // 自分で決めたリンク（プロジェクトなど）のときは、自動では始まらない
 
 /** Mac が Notion の作業DBに書き出した状態（worker.json）。古い Mac のときは null */
 const notionState = () => (S.worker && S.worker.notion) || null
@@ -1635,7 +1685,7 @@ function openClaude(a) {
       return
     }
     window.open(claudeUrl(id), '_blank', 'noopener,noreferrer')
-    toast('Claude.ai を開きました。要約が済むと、Mac の次の確認でここに反映されます。', false, 6000)
+    toast(claudeAuto() ? 'Claude.ai を開きました。この会議の要約をすぐに始めます（ページを開いたままにしてください）。済むと、Mac の次の確認でここに反映されます。' : 'Claude.ai を開きました。要約が済むと、Mac の次の確認でここに反映されます。', false, 8000)
     return
   }
   const n = S.items.filter((x) => x.st === 'sw' && !x.locked).length
@@ -1644,7 +1694,8 @@ function openClaude(a) {
   window.open(claudeUrl(), '_blank', 'noopener,noreferrer')
   const inDb = ns ? (ns.ids || []).length : null
   setNote(`Claude.ai を開きました（要約待ち ${n} 件${inDb != null && inDb !== n ? `、うち Notion の作業DBに書き出し済み ${inDb} 件` : ''}）。開かないときは、ブラウザのポップアップの許可を確かめてください。`
-    + ' Claude.ai が要約を Notion の作業DBに書き込むと、Mac が次の確認（5分以内）で回収し、ここが「要約済み」になります。')
+    + (claudeAuto() ? ' 開いたページが、要約をすぐに始めます。終わるまで、そのページを開いたままにしてください。' : ' 開いたページで、要約する会議を選んでください。')
+    + ' 要約が Notion の作業DBに書き込まれると、Mac が次の確認（5分以内）で回収し、ここが「要約済み」になります。')
 }
 
 function setNote(text) {
@@ -2116,29 +2167,6 @@ async function submitUpload() {
 }
 
 /* ---------- 編集・閲覧グループ・削除（管理者／登録した人） ---------- */
-function openEdit(id) {
-  const it = S.byId.get(id)
-  modal('タイトル・日時', `
-    <div class="fcol"><label for="edTitle">タイトル</label><input id="edTitle" value="${esc(it.title)}"></div>
-    <p class="muted sm">タグは、見出しの「＋ タグ」から付け外しします。</p>
-    <div class="fcol"><label for="edDate">開始日時</label><input id="edDate" type="datetime-local" value="${esc(it.date)}"></div>
-    <div class="dlg-foot"><span class="grow"></span><button class="btn" data-act="close">キャンセル</button><button class="btn main" data-act="edit-save" data-id="${id}">保存</button></div>
-    <p class="msg" id="edMsg" role="alert"></p>`)
-}
-
-async function saveEdit(id) {
-  const it = S.byId.get(id)
-  const title = $('#edTitle').value.trim()
-  if (!title) { $('#edMsg').textContent = 'タイトルを入れてください。'; return }
-  const meta = { ...(META.get(id)?.v || {}), title }
-  try {
-    const r = await gasS('put', { id, patch: { m: await sealJson(DEK.get(id), meta), date: $('#edDate').value || it.date } })
-    closeModal()
-    await applyEntry(r.entry)
-    toast('保存しました。')
-  } catch (e) { $('#edMsg').textContent = e.message }
-}
-
 function openGroups(id) {
   const it = S.byId.get(id)
   const byGid = Object.fromEntries(Object.entries(S.roles).map(([r, g]) => [g, r]))
@@ -2269,7 +2297,7 @@ function openSettings(tab) {
         <p class="${S.admin ? 'warn' : 'muted sm'}">${S.admin ? 'この端末は「管理者」の権限コードで開いています。渡すと、相手にも管理者の権限（すべての会議の閲覧・閲覧グループの変更・変換管理）を与えます。' : `いまの権限（${esc(S.role)}）を、相手にも与えます。`}</p>`}
         <div id="devLink" class="dl" aria-live="polite"></div>
         <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
-        <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください。</p>
+        <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinutesStock で受け取るときは、QR やリンクではなくコードを使ってください。</p>
       </section>
       <div class="sfoot"><button type="button" class="btn danger" data-act="forget-conn">この端末から接続情報を消去してロック</button></div>`)}
     `, { wide: true })
@@ -2483,8 +2511,8 @@ const ACT = {
     $('#memoMsg').textContent = '保存しています…'
     try { await mutateNotes(it, (n) => { n.memo = memo }, { quiet: true }); toast('メモを保存しました。'); const m = $('#memoMsg'); if (m) m.textContent = '' } catch (e) { const m = $('#memoMsg'); if (m) m.textContent = e.message }
   },
-  edit: (a) => openEdit(a.dataset.id),
-  'edit-save': (a) => saveEdit(a.dataset.id),
+  'inl-title': (a) => startInline(a.dataset.id, 'title'),
+  'inl-date': (a) => startInline(a.dataset.id, 'date'),
   groups: (a) => openGroups(a.dataset.id),
   'groups-save': (a) => saveGroups(a.dataset.id),
   delete: (a) => del(a.dataset.id),
@@ -2639,6 +2667,17 @@ document.addEventListener('change', (e) => {
   }
 })
 
+document.addEventListener('input', (e) => { if (e.target.id === 'inlIn' && S.inl) S.inl.value = e.target.value })
+document.addEventListener('keydown', (e) => {
+  if (e.target.id === 'inlIn' && S.inl) {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitInline() }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelInline() }
+    return
+  }
+  const ed = e.target.closest?.('.ed[data-act]')
+  if (ed && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); ed.click() }   // キーボードでも、タイトル・日時を直せる
+})
+document.addEventListener('focusout', (e) => { if (e.target.id === 'inlIn' && S.inl && !paintingDetail && document.contains(e.target)) setTimeout(() => { if (S.inl && !document.activeElement?.closest('#inlIn')) commitInline() }, 0) })
 document.addEventListener('submit', (e) => {
   const f = e.target
   if (f.matches && f.matches('form.editor')) { e.preventDefault(); return }
