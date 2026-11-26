@@ -82,3 +82,16 @@ export async function unwrapDek(w, priv) {
   const k = await kek(priv, await importPub(w.e))
   return new Uint8Array(await subtle.decrypt({ name: 'AES-GCM', iv: unb64(w.iv) }, k, unb64(w.ct)))
 }
+
+/* ---------- 個人の鍵（自分の端末どうしで表示の設定をそろえるための印） ----------
+   端末ごとにではなく「人ごと」に1つ。最初の端末で作り、「他端末へ設定共有」で自分の別の端末へ渡す。
+   同じ権限コードを使っていても、渡していない人の端末とは、保存先も暗号化の鍵も別になる */
+export const newPk = () => b64(rnd(32))
+
+/** 個人の鍵 → { uid: 保存先の名前（鍵そのものは出ない）, dek: 設定を暗号化する鍵 } */
+export async function personalIds(pk) {
+  const h = async (label) => new Uint8Array(await subtle.digest('SHA-256', te.encode(label + pk)))
+  const id = await h('minutes2-uid:')
+  const dek = await h('minutes2-prefs:')
+  return { uid: 'u-' + [...id.slice(0, 16)].map((x) => x.toString(16).padStart(2, '0')).join(''), dek }
+}

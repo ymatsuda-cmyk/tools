@@ -547,3 +547,4 @@ html{touch-action:manipulation}
 .nblock.acc .todos{padding-bottom:6px}
 .nblock.acc .acc-body{padding-bottom:6px}
 .nblock.acc .acc-body > .mkcard:first-child{margin-top:2px}
+.warn{margin:0;color:var(--danger);font-size:13px;line-height:1.7;font-weight:700}

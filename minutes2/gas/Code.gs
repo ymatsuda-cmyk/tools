@@ -5,7 +5,7 @@
  *   ・login     : 権限コードを確かめ、その role の「鍵束」（暗号化済み）とセッションを返す
  *   ・initUpload / putChunk : 音声を Drive の受付フォルダへ 3MB ずつ中継（今の minutes と同じ方式）
  *   ・put       : 暗号化済みの議事録を GitHub private リポジトリへ書く（書き込みトークンは GAS だけが持つ）
- *   ・putSettings : 暗号化済みの設定を settings/<グループID>.json に書く（グループごとに1ファイル）
+ *   ・putSettings : 暗号化済みの設定を settings/<個人の名前>.json に書く（人ごとに1ファイル。グループでは共有しない）
  *   ・setup     : Mac の setup_keys.py から、下のスクリプトプロパティをまとめて登録する
  *
  * GAS は中身を復号できない。権限の確認は「どのグループ鍵で包まれているか（index.json の k）」で行う。
@@ -385,19 +385,20 @@ function put_(sess, body) {
 // ============ 設定（AI の接続先など。グループごとに1ファイル） ============
 
 /**
- * body: { file: { v, upd, k: グループ公開鍵で包んだ鍵, d: 暗号化した設定 } }
- * GAS は中身を読めない。置き場所はセッションのグループで決める（ほかのグループの設定は書けない）
+ * body: { uid: 'u-' + 32桁の16進, file: { v: 2, upd, d: 個人の鍵で暗号化した設定 } }
+ * GAS は中身を読めない（個人の鍵はクライアントにだけある）。置き場所は settings/<uid>.json だけに限る。
+ * uid は個人の鍵から作る推測できない名前なので、ほかの人の設定ファイルには書けない（グループ単位の共有はしない）
  */
 function putSettings_(sess, body) {
   var f = body.file;
-  if (!f || typeof f !== 'object' || !isWrap_(f.k) || !isSealed_(f.d) || typeof f.upd !== 'number') throw new Error('設定の形式が不正です');
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(sess.gid || ''))) throw new Error('グループが不正です');
-  var text = JSON.stringify({ v: 1, upd: f.upd, k: f.k, d: f.d });
+  if (!/^u-[0-9a-f]{32}$/.test(String(body.uid || ''))) throw new Error('設定の保存先が不正です');
+  if (!f || typeof f !== 'object' || !isSealed_(f.d) || typeof f.upd !== 'number') throw new Error('設定の形式が不正です');
+  var text = JSON.stringify({ v: 2, upd: f.upd, d: f.d });
   if (text.length > 200000) throw new Error('設定が大きすぎます');
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    ghWrite_('settings/' + sess.gid + '.json', text);
+    ghWrite_('settings/' + body.uid + '.json', text);
   } finally {
     lock.releaseLock();
   }

@@ -1,13 +1,13 @@
 // src/app.js — MinuteStock（議事録 v2。ClipStock と同じ作り：暗号化して GitHub private に保管、GAS 経由で書く）
 import { GAS_URL, POLL_MS, CLAUDE_DEFAULT_URL, WORKER_EVERY_SEC, MARK_TAGS } from './config.js'
-import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd } from './crypto.js'
+import { openBundle, importPriv, newDek, sealJson, openJson, wrapDek, unwrapDek, rnd, newPk, personalIds } from './crypto.js'
 import { gas, repo } from './store.js'
 import { bioOk, bioRegistered, bioRegister, bioUnlock, bioForget } from './bio.js'
 import { autoSaved, autoLoad, autoForget } from './autoopen.js'   // 以前の版の控えを、パスコード方式へ引っ越すためだけに使う
 import { vaultExists, vaultOpened, vaultData, vaultPass, vaultCreate, vaultOpen, vaultUpdate, vaultRepass, vaultLock, vaultWipe, failsLeft, MAX_FAIL, MIN_PASS } from './vault.js'
 import { fmtT, parseT, normalizeSummary, segmentsFromText, summarizeWithAI, transcriptText, SUMMARY_PROMPT, extractJson } from './summary.js'
 import { parseSummaryText, summaryTypeLabel } from './summary-text.js'
-import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf, useSettingsStore, readSharedSettings, clearSharedSettings } from './llm-settings.js'
+import { loadSettings, saveSettings as saveSettingsLocal, newConnection, activeConnection, activeModelName, allModels, connectionOf, useSettingsStore, readSharedSettings } from './llm-settings.js'
 import { streamChat } from './llm-client.js'
 import { groupMarks, marksOf, validFor, renderMarked, applyRange, recolor, reconcile, summaryTexts, trTexts, withTimes, locCompare, locLabel, locTab, kindOf, SUMMARY_KINDS } from './marks.js'
 import { todoKey, doneOf, logsOf, mergeTodos } from './todos.js'
@@ -49,7 +49,7 @@ const LOCK_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x
 /* ---------- 状態 ---------- */
 const S = {
   code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null,
-  session: null, exp: 0, pub: {}, raw: [], items: [], byId: new Map(), worker: null, sig: '', syncedAt: 0, syncErr: '',
+  session: null, exp: 0, uid: null, pdek: null, pub: {}, raw: [], items: [], byId: new Map(), worker: null, sig: '', syncedAt: 0, syncErr: '',
   tab: 'list', view: ls.get('m2.view', 'timeline'), month: monthKey(new Date()), filter: 'all', favOnly: false, scope: 'all', tagF: '', tagOpen: null, q: '', sel: null, dtab: 'sum',
   cfilter: 'all', checked: new Set(), busy: {}, chat: {}, trq: '', seek: null, cnote: '',
   range: ls.get('m2.range', '3m'), tfilter: 'open', towner: '', nfilter: 0, nq: '', logOpen: null, mkMemo: null,
@@ -123,7 +123,7 @@ const gateOff = () => $$('#gate button').forEach((b) => { b.disabled = true })
 
 /* ---------- 初回：権限コードと、この端末のパスコードを決める ----------
    code があれば（以前の版が覚えていた分・他の端末から受け取った分）権限コードは聞かない */
-function showSetup({ code = null, ai = null, from = '', msg = '' } = {}) {
+function showSetup({ code = null, ai = null, pk = null, from = '', msg = '' } = {}) {
   const known = !!code
   gateShell(`
       <p class="gate-sub">${from === 'recv' ? '別の端末から受け取りました。この端末のパスコードを決めてください。'
@@ -150,11 +150,11 @@ function showSetup({ code = null, ai = null, from = '', msg = '' } = {}) {
     if (!c) { m.textContent = '権限コードを入れてください。'; return }
     if (p1.length < MIN_PASS) { m.textContent = `パスコードは${MIN_PASS}文字以上にしてください。`; return }
     if (p1 !== p2) { m.textContent = 'パスコードが一致しません。'; return }
-    await doSetup(c, p1, { ai, from, known })
+    await doSetup(c, p1, { ai, pk, from, known })
   })
 }
 
-async function doSetup(code, pass, { ai = null, from = '', known = false } = {}) {
+async function doSetup(code, pass, { ai = null, pk = null, from = '', known = false } = {}) {
   const m = $('#gateMsg')
   if (m) m.textContent = '確認しています…'
   gateOff()
@@ -164,7 +164,7 @@ async function doSetup(code, pass, { ai = null, from = '', known = false } = {})
     await autoForget(); bioForget()
     for (const k of ['m2.autoOff', 'm2.bioAsked']) localStorage.removeItem(k)
     const shared = readSharedSettings()   // 引っ越し：これまでの接続先を、保管庫の中へコピーする
-    await vaultCreate(pass, { v: 1, code, ai: ai || (hasConn(shared) ? shared : null) })
+    await vaultCreate(pass, { v: 1, code, pk: pk || newPk(), ai: ai || (hasConn(shared) ? shared : null) })   // pk：個人の鍵（受け取ったものがあればそれ。自分の端末どうしで設定をそろえる）
     bindStore()
     await start(); armIdle()
     toast(from === 'recv' ? `この端末で使えるようにしました（グループ：${S.admin ? '管理者' : S.role}）。` : '設定しました。', false, 5000)
@@ -172,7 +172,7 @@ async function doSetup(code, pass, { ai = null, from = '', known = false } = {})
     return true
   } catch (e) {
     S.code = null
-    showSetup({ code: known ? code : null, ai, from, msg: e.message || '設定できませんでした。' })
+    showSetup({ code: known ? code : null, ai, pk, from, msg: e.message || '設定できませんでした。' })
     return false
   }
 }
@@ -292,7 +292,7 @@ function showReceive(pkg = null, msg = '') {
         throw err
       }
       if (!data || typeof data.code !== 'string' || !data.code) throw new Error('受け取った内容に権限コードがありません。')
-      showSetup({ code: data.code, ai: data.ai || null, from: 'recv' })
+      showSetup({ code: data.code, ai: data.ai || null, pk: typeof data.pk === 'string' ? data.pk : null, from: 'recv' })
     } catch (err) {
       showReceive(got, err.message || '受け取れませんでした。')
     }
@@ -329,7 +329,7 @@ function clearData() {
   clearInterval(S.timer)
   clearTimeout(prefsTimer)
   hideBar()
-  Object.assign(S, { code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null, session: null, exp: 0, pub: {}, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '', edit: null, prefsReady: false })
+  Object.assign(S, { code: null, role: null, admin: false, gid: null, adminGid: null, roles: {}, privs: {}, gh: null, R: null, session: null, exp: 0, uid: null, pdek: null, pub: {}, raw: [], items: [], files: {}, chat: {}, sel: null, sig: '', edit: null, prefsReady: false })
   S.byId = new Map(); S.checked = new Set(); DEK.clear(); META.clear()
   closeModal()
 }
@@ -374,7 +374,8 @@ function armIdle() {
   clearInterval(idleTimer)
   idleTimer = setInterval(checkIdle, Math.min(10000, Math.max(500, idleMin() * 30000)))
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdle() })   // 裏に回っている間は時計が止まるので、戻ったときに確かめる
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdle() })
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.R && S.uid && S.prefsReady && !S.edit) pullPrefs().catch(() => {}) })   // 戻ってきたとき、自分の別の端末で変えた設定を取り込む   // 裏に回っている間は時計が止まるので、戻ったときに確かめる
 
 function askBio() {
   ls.set('m2.bioAsked', true)
@@ -401,18 +402,27 @@ async function boot() {
 }
 function showUnlockOrSetup(msg) { if (vaultExists()) showUnlock(msg); else showSetup({ msg }) }
 
-/* ---------- 設定の保管（GitHub private の settings/<グループ>.json。暗号化して GAS 経由で書く） ----------
-   中身：Claude.ai のページ・文字の大きさ・一覧の表示・ToDo の期間・お気に入り
-   AI の接続先（URL・API キー）は個人の設定なので入れない。この端末だけに置き、他の端末へは「他端末へ設定共有」で一緒に渡す
-   会議と同じく「使い捨ての鍵（DEK）で暗号化 → グループの公開鍵で包む」。開けるのは同じグループの端末だけ */
-const SYNC_KEYS = new Set(['m2.fs', 'm2.view', 'm2.range', 'm2.fav', 'm2.claudeUrl'])
+/* ---------- 設定の保管（暗号化して、GAS 経由で書く） ----------
+   中身：Claude.ai のページ・文字の大きさ・一覧の表示・ToDo／ノートの期間・お気に入り・ToDo／ノートの開け閉め・新着の既読・自動ロックの時間
+   保存先と暗号化の鍵は「個人の鍵（pk）」から作る。pk は人ごとに1つで、「他端末へ設定共有」で自分の別の端末へ渡す。
+   → 自分の端末どうしにだけ反映され、同じ権限コードを使う他の人の設定とは分かれる
+   AI の接続先（URL・API キー）は、ここには入れない（端末の保管庫に置き、渡すときだけ「他端末へ設定共有」で一緒に渡す） */
+const SYNC_KEYS = new Set(['m2.fs', 'm2.view', 'm2.range', 'm2.fav', 'm2.claudeUrl', 'm2.seen', 'm2.todoOpen', 'm2.noteOpen', 'm2.idle'])
 let prefsTimer = 0
-const prefsPath = () => `settings/${S.gid}.json`
-const prefsUpdOf = () => (ls.get('m2.prefsUpd', {}) || {})[S.gid] || 0
-function setPrefsUpd(v) { const m = ls.get('m2.prefsUpd', {}) || {}; m[S.gid] = v; localStorage.setItem('m2.prefsUpd', JSON.stringify(m)) }
+const prefsPath = () => `settings/${S.uid}.json`
+const prefsUpdOf = () => (ls.get('m2.prefsUpd', {}) || {})[S.uid] || 0
+function setPrefsUpd(v) { const m = ls.get('m2.prefsUpd', {}) || {}; m[S.uid] = v; localStorage.setItem('m2.prefsUpd', JSON.stringify(m)) }
+
+/** 個人の鍵から、保存先の名前と暗号化の鍵を用意する。鍵が無い端末（以前の版から使っている端末）は、ここで作る */
+async function initPersonal() {
+  let pk = vaultData()?.pk
+  if (!pk) { pk = newPk(); await vaultUpdate({ pk }) }
+  const { uid, dek } = await personalIds(pk)
+  S.uid = uid; S.pdek = dek
+}
 
 function localPrefs() {
-  return { claudeUrl: ls.get('m2.claudeUrl', ''), fs: S.fs, view: S.view, range: S.range, fav: [...S.fav] }
+  return { claudeUrl: ls.get('m2.claudeUrl', ''), fs: S.fs, view: S.view, range: S.range, fav: [...S.fav], todoOpen: S.todoOpen, noteOpen: S.noteOpen, seen: S.seen, idle: idleMin() }
 }
 
 function applyPrefs(p) {
@@ -422,20 +432,32 @@ function applyPrefs(p) {
   if (p.view === 'timeline' || p.view === 'cards') { S.view = p.view; raw('m2.view', p.view) }
   if (typeof p.range === 'string' && p.range) { S.range = p.range; raw('m2.range', p.range) }
   if (Array.isArray(p.fav)) { S.fav = new Set(p.fav); raw('m2.fav', p.fav) }
+  const plain = (v) => v && typeof v === 'object' && !Array.isArray(v)
+  if (plain(p.todoOpen)) { S.todoOpen = { ...p.todoOpen }; raw('m2.todoOpen', S.todoOpen) }
+  if (plain(p.noteOpen)) { S.noteOpen = { ...p.noteOpen }; raw('m2.noteOpen', S.noteOpen) }
+  if (plain(p.seen)) {   // 既読は、どちらかの端末で読んだものをすべて合わせる（新しいほうの時刻を採る）
+    const m = { ...S.seen }
+    for (const [k, v] of Object.entries(p.seen)) if (typeof v === 'number' && !(m[k] >= v)) m[k] = v
+    S.seen = m; raw('m2.seen', m)
+  }
+  if (typeof p.idle === 'number' && p.idle >= 0) raw('m2.idle', p.idle)
 }
 
-/** ログイン直後：GitHub の設定が新しければ取り込み、手元が新しければ送る */
+/** ログイン直後：自分の設定が新しければ取り込み、手元が新しければ送る */
 async function pullPrefs() {
   try {
+    await initPersonal()
     const f = await S.R.json(prefsPath())
     const local = prefsUpdOf()
-    if (f && f.upd > local && f.k && f.d && S.privs[S.gid]) {
-      const p = await openJson(await unwrapDek(f.k, S.privs[S.gid]), f.d)
+    if (f && f.upd > local && f.d) {
+      const p = await openJson(S.pdek, f.d)
       applyPrefs(p)
       setPrefsUpd(f.upd)
       render()
-      if (p.ai) { S.prefsReady = true; await pushPrefs() }   // 以前の形式で入っていた AI の接続先を、GitHub から消す
+      // 既読は両方を合わせるので、こちらにだけある分があれば、合わせたものを送り返す
+      if (Object.entries(S.seen).some(([k, v]) => !((p.seen || {})[k] >= v))) { S.prefsReady = true; await pushPrefs() }
     } else if (!f || local > f.upd) {
+      if (!f) await importGroupPrefs()   // 初めて：以前の版（グループで1つ）の設定が残っていれば、最初の値として一度だけ引き継ぐ
       S.prefsReady = true
       await pushPrefs()
     }
@@ -446,20 +468,25 @@ async function pullPrefs() {
   }
 }
 
+/** 以前の版は、同じ権限コードの人全員で1つの設定を共有していた。その内容を、自分の設定の最初の値にする（以後は分かれる） */
+async function importGroupPrefs() {
+  try {
+    const g = await S.R.json(`settings/${S.gid}.json`)
+    if (g && g.k && g.d && S.privs[S.gid]) { applyPrefs(await openJson(await unwrapDek(g.k, S.privs[S.gid]), g.d)); render() }
+  } catch { /* 無ければ、そのまま */ }
+}
+
 function schedulePush() {
-  if (!S.R || !S.prefsReady) return
+  if (!S.R || !S.prefsReady || !S.uid) return
   clearTimeout(prefsTimer)
   prefsTimer = setTimeout(() => { pushPrefs().catch((e) => toast('設定を保存できませんでした：' + e.message, true)) }, 1500)
 }
 
 async function pushPrefs() {
-  if (!S.R || !S.prefsReady) return
-  const pub = S.pub[S.gid]
-  if (!pub) throw new Error('グループの公開鍵が見つかりません')
+  if (!S.R || !S.prefsReady || !S.uid) return
   const upd = Date.now()
-  const dek = newDek()
-  const file = { v: 1, upd, k: await wrapDek(dek, pub), d: await sealJson(dek, localPrefs()) }
-  await gasS('putSettings', { file })
+  const file = { v: 2, upd, d: await sealJson(S.pdek, localPrefs()) }
+  await gasS('putSettings', { uid: S.uid, file })
   setPrefsUpd(upd)
 }
 
@@ -481,6 +508,7 @@ function aiForShare() {
 const PASS_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const newPass = () => { const s = [...rnd(10)].map((x) => PASS_ABC[x % 32]).join(''); return `${s.slice(0, 5)}-${s.slice(5)}` }
 const normPass = (v) => { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return s.length === 10 ? `${s.slice(0, 5)}-${s.slice(5)}` : String(v || '').trim() }
+let shareTo = 'me'   // 渡す相手：'me'＝自分の別の端末（権限コード＋個人の鍵＋AI の接続先）／'other'＝他の人の端末（権限コードだけ）
 let dlPanel = null
 let dlShare = null   // { pass, pkg } 設定画面を開いている間だけ同じパスフレーズを使う
 
@@ -494,18 +522,25 @@ async function mountShare() {
   if (!dl) { el.innerHTML = `<p class="msg">${esc(DL_MISSING)}</p>`; return }
   el.dataset.mounted = '1'
   dlShare = { pass: newPass(), pkg: null }
+  const mode = shareTo   // 画面に出している相手と、渡す中身がずれないよう、作った時点の相手に固定する
   dlPanel = dl.panel(el, {
     app: DL_APP,
     getPackage: async () => {
       if (!S.code) throw new Error('ログインし直してください。')
       if (!dlShare.pkg) {
-        const ai = ls.get('m2.shareAi', true) ? aiForShare() : null
-        dlShare.pkg = await dl.seal({ v: 1, code: S.code, ai }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
         dlShare.noAi = false
-        // QR・中継に収まらないほど大きいときは、権限コードだけ渡す（AI の接続先は受け取った端末で設定）
-        if (ai && dlShare.pkg.length > 1800) {
+        if (mode === 'other') {
+          // 他の人の端末へは、権限コードだけ。個人の鍵・設定・AI の接続先は渡さない（相手の設定は、あなたとは別に保たれる）
           dlShare.pkg = await dl.seal({ v: 1, code: S.code }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
-          dlShare.noAi = true
+        } else {
+          const ai = ls.get('m2.shareAi', true) ? aiForShare() : null
+          const pk = vaultData()?.pk
+          dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk, ai }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+          // QR・中継に収まらないほど大きいときは、AI の接続先を外す（受け取った端末の設定で入れてもらう）
+          if (ai && dlShare.pkg.length > 1800) {
+            dlShare.pkg = await dl.seal({ v: 1, code: S.code, pk }, dlShare.pass, { app: DL_APP, label: 'MinuteStock' })
+            dlShare.noAi = true
+          }
         }
       }
       const p = $('#dlPassBox')
@@ -1275,6 +1310,7 @@ function setAccOpen(kind, id, open) {
   map[id] = open
   if (S.byId.size) for (const k of Object.keys(map)) if (!S.byId.has(k)) delete map[k]
   try { localStorage.setItem(kind === 'note' ? 'm2.noteOpen' : 'm2.todoOpen', JSON.stringify(map)) } catch { /* 保存できなくても、開け閉めはできる */ }
+  schedulePush()
 }
 function paintAcc(sec, open) {
   sec.classList.toggle('open', open)
@@ -2160,7 +2196,6 @@ function openSettings(tab) {
   const c = activeConnection(s) || newConnection()
   const bio = bioOk()
   const idle = idleMin()
-  const sharedLeft = hasConn(readSharedSettings())
   const pane = (k, html) => `<div class="spane" data-pane="${k}" role="tabpanel" aria-labelledby="stab-${k}" ${setTab === k ? '' : 'hidden'}>${html}</div>`
   modal('設定', `
     <div class="stabs" role="tablist" aria-label="設定の種類">${SET_TABS.map(([k, l]) => `<button type="button" role="tab" id="stab-${k}" class="stab ${setTab === k ? 'on' : ''}" data-act="stab" data-v="${k}" aria-selected="${setTab === k}">${l}</button>`).join('')}</div>
@@ -2182,8 +2217,7 @@ function openSettings(tab) {
           <div class="fcol full"><label for="stModels">モデル <span class="muted">（カンマ区切り。先頭を使います）</span></label><input id="stModels" value="${esc((c.models || []).join(', '))}" autocapitalize="off" spellcheck="false"></div>
         </div>
         <div class="sfoot"><button class="btn main" data-act="ai-save">保存</button>${s.connections.length > 1 ? '<span class="grow"></span><button class="btn danger" data-act="ai-del">この接続を消す</button>' : ''}</div>
-        <p class="muted sm">パスコードで暗号化して、この端末にだけ置きます（グループで共有する設定にも、gemma-chat など他のアプリにも入れません）。自分の別の端末へは「他端末へ設定共有」で渡せます。</p>
-        ${sharedLeft ? '<p class="muted sm">gemma-chat など他のアプリと共有している保存（暗号化されていません）に、以前の接続情報が残っています。<button class="link" data-act="shared-clear">ここから消す</button>（他のアプリでは接続の入れ直しが必要になります）</p>' : ''}
+        <p class="muted sm">パスコードで暗号化して、この端末にだけ置きます。自分の別の端末へは「他端末へ設定共有」で渡せます。</p>
       </section>
       <section class="sset"><h3>Claude.ai で要約するページ</h3>
         <div class="srow"><label for="stClaude" class="sr">リンク</label><input id="stClaude" value="${esc(ls.get('m2.claudeUrl', ''))}" placeholder="空欄なら標準のページ" autocapitalize="off" spellcheck="false"><button class="btn" data-act="claude-save">保存</button></div>
@@ -2223,12 +2257,19 @@ function openSettings(tab) {
 
     ${pane('share', `
       <section class="sset">
-        <p class="muted sm">別の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードと、選んだときは この端末の AI の接続先です（受け取った端末で、その端末のパスコードを決めます）。表示の設定は、暗号化して保管しています。同じ権限コードで開いた端末には、自動で反映されます。</p>
+        <div class="fchips" role="group" aria-label="渡す相手">
+          <button type="button" class="fchip ${shareTo === 'me' ? 'on' : ''}" data-act="share-to" data-v="me" aria-pressed="${shareTo === 'me'}">自分の別の端末</button>
+          <button type="button" class="fchip ${shareTo === 'other' ? 'on' : ''}" data-act="share-to" data-v="other" aria-pressed="${shareTo === 'other'}">他の人の端末</button>
+        </div>
+        ${shareTo === 'me' ? `
+        <p class="muted sm">自分の別の端末を、権限コードを入れずに使えるようにします。渡すのは、権限コード・設定をそろえるための個人の鍵・（下でチェックを入れたとき）AI の接続先です。受け取った端末では、その端末のパスコードを決めます。渡したあとは、表示の設定（文字の大きさ・一覧の表示・期間・お気に入り・Claude.ai のリンク）、ToDo・ノートの開け閉め、新着の既読、自動ロックの時間が、あなたの端末どうしで自動でそろいます。同じ権限コードを使う他の人の設定とは分かれます。</p>
         <label class="chk"><input type="checkbox" id="dlAi" ${ls.get('m2.shareAi', true) ? 'checked' : ''}> AI の接続先（URL・API キー）も渡す</label>
-        <p class="muted sm" id="dlAiHint">${ls.get('m2.shareAi', true) ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'}</p>
+        <p class="muted sm" id="dlAiHint">${ls.get('m2.shareAi', true) ? 'この端末の AI の接続先を、そのまま渡します。' : 'AI の接続先は渡しません。受け取った端末の設定で入れてください。'}</p>` : `
+        <p class="muted sm">他の人の端末を、権限コードを入れずに使えるようにします。渡すのは権限コードだけです。あなたの個人の鍵・設定・AI の接続先は渡さないので、相手の設定は、あなたとは別に保たれます。受け取った人は、自分のパスコードを決めます。</p>
+        <p class="${S.admin ? 'warn' : 'muted sm'}">${S.admin ? 'この端末は「管理者」の権限コードで開いています。渡すと、相手にも管理者の権限（すべての会議の閲覧・閲覧グループの変更・変換管理）を与えます。' : `いまの権限（${esc(S.role)}）を、相手にも与えます。`}</p>`}
         <div id="devLink" class="dl" aria-live="polite"></div>
         <div id="dlPassBox" class="dlpass" hidden><span class="sm">パスフレーズ</span><span id="dlPassVal" class="dlpass-v"></span><span class="muted sm">受け取る端末で入力します。この画面を閉じると変わります。</span><span id="dlAiNote" class="sm bad-t"></span></div>
-        <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください（Safari とホーム画面のアプリは保存場所が別のため）。</p>
+        <p class="hint">中身はパスフレーズで暗号化してあります。ホーム画面に追加した MinuteStock で受け取るときは、QR やリンクではなくコードを使ってください。</p>
       </section>
       <div class="sfoot"><button type="button" class="btn danger" data-act="forget-conn">この端末から接続情報を消去してロック</button></div>`)}
     `, { wide: true })
@@ -2298,7 +2339,7 @@ function modal(title, body, opt = {}) {
   const first = $('#modal input, #modal textarea, #modal select, #modal button:not(.x)')
   first?.focus()
 }
-function closeModal() { dlPanel?.destroy(); dlPanel = null; dlShare = null; $('#modal').innerHTML = '' }
+function closeModal() { dlPanel?.destroy(); dlPanel = null; dlShare = null; shareTo = 'me'; $('#modal').innerHTML = '' }
 
 let toastTimer = 0
 function toast(text, bad = false, ms = 4000) {
@@ -2321,6 +2362,7 @@ const ACT = {
     try { await bioRegister(pass); if (m) m.textContent = ''; closeModal(); toast('登録しました。次から Face ID・Touch ID で開けます。') } catch (e) { if (m) m.textContent = e?.name === 'NotAllowedError' ? '取り消されました。' : e.message }
   },
   'bio-off': () => { bioForget(); openSettings() },
+  'share-to': (a) => { shareTo = a.dataset.v === 'other' ? 'other' : 'me'; openSettings('share') },
   stab: (a) => {
     setTab = a.dataset.v
     $$('.stab').forEach((b) => { const on = b.dataset.v === setTab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on) })
@@ -2346,10 +2388,6 @@ const ACT = {
   },
   'setup-new': () => showSetup(),
   lockgate: () => { lockVault(); showUnlock() },
-  'shared-clear': () => {
-    if (!confirm('gemma-chat など他のアプリと共有している保存から、AI の接続情報を消します。他のアプリでは接続の入れ直しが必要になります。MinuteStock の接続先（パスコードで暗号化したもの）は消えません。よろしいですか？')) return
-    clearSharedSettings(); openSettings()
-  },
   recv: () => showReceive(),
   gate: () => { if (vaultExists()) showUnlock(); else showSetup() },
   'code-change': changeCode,
@@ -2362,7 +2400,7 @@ const ACT = {
   close: closeModal,
   tab: (a) => { if (!leaveEdit()) return; if (a.dataset.tab === 'convert' && !S.admin) return; S.tab = a.dataset.tab; hideBar(); window.scrollTo(0, 0); scrollHide.reset(); render(true) },
   upload: openUpload,
-  settings: openSettings,
+  settings: () => { shareTo = 'me'; openSettings() },   // 開くたびに「自分の別の端末」から始める（他の人向けの状態を引きずらない）
   month: (a) => {
     const [y, m] = S.month.split('-').map(Number)
     S.month = monthKey(new Date(y, m - 1 + Number(a.dataset.d), 1))
@@ -2582,13 +2620,13 @@ document.addEventListener('change', (e) => {
   const t = e.target
   if (t.dataset.chk) { if (t.checked) S.checked.add(t.dataset.chk); else S.checked.delete(t.dataset.chk); renderMain() }
   if (t.dataset.todo) { toggleTodo(t.dataset.todo, t.dataset.k, t.checked); t.closest('li')?.classList.toggle('done', t.checked) }
-  if (t.id === 'stIdle') { localStorage.setItem(IDLE_KEY, t.value); armIdle() }
+  if (t.id === 'stIdle') { localStorage.setItem(IDLE_KEY, t.value); armIdle(); schedulePush() }
   if (t.id === 'scopeSel') { S.scope = t.value; renderMain() }
   if (t.id === 'stSel') { S.filter = t.value; renderMain() }
   if (t.id === 'tagSel') { S.tagF = t.value; renderMain() }
   if (t.id === 'dlAi') {
     localStorage.setItem('m2.shareAi', JSON.stringify(t.checked))   // この端末だけの選択（GitHub には送らない）
-    $('#dlAiHint').textContent = t.checked ? '受け取る端末に接続先が無いときだけ入ります（ある場合はそのまま）。' : '権限コードだけを渡します。AI の接続先は、受け取った端末の設定で入れてください。'
+    $('#dlAiHint').textContent = t.checked ? 'この端末の AI の接続先を、そのまま渡します。' : 'AI の接続先は渡しません。受け取った端末の設定で入れてください。'
     $('#dlPassBox').hidden = true
     const el = $('#devLink'); if (el) { el.innerHTML = ''; delete el.dataset.mounted }
     mountShare()   // 渡す中身が変わるので、表示中の QR・コードを作り直す
