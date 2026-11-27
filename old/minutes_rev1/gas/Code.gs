@@ -1,0 +1,890 @@
+/**
+ * 議事録ビューア用 GAS プロキシ
+ *
+ * 役割:
+ *  - Notion API はブラウザから直接叩けない(CORSヘッダーなし)ため、
+ *    このスクリプトが仲介する。
+ *  - フロントは text/plain で JSON を POST する(プリフライトを発生させないため)。
+ *    Content-Type を application/json にすると OPTIONS preflight が飛び、
+ *    GAS は OPTIONS に応答できないため必ず失敗する。
+ *
+ * 事前設定 (スクリプトプロパティ):
+ *  - NOTION_TOKEN    Notion Integration のシークレット
+ *  - ACCESS_TOKEN    フロントの minutes:config.notionToken と一致させる共有トークン
+ *
+ * デプロイ:
+ *  - 種類: ウェブアプリ
+ *  - 実行するユーザー: 自分
+ *  - アクセスできるユーザー: 全員
+ *  (URLを知っていれば誰でも叩けるため、ACCESS_TOKEN のチェックを必ず通す)
+ */
+
+var NOTION_VERSION = '2022-06-28';
+
+// プロパティ名(Notion側のカラム名とここを一致させること)
+var PROP_SUMMARY   = '要約';       // カード用の短い要約 (rich_text)
+var PROP_DECISIONS = '決定事項';   // 改行区切り (rich_text)
+var PROP_TODOS     = 'ToDo';       // 改行区切り (rich_text)
+var PROP_TODO_LOGS = 'ToDo経過';   // ToDoごとの経過ログ (rich_text、JSON文字列で格納)
+var PROP_TOPICS    = '論点';       // 改行区切り (rich_text)
+var PROP_MODEL     = '要約モデル'; // 生成に使ったモデル名 (rich_text)
+var PROP_GENERATED = '要約日時';   // 生成日時、鮮度判定に使用 (date)
+var PROP_STATUS    = '状態';       // 進捗ステータス (select)
+var STATUS_SUMMARIZED = '要約';    // 要約生成完了時にセットする値
+var STATUS_RETRANSCRIBE = '再取得'; // 再文字起こしをMac mini側バッチに依頼する際にセットする値
+var STATUS_DELETED = '削除';       // 削除ボタン押下時にセットする値(Notionページ自体は残す)
+var PROP_CATEGORY  = 'カテゴリー'; // タグ (multi_select、自由入力可)
+var PROP_AGENDA    = '議事';       // 議題ごとの経緯 (rich_text、JSON文字列で格納)
+var PROP_MEMO      = 'メモ';       // 自由記述のメモ (rich_text)
+var PROP_MINDMAP   = 'マインドマップ'; // マインドマップのツリー (rich_text、JSON文字列で格納)
+var PROP_RAW_COUNT = '原文文字数'; // 文字起こし全文の文字数キャッシュ (number)
+var RULES_DB_ID = '463313495202442fb7dfcd611a9334d8'; // 要約ルールDB
+var PROP_TITLE     = 'ミーティング名'; // タイトル (title)
+var PROP_PERMISSION = '権限';      // 閲覧権限 (multi_select)
+var ADMIN_ROLE     = 'xYz';        // 全機能を使える管理者権限
+var MINUTES_DB_ID  = '28b0e7a535dc805697c6d4b9f8032d18'; // 議事録DB(テキストからの新規登録先)
+var PROP_MEETING_AT = '日時';     // 会議の開始日時 (date)
+var PROP_DURATION  = '会議時間';  // 会議時間 (rich_text、「1時間 12分 36秒」形式)
+var STATUS_TRANSCRIBED = '文字起こし'; // テキスト登録時にセットする値(要約はしない)
+var BLOCK_TEXT_MAX = 2000;        // Notion rich_text 1要素あたりの上限
+var BLOCKS_PER_REQUEST = 40;      // 1リクエストのペイロード上限(約500KB)に収めるための件数
+
+// ============ エントリーポイント ============
+
+function doPost(e) {
+  var result;
+  try {
+    var body = JSON.parse(e.postData.contents);
+
+    // コード検証だけは共有トークン不要で受ける
+    // (初回はまだトークンが手元に無い状態で権限を問い合わせるため)
+    if (body.action === 'verifyCode') {
+      return jsonOutput_({ ok: true, data: verifyCode_(body.code) });
+    }
+
+    assertToken_(body);
+
+    switch (body.action) {
+      case 'fetchTranscript':
+        result = fetchTranscript_(body.pageId);
+        break;
+      case 'fetchSummary':
+        result = fetchSummary_(body.pageId);
+        break;
+      case 'saveSummary':
+        result = saveSummary_(body.pageId, body.cardSummary, body.detail, body.model, body.rawContextCount);
+        break;
+      case 'saveTags':
+        result = saveTags_(body.pageId, body.tags);
+        break;
+      case 'saveTitle':
+        result = saveTitle_(body.pageId, body.title);
+        break;
+      case 'saveDetail':
+        result = saveDetail_(body.pageId, body.cardSummary, body.detail);
+        break;
+      case 'requestRetranscribe':
+        result = requestRetranscribe_(body.pageId);
+        break;
+      case 'deleteItem':
+        result = deleteItem_(body.pageId);
+        break;
+      case 'savePermissions':
+        result = savePermissions_(body.pageIds, body.permissions, body.mode);
+        break;
+      case 'saveMemo':
+        result = saveMemo_(body.pageId, body.memo);
+        break;
+      case 'saveMindmap':
+        result = saveMindmap_(body.pageId, body.mindmap);
+        break;
+      case 'fetchRules':
+        result = fetchRules_();
+        break;
+      case 'saveRule':
+        result = saveRule_(body.rule, body.source);
+        break;
+      case 'deleteRule':
+        result = deleteRule_(body.ruleId);
+        break;
+      case 'setRuleEnabled':
+        result = setRuleEnabled_(body.ruleId, body.enabled);
+        break;
+      case 'updateRawContextCount':
+        result = updateRawContextCount_(body.pageId, body.count);
+        break;
+      case 'initUpload':
+        result = initUpload_(body);
+        break;
+      case 'putChunk':
+        result = putChunk_(body);
+        break;
+      case 'writeSidecar':
+        result = writeSidecar_(body);
+        break;
+      case 'createFromText':
+        result = createFromText_(body);
+        break;
+      default:
+        throw new Error('unknown action: ' + body.action);
+    }
+    return jsonOutput_({ ok: true, data: result });
+  } catch (err) {
+    return jsonOutput_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+function jsonOutput_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function assertToken_(body) {
+  var expected = PropertiesService.getScriptProperties().getProperty('ACCESS_TOKEN');
+  if (!expected || body.token !== expected) {
+    throw new Error('unauthorized');
+  }
+}
+
+// ============ Notion 共通ヘルパー ============
+
+function notionHeaders_() {
+  var token = PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
+  return {
+    Authorization: 'Bearer ' + token,
+    'Notion-Version': NOTION_VERSION,
+    'Content-Type': 'application/json',
+  };
+}
+
+function notionFetch_(path, method, payload) {
+  var options = {
+    method: method || 'get',
+    headers: notionHeaders_(),
+    muteHttpExceptions: true,
+  };
+  if (payload) {
+    options.payload = JSON.stringify(payload);
+  }
+  var res = UrlFetchApp.fetch('https://api.notion.com/v1/' + path, options);
+  var code = res.getResponseCode();
+  var json = JSON.parse(res.getContentText());
+  if (code >= 300) {
+    throw new Error('Notion API ' + code + ': ' + (json.message || res.getContentText()));
+  }
+  return json;
+}
+
+/** ページ本文のブロックを全件取得する(ページネーション対応) */
+function fetchAllBlocks_(blockId) {
+  var blocks = [];
+  var cursor = null;
+  do {
+    var path = 'blocks/' + blockId + '/children?page_size=100';
+    if (cursor) path += '&start_cursor=' + cursor;
+    var res = notionFetch_(path, 'get');
+    blocks = blocks.concat(res.results);
+    cursor = res.has_more ? res.next_cursor : null;
+  } while (cursor);
+  return blocks;
+}
+
+/** リッチテキスト配列からプレーンテキストを連結する */
+function plainTextOf_(richTextArray) {
+  return (richTextArray || []).map(function (t) { return t.plain_text; }).join('');
+}
+
+// ============ アクション実装 ============
+
+/**
+ * 文字起こし全文を取得する。
+ * ページ本文のうち paragraph / heading / bulleted_list_item 等のテキスト系ブロックを
+ * 上から連結して返す。updatedAt はページの last_edited_time。
+ */
+function fetchTranscript_(pageId) {
+  var page = notionFetch_('pages/' + pageId, 'get');
+  var blocks = fetchAllBlocks_(pageId);
+
+  var lines = [];
+  blocks.forEach(function (b) {
+    var rt = b[b.type] && b[b.type].rich_text;
+    if (rt) {
+      var text = plainTextOf_(rt);
+      if (text) lines.push(text);
+    }
+  });
+
+  return {
+    text: lines.join('\n'),
+    updatedAt: page.last_edited_time,
+  };
+}
+
+/**
+ * 既存の要約を取得する。
+ * カード要約・決定事項・ToDo・論点・モデル・生成日時、すべて専用プロパティから読む。
+ * "要約日時" が空なら未生成として null 相当を返す(フロント側の判定に使う)。
+ */
+function fetchSummary_(pageId) {
+  var page = notionFetch_('pages/' + pageId, 'get');
+  var props = page.properties;
+
+  var generatedAt = props[PROP_GENERATED] && props[PROP_GENERATED].date
+    ? props[PROP_GENERATED].date.start
+    : null;
+
+  // 生成日時が無ければ未生成扱い(detailは空でも意味を持たせない)
+  if (!generatedAt) {
+    return {
+      cardSummary: null,
+      detail: null,
+      model: null,
+      generatedAt: null,
+      updatedAt: page.last_edited_time,
+      tags: tagsOf_(props),
+      memo: richTextOf_(props, PROP_MEMO),
+      mindmap: richTextOf_(props, PROP_MINDMAP),
+      rawContextCount: numberOf_(props, PROP_RAW_COUNT),
+    };
+  }
+
+  return {
+    cardSummary: richTextOf_(props, PROP_SUMMARY) || null,
+    detail: {
+      decisions: splitLines_(richTextOf_(props, PROP_DECISIONS)),
+      todos: attachTodoLogs_(parseTodos_(richTextOf_(props, PROP_TODOS)), richTextOf_(props, PROP_TODO_LOGS)),
+      topics: splitLines_(richTextOf_(props, PROP_TOPICS)),
+      agenda: parseAgenda_(richTextOf_(props, PROP_AGENDA)),
+    },
+    model: richTextOf_(props, PROP_MODEL) || null,
+    generatedAt: generatedAt,
+    updatedAt: page.last_edited_time,
+    tags: tagsOf_(props),
+    memo: richTextOf_(props, PROP_MEMO),
+    mindmap: richTextOf_(props, PROP_MINDMAP),
+    rawContextCount: numberOf_(props, PROP_RAW_COUNT),
+  };
+}
+
+/** number プロパティの値を取得する。無ければ0 */
+function numberOf_(properties, name) {
+  var prop = properties[name];
+  return prop && typeof prop.number === 'number' ? prop.number : 0;
+}
+
+/**
+ * ToDo行をパースする。"[x] 内容" / "[ ] 内容" / "内容"(マーカー無し=未完了) に対応。
+ * @returns {{text: string, done: boolean}[]}
+ */
+function parseTodos_(text) {
+  return splitLines_(text).map(function (line) {
+    var m = line.match(/^\[([ xX])\]\s?(.*)$/);
+    if (m) {
+      return { text: m[2], done: m[1].toLowerCase() === 'x' };
+    }
+    return { text: line, done: false };
+  });
+}
+
+/** ToDo配列を "[x] 内容" 形式の改行区切り文字列にする */
+function serializeTodos_(todos) {
+  if (!Array.isArray(todos)) return '';
+  return todos.map(function (t) {
+    if (typeof t === 'string') return '[ ] ' + t;
+    return (t.done ? '[x] ' : '[ ] ') + (t.text || '');
+  }).join('\n');
+}
+
+/**
+ * ToDo経過(JSON)を、本文が一致するToDoに貼り付ける。
+ * ToDo本文と経過は同時に保存しているため、本文の完全一致で対応付けられる。
+ * 対応先が見つからない経過は、黙って捨てずに「引き継げなかったToDo」として末尾に残す。
+ */
+function attachTodoLogs_(todos, logsJson) {
+  var entries = [];
+  if (logsJson) {
+    try {
+      var parsed = JSON.parse(logsJson);
+      if (Array.isArray(parsed)) entries = parsed;
+    } catch (e) {
+      console.error('ToDo経過JSONのパースに失敗しました(長さ ' + logsJson.length + '): ' + e);
+    }
+  }
+  var used = {};
+  var result = todos.map(function (t) {
+    for (var i = 0; i < entries.length; i++) {
+      if (!used[i] && entries[i].text === t.text) {
+        used[i] = true;
+        return { text: t.text, done: t.done, logs: entries[i].logs || [] };
+      }
+    }
+    return { text: t.text, done: t.done, logs: [] };
+  });
+  entries.forEach(function (e, i) {
+    if (!used[i] && e.logs && e.logs.length) {
+      result.push({ text: e.text, done: !!e.done, logs: e.logs, orphan: true });
+    }
+  });
+  return result;
+}
+
+/** 経過ログを持つToDoだけをJSON化する(ログが無いものは保存不要) */
+function serializeTodoLogs_(todos) {
+  if (!Array.isArray(todos)) return '';
+  var withLogs = todos
+    .filter(function (t) { return t && typeof t === 'object' && t.logs && t.logs.length; })
+    .map(function (t) { return { text: t.text, done: !!t.done, logs: t.logs }; });
+  return withLogs.length ? JSON.stringify(withLogs) : '';
+}
+
+/** 議事JSONをパースする。壊れていれば空配列を返す */
+function parseAgenda_(text) {
+  if (!text) return [];
+  try {
+    var parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    // 保存時に文字数上限で切られていると閉じ括弧が無く、ここに来る。
+    // 黙って空配列を返すと「議事が未登録」に見えて原因が追えないため記録する。
+    console.error('議事JSONのパースに失敗しました(長さ ' + text.length + '): ' + e);
+    return [];
+  }
+}
+
+/**
+ * 人手による編集内容を保存する。
+ * saveSummary_ と違い、要約日時・要約モデル・状態は変更しない
+ * (AIが生成した時刻とモデルの記録を、手編集で上書きしないため)。
+ */
+function saveDetail_(pageId, cardSummary, detail) {
+  detail = detail || {};
+  var props = {};
+  props[PROP_SUMMARY]   = richTextProp_(cardSummary);
+  props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
+  props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
+  props[PROP_TODO_LOGS] = richTextProp_(serializeTodoLogs_(detail.todos));
+  props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
+  props[PROP_AGENDA]    = richTextProp_(detail.agenda ? JSON.stringify(detail.agenda) : '');
+
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/**
+ * 状態を「再取得」に変更する。実際の音声再取得・再文字起こしはここでは行わず、
+ * Mac mini側のバッチ処理がこの状態を見て後続処理を行う想定。
+ */
+function requestRetranscribe_(pageId) {
+  var props = {};
+  props[PROP_STATUS] = { select: { name: STATUS_RETRANSCRIBE } };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, status: STATUS_RETRANSCRIBE };
+}
+
+/**
+ * スクリプトプロパティ "code" からコードと権限の対応を引く。
+ * JSON形式: {"コード": "権限", ...}
+ * 該当が無い、またはJSON自体が壊れていれば 'err' を返す。
+ *   {"xynekgo":"jba","sdajoihn":"kijun","dfkjnga":"xYz"}
+ */
+function verifyCode_(code) {
+  var raw = PropertiesService.getScriptProperties().getProperty('code') || '';
+  var input = String(code || '').trim();
+  if (!input) return { role: 'err' };
+
+  var map;
+  try {
+    map = JSON.parse(raw);
+  } catch (e) {
+    return { role: 'err' };
+  }
+
+  var role = map[input];
+  if (!role) return { role: 'err' };
+  return { role: role, isAdmin: role === ADMIN_ROLE };
+}
+
+/** multi_select プロパティから権限名の配列を取り出す */
+function permissionsOf_(properties) {
+  var prop = properties[PROP_PERMISSION];
+  if (!prop || !prop.multi_select) return [];
+  return prop.multi_select.map(function (o) { return o.name; });
+}
+
+/**
+ * 複数ページの権限をまとめて更新する。
+ * mode: 'add' 既存に追加 / 'remove' 指定分を除去 / 'replace' 置き換え
+ * 6分の実行上限に収めるため、フロント側から適度な件数で分割して呼ぶこと。
+ */
+function savePermissions_(pageIds, permissions, mode) {
+  var ids = Array.isArray(pageIds) ? pageIds : [];
+  var names = (Array.isArray(permissions) ? permissions : []).filter(Boolean);
+  var op = mode || 'add';
+  var updated = 0;
+  var errors = [];
+
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      var next;
+      if (op === 'replace') {
+        next = names;
+      } else {
+        var page = notionFetch_('pages/' + ids[i], 'get');
+        var current = permissionsOf_(page.properties);
+        if (op === 'remove') {
+          next = current.filter(function (c) { return names.indexOf(c) === -1; });
+        } else {
+          next = current.slice();
+          names.forEach(function (n) { if (next.indexOf(n) === -1) next.push(n); });
+        }
+      }
+
+      var props = {};
+      props[PROP_PERMISSION] = {
+        multi_select: next.map(function (name) { return { name: name }; }),
+      };
+      notionFetch_('pages/' + ids[i], 'patch', { properties: props });
+      updated++;
+    } catch (err) {
+      errors.push(ids[i] + ': ' + (err.message || err));
+    }
+  }
+
+  return { updated: updated, failed: errors.length, errors: errors };
+}
+
+/** メモ(自由記述)を更新する。要約とは独立した項目なので単独で保存する */
+function saveMemo_(pageId, memo) {
+  var props = {};
+  props[PROP_MEMO] = richTextProp_(memo);
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/** マインドマップのツリーをJSON文字列のまま保存する */
+function saveMindmap_(pageId, mindmap) {
+  var props = {};
+  props[PROP_MINDMAP] = richTextProp_(mindmap);
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/**
+ * 状態を「削除」に変更する。Notionページ自体は削除しない
+ * (アプリの一覧から除外するだけの論理削除)。
+ */
+function deleteItem_(pageId) {
+  var props = {};
+  props[PROP_STATUS] = { select: { name: STATUS_DELETED } };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, status: STATUS_DELETED };
+}
+
+/** ミーティング名(title プロパティ)を更新する */
+function saveTitle_(pageId, title) {
+  var props = {};
+  props[PROP_TITLE] = {
+    title: [{ text: { content: String(title || '').slice(0, 2000) } }],
+  };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, title: title };
+}
+
+/** multi_select プロパティから選択肢名の配列を取り出す */
+function tagsOf_(properties) {
+  var prop = properties[PROP_CATEGORY];
+  if (!prop || !prop.multi_select) return [];
+  return prop.multi_select.map(function (o) { return o.name; });
+}
+
+/** タグ(カテゴリー)だけを更新する。要約の生成/再生成とは独立した操作。 */
+function saveTags_(pageId, tags) {
+  var names = (Array.isArray(tags) ? tags : []).filter(Boolean);
+  var props = {};
+  props[PROP_CATEGORY] = { multi_select: names.map(function (name) { return { name: name }; }) };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true, tags: names };
+}
+
+/**
+ * 要約を書き戻す。すべて専用プロパティへの patch 一発で完結する
+ * (本文ブロックは操作しない)。
+ */
+function saveSummary_(pageId, cardSummary, detail, model, rawContextCount) {
+  detail = detail || {};
+  var props = {};
+  props[PROP_SUMMARY]   = richTextProp_(cardSummary);
+  props[PROP_DECISIONS] = richTextProp_(joinLines_(detail.decisions));
+  props[PROP_TODOS]     = richTextProp_(serializeTodos_(detail.todos));
+  props[PROP_TODO_LOGS] = richTextProp_(serializeTodoLogs_(detail.todos));
+  props[PROP_TOPICS]    = richTextProp_(joinLines_(detail.topics));
+  // 議事は「議題ごとに複数の経緯を持つ」入れ子構造のため、行区切りでは表現できない。
+  // Notion上での可読性より構造保持を優先し、JSON文字列として保存する。
+  props[PROP_AGENDA]    = richTextProp_(detail.agenda ? JSON.stringify(detail.agenda) : '');
+  props[PROP_MODEL]     = richTextProp_(model);
+  props[PROP_GENERATED] = { date: { start: new Date().toISOString() } };
+  props[PROP_STATUS]    = { select: { name: STATUS_SUMMARIZED } };
+  if (typeof rawContextCount === 'number' && rawContextCount > 0) {
+    props[PROP_RAW_COUNT] = { number: rawContextCount };
+  }
+
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/** 原文の文字数だけを更新する。要約生成を伴わずコンテキスト数だけ後から確定させる場合に使う */
+function updateRawContextCount_(pageId, count) {
+  var props = {};
+  props[PROP_RAW_COUNT] = { number: Number(count) || 0 };
+  notionFetch_('pages/' + pageId, 'patch', { properties: props });
+  return { saved: true };
+}
+
+/**
+ * 要約ルールを全件取得する。有効なものだけを絞り込むかは呼び出し側の責務とし、
+ * ここでは全件(有効/無効問わず)を返す(設定画面での一覧表示にも使うため)。
+ */
+function fetchRules_() {
+  var res = notionFetch_('data_sources/' + RULES_DB_ID + '/query', 'post', {
+    sorts: [{ property: '作成日時', direction: 'descending' }],
+    page_size: 100,
+  });
+  return {
+    rules: res.results.map(function (page) {
+      var props = page.properties;
+      return {
+        id: page.id,
+        rule: (props['ルール'] && props['ルール'].title) ? plainTextOf_(props['ルール'].title) : '',
+        enabled: !!(props['有効'] && props['有効'].checkbox),
+        source: richTextOf_(props, '元の指摘'),
+      };
+    }),
+  };
+}
+
+/** ルールを1件追加する。デフォルトで有効にする */
+function saveRule_(rule, source) {
+  var props = {};
+  props['ルール'] = { title: [{ text: { content: String(rule || '').slice(0, 2000) } }] };
+  props['有効'] = { checkbox: true };
+  if (source) props['元の指摘'] = richTextProp_(source);
+
+  var page = notionFetch_('pages', 'post', {
+    parent: { data_source_id: RULES_DB_ID },
+    properties: props,
+  });
+  return { saved: true, id: page.id };
+}
+
+/** ルールを1件削除する(Notion上ではアーカイブ) */
+function deleteRule_(ruleId) {
+  notionFetch_('pages/' + ruleId, 'patch', { archived: true });
+  return { saved: true };
+}
+
+/** ルールの有効/無効を切り替える */
+function setRuleEnabled_(ruleId, enabled) {
+  notionFetch_('pages/' + ruleId, 'patch', { properties: { '有効': { checkbox: !!enabled } } });
+  return { saved: true };
+}
+
+
+/** rich_text プロパティ値からプレーンテキストを取り出す(無ければ空文字) */
+function richTextOf_(properties, name) {
+  var prop = properties[name];
+  return prop && prop.rich_text ? plainTextOf_(prop.rich_text) : '';
+}
+
+/**
+ * rich_text プロパティのペイロードを作る。
+ * Notionは1チャンクあたり2000文字までだが、チャンクを複数並べれば
+ * 1プロパティに長い文字列を保存できる。議事(agenda)はJSONで
+ * 2000文字を超えることがあるため、切り捨てずに分割する。
+ */
+function richTextProp_(text) {
+  var s = String(text || '');
+  if (!s) return { rich_text: [] };
+
+  var chunks = [];
+  for (var i = 0; i < s.length; i += 2000) {
+    chunks.push({ text: { content: s.slice(i, i + 2000) } });
+  }
+  return { rich_text: chunks };
+}
+
+/** 配列を改行区切りの1文字列にする(空配列/未定義は空文字) */
+function joinLines_(arr) {
+  return Array.isArray(arr) ? arr.filter(Boolean).join('\n') : '';
+}
+
+/** 改行区切りの文字列を配列に戻す(空文字は空配列) */
+function splitLines_(text) {
+  if (!text) return [];
+  return text.split('\n').filter(function (line) { return line.length > 0; });
+}
+
+// ============ 音声アップロード(ログイン不要) ============
+
+/**
+ * Drive API(高度なサービス)を実際に呼び出すことで、Apps Script の静的解析に
+ * 「このプロジェクトは Drive を使う」と認識させ、getOAuthToken() が発行する
+ * トークンに Drive の書き込みスコープを含めさせる。
+ *
+ * 事前に「サービス」→「+」→「Drive API」を追加しておくこと
+ * (エディタ左側の「サービス」から追加。関数名は Drive でグローバルに使えるようになる)。
+ * 戻り値は使わない。呼ぶこと自体に意味がある。
+ */
+function touchDriveScope_() {
+  try {
+    Drive.About.get({ fields: 'user' });
+  } catch (e) {
+    // 高度なサービスが未追加、または一時的なエラーでも致命的ではないので握りつぶす。
+    // これが原因で本当にスコープが付かない場合は、初回のトークン発行 403 で気づける。
+  }
+}
+
+/** デバッグ用。読み取り(About.get)ではなく、実際に書き込み(ファイル作成)を試す。
+ *  403 の原因はここ（Files.create）だったので、これが通るかどうかで切り分ける。
+ *  成功したら Drive にテスト用の空ファイルができるので、確認後に手動で削除してよい。 */
+function testDriveAuth() {
+  Logger.log('OAuth token: ' + ScriptApp.getOAuthToken().slice(0, 20) + '...');
+  var file = Drive.Files.create({ name: 'drive_auth_test.txt' }, Utilities.newBlob('test'));
+  Logger.log('Drive.Files.create 成功: ' + JSON.stringify(file));
+}
+
+/**
+ * Drive の resumable upload セッションを、このスクリプト自身(管理者)の権限で
+ * 発行する。Google の resumable upload は「セッション URL の発行」にだけ認証が要り、
+ * 発行された URL への実際のバイト送信(PUT)には認証が要らない仕様になっている。
+ * そのため、ブラウザはここで受け取った URL に直接 PUT するだけで済み、
+ * Google へのログインが一切不要になる。ファイル本体もこの GAS を経由しない
+ * (経由すると doPost 全体で約50MBのペイロード上限に当たるため)。
+ */
+function initUpload_(body) {
+  touchDriveScope_();
+  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
+  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
+
+  var token = ScriptApp.getOAuthToken();
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'application/json; charset=UTF-8',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'X-Upload-Content-Type': body.mimeType || 'application/octet-stream',
+        'X-Upload-Content-Length': String(body.size || 0),
+      },
+      payload: JSON.stringify({ name: body.filename, parents: [folderId] }),
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('Drive session failed (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+
+  var headers = res.getAllHeaders();
+  var sessionUrl = headers['Location'] || headers['location'];
+  if (!sessionUrl) throw new Error('セッション URL が取得できませんでした');
+
+  return { sessionUrl: sessionUrl };
+}
+
+/**
+ * 音声のバイトそのものを、ブラウザ→GAS→Google と中継する。
+ *
+ * 【なぜ直接PUTできないか】
+ * initUpload_ で発行したセッション URL に、ブラウザから直接 PUT できれば
+ * 一番シンプルだった。だが実際に試すと CORS で弾かれ、Origin ヘッダーを
+ * 明示しても改善しなかった。Google Cloud Storage の resumable upload とは
+ * 違い、Drive API v3 のセッション URL はブラウザからの直接アクセスを
+ * サポートしていないと判断し、バイト自体も GAS 経由にした。
+ *
+ * 【50MBペイロード上限に当たらない理由】
+ * GAS の上限は「1回の doPost リクエストのサイズ」に対してかかる。ここでは
+ * 音声全体を1回で送るのではなく、数MB単位のチャンクに分割して何度も
+ * doPost を呼ぶので、1回あたりのペイロードは小さいまま保たれる。
+ */
+function putChunk_(body) {
+  var bytes = Utilities.base64Decode(body.chunk);
+  var start = body.offset;
+  var end = start + bytes.length - 1;
+
+  var res = UrlFetchApp.fetch(body.sessionUrl, {
+    method: 'put',
+    contentType: 'application/octet-stream',
+    headers: {
+      'Content-Range': 'bytes ' + start + '-' + end + '/' + body.total,
+    },
+    payload: bytes,
+    muteHttpExceptions: true,
+  });
+
+  var code = res.getResponseCode();
+  if (code === 200 || code === 201) {
+    return { done: true, file: JSON.parse(res.getContentText()) };
+  }
+  if (code === 308) {
+    return { done: false };
+  }
+  throw new Error('chunk upload failed (' + code + '): ' + res.getContentText());
+}
+
+/**
+ * 打合せ日時などのメタデータをサイドカー JSON として同じフォルダに置く。
+ * ファイルサイズが小さいので multipart で一発アップロードする
+ * (resumable にする必要がない)。Mac mini 側の drive_inbox.py は
+ * このファイルの出現を処理開始の合図として使う。
+ */
+function writeSidecar_(body) {
+  touchDriveScope_();
+  var folderId = PropertiesService.getScriptProperties().getProperty('AUDIO_INBOX_FOLDER_ID');
+  if (!folderId) throw new Error('AUDIO_INBOX_FOLDER_ID が未設定です');
+
+  var token = ScriptApp.getOAuthToken();
+  var boundary = '-------minutesUploader' + Date.now();
+  var payload =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify({ name: body.name, parents: [folderId] }) + '\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(body.meta) + '\r\n' +
+    '--' + boundary + '--';
+
+  var res = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+    {
+      method: 'post',
+      contentType: 'multipart/related; boundary=' + boundary,
+      headers: { Authorization: 'Bearer ' + token },
+      payload: payload,
+      muteHttpExceptions: true,
+    }
+  );
+
+  if (res.getResponseCode() >= 300) {
+    throw new Error('JSON登録に失敗 (' + res.getResponseCode() + '): ' + res.getContentText());
+  }
+  return JSON.parse(res.getContentText());
+}
+
+// ============ テキストから議事録を新規登録 ============
+
+/**
+ * タイトル・タグ・開始日時・会議時間・原文から議事録ページを新規作成する。
+ * 原文はページ本文の paragraph ブロックとして書き込む(fetchTranscript_ が読む場所と同じ)。
+ * 状態は「文字起こし」にし、要約は作らない。
+ * body.summary(要約済みテキストを画面側で分解したもの)が付いているときは、その要約を
+ * 専用プロパティに書き、状態は「要約」にする(要約モデルは「テキスト取り込み」)。
+ * 権限: 管理者は body.permissions をそのまま付与。管理者以外は検証済み role のみ付与(upload と同じ)。
+ */
+function createFromText_(body) {
+  var title = String(body.title || '').trim();
+  var text = String(body.text || '').replace(/\r\n?/g, '\n');
+  if (!title) throw new Error('タイトルが空です');
+  if (!text.trim()) throw new Error('原文が空です');
+
+  var tags = (Array.isArray(body.tags) ? body.tags : [])
+    .map(function (t) { return String(t || '').trim(); })
+    .filter(Boolean);
+
+  var props = {};
+  props[PROP_TITLE] = { title: [{ text: { content: title.slice(0, 2000) } }] };
+  props[PROP_CATEGORY] = { multi_select: tags.map(function (name) { return { name: name }; }) };
+  props[PROP_STATUS] = { select: { name: STATUS_TRANSCRIBED } };
+  props[PROP_RAW_COUNT] = { number: text.length };
+  if (body.summary && typeof body.summary === 'object') {
+    var sm = body.summary;
+    props[PROP_STATUS]    = { select: { name: STATUS_SUMMARIZED } };
+    props[PROP_SUMMARY]   = richTextProp_(sm.cardSummary);
+    props[PROP_DECISIONS] = richTextProp_(joinLines_(sm.decisions));
+    props[PROP_TODOS]     = richTextProp_(serializeTodos_(sm.todos));
+    props[PROP_TOPICS]    = richTextProp_(joinLines_(sm.topics));
+    props[PROP_AGENDA]    = richTextProp_(Array.isArray(sm.agenda) && sm.agenda.length ? JSON.stringify(sm.agenda) : '');
+    props[PROP_MODEL]     = richTextProp_('テキスト取り込み');
+    props[PROP_GENERATED] = { date: { start: new Date().toISOString() } };
+  }
+  if (body.meetingAt) {
+    props[PROP_MEETING_AT] = { date: { start: String(body.meetingAt) } };
+  }
+  if (body.durationSec != null && body.durationSec !== '') {
+    props[PROP_DURATION] = richTextProp_(formatDuration_(body.durationSec));
+  }
+  // 権限: 管理者は画面で選んだ権限をそのまま付ける(空なら付けない=管理者のみ閲覧)。
+  // 管理者以外は送られてきた permissions を無視し、検証済み role だけを付ける。
+  if (body.role === ADMIN_ROLE) {
+    var perms = (Array.isArray(body.permissions) ? body.permissions : [])
+      .map(function (p) { return String(p || '').trim(); })
+      .filter(function (p, i, arr) { return p && arr.indexOf(p) === i; });
+    if (perms.length) {
+      props[PROP_PERMISSION] = { multi_select: perms.map(function (name) { return { name: name }; }) };
+    }
+  } else if (body.role && body.role !== 'err') {
+    props[PROP_PERMISSION] = { multi_select: [{ name: String(body.role) }] };
+  }
+
+  var blocks = textToBlocks_(text);
+  var page = notionFetch_('pages', 'post', {
+    parent: { database_id: MINUTES_DB_ID },
+    properties: props,
+    children: blocks.slice(0, BLOCKS_PER_REQUEST),
+  });
+
+  for (var i = BLOCKS_PER_REQUEST; i < blocks.length; i += BLOCKS_PER_REQUEST) {
+    notionFetch_('blocks/' + page.id + '/children', 'patch', {
+      children: blocks.slice(i, i + BLOCKS_PER_REQUEST),
+    });
+  }
+
+  return { saved: true, pageId: page.id, url: page.url, blocks: blocks.length };
+}
+
+/** 秒数を「1時間 12分 36秒」形式にする。0時間のときは「12分 36秒」 */
+function formatDuration_(totalSec) {
+  var sec = Math.max(0, Math.floor(Number(totalSec) || 0));
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  var s = sec % 60;
+  return (h > 0 ? h + '時間 ' : '') + m + '分 ' + s + '秒';
+}
+
+/**
+ * 原文を paragraph ブロックの配列にする。
+ * 行単位で 2000 文字以内に詰め、ブロック内の改行はそのまま残す
+ * (fetchTranscript_ はブロック同士を改行で連結するので、行の区切りが保たれる)。
+ * 1行が 2000 文字を超える場合だけ途中で切る。
+ */
+function textToBlocks_(text) {
+  var chunks = [];
+  var cur = [];
+  var curLen = -1; // 改行分を含む長さ。空のときは -1
+
+  function flush() {
+    if (cur.length) chunks.push(cur.join('\n'));
+    cur = [];
+    curLen = -1;
+  }
+
+  text.split('\n').forEach(function (line) {
+    while (line.length > BLOCK_TEXT_MAX) {
+      flush();
+      chunks.push(line.slice(0, BLOCK_TEXT_MAX));
+      line = line.slice(BLOCK_TEXT_MAX);
+    }
+    if (curLen + 1 + line.length > BLOCK_TEXT_MAX) flush();
+    cur.push(line);
+    curLen += 1 + line.length;
+  });
+  flush();
+
+  return chunks.map(function (c) {
+    return {
+      object: 'block',
+      type: 'paragraph',
+      paragraph: { rich_text: c ? [{ type: 'text', text: { content: c } }] : [] },
+    };
+  });
+}
